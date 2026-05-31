@@ -553,18 +553,16 @@ namespace JueMingZ.Input
 
             var before = BuildUiOptionStateJson();
             var itemIds = EnsureAutoSellItemIds();
-            itemIds.Add(0);
-            var createdIndex = itemIds.Count - 1;
-            ConfigService.SaveAll();
+            LegacyMainWindow.OpenAutoSellAddPicker();
             Record(
                 command,
                 "Ui.Configure.MiscAutoSell",
-                "Inventory",
+                "UI",
                 "Succeeded",
-                "Added empty auto sell list entry.",
+                "Auto sell multi item picker opened.",
                 before,
                 BuildUiOptionStateJson(),
-                "{\"submitted\":false,\"action\":\"add-empty\",\"createdIndex\":" + IntRaw(createdIndex) + ",\"autoSellEntryCount\":" + IntRaw(itemIds.Count) + ",\"autoSellItemCount\":" + IntRaw(CountValidAutoSellItems(itemIds)) + ",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                "{\"submitted\":false,\"action\":\"picker-open-add\",\"autoSellEntryCount\":" + IntRaw(itemIds.Count) + ",\"autoSellItemCount\":" + IntRaw(CountValidAutoSellItems(itemIds)) + ",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
                 "Button");
         }
 
@@ -572,6 +570,29 @@ namespace JueMingZ.Input
         {
             var before = BuildUiOptionStateJson();
             var itemIds = EnsureAutoSellItemIds();
+            if (string.Equals(payload, "picker-confirm", StringComparison.OrdinalIgnoreCase))
+            {
+                var selectedItemTypes = LegacyMainWindow.GetAutoSellPickerPendingItemTypes();
+                var appendedCount = AppendAutoItemTypes(itemIds, selectedItemTypes);
+                LegacyMainWindow.CloseAutoSellPicker();
+                if (appendedCount > 0)
+                {
+                    ConfigService.SaveAll();
+                }
+
+                Record(
+                    command,
+                    "Ui.Configure.MiscAutoSell",
+                    "Inventory",
+                    appendedCount > 0 ? "Succeeded" : "NotApplicable",
+                    appendedCount > 0 ? "Auto sell items added." : "Auto sell item add skipped: no selected items.",
+                    before,
+                    BuildUiOptionStateJson(),
+                    "{\"submitted\":false,\"action\":\"picker-confirm\",\"addedCount\":" + IntRaw(appendedCount) + ",\"selectedCount\":" + IntRaw(selectedItemTypes == null ? 0 : selectedItemTypes.Count) + ",\"autoSellEntryCount\":" + IntRaw(itemIds.Count) + ",\"autoSellItemCount\":" + IntRaw(CountValidAutoSellItems(itemIds)) + ",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                    "Button");
+                return;
+            }
+
             if (string.Equals(payload, "picker-close", StringComparison.OrdinalIgnoreCase))
             {
                 LegacyMainWindow.CloseAutoSellPicker();
@@ -584,6 +605,43 @@ namespace JueMingZ.Input
                     before,
                     BuildUiOptionStateJson(),
                     "{\"submitted\":false,\"action\":\"picker-close\",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                    "Button");
+                return;
+            }
+
+            const string pickerTogglePrefix = "picker-toggle:";
+            if (payload.StartsWith(pickerTogglePrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                int itemType;
+                if (!int.TryParse(payload.Substring(pickerTogglePrefix.Length), NumberStyles.Integer, CultureInfo.InvariantCulture, out itemType) ||
+                    itemType <= 0 ||
+                    IsCoinItemType(itemType) ||
+                    ContainsAutoSellItem(itemIds, itemType, -1))
+                {
+                    Record(
+                        command,
+                        "Ui.Configure.MiscAutoSell",
+                        "Inventory",
+                        "Rejected",
+                        "Auto sell item toggle failed: invalid or duplicate item type.",
+                        before,
+                        BuildUiOptionStateJson(),
+                        "{\"submitted\":false,\"action\":\"picker-toggle\",\"resultCode\":\"invalidSelection\",\"payload\":\"" + EscapeJson(payload) + "\",\"autoSellEntryCount\":" + IntRaw(itemIds.Count) + ",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                        "Button");
+                    return;
+                }
+
+                var selected = LegacyMainWindow.ToggleAutoSellPickerPendingItemType(itemType);
+                var pendingCount = LegacyMainWindow.GetAutoSellPickerPendingItemTypes().Count;
+                Record(
+                    command,
+                    "Ui.Configure.MiscAutoSell",
+                    "UI",
+                    "Succeeded",
+                    selected ? "Auto sell item marked for add." : "Auto sell item unmarked for add.",
+                    before,
+                    BuildUiOptionStateJson(),
+                    "{\"submitted\":false,\"action\":\"picker-toggle\",\"itemType\":" + IntRaw(itemType) + ",\"selected\":" + BoolRaw(selected) + ",\"pendingCount\":" + IntRaw(pendingCount) + ",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
                     "Button");
                 return;
             }
@@ -795,18 +853,16 @@ namespace JueMingZ.Input
 
             var before = BuildUiOptionStateJson();
             var itemIds = EnsureAutoDiscardItemIds();
-            itemIds.Add(0);
-            var createdIndex = itemIds.Count - 1;
-            ConfigService.SaveAll();
+            LegacyMainWindow.OpenAutoDiscardAddPicker();
             Record(
                 command,
                 "Ui.Configure.MiscAutoDiscard",
-                "Inventory",
+                "UI",
                 "Succeeded",
-                "Added empty auto discard list entry.",
+                "Auto discard multi item picker opened.",
                 before,
                 BuildUiOptionStateJson(),
-                "{\"submitted\":false,\"action\":\"add-empty\",\"createdIndex\":" + IntRaw(createdIndex) + ",\"autoDiscardEntryCount\":" + IntRaw(itemIds.Count) + ",\"autoDiscardItemCount\":" + IntRaw(CountValidAutoDiscardItems(itemIds)) + ",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                "{\"submitted\":false,\"action\":\"picker-open-add\",\"autoDiscardEntryCount\":" + IntRaw(itemIds.Count) + ",\"autoDiscardItemCount\":" + IntRaw(CountValidAutoDiscardItems(itemIds)) + ",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
                 "Button");
         }
 
@@ -814,6 +870,29 @@ namespace JueMingZ.Input
         {
             var before = BuildUiOptionStateJson();
             var itemIds = EnsureAutoDiscardItemIds();
+            if (string.Equals(payload, "picker-confirm", StringComparison.OrdinalIgnoreCase))
+            {
+                var selectedItemTypes = LegacyMainWindow.GetAutoDiscardPickerPendingItemTypes();
+                var appendedCount = AppendAutoItemTypes(itemIds, selectedItemTypes);
+                LegacyMainWindow.CloseAutoDiscardPicker();
+                if (appendedCount > 0)
+                {
+                    ConfigService.SaveAll();
+                }
+
+                Record(
+                    command,
+                    "Ui.Configure.MiscAutoDiscard",
+                    "Inventory",
+                    appendedCount > 0 ? "Succeeded" : "NotApplicable",
+                    appendedCount > 0 ? "Auto discard items added." : "Auto discard item add skipped: no selected items.",
+                    before,
+                    BuildUiOptionStateJson(),
+                    "{\"submitted\":false,\"action\":\"picker-confirm\",\"addedCount\":" + IntRaw(appendedCount) + ",\"selectedCount\":" + IntRaw(selectedItemTypes == null ? 0 : selectedItemTypes.Count) + ",\"autoDiscardEntryCount\":" + IntRaw(itemIds.Count) + ",\"autoDiscardItemCount\":" + IntRaw(CountValidAutoDiscardItems(itemIds)) + ",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                    "Button");
+                return;
+            }
+
             if (string.Equals(payload, "picker-close", StringComparison.OrdinalIgnoreCase))
             {
                 LegacyMainWindow.CloseAutoDiscardPicker();
@@ -826,6 +905,43 @@ namespace JueMingZ.Input
                     before,
                     BuildUiOptionStateJson(),
                     "{\"submitted\":false,\"action\":\"picker-close\",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                    "Button");
+                return;
+            }
+
+            const string pickerTogglePrefix = "picker-toggle:";
+            if (payload.StartsWith(pickerTogglePrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                int itemType;
+                if (!int.TryParse(payload.Substring(pickerTogglePrefix.Length), NumberStyles.Integer, CultureInfo.InvariantCulture, out itemType) ||
+                    itemType <= 0 ||
+                    IsCoinItemType(itemType) ||
+                    ContainsAutoDiscardItem(itemIds, itemType, -1))
+                {
+                    Record(
+                        command,
+                        "Ui.Configure.MiscAutoDiscard",
+                        "Inventory",
+                        "Rejected",
+                        "Auto discard item toggle failed: invalid or duplicate item type.",
+                        before,
+                        BuildUiOptionStateJson(),
+                        "{\"submitted\":false,\"action\":\"picker-toggle\",\"resultCode\":\"invalidSelection\",\"payload\":\"" + EscapeJson(payload) + "\",\"autoDiscardEntryCount\":" + IntRaw(itemIds.Count) + ",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                        "Button");
+                    return;
+                }
+
+                var selected = LegacyMainWindow.ToggleAutoDiscardPickerPendingItemType(itemType);
+                var pendingCount = LegacyMainWindow.GetAutoDiscardPickerPendingItemTypes().Count;
+                Record(
+                    command,
+                    "Ui.Configure.MiscAutoDiscard",
+                    "UI",
+                    "Succeeded",
+                    selected ? "Auto discard item marked for add." : "Auto discard item unmarked for add.",
+                    before,
+                    BuildUiOptionStateJson(),
+                    "{\"submitted\":false,\"action\":\"picker-toggle\",\"itemType\":" + IntRaw(itemType) + ",\"selected\":" + BoolRaw(selected) + ",\"pendingCount\":" + IntRaw(pendingCount) + ",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
                     "Button");
                 return;
             }
@@ -1451,6 +1567,31 @@ namespace JueMingZ.Input
             }
 
             return settings.NpcAutoReforgePrefixes;
+        }
+
+        private static int AppendAutoItemTypes(List<int> itemIds, IList<int> selectedItemTypes)
+        {
+            if (itemIds == null || selectedItemTypes == null || selectedItemTypes.Count <= 0)
+            {
+                return 0;
+            }
+
+            var appendedCount = 0;
+            for (var index = 0; index < selectedItemTypes.Count; index++)
+            {
+                var itemType = selectedItemTypes[index];
+                if (itemType <= 0 ||
+                    IsCoinItemType(itemType) ||
+                    ContainsAutoSellItem(itemIds, itemType, -1))
+                {
+                    continue;
+                }
+
+                itemIds.Add(itemType);
+                appendedCount++;
+            }
+
+            return appendedCount;
         }
 
         private static int CountValidAutoSellItems(IList<int> itemIds)

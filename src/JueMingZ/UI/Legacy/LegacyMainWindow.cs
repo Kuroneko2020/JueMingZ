@@ -78,10 +78,10 @@ namespace JueMingZ.UI.Legacy
         private const int AutoSellGridCellHeight = 32;
         private const int AutoSellGridCellMinWidth = 42;
         private const int AutoSellGridIconCellSize = 24;
+        private const int AutoItemPickerColumnCount = 11;
+        private const int AutoItemPickerCellGap = 4;
+        private const int AutoItemPickerCellMinSize = 28;
         private const int QuickItemHotkeyCellMinWidth = 64;
-        private const int QuickItemPickerRowHeight = 30;
-        private const int QuickItemPickerColumnGap = 6;
-        private const int QuickItemPickerColumnCount = 2;
         private const int QuickItemCaptureHintHeight = 28;
         private const int VkShift = 0x10;
         private const int VkControl = 0x11;
@@ -129,6 +129,8 @@ namespace JueMingZ.UI.Legacy
         private static List<QuickItemInventoryCandidate> _autoSellPickerCandidateCache;
         private static DateTime _autoDiscardPickerCandidateCacheUtc = DateTime.MinValue;
         private static List<QuickItemInventoryCandidate> _autoDiscardPickerCandidateCache;
+        private static readonly List<int> AutoSellPickerPendingItemTypes = new List<int>();
+        private static readonly List<int> AutoDiscardPickerPendingItemTypes = new List<int>();
         private static readonly List<LegacyUiElement> FrameElements = new List<LegacyUiElement>(128);
         private static string _contentHeightCachePageId = string.Empty;
         private static int _contentHeightCacheWidth;

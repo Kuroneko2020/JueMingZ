@@ -8,18 +8,23 @@ namespace JueMingZ.UI.Legacy
 {
     public static partial class LegacyMainWindow
     {
-        private sealed class MiscInventoryPickerOptions
+        private sealed class MiscInventoryIconPickerOptions
         {
             public string Title;
             public string CloseId;
             public string CloseLabel;
             public string CloseTooltip;
+            public string ConfirmId;
+            public string ConfirmLabel;
+            public string ConfirmTooltip;
             public string EmptyText;
+            public string ToggleIdPrefix;
+            public string ToggleLabel;
             public string SelectIdPrefix;
             public string SelectLabel;
-            public string SelectTooltipPrefix;
-            public string DuplicateTooltip;
-            public Func<QuickItemInventoryCandidate, bool> IsDuplicate;
+            public string TooltipPrefix;
+            public int TargetIndex;
+            public Func<QuickItemInventoryCandidate, bool> IsSelected;
         }
 
         private delegate LegacyUiElement MiscItemCardRenderer(
@@ -42,13 +47,12 @@ namespace JueMingZ.UI.Legacy
 
         private static int CalculateAutoSellPanelHeight(int viewportWidth, int itemCount, bool pickerOpen, int pickerCandidateCount)
         {
-            var height = LegacyUiMetrics.SectionHeaderHeight + CalculateAutoSellCardsBodyHeight(viewportWidth, itemCount);
             if (pickerOpen)
             {
-                height += CalculateQuickItemPickerPanelHeight(viewportWidth, pickerCandidateCount) + 8;
+                return CalculateAutoItemPickerPanelHeight(viewportWidth, pickerCandidateCount);
             }
 
-            return height;
+            return LegacyUiMetrics.SectionHeaderHeight + CalculateAutoSellCardsBodyHeight(viewportWidth, itemCount);
         }
 
         private static int CalculateAutoSellCardsBodyHeight(int viewportWidth, int itemCount)
@@ -65,14 +69,20 @@ namespace JueMingZ.UI.Legacy
             return rows * AutoSellGridCellHeight + Math.Max(0, rows - 1) * QuickItemCardGap + 16;
         }
 
-        private static int CalculateQuickItemPickerPanelHeight(int viewportWidth, int candidateCount)
+        private static int CalculateAutoItemPickerPanelHeight(int viewportWidth, int candidateCount)
         {
             var width = Math.Max(1, viewportWidth - 16);
-            var columnWidth = Math.Max(100, (width - QuickItemPickerColumnGap) / QuickItemPickerColumnCount);
-            var columns = columnWidth > 0 ? QuickItemPickerColumnCount : 1;
-            var rows = candidateCount <= 0 ? 1 : (candidateCount + columns - 1) / columns;
-            var bodyHeight = rows * (QuickItemPickerRowHeight + 3) + 4;
-            return 40 + bodyHeight + 8;
+            var cellSize = ResolveAutoItemPickerCellSize(width);
+            var rows = candidateCount <= 0 ? 1 : (candidateCount + AutoItemPickerColumnCount - 1) / AutoItemPickerColumnCount;
+            var bodyHeight = rows * cellSize + Math.Max(0, rows - 1) * AutoItemPickerCellGap + 4;
+            return 34 + bodyHeight + 8;
+        }
+
+        private static int ResolveAutoItemPickerCellSize(int bodyWidth)
+        {
+            var usableWidth = Math.Max(1, bodyWidth);
+            var gapWidth = (AutoItemPickerColumnCount - 1) * AutoItemPickerCellGap;
+            return Math.Max(AutoItemPickerCellMinSize, (usableWidth - gapWidth) / AutoItemPickerColumnCount);
         }
 
         private static void ComputeAutoSellCardLayout(int viewportWidth, int itemCount, out int columns, out int rows, out int cardWidth)
@@ -99,7 +109,12 @@ namespace JueMingZ.UI.Legacy
             MiscItemCardRenderer drawCard,
             MiscItemPickerRenderer drawPicker)
         {
-            if (itemIds == null || itemIds.Count <= 0)
+            if (itemIds == null)
+            {
+                itemIds = new List<int>();
+            }
+
+            if (itemIds.Count <= 0 && !pickerOpen)
             {
                 if (closePicker != null)
                 {
@@ -110,10 +125,16 @@ namespace JueMingZ.UI.Legacy
                 return null;
             }
 
-            if (pickerOpen && (pickerIndex < 0 || pickerIndex >= itemIds.Count) && closePicker != null)
+            if (pickerOpen && (pickerIndex < -1 || pickerIndex >= itemIds.Count) && closePicker != null)
             {
                 closePicker();
                 pickerOpen = false;
+            }
+
+            if (itemIds.Count <= 0 && !pickerOpen)
+            {
+                consumedHeight = 0;
+                return null;
             }
 
             List<QuickItemInventoryCandidate> pickerCandidates = null;
@@ -123,13 +144,21 @@ namespace JueMingZ.UI.Legacy
             }
 
             var pickerCandidateCount = pickerCandidates == null ? 0 : pickerCandidates.Count;
-            consumedHeight = CalculateAutoSellPanelHeight(area.Viewport.Width, itemIds.Count, pickerOpen, pickerCandidateCount);
+            var clip = area.Viewport;
+            var hovered = (LegacyUiElement)null;
+
+            if (pickerOpen && drawPicker != null)
+            {
+                consumedHeight = CalculateAutoItemPickerPanelHeight(area.Viewport.Width, pickerCandidateCount);
+                var pickerRect = new LegacyUiRect(area.Viewport.X, area.ToScreenY(contentY), area.Viewport.Width, consumedHeight);
+                return drawPicker(spriteBatch, area, mouse, elements, pickerRect, pickerCandidates, itemIds);
+            }
+
+            consumedHeight = CalculateAutoSellPanelHeight(area.Viewport.Width, itemIds.Count, false, 0);
             DrawSection(spriteBatch, area, contentY, sectionTitle);
             var cardsContentY = contentY + LegacyUiMetrics.SectionHeaderHeight;
             var cardsHeight = CalculateAutoSellCardsBodyHeight(area.Viewport.Width, itemIds.Count);
             var cardsRect = new LegacyUiRect(area.Viewport.X, area.ToScreenY(cardsContentY), area.Viewport.Width, cardsHeight);
-            var clip = area.Viewport;
-            var hovered = (LegacyUiElement)null;
 
             if (area.IsVisible(cardsRect))
             {
@@ -149,13 +178,6 @@ namespace JueMingZ.UI.Legacy
                         AutoSellGridCellHeight);
                     hovered = drawCard(spriteBatch, mouse, elements, clip, itemIds[index], index, card) ?? hovered;
                 }
-            }
-
-            if (pickerOpen && drawPicker != null)
-            {
-                var pickerHeight = CalculateQuickItemPickerPanelHeight(area.Viewport.Width, pickerCandidateCount);
-                var pickerRect = new LegacyUiRect(area.Viewport.X, area.ToScreenY(cardsContentY + cardsHeight), area.Viewport.Width, pickerHeight);
-                hovered = drawPicker(spriteBatch, area, mouse, elements, pickerRect, pickerCandidates, itemIds) ?? hovered;
             }
 
             return hovered;
@@ -231,16 +253,14 @@ namespace JueMingZ.UI.Legacy
             return hovered;
         }
 
-        private static LegacyUiElement DrawMiscInventoryPickerPanel(
+        private static LegacyUiElement DrawMiscInventoryIconPickerPanel(
             object spriteBatch,
             LegacyScrollArea area,
             LegacyMouseSnapshot mouse,
             List<LegacyUiElement> elements,
             LegacyUiRect rect,
             List<QuickItemInventoryCandidate> candidates,
-            int targetIndex,
-            int selectedItemType,
-            MiscInventoryPickerOptions options)
+            MiscInventoryIconPickerOptions options)
         {
             if (rect.Height <= 0 || rect.Width <= 0 || options == null)
             {
@@ -249,9 +269,16 @@ namespace JueMingZ.UI.Legacy
 
             LegacyUiTheme.DrawSubPanelClipped(spriteBatch, rect, area.Viewport);
             var hovered = (LegacyUiElement)null;
-            UiTextRenderer.DrawTextClipped(spriteBatch, options.Title, rect.X + 10, rect.Y + 8, rect.Width - 54, 18, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 238, 226, 255, 0.70f);
+            var hasConfirm = !string.IsNullOrWhiteSpace(options.ConfirmId);
+            var confirmRect = hasConfirm
+                ? new LegacyUiRect(rect.Right - 58, rect.Y + 6, 50, 20)
+                : new LegacyUiRect(rect.Right - 28, rect.Y + 6, 20, 20);
+            var closeRect = hasConfirm
+                ? new LegacyUiRect(confirmRect.X - 26, rect.Y + 6, 20, 20)
+                : confirmRect;
+            var titleRightPadding = hasConfirm ? 104 : 54;
+            UiTextRenderer.DrawTextClipped(spriteBatch, options.Title, rect.X + 10, rect.Y + 8, rect.Width - titleRightPadding, 18, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 238, 226, 255, 0.70f);
 
-            var closeRect = new LegacyUiRect(rect.Right - 28, rect.Y + 6, 20, 20);
             var closeHit = closeRect.Intersect(area.Viewport);
             var closeHovered = closeHit.Width > 0 && closeHit.Height > 0 && closeHit.Contains(mouse.X, mouse.Y);
             LegacyUiTheme.DrawButtonClipped(spriteBatch, closeRect, closeHovered, closeHovered && mouse.LeftDown, false, true, area.Viewport);
@@ -270,6 +297,27 @@ namespace JueMingZ.UI.Legacy
                 hovered = closeElement;
             }
 
+            if (hasConfirm)
+            {
+                var confirmHit = confirmRect.Intersect(area.Viewport);
+                var confirmHovered = confirmHit.Width > 0 && confirmHit.Height > 0 && confirmHit.Contains(mouse.X, mouse.Y);
+                LegacyUiTheme.DrawButtonClipped(spriteBatch, confirmRect, confirmHovered, confirmHovered && mouse.LeftDown, false, true, area.Viewport);
+                UiTextRenderer.DrawCenteredTextClipped(spriteBatch, options.ConfirmLabel, confirmRect.X + 4, confirmRect.Y, confirmRect.Width - 8, confirmRect.Height, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 230, 236, 220, 255, 0.66f);
+                var confirmElement = new LegacyUiElement
+                {
+                    Id = options.ConfirmId,
+                    Label = options.ConfirmLabel,
+                    Kind = "button",
+                    Rect = confirmHit.Width > 0 && confirmHit.Height > 0 ? confirmHit : confirmRect,
+                    TooltipLines = new[] { options.ConfirmTooltip }
+                };
+                elements.Add(confirmElement);
+                if (confirmHovered)
+                {
+                    hovered = confirmElement;
+                }
+            }
+
             var body = new LegacyUiRect(rect.X + 8, rect.Y + 32, rect.Width - 16, Math.Max(0, rect.Height - 40));
             if (candidates == null || candidates.Count <= 0)
             {
@@ -277,72 +325,61 @@ namespace JueMingZ.UI.Legacy
                 return hovered;
             }
 
-            var columnWidth = Math.Max(100, (body.Width - QuickItemPickerColumnGap) / QuickItemPickerColumnCount);
+            var cellSize = ResolveAutoItemPickerCellSize(body.Width);
             for (var index = 0; index < candidates.Count; index++)
             {
-                var rowIndex = index / QuickItemPickerColumnCount;
-                var columnIndex = index % QuickItemPickerColumnCount;
-                var row = new LegacyUiRect(
-                    body.X + columnIndex * (columnWidth + QuickItemPickerColumnGap),
-                    body.Y + rowIndex * (QuickItemPickerRowHeight + 3),
-                    columnWidth,
-                    QuickItemPickerRowHeight);
-                hovered = DrawMiscInventoryPickerCandidate(spriteBatch, mouse, elements, row, area.Viewport, candidates[index], selectedItemType, targetIndex, options) ?? hovered;
+                var rowIndex = index / AutoItemPickerColumnCount;
+                var columnIndex = index % AutoItemPickerColumnCount;
+                var cell = new LegacyUiRect(
+                    body.X + columnIndex * (cellSize + AutoItemPickerCellGap),
+                    body.Y + rowIndex * (cellSize + AutoItemPickerCellGap),
+                    cellSize,
+                    cellSize);
+                hovered = DrawMiscInventoryIconPickerCandidate(spriteBatch, mouse, elements, cell, area.Viewport, candidates[index], options) ?? hovered;
             }
 
             return hovered;
         }
 
-        private static LegacyUiElement DrawMiscInventoryPickerCandidate(
+        private static LegacyUiElement DrawMiscInventoryIconPickerCandidate(
             object spriteBatch,
             LegacyMouseSnapshot mouse,
             List<LegacyUiElement> elements,
-            LegacyUiRect row,
+            LegacyUiRect cell,
             LegacyUiRect clip,
             QuickItemInventoryCandidate candidate,
-            int selectedItemType,
-            int targetIndex,
-            MiscInventoryPickerOptions options)
+            MiscInventoryIconPickerOptions options)
         {
-            if (candidate == null || row.Width <= 0 || row.Height <= 0 || !row.Intersects(clip) || options == null)
+            if (candidate == null || cell.Width <= 0 || cell.Height <= 0 || !cell.Intersects(clip) || options == null)
             {
                 return null;
             }
 
-            var duplicate = options.IsDuplicate != null && options.IsDuplicate(candidate);
-            var selected = candidate.ItemType > 0 && candidate.ItemType == selectedItemType;
-            LegacyUiTheme.DrawRowClipped(spriteBatch, row, clip);
+            var selected = options.IsSelected != null && options.IsSelected(candidate);
+            var hit = cell.Intersect(clip);
+            var hovered = hit.Width > 0 && hit.Height > 0 && hit.Contains(mouse.X, mouse.Y);
+            DrawMiscItemIcon(spriteBatch, cell, clip, candidate.ItemType, hovered, false, string.Empty, 0.46f);
             if (selected)
             {
-                UiPrimitiveRenderer.DrawRoundedRectClipped(spriteBatch, row.X + 1, row.Y + 1, row.Width - 2, row.Height - 2, clip.X, clip.Y, clip.Width, clip.Height, 6, 88, 114, 86, 84);
-            }
-            else if (duplicate)
-            {
-                UiPrimitiveRenderer.DrawRoundedRectClipped(spriteBatch, row.X + 1, row.Y + 1, row.Width - 2, row.Height - 2, clip.X, clip.Y, clip.Width, clip.Height, 6, 78, 64, 48, 76);
+                UiPrimitiveRenderer.DrawRoundedRectClipped(spriteBatch, cell.Right - 15, cell.Y + 4, 10, 10, clip.X, clip.Y, clip.Width, clip.Height, 5, 126, 226, 156, 245);
             }
 
-            var iconRect = new LegacyUiRect(row.X + 5, row.Y + 4, 22, 22);
-            DrawMiscItemIcon(spriteBatch, iconRect, clip, candidate.ItemType, false, selected, string.Empty, 0.46f);
-
+            var addMode = options.TargetIndex < 0 && !string.IsNullOrWhiteSpace(options.ToggleIdPrefix);
             var label = string.IsNullOrWhiteSpace(candidate.ItemName)
                 ? "#" + candidate.ItemType.ToString(CultureInfo.InvariantCulture)
                 : candidate.ItemName + " #" + candidate.ItemType.ToString(CultureInfo.InvariantCulture);
-            UiTextRenderer.DrawTextClipped(spriteBatch, label, row.X + 31, row.Y + 7, row.Width - 36, 16, clip.X, clip.Y, clip.Width, clip.Height, duplicate ? 206 : 232, duplicate ? 194 : 234, duplicate ? 174 : 224, 246, 0.58f);
-
-            var hit = row.Intersect(clip);
-            var hovered = hit.Width > 0 && hit.Height > 0 && hit.Contains(mouse.X, mouse.Y);
             var element = new LegacyUiElement
             {
-                Id = options.SelectIdPrefix + targetIndex.ToString(CultureInfo.InvariantCulture) + ":" + candidate.ItemType.ToString(CultureInfo.InvariantCulture),
-                Label = options.SelectLabel,
+                Id = addMode
+                    ? options.ToggleIdPrefix + candidate.ItemType.ToString(CultureInfo.InvariantCulture)
+                    : options.SelectIdPrefix + options.TargetIndex.ToString(CultureInfo.InvariantCulture) + ":" + candidate.ItemType.ToString(CultureInfo.InvariantCulture),
+                Label = addMode ? options.ToggleLabel : options.SelectLabel,
                 Kind = "button",
-                Rect = hit.Width > 0 && hit.Height > 0 ? hit : row,
+                Rect = hit.Width > 0 && hit.Height > 0 ? hit : cell,
                 Selected = selected,
                 TooltipLines = new[]
                 {
-                    duplicate && !string.IsNullOrWhiteSpace(options.DuplicateTooltip)
-                        ? options.DuplicateTooltip
-                        : options.SelectTooltipPrefix + label + "（背包槽位 #" + (candidate.Slot + 1).ToString(CultureInfo.InvariantCulture) + "）"
+                    options.TooltipPrefix + label + "（背包槽位 #" + (candidate.Slot + 1).ToString(CultureInfo.InvariantCulture) + "）"
                 }
             };
             elements.Add(element);

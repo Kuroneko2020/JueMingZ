@@ -9,9 +9,9 @@ namespace JueMingZ.UI.Legacy
     public static class LegacyPotionGrid
     {
         public const int CardHeight = 68;
-        public const int CellWidth = 52;
-        public const int CellHeight = 52;
-        public const int IconSize = 26;
+        public const int CellWidth = 56;
+        public const int CellHeight = 56;
+        public const int IconSize = 42;
 
         public static void DrawCandidate(object spriteBatch, LegacyUiRect rect, BuffPotionCandidate candidate, bool hovered)
         {
@@ -39,7 +39,7 @@ namespace JueMingZ.UI.Legacy
                 return;
             }
 
-            DrawPotionCell(spriteBatch, rect, clip, candidate.ItemType, ShortDisplayName(candidate.BuffName, candidate.ItemName), hovered, false, false, candidate.IsActive);
+            DrawPotionCell(spriteBatch, rect, clip, candidate.ItemType, hovered, false, false, candidate.IsActive);
         }
 
         public static void DrawWhitelistCell(object spriteBatch, LegacyUiRect rect, LegacyUiRect clip, BuffPotionWhitelistEntry entry, BuffPotionCandidate liveCandidate, bool hovered)
@@ -55,7 +55,7 @@ namespace JueMingZ.UI.Legacy
             }
 
             var missing = liveCandidate == null;
-            DrawPotionCell(spriteBatch, rect, clip, entry.ItemType, ShortDisplayName(entry.BuffName, entry.ItemName), hovered, false, missing, active);
+            DrawPotionCell(spriteBatch, rect, clip, entry.ItemType, hovered, false, missing, active);
         }
 
         public static void DrawWhitelistEntry(object spriteBatch, LegacyUiRect rect, BuffPotionWhitelistEntry entry, BuffPotionCandidate liveCandidate, bool hovered)
@@ -95,7 +95,7 @@ namespace JueMingZ.UI.Legacy
             }
         }
 
-        private static void DrawPotionCell(object spriteBatch, LegacyUiRect rect, LegacyUiRect clip, int itemType, string shortName, bool hovered, bool selected, bool missing, bool active)
+        private static void DrawPotionCell(object spriteBatch, LegacyUiRect rect, LegacyUiRect clip, int itemType, bool hovered, bool selected, bool missing, bool active)
         {
             if (!rect.Intersects(clip))
             {
@@ -103,7 +103,7 @@ namespace JueMingZ.UI.Legacy
             }
 
             LegacyUiTheme.DrawCellClipped(spriteBatch, rect, hovered, selected, missing, clip);
-            var iconRect = new LegacyUiRect(rect.X + (rect.Width - IconSize) / 2, rect.Y + 5, IconSize, IconSize);
+            var iconRect = new LegacyUiRect(rect.X + (rect.Width - IconSize) / 2, rect.Y + (rect.Height - IconSize) / 2, IconSize, IconSize);
 
             object itemTexture;
             if (VanillaUiSkinCompat.TryGetItemTexture(itemType, out itemTexture))
@@ -117,24 +117,12 @@ namespace JueMingZ.UI.Legacy
 
             if (missing)
             {
-                UiPrimitiveRenderer.DrawRoundedRectClipped(spriteBatch, rect.Right - 13, rect.Y + 5, 8, 8, clip.X, clip.Y, clip.Width, clip.Height, 4, 236, 58, 66, 248);
+                UiPrimitiveRenderer.DrawRoundedRectClipped(spriteBatch, rect.Right - 15, rect.Y + 5, 10, 10, clip.X, clip.Y, clip.Width, clip.Height, 5, 236, 58, 66, 248);
             }
             else if (active)
             {
-                UiPrimitiveRenderer.DrawRoundedRectClipped(spriteBatch, rect.Right - 12, rect.Y + 5, 7, 7, clip.X, clip.Y, clip.Width, clip.Height, 4, 126, 226, 156, 245);
+                UiPrimitiveRenderer.DrawRoundedRectClipped(spriteBatch, rect.Right - 15, rect.Y + 5, 10, 10, clip.X, clip.Y, clip.Width, clip.Height, 5, 126, 226, 156, 245);
             }
-
-            UiTextRenderer.DrawCenteredTextClipped(spriteBatch, shortName, rect.X + 3, rect.Bottom - 17, rect.Width - 6, 15, clip.X, clip.Y, clip.Width, clip.Height, 238, 238, 220, 255, 0.56f);
-        }
-
-        private static string ShortDisplayName(string buffName, string itemName)
-        {
-            var value = !string.IsNullOrWhiteSpace(buffName) && !buffName.StartsWith("Buff ", StringComparison.OrdinalIgnoreCase)
-                ? buffName
-                : itemName;
-            value = value ?? string.Empty;
-            value = value.Replace("药水", string.Empty).Replace("Potion", string.Empty).Trim();
-            return Shorten(value, 5);
         }
 
         private static string SourceText(string source)

@@ -124,6 +124,20 @@ namespace JueMingZ.UI.Legacy
             StopAutoMiningHotkeyCapture();
             _autoSellPickerIndex = itemIndex;
             _autoSellPickerOpen = true;
+            AutoSellPickerPendingItemTypes.Clear();
+            _autoSellPickerCandidateCache = null;
+            _autoSellPickerCandidateCacheUtc = DateTime.MinValue;
+        }
+
+        public static void OpenAutoSellAddPicker()
+        {
+            CloseQuickItemPicker();
+            CloseAutoDiscardPicker();
+            StopQuickItemHotkeyCapture();
+            StopAutoMiningHotkeyCapture();
+            _autoSellPickerIndex = -1;
+            _autoSellPickerOpen = true;
+            AutoSellPickerPendingItemTypes.Clear();
             _autoSellPickerCandidateCache = null;
             _autoSellPickerCandidateCacheUtc = DateTime.MinValue;
         }
@@ -132,8 +146,19 @@ namespace JueMingZ.UI.Legacy
         {
             _autoSellPickerOpen = false;
             _autoSellPickerIndex = -1;
+            AutoSellPickerPendingItemTypes.Clear();
             _autoSellPickerCandidateCache = null;
             _autoSellPickerCandidateCacheUtc = DateTime.MinValue;
+        }
+
+        public static bool ToggleAutoSellPickerPendingItemType(int itemType)
+        {
+            return TogglePendingItemType(AutoSellPickerPendingItemTypes, itemType);
+        }
+
+        public static List<int> GetAutoSellPickerPendingItemTypes()
+        {
+            return new List<int>(AutoSellPickerPendingItemTypes);
         }
 
         public static void OpenAutoDiscardPicker(int itemIndex)
@@ -150,6 +175,20 @@ namespace JueMingZ.UI.Legacy
             StopAutoMiningHotkeyCapture();
             _autoDiscardPickerIndex = itemIndex;
             _autoDiscardPickerOpen = true;
+            AutoDiscardPickerPendingItemTypes.Clear();
+            _autoDiscardPickerCandidateCache = null;
+            _autoDiscardPickerCandidateCacheUtc = DateTime.MinValue;
+        }
+
+        public static void OpenAutoDiscardAddPicker()
+        {
+            CloseQuickItemPicker();
+            CloseAutoSellPicker();
+            StopQuickItemHotkeyCapture();
+            StopAutoMiningHotkeyCapture();
+            _autoDiscardPickerIndex = -1;
+            _autoDiscardPickerOpen = true;
+            AutoDiscardPickerPendingItemTypes.Clear();
             _autoDiscardPickerCandidateCache = null;
             _autoDiscardPickerCandidateCacheUtc = DateTime.MinValue;
         }
@@ -158,8 +197,19 @@ namespace JueMingZ.UI.Legacy
         {
             _autoDiscardPickerOpen = false;
             _autoDiscardPickerIndex = -1;
+            AutoDiscardPickerPendingItemTypes.Clear();
             _autoDiscardPickerCandidateCache = null;
             _autoDiscardPickerCandidateCacheUtc = DateTime.MinValue;
+        }
+
+        public static bool ToggleAutoDiscardPickerPendingItemType(int itemType)
+        {
+            return TogglePendingItemType(AutoDiscardPickerPendingItemTypes, itemType);
+        }
+
+        public static List<int> GetAutoDiscardPickerPendingItemTypes()
+        {
+            return new List<int>(AutoDiscardPickerPendingItemTypes);
         }
 
         public static bool NeedsMiscInventorySnapshot()
@@ -203,6 +253,24 @@ namespace JueMingZ.UI.Legacy
         {
             _autoMiningHotkeyCaptureActive = false;
             AutoMiningCaptureWasDown.Clear();
+        }
+
+        private static bool TogglePendingItemType(List<int> itemTypes, int itemType)
+        {
+            if (itemTypes == null || itemType <= 0)
+            {
+                return false;
+            }
+
+            var index = itemTypes.IndexOf(itemType);
+            if (index >= 0)
+            {
+                itemTypes.RemoveAt(index);
+                return false;
+            }
+
+            itemTypes.Add(itemType);
+            return true;
         }
     }
 }

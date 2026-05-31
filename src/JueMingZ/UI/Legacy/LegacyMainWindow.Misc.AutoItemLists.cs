@@ -27,7 +27,7 @@ namespace JueMingZ.UI.Legacy
                 "misc-auto-sell-row:",
                 new[]
                 {
-                    "新增一个自动出售名单空位。",
+                    "从背包批量选择要加入自动出售名单的物品。",
                     "尝试出售名单里的物品",
                     "关闭自动出售功能。"
                 });
@@ -49,7 +49,7 @@ namespace JueMingZ.UI.Legacy
                 "misc-auto-discard-row:",
                 new[]
                 {
-                    "新增一个自动丢弃名单空位。",
+                    "从背包批量选择要加入自动丢弃名单的物品。",
                     "尝试丢弃名单里的物品",
                     "关闭自动丢弃功能。"
                 });
@@ -99,33 +99,30 @@ namespace JueMingZ.UI.Legacy
         private static LegacyUiElement DrawAutoSellInventoryPickerPanel(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, LegacyUiRect rect, List<QuickItemInventoryCandidate> candidates, List<int> itemIds)
         {
             var itemIndex = _autoSellPickerIndex;
-            var selectedItemType = itemIndex >= 0 && itemIds != null && itemIndex < itemIds.Count
-                ? itemIds[itemIndex]
-                : 0;
-            var title = itemIndex >= 0
-                ? "出售物品选择（第 " + (itemIndex + 1).ToString(CultureInfo.InvariantCulture) + " 项）"
-                : "出售物品选择";
-            return DrawMiscInventoryPickerPanel(
+            return DrawMiscInventoryIconPickerPanel(
                 spriteBatch,
                 area,
                 mouse,
                 elements,
                 rect,
                 candidates,
-                itemIndex,
-                selectedItemType,
-                new MiscInventoryPickerOptions
+                new MiscInventoryIconPickerOptions
                 {
-                    Title = title,
+                    Title = "点击选择物品",
                     CloseId = "misc-auto-sell:picker-close",
                     CloseLabel = "关闭出售物品选择",
                     CloseTooltip = "关闭出售物品选择窗口。",
+                    ConfirmId = itemIndex < 0 ? "misc-auto-sell:picker-confirm" : null,
+                    ConfirmLabel = "确定",
+                    ConfirmTooltip = "把已选物品加入自动出售名单。",
                     EmptyText = "背包里没有可加入出售名单的物品。",
+                    ToggleIdPrefix = "misc-auto-sell:picker-toggle:",
+                    ToggleLabel = "切换自动出售物品选择",
                     SelectIdPrefix = "misc-auto-sell:picker-select:",
                     SelectLabel = "选择自动出售物品",
-                    SelectTooltipPrefix = "加入出售名单：",
-                    DuplicateTooltip = "该物品已在自动出售名单里。",
-                    IsDuplicate = candidate => ContainsAutoSellItemType(itemIds, candidate.ItemType, itemIndex)
+                    TooltipPrefix = itemIndex < 0 ? "加入出售名单：" : "替换为：",
+                    TargetIndex = itemIndex,
+                    IsSelected = candidate => itemIndex < 0 && AutoSellPickerPendingItemTypes.Contains(candidate.ItemType)
                 });
         }
 
@@ -173,33 +170,30 @@ namespace JueMingZ.UI.Legacy
         private static LegacyUiElement DrawAutoDiscardInventoryPickerPanel(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, LegacyUiRect rect, List<QuickItemInventoryCandidate> candidates, List<int> itemIds)
         {
             var itemIndex = _autoDiscardPickerIndex;
-            var selectedItemType = itemIndex >= 0 && itemIds != null && itemIndex < itemIds.Count
-                ? itemIds[itemIndex]
-                : 0;
-            var title = itemIndex >= 0
-                ? "丢弃物品选择（第 " + (itemIndex + 1).ToString(CultureInfo.InvariantCulture) + " 项）"
-                : "丢弃物品选择";
-            return DrawMiscInventoryPickerPanel(
+            return DrawMiscInventoryIconPickerPanel(
                 spriteBatch,
                 area,
                 mouse,
                 elements,
                 rect,
                 candidates,
-                itemIndex,
-                selectedItemType,
-                new MiscInventoryPickerOptions
+                new MiscInventoryIconPickerOptions
                 {
-                    Title = title,
+                    Title = "点击选择物品",
                     CloseId = "misc-auto-discard:picker-close",
                     CloseLabel = "关闭丢弃物品选择",
                     CloseTooltip = "关闭丢弃物品选择窗口。",
+                    ConfirmId = itemIndex < 0 ? "misc-auto-discard:picker-confirm" : null,
+                    ConfirmLabel = "确定",
+                    ConfirmTooltip = "把已选物品加入自动丢弃名单。",
                     EmptyText = "背包里没有可加入丢弃名单的物品。",
+                    ToggleIdPrefix = "misc-auto-discard:picker-toggle:",
+                    ToggleLabel = "切换自动丢弃物品选择",
                     SelectIdPrefix = "misc-auto-discard:picker-select:",
                     SelectLabel = "选择自动丢弃物品",
-                    SelectTooltipPrefix = "加入丢弃名单：",
-                    DuplicateTooltip = "该物品已在自动丢弃名单里。",
-                    IsDuplicate = candidate => ContainsAutoDiscardItemType(itemIds, candidate.ItemType, itemIndex)
+                    TooltipPrefix = itemIndex < 0 ? "加入丢弃名单：" : "替换为：",
+                    TargetIndex = itemIndex,
+                    IsSelected = candidate => itemIndex < 0 && AutoDiscardPickerPendingItemTypes.Contains(candidate.ItemType)
                 });
         }
 
@@ -355,7 +349,7 @@ namespace JueMingZ.UI.Legacy
                 return _autoSellPickerCandidateCache;
             }
 
-            _autoSellPickerCandidateCache = BuildAutoSellInventoryCandidates();
+            _autoSellPickerCandidateCache = FilterAutoItemPickerCandidates(BuildAutoSellInventoryCandidates(), GetAutoSellItemIds());
             _autoSellPickerCandidateCacheUtc = now;
             return _autoSellPickerCandidateCache;
         }
@@ -376,9 +370,33 @@ namespace JueMingZ.UI.Legacy
                 return _autoDiscardPickerCandidateCache;
             }
 
-            _autoDiscardPickerCandidateCache = BuildAutoDiscardInventoryCandidates();
+            _autoDiscardPickerCandidateCache = FilterAutoItemPickerCandidates(BuildAutoDiscardInventoryCandidates(), GetAutoDiscardItemIds());
             _autoDiscardPickerCandidateCacheUtc = now;
             return _autoDiscardPickerCandidateCache;
+        }
+
+        private static List<QuickItemInventoryCandidate> FilterAutoItemPickerCandidates(List<QuickItemInventoryCandidate> candidates, IList<int> itemIds)
+        {
+            if (candidates == null || candidates.Count <= 0)
+            {
+                return candidates;
+            }
+
+            var result = new List<QuickItemInventoryCandidate>(candidates.Count);
+            for (var index = 0; index < candidates.Count; index++)
+            {
+                var candidate = candidates[index];
+                if (candidate == null ||
+                    candidate.ItemType <= 0 ||
+                    ContainsAutoSellItemType(itemIds, candidate.ItemType, -1))
+                {
+                    continue;
+                }
+
+                result.Add(candidate);
+            }
+
+            return result;
         }
 
         private static bool ContainsAutoSellItemType(IList<int> itemIds, int itemType, int exceptIndex)

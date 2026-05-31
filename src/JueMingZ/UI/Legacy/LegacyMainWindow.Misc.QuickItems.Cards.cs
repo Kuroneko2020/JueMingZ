@@ -78,7 +78,7 @@ namespace JueMingZ.UI.Legacy
             elements.Add(itemElement);
             var hovered = itemHovered ? itemElement : null;
 
-            if (itemType > 0 && itemHovered)
+            if (itemHovered)
             {
                 var deleteRect = new LegacyUiRect(itemButtonRect.Right - 15, itemButtonRect.Y + 1, 14, 14);
                 var deleteHit = deleteRect.Intersect(clip);
@@ -147,28 +147,25 @@ namespace JueMingZ.UI.Legacy
             var selectedItemType = bindingIndex >= 0 && bindings != null && bindingIndex < bindings.Count
                 ? GetQuickItemBindingPrimaryItemType(bindings[bindingIndex])
                 : 0;
-            var title = bindingIndex >= 0
-                ? "背包物品选择（第 " + (bindingIndex + 1).ToString(CultureInfo.InvariantCulture) + " 条）"
-                : "背包物品选择";
-            return DrawMiscInventoryPickerPanel(
+            return DrawMiscInventoryIconPickerPanel(
                 spriteBatch,
                 area,
                 mouse,
                 elements,
                 rect,
                 candidates,
-                bindingIndex,
-                selectedItemType,
-                new MiscInventoryPickerOptions
+                new MiscInventoryIconPickerOptions
                 {
-                    Title = title,
+                    Title = "点击选择物品",
                     CloseId = "misc-quick-item-hotkeys:picker-close",
                     CloseLabel = "关闭物品选择",
                     CloseTooltip = "关闭物品选择窗口。",
                     EmptyText = "背包里没有可用物品。",
                     SelectIdPrefix = "misc-quick-item-hotkeys:picker-select:",
                     SelectLabel = "选择快捷物品",
-                    SelectTooltipPrefix = "选择："
+                    TooltipPrefix = "选择：",
+                    TargetIndex = bindingIndex,
+                    IsSelected = candidate => selectedItemType > 0 && candidate.ItemType == selectedItemType
                 });
         }
     }

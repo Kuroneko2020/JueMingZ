@@ -22,7 +22,7 @@ namespace JueMingZ.UI.Legacy
 
             if (pickerOpen)
             {
-                height += CalculateQuickItemPickerPanelHeight(viewportWidth, pickerCandidateCount) + 8;
+                height += CalculateAutoItemPickerPanelHeight(viewportWidth, pickerCandidateCount) + 8;
             }
 
             return height;

@@ -152,7 +152,7 @@ namespace JueMingZ.UI.Legacy
 
             if (_quickItemPickerOpen)
             {
-                var pickerHeight = CalculateQuickItemPickerPanelHeight(area.Viewport.Width, pickerCandidateCount);
+                var pickerHeight = CalculateAutoItemPickerPanelHeight(area.Viewport.Width, pickerCandidateCount);
                 var pickerRect = new LegacyUiRect(area.Viewport.X, area.ToScreenY(nextContentY), area.Viewport.Width, pickerHeight);
                 hovered = DrawQuickItemInventoryPickerPanel(spriteBatch, area, mouse, elements, pickerRect, pickerCandidates, bindings) ?? hovered;
             }
