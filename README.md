@@ -11,7 +11,7 @@
 - `src/JueMingZ/`：主程序源码。
 - `tests/JueMingZ.Tests/`：控制台测试项目。
 - `scripts/*.ps1`：构建、测试包和本地审计脚本。
-- `external/ThirdParty/0Harmony.dll`：当前构建需要嵌入的 Harmony 依赖。
+- `external/ThirdParty/0Harmony.dll`：当前构建需要的 Harmony 输入依赖，打包时会压缩后嵌入 `JueMingZ.dll`。
 
 
 ## 构建

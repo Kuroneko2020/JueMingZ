@@ -216,6 +216,66 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void FishingAutoEquipmentManualInventoryInteractionStopsKeepingRodAppliedWithoutBobber()
+        {
+            if (!FishingAutoEquipmentService.ShouldRestoreWithoutBobberForTesting(true, true))
+            {
+                throw new InvalidOperationException("Expected manual inventory interaction to restore after bobber is gone even while the original rod is still selected.");
+            }
+
+            if (FishingAutoEquipmentService.ShouldRestoreWithoutBobberForTesting(true, false))
+            {
+                throw new InvalidOperationException("Expected ordinary bobber scan gaps to keep auto equipment applied while the original rod is still selected.");
+            }
+
+            if (!FishingAutoEquipmentService.ShouldRestoreWithoutBobberForTesting(false, false))
+            {
+                throw new InvalidOperationException("Expected leaving the original rod to restore auto equipment.");
+            }
+        }
+
+        private static void FishingAutoEquipmentRestoreKeepsPendingWhenOriginalMovedByUser()
+        {
+            var player = CreateFishingEquipmentPlayer();
+            var fishingItem = Accessory(TestAnglerEarring, "Angler Earring");
+            var originalItem = Accessory(TestLuckyCoin, "Lucky Coin");
+            player.armor[3] = fishingItem;
+            player.inventory[10] = null;
+
+            var result = InvokeFishingAutoEquipmentRestoreRecords(
+                player,
+                new[]
+                {
+                    FishingAutoEquipmentRecord(3, FishingEquipmentContainerKind.Inventory, 10, fishingItem, originalItem)
+                });
+
+            if (result == null || result.PendingRestoreCount != 1 || result.OriginalMovedByUserCount != 1 || result.Records.Count != 1)
+            {
+                throw new InvalidOperationException("Expected restore to remain pending when the original accessory is temporarily unavailable.");
+            }
+        }
+
+        private static void FishingAutoEquipmentRestoreCompletesWhenOriginalAlreadyBack()
+        {
+            var player = CreateFishingEquipmentPlayer();
+            var fishingItem = Accessory(TestAnglerEarring, "Angler Earring");
+            var originalItem = Accessory(TestLuckyCoin, "Lucky Coin");
+            player.armor[3] = originalItem;
+            player.inventory[10] = fishingItem;
+
+            var result = InvokeFishingAutoEquipmentRestoreRecords(
+                player,
+                new[]
+                {
+                    FishingAutoEquipmentRecord(3, FishingEquipmentContainerKind.Inventory, 10, fishingItem, originalItem)
+                });
+
+            if (result == null || result.PendingRestoreCount != 0 || result.RestoredMoveCount != 1 || result.UserChangedManagedSlotCount != 0)
+            {
+                throw new InvalidOperationException("Expected restore to complete when the original accessory is already back in the managed slot.");
+            }
+        }
+
         private static void EnemySegmentLabelsHideMiddleSegments()
         {
             if (!InformationOverlayService.ShouldDrawEnemySegmentLabel(1, 0))

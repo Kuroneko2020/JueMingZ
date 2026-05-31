@@ -7,18 +7,26 @@
     <Platforms>AnyCPU;x86</Platforms>
     <PlatformTarget>x86</PlatformTarget>
     <LangVersion>7.3</LangVersion>
-    <Version>1.7.383</Version>
-    <AssemblyVersion>1.7.383.0</AssemblyVersion>
-    <FileVersion>1.7.383.0</FileVersion>
-    <InformationalVersion>1.7.383-fishing-equip-safelanding-stale</InformationalVersion>
+    <Version>1.7.385</Version>
+    <AssemblyVersion>1.7.385.0</AssemblyVersion>
+    <FileVersion>1.7.385.0</FileVersion>
+    <InformationalVersion>1.7.385-fishing-manual-inventory-restore</InformationalVersion>
     <Deterministic>true</Deterministic>
     <RestoreConfigFile>$(MSBuildThisFileDirectory)..\..\NuGet.Config</RestoreConfigFile>
     <RestorePackagesPath>$(MSBuildThisFileDirectory)..\..\.nuget\packages</RestorePackagesPath>
     <HarmonyDllPath>$(MSBuildThisFileDirectory)..\..\external\ThirdParty\0Harmony.dll</HarmonyDllPath>
+    <CompressedHarmonyDllPath>$(MSBuildProjectDirectory)\obj\$(Platform)\$(Configuration)\$(TargetFramework)\JueMingZ.Embedded.0Harmony.dll.deflate</CompressedHarmonyDllPath>
     <JueMingZTerrariaRefsDir Condition="'$(JueMingZTerrariaRefsDir)' == ''">$(MSBuildThisFileDirectory)..\..\external\TerrariaRefs</JueMingZTerrariaRefsDir>
   </PropertyGroup>
   <Target Name="EnsureHarmonyDependency" BeforeTargets="PrepareForBuild">
     <Error Condition="!Exists('$(HarmonyDllPath)')" Text="Required Harmony dependency missing: $(HarmonyDllPath)" />
+  </Target>
+  <Target
+    Name="CompressHarmonyEmbeddedDependency"
+    BeforeTargets="PrepareResources"
+    Inputs="$(HarmonyDllPath);$(MSBuildThisFileDirectory)..\..\scripts\compress-embedded-dependency.ps1"
+    Outputs="$(CompressedHarmonyDllPath)">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)..\..\scripts\compress-embedded-dependency.ps1&quot; -Source &quot;$(HarmonyDllPath)&quot; -Destination &quot;$(CompressedHarmonyDllPath)&quot;" />
   </Target>
   <ItemGroup>
     <JueMingZRequiredTerrariaRef Include="Terraria.exe" />
@@ -57,7 +65,7 @@
       <HintPath>$(JueMingZTerrariaRefsDir)\ReLogic.dll</HintPath>
       <Private>false</Private>
     </Reference>
-    <EmbeddedResource Include="$(HarmonyDllPath)" LogicalName="JueMingZ.Embedded.0Harmony.dll" />
+    <EmbeddedResource Include="$(CompressedHarmonyDllPath)" LogicalName="JueMingZ.Embedded.0Harmony.dll.deflate" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Assets\About\wechat.png" LogicalName="JueMingZ.Assets.About.wechat.png" />

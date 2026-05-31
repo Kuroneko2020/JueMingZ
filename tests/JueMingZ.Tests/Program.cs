@@ -95,6 +95,7 @@ namespace JueMingZ.Tests
         private static int Main()
         {
             var failed = 0;
+            Run("dependency resolver loads compressed embedded Harmony", ref failed, DependencyResolverLoadsCompressedEmbeddedHarmony);
             Run("temporary double jump requires a real air jump flag", ref failed, TemporaryDoubleJumpRequiresAirJump);
             Run("temporary rocket boots require rocket ability after equip", ref failed, TemporaryRocketBootsRequireCapability);
             Run("temporary flying carpet requires carpet availability after equip", ref failed, TemporaryFlyingCarpetRequiresCapability);
@@ -352,6 +353,9 @@ namespace JueMingZ.Tests
             Run("fishing auto equipment deduplicates luck and bobbers", ref failed, FishingAutoEquipmentDeduplicatesLuckAndBobbers);
             Run("fishing auto equipment capacity keeps highest scores", ref failed, FishingAutoEquipmentCapacityKeepsHighestScores);
             Run("fishing auto equipment replaces covered lower accessory first", ref failed, FishingAutoEquipmentReplacesCoveredLowerAccessoryFirst);
+            Run("fishing auto equipment manual inventory interaction restores after bobber gone", ref failed, FishingAutoEquipmentManualInventoryInteractionStopsKeepingRodAppliedWithoutBobber);
+            Run("fishing auto equipment restore keeps pending when original moved", ref failed, FishingAutoEquipmentRestoreKeepsPendingWhenOriginalMovedByUser);
+            Run("fishing auto equipment restore completes when original already back", ref failed, FishingAutoEquipmentRestoreCompletesWhenOriginalAlreadyBack);
             Run("fishing filter requires sonar buff", ref failed, FishingFilterRequiresSonarBuff);
             Run("enemy segment labels hide middle segments", ref failed, EnemySegmentLabelsHideMiddleSegments);
             Run("known worm segment labels use Terraria NPC roles", ref failed, KnownWormSegmentLabelsUseTerrariaNpcRoles);

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
@@ -11,6 +12,7 @@ namespace JueMingZ.Bootstrap
     public static class DependencyResolver
     {
         private const string EmbeddedHarmonyResourceName = "JueMingZ.Embedded.0Harmony.dll";
+        private const string EmbeddedHarmonyCompressedResourceName = "JueMingZ.Embedded.0Harmony.dll.deflate";
 
         private static readonly object AssemblyLoadLock = new object();
         private static int _registered;
@@ -172,26 +174,42 @@ namespace JueMingZ.Bootstrap
                 try
                 {
                     var owner = typeof(DependencyResolver).Assembly;
-                    using (var stream = owner.GetManifestResourceStream(EmbeddedHarmonyResourceName))
+                    byte[] assemblyBytes;
+                    string resourceName;
+                    string resourceKind;
+                    if (TryReadEmbeddedAssemblyBytes(
+                            owner,
+                            EmbeddedHarmonyCompressedResourceName,
+                            true,
+                            out assemblyBytes))
                     {
-                        if (stream == null)
-                        {
-                            LogThrottle.WarnThrottled(
-                                "dependency-embedded-missing-" + simpleName,
-                                TimeSpan.FromSeconds(30),
-                                "DependencyResolver",
-                                "Embedded Harmony resource was not found: " + EmbeddedHarmonyResourceName);
-                            return false;
-                        }
-
-                        using (var memory = new MemoryStream())
-                        {
-                            stream.CopyTo(memory);
-                            assembly = Assembly.Load(memory.ToArray());
-                        }
+                        resourceName = EmbeddedHarmonyCompressedResourceName;
+                        resourceKind = "compressed embedded resource";
+                    }
+                    else if (TryReadEmbeddedAssemblyBytes(
+                                 owner,
+                                 EmbeddedHarmonyResourceName,
+                                 false,
+                                 out assemblyBytes))
+                    {
+                        resourceName = EmbeddedHarmonyResourceName;
+                        resourceKind = "embedded resource";
+                    }
+                    else
+                    {
+                        LogThrottle.WarnThrottled(
+                            "dependency-embedded-missing-" + simpleName,
+                            TimeSpan.FromSeconds(30),
+                            "DependencyResolver",
+                            "Embedded Harmony resource was not found: " +
+                            EmbeddedHarmonyCompressedResourceName + " or " + EmbeddedHarmonyResourceName);
+                        return false;
                     }
 
-                    Logger.Info("DependencyResolver", "Assembly resolved from embedded resource: " + simpleName);
+                    assembly = Assembly.Load(assemblyBytes);
+                    Logger.Info(
+                        "DependencyResolver",
+                        "Assembly resolved from " + resourceKind + ": " + simpleName + " (" + resourceName + ")");
                     return true;
                 }
                 catch (Exception error)
@@ -204,6 +222,59 @@ namespace JueMingZ.Bootstrap
                     assembly = null;
                     return false;
                 }
+            }
+        }
+
+        private static bool TryReadEmbeddedAssemblyBytes(
+            Assembly owner,
+            string resourceName,
+            bool compressed,
+            out byte[] bytes)
+        {
+            bytes = null;
+            if (owner == null || string.IsNullOrWhiteSpace(resourceName))
+            {
+                return false;
+            }
+
+            try
+            {
+                using (var stream = owner.GetManifestResourceStream(resourceName))
+                {
+                    if (stream == null)
+                    {
+                        return false;
+                    }
+
+                    using (var memory = new MemoryStream())
+                    {
+                        if (compressed)
+                        {
+                            using (var deflate = new DeflateStream(stream, CompressionMode.Decompress))
+                            {
+                                deflate.CopyTo(memory);
+                            }
+                        }
+                        else
+                        {
+                            stream.CopyTo(memory);
+                        }
+
+                        bytes = memory.ToArray();
+                    }
+                }
+
+                return bytes.Length > 0;
+            }
+            catch (Exception error)
+            {
+                LogThrottle.WarnThrottled(
+                    "dependency-embedded-read-failed-" + resourceName,
+                    TimeSpan.FromSeconds(30),
+                    "DependencyResolver",
+                    "Embedded dependency resource read failed for " + resourceName + ": " + error.Message);
+                bytes = null;
+                return false;
             }
         }
 

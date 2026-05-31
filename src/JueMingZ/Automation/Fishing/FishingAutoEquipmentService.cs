@@ -156,18 +156,19 @@ namespace JueMingZ.Automation.Fishing
                 bool stillHolding;
                 string holdReason;
                 FishingAutoEquipmentCompat.TryIsStillHoldingOriginalRod(player, GetSession(), out stillHolding, out holdReason);
+                var manualInventoryInteractionDetected = HasManualInventoryInteractionDetected();
                 lock (SyncRoot)
                 {
                     _stillHoldingOriginalRod = stillHolding;
                 }
 
-                if (hasLocalBobber || stillHolding)
+                if (ShouldKeepApplied(hasLocalBobber, stillHolding, manualInventoryInteractionDetected))
                 {
                     Record(hasLocalBobber ? "keepingApplied" : "keepingAppliedWithoutBobber", stillHolding ? "stillHoldingOriginalRod" : string.Empty);
                     return;
                 }
 
-                TryEnqueueRestore(queue, tick, "leftOriginalRod");
+                TryEnqueueRestore(queue, tick, manualInventoryInteractionDetected ? "manualInventoryInteractionEnded" : "leftOriginalRod");
                 return;
             }
 
@@ -406,12 +407,19 @@ namespace JueMingZ.Automation.Fishing
         {
             lock (SyncRoot)
             {
-                if (result != null &&
-                    (result.BlockedByMouseItem || result.LoadoutChangedDuringAutoEquipment) &&
-                    _restoreAttemptCount > 0)
+                var pauseWithoutBudgetCost = result != null &&
+                                             (result.BlockedByMouseItem ||
+                                              result.LoadoutChangedDuringAutoEquipment ||
+                                              (result.PendingRestoreCount > 0 &&
+                                               (result.UserChangedManagedSlotCount > 0 ||
+                                                result.OriginalMovedByUserCount > 0)));
+                if (pauseWithoutBudgetCost && _restoreAttemptCount > 0)
                 {
                     _restoreAttemptCount--;
-                    _lastRestoreAttemptTick = 0;
+                    if (result.BlockedByMouseItem || result.LoadoutChangedDuringAutoEquipment)
+                    {
+                        _lastRestoreAttemptTick = 0;
+                    }
                 }
 
                 Records.Clear();
@@ -541,6 +549,24 @@ namespace JueMingZ.Automation.Fishing
             {
                 return _forceRestoreWhenPossible;
             }
+        }
+
+        private static bool HasManualInventoryInteractionDetected()
+        {
+            lock (SyncRoot)
+            {
+                return _manualInventoryInteractionDetected;
+            }
+        }
+
+        private static bool ShouldKeepApplied(bool hasLocalBobber, bool stillHoldingOriginalRod, bool manualInventoryInteractionDetected)
+        {
+            return hasLocalBobber || (stillHoldingOriginalRod && !manualInventoryInteractionDetected);
+        }
+
+        internal static bool ShouldRestoreWithoutBobberForTesting(bool stillHoldingOriginalRod, bool manualInventoryInteractionDetected)
+        {
+            return !ShouldKeepApplied(false, stillHoldingOriginalRod, manualInventoryInteractionDetected);
         }
 
         private static FishingAutoEquipmentSessionInfo GetSession()

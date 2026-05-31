@@ -972,8 +972,16 @@ namespace JueMingZ.Compat
                 var targetItem = GetIndexed(armor, record.TargetEquipmentSlot);
                 if (!SignatureMatches(targetItem, record.FishingItemSignature))
                 {
+                    if (SignatureMatches(targetItem, record.OriginalTargetItemSignature))
+                    {
+                        result.RestoredMoveCount++;
+                        record.RestoreStatus = "originalAlreadyRestored";
+                        continue;
+                    }
+
                     result.UserChangedManagedSlotCount++;
                     record.RestoreStatus = "userChangedManagedSlot";
+                    result.Records.Add(CloneRecord(record));
                     continue;
                 }
 
@@ -1021,6 +1029,7 @@ namespace JueMingZ.Compat
 
                     result.OriginalMovedByUserCount++;
                     record.RestoreStatus = "originalMovedByUser";
+                    result.Records.Add(CloneRecord(record));
                     continue;
                 }
 
@@ -1527,14 +1536,30 @@ namespace JueMingZ.Compat
 
             if (TerrariaMemberCache.TryGetField(type, name, true, out var field))
             {
-                value = field.GetValue(null);
-                return true;
+                try
+                {
+                    value = field.GetValue(null);
+                    return true;
+                }
+                catch (Exception error)
+                {
+                    RuntimeDiagnostics.RecordError("FishingAutoEquipmentCompat.TryGetStaticMember." + name, error);
+                    return false;
+                }
             }
 
             if (TerrariaMemberCache.TryGetProperty(type, name, true, out var property) && property.CanRead)
             {
-                value = property.GetValue(null, null);
-                return true;
+                try
+                {
+                    value = property.GetValue(null, null);
+                    return true;
+                }
+                catch (Exception error)
+                {
+                    RuntimeDiagnostics.RecordError("FishingAutoEquipmentCompat.TryGetStaticMember." + name, error);
+                    return false;
+                }
             }
 
             return false;

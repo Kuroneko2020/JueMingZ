@@ -25,6 +25,17 @@ namespace JueMingZ.Tests
 {
     internal static partial class Program
     {
+        private static void DependencyResolverLoadsCompressedEmbeddedHarmony()
+        {
+            Assembly assembly;
+            if (!JueMingZ.Bootstrap.DependencyResolver.TryLoadAssemblyBySimpleName("0Harmony", out assembly) ||
+                assembly == null ||
+                !string.Equals(assembly.GetName().Name, "0Harmony", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("0Harmony was not loaded by the embedded dependency resolver.");
+            }
+        }
+
         private static void AssertSelected(MovementSafeLandingStrategySelection selection, int priority, string strategy, string actionType)
         {
             if (selection == null || selection.SelectedPlan == null)
@@ -178,6 +189,55 @@ namespace JueMingZ.Tests
             }
 
             return method.Invoke(null, new[] { (object)player, request }) as MovementSafeLandingEquipmentActionResult;
+        }
+
+        private static FishingAutoEquipmentActionResult InvokeFishingAutoEquipmentRestoreRecords(FakePlayer player, IEnumerable<FishingAutoEquipmentMoveRecord> records)
+        {
+            var compatType = typeof(FishingAutoEquipmentCompat);
+            var restoreRequestType = compatType.GetNestedType("RestoreRequest", BindingFlags.NonPublic);
+            if (restoreRequestType == null)
+            {
+                throw new InvalidOperationException("Fishing RestoreRequest reflection hook missing.");
+            }
+
+            var request = Activator.CreateInstance(restoreRequestType, true);
+            restoreRequestType.GetField("Session", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                .SetValue(request, new FishingAutoEquipmentSessionInfo());
+            restoreRequestType.GetField("Records", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                .SetValue(request, new List<FishingAutoEquipmentMoveRecord>(records));
+            restoreRequestType.GetField("Reason", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                .SetValue(request, "test");
+
+            var method = compatType.GetMethod("RestoreRecords", BindingFlags.NonPublic | BindingFlags.Static);
+            if (method == null)
+            {
+                throw new InvalidOperationException("Fishing RestoreRecords reflection hook missing.");
+            }
+
+            return method.Invoke(null, new[] { (object)player, request }) as FishingAutoEquipmentActionResult;
+        }
+
+        private static FishingAutoEquipmentMoveRecord FishingAutoEquipmentRecord(
+            int targetSlot,
+            FishingEquipmentContainerKind originalKind,
+            int originalSlot,
+            FakeItem fishingItem,
+            FakeItem originalItem)
+        {
+            return new FishingAutoEquipmentMoveRecord
+            {
+                MoveId = 1,
+                TargetEquipmentSlot = targetSlot,
+                SourceContainerKind = originalKind,
+                SourceSlot = originalSlot,
+                FishingItemSignature = FishingAutoEquipmentCompat.CreateSignature(fishingItem),
+                OriginalTargetWasAir = originalItem == null || originalItem.IsAir,
+                OriginalTargetItemSignature = FishingAutoEquipmentCompat.CreateSignature(originalItem),
+                OriginalTargetHoldingContainerKind = originalKind,
+                OriginalTargetHoldingSlot = originalSlot,
+                ApplyStatus = "applied",
+                RestoreStatus = "pending"
+            };
         }
 
         private static MovementSafeLandingEquipmentMoveRecord Record(string strategy, string category, string actionType)
