@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.Text;
+using JueMingZ.Automation.Movement;
 using JueMingZ.Common;
 using JueMingZ.Compat;
 using JueMingZ.Diagnostics;
@@ -98,6 +99,12 @@ namespace JueMingZ.Actions.Executors
             if (targetState.ItemType <= 0 || targetState.ItemStack <= 0)
             {
                 return CompleteDetailed(execution, InputActionStatus.Failed, DiagnosticResultCode.MissingRequiredItem, "Target hotbar slot is empty; click a non-empty test slot first.");
+            }
+
+            InputActionExecutionStepResult staleResult;
+            if (TryCompleteStaleSafeLandingTeleportRod(execution, player, out staleResult))
+            {
+                return staleResult;
             }
 
             SetState(execution, "Stage", IsButtonSource(execution) ? StageWaitMouseRelease : StageSwitchToTargetSlot);
@@ -321,6 +328,12 @@ namespace JueMingZ.Actions.Executors
                 SetState(execution, "LikelyReason", "Target slot item changed or became empty before ItemUseBridge.");
                 TryRestoreOriginalSlot(execution);
                 return CompleteDetailed(execution, InputActionStatus.Failed, DiagnosticResultCode.Failed, "UseHotbarItem target item changed or became empty before use.");
+            }
+
+            InputActionExecutionStepResult staleResult;
+            if (TryCompleteStaleSafeLandingTeleportRod(execution, player, out staleResult))
+            {
+                return staleResult;
             }
 
             var hasMouseWorldTarget = HasMetadata(execution, ActionMetadataKeys.WorldX) &&
@@ -748,6 +761,32 @@ namespace JueMingZ.Actions.Executors
             return restored;
         }
 
+        private bool TryCompleteStaleSafeLandingTeleportRod(InputActionExecution execution, object player, out InputActionExecutionStepResult result)
+        {
+            result = null;
+            if (execution == null || execution.Request == null)
+            {
+                return false;
+            }
+
+            string staleReason;
+            if (!MovementSafeLandingService.IsSafeLandingTeleportRodRequestStale(player, execution.Request.Metadata, out staleReason))
+            {
+                return false;
+            }
+
+            SetState(execution, "SafeLandingTeleportStaleCheckAttempted", "true");
+            SetState(execution, "SafeLandingTeleportStale", "true");
+            SetState(execution, "SafeLandingTeleportStaleReason", staleReason ?? string.Empty);
+            SetState(execution, "LikelyReason", staleReason ?? "safeLandingTeleportStale");
+            result = CompleteDetailed(
+                execution,
+                InputActionStatus.NotApplicable,
+                DiagnosticResultCode.NotApplicable,
+                "Safe landing teleport rod skipped because the queued landing target is stale: " + (staleReason ?? string.Empty));
+            return true;
+        }
+
         private void SetFinalSelectedSlot(InputActionExecution execution, int slot)
         {
             SetState(execution, "FinalSelectedSlot", slot);
@@ -960,6 +999,9 @@ namespace JueMingZ.Actions.Executors
                    "\"selectedSlotRestored\":" + BoolRaw(GetStateBool(execution, "SelectedSlotRestored", false)) + "," +
                    "\"finalSelectedSlotMatchesOriginal\":" + BoolRaw(originalSlot >= 0 && finalSlot == originalSlot) + "," +
                    "\"buttonClickSuppressedGameInput\":" + BoolRaw(GetStateBool(execution, "UiClickSuppressionSucceeded", false)) + "," +
+                   "\"safeLandingTeleportStaleCheckAttempted\":" + BoolRaw(GetStateBool(execution, "SafeLandingTeleportStaleCheckAttempted", false)) + "," +
+                   "\"safeLandingTeleportStale\":" + BoolRaw(GetStateBool(execution, "SafeLandingTeleportStale", false)) + "," +
+                   "\"safeLandingTeleportStaleReason\":\"" + EscapeJson(GetState(execution, "SafeLandingTeleportStaleReason", string.Empty)) + "\"," +
                    "\"likelyReason\":\"" + EscapeJson(GetState(execution, "LikelyReason", GetState(execution, "RestoreMessage", string.Empty))) + "\"" +
                    "}";
         }

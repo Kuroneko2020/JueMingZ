@@ -2873,6 +2873,76 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void SafeLandingClearsRepeatedRescueWhenLandingChanges()
+        {
+            MovementSafeLandingService.ResetDescentRescueGuardForTesting();
+            try
+            {
+                var original = AnalysisNearGround();
+                original.PositionX = 90f;
+                original.ImpactWorldX = 100f;
+                original.ImpactWorldY = 200f;
+                MovementSafeLandingService.MarkDescentRescueSubmittedForTesting(
+                    10,
+                    original,
+                    5,
+                    "inventory_teleport_rod",
+                    "teleport_rod");
+
+                var changed = AnalysisNearGround();
+                changed.PositionX = 420f;
+                changed.ImpactWorldX = 430f;
+                changed.ImpactWorldY = 200f;
+
+                string reason;
+                if (MovementSafeLandingService.TrySuppressRepeatedDescentRescueForTesting(changed, 12, out reason))
+                {
+                    throw new InvalidOperationException("Expected changed landing target to clear same descent rescue guard, got " + reason + ".");
+                }
+            }
+            finally
+            {
+                MovementSafeLandingService.ResetDescentRescueGuardForTesting();
+            }
+        }
+
+        private static void SafeLandingTeleportRodRequestStaleWhenLandingChanges()
+        {
+            var metadata = SafeLandingTeleportRodMetadata(100f, 200f, 104f, 184f, 90f, 120f);
+            var current = AnalysisNearGround();
+            current.PositionX = 420f;
+            current.ImpactWorldX = 430f;
+            current.ImpactWorldY = 200f;
+            current.HasTeleportTarget = true;
+            current.TeleportTargetWorldX = 424f;
+            current.TeleportTargetWorldY = 184f;
+
+            string reason;
+            if (!MovementSafeLandingService.IsSafeLandingTeleportRodRequestStaleForTesting(current, metadata, out reason) ||
+                reason.IndexOf("landingChanged", StringComparison.Ordinal) < 0)
+            {
+                throw new InvalidOperationException("Expected stale teleport rod request when landing changed, got " + reason + ".");
+            }
+        }
+
+        private static void SafeLandingTeleportRodRequestKeepsSameLanding()
+        {
+            var metadata = SafeLandingTeleportRodMetadata(100f, 200f, 104f, 184f, 90f, 120f);
+            var current = AnalysisNearGround();
+            current.PositionX = 96f;
+            current.ImpactWorldX = 108f;
+            current.ImpactWorldY = 204f;
+            current.HasTeleportTarget = true;
+            current.TeleportTargetWorldX = 104f;
+            current.TeleportTargetWorldY = 184f;
+
+            string reason;
+            if (MovementSafeLandingService.IsSafeLandingTeleportRodRequestStaleForTesting(current, metadata, out reason))
+            {
+                throw new InvalidOperationException("Expected same landing teleport rod request to remain valid, got " + reason + ".");
+            }
+        }
+
         private static void SafeLandingRequestBuilderPreservesOldMetadataKeys()
         {
             var analysis = AnalysisNearGround();
@@ -2906,6 +2976,28 @@ namespace JueMingZ.Tests
             };
             var rodRequest = MovementSafeLandingRequestBuilder.BuildTeleportRodRequest(rodPlan, rodAnalysis);
             AssertPreservedSafeLandingMetadata(rodRequest);
+        }
+
+        private static Dictionary<string, string> SafeLandingTeleportRodMetadata(
+            float impactWorldX,
+            float impactWorldY,
+            float teleportWorldX,
+            float teleportWorldY,
+            float positionX,
+            float positionY)
+        {
+            return new Dictionary<string, string>
+            {
+                { ActionMetadataKeys.Scenario, ScenarioNames.MovementSafeLanding },
+                { "SafeLandingActionType", "teleport_rod" },
+                { "SafeLandingRescueMode", "TeleportRod" },
+                { "SafeLandingImpactWorldX", impactWorldX.ToString("0.###", CultureInfo.InvariantCulture) },
+                { "SafeLandingImpactWorldY", impactWorldY.ToString("0.###", CultureInfo.InvariantCulture) },
+                { "SafeLandingTeleportTargetWorldX", teleportWorldX.ToString("0.###", CultureInfo.InvariantCulture) },
+                { "SafeLandingTeleportTargetWorldY", teleportWorldY.ToString("0.###", CultureInfo.InvariantCulture) },
+                { "SafeLandingPlayerPositionX", positionX.ToString("0.###", CultureInfo.InvariantCulture) },
+                { "SafeLandingPlayerPositionY", positionY.ToString("0.###", CultureInfo.InvariantCulture) }
+            };
         }
 
         private static void SafeLandingRecoveryKeepsItemWhenRestoreTargetChanged()

@@ -839,6 +839,8 @@ namespace JueMingZ.Actions.Executors
                    "\"userChangedManagedSlotCount\":" + IntRaw(result == null ? 0 : result.UserChangedManagedSlotCount) + "," +
                    "\"originalMovedByUser\":" + BoolRaw(result != null && result.OriginalMovedByUserCount > 0) + "," +
                    "\"originalMovedByUserCount\":" + IntRaw(result == null ? 0 : result.OriginalMovedByUserCount) + "," +
+                   "\"originalRelocatedByUser\":" + BoolRaw(result != null && result.OriginalRelocatedByUserCount > 0) + "," +
+                   "\"originalRelocatedByUserCount\":" + IntRaw(result == null ? 0 : result.OriginalRelocatedByUserCount) + "," +
                    "\"pendingRestoreNoSpace\":" + BoolRaw(result != null && result.PendingRestoreNoSpaceCount > 0) + "," +
                    "\"pendingRestoreNoSpaceCount\":" + IntRaw(result == null ? 0 : result.PendingRestoreNoSpaceCount) + "," +
                    "\"loadoutChangedDuringAutoEquipment\":" + BoolRaw(result != null && result.LoadoutChangedDuringAutoEquipment) + "," +

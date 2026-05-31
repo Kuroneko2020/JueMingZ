@@ -179,6 +179,9 @@ namespace JueMingZ.Tests
             Run("safe landing p1 to p3 block lower priority not destroyed", ref failed, SafeLandingP1toP3BlockLowerPriorityNotDestroyed);
             Run("priority 1 still blocks lower priority when timing not ready", ref failed, PriorityOneStillBlocksLowerPriorityWhenTimingNotReady);
             Run("priority lower strategy waits behind higher timing window", ref failed, PriorityLowerStrategyWaitsBehindHigherTimingWindow);
+            Run("safe landing clears repeated rescue when landing changes", ref failed, SafeLandingClearsRepeatedRescueWhenLandingChanges);
+            Run("safe landing teleport rod request stale when landing changes", ref failed, SafeLandingTeleportRodRequestStaleWhenLandingChanges);
+            Run("safe landing teleport rod request keeps same landing", ref failed, SafeLandingTeleportRodRequestKeepsSameLanding);
             Run("safe landing request builder preserves old metadata keys", ref failed, SafeLandingRequestBuilderPreservesOldMetadataKeys);
             Run("safe landing recovery keeps item when restore target changed", ref failed, SafeLandingRecoveryKeepsItemWhenRestoreTargetChanged);
             Run("channel resolver maps unknown action to global exclusive", ref failed, ChannelResolverUnknownActionDefaultsGlobalExclusive);

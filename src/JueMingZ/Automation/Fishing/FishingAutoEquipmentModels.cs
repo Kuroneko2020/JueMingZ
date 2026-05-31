@@ -167,6 +167,7 @@ namespace JueMingZ.Automation.Fishing
         public int SkippedMoveCount { get; set; }
         public int UserChangedManagedSlotCount { get; set; }
         public int OriginalMovedByUserCount { get; set; }
+        public int OriginalRelocatedByUserCount { get; set; }
         public int PendingRestoreNoSpaceCount { get; set; }
         public string Decision { get; set; }
         public string SkipReason { get; set; }

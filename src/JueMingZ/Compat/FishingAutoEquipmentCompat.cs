@@ -1007,6 +1007,18 @@ namespace JueMingZ.Compat
                 if (!TryGetContainerItem(player, record.OriginalTargetHoldingContainerKind, record.OriginalTargetHoldingSlot, out originalItem) ||
                     !SignatureMatches(originalItem, record.OriginalTargetItemSignature))
                 {
+                    FishingEquipmentContainerKind relocatedKind;
+                    int relocatedSlot;
+                    if (TryFindRestoreOriginalItem(player, record, out relocatedKind, out relocatedSlot, out originalItem) &&
+                        SetIndexed(armor, record.TargetEquipmentSlot, originalItem) &&
+                        SetContainerItem(player, relocatedKind, relocatedSlot, targetItem))
+                    {
+                        result.RestoredMoveCount++;
+                        result.OriginalRelocatedByUserCount++;
+                        record.RestoreStatus = "restoredRelocatedOriginal";
+                        continue;
+                    }
+
                     result.OriginalMovedByUserCount++;
                     record.RestoreStatus = "originalMovedByUser";
                     continue;
@@ -1040,12 +1052,94 @@ namespace JueMingZ.Compat
                 result.SkipReason = AppendReason(result.SkipReason, "originalMovedByUser");
             }
 
+            if (result.OriginalRelocatedByUserCount > 0)
+            {
+                result.SkipReason = AppendReason(result.SkipReason, "originalRelocatedByUser");
+            }
+
             if (result.PendingRestoreNoSpaceCount > 0)
             {
                 result.SkipReason = AppendReason(result.SkipReason, "pendingRestoreNoSpace");
             }
 
             return result;
+        }
+
+        private static bool TryFindRestoreOriginalItem(
+            object player,
+            FishingAutoEquipmentMoveRecord record,
+            out FishingEquipmentContainerKind kind,
+            out int slot,
+            out object item)
+        {
+            kind = FishingEquipmentContainerKind.Unknown;
+            slot = -1;
+            item = null;
+            if (player == null || record == null || record.OriginalTargetItemSignature == null ||
+                record.OriginalTargetItemSignature.IsAir)
+            {
+                return false;
+            }
+
+            IList inventory;
+            if (TryGetInventoryItems(player, out inventory) &&
+                TryFindMatchingItem(inventory, 0, Math.Min(50, GetCollectionCount(inventory)), record.OriginalTargetItemSignature, out slot, out item))
+            {
+                kind = FishingEquipmentContainerKind.Inventory;
+                return true;
+            }
+
+            IList voidBag;
+            if (TryGetVoidBagItems(player, out voidBag) &&
+                TryFindMatchingItem(voidBag, 0, GetCollectionCount(voidBag), record.OriginalTargetItemSignature, out slot, out item))
+            {
+                kind = FishingEquipmentContainerKind.VoidBag;
+                return true;
+            }
+
+            IList armor;
+            if (TryGetArmorItems(player, out armor) &&
+                TryFindMatchingItem(armor, 10, GetCollectionCount(armor), record.OriginalTargetItemSignature, out slot, out item))
+            {
+                kind = FishingEquipmentContainerKind.Social;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryFindMatchingItem(
+            IList items,
+            int startSlot,
+            int endSlotExclusive,
+            FishingAutoEquipmentItemSignature signature,
+            out int slot,
+            out object item)
+        {
+            slot = -1;
+            item = null;
+            if (items == null || signature == null)
+            {
+                return false;
+            }
+
+            var count = GetCollectionCount(items);
+            var start = Math.Max(0, startSlot);
+            var end = Math.Min(Math.Max(start, endSlotExclusive), count);
+            for (var index = start; index < end; index++)
+            {
+                var candidate = GetIndexed(items, index);
+                if (!SignatureMatches(candidate, signature))
+                {
+                    continue;
+                }
+
+                slot = index;
+                item = candidate;
+                return true;
+            }
+
+            return false;
         }
 
         private static bool TryFindRestoreDestination(object player, FishingAutoEquipmentMoveRecord record, out FishingEquipmentContainerKind kind, out int slot)

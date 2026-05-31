@@ -19,6 +19,8 @@ namespace JueMingZ.Automation.Movement
             "SafeLandingImpactWorldY",
             "SafeLandingFallingSpeed",
             "SafeLandingVelocityX",
+            "SafeLandingPlayerPositionX",
+            "SafeLandingPlayerPositionY",
             "SafeLandingCapabilitySummary",
             "SafeLandingSuppressDown",
             "SafeLandingGrappleTargetWorldX",
@@ -98,6 +100,8 @@ namespace JueMingZ.Automation.Movement
             metadata["SafeLandingImpactWorldY"] = analysis == null ? string.Empty : analysis.ImpactWorldY.ToString("0.###", CultureInfo.InvariantCulture);
             metadata["SafeLandingFallingSpeed"] = analysis == null ? string.Empty : analysis.FallingSpeed.ToString("0.###", CultureInfo.InvariantCulture);
             metadata["SafeLandingVelocityX"] = analysis == null ? string.Empty : analysis.VelocityX.ToString("0.###", CultureInfo.InvariantCulture);
+            metadata["SafeLandingPlayerPositionX"] = analysis == null ? string.Empty : analysis.PositionX.ToString("0.###", CultureInfo.InvariantCulture);
+            metadata["SafeLandingPlayerPositionY"] = analysis == null ? string.Empty : analysis.PositionY.ToString("0.###", CultureInfo.InvariantCulture);
             metadata["SafeLandingCapabilitySummary"] = analysis == null ? string.Empty : analysis.ActiveCapabilitySummary ?? string.Empty;
             metadata["SafeLandingSuppressDown"] = analysis != null && analysis.ControlDown ? "true" : "false";
             metadata["SafeLandingGrappleTargetWorldX"] = analysis == null ? string.Empty : analysis.GrappleTargetWorldX.ToString("0.###", CultureInfo.InvariantCulture);

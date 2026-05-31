@@ -324,7 +324,12 @@ namespace JueMingZ.Automation.Fishing
 
             lock (SyncRoot)
             {
-                if (_restoreRequestId != Guid.Empty && tick - _lastRestoreAttemptTick < 30)
+                if (_restoreRequestId != Guid.Empty)
+                {
+                    return;
+                }
+
+                if (_lastRestoreAttemptTick > 0 && tick >= _lastRestoreAttemptTick && tick - _lastRestoreAttemptTick < 30)
                 {
                     return;
                 }
@@ -401,6 +406,14 @@ namespace JueMingZ.Automation.Fishing
         {
             lock (SyncRoot)
             {
+                if (result != null &&
+                    (result.BlockedByMouseItem || result.LoadoutChangedDuringAutoEquipment) &&
+                    _restoreAttemptCount > 0)
+                {
+                    _restoreAttemptCount--;
+                    _lastRestoreAttemptTick = 0;
+                }
+
                 Records.Clear();
                 if (result != null && result.Records != null)
                 {
