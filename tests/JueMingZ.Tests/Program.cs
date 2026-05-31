@@ -209,11 +209,14 @@ namespace JueMingZ.Tests
             Run("auto stack uses short inventory-open settle window", ref failed, AutoStackUsesShortInventoryOpenSettleWindow);
             Run("auto sell default list is conservative fishing junk", ref failed, AutoSellDefaultListIsConservativeFishingJunk);
             Run("auto sell request uses shop metadata", ref failed, AutoSellRequestUsesShopMetadata);
+            Run("auto sell allows player inventory open", ref failed, AutoSellAllowsPlayerInventoryOpen);
             Run("auto sell candidates use inventory snapshot", ref failed, AutoSellCandidatesUseInventorySnapshot);
             Run("auto discard default list is empty", ref failed, AutoDiscardDefaultListIsEmpty);
             Run("auto discard request uses trash metadata", ref failed, AutoDiscardRequestUsesTrashMetadata);
+            Run("auto discard allows player inventory open", ref failed, AutoDiscardAllowsPlayerInventoryOpen);
             Run("auto discard candidates use inventory snapshot", ref failed, AutoDiscardCandidatesUseInventorySnapshot);
             Run("quick bag open request uses inventory slot metadata", ref failed, QuickBagOpenRequestUsesInventorySlotMetadata);
+            Run("quick bag open yields after batch when cleanup enabled", ref failed, QuickBagOpenYieldsAfterBatchWhenCleanupEnabled);
             Run("auto deposit coins request uses chest metadata", ref failed, AutoDepositCoinsRequestUsesChestMetadata);
             Run("auto deposit coins candidates use inventory snapshot", ref failed, AutoDepositCoinsCandidatesUseInventorySnapshot);
             Run("auto extractinator request uses item use metadata", ref failed, AutoExtractinatorRequestUsesItemUseMetadata);

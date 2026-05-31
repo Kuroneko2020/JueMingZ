@@ -1037,6 +1037,20 @@ namespace JueMingZ.Compat
         private static bool TryReadMouseButtonDownFallback(int virtualKey, out bool down)
         {
             down = false;
+            var overrideReader = _creativeUiMouseButtonDownFallbackOverride;
+            if (overrideReader != null)
+            {
+                try
+                {
+                    down = overrideReader(virtualKey);
+                    return true;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+
             if (!TerrariaMainCompat.AllowsInputProcessing)
             {
                 return true;
@@ -1044,10 +1058,7 @@ namespace JueMingZ.Compat
 
             try
             {
-                var overrideReader = _creativeUiMouseButtonDownFallbackOverride;
-                down = overrideReader == null
-                    ? (GetAsyncKeyState(virtualKey) & 0x8000) != 0
-                    : overrideReader(virtualKey);
+                down = (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
                 return true;
             }
             catch

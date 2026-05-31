@@ -133,6 +133,7 @@ namespace JueMingZ.Automation.InventoryAndItems
             }
 
             var tick = runtimeState == null ? 0 : runtimeState.UpdateCount;
+            var quickBagCleanupYieldActive = QuickBagOpenService.IsCleanupYieldActiveForAutomation(tick);
             if (queue == null)
             {
                 RecordDecision("queue unavailable", string.Empty, string.Empty);
@@ -151,7 +152,7 @@ namespace JueMingZ.Automation.InventoryAndItems
                 return;
             }
 
-            if (ShouldScan(tick))
+            if (ShouldScan(tick, quickBagCleanupYieldActive))
             {
                 Dictionary<int, int> current;
                 HashSet<int> eligibleItemTypes;
@@ -527,11 +528,11 @@ namespace JueMingZ.Automation.InventoryAndItems
             }
         }
 
-        private static bool ShouldScan(long tick)
+        private static bool ShouldScan(long tick, bool force)
         {
             lock (SyncRoot)
             {
-                if (!_baselineInitialized || tick - _lastScanTick >= CheckIntervalTicks || tick < _lastScanTick)
+                if (force || !_baselineInitialized || tick - _lastScanTick >= CheckIntervalTicks || tick < _lastScanTick)
                 {
                     _lastScanTick = tick;
                     return true;

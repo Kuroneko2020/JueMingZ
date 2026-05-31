@@ -1235,11 +1235,6 @@ namespace JueMingZ.Compat
         public static bool TryReadPhysicalUseItemHeld(object player, out bool held)
         {
             held = false;
-            if (!TerrariaMainCompat.AllowsInputProcessing)
-            {
-                return ClearInputError();
-            }
-
             if (player == null)
             {
                 return Fail("Cannot read physical use item state: player unavailable.");
@@ -2748,14 +2743,21 @@ namespace JueMingZ.Compat
 
         private static object GetStatic(Type type, string name)
         {
-            if (TerrariaMemberCache.TryGetField(type, name, true, out var field))
+            try
             {
-                return field.GetValue(null);
-            }
+                if (TerrariaMemberCache.TryGetField(type, name, true, out var field))
+                {
+                    return field.GetValue(null);
+                }
 
-            if (TerrariaMemberCache.TryGetProperty(type, name, true, out var property))
+                if (TerrariaMemberCache.TryGetProperty(type, name, true, out var property))
+                {
+                    return property.GetValue(null, null);
+                }
+            }
+            catch
             {
-                return property.GetValue(null, null);
+                return null;
             }
 
             return null;
@@ -3730,7 +3732,16 @@ namespace JueMingZ.Compat
         private static bool TryGetStaticBool(Type type, string name, out bool value)
         {
             value = false;
-            var raw = GetStatic(type, name);
+            object raw;
+            try
+            {
+                raw = GetStatic(type, name);
+            }
+            catch
+            {
+                return false;
+            }
+
             if (raw == null)
             {
                 return false;

@@ -72,6 +72,20 @@ namespace JueMingZ.Automation.InventoryAndItems
             return BuildAutoSellRequest(target, candidates, signature);
         }
 
+        internal static InputActionRequest BuildAutoSellRequestForTesting(
+            AutoSellShopTarget target,
+            IReadOnlyList<AutoSellInventoryCandidate> candidates,
+            string signature,
+            bool allowPlayerInventoryOpen)
+        {
+            return BuildAutoSellRequest(target, candidates, signature);
+        }
+
+        internal static string GetExecutionBlockedReasonForTesting(GameStateSnapshot snapshot, bool allowPlayerInventoryOpen)
+        {
+            return GetExecutionBlockedReason(snapshot);
+        }
+
         internal static bool TryFindSellableInventoryCandidatesForTesting(
             GameStateSnapshot gameState,
             ICollection<int> itemIds,
@@ -107,7 +121,8 @@ namespace JueMingZ.Automation.InventoryAndItems
             }
 
             var tick = runtimeState == null ? 0 : runtimeState.UpdateCount;
-            if (!ShouldScan(tick))
+            var quickBagCleanupYieldActive = QuickBagOpenService.IsCleanupYieldActiveForAutomation(tick);
+            if (!ShouldScan(tick, quickBagCleanupYieldActive))
             {
                 return;
             }
@@ -219,6 +234,7 @@ namespace JueMingZ.Automation.InventoryAndItems
             request.Metadata["InventorySignature"] = signature ?? string.Empty;
             request.Metadata["SellSlotCount"] = candidates.Count.ToString(CultureInfo.InvariantCulture);
             request.Metadata["SellStackTotal"] = SumCandidateStacks(candidates).ToString(CultureInfo.InvariantCulture);
+            request.Metadata["AllowPlayerInventoryOpen"] = "true";
             return request;
         }
 
@@ -302,11 +318,11 @@ namespace JueMingZ.Automation.InventoryAndItems
             return result;
         }
 
-        private static bool ShouldScan(long tick)
+        private static bool ShouldScan(long tick, bool force)
         {
             lock (SyncRoot)
             {
-                if (tick - _lastScanTick >= CheckIntervalTicks || tick < _lastScanTick)
+                if (force || tick - _lastScanTick >= CheckIntervalTicks || tick < _lastScanTick)
                 {
                     _lastScanTick = tick;
                     return true;
@@ -346,11 +362,6 @@ namespace JueMingZ.Automation.InventoryAndItems
             if (snapshot.Ui.NpcChatOpen)
             {
                 return "blocked: NPC chat open";
-            }
-
-            if (snapshot.Ui.PlayerInventoryOpen)
-            {
-                return "blocked: player inventory UI open";
             }
 
             if (snapshot.Ui.ChestOpen)

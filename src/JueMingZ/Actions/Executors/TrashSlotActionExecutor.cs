@@ -110,7 +110,6 @@ namespace JueMingZ.Actions.Executors
             return snapshot.Ui.IsInMainMenu ||
                    snapshot.Ui.ChatOpen ||
                    snapshot.Ui.NpcChatOpen ||
-                   snapshot.Ui.PlayerInventoryOpen ||
                    snapshot.Ui.ChestOpen;
         }
 

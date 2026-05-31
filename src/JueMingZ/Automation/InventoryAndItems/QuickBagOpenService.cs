@@ -32,9 +32,11 @@ namespace JueMingZ.Automation.InventoryAndItems
         private const long CheckIntervalTicks = 1;
         private const long UseCooldownTicks = 1;
         private const int RapidOpenRepeatCount = 8;
+        private const long CleanupYieldTicks = 24;
         private static readonly object SyncRoot = new object();
         private static long _lastScanTick = -CheckIntervalTicks;
         private static long _lastUseTick = -UseCooldownTicks;
+        private static long _cleanupYieldUntilTick = -1;
         private static string _lastDecision = string.Empty;
         private static DateTime? _lastDecisionUtc;
         private static int _lastBagSlot = -1;
@@ -71,6 +73,7 @@ namespace JueMingZ.Automation.InventoryAndItems
             {
                 _lastScanTick = -CheckIntervalTicks;
                 _lastUseTick = -UseCooldownTicks;
+                _cleanupYieldUntilTick = -1;
                 _lastDecision = string.IsNullOrWhiteSpace(reason) ? "cleared" : reason;
                 _lastDecisionUtc = DateTime.UtcNow;
                 _lastBagSlot = -1;
@@ -99,12 +102,35 @@ namespace JueMingZ.Automation.InventoryAndItems
             return BuildRequest(slot, itemType, itemName);
         }
 
+        internal static bool IsCleanupYieldActiveForTesting(long tick)
+        {
+            return IsCleanupYieldActive(tick);
+        }
+
+        internal static void BeginCleanupYieldForTesting(long tick, bool cleanupEnabled)
+        {
+            BeginCleanupYield(tick, cleanupEnabled);
+        }
+
+        internal static bool IsCleanupYieldActiveForAutomation(long tick)
+        {
+            return IsCleanupYieldActive(tick);
+        }
+
         public static void HandleItemSlotRightClickPrefix(object inventory, int context, int slot)
         {
             var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
             if (!settings.InventoryQuickBagOpenEnabled)
             {
                 QuickBagOpenCompat.ResetHookPulseCooldown();
+                return;
+            }
+
+            var tick = JueMingZRuntime.State == null ? 0 : JueMingZRuntime.State.UpdateCount;
+            if (IsCleanupYieldActive(tick))
+            {
+                QuickBagOpenCompat.ResetHookPulseCooldown();
+                RecordDecision("hook: yielding for inventory cleanup", slot, 0, string.Empty);
                 return;
             }
 
@@ -131,6 +157,12 @@ namespace JueMingZ.Automation.InventoryAndItems
             {
                 ClearState("disabled");
                 return;
+            }
+
+            var cleanupEnabled = IsCleanupAutomationEnabled(settingsSnapshot);
+            if (!cleanupEnabled)
+            {
+                ClearCleanupYield();
             }
 
             var tick = runtimeState == null ? 0 : runtimeState.UpdateCount;
@@ -164,16 +196,22 @@ namespace JueMingZ.Automation.InventoryAndItems
                 return;
             }
 
-            if (IsQueueBusy(queue))
-            {
-                RecordDecision("queue busy", -1, 0, string.Empty);
-                return;
-            }
-
             string inputMessage;
             if (!QuickBagOpenCompat.TryIsRapidOpenInputActive(out inputMessage))
             {
                 RecordDecision("input gate: " + inputMessage, -1, 0, string.Empty);
+                return;
+            }
+
+            if (cleanupEnabled && IsCleanupYieldActive(tick))
+            {
+                RecordDecision("yielding for inventory cleanup", -1, 0, string.Empty);
+                return;
+            }
+
+            if (IsQueueBusy(queue))
+            {
+                RecordDecision("queue busy", -1, 0, string.Empty);
                 return;
             }
 
@@ -207,7 +245,8 @@ namespace JueMingZ.Automation.InventoryAndItems
             }
 
             _lastUseTick = tick;
-            RecordDecision("submitted quick bag open", slot, itemType, itemName);
+            BeginCleanupYield(tick, cleanupEnabled);
+            RecordDecision(cleanupEnabled ? "submitted quick bag open; yielding for inventory cleanup" : "submitted quick bag open", slot, itemType, itemName);
         }
 
         private static InputActionRequest BuildRequest(int slot, int itemType, string itemName)
@@ -307,6 +346,42 @@ namespace JueMingZ.Automation.InventoryAndItems
             var fast = queue == null ? null : queue.GetFastState();
             return fast == null || fast.PendingCount > 0 || fast.HasRunningAction ||
                    ItemUseBridge.PendingRequestId != Guid.Empty;
+        }
+
+        private static bool IsCleanupAutomationEnabled(RuntimeSettingsSnapshot settingsSnapshot)
+        {
+            return settingsSnapshot != null &&
+                   (settingsSnapshot.InventoryAutoStackEnabled ||
+                    settingsSnapshot.InventoryAutoSellEnabled ||
+                    settingsSnapshot.InventoryAutoDiscardEnabled);
+        }
+
+        private static void BeginCleanupYield(long tick, bool cleanupEnabled)
+        {
+            lock (SyncRoot)
+            {
+                _cleanupYieldUntilTick = cleanupEnabled
+                    ? tick + CleanupYieldTicks
+                    : -1;
+            }
+        }
+
+        private static void ClearCleanupYield()
+        {
+            lock (SyncRoot)
+            {
+                _cleanupYieldUntilTick = -1;
+            }
+        }
+
+        private static bool IsCleanupYieldActive(long tick)
+        {
+            lock (SyncRoot)
+            {
+                return _cleanupYieldUntilTick >= 0 &&
+                       tick >= 0 &&
+                       tick <= _cleanupYieldUntilTick;
+            }
         }
 
         private static void RecordDecision(string decision, int slot, int itemType, string itemName)

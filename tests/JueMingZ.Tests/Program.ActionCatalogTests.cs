@@ -426,6 +426,22 @@ namespace JueMingZ.Tests
             AssertMetadata(request, "InventorySignature", "8:2337x2|9:2339x1");
             AssertMetadata(request, "SellSlotCount", "2");
             AssertMetadata(request, "SellStackTotal", "3");
+            AssertMetadata(request, "AllowPlayerInventoryOpen", "true");
+        }
+
+        private static void AutoSellAllowsPlayerInventoryOpen()
+        {
+            var snapshot = new GameStateSnapshot
+            {
+                IsInWorld = true
+            };
+            snapshot.Ui.PlayerInventoryOpen = true;
+
+            var reason = AutoSellService.GetExecutionBlockedReasonForTesting(snapshot, false);
+            if (!string.IsNullOrEmpty(reason))
+            {
+                throw new InvalidOperationException("Auto sell service should allow player inventory to stay open, got: " + reason);
+            }
         }
 
         private static void AutoSellCandidatesUseInventorySnapshot()
@@ -506,6 +522,26 @@ namespace JueMingZ.Tests
             AssertMetadata(request, "InventorySignature", "8:12x2|9:99x3");
             AssertMetadata(request, "DiscardSlotCount", "2");
             AssertMetadata(request, "DiscardStackTotal", "5");
+            AssertMetadata(request, "AllowPlayerInventoryOpen", "true");
+        }
+
+        private static void AutoDiscardAllowsPlayerInventoryOpen()
+        {
+            var snapshot = new GameStateSnapshot
+            {
+                IsInWorld = true,
+                Player = new PlayerStateSnapshot
+                {
+                    Exists = true,
+                    Active = true
+                }
+            };
+            snapshot.Ui.PlayerInventoryOpen = true;
+
+            if (AutoDiscardService.IsExecutionBlockedForTesting(snapshot, false))
+            {
+                throw new InvalidOperationException("Auto discard service should allow player inventory to stay open.");
+            }
         }
 
         private static void AutoDiscardCandidatesUseInventorySnapshot()
@@ -563,6 +599,28 @@ namespace JueMingZ.Tests
             AssertMetadata(request, "QuickBagOpenItemType", "4405");
             AssertMetadata(request, "QuickBagOpenItemName", "宝匣");
             AssertMetadata(request, "QuickBagOpenRepeatCount", "8");
+        }
+
+        private static void QuickBagOpenYieldsAfterBatchWhenCleanupEnabled()
+        {
+            QuickBagOpenService.ClearState("test reset");
+            QuickBagOpenService.BeginCleanupYieldForTesting(100, true);
+            if (!QuickBagOpenService.IsCleanupYieldActiveForTesting(100) ||
+                !QuickBagOpenService.IsCleanupYieldActiveForTesting(124))
+            {
+                throw new InvalidOperationException("Quick bag open should yield for a bounded cleanup window after a batch.");
+            }
+
+            if (QuickBagOpenService.IsCleanupYieldActiveForTesting(125))
+            {
+                throw new InvalidOperationException("Quick bag open cleanup yield window should expire after its bounded window.");
+            }
+
+            QuickBagOpenService.BeginCleanupYieldForTesting(200, false);
+            if (QuickBagOpenService.IsCleanupYieldActiveForTesting(200))
+            {
+                throw new InvalidOperationException("Quick bag open should not yield when cleanup automation is disabled.");
+            }
         }
 
         private static void AutoDepositCoinsRequestUsesChestMetadata()

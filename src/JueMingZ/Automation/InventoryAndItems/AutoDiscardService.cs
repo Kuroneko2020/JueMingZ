@@ -71,6 +71,14 @@ namespace JueMingZ.Automation.InventoryAndItems
             return BuildAutoDiscardRequest(candidates, signature);
         }
 
+        internal static InputActionRequest BuildAutoDiscardRequestForTesting(
+            IReadOnlyList<AutoDiscardInventoryCandidate> candidates,
+            string signature,
+            bool allowPlayerInventoryOpen)
+        {
+            return BuildAutoDiscardRequest(candidates, signature);
+        }
+
         internal static bool TryFindDiscardableInventoryCandidatesForTesting(
             GameStateSnapshot gameState,
             ICollection<int> itemIds,
@@ -79,6 +87,11 @@ namespace JueMingZ.Automation.InventoryAndItems
             out string message)
         {
             return TryFindDiscardableInventoryCandidates(gameState, itemIds, out candidates, out signature, out message);
+        }
+
+        internal static bool IsExecutionBlockedForTesting(GameStateSnapshot snapshot, bool allowPlayerInventoryOpen)
+        {
+            return IsExecutionBlocked(snapshot);
         }
 
         public static AutoDiscardServiceDiagnostics GetDiagnostics()
@@ -106,7 +119,8 @@ namespace JueMingZ.Automation.InventoryAndItems
             }
 
             var tick = runtimeState == null ? 0 : runtimeState.UpdateCount;
-            if (!ShouldScan(tick))
+            var quickBagCleanupYieldActive = QuickBagOpenService.IsCleanupYieldActiveForAutomation(tick);
+            if (!ShouldScan(tick, quickBagCleanupYieldActive))
             {
                 return;
             }
@@ -196,6 +210,7 @@ namespace JueMingZ.Automation.InventoryAndItems
             request.Metadata["InventorySignature"] = signature ?? string.Empty;
             request.Metadata["DiscardSlotCount"] = candidates.Count.ToString(CultureInfo.InvariantCulture);
             request.Metadata["DiscardStackTotal"] = SumCandidateStacks(candidates).ToString(CultureInfo.InvariantCulture);
+            request.Metadata["AllowPlayerInventoryOpen"] = "true";
             return request;
         }
 
@@ -278,11 +293,11 @@ namespace JueMingZ.Automation.InventoryAndItems
             return result;
         }
 
-        private static bool ShouldScan(long tick)
+        private static bool ShouldScan(long tick, bool force)
         {
             lock (SyncRoot)
             {
-                if (tick - _lastScanTick >= CheckIntervalTicks || tick < _lastScanTick)
+                if (force || tick - _lastScanTick >= CheckIntervalTicks || tick < _lastScanTick)
                 {
                     _lastScanTick = tick;
                     return true;
@@ -312,7 +327,6 @@ namespace JueMingZ.Automation.InventoryAndItems
             return snapshot.Ui.IsInMainMenu ||
                    snapshot.Ui.ChatOpen ||
                    snapshot.Ui.NpcChatOpen ||
-                   snapshot.Ui.PlayerInventoryOpen ||
                    snapshot.Ui.ChestOpen;
         }
 

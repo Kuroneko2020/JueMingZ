@@ -125,11 +125,6 @@ namespace JueMingZ.Actions.Executors
                 return "blocked: NPC chat open";
             }
 
-            if (snapshot.Ui.PlayerInventoryOpen)
-            {
-                return "blocked: player inventory UI open";
-            }
-
             if (snapshot.Ui.ChestOpen)
             {
                 return "blocked: chest UI open";
