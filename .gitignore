@@ -1,0 +1,44 @@
+**/bin/
+**/obj/
+.vs/
+*.user
+*.suo
+*.log
+*.tmp
+.tmp
+.codex-tmp/
+_codex_log_inspect_*/
+
+# Local-only AI/maintainer documents. GitHub should stay a human-facing source tree.
+AGENTS.md
+docs/
+
+# Local-only reference materials under references are excluded by default.
+references/
+
+# Local-only decompiled Terraria reference; never commit or package.
+references/TerrariaDecompiled-*/
+
+# Temporary generated patch helpers; keep curated PowerShell scripts trackable.
+scripts/_*.py
+
+*.pdb
+.pdb
+external/Terraria/*.exe
+external/Terraria/*.dll
+external/TerrariaRefs/
+external/Harmony/*.dll
+.dotnet_home/
+.dotnet-home/
+.nuget/
+.appdata/
+.tmp-terraria-test/
+.tmp-terraria-test-flat/
+JueMingZ-TestPackage/
+JueMingZ-TestPackage.zip
+JueMingZ-SourcePackage/
+JueMingZ-SourcePackage.zip
+JueMing-Z-main.zip
+/logs/
+/config/
+/diagnostics/

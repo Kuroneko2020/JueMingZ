@@ -1,0 +1,255 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Reflection;
+using JueMingZ.Automation.BuffAndRecovery;
+using JueMingZ.Config;
+using JueMingZ.Diagnostics;
+using JueMingZ.Runtime;
+
+namespace JueMingZ.UI.Legacy
+{
+    public static partial class LegacyMainUiState
+    {
+        public static int X { get { EnsureLoaded(); lock (SyncRoot) { return _x; } } }
+
+        public static bool ToggleVisible()
+        {
+            EnsureLoaded();
+            bool visible;
+            lock (SyncRoot)
+            {
+                _visible = !_visible;
+                visible = _visible;
+                if (visible)
+                {
+                    ClampToScreenLocked();
+                    SaveWindowLocked();
+                }
+            }
+
+            if (visible && !_candidateScanAttempted)
+            {
+                RefreshBuffCandidates("Ui.MainWindow.Open");
+            }
+            else if (!visible)
+            {
+                LegacyUiInput.ResetInteractionState();
+                FishingFilterUiState.Reset();
+                UiMouseCaptureService.ReleaseForOperationWindow();
+            }
+
+            RecordWindowToggle(visible);
+            return visible;
+        }
+
+        public static void SetVisible(bool visible)
+        {
+            EnsureLoaded();
+            lock (SyncRoot)
+            {
+                _visible = visible;
+                if (visible)
+                {
+                    ClampToScreenLocked();
+                }
+            }
+
+            if (!visible)
+            {
+                LegacyUiInput.ResetInteractionState();
+                FishingFilterUiState.Reset();
+                UiMouseCaptureService.ReleaseForOperationWindow();
+            }
+        }
+
+        public static bool HideIfMainMenu(string source)
+        {
+            bool blocked;
+            string reason;
+            if (!GameMode.TryReadLegacyUiBlockedByVanillaMenuLateOnly(out blocked, out reason) || !blocked)
+            {
+                return false;
+            }
+
+            bool wasVisible;
+            lock (SyncRoot)
+            {
+                wasVisible = _visible;
+                _visible = false;
+            }
+
+            if (wasVisible)
+            {
+                LegacyUiInput.ResetInteractionState();
+                FishingFilterUiState.Reset();
+                UiMouseCaptureService.ReleaseForOperationWindow();
+                RecordWindowMainMenuSuppressed(source, reason);
+            }
+
+            return true;
+        }
+
+        public static void SelectPage(string pageId)
+        {
+            if (!IsKnownPage(pageId))
+            {
+                pageId = "buff";
+            }
+
+            lock (SyncRoot)
+            {
+                if (_selectedPageId == pageId)
+                {
+                    return;
+                }
+
+                _selectedPageId = pageId;
+                _scrollOffset = 0;
+                _maxScroll = 0;
+                FishingFilterUiState.Reset();
+                var settings = ConfigService.AppSettings;
+                if (settings != null)
+                {
+                    settings.LegacySelectedPageId = pageId;
+                    ConfigService.SaveAll();
+                }
+            }
+        }
+
+        public static void SetWindow(int x, int y, int width, int height, bool save)
+        {
+            EnsureLoaded();
+            lock (SyncRoot)
+            {
+                _x = Clamp(x, -4096, 4096);
+                _y = Clamp(y, -4096, 4096);
+                _width = LegacyUiMetrics.DefaultWidth;
+                _height = LegacyUiMetrics.DefaultHeight;
+                ClampToScreenLocked();
+                if (save)
+                {
+                    SaveWindowLocked();
+                }
+            }
+        }
+
+        public static void SaveWindow()
+        {
+            EnsureLoaded();
+            lock (SyncRoot)
+            {
+                SaveWindowLocked();
+            }
+        }
+
+        private static void ClampToScreenLocked()
+        {
+            int screenWidth;
+            int screenHeight;
+            ReadScreenSize(out screenWidth, out screenHeight);
+            _width = LegacyUiMetrics.DefaultWidth;
+            _height = LegacyUiMetrics.DefaultHeight;
+            _x = Clamp(_x, 0, Math.Max(0, screenWidth - _width - 8));
+            _y = Clamp(_y, 0, Math.Max(0, screenHeight - _height - 8));
+        }
+
+        private static void SaveWindowLocked()
+        {
+            var settings = ConfigService.AppSettings;
+            if (settings == null)
+            {
+                return;
+            }
+
+            settings.LegacyMainWindowX = _x;
+            settings.LegacyMainWindowY = _y;
+            settings.LegacyMainWindowWidth = _width;
+            settings.LegacyMainWindowHeight = _height;
+            settings.LegacySelectedPageId = _selectedPageId;
+            ConfigService.SaveAll();
+        }
+
+        private static bool IsKnownPage(string pageId)
+        {
+            if (string.IsNullOrWhiteSpace(pageId))
+            {
+                return false;
+            }
+
+            for (var index = 0; index < LegacyTabBar.Tabs.Length; index++)
+            {
+                if (LegacyTabBar.Tabs[index].Id == pageId)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static void ReadScreenSize(out int width, out int height)
+        {
+            width = 1280;
+            height = 720;
+            try
+            {
+                var mainType = FindType("Terraria.Main");
+                if (mainType == null)
+                {
+                    return;
+                }
+
+                width = ReadStaticInt(mainType, "screenWidth", width);
+                height = ReadStaticInt(mainType, "screenHeight", height);
+            }
+            catch
+            {
+            }
+        }
+
+        private static int ReadStaticInt(Type type, string name, int fallback)
+        {
+            const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
+            try
+            {
+                var field = type.GetField(name, flags);
+                if (field != null)
+                {
+                    return Convert.ToInt32(field.GetValue(null));
+                }
+
+                var property = type.GetProperty(name, flags);
+                if (property != null && property.CanRead)
+                {
+                    return Convert.ToInt32(property.GetValue(null, null));
+                }
+            }
+            catch
+            {
+            }
+
+            return fallback;
+        }
+
+        private static Type FindType(string fullName)
+        {
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                try
+                {
+                    var type = assembly.GetType(fullName, false);
+                    if (type != null)
+                    {
+                        return type;
+                    }
+                }
+                catch
+                {
+                }
+            }
+
+            return null;
+        }
+    }
+}

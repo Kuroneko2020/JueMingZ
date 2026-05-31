@@ -1,0 +1,66 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <OutputType>Library</OutputType>
+    <AssemblyName>JueMingZ</AssemblyName>
+    <RootNamespace>JueMingZ</RootNamespace>
+    <Platforms>AnyCPU;x86</Platforms>
+    <PlatformTarget>x86</PlatformTarget>
+    <LangVersion>7.3</LangVersion>
+    <Version>1.7.382</Version>
+    <AssemblyVersion>1.7.382.0</AssemblyVersion>
+    <FileVersion>1.7.382.0</FileVersion>
+    <InformationalVersion>1.7.382-fishing-restore-retry</InformationalVersion>
+    <Deterministic>true</Deterministic>
+    <RestoreConfigFile>$(MSBuildThisFileDirectory)..\..\NuGet.Config</RestoreConfigFile>
+    <RestorePackagesPath>$(MSBuildThisFileDirectory)..\..\.nuget\packages</RestorePackagesPath>
+    <HarmonyDllPath>$(MSBuildThisFileDirectory)..\..\external\ThirdParty\0Harmony.dll</HarmonyDllPath>
+    <JueMingZTerrariaRefsDir Condition="'$(JueMingZTerrariaRefsDir)' == ''">$(MSBuildThisFileDirectory)..\..\external\TerrariaRefs</JueMingZTerrariaRefsDir>
+  </PropertyGroup>
+  <Target Name="EnsureHarmonyDependency" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('$(HarmonyDllPath)')" Text="Required Harmony dependency missing: $(HarmonyDllPath)" />
+  </Target>
+  <ItemGroup>
+    <JueMingZRequiredTerrariaRef Include="Terraria.exe" />
+    <JueMingZRequiredTerrariaRef Include="Microsoft.Xna.Framework.dll" />
+    <JueMingZRequiredTerrariaRef Include="Microsoft.Xna.Framework.Game.dll" />
+    <JueMingZRequiredTerrariaRef Include="Microsoft.Xna.Framework.Graphics.dll" />
+    <JueMingZRequiredTerrariaRef Include="ReLogic.dll" />
+  </ItemGroup>
+  <Target Name="EnsureTerrariaReferenceDependencies" BeforeTargets="PrepareForBuild">
+    <Error
+      Condition="!Exists('$(JueMingZTerrariaRefsDir)\%(JueMingZRequiredTerrariaRef.Identity)')"
+      Text="Required Terraria compile reference missing: $(JueMingZTerrariaRefsDir)\%(JueMingZRequiredTerrariaRef.Identity). Copy Terraria.exe, Microsoft.Xna.Framework.dll, Microsoft.Xna.Framework.Game.dll, Microsoft.Xna.Framework.Graphics.dll, and ReLogic.dll from your Terraria install directory or C:\Users\kongd\Desktop\决明依赖 into external\TerrariaRefs\, or pass -p:JueMingZTerrariaRefsDir=&quot;C:\path\to\refs&quot;." />
+  </Target>
+  <ItemGroup>
+    <Reference Include="0Harmony">
+      <HintPath>$(HarmonyDllPath)</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Terraria">
+      <HintPath>$(JueMingZTerrariaRefsDir)\Terraria.exe</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Microsoft.Xna.Framework">
+      <HintPath>$(JueMingZTerrariaRefsDir)\Microsoft.Xna.Framework.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Microsoft.Xna.Framework.Game">
+      <HintPath>$(JueMingZTerrariaRefsDir)\Microsoft.Xna.Framework.Game.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Microsoft.Xna.Framework.Graphics">
+      <HintPath>$(JueMingZTerrariaRefsDir)\Microsoft.Xna.Framework.Graphics.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="ReLogic">
+      <HintPath>$(JueMingZTerrariaRefsDir)\ReLogic.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <EmbeddedResource Include="$(HarmonyDllPath)" LogicalName="JueMingZ.Embedded.0Harmony.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\About\wechat.png" LogicalName="JueMingZ.Assets.About.wechat.png" />
+    <EmbeddedResource Include="Assets\About\alipay.jpg" LogicalName="JueMingZ.Assets.About.alipay.jpg" />
+  </ItemGroup>
+</Project>

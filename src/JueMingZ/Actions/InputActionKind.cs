@@ -1,0 +1,32 @@
+namespace JueMingZ.Actions
+{
+    public enum InputActionKind
+    {
+        None,
+        DiagnosticNoop,
+        ItemUse,
+        UseHotbarItem,
+        UseInventoryItem,
+        QuickHeal,
+        QuickMana,
+        QuickBuff,
+        BuffPotionDirectUse,
+        TileInteract,
+        NpcInteract,
+        InventorySlot,
+        SelectHotbarSlot,
+        Chest,
+        Shop,
+        Reforge,
+        TrashSlot,
+        Aim,
+        MouseTarget,
+        MouseTargetDryRun,
+        Movement,
+        Jump,
+        Dash,
+        TeleportCorrection,
+        RawInput,
+        PlayerRename
+    }
+}

@@ -1,0 +1,69 @@
+namespace JueMingZ.Automation.Combat
+{
+    public sealed class CombatTargetSnapshot
+    {
+        public int WhoAmI { get; set; }
+        public int Type { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public bool Active { get; set; }
+        public bool Friendly { get; set; }
+        public bool TownNpc { get; set; }
+        public bool Hide { get; set; }
+        public bool Chaseable { get; set; }
+        public bool DontTakeDamage { get; set; }
+        public bool Immortal { get; set; }
+        public bool IsTargetDummy { get; set; }
+        public int Life { get; set; }
+        public int LifeMax { get; set; }
+        public float PositionX { get; set; }
+        public float PositionY { get; set; }
+        public int Width { get; set; }
+        public int Height { get; set; }
+        public float CenterX { get; set; }
+        public float CenterY { get; set; }
+        public float VelocityX { get; set; }
+        public float VelocityY { get; set; }
+        public bool SmoothedVelocityAvailable { get; set; }
+        public float SmoothedVelocityX { get; set; }
+        public float SmoothedVelocityY { get; set; }
+        public float HitboxX { get; set; }
+        public float HitboxY { get; set; }
+        public float HitboxWidth { get; set; }
+        public float HitboxHeight { get; set; }
+
+        public CombatTargetSnapshot CloneForAimSample(float centerX, float centerY)
+        {
+            return new CombatTargetSnapshot
+            {
+                WhoAmI = WhoAmI,
+                Type = Type,
+                Name = Name,
+                Active = Active,
+                Friendly = Friendly,
+                TownNpc = TownNpc,
+                Hide = Hide,
+                Chaseable = Chaseable,
+                DontTakeDamage = DontTakeDamage,
+                Immortal = Immortal,
+                IsTargetDummy = IsTargetDummy,
+                Life = Life,
+                LifeMax = LifeMax,
+                PositionX = PositionX,
+                PositionY = PositionY,
+                Width = Width,
+                Height = Height,
+                CenterX = centerX,
+                CenterY = centerY,
+                VelocityX = SmoothedVelocityAvailable ? SmoothedVelocityX : VelocityX,
+                VelocityY = SmoothedVelocityAvailable ? SmoothedVelocityY : VelocityY,
+                SmoothedVelocityAvailable = SmoothedVelocityAvailable,
+                SmoothedVelocityX = SmoothedVelocityX,
+                SmoothedVelocityY = SmoothedVelocityY,
+                HitboxX = HitboxX,
+                HitboxY = HitboxY,
+                HitboxWidth = HitboxWidth,
+                HitboxHeight = HitboxHeight
+            };
+        }
+    }
+}

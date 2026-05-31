@@ -1,0 +1,236 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
+using System.Runtime.InteropServices;
+using JueMingZ.Automation.AutoRecovery;
+using JueMingZ.Automation.BuffAndRecovery;
+using JueMingZ.Automation.Fishing.Filtering;
+using JueMingZ.Automation.Information;
+using JueMingZ.Automation.Movement;
+using JueMingZ.Compat;
+using JueMingZ.Config;
+using JueMingZ.Diagnostics;
+using JueMingZ.Runtime;
+using JueMingZ.UI.Legacy.Controls;
+using JueMingZ.UI.Legacy.Framework;
+
+namespace JueMingZ.UI.Legacy
+{
+    public static partial class LegacyMainWindow
+    {
+        public static bool DrawInterfaceLayer()
+        {
+            try
+            {
+                if (!LegacyMainUiState.Visible)
+                {
+                    return true;
+                }
+
+                if (LegacyMainUiState.HideIfMainMenu("LegacyMainUi.Draw"))
+                {
+                    return true;
+                }
+
+                if (!TerrariaMainCompat.AllowsInputProcessing)
+                {
+                    LegacyUiInput.ResetInteractionState();
+                    UiMouseCaptureService.ReleaseForOperationWindow();
+                }
+
+                object spriteBatch;
+                if (!UiDrawLifecycleGuard.TryEnterInterfaceDraw("LegacyMainWindow", true, out spriteBatch))
+                {
+                    return true;
+                }
+
+                var mouse = LegacyUiInput.ReadMouse();
+                var window = LegacyMainUiState.WindowRect;
+                var shell = LegacyMainWindowShell.Create(window);
+                LegacyUiInput.HandleWindowFrame(mouse, shell.TitleRect, shell.ResizeRect);
+
+                window = LegacyMainUiState.WindowRect;
+                shell = LegacyMainWindowShell.Create(window);
+                var inWindow = LegacyUiInput.IsMouseInWindow(mouse) || LegacyUiInput.IsActiveInteraction();
+                LegacyUiInput.CaptureIfNeeded(inWindow);
+                var selectedPage = LegacyMainUiState.SelectedPageId;
+                var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
+                var elements = PrepareFrameElements();
+                var frameContext = new LegacyUiContext(spriteBatch, mouse, window, selectedPage, settings, elements);
+
+                DrawFrame(spriteBatch, window, shell.TitleRect, shell.ResizeRect);
+
+                DrawTabs(frameContext);
+
+                var contentRect = shell.ContentRect;
+                frameContext.SetContentRect(contentRect);
+                LegacyUiTheme.DrawContentPanel(spriteBatch, contentRect);
+                var contentHeight = CalculateCachedContentHeight(selectedPage, contentRect, settings);
+                var scrollContainer = LegacyScrollContainerControl.Create(contentRect, contentHeight, LegacyMainUiState.ScrollOffset);
+                var scrollArea = scrollContainer.Area;
+                LegacyMainUiState.SetScrollOffset(scrollArea.ScrollOffset, scrollArea.MaxScroll);
+                frameContext.SetScrollArea(scrollArea);
+
+                if (inWindow && mouse.ScrollDelta != 0)
+                {
+                    var scrollSnapshot = TerrariaUiMouseCompat.ReadScrollSnapshot(mouse.ScrollDelta);
+                    if (string.Equals(selectedPage, "fishing", StringComparison.Ordinal) &&
+                        (FishingFilterUiState.TryConsumePickerScroll(mouse) ||
+                         FishingFilterUiState.TryConsumePresetScroll(mouse) ||
+                         FishingFilterUiState.TryConsumeEntryScroll(mouse)))
+                    {
+                        LegacyUiInput.CaptureIfNeeded(true);
+                        LegacyHotbarScrollGuard.RestoreLateUiWheelIfNeeded(scrollSnapshot, inWindow, LegacyUiInput.IsActiveInteraction());
+                        LegacyUiInput.SuppressHotbarScroll();
+                    }
+                    else
+                    {
+                        var before = LegacyMainUiState.ScrollOffset;
+                        var scrollDelta = -mouse.ScrollDelta / 3;
+                        if (scrollDelta == 0)
+                        {
+                            scrollDelta = mouse.ScrollDelta > 0 ? -40 : 40;
+                        }
+
+                        LegacyMainUiState.ScrollBy(scrollDelta, scrollArea.MaxScroll);
+                        scrollArea = LegacyScrollArea.Create(contentRect, contentHeight, LegacyMainUiState.ScrollOffset);
+                        LegacyUiInput.CaptureIfNeeded(true);
+                        var restored = LegacyHotbarScrollGuard.RestoreLateUiWheelIfNeeded(scrollSnapshot, inWindow, LegacyUiInput.IsActiveInteraction());
+                        var suppressed = LegacyUiInput.SuppressHotbarScroll();
+                        if (before != LegacyMainUiState.ScrollOffset)
+                        {
+                            RecordUiScroll(mouse.ScrollDelta, before, LegacyMainUiState.ScrollOffset, suppressed || restored);
+                        }
+                    }
+                }
+
+                LegacyUiInput.HandleScrollbarDrag(mouse, scrollArea);
+                scrollContainer = LegacyScrollContainerControl.Create(contentRect, contentHeight, LegacyMainUiState.ScrollOffset);
+                scrollArea = scrollContainer.Area;
+                frameContext.SetScrollArea(scrollArea);
+
+                LegacyUiElement hoveredElement = null;
+                if (string.Equals(selectedPage, "buff", StringComparison.Ordinal))
+                {
+                    hoveredElement = DrawBuffPage(spriteBatch, scrollArea, mouse, elements);
+                }
+                else if (string.Equals(selectedPage, "combat", StringComparison.Ordinal))
+                {
+                    hoveredElement = DrawCombatPage(spriteBatch, scrollArea, mouse, elements);
+                }
+                else if (string.Equals(selectedPage, "misc", StringComparison.Ordinal))
+                {
+                    hoveredElement = DrawMiscPage(spriteBatch, scrollArea, mouse, elements);
+                }
+                else if (string.Equals(selectedPage, "about", StringComparison.Ordinal))
+                {
+                    hoveredElement = DrawAboutPage(spriteBatch, scrollArea, mouse, elements);
+                }
+                else if (string.Equals(selectedPage, "information", StringComparison.Ordinal))
+                {
+                    hoveredElement = DrawInformationPage(spriteBatch, scrollArea, mouse, elements);
+                }
+                else if (string.Equals(selectedPage, "fishing", StringComparison.Ordinal))
+                {
+                    hoveredElement = DrawFishingPage(spriteBatch, scrollArea, mouse, elements);
+                }
+                else if (string.Equals(selectedPage, "movement", StringComparison.Ordinal))
+                {
+                    hoveredElement = DrawMovementPage(spriteBatch, scrollArea, mouse, elements);
+                }
+                else
+                {
+                    hoveredElement = DrawEmptyPage(spriteBatch, scrollArea, selectedPage, mouse);
+                }
+
+                if (!string.Equals(selectedPage, "about", StringComparison.Ordinal) || scrollArea.NeedsScroll)
+                {
+                    scrollContainer.DrawScrollbar(spriteBatch);
+                }
+
+                if (!string.Equals(selectedPage, "about", StringComparison.Ordinal))
+                {
+                    DrawFooter(spriteBatch, window);
+                }
+                if (hoveredElement != null)
+                {
+                    DrawTooltip(spriteBatch, hoveredElement, mouse);
+                }
+
+                if (inWindow)
+                {
+                    UiMouseCaptureService.SuppressMouseTextForOperationWindow();
+                }
+
+                HandleClicks(elements, mouse, shell.TitleRect, shell.ResizeRect);
+                LegacyUiInput.FinishFrame(mouse, inWindow);
+            }
+            catch (Exception error)
+            {
+                UiDrawLifecycleGuard.RecordDrawException("LegacyMainWindow", error);
+                LogThrottle.ErrorThrottled(
+                    "legacy-main-window-draw-error",
+                    TimeSpan.FromSeconds(10),
+                    "LegacyMainWindow",
+                    "Legacy main window draw failed.", error);
+            }
+
+            return true;
+        }
+
+        public static bool DrawInputGuardLayer()
+        {
+            try
+            {
+                if (!LegacyMainUiState.Visible)
+                {
+                    return true;
+                }
+
+                if (!LegacyMainUiState.HideIfMainMenu("LegacyMainUi.InputGuard"))
+                {
+                    LegacyUiInput.CaptureCurrentMouseForWindow("LegacyMainUi.InputGuard");
+                }
+            }
+            catch (Exception error)
+            {
+                LogThrottle.ErrorThrottled(
+                    "legacy-main-window-input-guard-error",
+                    TimeSpan.FromSeconds(10),
+                    "LegacyMainWindow",
+                    "Legacy main window input guard failed.", error);
+            }
+
+            return true;
+        }
+
+        public static bool DrawMouseTextGuardLayer()
+        {
+            try
+            {
+                if (!LegacyMainUiState.Visible)
+                {
+                    return true;
+                }
+
+                if (!LegacyMainUiState.HideIfMainMenu("LegacyMainUi.MouseTextGuard") &&
+                    LegacyUiInput.CaptureCurrentMouseForWindow("LegacyMainUi.MouseTextGuard"))
+                {
+                    UiMouseCaptureService.SuppressMouseTextForOperationWindow();
+                }
+            }
+            catch (Exception error)
+            {
+                LogThrottle.ErrorThrottled(
+                    "legacy-main-window-mouse-text-guard-error",
+                    TimeSpan.FromSeconds(10),
+                    "LegacyMainWindow",
+                    "Legacy main window mouse text guard failed.", error);
+            }
+
+            return true;
+        }
+    }
+}

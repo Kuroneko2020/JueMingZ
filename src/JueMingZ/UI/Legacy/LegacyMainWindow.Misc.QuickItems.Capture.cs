@@ -1,0 +1,237 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
+using JueMingZ.Common;
+using JueMingZ.Compat;
+using JueMingZ.Config;
+using JueMingZ.UI.Legacy.Framework;
+
+namespace JueMingZ.UI.Legacy
+{
+    public static partial class LegacyMainWindow
+    {
+        private static void UpdateQuickItemHotkeyCapture(List<QuickItemHotkeyBinding> bindings)
+        {
+            if (!_quickItemHotkeyCaptureActive ||
+                _quickItemHotkeyCaptureBindingIndex < 0 ||
+                bindings == null ||
+                _quickItemHotkeyCaptureBindingIndex >= bindings.Count ||
+                !IsCurrentProcessForeground())
+            {
+                return;
+            }
+
+            var ctrl = IsKeyDown(VkControl);
+            var alt = IsKeyDown(VkAlt);
+            var shift = IsKeyDown(VkShift);
+            if (!ctrl && !alt && !shift && PressedQuickItemCaptureKey(0x1B))
+            {
+                StopQuickItemHotkeyCapture();
+                return;
+            }
+
+            string token;
+            if (!TryCaptureQuickItemPrimaryKeyToken(out token))
+            {
+                return;
+            }
+
+            var normalized = (ctrl ? "Ctrl+" : string.Empty) +
+                             (alt ? "Alt+" : string.Empty) +
+                             (shift ? "Shift+" : string.Empty) +
+                             token;
+            var binding = bindings[_quickItemHotkeyCaptureBindingIndex];
+            if (binding != null)
+            {
+                binding.Hotkey = normalized;
+                binding.Enabled = true;
+                ConfigService.SaveAll();
+            }
+
+            StopQuickItemHotkeyCapture();
+        }
+
+        private static void UpdateAutoMiningHotkeyCapture()
+        {
+            if (!_autoMiningHotkeyCaptureActive || !IsCurrentProcessForeground())
+            {
+                return;
+            }
+
+            var ctrl = IsKeyDown(VkControl);
+            var alt = IsKeyDown(VkAlt);
+            var shift = IsKeyDown(VkShift);
+            if (!ctrl && !alt && !shift && PressedCaptureKey(AutoMiningCaptureWasDown, 0x1B))
+            {
+                StopAutoMiningHotkeyCapture();
+                return;
+            }
+
+            string token;
+            if (!TryCaptureHotkeyPrimaryKeyToken(AutoMiningCaptureWasDown, out token))
+            {
+                return;
+            }
+
+            var normalized = (ctrl ? "Ctrl+" : string.Empty) +
+                             (alt ? "Alt+" : string.Empty) +
+                             (shift ? "Shift+" : string.Empty) +
+                             token;
+            var hotkeySettings = ConfigService.HotkeySettings ?? HotkeySettings.CreateDefault();
+            if (hotkeySettings.HotkeysByFeatureId == null)
+            {
+                hotkeySettings.HotkeysByFeatureId = new Dictionary<string, string>();
+            }
+
+            hotkeySettings.HotkeysByFeatureId[FeatureIds.WorldAutomationAutoMining] = normalized;
+            ConfigService.SaveAll();
+            StopAutoMiningHotkeyCapture();
+        }
+
+        private static bool TryCaptureQuickItemPrimaryKeyToken(out string token)
+        {
+            return TryCaptureHotkeyPrimaryKeyToken(QuickItemCaptureWasDown, out token);
+        }
+
+        private static bool TryCaptureHotkeyPrimaryKeyToken(Dictionary<int, bool> state, out string token)
+        {
+            token = string.Empty;
+            for (var key = 0x41; key <= 0x5A; key++)
+            {
+                if (PressedCaptureKey(state, key))
+                {
+                    token = ((char)key).ToString();
+                    return true;
+                }
+            }
+
+            for (var key = 0x30; key <= 0x39; key++)
+            {
+                if (PressedCaptureKey(state, key))
+                {
+                    token = ((char)key).ToString();
+                    return true;
+                }
+            }
+
+            for (var key = 0x70; key <= 0x87; key++)
+            {
+                if (PressedCaptureKey(state, key))
+                {
+                    token = "F" + (key - 0x6F).ToString(CultureInfo.InvariantCulture);
+                    return true;
+                }
+            }
+
+            for (var index = 0; index < QuickItemCaptureAdditionalKeys.Length; index++)
+            {
+                var keyCode = QuickItemCaptureAdditionalKeys[index];
+                if (!PressedCaptureKey(state, keyCode))
+                {
+                    continue;
+                }
+
+                if (TryGetQuickItemCaptureToken(keyCode, out token))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool PressedQuickItemCaptureKey(int keyCode)
+        {
+            return PressedCaptureKey(QuickItemCaptureWasDown, keyCode);
+        }
+
+        private static bool PressedCaptureKey(Dictionary<int, bool> state, int keyCode)
+        {
+            var isDown = IsKeyDown(keyCode);
+            bool wasDown;
+            if (state == null)
+            {
+                return isDown;
+            }
+
+            state.TryGetValue(keyCode, out wasDown);
+            state[keyCode] = isDown;
+            return isDown && !wasDown;
+        }
+
+        private static bool IsKeyDown(int keyCode)
+        {
+            if (!TerrariaMainCompat.AllowsInputProcessing)
+            {
+                return false;
+            }
+
+            return (GetAsyncKeyState(keyCode) & 0x8000) != 0;
+        }
+
+        private static bool TryGetQuickItemCaptureToken(int keyCode, out string token)
+        {
+            token = string.Empty;
+            switch (keyCode)
+            {
+                case 0x14:
+                    token = "CAPS";
+                    return true;
+                case 0x20:
+                    token = "SPACE";
+                    return true;
+                case 0x09:
+                    token = "TAB";
+                    return true;
+                case 0x0D:
+                    token = "ENTER";
+                    return true;
+                case 0x1B:
+                    token = "ESC";
+                    return true;
+                case 0x25:
+                    token = "LEFT";
+                    return true;
+                case 0x26:
+                    token = "UP";
+                    return true;
+                case 0x27:
+                    token = "RIGHT";
+                    return true;
+                case 0x28:
+                    token = "DOWN";
+                    return true;
+                case 0x05:
+                    token = "MOUSE4";
+                    return true;
+                case 0x06:
+                    token = "MOUSE5";
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private static bool IsCurrentProcessForeground()
+        {
+            try
+            {
+                var foregroundWindow = GetForegroundWindow();
+                if (foregroundWindow == IntPtr.Zero)
+                {
+                    return true;
+                }
+
+                int processId;
+                GetWindowThreadProcessId(foregroundWindow, out processId);
+                return processId == Process.GetCurrentProcess().Id;
+            }
+            catch
+            {
+                return true;
+            }
+        }
+    }
+}

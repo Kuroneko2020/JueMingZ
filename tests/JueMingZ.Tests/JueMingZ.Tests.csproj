@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net472</TargetFramework>
+    <PlatformTarget>x86</PlatformTarget>
+    <LangVersion>7.3</LangVersion>
+    <NoWarn>0649</NoWarn>
+    <RestoreConfigFile>$(MSBuildThisFileDirectory)..\..\NuGet.Config</RestoreConfigFile>
+    <RestorePackagesPath>$(MSBuildThisFileDirectory)..\..\.nuget\packages</RestorePackagesPath>
+    <JueMingZTerrariaRefsDir Condition="'$(JueMingZTerrariaRefsDir)' == ''">$(MSBuildThisFileDirectory)..\..\external\TerrariaRefs</JueMingZTerrariaRefsDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\JueMingZ\JueMingZ.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <JueMingZRuntimeTestDependency Include="$(JueMingZTerrariaRefsDir)\Terraria.exe" />
+    <JueMingZRuntimeTestDependency Include="$(JueMingZTerrariaRefsDir)\Microsoft.Xna.Framework.dll" />
+    <JueMingZRuntimeTestDependency Include="$(JueMingZTerrariaRefsDir)\Microsoft.Xna.Framework.Game.dll" />
+    <JueMingZRuntimeTestDependency Include="$(JueMingZTerrariaRefsDir)\Microsoft.Xna.Framework.Graphics.dll" />
+    <JueMingZRuntimeTestDependency Include="$(JueMingZTerrariaRefsDir)\ReLogic.dll" />
+  </ItemGroup>
+  <Target Name="CopyTerrariaRuntimeTestDependencies" AfterTargets="Build">
+    <Copy SourceFiles="@(JueMingZRuntimeTestDependency)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
+  </Target>
+</Project>
