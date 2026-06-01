@@ -13,6 +13,7 @@ namespace JueMingZ.Diagnostics
         public static bool InterfaceLayerHookInstalled { get; private set; }
         public static bool ItemCheckHookInstalled { get; private set; }
         public static bool TeleportRodHookInstalled { get; private set; }
+        public static bool GoblinExecutionHookInstalled { get; private set; }
         public static string SafeBootstrapHookMethod { get; private set; } = string.Empty;
         public static string UpdateHookMethod { get; private set; } = string.Empty;
         public static string DrawHookMethod { get; private set; } = string.Empty;
@@ -23,6 +24,9 @@ namespace JueMingZ.Diagnostics
         public static string TeleportRodHookMethod { get; private set; } = string.Empty;
         public static string TeleportRodHookMessage { get; private set; } = string.Empty;
         public static string TeleportRodHookError { get; private set; } = string.Empty;
+        public static string GoblinExecutionHookMethod { get; private set; } = string.Empty;
+        public static string GoblinExecutionHookMessage { get; private set; } = string.Empty;
+        public static string GoblinExecutionHookError { get; private set; } = string.Empty;
         public static string LastInstallMessage { get; private set; } = string.Empty;
         public static string LastInstallError { get; private set; } = string.Empty;
         public static DateTime? LastInstallAttemptUtc { get; private set; }
@@ -200,6 +204,51 @@ namespace JueMingZ.Diagnostics
                 TeleportRodHookMethod = string.Empty;
                 TeleportRodHookMessage = message ?? string.Empty;
                 TeleportRodHookError = error == null ? string.Empty : error.ToString();
+                LastInstallMessage = message ?? string.Empty;
+                LastInstallError = error == null ? string.Empty : error.ToString();
+                LastInstallAttemptUtc = DateTime.UtcNow;
+            }
+        }
+
+        public static void MarkGoblinExecutionHookSucceeded(string methodName, string message)
+        {
+            lock (SyncRoot)
+            {
+                HookInstallAttempted = true;
+                GoblinExecutionHookInstalled = true;
+                GoblinExecutionHookMethod = methodName ?? string.Empty;
+                GoblinExecutionHookMessage = message ?? string.Empty;
+                GoblinExecutionHookError = string.Empty;
+                LastInstallMessage = message ?? string.Empty;
+                LastInstallError = string.Empty;
+                LastInstallAttemptUtc = DateTime.UtcNow;
+            }
+        }
+
+        public static void MarkGoblinExecutionHookSkipped(string message)
+        {
+            lock (SyncRoot)
+            {
+                HookInstallAttempted = true;
+                GoblinExecutionHookInstalled = false;
+                GoblinExecutionHookMethod = string.Empty;
+                GoblinExecutionHookMessage = message ?? string.Empty;
+                GoblinExecutionHookError = string.Empty;
+                LastInstallMessage = message ?? string.Empty;
+                LastInstallError = string.Empty;
+                LastInstallAttemptUtc = DateTime.UtcNow;
+            }
+        }
+
+        public static void MarkGoblinExecutionHookFailed(string message, Exception error)
+        {
+            lock (SyncRoot)
+            {
+                HookInstallAttempted = true;
+                GoblinExecutionHookInstalled = false;
+                GoblinExecutionHookMethod = string.Empty;
+                GoblinExecutionHookMessage = message ?? string.Empty;
+                GoblinExecutionHookError = error == null ? string.Empty : error.ToString();
                 LastInstallMessage = message ?? string.Empty;
                 LastInstallError = error == null ? string.Empty : error.ToString();
                 LastInstallAttemptUtc = DateTime.UtcNow;

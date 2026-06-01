@@ -2062,7 +2062,7 @@ namespace JueMingZ.Input
                     ? "自动转向已开启：使用合格战斗物品时，会通过 Player.ChangeDir 朝向当前目标或鼠标方向。"
                     : "自动转向已关闭。";
             }
-            else
+            else if (string.Equals(option, "equipmentWarning", StringComparison.Ordinal))
             {
                 changed = settings.CombatEquipmentWarningEnabled != enabled;
                 settings.CombatEquipmentWarningEnabled = enabled;
@@ -2071,6 +2071,30 @@ namespace JueMingZ.Input
                 message = enabled
                     ? "装备提示已开启：Boss 或非血月事件期间，穿着非战斗装备时会在玩家头顶提示。"
                     : "装备提示已关闭。";
+            }
+            else if (string.Equals(option, "goblinExecution", StringComparison.Ordinal))
+            {
+                changed = settings.CombatGoblinExecutionEnabled != enabled;
+                settings.CombatGoblinExecutionEnabled = enabled;
+                scenario = "Ui.Toggle.CombatGoblinExecution";
+                implemented = true;
+                message = enabled
+                    ? "哥布林必死已开启：玩家武器命中哥布林工匠时会放行原版伤害路径，其它城镇 NPC 不受影响。"
+                    : "哥布林必死已关闭。";
+            }
+            else
+            {
+                Record(
+                    command,
+                    "Ui.Toggle.CombatUnknown",
+                    "UI",
+                    "NotApplicable",
+                    "Combat toggle ignored because the option was unknown.",
+                    before,
+                    BuildCombatUiStateJson(),
+                    "{\"submitted\":false,\"implemented\":false,\"enabled\":" + BoolRaw(enabled) + ",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                    "Button");
+                return;
             }
 
             ConfigService.SaveAll();

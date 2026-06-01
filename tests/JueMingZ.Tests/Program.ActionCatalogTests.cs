@@ -1695,6 +1695,37 @@ namespace JueMingZ.Tests
             AssertImplementedFeatureVisible(registry, "inventory.keep_favorited");
         }
 
+        private static void FeatureCatalogExposesGoblinExecution()
+        {
+            var registry = FeatureRegistry.CreateDefault();
+            FeatureDefinition feature;
+            if (!registry.TryGet(FeatureIds.CombatGoblinExecution, out feature) || feature == null)
+            {
+                throw new InvalidOperationException("Expected goblin execution feature to be registered.");
+            }
+
+            if (!feature.VisibleInMainUi || !feature.IsImplemented)
+            {
+                throw new InvalidOperationException("Goblin execution must be visible and implemented.");
+            }
+
+            if (feature.CodeDomain != FeatureCodeDomain.Combat ||
+                feature.UserCategory != FeatureUserCategory.Combat)
+            {
+                throw new InvalidOperationException("Goblin execution must stay Combat code-domain and Combat UI category.");
+            }
+
+            if (feature.RequiredActions.Count != 1 || feature.RequiredActions[0] != InputActionKind.None)
+            {
+                throw new InvalidOperationException("Goblin execution must not require ActionQueue actions.");
+            }
+
+            if (feature.MultiplayerSupport != FeatureMultiplayerSupport.SupportedByOriginalAction)
+            {
+                throw new InvalidOperationException("Goblin execution must use original hit-path multiplayer metadata.");
+            }
+        }
+
         private static void WorldGenDebugViewerAndDeveloperMenuAlwaysAvailable()
         {
             var registry = FeatureRegistry.CreateDefault();
@@ -2496,6 +2527,7 @@ namespace JueMingZ.Tests
             AssertDefault(!settings.CombatMagicStringClickerEnabled, "combat magic string clicker off");
             AssertDefault(!settings.CombatAutoFacingEnabled, "combat auto facing off");
             AssertDefault(!settings.CombatEquipmentWarningEnabled, "combat equipment warning off");
+            AssertDefault(!settings.CombatGoblinExecutionEnabled, "combat goblin execution off");
             AssertStringEquals(CombatAimModes.NormalizeTargetPriority(settings.AimTargetPriority), CombatAimModes.TargetPriorityNearest, "combat aim target priority");
             AssertStringEquals(CombatAimModes.NormalizeRangeOrigin(settings.AimRangeOrigin), CombatAimModes.RangeOriginPlayer, "combat aim range origin");
 

@@ -25,6 +25,8 @@ namespace JueMingZ.Diagnostics
         public bool InterfaceLayerHookInstalled { get; set; }
         public bool ItemCheckHookInstalled { get; set; }
         public string ItemCheckHookMethod { get; set; }
+        public bool GoblinExecutionHookInstalled { get; set; }
+        public string GoblinExecutionHookMethod { get; set; }
         public bool DiagnosticsOverlayVisible { get; set; }
         public long DrawCallCount { get; set; }
         public DateTime? LastDrawUtc { get; set; }

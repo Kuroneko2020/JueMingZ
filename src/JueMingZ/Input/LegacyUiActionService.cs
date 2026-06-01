@@ -129,6 +129,12 @@ namespace JueMingZ.Input
                 return;
             }
 
+            if (command.ElementId.StartsWith("combat-goblin-execution-mode:", StringComparison.Ordinal))
+            {
+                SetCombatFeatureEnabled(command, "goblinExecution", IsOnMode(command.ElementId.Substring("combat-goblin-execution-mode:".Length)));
+                return;
+            }
+
             if (command.ElementId.StartsWith("fishing-toggle:", StringComparison.Ordinal))
             {
                 SetFishingFeatureEnabled(command, command.ElementId.Substring("fishing-toggle:".Length));

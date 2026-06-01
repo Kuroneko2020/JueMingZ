@@ -206,6 +206,11 @@ namespace JueMingZ.Bootstrap
 
         internal static void PatchWithHarmony(Type harmonyType, object harmony, MethodInfo original, object prefix, object postfix)
         {
+            PatchWithHarmony(harmonyType, harmony, original, prefix, postfix, null);
+        }
+
+        internal static void PatchWithHarmony(Type harmonyType, object harmony, MethodInfo original, object prefix, object postfix, object transpiler)
+        {
             var patchMethod = harmonyType
                 .GetMethods(BindingFlags.Public | BindingFlags.Instance)
                 .Where(method => string.Equals(method.Name, "Patch", StringComparison.Ordinal))
@@ -236,6 +241,10 @@ namespace JueMingZ.Bootstrap
                 else if (parameterName.Equals("postfix", StringComparison.OrdinalIgnoreCase))
                 {
                     args[index] = postfix;
+                }
+                else if (parameterName.Equals("transpiler", StringComparison.OrdinalIgnoreCase))
+                {
+                    args[index] = transpiler;
                 }
                 else
                 {

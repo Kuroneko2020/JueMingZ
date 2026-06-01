@@ -139,6 +139,32 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void CombatGoblinExecutionAllowsOnlyTinkererWhenEnabled()
+        {
+            if (CombatGoblinExecutionCompat.ShouldAllowGoblinExecutionForTesting(false, true, CombatGoblinExecutionCompat.GoblinTinkererNpcType))
+            {
+                throw new InvalidOperationException("Goblin execution must stay disabled until both transpilers are ready.");
+            }
+
+            if (CombatGoblinExecutionCompat.ShouldAllowGoblinExecutionForTesting(true, false, CombatGoblinExecutionCompat.GoblinTinkererNpcType))
+            {
+                throw new InvalidOperationException("Goblin execution must stay disabled when config is off.");
+            }
+
+            if (!CombatGoblinExecutionCompat.ShouldAllowGoblinExecutionForTesting(true, true, CombatGoblinExecutionCompat.GoblinTinkererNpcType))
+            {
+                throw new InvalidOperationException("Goblin execution should allow NPC type 107 when hook and config are enabled.");
+            }
+
+            if (CombatGoblinExecutionCompat.ShouldAllowGoblinExecutionForTesting(true, true, CombatGoblinExecutionCompat.BoundGoblinNpcType) ||
+                CombatGoblinExecutionCompat.ShouldAllowGoblinExecutionForTesting(true, true, 22) ||
+                CombatGoblinExecutionCompat.ShouldAllowGoblinExecutionForTesting(true, true, 54) ||
+                CombatGoblinExecutionCompat.ShouldAllowGoblinExecutionForTesting(true, true, 108))
+            {
+                throw new InvalidOperationException("Goblin execution must not allow BoundGoblin, guide, clothier, or other town NPC types.");
+            }
+        }
+
         private static void ChannelArbiterAcquireRelease()
         {
             var arbiter = new InputActionChannelArbiter();

@@ -32,6 +32,8 @@ namespace JueMingZ.Diagnostics
             Append(builder, "InterfaceLayerHookInstalled", snapshot.InterfaceLayerHookInstalled, true);
             Append(builder, "ItemCheckHookInstalled", snapshot.ItemCheckHookInstalled, true);
             Append(builder, "ItemCheckHookMethod", snapshot.ItemCheckHookMethod, true);
+            Append(builder, "GoblinExecutionHookInstalled", snapshot.GoblinExecutionHookInstalled, true);
+            Append(builder, "GoblinExecutionHookMethod", snapshot.GoblinExecutionHookMethod, true);
             Append(builder, "TeleportRodHookInstalled", snapshot.MovementTeleportCorrectionHookInstalled, true);
             Append(builder, "TeleportRodHookMethod", snapshot.MovementTeleportCorrectionHookMethod, true);
             Append(builder, "DiagnosticsOverlayVisible", snapshot.DiagnosticsOverlayVisible, true);

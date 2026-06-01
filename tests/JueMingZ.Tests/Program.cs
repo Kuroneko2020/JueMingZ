@@ -267,6 +267,7 @@ namespace JueMingZ.Tests
             Run("performance hitch recorder detects runtime gaps", ref failed, PerformanceHitchRecorderDetectsRuntimeGaps);
             Run("diagnostic snapshot writes performance hitch state", ref failed, DiagnosticSnapshotWritesPerformanceHitchState);
             Run("feature catalog exposes implemented misc inventory automation", ref failed, FeatureCatalogExposesImplementedMiscInventoryAutomation);
+            Run("feature catalog exposes goblin execution", ref failed, FeatureCatalogExposesGoblinExecution);
             Run("first-run app settings defaults match requested UI baseline", ref failed, FirstRunAppSettingsDefaultsMatchRequestedUiBaseline);
             Run("auto capture critter mode aliases preserve legacy bool", ref failed, AutoCaptureCritterModeAliasesPreserveLegacyBool);
             Run("app settings code-domain aliases preserve misc storage", ref failed, AppSettingsCodeDomainAliasesPreserveMiscStorage);
@@ -286,6 +287,7 @@ namespace JueMingZ.Tests
             Run("combat auto clicker item use request allows combat aim", ref failed, CombatAutoClickerItemUseRequestAllowsCombatAim);
             Run("combat perfect revolver ItemCheck takeover mirrors helper cadence", ref failed, CombatPerfectRevolverItemCheckTakeoverMirrorsHelperCadence);
             Run("combat perfect revolver schedules only in fire window", ref failed, CombatPerfectRevolverSchedulesOnlyInFireWindow);
+            Run("combat goblin execution allows only tinkerer when enabled", ref failed, CombatGoblinExecutionAllowsOnlyTinkererWhenEnabled);
             Run("travel menu diagnostics clone keeps scoped hook fields", ref failed, TravelMenuDiagnosticsCloneKeepsScopedHookFields);
             Run("travel menu ItemCheck guard suppresses world use and restores click", ref failed, TravelMenuItemCheckGuardSuppressesWorldUseAndRestoresClick);
             Run("travel menu CreativeUI world input guard does not override mouse state", ref failed, TravelMenuCreativeUiWorldInputGuardDoesNotOverrideMouseState);

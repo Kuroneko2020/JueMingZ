@@ -242,7 +242,8 @@ namespace JueMingZ.Input
                    "\"combatPerfectRevolverEnabled\":" + BoolRaw(settings.CombatPerfectRevolverEnabled) + "," +
                    "\"combatMagicStringClickerEnabled\":" + BoolRaw(settings.CombatMagicStringClickerEnabled) + "," +
                    "\"combatAutoFacingEnabled\":" + BoolRaw(settings.CombatAutoFacingEnabled) + "," +
-                   "\"combatEquipmentWarningEnabled\":" + BoolRaw(settings.CombatEquipmentWarningEnabled) +
+                   "\"combatEquipmentWarningEnabled\":" + BoolRaw(settings.CombatEquipmentWarningEnabled) + "," +
+                   "\"combatGoblinExecutionEnabled\":" + BoolRaw(settings.CombatGoblinExecutionEnabled) +
                    "}";
         }
 

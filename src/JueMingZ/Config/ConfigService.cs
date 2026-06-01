@@ -174,6 +174,7 @@ namespace JueMingZ.Config
             SetFeatureEnabledLocked("combat.magic_string_clicker", settings.CombatMagicStringClickerEnabled);
             SetFeatureEnabledLocked("combat.auto_facing", settings.CombatAutoFacingEnabled);
             SetFeatureEnabledLocked("combat.equipment_warning", settings.CombatEquipmentWarningEnabled);
+            SetFeatureEnabledLocked(FeatureIds.CombatGoblinExecution, settings.CombatGoblinExecutionEnabled);
             SetFeatureEnabledLocked("information.enemy_name_labels", settings.InformationEnemyNameLabelsEnabled);
             SetFeatureEnabledLocked("information.critter_name_labels", settings.InformationCritterNameLabelsEnabled);
             SetFeatureEnabledLocked("information.npc_name_labels", !string.Equals(settings.InformationNpcNameLabelsMode, "Off", StringComparison.OrdinalIgnoreCase));
@@ -241,6 +242,7 @@ namespace JueMingZ.Config
             if (settings.CombatMagicStringClickerEnabled) count++;
             if (settings.CombatAutoFacingEnabled) count++;
             if (settings.CombatEquipmentWarningEnabled) count++;
+            if (settings.CombatGoblinExecutionEnabled) count++;
             if (settings.InformationEnemyNameLabelsEnabled) count++;
             if (settings.InformationCritterNameLabelsEnabled) count++;
             if (!string.Equals(settings.InformationNpcNameLabelsMode, "Off", StringComparison.OrdinalIgnoreCase)) count++;

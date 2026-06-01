@@ -41,6 +41,11 @@ namespace JueMingZ.Features.Catalog
                 .Actions()
                 .GameState(GameStateKind.Player, GameStateKind.World, GameStateKind.CombatTargets)
                 .Notes("只读扫描当前功能装备 / 饰品槽和 miscEquips；检测到 Boss 或血月以外的事件时，如果穿着建筑、钓鱼、信息、经济、召唤娃娃或非战斗头身腿等装备，在玩家头顶显示 1 秒提示，不提交动作也不修改装备。"), true);
+
+            Add(registry, FeatureDefinitionBuilder.Create(FeatureIds.CombatGoblinExecution, "哥布林必死", "允许玩家武器命中哥布林工匠")
+                .Actions()
+                .GameState(GameStateKind.Player)
+                .Notes("默认关闭；开启后只在 Terraria 原版玩家近战或弹幕命中 NPC 的路径里对白名单 NPC type 107 放行，不改变臭虫剑、向导/服装商娃娃、NPC friendly/townNPC 状态、玩家状态、伤害写入或网络包。BoundGoblin type 105 和其它城镇 NPC 不受影响。"), true);
         }
 
         private static void Add(FeatureRegistry registry, FeatureDefinitionBuilder builder)

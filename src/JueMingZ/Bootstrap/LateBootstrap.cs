@@ -75,6 +75,14 @@ namespace JueMingZ.Bootstrap
                     Logger.Warn("LateBootstrap", "ItemCheck hook did not install; diagnostics will continue, but ItemUseAction bridge tests will fail.");
                 }
 
+                Logger.Info("LateBootstrap", "Installing goblin execution hit gate hooks...");
+                var goblinExecutionHookResult = GoblinExecutionHookInstaller.Install();
+                Logger.Info("LateBootstrap", "Goblin execution hook handoff result: " + goblinExecutionHookResult.Message);
+                if (!goblinExecutionHookResult.Succeeded)
+                {
+                    Logger.Warn("LateBootstrap", "Goblin execution hooks did not install fully; feature will remain fail-safe original behavior.");
+                }
+
                 Logger.Info("LateBootstrap", "Installing quick bag ItemSlot.RightClick hook...");
                 var quickBagOpenItemSlotHookResult = QuickBagOpenItemSlotHookInstaller.Install();
                 Logger.Info("LateBootstrap", "Quick bag ItemSlot.RightClick hook handoff result: " + quickBagOpenItemSlotHookResult.Message);

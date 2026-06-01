@@ -127,6 +127,9 @@ namespace JueMingZ.Config
         [DataMember(Order = 139)]
         public bool CombatEquipmentWarningEnabled { get; set; }
 
+        [DataMember(Order = 171)]
+        public bool CombatGoblinExecutionEnabled { get; set; }
+
         [DataMember(Order = 40)]
         public string AimRangeOrigin { get; set; } = CombatAimModes.RangeOriginPlayer;
 
@@ -702,6 +705,7 @@ namespace JueMingZ.Config
                 CombatMagicStringClickerEnabled = false,
                 CombatAutoFacingEnabled = false,
                 CombatEquipmentWarningEnabled = false,
+                CombatGoblinExecutionEnabled = false,
                 AimRangeOrigin = CombatAimModes.RangeOriginPlayer,
                 AimTargetPriority = CombatAimModes.TargetPriorityNearest,
                 CursorAimRadius = 0,
