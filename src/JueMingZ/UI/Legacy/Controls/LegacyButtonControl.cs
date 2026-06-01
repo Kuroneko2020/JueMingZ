@@ -33,7 +33,7 @@ namespace JueMingZ.UI.Legacy.Controls
 
         protected override void DrawSelf(LegacyUiContext context)
         {
-            var hovered = context.IsMouseOver(Bounds);
+            var hovered = context.IsElementHovered(Id, Bounds);
             var pressed = hovered && context.Mouse != null && context.Mouse.LeftDown;
             var text = string.IsNullOrWhiteSpace(Text) ? Label : Text;
             var selectedOffset = Selected && Enabled ? 1 : 0;

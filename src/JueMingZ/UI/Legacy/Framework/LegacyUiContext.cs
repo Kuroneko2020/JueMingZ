@@ -113,6 +113,16 @@ namespace JueMingZ.UI.Legacy.Framework
             return rect.Contains(Mouse.X, Mouse.Y);
         }
 
+        public bool IsElementHovered(string id, LegacyUiRect rect)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                return IsMouseOver(rect);
+            }
+
+            return LegacyUiElementFrame.IsHovered(id, ResolveHitRect(rect), Mouse);
+        }
+
         public LegacyUiElement RegisterElement(
             string id,
             string label,
@@ -125,21 +135,24 @@ namespace JueMingZ.UI.Legacy.Framework
             int maxValue,
             string[] tooltipLines)
         {
-            var element = new LegacyUiElement
-            {
-                Id = id ?? string.Empty,
-                Label = label ?? string.Empty,
-                Kind = kind ?? string.Empty,
-                Rect = ResolveHitRect(rect),
-                Enabled = enabled,
-                Selected = selected,
-                IntValue = intValue,
-                MinValue = minValue,
-                MaxValue = maxValue,
-                TooltipLines = tooltipLines
-            };
-            Elements.Add(element);
-            if (IsMouseOver(rect))
+            var hitRect = ResolveHitRect(rect);
+            var element = LegacyUiElementFrame.Add(
+                Elements,
+                id,
+                label,
+                kind,
+                hitRect,
+                enabled,
+                selected,
+                intValue,
+                minValue,
+                maxValue,
+                tooltipLines,
+                null,
+                null);
+            var hovered = LegacyUiElementFrame.IsHovered(id, hitRect, Mouse);
+            LegacyUiElementFrame.RecordHover(element, hovered);
+            if (hovered)
             {
                 HoveredElement = element;
             }
@@ -155,7 +168,9 @@ namespace JueMingZ.UI.Legacy.Framework
             }
 
             Elements.Add(element);
-            if (IsMouseOver(element.Rect))
+            var hovered = IsElementHovered(element.Id, element.Rect);
+            LegacyUiElementFrame.RecordHover(element, hovered);
+            if (hovered)
             {
                 HoveredElement = element;
             }

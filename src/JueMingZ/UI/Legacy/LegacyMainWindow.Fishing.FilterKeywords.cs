@@ -112,15 +112,7 @@ namespace JueMingZ.UI.Legacy
             var tooltip = string.IsNullOrWhiteSpace(message)
                 ? "关键词按当前显示名匹配，会受语言和材质包影响。"
                 : message;
-            elements.Add(new LegacyUiElement
-            {
-                Id = FishingFilterUiState.KeywordInputId,
-                Label = "关键词输入",
-                Kind = "blocker",
-                Rect = hit.Width > 0 && hit.Height > 0 ? hit : rect,
-                Enabled = true,
-                TooltipLines = new[] { tooltip }
-            });
+            AddFrameElement(elements, FishingFilterUiState.KeywordInputId, "关键词输入", "blocker", hit.Width > 0 && hit.Height > 0 ? hit : rect, tooltipLines: new[] { tooltip });
         }
 
         private static LegacyUiElement DrawFishingFilterKeywordEntries(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, LegacyUiRect rect, AppSettings settings, string filterMode)
@@ -199,19 +191,14 @@ namespace JueMingZ.UI.Legacy
             LegacyUiTheme.DrawRowClipped(spriteBatch, row, clip);
             var deleteRect = new LegacyUiRect(row.Right - 25, row.Y + 4, 20, 20);
             UiTextRenderer.DrawTextClipped(spriteBatch, keyword, row.X + 9, row.Y + 7, Math.Max(1, deleteRect.X - row.X - 15), 16, clip.X, clip.Y, clip.Width, clip.Height, 238, 236, 220, 248, 0.66f);
-            var deleteHovered = deleteRect.Intersect(clip).Contains(mouse.X, mouse.Y);
+            var elementId = "fishing-filter-keyword:delete:" + index.ToString(CultureInfo.InvariantCulture);
+            var elementRect = deleteRect.Intersect(clip);
+            var deleteHovered = IsFrameElementHovered(elementId, elementRect, mouse);
             LegacyUiTheme.DrawButtonClipped(spriteBatch, deleteRect, deleteHovered, deleteHovered && mouse.LeftDown, false, true, clip);
             UiTextRenderer.DrawCenteredTextClipped(spriteBatch, "x", deleteRect.X + 2, deleteRect.Y + 1, deleteRect.Width - 4, deleteRect.Height, clip.X, clip.Y, clip.Width, clip.Height, 238, 196, 180, 255, 0.74f);
 
-            var element = new LegacyUiElement
-            {
-                Id = "fishing-filter-keyword:delete:" + index.ToString(CultureInfo.InvariantCulture),
-                Label = "删除 " + keyword,
-                Kind = "button",
-                Rect = deleteRect.Intersect(clip),
-                TooltipLines = new[] { "删除关键词：" + keyword, "关键词按当前显示名匹配，会受语言和材质包影响。" }
-            };
-            elements.Add(element);
+            var element = AddFrameElement(elements, elementId, "删除 " + keyword, "button", elementRect, tooltipLines: new[] { "删除关键词：" + keyword, "关键词按当前显示名匹配，会受语言和材质包影响。" });
+            RecordFrameElementHover(element, deleteHovered);
             return deleteHovered ? element : null;
         }
 

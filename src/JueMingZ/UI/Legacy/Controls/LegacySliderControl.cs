@@ -24,7 +24,7 @@ namespace JueMingZ.UI.Legacy.Controls
 
             var element = RegisterAndUpdate(context);
             DrawSelf(context);
-            return context.IsMouseOver(Bounds) ? element : null;
+            return context.IsElementHovered(Id, Bounds) ? element : null;
         }
 
         public LegacyUiElement RegisterAndUpdate(LegacyUiContext context)
@@ -59,7 +59,7 @@ namespace JueMingZ.UI.Legacy.Controls
                 MinValue,
                 MaxValue,
                 Suffix,
-                context.IsMouseOver(Bounds),
+                context.IsElementHovered(Id, Bounds),
                 dragging);
         }
     }

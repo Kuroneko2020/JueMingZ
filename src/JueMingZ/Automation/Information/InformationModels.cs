@@ -66,6 +66,12 @@ namespace JueMingZ.Automation.Information
         public int StatusLinesDrawn { get; set; }
         public double LastDrawElapsedMs { get; set; }
         public string LastSkipReason { get; set; }
+        public long SignTextLayoutCacheHitCount { get; set; }
+        public long SignTextLayoutCacheMissCount { get; set; }
+        public long WorldLabelSnapshotRefreshCount { get; set; }
+        public long NpcLabelSnapshotRefreshCount { get; set; }
+        public long ChestLabelSnapshotRefreshCount { get; set; }
+        public long ChestLabelSortRefreshCount { get; set; }
 
         public InformationOverlayDiagnostics()
         {

@@ -58,7 +58,7 @@ namespace JueMingZ.UI.Legacy.Controls
                         : null
                 };
                 var element = button.Draw(context);
-                if (element != null && context.IsMouseOver(rect))
+                if (element != null && context.IsElementHovered(element.Id, rect))
                 {
                     hovered = element;
                 }

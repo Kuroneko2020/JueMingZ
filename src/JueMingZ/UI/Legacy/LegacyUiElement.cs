@@ -25,5 +25,33 @@ namespace JueMingZ.UI.Legacy
             Kind = string.Empty;
             Enabled = true;
         }
+
+        public void Reset(
+            string id,
+            string label,
+            string kind,
+            LegacyUiRect rect,
+            bool enabled,
+            bool selected,
+            int intValue,
+            int minValue,
+            int maxValue,
+            string[] tooltipLines,
+            BuffPotionCandidate candidate,
+            BuffPotionWhitelistEntry whitelistEntry)
+        {
+            Id = id ?? string.Empty;
+            Label = label ?? string.Empty;
+            Kind = kind ?? string.Empty;
+            Rect = rect;
+            Enabled = enabled;
+            Selected = selected;
+            IntValue = intValue;
+            MinValue = minValue;
+            MaxValue = maxValue;
+            Candidate = candidate;
+            WhitelistEntry = whitelistEntry;
+            TooltipLines = tooltipLines;
+        }
     }
 }

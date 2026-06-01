@@ -14,27 +14,17 @@ namespace JueMingZ.Hooks
     public static class InterfaceLayerHookCallbacks
     {
         private const string LegacyInputGuardLayerName = "JueMing-Z: Legacy Main UI Input Guard";
-        private const string LegacyLayerName = "JueMing-Z: Legacy Main UI";
+        private const string GameOverlayDispatcherLayerName = "JueMing-Z: Game Overlay Dispatcher";
+        private const string UiOverlayDispatcherLayerName = "JueMing-Z: UI Overlay Dispatcher";
         private const string LegacyMouseTextGuardLayerName = "JueMing-Z: Legacy Main UI Mouse Text Guard";
-        private const string CombatAimLayerName = "JueMing-Z: Combat Aim Marker";
-        private const string FirstWorldLoadPromptLayerName = "JueMing-Z: First World Load Prompt";
-        private const string CombatEquipmentWarningPromptLayerName = "JueMing-Z: Combat Equipment Warning Prompt";
-        private const string FishingStatusPromptLayerName = "JueMing-Z: Fishing Status Prompt";
-        private const string InformationWorldLayerName = "JueMing-Z: Information World Overlay";
-        private const string InformationStatusPanelLayerName = "JueMing-Z: Information Status Panel";
 
         private static readonly object ReflectionCacheSyncRoot = new object();
         private static readonly Dictionary<Type, LayerNameAccessor> LayerNameAccessorCache = new Dictionary<Type, LayerNameAccessor>();
 
         private static int _firstLegacyInputGuardInsertLogged;
-        private static int _firstLegacyInsertLogged;
+        private static int _firstGameOverlayDispatcherInsertLogged;
+        private static int _firstUiOverlayDispatcherInsertLogged;
         private static int _firstLegacyMouseTextGuardInsertLogged;
-        private static int _firstCombatAimInsertLogged;
-        private static int _firstFirstWorldLoadPromptInsertLogged;
-        private static int _firstCombatEquipmentWarningPromptInsertLogged;
-        private static int _firstFishingStatusPromptInsertLogged;
-        private static int _firstInformationWorldInsertLogged;
-        private static int _firstInformationStatusPanelInsertLogged;
 
         private static Type _gameInterfaceLayerType;
         private static Type _legacyLayerType;
@@ -108,71 +98,21 @@ namespace JueMingZ.Hooks
             InsertLayerIfMissing(
                 layers,
                 layerState,
-                InformationWorldLayerName,
-                typeof(InformationWorldOverlay).GetMethod("DrawInterfaceLayer", BindingFlags.Public | BindingFlags.Static),
+                GameOverlayDispatcherLayerName,
+                typeof(InterfaceLayerHookCallbacks).GetMethod("DrawGameOverlayDispatcherLayer", BindingFlags.Public | BindingFlags.Static),
                 _gameScaleValue,
-                ref _firstInformationWorldInsertLogged,
-                "Information world overlay interface layer inserted.",
+                ref _firstGameOverlayDispatcherInsertLogged,
+                "Game overlay dispatcher interface layer inserted.",
                 -1);
 
             InsertLayerIfMissing(
                 layers,
                 layerState,
-                FishingStatusPromptLayerName,
-                typeof(FishingStatusPromptOverlay).GetMethod("DrawInterfaceLayer", BindingFlags.Public | BindingFlags.Static),
-                _gameScaleValue,
-                ref _firstFishingStatusPromptInsertLogged,
-                "Fishing status prompt interface layer inserted.",
-                -1);
-
-            InsertLayerIfMissing(
-                layers,
-                layerState,
-                FirstWorldLoadPromptLayerName,
-                typeof(FirstWorldLoadPromptOverlay).GetMethod("DrawInterfaceLayer", BindingFlags.Public | BindingFlags.Static),
-                _gameScaleValue,
-                ref _firstFirstWorldLoadPromptInsertLogged,
-                "First world load prompt interface layer inserted.",
-                -1);
-
-            InsertLayerIfMissing(
-                layers,
-                layerState,
-                CombatEquipmentWarningPromptLayerName,
-                typeof(CombatEquipmentWarningPromptOverlay).GetMethod("DrawInterfaceLayer", BindingFlags.Public | BindingFlags.Static),
-                _gameScaleValue,
-                ref _firstCombatEquipmentWarningPromptInsertLogged,
-                "Combat equipment warning prompt interface layer inserted.",
-                -1);
-
-            InsertLayerIfMissing(
-                layers,
-                layerState,
-                CombatAimLayerName,
-                typeof(CombatAimMarkerOverlay).GetMethod("DrawInterfaceLayer", BindingFlags.Public | BindingFlags.Static),
-                _gameScaleValue,
-                ref _firstCombatAimInsertLogged,
-                "Combat aim marker interface layer inserted.",
-                -1);
-
-            InsertLayerIfMissing(
-                layers,
-                layerState,
-                InformationStatusPanelLayerName,
-                typeof(InformationStatusPanelOverlay).GetMethod("DrawInterfaceLayer", BindingFlags.Public | BindingFlags.Static),
+                UiOverlayDispatcherLayerName,
+                typeof(InterfaceLayerHookCallbacks).GetMethod("DrawUiOverlayDispatcherLayer", BindingFlags.Public | BindingFlags.Static),
                 _uiScaleValue,
-                ref _firstInformationStatusPanelInsertLogged,
-                "Information status panel interface layer inserted.",
-                -1);
-
-            InsertLayerIfMissing(
-                layers,
-                layerState,
-                LegacyLayerName,
-                typeof(LegacyMainWindow).GetMethod("DrawInterfaceLayer", BindingFlags.Public | BindingFlags.Static),
-                _uiScaleValue,
-                ref _firstLegacyInsertLogged,
-                "Legacy main UI interface layer inserted.",
+                ref _firstUiOverlayDispatcherInsertLogged,
+                "UI overlay dispatcher interface layer inserted.",
                 -1);
 
             InsertLayerIfMissing(
@@ -184,6 +124,25 @@ namespace JueMingZ.Hooks
                 ref _firstLegacyMouseTextGuardInsertLogged,
                 "Legacy main UI mouse text guard layer inserted.",
                 layerState.MouseTextIndex);
+        }
+
+        public static bool DrawGameOverlayDispatcherLayer()
+        {
+            var keepDrawing = true;
+            keepDrawing &= InformationWorldOverlay.DrawInterfaceLayer();
+            keepDrawing &= FishingStatusPromptOverlay.DrawInterfaceLayer();
+            keepDrawing &= FirstWorldLoadPromptOverlay.DrawInterfaceLayer();
+            keepDrawing &= CombatEquipmentWarningPromptOverlay.DrawInterfaceLayer();
+            keepDrawing &= CombatAimMarkerOverlay.DrawInterfaceLayer();
+            return keepDrawing;
+        }
+
+        public static bool DrawUiOverlayDispatcherLayer()
+        {
+            var keepDrawing = true;
+            keepDrawing &= InformationStatusPanelOverlay.DrawInterfaceLayer();
+            keepDrawing &= LegacyMainWindow.DrawInterfaceLayer();
+            return keepDrawing;
         }
 
         private static IList FindLayerList(object mainInstance, Type gameInterfaceLayerType)

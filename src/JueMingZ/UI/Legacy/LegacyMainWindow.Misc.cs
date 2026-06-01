@@ -127,20 +127,14 @@ namespace JueMingZ.UI.Legacy
 
             var rect = new LegacyUiRect(buttonX, RowModeButtonY(row), buttonWidth, RowModeButtonHeight);
             var hit = rect.Intersect(area.Viewport);
-            var isHovered = hit.Width > 0 && hit.Height > 0 && hit.Contains(mouse.X, mouse.Y);
+            var elementId = elementPrefix + buttonValue;
+            var elementRect = hit.Width > 0 && hit.Height > 0 ? hit : rect;
+            var isHovered = IsFrameElementHovered(elementId, elementRect, mouse);
             LegacyUiTheme.DrawButtonClipped(spriteBatch, rect, isHovered, isHovered && mouse.LeftDown, false, true, area.Viewport);
             UiTextRenderer.DrawCenteredTextClipped(spriteBatch, buttonLabel, rect.X + 4, rect.Y, rect.Width - 8, rect.Height, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, textR, textG, textB, 255, ResolveSingleMiscButtonScale(buttonLabel, rect.Width - 8));
 
-            var element = new LegacyUiElement
-            {
-                Id = elementPrefix + buttonValue,
-                Label = label + ":" + buttonLabel,
-                Kind = "button",
-                Rect = hit.Width > 0 && hit.Height > 0 ? hit : rect,
-                Selected = false,
-                TooltipLines = null
-            };
-            elements.Add(element);
+            var element = AddFrameElement(elements, elementId, label + ":" + buttonLabel, "button", elementRect);
+            RecordFrameElementHover(element, isHovered);
             return isHovered ? element : null;
         }
 

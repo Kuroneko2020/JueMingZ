@@ -43,32 +43,27 @@ namespace JueMingZ.UI.Legacy
             }
 
             LegacyFeatureRow.DrawLabel(spriteBatch, row, "检查冷却", string.Empty);
-            var slider = new LegacyUiElement
-            {
-                Id = "auto-buff-cooldown",
-                Label = "自动增益冷却",
-                Kind = "slider",
-                Rect = new LegacyUiRect(row.X + 116, row.Y + 4, row.Width - 126, LegacyUiMetrics.SliderHeight),
-                IntValue = LegacyMainUiState.Clamp(cooldown, AutoBuffCooldownMin, AutoBuffCooldownMax),
-                MinValue = AutoBuffCooldownMin,
-                MaxValue = AutoBuffCooldownMax
-            };
+            var sliderId = "auto-buff-cooldown";
+            var sliderLabel = "自动增益冷却";
+            var sliderRect = new LegacyUiRect(row.X + 116, row.Y + 4, row.Width - 126, LegacyUiMetrics.SliderHeight);
+            var sliderValue = LegacyMainUiState.Clamp(cooldown, AutoBuffCooldownMin, AutoBuffCooldownMax);
             var sliderElement = new LegacySliderControl
             {
-                Id = slider.Id,
-                Label = slider.Label,
-                Kind = slider.Kind,
-                Bounds = slider.Rect,
-                IntValue = slider.IntValue,
-                MinValue = slider.MinValue,
-                MaxValue = slider.MaxValue,
+                Id = sliderId,
+                Label = sliderLabel,
+                Kind = "slider",
+                Bounds = sliderRect,
+                IntValue = sliderValue,
+                MinValue = AutoBuffCooldownMin,
+                MaxValue = AutoBuffCooldownMax,
                 SliderLabel = "冷却",
                 Suffix = " tick"
             }.RegisterAndUpdate(LegacyUiContext.ForScrollArea(spriteBatch, mouse, area, elements, ConfigService.AppSettings ?? AppSettings.CreateDefault()));
-            var dragging = string.Equals(LegacyUiInput.ActiveSliderId, slider.Id, StringComparison.Ordinal);
-            var value = LegacyUiInput.GetSliderDisplayValue(slider.Id, slider.IntValue);
-            LegacySlider.DrawValue(spriteBatch, slider.Rect, "冷却", value, AutoBuffCooldownMin, AutoBuffCooldownMax, " tick", slider.Rect.Contains(mouse.X, mouse.Y), dragging);
-            return slider.Rect.Contains(mouse.X, mouse.Y) ? sliderElement : null;
+            var dragging = string.Equals(LegacyUiInput.ActiveSliderId, sliderId, StringComparison.Ordinal);
+            var value = LegacyUiInput.GetSliderDisplayValue(sliderId, sliderValue);
+            var hovered = IsFrameElementHovered(sliderId, sliderRect, mouse);
+            LegacySlider.DrawValue(spriteBatch, sliderRect, "冷却", value, AutoBuffCooldownMin, AutoBuffCooldownMax, " tick", hovered, dragging);
+            return hovered ? sliderElement : null;
         }
 
         private static LegacyUiElement DrawDualBuffGrid(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY)
@@ -139,7 +134,8 @@ namespace JueMingZ.UI.Legacy
         private static LegacyUiElement DrawPaneHeaderButton(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, LegacyUiRect rect, string id, string label, bool selected, string[] tooltipLines)
         {
             var hit = rect.Intersect(area.Viewport);
-            var hovered = hit.Width > 0 && hit.Height > 0 && hit.Contains(mouse.X, mouse.Y);
+            var elementRect = hit.Width > 0 && hit.Height > 0 ? hit : rect;
+            var hovered = IsFrameElementHovered(id, elementRect, mouse);
             LegacyUiTheme.DrawButtonClipped(spriteBatch, rect, hovered, hovered && mouse.LeftDown, selected, true, area.Viewport);
             var scale = label != null && label.Length >= 4 && rect.Width < 62
                 ? 0.48f
@@ -150,16 +146,8 @@ namespace JueMingZ.UI.Legacy
                 LegacyUiTheme.DrawSelectedTextMarkersClipped(spriteBatch, new LegacyUiRect(rect.X + 2, rect.Y, rect.Width - 4, rect.Height), area.Viewport, label, scale);
             }
 
-            var element = new LegacyUiElement
-            {
-                Id = id,
-                Label = label,
-                Kind = "button",
-                Rect = hit.Width > 0 && hit.Height > 0 ? hit : rect,
-                Selected = selected,
-                TooltipLines = tooltipLines
-            };
-            elements.Add(element);
+            var element = AddFrameElement(elements, id, label, "button", elementRect, selected: selected, tooltipLines: tooltipLines);
+            RecordFrameElementHover(element, hovered);
             return hovered ? element : null;
         }
 
@@ -190,17 +178,12 @@ namespace JueMingZ.UI.Legacy
                 }
 
                 var hit = rect.Intersect(area.Viewport);
-                var isHovered = hit.Width > 0 && hit.Height > 0 && hit.Contains(mouse.X, mouse.Y);
+                var elementId = "candidate:" + candidate.ItemType.ToString(CultureInfo.InvariantCulture);
+                var elementRect = hit.Width > 0 && hit.Height > 0 ? hit : rect;
+                var isHovered = IsFrameElementHovered(elementId, elementRect, mouse);
                 LegacyPotionGrid.DrawCandidateCell(spriteBatch, rect, area.Viewport, candidate, isHovered);
-                var element = new LegacyUiElement
-                {
-                    Id = "candidate:" + candidate.ItemType.ToString(CultureInfo.InvariantCulture),
-                    Label = candidate.BuffName,
-                    Kind = "candidate",
-                    Rect = hit.Width > 0 && hit.Height > 0 ? hit : rect,
-                    Candidate = candidate
-                };
-                elements.Add(element);
+                var element = AddFrameElement(elements, elementId, candidate.BuffName, "candidate", elementRect, candidate: candidate);
+                RecordFrameElementHover(element, isHovered);
                 if (isHovered)
                 {
                     hovered = element;
@@ -239,18 +222,13 @@ namespace JueMingZ.UI.Legacy
 
                 var hit = rect.Intersect(area.Viewport);
                 var liveCandidate = LegacyMainUiState.FindLiveCandidate(entry.ItemType);
-                var isHovered = hit.Width > 0 && hit.Height > 0 && hit.Contains(mouse.X, mouse.Y);
+                var elementId = "whitelist:" + entry.ItemType.ToString(CultureInfo.InvariantCulture);
+                var elementRect = hit.Width > 0 && hit.Height > 0 ? hit : rect;
+                var isHovered = IsFrameElementHovered(elementId, elementRect, mouse);
                 var active = entry.BuffType > 0 && activeBuffs.Contains(entry.BuffType);
                 LegacyPotionGrid.DrawWhitelistCell(spriteBatch, rect, area.Viewport, entry, liveCandidate, isHovered, active);
-                var element = new LegacyUiElement
-                {
-                    Id = "whitelist:" + entry.ItemType.ToString(CultureInfo.InvariantCulture),
-                    Label = entry.BuffName,
-                    Kind = "whitelist",
-                    Rect = hit.Width > 0 && hit.Height > 0 ? hit : rect,
-                    WhitelistEntry = entry
-                };
-                elements.Add(element);
+                var element = AddFrameElement(elements, elementId, entry.BuffName, "whitelist", elementRect, whitelistEntry: entry);
+                RecordFrameElementHover(element, isHovered);
                 if (isHovered)
                 {
                     hovered = element;

@@ -39,15 +39,7 @@ namespace JueMingZ.UI.Legacy
             var tooltip = string.IsNullOrWhiteSpace(message)
                 ? "输入预设名称。应用预设会覆盖当前名单，不会合并。"
                 : message;
-            elements.Add(new LegacyUiElement
-            {
-                Id = FishingFilterUiState.PresetNameInputId,
-                Label = "预设名称",
-                Kind = "blocker",
-                Rect = hit.Width > 0 && hit.Height > 0 ? hit : rect,
-                Enabled = true,
-                TooltipLines = new[] { tooltip }
-            });
+            AddFrameElement(elements, FishingFilterUiState.PresetNameInputId, "预设名称", "blocker", hit.Width > 0 && hit.Height > 0 ? hit : rect, tooltipLines: new[] { tooltip });
         }
 
         private static void DrawFishingFilterPresetSaveNotice(object spriteBatch, LegacyScrollArea area, LegacyUiRect anchor)
@@ -131,9 +123,11 @@ namespace JueMingZ.UI.Legacy
         private static LegacyUiElement DrawFishingFilterPresetRow(object spriteBatch, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, LegacyUiRect row, LegacyUiRect clip, FishingFilterPresetView preset)
         {
             var hit = row.Intersect(clip);
-            var hovered = hit.Width > 0 && hit.Height > 0 && hit.Contains(mouse.X, mouse.Y);
-            LegacyUiTheme.DrawRowClipped(spriteBatch, row, clip);
+            var applyId = "fishing-filter-preset:apply:" + preset.Key;
             var deleteRect = preset.IsBuiltIn ? new LegacyUiRect(row.Right, row.Y, 0, 0) : new LegacyUiRect(row.Right - 25, row.Y + 3, 20, 20);
+            var applyRect = hit.Width > 0 && hit.Height > 0 ? (preset.IsBuiltIn ? hit : new LegacyUiRect(hit.X, hit.Y, Math.Max(0, Math.Min(hit.Width, deleteRect.X - hit.X - 2)), hit.Height)) : row;
+            var hovered = IsFrameElementHovered(applyId, applyRect, mouse);
+            LegacyUiTheme.DrawRowClipped(spriteBatch, row, clip);
             var contentRight = preset.IsBuiltIn ? row.Right - 6 : deleteRect.X - 5;
             var contentRect = new LegacyUiRect(row.X + 6, row.Y + 2, Math.Max(1, contentRight - row.X - 6), row.Height - 4);
             var keywordPreset = string.Equals(FishingFilterMatchModes.Normalize(preset.Preset.MatchModeScope), FishingFilterMatchModes.Keyword, StringComparison.OrdinalIgnoreCase);
@@ -147,31 +141,19 @@ namespace JueMingZ.UI.Legacy
                 DrawFishingFilterExactPresetIcons(spriteBatch, preset.Preset, contentRect, clip);
             }
 
-            var applyElement = new LegacyUiElement
-            {
-                Id = "fishing-filter-preset:apply:" + preset.Key,
-                Label = "应用预设",
-                Kind = "button",
-                Rect = hit.Width > 0 && hit.Height > 0 ? (preset.IsBuiltIn ? hit : new LegacyUiRect(hit.X, hit.Y, Math.Max(0, Math.Min(hit.Width, deleteRect.X - hit.X - 2)), hit.Height)) : row,
-                TooltipLines = BuildFishingFilterPresetTooltipLines(preset)
-            };
-            elements.Add(applyElement);
-            var hoveredElement = hovered && (preset.IsBuiltIn || !deleteRect.Contains(mouse.X, mouse.Y)) ? applyElement : null;
+            var applyElement = AddFrameElement(elements, applyId, "应用预设", "button", applyRect, tooltipLines: BuildFishingFilterPresetTooltipLines(preset));
+            RecordFrameElementHover(applyElement, hovered);
+            var hoveredElement = hovered ? applyElement : null;
 
             if (!preset.IsBuiltIn)
             {
-                var deleteHovered = deleteRect.Intersect(clip).Contains(mouse.X, mouse.Y);
+                var deleteId = "fishing-filter-preset:delete:" + preset.Key;
+                var deleteElementRect = deleteRect.Intersect(clip);
+                var deleteHovered = IsFrameElementHovered(deleteId, deleteElementRect, mouse);
                 LegacyUiTheme.DrawButtonClipped(spriteBatch, deleteRect, deleteHovered, deleteHovered && mouse.LeftDown, false, true, clip);
                 UiTextRenderer.DrawCenteredTextClipped(spriteBatch, "x", deleteRect.X + 2, deleteRect.Y + 1, deleteRect.Width - 4, deleteRect.Height, clip.X, clip.Y, clip.Width, clip.Height, 238, 196, 180, 255, 0.74f);
-                var deleteElement = new LegacyUiElement
-                {
-                    Id = "fishing-filter-preset:delete:" + preset.Key,
-                    Label = "删除预设",
-                    Kind = "button",
-                    Rect = deleteRect.Intersect(clip),
-                    TooltipLines = new[] { "删除这个预设。" }
-                };
-                elements.Add(deleteElement);
+                var deleteElement = AddFrameElement(elements, deleteId, "删除预设", "button", deleteElementRect, tooltipLines: new[] { "删除这个预设。" });
+                RecordFrameElementHover(deleteElement, deleteHovered);
                 if (deleteHovered)
                 {
                     hoveredElement = deleteElement;

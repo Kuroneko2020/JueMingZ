@@ -90,22 +90,31 @@ namespace JueMingZ.Automation.Movement
                     return;
                 }
 
+                var inputFrame = MovementInputFrameCache.GetOrCreate(runtimeState, settingsSnapshot);
                 object player;
-                if (!TerrariaInputCompat.TryGetLocalPlayer(out player) || player == null)
+                if (inputFrame == null || !inputFrame.TryGetPlayer(out player))
                 {
-                    ResetArming("localPlayerUnavailable");
-                    RecordDecision(true, mode, "skipped", "localPlayerUnavailable", tick, null, null, false, false, string.Empty);
-                    return;
+                    if (!TerrariaInputCompat.TryGetLocalPlayer(out player) || player == null)
+                    {
+                        ResetArming("localPlayerUnavailable");
+                        RecordDecision(true, mode, "skipped", "localPlayerUnavailable", tick, null, null, false, false, string.Empty);
+                        return;
+                    }
                 }
 
                 TerrariaDashCompat.ResetImmediatePulseIfStale(player);
 
                 DashInputProfile profile;
-                if (!TerrariaDashCompat.TryReadDashInputProfile(player, out profile))
+                string profileFailureReason = string.Empty;
+                if (inputFrame == null || !inputFrame.TryGetDashProfile(out profile, out profileFailureReason))
                 {
-                    ResetArming("dashProfile:" + TerrariaDashCompat.LastDashCompatError);
-                    RecordDecision(true, mode, "skipped", "dashProfile:" + TerrariaDashCompat.LastDashCompatError, tick, null, null, false, false, string.Empty);
-                    return;
+                    if (!TerrariaDashCompat.TryReadDashInputProfile(player, out profile))
+                    {
+                        var reason = FirstNonEmpty(TerrariaDashCompat.LastDashCompatError, profileFailureReason);
+                        ResetArming("dashProfile:" + reason);
+                        RecordDecision(true, mode, "skipped", "dashProfile:" + reason, tick, null, null, false, false, string.Empty);
+                        return;
+                    }
                 }
 
                 var gateReason = EvaluateDirectionAndMode(profile, mode, tick);
@@ -347,6 +356,11 @@ namespace JueMingZ.Automation.Movement
 
             _armedDirection = 0;
             _lastArmedCancelReason = reason ?? string.Empty;
+        }
+
+        private static string FirstNonEmpty(string first, string second)
+        {
+            return !string.IsNullOrWhiteSpace(first) ? first : second ?? string.Empty;
         }
 
         private static void RecordDecision(

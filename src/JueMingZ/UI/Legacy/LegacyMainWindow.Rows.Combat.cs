@@ -35,16 +35,12 @@ namespace JueMingZ.UI.Legacy
             var titleRect = new LegacyUiRect(row.X + 10, row.Y + 7, titleWidth, 22);
             UiTextRenderer.DrawTextClipped(spriteBatch, title, titleRect.X, titleRect.Y + 2, titleRect.Width, titleRect.Height, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 238, 226, 255, 0.86f);
             var titleHit = titleRect.Intersect(area.Viewport);
-            if (titleHit.Width > 0 && titleHit.Height > 0 && titleHit.Contains(mouse.X, mouse.Y))
+            var titleElementRect = titleHit.Width > 0 && titleHit.Height > 0 ? titleHit : titleRect;
+            var titleHovered = IsFrameElementHovered("combat-aim-assist-title", titleElementRect, mouse);
+            if (titleHovered)
             {
-                hovered = new LegacyUiElement
-                {
-                    Id = "combat-aim-assist-title",
-                    Label = title,
-                    Kind = "label",
-                    Rect = titleHit,
-                    TooltipLines = new[] { "辅助瞄准会按当前范围中心与目标策略选择敌怪；鼠标中心使用滑条距离，玩家中心使用屏幕范围。" }
-                };
+                hovered = AddFrameElement(elements, "combat-aim-assist-title", title, "label", titleElementRect, enabled: false, tooltipLines: new[] { "辅助瞄准会按当前范围中心与目标策略选择敌怪；鼠标中心使用滑条距离，玩家中心使用屏幕范围。" });
+                RecordFrameElementHover(hovered, true);
             }
 
             const int toggleWidth = 76;
@@ -83,7 +79,7 @@ namespace JueMingZ.UI.Legacy
 
             var sliderDragging = !playerCenterMode && string.Equals(LegacyUiInput.ActiveSliderId, slider.Id, StringComparison.Ordinal);
             var sliderValue = LegacyUiInput.GetSliderDisplayValue(slider.Id, slider.IntValue);
-            var sliderHovered = slider.Bounds.Contains(mouse.X, mouse.Y);
+            var sliderHovered = IsFrameElementHovered(slider.Id, slider.Bounds, mouse);
             DrawCombatAimRadiusSlider(spriteBatch, slider.Bounds, sliderValue, sliderHovered, sliderDragging, playerCenterMode, area.Viewport);
             DrawCombatAimValueText(spriteBatch, valueText, playerCenterMode ? "屏幕范围" : "鼠标半径 " + sliderValue.ToString(CultureInfo.InvariantCulture), playerCenterMode, area.Viewport);
             if (sliderHovered)
@@ -97,7 +93,8 @@ namespace JueMingZ.UI.Legacy
         private static LegacyUiElement DrawCombatSmallToggle(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, LegacyUiRect rect, string id, string label, bool selected)
         {
             var hit = rect.Intersect(area.Viewport);
-            var hovered = hit.Width > 0 && hit.Height > 0 && hit.Contains(mouse.X, mouse.Y);
+            var elementRect = hit.Width > 0 && hit.Height > 0 ? hit : rect;
+            var hovered = IsFrameElementHovered(id, elementRect, mouse);
             LegacyUiTheme.DrawButtonClipped(spriteBatch, rect, hovered, hovered && mouse.LeftDown, selected, true, area.Viewport);
             UiTextRenderer.DrawCenteredTextClipped(spriteBatch, label, rect.X + 3, rect.Y, rect.Width - 6, rect.Height, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, selected ? LegacyUiTheme.SelectedTextR : 230, selected ? LegacyUiTheme.SelectedTextG : 232, selected ? LegacyUiTheme.SelectedTextB : 224, 255, 0.62f);
             if (selected)
@@ -105,15 +102,8 @@ namespace JueMingZ.UI.Legacy
                 LegacyUiTheme.DrawSelectedTextMarkersClipped(spriteBatch, new LegacyUiRect(rect.X + 3, rect.Y, rect.Width - 6, rect.Height), area.Viewport, label, 0.62f);
             }
 
-            var element = new LegacyUiElement
-            {
-                Id = id,
-                Label = "辅助瞄准:" + label,
-                Kind = "button",
-                Rect = hit.Width > 0 && hit.Height > 0 ? hit : rect,
-                Selected = selected
-            };
-            elements.Add(element);
+            var element = AddFrameElement(elements, id, "辅助瞄准:" + label, "button", elementRect, selected: selected);
+            RecordFrameElementHover(element, hovered);
             return hovered ? element : null;
         }
 

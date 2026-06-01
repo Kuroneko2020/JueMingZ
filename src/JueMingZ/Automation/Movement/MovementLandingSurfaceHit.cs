@@ -2,6 +2,8 @@
 {
     internal sealed class MovementLandingSurfaceHit
     {
+        private string _summary;
+
         public bool Found { get; set; }
         public int ImpactDistancePixels { get; set; }
         public float ImpactTicks { get; set; }
@@ -20,7 +22,23 @@
         public bool MovingWithSlope { get; set; }
         public float SurfaceNormalX { get; set; }
         public float SurfaceNormalY { get; set; }
-        public string Summary { get; set; }
+        public string Summary
+        {
+            get
+            {
+                if (_summary == null)
+                {
+                    _summary = BuildSummary();
+                }
+
+                return _summary;
+            }
+
+            set
+            {
+                _summary = value ?? string.Empty;
+            }
+        }
 
         public MovementLandingSurfaceHit()
         {
@@ -32,7 +50,30 @@
             SurfaceKind = string.Empty;
             SlopeDirection = string.Empty;
             ContactSample = string.Empty;
-            Summary = string.Empty;
+        }
+
+        public string BuildSummary()
+        {
+            if (!Found)
+            {
+                return string.Empty;
+            }
+
+            var surfaceKind = string.IsNullOrEmpty(SurfaceKind) ? "unknown" : SurfaceKind;
+            var slopeDirection = string.IsNullOrEmpty(SlopeDirection) ? "unknown" : SlopeDirection;
+            var contactSample = string.IsNullOrEmpty(ContactSample) ? "unknown" : ContactSample;
+            return surfaceKind +
+                   (slopeDirection.Length > 0 ? " " + slopeDirection : string.Empty) +
+                   " contact=" + contactSample +
+                   " movingIntoSlope=" + BoolText(MovingIntoSlope) +
+                   " movingWithSlope=" + BoolText(MovingWithSlope) +
+                   " world=(" + ContactWorldX.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) +
+                   "," + ContactWorldY.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + ")";
+        }
+
+        private static string BoolText(bool value)
+        {
+            return value ? "true" : "false";
         }
     }
 }

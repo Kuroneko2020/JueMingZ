@@ -38,6 +38,9 @@ namespace JueMingZ.Automation.Fishing
         public string FishingAutoStoreLastDiagnosticMessage { get; set; }
         public bool FishingHookInstalled { get; set; }
         public long FishingHookLastObservationTick { get; set; }
+        public long FishingFallbackScanExecutedCount { get; set; }
+        public long FishingFallbackScanSkippedHookFreshCount { get; set; }
+        public long FishingFallbackScanForcedDisappearanceConfirmationCount { get; set; }
         public string FishingFilterMode { get; set; }
         public string FishingFilterMatchMode { get; set; }
         public string FishingFilterCatchKind { get; set; }

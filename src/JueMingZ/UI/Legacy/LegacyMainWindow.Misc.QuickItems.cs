@@ -110,6 +110,11 @@ namespace JueMingZ.UI.Legacy
                             cardsRect.Y + 8 + rowIndex * (QuickItemCardHeight + QuickItemCardGap),
                             cardWidth,
                             QuickItemCardHeight);
+                        if (!card.Intersects(clip))
+                        {
+                            continue;
+                        }
+
                         hovered = DrawQuickItemBindingCard(spriteBatch, mouse, elements, clip, bindings[index], index, card) ?? hovered;
                     }
                 }
@@ -129,18 +134,12 @@ namespace JueMingZ.UI.Legacy
 
                     var cancelRect = new LegacyUiRect(captureRect.Right - 72, captureRect.Y + 3, 64, 22);
                     var cancelHit = cancelRect.Intersect(clip);
-                    var cancelHovered = cancelHit.Width > 0 && cancelHit.Height > 0 && cancelHit.Contains(mouse.X, mouse.Y);
+                    var cancelElementRect = cancelHit.Width > 0 && cancelHit.Height > 0 ? cancelHit : cancelRect;
+                    var cancelHovered = IsFrameElementHovered("misc-quick-item-hotkeys:capture-stop", cancelElementRect, mouse);
                     LegacyUiTheme.DrawButtonClipped(spriteBatch, cancelRect, cancelHovered, cancelHovered && mouse.LeftDown, false, true, clip);
                     UiTextRenderer.DrawCenteredTextClipped(spriteBatch, "取消", cancelRect.X + 2, cancelRect.Y, cancelRect.Width - 4, cancelRect.Height, clip.X, clip.Y, clip.Width, clip.Height, 230, 232, 224, 255, 0.70f);
-                    var cancelElement = new LegacyUiElement
-                    {
-                        Id = "misc-quick-item-hotkeys:capture-stop",
-                        Label = "取消快捷键录入",
-                        Kind = "button",
-                        Rect = cancelHit.Width > 0 && cancelHit.Height > 0 ? cancelHit : cancelRect,
-                        TooltipLines = new[] { "取消当前快捷键录入。" }
-                    };
-                    elements.Add(cancelElement);
+                    var cancelElement = AddFrameElement(elements, "misc-quick-item-hotkeys:capture-stop", "取消快捷键录入", "button", cancelElementRect, tooltipLines: new[] { "取消当前快捷键录入。" });
+                    RecordFrameElementHover(cancelElement, cancelHovered);
                     if (cancelHovered)
                     {
                         hovered = cancelElement;

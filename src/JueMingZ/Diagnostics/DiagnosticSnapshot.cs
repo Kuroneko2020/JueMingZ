@@ -175,6 +175,10 @@ namespace JueMingZ.Diagnostics
         public int HoveredButtonHitY { get; set; }
         public int HoveredButtonHitWidth { get; set; }
         public int HoveredButtonHitHeight { get; set; }
+        public long LegacyUiLayoutCacheHitCount { get; set; }
+        public long LegacyUiLayoutCacheMissCount { get; set; }
+        public int LegacyUiLastFrameVisibleElementCount { get; set; }
+        public long LegacyUiHoverReuseCount { get; set; }
         public string LastDiagnosticHotkey { get; set; }
         public DateTime? LastDiagnosticHotkeyUtc { get; set; }
         public string LastDiagnosticHotkeyMessage { get; set; }
@@ -192,6 +196,16 @@ namespace JueMingZ.Diagnostics
         public double LastGameStateReadMs { get; set; }
         public double LastActionQueueUpdateMs { get; set; }
         public double LastInputActionUpdateMs { get; set; }
+        public double LastInformationDrawMs { get; set; }
+        public int RecentPerformanceWindowCapacitySamples { get; set; }
+        public int RecentPerformanceWindowSampleCount { get; set; }
+        public double RecentRuntimeUpdateAverageMs { get; set; }
+        public double RecentGameStateReadAverageMs { get; set; }
+        public double RecentActionQueueUpdateAverageMs { get; set; }
+        public double RecentInputActionUpdateAverageMs { get; set; }
+        public double RecentInformationDrawAverageMs { get; set; }
+        public long UiTextFastPathHitCount { get; set; }
+        public long UiTextFallbackCount { get; set; }
         public string LastSlowestStageName { get; set; }
         public double LastSlowestStageElapsedMs { get; set; }
         public string LastSlowestOperationName { get; set; }
@@ -295,6 +309,17 @@ namespace JueMingZ.Diagnostics
         public int InformationStatusLinesDrawn { get; set; }
         public double InformationLastDrawElapsedMs { get; set; }
         public string InformationLastSkipReason { get; set; }
+        public long InformationStatusPanelLayoutCacheHitCount { get; set; }
+        public long InformationStatusPanelLayoutCacheMissCount { get; set; }
+        public long InformationSignTextLayoutCacheHitCount { get; set; }
+        public long InformationSignTextLayoutCacheMissCount { get; set; }
+        public long InformationWorldLabelSnapshotRefreshCount { get; set; }
+        public long InformationNpcLabelSnapshotRefreshCount { get; set; }
+        public long InformationChestLabelSnapshotRefreshCount { get; set; }
+        public long InformationChestLabelSortRefreshCount { get; set; }
+        public bool FishingAutomationNeedsTick { get; set; }
+        public bool FishingDisplayNeedsCatchResolver { get; set; }
+        public bool FishingHasResidualState { get; set; }
         public bool FishingSessionActive { get; set; }
         public string FishingLastDecision { get; set; }
         public string FishingLastSkipReason { get; set; }
@@ -331,6 +356,9 @@ namespace JueMingZ.Diagnostics
         public string FishingAutoStoreLastDiagnosticMessage { get; set; }
         public bool FishingHookInstalled { get; set; }
         public long FishingHookLastObservationTick { get; set; }
+        public long FishingFallbackScanExecutedCount { get; set; }
+        public long FishingFallbackScanSkippedHookFreshCount { get; set; }
+        public long FishingFallbackScanForcedDisappearanceConfirmationCount { get; set; }
         public string FishingFilterMode { get; set; }
         public string FishingFilterMatchMode { get; set; }
         public string FishingFilterCatchKind { get; set; }
@@ -557,7 +585,11 @@ namespace JueMingZ.Diagnostics
         public string MovementSafeLandingRecoveryStateSummary { get; set; }
         public long MovementSafeLandingSubmittedCount { get; set; }
         public long MovementSafeLandingSkippedCount { get; set; }
+        public long MovementSafeLandingFullAnalysisCount { get; set; }
+        public long MovementSafeLandingCheapPrecheckSkipCount { get; set; }
+        public long MovementSafeLandingLandingProbeCount { get; set; }
         public string MovementSafeLandingLastCompatError { get; set; }
+        public string MovementSafeLandingCollisionFastPathStatus { get; set; }
         public bool MovementSafeLandingPlayerUpdateHookInstalled { get; set; }
         public string MovementSafeLandingPlayerUpdateHookMessage { get; set; }
         public bool MovementSafeLandingQueuedJumpPulseActive { get; set; }
@@ -836,6 +868,7 @@ namespace JueMingZ.Diagnostics
             MovementSafeLandingPostApplyVerificationSummary = string.Empty;
             MovementSafeLandingRecoveryStateSummary = string.Empty;
             MovementSafeLandingLastCompatError = string.Empty;
+            MovementSafeLandingCollisionFastPathStatus = string.Empty;
             MovementSafeLandingPlayerUpdateHookMessage = string.Empty;
             MovementSafeLandingQueuedJumpPulseStatus = string.Empty;
             MovementSafeLandingQueuedJumpPulseApplySite = string.Empty;

@@ -159,6 +159,112 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void SafeLandingCheapPrecheckSkipsSlowFall()
+        {
+            var player = new FakePlayer
+            {
+                gravDir = 1f,
+                velocity = new FakeVector2 { X = 0f, Y = 2f }
+            };
+
+            MovementSafeLandingAnalysis analysis;
+            bool shouldRunFullAnalysis;
+            if (!MovementSafeLandingCompat.TryCheapDangerPrecheck(player, out analysis, out shouldRunFullAnalysis))
+            {
+                throw new InvalidOperationException("Expected safe landing cheap precheck to read a fake player.");
+            }
+
+            if (shouldRunFullAnalysis)
+            {
+                throw new InvalidOperationException("Expected slow falling player to skip full safe landing analysis.");
+            }
+
+            AssertStringEquals(analysis.SkipReason, "notFallingFastEnough:cheap", "cheap precheck skip reason");
+            AssertNear(analysis.FallingSpeed, 2f, "cheap precheck falling speed");
+            if (!analysis.PlayerControllable)
+            {
+                throw new InvalidOperationException("Expected fake player to be controllable during cheap precheck.");
+            }
+        }
+
+        private static void SafeLandingCheapPrecheckOpensFullAnalysisWhenFast()
+        {
+            var player = new FakePlayer
+            {
+                gravDir = -1f,
+                velocity = new FakeVector2 { X = 1f, Y = -7f }
+            };
+
+            MovementSafeLandingAnalysis analysis;
+            bool shouldRunFullAnalysis;
+            if (!MovementSafeLandingCompat.TryCheapDangerPrecheck(player, out analysis, out shouldRunFullAnalysis))
+            {
+                throw new InvalidOperationException("Expected safe landing cheap precheck to read reverse-gravity falling state.");
+            }
+
+            if (!shouldRunFullAnalysis)
+            {
+                throw new InvalidOperationException("Expected fast reverse-gravity fall to continue into full safe landing analysis.");
+            }
+
+            AssertStringEquals(analysis.SkipReason, "cheapPrecheckPassed", "cheap precheck pass reason");
+            AssertNear(analysis.GravityDirection, -1f, "cheap precheck gravity direction");
+            AssertNear(analysis.FallingSpeed, 7f, "cheap precheck reverse-gravity falling speed");
+        }
+
+        private static void SafeLandingCheapPrecheckFailsOpenWhenVelocityUnavailable()
+        {
+            var player = new FakeSafeLandingCheapPrecheckPlayerWithoutVelocity();
+
+            MovementSafeLandingAnalysis analysis;
+            bool shouldRunFullAnalysis;
+            if (!MovementSafeLandingCompat.TryCheapDangerPrecheck(player, out analysis, out shouldRunFullAnalysis))
+            {
+                throw new InvalidOperationException("Expected missing velocity to fail open without treating precheck as an error.");
+            }
+
+            if (!shouldRunFullAnalysis)
+            {
+                throw new InvalidOperationException("Expected missing velocity to continue into full safe landing analysis.");
+            }
+
+            AssertStringEquals(analysis.SkipReason, "cheapPrecheckUnavailable:velocity", "cheap precheck fail-open reason");
+        }
+
+        private static void SafeLandingCheapPrecheckFailsOpenWhenPlayerStateUnavailable()
+        {
+            var player = new FakeSafeLandingCheapPrecheckPlayerWithoutState();
+
+            MovementSafeLandingAnalysis analysis;
+            bool shouldRunFullAnalysis;
+            if (!MovementSafeLandingCompat.TryCheapDangerPrecheck(player, out analysis, out shouldRunFullAnalysis))
+            {
+                throw new InvalidOperationException("Expected missing player state to fail open without treating precheck as an error.");
+            }
+
+            if (!shouldRunFullAnalysis)
+            {
+                throw new InvalidOperationException("Expected missing player state to continue into full safe landing analysis.");
+            }
+
+            AssertStringEquals(analysis.SkipReason, "cheapPrecheckUnavailable:playerState", "cheap precheck state fail-open reason");
+        }
+
+        private sealed class FakeSafeLandingCheapPrecheckPlayerWithoutVelocity
+        {
+            public bool active = true;
+            public bool dead;
+            public bool ghost;
+            public bool CCed;
+            public float gravDir = 1f;
+        }
+
+        private sealed class FakeSafeLandingCheapPrecheckPlayerWithoutState
+        {
+            public float gravDir = 1f;
+            public FakeVector2 velocity = new FakeVector2 { X = 0f, Y = 2f };
+        }
+
         private static bool InvokeSafeLandingAlreadySafe(FakePlayer player, JumpInputProfile profile, out string reason)
         {
             var method = typeof(MovementSafeLandingCompat).GetMethod(
@@ -219,6 +325,8 @@ namespace JueMingZ.Tests
             var previousSolidTop = Terraria.Main.tileSolidTop;
             try
             {
+                MovementSafeLandingCompat.SetMainTypeForTesting(typeof(Terraria.Main));
+                MovementSafeLandingCompat.ResetCollisionFastPathCachesForTesting();
                 Terraria.Main.tile = new object[20, 20];
                 Terraria.Main.tileSolid = new bool[1000];
                 Terraria.Main.tileSolidTop = new bool[1000];
@@ -242,7 +350,30 @@ namespace JueMingZ.Tests
                 Terraria.Main.tile = previousTiles;
                 Terraria.Main.tileSolid = previousSolid;
                 Terraria.Main.tileSolidTop = previousSolidTop;
+                MovementSafeLandingCompat.SetMainTypeForTesting(null);
+                MovementSafeLandingCompat.ResetCollisionFastPathCachesForTesting();
             }
+        }
+
+        private static void SafeLandingCollisionFastPathRecordsManualFallback()
+        {
+            WithSafeLandingTileMap(() =>
+            {
+                Terraria.Main.tile[5, 10] = new FakeTile
+                {
+                    type = 1,
+                    Active = true,
+                    Slope = 1
+                };
+
+                bool solid;
+                if (!MovementSafeLandingCompat.TryProbeLandingCollision(80f, 126f, 20, 42, 1f, 10f, out solid) || !solid)
+                {
+                    throw new InvalidOperationException("Expected safe landing collision probe to detect the manual slope fallback.");
+                }
+
+                AssertStringEquals(MovementSafeLandingCompat.CollisionFastPathStatus, "manual_surface", "collision fast path status");
+            });
         }
 
         private static void SafeLandingLandingSurfaceReportsSlopeContact()
@@ -267,6 +398,9 @@ namespace JueMingZ.Tests
                 AssertStringEquals(hit.SlopeDirection, "left_high_right_low", "slope direction");
                 AssertStringEquals(hit.ContactTileX.ToString(CultureInfo.InvariantCulture), "5", "contact tile x");
                 AssertStringEquals(hit.ContactTileY.ToString(CultureInfo.InvariantCulture), "10", "contact tile y");
+                AssertContains(hit.Summary, "slope left_high_right_low contact=");
+                AssertContains(hit.Summary, "movingIntoSlope=false");
+                AssertStringEquals(hit.Summary, hit.BuildSummary(), "landing surface summary");
                 if (hit.ProjectedPlayerRightX - hit.ProjectedPlayerLeftX < 19f)
                 {
                     throw new InvalidOperationException("Expected projected player left/right to describe the full rectangle.");
@@ -472,6 +606,8 @@ namespace JueMingZ.Tests
             var previousSolidTop = Terraria.Main.tileSolidTop;
             try
             {
+                MovementSafeLandingCompat.SetMainTypeForTesting(typeof(Terraria.Main));
+                MovementSafeLandingCompat.ResetCollisionFastPathCachesForTesting();
                 Terraria.Main.tile = new object[30, 30];
                 Terraria.Main.tileSolid = new bool[1000];
                 Terraria.Main.tileSolidTop = new bool[1000];
@@ -485,6 +621,8 @@ namespace JueMingZ.Tests
                 Terraria.Main.tile = previousTiles;
                 Terraria.Main.tileSolid = previousSolid;
                 Terraria.Main.tileSolidTop = previousSolidTop;
+                MovementSafeLandingCompat.SetMainTypeForTesting(null);
+                MovementSafeLandingCompat.ResetCollisionFastPathCachesForTesting();
             }
         }
 

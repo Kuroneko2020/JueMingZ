@@ -9,6 +9,17 @@ namespace JueMingZ.Automation.Fishing
         private static long _hookLastObservationTick;
         private static FishingAutomationDiagnosticInfo _last = new FishingAutomationDiagnosticInfo();
 
+        public static bool HookInstalled
+        {
+            get
+            {
+                lock (SyncRoot)
+                {
+                    return _hookInstalled;
+                }
+            }
+        }
+
         public static void MarkHookInstalled()
         {
             lock (SyncRoot)
@@ -90,6 +101,9 @@ namespace JueMingZ.Automation.Fishing
                     FishingAutoStoreLastDiagnosticMessage = _last.FishingAutoStoreLastDiagnosticMessage ?? string.Empty,
                     FishingHookInstalled = _hookInstalled,
                     FishingHookLastObservationTick = Math.Max(_hookLastObservationTick, FishingBobberObserver.LastObservationTick),
+                    FishingFallbackScanExecutedCount = _last.FishingFallbackScanExecutedCount,
+                    FishingFallbackScanSkippedHookFreshCount = _last.FishingFallbackScanSkippedHookFreshCount,
+                    FishingFallbackScanForcedDisappearanceConfirmationCount = _last.FishingFallbackScanForcedDisappearanceConfirmationCount,
                     FishingFilterMode = _last.FishingFilterMode ?? string.Empty,
                     FishingFilterMatchMode = _last.FishingFilterMatchMode ?? string.Empty,
                     FishingFilterCatchKind = _last.FishingFilterCatchKind ?? string.Empty,

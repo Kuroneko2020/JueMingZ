@@ -68,6 +68,14 @@ namespace JueMingZ.Automation.WorldAutomation
             }
         }
 
+        internal static bool RequiresRuntimeTickWhenDisabled()
+        {
+            lock (SyncRoot)
+            {
+                return _activeOriginalContext != null;
+            }
+        }
+
         public static void RecordSaveGuardHook(bool installed, string message)
         {
             lock (SyncRoot)

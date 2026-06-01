@@ -84,15 +84,7 @@ namespace JueMingZ.UI.Legacy
             var tooltip = string.IsNullOrWhiteSpace(message)
                 ? "输入当前显示名、内部英文名或 #ID，搜索全游戏可钓物品。"
                 : message;
-            elements.Add(new LegacyUiElement
-            {
-                Id = FishingFilterUiState.GlobalSearchInputId,
-                Label = "全局可钓物品搜索",
-                Kind = "blocker",
-                Rect = hit.Width > 0 && hit.Height > 0 ? hit : rect,
-                Enabled = true,
-                TooltipLines = new[] { tooltip }
-            });
+            AddFrameElement(elements, FishingFilterUiState.GlobalSearchInputId, "全局可钓物品搜索", "blocker", hit.Width > 0 && hit.Height > 0 ? hit : rect, tooltipLines: new[] { tooltip });
         }
 
         private static List<FishingCatchCandidate> ResolveGlobalFishingSearchCandidates(string query, out string message)

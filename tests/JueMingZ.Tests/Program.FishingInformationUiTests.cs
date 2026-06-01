@@ -23,6 +23,7 @@ using JueMingZ.GameState;
 using JueMingZ.GameState.Buffs;
 using JueMingZ.Records;
 using JueMingZ.UI;
+using JueMingZ.UI.Information;
 using JueMingZ.UI.Legacy;
 
 namespace JueMingZ.Tests
@@ -410,6 +411,66 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void InformationSignTextLayoutCacheReusesWrappedLines()
+        {
+            InformationOverlayService.ResetSignTextLayoutCacheForTesting();
+            try
+            {
+                var first = InformationOverlayService.BuildSignTextLayoutSnapshotForTesting("alpha beta gamma", InformationSignTextModes.Lines, 3, 999, 0.7f);
+                if (first.RebuildCount != 1 ||
+                    first.LineCount <= 0 ||
+                    string.IsNullOrEmpty(first.FirstLineText) ||
+                    first.FirstLineWidth <= 0 ||
+                    first.LineHeight <= 0 ||
+                    first.TotalHeight != first.LineHeight * first.LineCount)
+                {
+                    throw new InvalidOperationException("Expected initial sign text layout to cache wrapped lines, widths and height.");
+                }
+
+                var same = InformationOverlayService.BuildSignTextLayoutSnapshotForTesting("alpha beta gamma", InformationSignTextModes.Lines, 3, 999, 0.7f);
+                if (same.RebuildCount != first.RebuildCount ||
+                    same.LineCount != first.LineCount ||
+                    !string.Equals(same.FirstLineText, first.FirstLineText, StringComparison.Ordinal) ||
+                    same.FirstLineWidth != first.FirstLineWidth ||
+                    same.TotalHeight != first.TotalHeight)
+                {
+                    throw new InvalidOperationException("Expected identical sign text layout key to reuse the cached layout.");
+                }
+
+                var signDiagnostics = InformationOverlayService.GetDiagnostics();
+                if (signDiagnostics.SignTextLayoutCacheMissCount != 1 ||
+                    signDiagnostics.SignTextLayoutCacheHitCount != 1)
+                {
+                    throw new InvalidOperationException("Expected sign text layout diagnostics to count cache hit and miss paths.");
+                }
+
+                var changedText = InformationOverlayService.BuildSignTextLayoutSnapshotForTesting("alpha beta changed", InformationSignTextModes.Lines, 3, 999, 0.7f);
+                if (changedText.RebuildCount <= same.RebuildCount)
+                {
+                    throw new InvalidOperationException("Expected changed sign text to invalidate the cached layout.");
+                }
+
+                var changedMode = InformationOverlayService.BuildSignTextLayoutSnapshotForTesting("alpha beta changed", InformationSignTextModes.Characters, 3, 5, 0.7f);
+                if (changedMode.RebuildCount <= changedText.RebuildCount ||
+                    !changedMode.FirstLineText.EndsWith("...", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected sign text layout mode and character limit to be part of the cache key.");
+                }
+
+                var beforeFontInvalidation = changedMode.RebuildCount;
+                UiTextRenderer.InvalidateCachedResources("sign text layout cache test");
+                var fontInvalidated = InformationOverlayService.BuildSignTextLayoutSnapshotForTesting("alpha beta changed", InformationSignTextModes.Characters, 3, 5, 0.7f);
+                if (fontInvalidated.RebuildCount <= beforeFontInvalidation)
+                {
+                    throw new InvalidOperationException("Expected UI text renderer cache invalidation to rebuild sign text layout.");
+                }
+            }
+            finally
+            {
+                InformationOverlayService.ResetSignTextLayoutCacheForTesting();
+            }
+        }
+
         private static void InformationPageContentHeightIncludesLimitRows()
         {
             var settings = AppSettings.CreateDefault();
@@ -476,6 +537,133 @@ namespace JueMingZ.Tests
             if (UiTextRenderer.TryCalculateClippedSingleLinePositionForTesting("顶部越界", 12, 68, 120, 20, UiTextHorizontalAlignment.Left, 0, 100, 240, 180, 0.86f, out drawX, out drawY))
             {
                 throw new InvalidOperationException("Expected fully out-of-viewport top text to stay hidden.");
+            }
+        }
+
+        private static void InformationStatusPanelLayoutCacheReusesPreparedRows()
+        {
+            InformationStatusPanelService.ResetLayoutCacheForTesting();
+            try
+            {
+                var lines = new List<InformationStatusLine>
+                {
+                    new InformationStatusLine
+                    {
+                        Text = "群系: 森林",
+                        Color = new InformationColor(210, 235, 255, 240),
+                        FontScale = 0.72d
+                    },
+                    new InformationStatusLine
+                    {
+                        Text = "幸运: 普通",
+                        Color = new InformationColor(230, 230, 190, 240),
+                        FontScale = 0.68d
+                    }
+                };
+
+                var first = InformationStatusPanelService.BuildLayoutSnapshotForTesting(lines, 800, 600, true, 20, 200, false);
+                if (first.RebuildCount != 1 || first.RowCount != 2 || !string.Equals(first.FirstRowText, "群系: 森林", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected the initial status panel layout to build visible rows.");
+                }
+
+                var moved = InformationStatusPanelService.BuildLayoutSnapshotForTesting(lines, 800, 600, true, 140, 260, false);
+                if (moved.RebuildCount != first.RebuildCount ||
+                    moved.Width != first.Width ||
+                    moved.Height != first.Height ||
+                    moved.FirstRowDrawX != first.FirstRowDrawX + 120 ||
+                    moved.FirstRowDrawY != first.FirstRowDrawY + 60)
+                {
+                    throw new InvalidOperationException("Expected position-only changes to reuse prepared row layout and only offset draw coordinates.");
+                }
+
+                if (InformationStatusPanelService.LayoutCacheMissCount != 1 ||
+                    InformationStatusPanelService.LayoutCacheHitCount != 1)
+                {
+                    throw new InvalidOperationException("Expected status panel diagnostics to count layout cache hit and miss paths.");
+                }
+
+                lines[0].Text = "群系: 雪原";
+                var changed = InformationStatusPanelService.BuildLayoutSnapshotForTesting(lines, 800, 600, true, 140, 260, false);
+                if (changed.RebuildCount <= moved.RebuildCount || !string.Equals(changed.FirstRowText, "群系: 雪原", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected status panel text changes to rebuild cached layout.");
+                }
+
+                var resized = InformationStatusPanelService.BuildLayoutSnapshotForTesting(lines, 900, 600, true, 140, 260, false);
+                if (resized.RebuildCount <= changed.RebuildCount)
+                {
+                    throw new InvalidOperationException("Expected screen size changes to rebuild cached layout.");
+                }
+
+                var adjusting = InformationStatusPanelService.BuildLayoutSnapshotForTesting(new List<InformationStatusLine>(), 800, 600, true, 20, 200, true);
+                if (adjusting.RowCount != 1 || !string.Equals(adjusting.FirstRowText, "信息窗", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected adjustment placeholder text to remain available when there are no status rows.");
+                }
+
+                var beforeFontInvalidation = adjusting.RebuildCount;
+                UiTextRenderer.InvalidateCachedResources("status panel layout cache test");
+                var fontInvalidated = InformationStatusPanelService.BuildLayoutSnapshotForTesting(new List<InformationStatusLine>(), 800, 600, true, 20, 200, true);
+                if (fontInvalidated.RebuildCount <= beforeFontInvalidation)
+                {
+                    throw new InvalidOperationException("Expected UI text renderer cache invalidation to rebuild status panel layout.");
+                }
+            }
+            finally
+            {
+                InformationStatusPanelService.ResetLayoutCacheForTesting();
+            }
+        }
+
+        private static void UiTextRendererFastPathKeepsSafeFallbacks()
+        {
+            if (UiTextRenderer.DrawText(null, "文字", 10f, 10f, 255, 255, 255, 255, 1f))
+            {
+                throw new InvalidOperationException("Expected null SpriteBatch draw to fail safely.");
+            }
+
+            if (UiTextRenderer.IsAnchorFreeFastPathEligibleForTesting(true, true, string.Empty, 1f, 0f, 0f))
+            {
+                throw new InvalidOperationException("Expected empty text to skip the fast path.");
+            }
+
+            if (UiTextRenderer.IsAnchorFreeFastPathEligibleForTesting(false, true, "文字", 1f, 0f, 0f))
+            {
+                throw new InvalidOperationException("Expected missing SpriteBatch to skip the fast path.");
+            }
+
+            if (UiTextRenderer.IsAnchorFreeFastPathEligibleForTesting(true, false, "文字", 1f, 0f, 0f))
+            {
+                throw new InvalidOperationException("Expected missing font to skip the fast path.");
+            }
+
+            if (UiTextRenderer.IsAnchorFreeFastPathEligibleForTesting(true, true, "文字", 1f, 0.5f, 0f))
+            {
+                throw new InvalidOperationException("Expected anchored text to keep the DrawBorderString fallback.");
+            }
+
+            if (!UiTextRenderer.IsAnchorFreeFastPathEligibleForTesting(true, true, "文字", 0.01f, 0f, 0f))
+            {
+                throw new InvalidOperationException("Expected tiny positive scale to remain eligible after clamping.");
+            }
+
+            if (Math.Abs(UiTextRenderer.ResolveEffectiveScaleForTesting(0.01f) - 0.1f) > 0.0001f)
+            {
+                throw new InvalidOperationException("Expected tiny scale to clamp to the existing 0.1 minimum.");
+            }
+
+            if (UiTextRenderer.IsAnchorFreeFastPathEligibleForTesting(true, true, "文字", float.NaN, 0f, 0f))
+            {
+                throw new InvalidOperationException("Expected invalid scale to keep the fallback path.");
+            }
+        }
+
+        private static void UiTextRendererFontSignatureChangeClearsCaches()
+        {
+            if (!UiTextRenderer.FontSignatureChangeClearsCachesForTesting())
+            {
+                throw new InvalidOperationException("Expected font signature change to clear UI text caches and fast path suspension.");
             }
         }
 
@@ -552,6 +740,192 @@ namespace JueMingZ.Tests
             {
                 throw new InvalidOperationException("Expected cached tile accessor to read vanilla-style method and field tile members.");
             }
+        }
+
+        private static void InformationTileHighlightCacheSignatureTracksBoundsSettingsAndWorld()
+        {
+            var settings = AppSettings.CreateDefault();
+            settings.InformationHighlightLifeCrystalEnabled = true;
+            var context = CreateInformationTileHighlightContext(1025f, 1000f, 800, 600, 512f, 512f, "world-a", "world-record-a");
+            var signature = InformationOverlayService.BuildTileHighlightCacheSignatureForTesting(context, settings);
+
+            var sameTileBounds = CreateInformationTileHighlightContext(1035f, 1000f, 800, 600, 520f, 512f, "world-a", "world-record-a");
+            var sameTileBoundsSignature = InformationOverlayService.BuildTileHighlightCacheSignatureForTesting(sameTileBounds, settings);
+            if (!string.Equals(signature, sameTileBoundsSignature, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected tile highlight signature to survive sub-tile screen movement inside the same scan bounds and player chunk.");
+            }
+
+            var crossedTileBounds = CreateInformationTileHighlightContext(1041f, 1000f, 800, 600, 520f, 512f, "world-a", "world-record-a");
+            if (string.Equals(signature, InformationOverlayService.BuildTileHighlightCacheSignatureForTesting(crossedTileBounds, settings), StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected tile highlight signature to dirty when the screen tile scan bounds change.");
+            }
+
+            var crossedPlayerChunk = CreateInformationTileHighlightContext(1025f, 1000f, 800, 600, 900f, 512f, "world-a", "world-record-a");
+            if (string.Equals(signature, InformationOverlayService.BuildTileHighlightCacheSignatureForTesting(crossedPlayerChunk, settings), StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected tile highlight signature to include the player tile chunk.");
+            }
+
+            var otherWorld = CreateInformationTileHighlightContext(1025f, 1000f, 800, 600, 512f, 512f, "world-b", "world-record-b");
+            if (string.Equals(signature, InformationOverlayService.BuildTileHighlightCacheSignatureForTesting(otherWorld, settings), StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected tile highlight signature to dirty across world identity changes.");
+            }
+
+            var extraHighlight = AppSettings.CreateDefault();
+            extraHighlight.InformationHighlightLifeCrystalEnabled = true;
+            extraHighlight.InformationHighlightLifeFruitEnabled = true;
+            if (string.Equals(signature, InformationOverlayService.BuildTileHighlightCacheSignatureForTesting(context, extraHighlight), StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected tile highlight signature to dirty when enabled highlight types change.");
+            }
+
+            var changedColor = AppSettings.CreateDefault();
+            changedColor.InformationHighlightLifeCrystalEnabled = true;
+            changedColor.InformationLifeCrystalHighlightColor = "#00FF00";
+            if (string.Equals(signature, InformationOverlayService.BuildTileHighlightCacheSignatureForTesting(context, changedColor), StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected tile highlight signature to dirty when highlight color configuration changes.");
+            }
+        }
+
+        private static void InformationTileHighlightCacheKeepsSafetyRefresh()
+        {
+            if (!InformationOverlayService.ShouldRefreshTileHighlightCacheForTesting(0, 1u, 10, 1u))
+            {
+                throw new InvalidOperationException("Expected tile highlight cache to scan when no previous scan tick exists.");
+            }
+
+            if (InformationOverlayService.ShouldRefreshTileHighlightCacheForTesting(100, 1u, 159, 1u))
+            {
+                throw new InvalidOperationException("Expected tile highlight cache to reuse before the safety refresh interval.");
+            }
+
+            if (!InformationOverlayService.ShouldRefreshTileHighlightCacheForTesting(100, 1u, 160, 1u))
+            {
+                throw new InvalidOperationException("Expected tile highlight cache to keep the 60 tick safety refresh when no tile generation is available.");
+            }
+
+            if (!InformationOverlayService.ShouldRefreshTileHighlightCacheForTesting(100, 1u, 120, 2u))
+            {
+                throw new InvalidOperationException("Expected tile highlight cache to refresh immediately when its stable signature changes.");
+            }
+
+            if (!InformationOverlayService.ShouldRefreshTileHighlightCacheForTesting(100, 1u, 90, 1u))
+            {
+                throw new InvalidOperationException("Expected tile highlight cache to refresh after a tick counter rewind.");
+            }
+        }
+
+        private static void InformationFishingCatchQueryKeyTracksEnvironment()
+        {
+            var player = new TestInformationFishingEnvironmentPlayer
+            {
+                luck = 0.25d,
+                fishingSkill = 12,
+                accLavaFishing = true,
+                ZoneJungle = true
+            };
+            var context = new InformationWorldContext
+            {
+                LocalPlayer = player,
+                WorldKey = "world-a#42",
+                PlayerCenterY = 1200f
+            };
+
+            var signature = InformationFishingCatchResolver.BuildCatchQuerySignatureForTesting(
+                context,
+                80,
+                120,
+                "water",
+                320,
+                45,
+                TestFishingRod,
+                267,
+                2454,
+                "filter-a");
+
+            var same = InformationFishingCatchResolver.BuildCatchQuerySignatureForTesting(
+                context,
+                80,
+                120,
+                "water",
+                320,
+                45,
+                TestFishingRod,
+                267,
+                2454,
+                "filter-a");
+            if (!string.Equals(signature, same, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected identical fishing catch query inputs to reuse the same cache signature.");
+            }
+
+            var movedTile = InformationFishingCatchResolver.BuildCatchQuerySignatureForTesting(
+                context,
+                81,
+                120,
+                "water",
+                320,
+                45,
+                TestFishingRod,
+                267,
+                2454,
+                "filter-a");
+            if (string.Equals(signature, movedTile, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected bobber tile changes to dirty the fishing catch cache key.");
+            }
+
+            var changedFilter = InformationFishingCatchResolver.BuildCatchQuerySignatureForTesting(
+                context,
+                80,
+                120,
+                "water",
+                320,
+                45,
+                TestFishingRod,
+                267,
+                2454,
+                "filter-b");
+            if (string.Equals(signature, changedFilter, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected fishing filter configuration changes to dirty the fishing catch cache key.");
+            }
+
+            player.ZoneJungle = false;
+            var changedZone = InformationFishingCatchResolver.BuildCatchQuerySignatureForTesting(
+                context,
+                80,
+                120,
+                "water",
+                320,
+                45,
+                TestFishingRod,
+                267,
+                2454,
+                "filter-a");
+            if (string.Equals(signature, changedZone, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected player biome changes to dirty the fishing catch cache key.");
+            }
+        }
+
+        private static InformationWorldContext CreateInformationTileHighlightContext(float screenX, float screenY, int screenWidth, int screenHeight, float playerCenterX, float playerCenterY, string worldKey, string worldRecordKey)
+        {
+            return new InformationWorldContext
+            {
+                ScreenX = screenX,
+                ScreenY = screenY,
+                ScreenWidth = screenWidth,
+                ScreenHeight = screenHeight,
+                PlayerCenterX = playerCenterX,
+                PlayerCenterY = playerCenterY,
+                WorldKey = worldKey,
+                WorldRecordKey = worldRecordKey
+            };
         }
 
         private static void InformationChestLabelsCacheSignatureChangesWithModeAndKnownKeys()
@@ -798,6 +1172,93 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void InformationNpcLabelSnapshotReusesMovementOnly()
+        {
+            if (!InformationOverlayService.CanReuseNpcLabelSnapshotForTesting(
+                    7,
+                    42,
+                    80,
+                    100,
+                    false,
+                    false,
+                    false,
+                    false,
+                    7,
+                    42,
+                    25,
+                    100,
+                    false,
+                    false,
+                    false,
+                    false))
+            {
+                throw new InvalidOperationException("Expected NPC label snapshot refresh to reuse text/color when only position and non-eligibility life changed.");
+            }
+
+            if (InformationOverlayService.CanReuseNpcLabelSnapshotForTesting(
+                    7,
+                    42,
+                    80,
+                    100,
+                    false,
+                    false,
+                    false,
+                    false,
+                    7,
+                    42,
+                    0,
+                    100,
+                    false,
+                    false,
+                    false,
+                    false))
+            {
+                throw new InvalidOperationException("Expected dead NPC snapshot to dirty the label cache.");
+            }
+
+            if (InformationOverlayService.CanReuseNpcLabelSnapshotForTesting(
+                    7,
+                    42,
+                    80,
+                    100,
+                    false,
+                    false,
+                    false,
+                    false,
+                    7,
+                    42,
+                    80,
+                    100,
+                    false,
+                    true,
+                    false,
+                    false))
+            {
+                throw new InvalidOperationException("Expected friendly-state changes to dirty the NPC label cache.");
+            }
+
+            if (InformationOverlayService.CanReuseNpcLabelSnapshotForTesting(
+                    7,
+                    42,
+                    80,
+                    100,
+                    false,
+                    false,
+                    false,
+                    false,
+                    7,
+                    43,
+                    80,
+                    100,
+                    false,
+                    false,
+                    false,
+                    false))
+            {
+                throw new InvalidOperationException("Expected NPC type changes to dirty the label cache.");
+            }
+        }
+
         private static void InformationChestLabelsDrawOrderPrioritizesScreenCenter()
         {
             var context = new InformationWorldContext
@@ -820,6 +1281,85 @@ namespace JueMingZ.Tests
             if (sorted[sorted.Length - 1] != 3)
             {
                 throw new InvalidOperationException("Expected off-screen padding labels to be drawn after labels inside the current screen.");
+            }
+        }
+
+        private static void InformationChestLabelSortCacheDirtiesOnSourceAndMovementThreshold()
+        {
+            if (InformationOverlayService.ShouldRefreshChestLabelSortForTesting(
+                    1000f,
+                    1000f,
+                    0f,
+                    0f,
+                    800,
+                    600,
+                    1u,
+                    1063f,
+                    1000f,
+                    0f,
+                    0f,
+                    800,
+                    600,
+                    1u))
+            {
+                throw new InvalidOperationException("Expected chest label sort cache to survive movement below the refresh threshold.");
+            }
+
+            if (!InformationOverlayService.ShouldRefreshChestLabelSortForTesting(
+                    1000f,
+                    1000f,
+                    0f,
+                    0f,
+                    800,
+                    600,
+                    1u,
+                    1064f,
+                    1000f,
+                    0f,
+                    0f,
+                    800,
+                    600,
+                    1u))
+            {
+                throw new InvalidOperationException("Expected chest label sort cache to dirty once player movement reaches the threshold.");
+            }
+
+            if (!InformationOverlayService.ShouldRefreshChestLabelSortForTesting(
+                    1000f,
+                    1000f,
+                    0f,
+                    0f,
+                    800,
+                    600,
+                    1u,
+                    1000f,
+                    1000f,
+                    0f,
+                    0f,
+                    800,
+                    600,
+                    2u))
+            {
+                throw new InvalidOperationException("Expected chest label sort cache to dirty when the source label snapshot changes.");
+            }
+
+            if (!InformationOverlayService.ShouldRefreshChestLabelSortForTesting(
+                    1000f,
+                    1000f,
+                    0f,
+                    0f,
+                    800,
+                    600,
+                    1u,
+                    1000f,
+                    1000f,
+                    64f,
+                    0f,
+                    800,
+                    600,
+                    1u))
+            {
+                throw new InvalidOperationException("Expected chest label sort cache to dirty when screen center moves by the threshold.");
             }
         }
 
@@ -878,6 +1418,14 @@ namespace JueMingZ.Tests
             AssertContains(string.Join("|", lines), "其他/未解析 +0.1");
             AssertContains(string.Join("|", lines), "幸运药水 +0.3");
             AssertContains(string.Join("|", lines), "火把 -0.06");
+        }
+
+        private sealed class TestInformationFishingEnvironmentPlayer
+        {
+            public double luck;
+            public int fishingSkill;
+            public bool accLavaFishing;
+            public bool ZoneJungle;
         }
 
         private sealed class TestInformationPropertyTile
@@ -1004,9 +1552,11 @@ namespace JueMingZ.Tests
 
         private static void RuntimePerformanceDiagnosticsRecordsSlowestOperation()
         {
-            RuntimePerformanceDiagnostics.Record(8d, 9d, 1d, 2d, 3d, "stage-a", 4d, "dispatch.service-a", 5d);
+            RuntimePerformanceDiagnostics.ResetForTesting();
+            RuntimePerformanceDiagnostics.Record(8d, 9d, 1d, 2d, 3d, 6d, "stage-a", 4d, "dispatch.service-a", 5d);
             if (!string.Equals(RuntimePerformanceDiagnostics.LastSlowestOperationName, "dispatch.service-a", StringComparison.Ordinal) ||
-                Math.Abs(RuntimePerformanceDiagnostics.LastSlowestOperationElapsedMs - 5d) > 0.001d)
+                Math.Abs(RuntimePerformanceDiagnostics.LastSlowestOperationElapsedMs - 5d) > 0.001d ||
+                Math.Abs(RuntimePerformanceDiagnostics.LastInformationDrawMs - 6d) > 0.001d)
             {
                 throw new InvalidOperationException("Expected runtime performance diagnostics to keep the slowest sub-operation.");
             }
@@ -1027,6 +1577,24 @@ namespace JueMingZ.Tests
                 Math.Abs(RuntimePerformanceDiagnostics.LastPerformanceHitchSlowestOperationMs - 12d) > 0.001d)
             {
                 throw new InvalidOperationException("Expected hitch diagnostics to preserve the slowest sub-operation.");
+            }
+
+            RuntimePerformanceDiagnostics.ResetForTesting();
+            var capacity = RuntimePerformanceDiagnostics.RecentWindowCapacitySamples;
+            for (var index = 0; index < capacity; index++)
+            {
+                RuntimePerformanceDiagnostics.Record(1d, 0d, 1d, 1d, 1d, 1d, "stage-a", 1d, "dispatch.service-a", 1d);
+            }
+
+            RuntimePerformanceDiagnostics.Record(601d, 0d, 601d, 601d, 601d, 601d, "stage-b", 601d, "dispatch.service-b", 601d);
+            if (RuntimePerformanceDiagnostics.RecentWindowSampleCount != capacity ||
+                Math.Abs(RuntimePerformanceDiagnostics.RecentRuntimeUpdateAverageMs - 2d) > 0.001d ||
+                Math.Abs(RuntimePerformanceDiagnostics.RecentGameStateReadAverageMs - 2d) > 0.001d ||
+                Math.Abs(RuntimePerformanceDiagnostics.RecentActionQueueUpdateAverageMs - 2d) > 0.001d ||
+                Math.Abs(RuntimePerformanceDiagnostics.RecentInputActionUpdateAverageMs - 2d) > 0.001d ||
+                Math.Abs(RuntimePerformanceDiagnostics.RecentInformationDrawAverageMs - 2d) > 0.001d)
+            {
+                throw new InvalidOperationException("Expected runtime performance diagnostics to keep a fixed-size recent average window.");
             }
         }
 

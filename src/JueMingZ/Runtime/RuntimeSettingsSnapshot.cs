@@ -109,6 +109,12 @@ namespace JueMingZ.Runtime
                 FishingFilterEnemyRule = FishingFilterSpecialRuleModes.Normalize(settings.FishingFilterEnemyRule),
                 FishingFilterEnabled = !string.Equals(fishingFilterMode, FishingFilterModes.Disabled, StringComparison.OrdinalIgnoreCase),
                 FishingFilterCutRodSkipEnabled = settings.FishingFilterCutRodSkipEnabled,
+                FishingAutomationNeedsTick = settings.FishingAutoFishEnabled ||
+                                             settings.FishingAutoLoadoutEnabled ||
+                                             settings.FishingAutoEquipmentEnabled ||
+                                             FishingAutoStoreModes.IsEnabled(fishingAutoStoreMode),
+                FishingDisplayNeedsCatchResolver = settings.InformationFishingCatchesEnabled ||
+                                                   settings.InformationFishingFilteredCatchesEnabled,
                 FishingAnyEnabled = settings.FishingAutoFishEnabled ||
                                     settings.FishingAutoLoadoutEnabled ||
                                     settings.FishingAutoEquipmentEnabled ||
@@ -196,6 +202,8 @@ namespace JueMingZ.Runtime
         public string FishingFilterEnemyRule { get; private set; }
         public bool FishingFilterEnabled { get; private set; }
         public bool FishingFilterCutRodSkipEnabled { get; private set; }
+        public bool FishingAutomationNeedsTick { get; private set; }
+        public bool FishingDisplayNeedsCatchResolver { get; private set; }
         public bool FishingAnyEnabled { get; private set; }
         public bool MovementSimulatedMultiJumpEnabled { get; private set; }
         public bool MovementContinuousDashEnabled { get; private set; }

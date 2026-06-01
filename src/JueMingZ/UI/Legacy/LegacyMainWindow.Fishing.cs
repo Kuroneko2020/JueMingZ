@@ -107,38 +107,23 @@ namespace JueMingZ.UI.Legacy
                 ? LegacyTextInput.GetDisplayText(FishingQuickRenameTextInputId, currentName)
                 : hasName ? currentName : "未进入世界";
             var inputHit = inputRect.Intersect(area.Viewport);
-            var inputHovered = inputHit.Width > 0 && inputHit.Height > 0 && inputHit.Contains(mouse.X, mouse.Y);
+            var inputElementRect = inputHit.Width > 0 && inputHit.Height > 0 ? inputHit : inputRect;
+            var inputHovered = IsFrameElementHovered("fishing-quick-rename:input", inputElementRect, mouse);
             LegacyUiTheme.DrawButtonClipped(spriteBatch, inputRect, inputHovered, inputHovered && mouse.LeftDown, inputFocused, hasName || inputFocused, area.Viewport);
             UiTextRenderer.DrawTextClipped(spriteBatch, inputText, inputRect.X + 8, inputRect.Y + 3, inputRect.Width - 16, inputRect.Height - 6, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, inputFocused ? 255 : 230, inputFocused ? 245 : 232, inputFocused ? 205 : 224, 255, 0.72f);
 
-            var inputElement = new LegacyUiElement
-            {
-                Id = "fishing-quick-rename:input",
-                Label = "快捷改名:名字",
-                Kind = "button",
-                Rect = inputHit.Width > 0 && inputHit.Height > 0 ? inputHit : inputRect,
-                Selected = inputFocused,
-                Enabled = hasName || inputFocused,
-                TooltipLines = new[] { hasName || inputFocused ? "双击编辑" : FirstNonEmpty(message, "未进入世界") }
-            };
-            elements.Add(inputElement);
+            var inputElement = AddFrameElement(elements, "fishing-quick-rename:input", "快捷改名:名字", "button", inputElementRect, enabled: hasName || inputFocused, selected: inputFocused, tooltipLines: new[] { hasName || inputFocused ? "双击编辑" : FirstNonEmpty(message, "未进入世界") });
+            RecordFrameElementHover(inputElement, inputHovered);
 
             var buttonLabel = inputFocused ? "确定" : "快捷改名";
             var buttonHit = buttonRect.Intersect(area.Viewport);
-            var buttonHovered = buttonHit.Width > 0 && buttonHit.Height > 0 && buttonHit.Contains(mouse.X, mouse.Y);
+            var buttonElementRect = buttonHit.Width > 0 && buttonHit.Height > 0 ? buttonHit : buttonRect;
+            var buttonHovered = IsFrameElementHovered("fishing-quick-rename:apply", buttonElementRect, mouse);
             LegacyUiTheme.DrawButtonClipped(spriteBatch, buttonRect, buttonHovered, buttonHovered && mouse.LeftDown, false, hasName || inputFocused, area.Viewport);
             var buttonScale = FitFishingFilterActionButtonScale(buttonLabel, buttonRect.Width, buttonLabel.Length >= 4 ? 0.66f : 0.74f);
             UiTextRenderer.DrawCenteredTextClipped(spriteBatch, buttonLabel, buttonRect.X + 3, buttonRect.Y, buttonRect.Width - 6, buttonRect.Height, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 230, 232, 224, 255, buttonScale);
-            var buttonElement = new LegacyUiElement
-            {
-                Id = "fishing-quick-rename:apply",
-                Label = "快捷改名:" + buttonLabel,
-                Kind = "button",
-                Rect = buttonHit.Width > 0 && buttonHit.Height > 0 ? buttonHit : buttonRect,
-                Enabled = hasName || inputFocused,
-                TooltipLines = new[] { inputFocused ? "应用当前输入的名字" : "+1" }
-            };
-            elements.Add(buttonElement);
+            var buttonElement = AddFrameElement(elements, "fishing-quick-rename:apply", "快捷改名:" + buttonLabel, "button", buttonElementRect, enabled: hasName || inputFocused, tooltipLines: new[] { inputFocused ? "应用当前输入的名字" : "+1" });
+            RecordFrameElementHover(buttonElement, buttonHovered);
 
             if (buttonHovered)
             {
@@ -243,16 +228,8 @@ namespace JueMingZ.UI.Legacy
             hovered = DrawFishingFilterListContent(spriteBatch, area, mouse, elements, listRect, settings, filterMode, matchMode) ?? hovered;
 
             var hit = titleRect.Intersect(area.Viewport);
-            var titleElement = new LegacyUiElement
-            {
-                Id = "fishing-filter-list-title",
-                Label = title,
-                Kind = "label",
-                Rect = hit.Width > 0 && hit.Height > 0 ? hit : titleRect,
-                Enabled = false,
-                TooltipLines = new[] { title + "：编辑当前模式下的钓鱼过滤名单；自动钓鱼会按当前页匹配方式运行过滤。" }
-            };
-            elements.Add(titleElement);
+            var titleElementRect = hit.Width > 0 && hit.Height > 0 ? hit : titleRect;
+            AddFrameElement(elements, "fishing-filter-list-title", title, "label", titleElementRect, enabled: false, tooltipLines: new[] { title + "：编辑当前模式下的钓鱼过滤名单；自动钓鱼会按当前页匹配方式运行过滤。" });
             return hovered;
         }
 

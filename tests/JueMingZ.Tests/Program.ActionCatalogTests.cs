@@ -2113,6 +2113,83 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void RuntimeSettingsSnapshotSplitsFishingDispatchLayers()
+        {
+            var settings = AppSettings.CreateDefault();
+            settings.FishingFilterMode = FishingFilterModes.DenyList;
+
+            var filterOnly = RuntimeSettingsSnapshot.FromSettings(settings);
+            if (!filterOnly.FishingFilterEnabled ||
+                filterOnly.FishingAutomationNeedsTick ||
+                filterOnly.FishingAnyEnabled ||
+                filterOnly.FishingDisplayNeedsCatchResolver)
+            {
+                throw new InvalidOperationException("Filter configuration alone must not be treated as fishing automation or display resolver work.");
+            }
+
+            settings.InformationFishingFilteredCatchesEnabled = true;
+            var display = RuntimeSettingsSnapshot.FromSettings(settings);
+            if (!display.FishingDisplayNeedsCatchResolver || display.FishingAutomationNeedsTick)
+            {
+                throw new InvalidOperationException("Information fishing display must be separate from fishing automation tick work.");
+            }
+
+            settings.FishingAutoFishEnabled = true;
+            var automation = RuntimeSettingsSnapshot.FromSettings(settings);
+            if (!automation.FishingAutomationNeedsTick || !automation.FishingAnyEnabled)
+            {
+                throw new InvalidOperationException("Auto fishing must keep the automation tick enabled.");
+            }
+        }
+
+        private static void RuntimeFishingDispatchSkipsFilterOnlySettings()
+        {
+            var settings = AppSettings.CreateDefault();
+            settings.FishingFilterMode = FishingFilterModes.AllowList;
+
+            var filterOnly = RuntimeSettingsSnapshot.FromSettings(settings);
+            if (JueMingZRuntime.ShouldDispatchFishingAutomationForTesting(filterOnly, false))
+            {
+                throw new InvalidOperationException("Pure fishing filter settings must not dispatch the full fishing automation service.");
+            }
+
+            if (!JueMingZRuntime.ShouldDispatchFishingAutomationForTesting(filterOnly, true))
+            {
+                throw new InvalidOperationException("Fishing residual state must keep runtime dispatch alive.");
+            }
+
+            settings.InformationFishingCatchesEnabled = true;
+            var displayOnly = RuntimeSettingsSnapshot.FromSettings(settings);
+            if (JueMingZRuntime.ShouldDispatchFishingAutomationForTesting(displayOnly, false))
+            {
+                throw new InvalidOperationException("Information-only fishing catch display must stay outside fishing automation dispatch.");
+            }
+
+            settings.FishingAutoFishEnabled = true;
+            var autoFishing = RuntimeSettingsSnapshot.FromSettings(settings);
+            if (!JueMingZRuntime.ShouldDispatchFishingAutomationForTesting(autoFishing, false))
+            {
+                throw new InvalidOperationException("Auto fishing must dispatch fishing automation even when filter is enabled.");
+            }
+        }
+
+        private static void FishingResidualStateKeepsRuntimeDispatchAlive()
+        {
+            var requestId = Guid.NewGuid();
+            try
+            {
+                FishingLoadoutService.SetRestoreSessionForTesting(requestId, 1, 0);
+                if (!FishingAutomationService.HasResidualState)
+                {
+                    throw new InvalidOperationException("Loadout restore state must be visible as fishing residual runtime work.");
+                }
+            }
+            finally
+            {
+                FishingLoadoutService.ResetForTesting();
+            }
+        }
+
         private static void RuntimeSettingsSnapshotProviderRebuildsAfterConfigMutation()
         {
             var settings = ConfigService.AppSettings;
@@ -2143,6 +2220,56 @@ namespace JueMingZ.Tests
             {
                 settings.CursorAimRadius = originalCursorAimRadius;
                 settings.PlayerAimRadius = originalPlayerAimRadius;
+                RuntimeSettingsSnapshotProvider.ResetForTesting();
+            }
+        }
+
+        private static void RuntimeSettingsSnapshotProviderSkipsDisabledListHashes()
+        {
+            var settings = ConfigService.AppSettings;
+            var originalAutoSellEnabled = settings.InventoryAutoSellEnabled;
+            var originalAutoDiscardEnabled = settings.InventoryAutoDiscardEnabled;
+            var originalQuickReforgeEnabled = settings.NpcAutoReforgeEnabled;
+            var originalAutoSellIds = settings.InventoryAutoSellItemIds;
+            var originalAutoDiscardIds = settings.InventoryAutoDiscardItemIds;
+            var originalQuickReforgePrefixes = settings.NpcAutoReforgePrefixes;
+
+            try
+            {
+                RuntimeSettingsSnapshotProvider.ResetForTesting();
+                settings.InventoryAutoSellEnabled = false;
+                settings.InventoryAutoDiscardEnabled = false;
+                settings.NpcAutoReforgeEnabled = false;
+                settings.InventoryAutoSellItemIds = new List<int> { 1 };
+                settings.InventoryAutoDiscardItemIds = new List<int> { 2 };
+                settings.NpcAutoReforgePrefixes = new List<string> { "Demonic" };
+
+                var first = RuntimeSettingsSnapshotProvider.GetCurrent();
+                settings.InventoryAutoSellItemIds.Add(3);
+                settings.InventoryAutoDiscardItemIds.Add(4);
+                settings.NpcAutoReforgePrefixes.Add("Legendary");
+                var second = RuntimeSettingsSnapshotProvider.GetCurrent();
+
+                if (!object.ReferenceEquals(first, second))
+                {
+                    throw new InvalidOperationException("Disabled list-only mutations must not rebuild the hot-path runtime settings snapshot.");
+                }
+
+                settings.InventoryAutoSellEnabled = true;
+                var third = RuntimeSettingsSnapshotProvider.GetCurrent();
+                if (object.ReferenceEquals(second, third) || !third.InventoryAutoSellEnabled)
+                {
+                    throw new InvalidOperationException("Enabling a list-backed feature must rebuild the runtime settings snapshot.");
+                }
+            }
+            finally
+            {
+                settings.InventoryAutoSellEnabled = originalAutoSellEnabled;
+                settings.InventoryAutoDiscardEnabled = originalAutoDiscardEnabled;
+                settings.NpcAutoReforgeEnabled = originalQuickReforgeEnabled;
+                settings.InventoryAutoSellItemIds = originalAutoSellIds;
+                settings.InventoryAutoDiscardItemIds = originalAutoDiscardIds;
+                settings.NpcAutoReforgePrefixes = originalQuickReforgePrefixes;
                 RuntimeSettingsSnapshotProvider.ResetForTesting();
             }
         }
@@ -2213,6 +2340,29 @@ namespace JueMingZ.Tests
             var snapshot = new DiagnosticSnapshot
             {
                 LastUpdateStartGapMs = 87.5d,
+                LastInformationDrawMs = 4.25d,
+                RecentPerformanceWindowCapacitySamples = 600,
+                RecentPerformanceWindowSampleCount = 420,
+                RecentRuntimeUpdateAverageMs = 2.5d,
+                RecentGameStateReadAverageMs = 1.125d,
+                RecentActionQueueUpdateAverageMs = 0.75d,
+                RecentInputActionUpdateAverageMs = 0.25d,
+                RecentInformationDrawAverageMs = 3.5d,
+                UiTextFastPathHitCount = 101,
+                UiTextFallbackCount = 17,
+                InformationStatusPanelLayoutCacheHitCount = 11,
+                InformationStatusPanelLayoutCacheMissCount = 3,
+                InformationSignTextLayoutCacheHitCount = 19,
+                InformationSignTextLayoutCacheMissCount = 5,
+                InformationWorldLabelSnapshotRefreshCount = 7,
+                InformationNpcLabelSnapshotRefreshCount = 4,
+                InformationChestLabelSnapshotRefreshCount = 3,
+                InformationChestLabelSortRefreshCount = 2,
+                LegacyUiLayoutCacheHitCount = 13,
+                LegacyUiLayoutCacheMissCount = 6,
+                LegacyUiLastFrameVisibleElementCount = 42,
+                LegacyUiHoverReuseCount = 8,
+                MovementSafeLandingLandingProbeCount = 29,
                 LastSlowestStageName = "game-state-read",
                 LastSlowestStageElapsedMs = 12.25d,
                 PerformanceEventsPath = "diagnostics/performance-events-20260525.jsonl",
@@ -2232,6 +2382,19 @@ namespace JueMingZ.Tests
             var json = InvokeDiagnosticSnapshotJson(snapshot);
 
             AssertContains(json, "\"LastUpdateStartGapMs\": 87.5");
+            AssertContains(json, "\"LastInformationDrawMs\": 4.25");
+            AssertContains(json, "\"RecentPerformanceWindowCapacitySamples\": 600");
+            AssertContains(json, "\"RecentPerformanceWindowSampleCount\": 420");
+            AssertContains(json, "\"RecentRuntimeUpdateAverageMs\": 2.5");
+            AssertContains(json, "\"RecentInformationDrawAverageMs\": 3.5");
+            AssertContains(json, "\"UiTextFastPathHitCount\": 101");
+            AssertContains(json, "\"UiTextFallbackCount\": 17");
+            AssertContains(json, "\"InformationStatusPanelLayoutCacheHitCount\": 11");
+            AssertContains(json, "\"InformationSignTextLayoutCacheMissCount\": 5");
+            AssertContains(json, "\"InformationWorldLabelSnapshotRefreshCount\": 7");
+            AssertContains(json, "\"LegacyUiLastFrameVisibleElementCount\": 42");
+            AssertContains(json, "\"LegacyUiHoverReuseCount\": 8");
+            AssertContains(json, "\"MovementSafeLandingLandingProbeCount\": 29");
             AssertContains(json, "\"LastSlowestStageName\": \"game-state-read\"");
             AssertContains(json, "\"PerformanceEventsPath\": \"diagnostics/performance-events-20260525.jsonl\"");
             AssertContains(json, "\"PerformanceHitchCount\": 3");

@@ -25,11 +25,14 @@ namespace JueMingZ.UI.Legacy
             var itemButtonRect = new LegacyUiRect(card.X + 4, buttonY, Math.Max(1, hotkeyRect.X - card.X - 8), buttonHeight);
             var itemType = GetQuickItemBindingPrimaryItemType(binding);
             var itemHit = itemButtonRect.Intersect(clip);
-            var itemHovered = itemHit.Width > 0 && itemHit.Height > 0 && itemHit.Contains(mouse.X, mouse.Y);
-            LegacyUiTheme.DrawButtonClipped(spriteBatch, itemButtonRect, itemHovered, itemHovered && mouse.LeftDown, false, true, clip);
+            var itemId = "misc-quick-item-hotkeys:picker-open:" + index.ToString(CultureInfo.InvariantCulture);
+            var itemElementRect = itemHit.Width > 0 && itemHit.Height > 0 ? itemHit : itemButtonRect;
+            var itemAreaHovered = mouse != null && itemElementRect.Contains(mouse.X, mouse.Y);
+            var itemHovered = IsFrameElementHovered(itemId, itemElementRect, mouse);
+            LegacyUiTheme.DrawButtonClipped(spriteBatch, itemButtonRect, itemAreaHovered, itemAreaHovered && mouse.LeftDown, false, true, clip);
 
             var iconRect = new LegacyUiRect(itemButtonRect.X + 4, itemButtonRect.Y + Math.Max(0, (itemButtonRect.Height - QuickItemIconCellSize) / 2), QuickItemIconCellSize, QuickItemIconCellSize);
-            LegacyUiTheme.DrawCellClipped(spriteBatch, iconRect, itemHovered, false, false, clip);
+            LegacyUiTheme.DrawCellClipped(spriteBatch, iconRect, itemAreaHovered, false, false, clip);
             if (itemType > 0)
             {
                 object texture;
@@ -67,33 +70,21 @@ namespace JueMingZ.UI.Legacy
                 242,
                 0.56f);
 
-            var itemElement = new LegacyUiElement
-            {
-                Id = "misc-quick-item-hotkeys:picker-open:" + index.ToString(CultureInfo.InvariantCulture),
-                Label = "快捷物品:选择物品",
-                Kind = "button",
-                Rect = itemHit.Width > 0 && itemHit.Height > 0 ? itemHit : itemButtonRect,
-                TooltipLines = new[] { itemType > 0 ? "点击修改该快捷物品。" : "点击从背包选择物品。" }
-            };
-            elements.Add(itemElement);
+            var itemElement = AddFrameElement(elements, itemId, "快捷物品:选择物品", "button", itemElementRect, tooltipLines: new[] { itemType > 0 ? "点击修改该快捷物品。" : "点击从背包选择物品。" });
+            RecordFrameElementHover(itemElement, itemHovered);
             var hovered = itemHovered ? itemElement : null;
 
-            if (itemHovered)
+            if (itemAreaHovered)
             {
                 var deleteRect = new LegacyUiRect(itemButtonRect.Right - 15, itemButtonRect.Y + 1, 14, 14);
                 var deleteHit = deleteRect.Intersect(clip);
-                var deleteHovered = deleteHit.Width > 0 && deleteHit.Height > 0 && deleteHit.Contains(mouse.X, mouse.Y);
+                var deleteId = "misc-quick-item-hotkeys:remove:" + index.ToString(CultureInfo.InvariantCulture);
+                var deleteElementRect = deleteHit.Width > 0 && deleteHit.Height > 0 ? deleteHit : deleteRect;
+                var deleteHovered = IsFrameElementHovered(deleteId, deleteElementRect, mouse);
                 LegacyUiTheme.DrawButtonClipped(spriteBatch, deleteRect, deleteHovered, deleteHovered && mouse.LeftDown, false, true, clip);
                 UiTextRenderer.DrawCenteredTextClipped(spriteBatch, "x", deleteRect.X + 1, deleteRect.Y, deleteRect.Width - 2, deleteRect.Height, clip.X, clip.Y, clip.Width, clip.Height, 238, 196, 180, 255, 0.64f);
-                var deleteElement = new LegacyUiElement
-                {
-                    Id = "misc-quick-item-hotkeys:remove:" + index.ToString(CultureInfo.InvariantCulture),
-                    Label = "删除快捷物品条目",
-                    Kind = "button",
-                    Rect = deleteHit.Width > 0 && deleteHit.Height > 0 ? deleteHit : deleteRect,
-                    TooltipLines = new[] { "删除这一条快捷物品配置。" }
-                };
-                elements.Add(deleteElement);
+                var deleteElement = AddFrameElement(elements, deleteId, "删除快捷物品条目", "button", deleteElementRect, tooltipLines: new[] { "删除这一条快捷物品配置。" });
+                RecordFrameElementHover(deleteElement, deleteHovered);
                 if (deleteHovered)
                 {
                     hovered = deleteElement;
@@ -101,7 +92,9 @@ namespace JueMingZ.UI.Legacy
             }
 
             var hotkeyHit = hotkeyRect.Intersect(clip);
-            var hotkeyHovered = hotkeyHit.Width > 0 && hotkeyHit.Height > 0 && hotkeyHit.Contains(mouse.X, mouse.Y);
+            var hotkeyId = "misc-quick-item-hotkeys:capture-start:" + index.ToString(CultureInfo.InvariantCulture);
+            var hotkeyElementRect = hotkeyHit.Width > 0 && hotkeyHit.Height > 0 ? hotkeyHit : hotkeyRect;
+            var hotkeyHovered = IsFrameElementHovered(hotkeyId, hotkeyElementRect, mouse);
             LegacyUiTheme.DrawButtonClipped(spriteBatch, hotkeyRect, hotkeyHovered, hotkeyHovered && mouse.LeftDown, captureSelected, true, clip);
             var hotkeyScale = hotkeyText.Length >= 12
                 ? 0.52f
@@ -123,16 +116,8 @@ namespace JueMingZ.UI.Legacy
                 UiTextRenderer.DrawTextClipped(spriteBatch, "编辑", hotkeyRect.X + 4, hotkeyRect.Y + 2, hotkeyRect.Width - 8, 14, clip.X, clip.Y, clip.Width, clip.Height, 238, 196, 156, 248, 0.52f);
             }
 
-            var hotkeyElement = new LegacyUiElement
-            {
-                Id = "misc-quick-item-hotkeys:capture-start:" + index.ToString(CultureInfo.InvariantCulture),
-                Label = "编辑快捷键",
-                Kind = "button",
-                Rect = hotkeyHit.Width > 0 && hotkeyHit.Height > 0 ? hotkeyHit : hotkeyRect,
-                Selected = captureSelected,
-                TooltipLines = new[] { "点击后按下快捷键组合（支持 Ctrl / Alt / Shift + 键）。" }
-            };
-            elements.Add(hotkeyElement);
+            var hotkeyElement = AddFrameElement(elements, hotkeyId, "编辑快捷键", "button", hotkeyElementRect, selected: captureSelected, tooltipLines: new[] { "点击后按下快捷键组合（支持 Ctrl / Alt / Shift + 键）。" });
+            RecordFrameElementHover(hotkeyElement, hotkeyHovered);
             if (hotkeyHovered)
             {
                 hovered = hotkeyElement;

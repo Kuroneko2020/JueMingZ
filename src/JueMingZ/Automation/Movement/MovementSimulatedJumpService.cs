@@ -94,20 +94,37 @@ namespace JueMingZ.Automation.Movement
                     return;
                 }
 
+                var inputFrame = MovementInputFrameCache.GetOrCreate(runtimeState, settingsSnapshot);
                 object player;
-                if (!TerrariaInputCompat.TryGetLocalPlayer(out player) || player == null)
+                if (inputFrame == null || !inputFrame.TryGetPlayer(out player))
                 {
-                    ResetOpportunityFlags();
-                    RecordDecision(true, "skipped", "localPlayerUnavailable", tick, queueSnapshot, null, false, false, string.Empty);
-                    return;
+                    if (!TerrariaInputCompat.TryGetLocalPlayer(out player) || player == null)
+                    {
+                        ResetOpportunityFlags();
+                        RecordDecision(true, "skipped", "localPlayerUnavailable", tick, queueSnapshot, null, false, false, string.Empty);
+                        return;
+                    }
                 }
 
                 JumpInputProfile profile;
-                if (!TerrariaInputCompat.TryReadJumpInputProfile(player, out profile))
+                string profileFailureReason = string.Empty;
+                if (inputFrame == null || !inputFrame.TryGetJumpProfile(out profile, out profileFailureReason))
                 {
-                    ResetOpportunityFlags();
-                    RecordDecision(true, "skipped", "jumpProfile:" + TerrariaInputCompat.LastInputCompatError, tick, queueSnapshot, null, false, false, string.Empty);
-                    return;
+                    if (!TerrariaInputCompat.TryReadJumpInputProfile(player, out profile))
+                    {
+                        ResetOpportunityFlags();
+                        RecordDecision(
+                            true,
+                            "skipped",
+                            "jumpProfile:" + FirstNonEmpty(TerrariaInputCompat.LastInputCompatError, profileFailureReason),
+                            tick,
+                            queueSnapshot,
+                            null,
+                            false,
+                            false,
+                            string.Empty);
+                        return;
+                    }
                 }
 
                 if (!profile.PlayerControllable)
@@ -336,6 +353,11 @@ namespace JueMingZ.Automation.Movement
                 _releasedForGroundContact = false;
                 _releasedForAerialOpportunity = false;
             }
+        }
+
+        private static string FirstNonEmpty(string first, string second)
+        {
+            return !string.IsNullOrWhiteSpace(first) ? first : second ?? string.Empty;
         }
 
         private static void RecordDecision(

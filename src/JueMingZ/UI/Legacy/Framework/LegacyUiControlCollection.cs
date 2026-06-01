@@ -25,7 +25,7 @@ namespace JueMingZ.UI.Legacy.Framework
             for (var index = 0; index < _controls.Count; index++)
             {
                 var element = _controls[index].Draw(context);
-                if (element != null && context != null && context.IsMouseOver(element.Rect))
+                if (element != null && context != null && context.IsElementHovered(element.Id, element.Rect))
                 {
                     hovered = element;
                 }

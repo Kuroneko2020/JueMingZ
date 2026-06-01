@@ -2551,18 +2551,24 @@ namespace JueMingZ.Compat
                 return false;
             }
 
-            FieldInfo field;
-            if (TerrariaMemberCache.TryGetField(type, name, true, out field) && field != null)
+            try
             {
-                value = field.GetValue(null);
-                return true;
-            }
+                FieldInfo field;
+                if (TerrariaMemberCache.TryGetField(type, name, true, out field) && field != null)
+                {
+                    value = field.GetValue(null);
+                    return true;
+                }
 
-            PropertyInfo property;
-            if (TerrariaMemberCache.TryGetProperty(type, name, true, out property) && property != null && property.CanRead)
+                PropertyInfo property;
+                if (TerrariaMemberCache.TryGetProperty(type, name, true, out property) && property != null && property.CanRead)
+                {
+                    value = property.GetValue(null, null);
+                    return true;
+                }
+            }
+            catch
             {
-                value = property.GetValue(null, null);
-                return true;
             }
 
             return false;

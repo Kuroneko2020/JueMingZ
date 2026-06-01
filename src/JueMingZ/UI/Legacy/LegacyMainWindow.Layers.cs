@@ -22,6 +22,7 @@ namespace JueMingZ.UI.Legacy
     {
         public static bool DrawInterfaceLayer()
         {
+            var elementFrameStarted = false;
             try
             {
                 if (!LegacyMainUiState.Visible)
@@ -58,6 +59,7 @@ namespace JueMingZ.UI.Legacy
                 var selectedPage = LegacyMainUiState.SelectedPageId;
                 var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
                 var elements = PrepareFrameElements();
+                elementFrameStarted = true;
                 var frameContext = new LegacyUiContext(spriteBatch, mouse, window, selectedPage, settings, elements);
 
                 DrawFrame(spriteBatch, window, shell.TitleRect, shell.ResizeRect);
@@ -67,9 +69,9 @@ namespace JueMingZ.UI.Legacy
                 var contentRect = shell.ContentRect;
                 frameContext.SetContentRect(contentRect);
                 LegacyUiTheme.DrawContentPanel(spriteBatch, contentRect);
-                var contentHeight = CalculateCachedContentHeight(selectedPage, contentRect, settings);
-                var scrollContainer = LegacyScrollContainerControl.Create(contentRect, contentHeight, LegacyMainUiState.ScrollOffset);
-                var scrollArea = scrollContainer.Area;
+                var pageLayout = GetCachedPageLayout(selectedPage, window, contentRect, settings, LegacyMainUiState.ScrollOffset);
+                var contentHeight = pageLayout.ContentHeight;
+                var scrollArea = pageLayout.CreateScrollArea(contentRect);
                 LegacyMainUiState.SetScrollOffset(scrollArea.ScrollOffset, scrollArea.MaxScroll);
                 frameContext.SetScrollArea(scrollArea);
 
@@ -95,7 +97,9 @@ namespace JueMingZ.UI.Legacy
                         }
 
                         LegacyMainUiState.ScrollBy(scrollDelta, scrollArea.MaxScroll);
-                        scrollArea = LegacyScrollArea.Create(contentRect, contentHeight, LegacyMainUiState.ScrollOffset);
+                        pageLayout = GetCachedPageLayout(selectedPage, window, contentRect, settings, LegacyMainUiState.ScrollOffset);
+                        contentHeight = pageLayout.ContentHeight;
+                        scrollArea = pageLayout.CreateScrollArea(contentRect);
                         LegacyUiInput.CaptureIfNeeded(true);
                         var restored = LegacyHotbarScrollGuard.RestoreLateUiWheelIfNeeded(scrollSnapshot, inWindow, LegacyUiInput.IsActiveInteraction());
                         var suppressed = LegacyUiInput.SuppressHotbarScroll();
@@ -107,9 +111,11 @@ namespace JueMingZ.UI.Legacy
                 }
 
                 LegacyUiInput.HandleScrollbarDrag(mouse, scrollArea);
-                scrollContainer = LegacyScrollContainerControl.Create(contentRect, contentHeight, LegacyMainUiState.ScrollOffset);
-                scrollArea = scrollContainer.Area;
+                pageLayout = GetCachedPageLayout(selectedPage, window, contentRect, settings, LegacyMainUiState.ScrollOffset);
+                contentHeight = pageLayout.ContentHeight;
+                scrollArea = pageLayout.CreateScrollArea(contentRect);
                 frameContext.SetScrollArea(scrollArea);
+                BeginFrameHoverCache(mouse, selectedPage, window, contentRect, scrollArea, settings);
 
                 LegacyUiElement hoveredElement = null;
                 if (string.Equals(selectedPage, "buff", StringComparison.Ordinal))
@@ -147,13 +153,14 @@ namespace JueMingZ.UI.Legacy
 
                 if (!string.Equals(selectedPage, "about", StringComparison.Ordinal) || scrollArea.NeedsScroll)
                 {
-                    scrollContainer.DrawScrollbar(spriteBatch);
+                    LegacyUiTheme.DrawScrollbar(spriteBatch, scrollArea.ScrollbarTrack, scrollArea.ScrollbarThumb);
                 }
 
                 if (!string.Equals(selectedPage, "about", StringComparison.Ordinal))
                 {
                     DrawFooter(spriteBatch, window);
                 }
+                hoveredElement = ResolveFrameHoveredElement(hoveredElement, elements, mouse);
                 if (hoveredElement != null)
                 {
                     DrawTooltip(spriteBatch, hoveredElement, mouse);
@@ -175,6 +182,13 @@ namespace JueMingZ.UI.Legacy
                     TimeSpan.FromSeconds(10),
                     "LegacyMainWindow",
                     "Legacy main window draw failed.", error);
+            }
+            finally
+            {
+                if (elementFrameStarted)
+                {
+                    FinishFrameElements();
+                }
             }
 
             return true;

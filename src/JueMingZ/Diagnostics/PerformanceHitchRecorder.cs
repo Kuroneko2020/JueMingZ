@@ -24,6 +24,9 @@ namespace JueMingZ.Diagnostics
         public double InformationLastDrawElapsedMs { get; set; }
         public string InformationEnabledSummary { get; set; }
         public string InformationLastSkipReason { get; set; }
+        public bool FishingAutomationNeedsTick { get; set; }
+        public bool FishingDisplayNeedsCatchResolver { get; set; }
+        public bool FishingHasResidualState { get; set; }
         public bool LateBootstrapCompleted { get; set; }
         public bool IsInWorld { get; set; }
         public bool IsInMainMenu { get; set; }
@@ -408,7 +411,10 @@ namespace JueMingZ.Diagnostics
             AppendRaw(builder, "combatAimMarkerEnabled", BoolRaw(sample.CombatAimMarkerEnabled), true);
             AppendRaw(builder, "combatEquipmentWarningEnabled", BoolRaw(sample.CombatEquipmentWarningEnabled), true);
             AppendString(builder, "informationEnabledSummary", sample.InformationEnabledSummary, true);
-            AppendString(builder, "informationLastSkipReason", sample.InformationLastSkipReason, false);
+            AppendString(builder, "informationLastSkipReason", sample.InformationLastSkipReason, true);
+            AppendRaw(builder, "fishingAutomationNeedsTick", BoolRaw(sample.FishingAutomationNeedsTick), true);
+            AppendRaw(builder, "fishingDisplayNeedsCatchResolver", BoolRaw(sample.FishingDisplayNeedsCatchResolver), true);
+            AppendRaw(builder, "fishingHasResidualState", BoolRaw(sample.FishingHasResidualState), false);
             builder.Append("}");
             return builder.ToString();
         }

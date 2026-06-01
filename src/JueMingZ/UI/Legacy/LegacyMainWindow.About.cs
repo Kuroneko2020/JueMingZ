@@ -176,7 +176,7 @@ namespace JueMingZ.UI.Legacy
             DrawAboutCenteredTitle(spriteBatch, rect, clip, "QQ 问题反馈群", "message", rect.Y + 8, 0.70f);
             DrawAboutDottedLine(spriteBatch, rect.X + 34, rect.Y + 31, rect.Width - 68, clip, palette.BorderR, palette.BorderG, palette.BorderB, 96);
             var numberRect = new LegacyUiRect(rect.X + 28, rect.Y + 42, rect.Width - 56, 26);
-            var hovered = mouse != null && numberRect.Contains(mouse.X, mouse.Y);
+            var hovered = IsFrameElementHovered("about-copy-feedback-group", numberRect, mouse);
             var pressed = hovered && mouse.LeftDown;
             var fillAlpha = hovered ? 158 : 122;
             var borderAlpha = hovered ? 214 : 152;
@@ -188,19 +188,8 @@ namespace JueMingZ.UI.Legacy
             DrawAboutSparkle(spriteBatch, numberRect.Right - 18, numberRect.CenterY, clip, 2, 255, 226, 150, hovered ? 240 : 190);
             UiTextRenderer.DrawCenteredTextClipped(spriteBatch, AboutFeedbackGroupNumber, numberRect.X + 28, numberRect.Y + 2, numberRect.Width - 56, numberRect.Height - 4, clip.X, clip.Y, clip.Width, clip.Height, 255, 226, 150, 255, FitAboutTextScale(AboutFeedbackGroupNumber, numberRect.Width - 56, 0.88f, 0.66f));
 
-            var element = new LegacyUiElement
-            {
-                Id = "about-copy-feedback-group",
-                Label = "复制QQ群号",
-                Kind = "button",
-                Rect = numberRect,
-                Enabled = true,
-                TooltipLines = null
-            };
-            if (elements != null)
-            {
-                elements.Add(element);
-            }
+            var element = AddFrameElement(elements, "about-copy-feedback-group", "复制QQ群号", "button", numberRect);
+            RecordFrameElementHover(element, hovered);
 
             return hovered ? element : null;
         }

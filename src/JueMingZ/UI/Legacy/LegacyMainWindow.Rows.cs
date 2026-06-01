@@ -101,7 +101,9 @@ namespace JueMingZ.UI.Legacy
             if (configRect.Width > 0)
             {
                 var hit = configRect.Intersect(area.Viewport);
-                var isHovered = hit.Width > 0 && hit.Height > 0 && hit.Contains(mouse.X, mouse.Y);
+                var elementId = "information-style-config:" + styleFeatureId;
+                var elementRect = hit.Width > 0 && hit.Height > 0 ? hit : configRect;
+                var isHovered = IsFrameElementHovered(elementId, elementRect, mouse);
                 var selected = string.Equals(_informationStylePopupFeatureId, styleFeatureId, StringComparison.Ordinal);
                 LegacyUiTheme.DrawButtonClipped(spriteBatch, configRect, isHovered, isHovered && mouse.LeftDown, selected, true, area.Viewport);
                 var color = InformationStyleHelper.GetColor(ConfigService.AppSettings ?? AppSettings.CreateDefault(), styleFeatureId);
@@ -114,16 +116,8 @@ namespace JueMingZ.UI.Legacy
                     LegacyUiTheme.DrawSelectedTextMarkersClipped(spriteBatch, new LegacyUiRect(configRect.X + 14, configRect.Y, configRect.Width - 16, configRect.Height), area.Viewport, "配置", 0.72f);
                 }
 
-                var element = new LegacyUiElement
-                {
-                    Id = "information-style-config:" + styleFeatureId,
-                    Label = label + ":配置",
-                    Kind = "button",
-                    Rect = hit.Width > 0 && hit.Height > 0 ? hit : configRect,
-                    Selected = selected,
-                    TooltipLines = new[] { "调整颜色和字号" }
-                };
-                elements.Add(element);
+                var element = AddFrameElement(elements, elementId, label + ":配置", "button", elementRect, selected: selected, tooltipLines: new[] { "调整颜色和字号" });
+                RecordFrameElementHover(element, isHovered);
                 if (selected)
                 {
                     _informationStylePopupAnchor = configRect;
@@ -142,7 +136,9 @@ namespace JueMingZ.UI.Legacy
                 var rect = new LegacyUiRect(x, buttonY, width, RowModeButtonHeight);
                 var selected = string.Equals(selectedMode, values[index], StringComparison.OrdinalIgnoreCase);
                 var hit = rect.Intersect(area.Viewport);
-                var isHovered = hit.Width > 0 && hit.Height > 0 && hit.Contains(mouse.X, mouse.Y);
+                var elementId = elementPrefix + values[index];
+                var elementRect = hit.Width > 0 && hit.Height > 0 ? hit : rect;
+                var isHovered = IsFrameElementHovered(elementId, elementRect, mouse);
                 LegacyUiTheme.DrawButtonClipped(spriteBatch, rect, isHovered, isHovered && mouse.LeftDown, selected, true, area.Viewport);
                 UiTextRenderer.DrawCenteredTextClipped(spriteBatch, labels[index], rect.X + 3, rect.Y, rect.Width - 6, rect.Height, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, selected ? LegacyUiTheme.SelectedTextR : 230, selected ? LegacyUiTheme.SelectedTextG : 232, selected ? LegacyUiTheme.SelectedTextB : 224, 255, 0.78f);
                 if (selected)
@@ -150,18 +146,17 @@ namespace JueMingZ.UI.Legacy
                     LegacyUiTheme.DrawSelectedTextMarkersClipped(spriteBatch, new LegacyUiRect(rect.X + 3, rect.Y, rect.Width - 6, rect.Height), area.Viewport, labels[index], 0.78f);
                 }
 
-                var element = new LegacyUiElement
-                {
-                    Id = elementPrefix + values[index],
-                    Label = label + ":" + labels[index],
-                    Kind = "button",
-                    Rect = hit.Width > 0 && hit.Height > 0 ? hit : rect,
-                    Selected = selected,
-                    TooltipLines = tooltips != null && index < tooltips.Length && !string.IsNullOrWhiteSpace(tooltips[index])
+                var element = AddFrameElement(
+                    elements,
+                    elementId,
+                    label + ":" + labels[index],
+                    "button",
+                    elementRect,
+                    selected: selected,
+                    tooltipLines: tooltips != null && index < tooltips.Length && !string.IsNullOrWhiteSpace(tooltips[index])
                         ? new[] { tooltips[index] }
-                        : null
-                };
-                elements.Add(element);
+                        : null);
+                RecordFrameElementHover(element, isHovered);
                 if (isHovered)
                 {
                     hovered = element;

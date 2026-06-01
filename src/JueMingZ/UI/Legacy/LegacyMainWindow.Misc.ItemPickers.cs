@@ -176,6 +176,11 @@ namespace JueMingZ.UI.Legacy
                         cardsRect.Y + 8 + rowIndex * (AutoSellGridCellHeight + QuickItemCardGap),
                         cardWidth,
                         AutoSellGridCellHeight);
+                    if (!card.Intersects(clip))
+                    {
+                        continue;
+                    }
+
                     hovered = drawCard(spriteBatch, mouse, elements, clip, itemIds[index], index, card) ?? hovered;
                 }
             }
@@ -205,45 +210,42 @@ namespace JueMingZ.UI.Legacy
             LegacyUiTheme.DrawRowClipped(spriteBatch, card, clip);
             var itemButtonRect = new LegacyUiRect(card.X + 4, card.Y + 3, Math.Max(1, card.Width - 8), Math.Max(1, card.Height - 6));
             var itemHit = itemButtonRect.Intersect(clip);
-            var itemHovered = itemHit.Width > 0 && itemHit.Height > 0 && itemHit.Contains(mouse.X, mouse.Y);
-            LegacyUiTheme.DrawButtonClipped(spriteBatch, itemButtonRect, itemHovered, itemHovered && mouse.LeftDown, selected, true, clip);
+            var itemId = openIdPrefix + index.ToString(CultureInfo.InvariantCulture);
+            var itemElementRect = itemHit.Width > 0 && itemHit.Height > 0 ? itemHit : itemButtonRect;
+            var itemAreaHovered = mouse != null && itemElementRect.Contains(mouse.X, mouse.Y);
+            var itemHovered = IsFrameElementHovered(itemId, itemElementRect, mouse);
+            LegacyUiTheme.DrawButtonClipped(spriteBatch, itemButtonRect, itemAreaHovered, itemAreaHovered && mouse.LeftDown, selected, true, clip);
 
             var iconRect = new LegacyUiRect(
                 itemButtonRect.X + Math.Max(0, (itemButtonRect.Width - AutoSellGridIconCellSize) / 2),
                 itemButtonRect.Y + Math.Max(0, (itemButtonRect.Height - AutoSellGridIconCellSize) / 2),
                 AutoSellGridIconCellSize,
                 AutoSellGridIconCellSize);
-            DrawMiscItemIcon(spriteBatch, iconRect, clip, itemType, itemHovered, false, "+", 0.84f);
+            DrawMiscItemIcon(spriteBatch, iconRect, clip, itemType, itemAreaHovered, false, "+", 0.84f);
 
-            var itemElement = new LegacyUiElement
-            {
-                Id = openIdPrefix + index.ToString(CultureInfo.InvariantCulture),
-                Label = openLabel,
-                Kind = "button",
-                Rect = itemHit.Width > 0 && itemHit.Height > 0 ? itemHit : itemButtonRect,
-                TooltipLines = itemType > 0
+            var itemElement = AddFrameElement(
+                elements,
+                itemId,
+                openLabel,
+                "button",
+                itemElementRect,
+                tooltipLines: itemType > 0
                     ? new[] { itemLabel + " #" + itemType.ToString(CultureInfo.InvariantCulture), selectedTooltip }
-                    : new[] { "未选择", emptyTooltip }
-            };
-            elements.Add(itemElement);
+                    : new[] { "未选择", emptyTooltip });
+            RecordFrameElementHover(itemElement, itemHovered);
             var hovered = itemHovered ? itemElement : null;
 
-            if (itemHovered)
+            if (itemAreaHovered)
             {
                 var deleteRect = new LegacyUiRect(itemButtonRect.Right - 15, itemButtonRect.Y + 1, 14, 14);
                 var deleteHit = deleteRect.Intersect(clip);
-                var deleteHovered = deleteHit.Width > 0 && deleteHit.Height > 0 && deleteHit.Contains(mouse.X, mouse.Y);
+                var deleteId = removeIdPrefix + index.ToString(CultureInfo.InvariantCulture);
+                var deleteElementRect = deleteHit.Width > 0 && deleteHit.Height > 0 ? deleteHit : deleteRect;
+                var deleteHovered = IsFrameElementHovered(deleteId, deleteElementRect, mouse);
                 LegacyUiTheme.DrawButtonClipped(spriteBatch, deleteRect, deleteHovered, deleteHovered && mouse.LeftDown, false, true, clip);
                 UiTextRenderer.DrawCenteredTextClipped(spriteBatch, "x", deleteRect.X + 1, deleteRect.Y, deleteRect.Width - 2, deleteRect.Height, clip.X, clip.Y, clip.Width, clip.Height, 238, 196, 180, 255, 0.64f);
-                var deleteElement = new LegacyUiElement
-                {
-                    Id = removeIdPrefix + index.ToString(CultureInfo.InvariantCulture),
-                    Label = removeLabel,
-                    Kind = "button",
-                    Rect = deleteHit.Width > 0 && deleteHit.Height > 0 ? deleteHit : deleteRect,
-                    TooltipLines = new[] { itemType > 0 ? removeFilledTooltip : removeEmptyTooltip }
-                };
-                elements.Add(deleteElement);
+                var deleteElement = AddFrameElement(elements, deleteId, removeLabel, "button", deleteElementRect, tooltipLines: new[] { itemType > 0 ? removeFilledTooltip : removeEmptyTooltip });
+                RecordFrameElementHover(deleteElement, deleteHovered);
                 if (deleteHovered)
                 {
                     hovered = deleteElement;
@@ -280,18 +282,12 @@ namespace JueMingZ.UI.Legacy
             UiTextRenderer.DrawTextClipped(spriteBatch, options.Title, rect.X + 10, rect.Y + 8, rect.Width - titleRightPadding, 18, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 238, 226, 255, 0.70f);
 
             var closeHit = closeRect.Intersect(area.Viewport);
-            var closeHovered = closeHit.Width > 0 && closeHit.Height > 0 && closeHit.Contains(mouse.X, mouse.Y);
+            var closeElementRect = closeHit.Width > 0 && closeHit.Height > 0 ? closeHit : closeRect;
+            var closeHovered = IsFrameElementHovered(options.CloseId, closeElementRect, mouse);
             LegacyUiTheme.DrawButtonClipped(spriteBatch, closeRect, closeHovered, closeHovered && mouse.LeftDown, false, true, area.Viewport);
             UiTextRenderer.DrawCenteredTextClipped(spriteBatch, "x", closeRect.X + 2, closeRect.Y + 1, closeRect.Width - 4, closeRect.Height, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 196, 180, 255, 0.72f);
-            var closeElement = new LegacyUiElement
-            {
-                Id = options.CloseId,
-                Label = options.CloseLabel,
-                Kind = "button",
-                Rect = closeHit.Width > 0 && closeHit.Height > 0 ? closeHit : closeRect,
-                TooltipLines = new[] { options.CloseTooltip }
-            };
-            elements.Add(closeElement);
+            var closeElement = AddFrameElement(elements, options.CloseId, options.CloseLabel, "button", closeElementRect, tooltipLines: new[] { options.CloseTooltip });
+            RecordFrameElementHover(closeElement, closeHovered);
             if (closeHovered)
             {
                 hovered = closeElement;
@@ -300,18 +296,12 @@ namespace JueMingZ.UI.Legacy
             if (hasConfirm)
             {
                 var confirmHit = confirmRect.Intersect(area.Viewport);
-                var confirmHovered = confirmHit.Width > 0 && confirmHit.Height > 0 && confirmHit.Contains(mouse.X, mouse.Y);
+                var confirmElementRect = confirmHit.Width > 0 && confirmHit.Height > 0 ? confirmHit : confirmRect;
+                var confirmHovered = IsFrameElementHovered(options.ConfirmId, confirmElementRect, mouse);
                 LegacyUiTheme.DrawButtonClipped(spriteBatch, confirmRect, confirmHovered, confirmHovered && mouse.LeftDown, false, true, area.Viewport);
                 UiTextRenderer.DrawCenteredTextClipped(spriteBatch, options.ConfirmLabel, confirmRect.X + 4, confirmRect.Y, confirmRect.Width - 8, confirmRect.Height, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 230, 236, 220, 255, 0.66f);
-                var confirmElement = new LegacyUiElement
-                {
-                    Id = options.ConfirmId,
-                    Label = options.ConfirmLabel,
-                    Kind = "button",
-                    Rect = confirmHit.Width > 0 && confirmHit.Height > 0 ? confirmHit : confirmRect,
-                    TooltipLines = new[] { options.ConfirmTooltip }
-                };
-                elements.Add(confirmElement);
+                var confirmElement = AddFrameElement(elements, options.ConfirmId, options.ConfirmLabel, "button", confirmElementRect, tooltipLines: new[] { options.ConfirmTooltip });
+                RecordFrameElementHover(confirmElement, confirmHovered);
                 if (confirmHovered)
                 {
                     hovered = confirmElement;
@@ -335,6 +325,11 @@ namespace JueMingZ.UI.Legacy
                     body.Y + rowIndex * (cellSize + AutoItemPickerCellGap),
                     cellSize,
                     cellSize);
+                if (!cell.Intersects(area.Viewport))
+                {
+                    continue;
+                }
+
                 hovered = DrawMiscInventoryIconPickerCandidate(spriteBatch, mouse, elements, cell, area.Viewport, candidates[index], options) ?? hovered;
             }
 
@@ -357,32 +352,33 @@ namespace JueMingZ.UI.Legacy
 
             var selected = options.IsSelected != null && options.IsSelected(candidate);
             var hit = cell.Intersect(clip);
-            var hovered = hit.Width > 0 && hit.Height > 0 && hit.Contains(mouse.X, mouse.Y);
+            var addMode = options.TargetIndex < 0 && !string.IsNullOrWhiteSpace(options.ToggleIdPrefix);
+            var label = string.IsNullOrWhiteSpace(candidate.ItemName)
+                ? "#" + candidate.ItemType.ToString(CultureInfo.InvariantCulture)
+                : candidate.ItemName + " #" + candidate.ItemType.ToString(CultureInfo.InvariantCulture);
+            var elementId = addMode
+                    ? options.ToggleIdPrefix + candidate.ItemType.ToString(CultureInfo.InvariantCulture)
+                    : options.SelectIdPrefix + options.TargetIndex.ToString(CultureInfo.InvariantCulture) + ":" + candidate.ItemType.ToString(CultureInfo.InvariantCulture);
+            var elementRect = hit.Width > 0 && hit.Height > 0 ? hit : cell;
+            var hovered = IsFrameElementHovered(elementId, elementRect, mouse);
             DrawMiscItemIcon(spriteBatch, cell, clip, candidate.ItemType, hovered, false, string.Empty, 0.46f);
             if (selected)
             {
                 UiPrimitiveRenderer.DrawRoundedRectClipped(spriteBatch, cell.Right - 15, cell.Y + 4, 10, 10, clip.X, clip.Y, clip.Width, clip.Height, 5, 126, 226, 156, 245);
             }
 
-            var addMode = options.TargetIndex < 0 && !string.IsNullOrWhiteSpace(options.ToggleIdPrefix);
-            var label = string.IsNullOrWhiteSpace(candidate.ItemName)
-                ? "#" + candidate.ItemType.ToString(CultureInfo.InvariantCulture)
-                : candidate.ItemName + " #" + candidate.ItemType.ToString(CultureInfo.InvariantCulture);
-            var element = new LegacyUiElement
-            {
-                Id = addMode
-                    ? options.ToggleIdPrefix + candidate.ItemType.ToString(CultureInfo.InvariantCulture)
-                    : options.SelectIdPrefix + options.TargetIndex.ToString(CultureInfo.InvariantCulture) + ":" + candidate.ItemType.ToString(CultureInfo.InvariantCulture),
-                Label = addMode ? options.ToggleLabel : options.SelectLabel,
-                Kind = "button",
-                Rect = hit.Width > 0 && hit.Height > 0 ? hit : cell,
-                Selected = selected,
-                TooltipLines = new[]
+            var element = AddFrameElement(
+                elements,
+                elementId,
+                addMode ? options.ToggleLabel : options.SelectLabel,
+                "button",
+                elementRect,
+                selected: selected,
+                tooltipLines: new[]
                 {
                     options.TooltipPrefix + label + "（背包槽位 #" + (candidate.Slot + 1).ToString(CultureInfo.InvariantCulture) + "）"
-                }
-            };
-            elements.Add(element);
+                });
+            RecordFrameElementHover(element, hovered);
             return hovered ? element : null;
         }
 

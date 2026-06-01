@@ -18,6 +18,7 @@ using JueMingZ.Features;
 using JueMingZ.GameState;
 using JueMingZ.Input;
 using JueMingZ.UI;
+using JueMingZ.UI.Information;
 using JueMingZ.UI.Legacy;
 
 namespace JueMingZ.Runtime
@@ -47,7 +48,7 @@ namespace JueMingZ.Runtime
         private static readonly Dictionary<string, long> ServiceSchedulerLastRunTick =
             new Dictionary<string, long>(StringComparer.Ordinal);
 
-        public const string Version = "1.7.390-auto-buff-icons";
+        public const string Version = "1.7.408-performance-counters";
 
         public static RuntimeState State { get; private set; } = new RuntimeState();
         public static FeatureRegistry FeatureRegistry { get; private set; }
@@ -206,22 +207,30 @@ namespace JueMingZ.Runtime
             var gameState = context.GameState;
             var settings = context.SettingsSnapshot ?? RuntimeSettingsSnapshotProvider.GetCurrent();
             var operationStart = Stopwatch.GetTimestamp();
-            CombatAimReleaseHoldService.Tick(gameState != null && gameState.IsInWorld, settings);
-            RecordOperationTiming(context, "targeting.combat-release-hold", operationStart);
+            if (ShouldRunService("targeting.combat-release-hold", settings.CombatAimAnyEnabled, 1, context.UpdateTick))
+            {
+                CombatAimReleaseHoldService.Tick(gameState != null && gameState.IsInWorld, settings);
+                RecordOperationTiming(context, "targeting.combat-release-hold", operationStart);
+            }
+
             operationStart = Stopwatch.GetTimestamp();
             if (ShouldRunService(
                 "targeting.combat-auto-aim",
-                settings.CombatAimAnyEnabled || settings.PersistentCursorAimEnabled || settings.CombatAimMarkerEnabled,
+                settings.CursorAimRadius > 0,
                 1,
                 context.UpdateTick))
             {
                 CombatAutoAimService.Tick(gameState, State, settings);
                 RecordOperationTiming(context, "targeting.combat-auto-aim", operationStart);
-                operationStart = Stopwatch.GetTimestamp();
             }
 
-            CombatAimFlailControlService.Update();
-            RecordOperationTiming(context, "targeting.combat-flail-control", operationStart);
+            operationStart = Stopwatch.GetTimestamp();
+            if (ShouldRunService("targeting.combat-flail-control", settings.CursorAimRadius > 0, 1, context.UpdateTick))
+            {
+                CombatAimFlailControlService.Update();
+                RecordOperationTiming(context, "targeting.combat-flail-control", operationStart);
+            }
+
             operationStart = Stopwatch.GetTimestamp();
             QueueStartupDiagnosticNoopIfReady();
             RecordOperationTiming(context, "targeting.startup-diagnostic-noop", operationStart);
@@ -247,8 +256,16 @@ namespace JueMingZ.Runtime
             var settings = context.SettingsSnapshot ?? RuntimeSettingsSnapshotProvider.GetCurrent();
             var tick = context.UpdateTick;
             var operationStart = Stopwatch.GetTimestamp();
-            TravelMenuService.Tick(gameState, State);
-            RecordOperationTiming(context, "dispatch.travel-menu", operationStart);
+            if (ShouldRunService(
+                "travel-menu",
+                settings.WorldAutomationTravelMenuEnabled || TravelMenuService.RequiresRuntimeTickWhenDisabled(),
+                1,
+                tick))
+            {
+                TravelMenuService.Tick(gameState, State);
+                RecordOperationTiming(context, "dispatch.travel-menu", operationStart);
+            }
+
             operationStart = Stopwatch.GetTimestamp();
             if (TravelMenuService.ShouldPauseAutomationForTravelMenu())
             {
@@ -264,7 +281,12 @@ namespace JueMingZ.Runtime
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRunService("fishing-automation", settings.FishingAnyEnabled || settings.FishingFilterEnabled, 1, tick))
+            var fishingHasResidualState = FishingAutomationService.HasResidualState;
+            if (ShouldRunService(
+                "fishing-automation",
+                ShouldDispatchFishingAutomation(settings, fishingHasResidualState),
+                1,
+                tick))
             {
                 FishingAutomationService.Tick(ActionQueue, gameState, State, settings);
                 RecordOperationTiming(context, "dispatch.fishing-automation", operationStart);
@@ -394,8 +416,16 @@ namespace JueMingZ.Runtime
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            MovementSafeLandingService.Tick(ActionQueue, gameState, State);
-            RecordOperationTiming(context, "dispatch.movement-safe-landing", operationStart);
+            if (ShouldRunService(
+                "movement-safe-landing",
+                settings.MovementSafeLandingEnabled || MovementSafeLandingService.RequiresRuntimeTickWhenDisabled(),
+                1,
+                tick))
+            {
+                MovementSafeLandingService.Tick(ActionQueue, gameState, State);
+                RecordOperationTiming(context, "dispatch.movement-safe-landing", operationStart);
+            }
+
             operationStart = Stopwatch.GetTimestamp();
 
             if (ShouldRunService("movement-continuous-dash", settings.MovementContinuousDashEnabled, 1, tick))
@@ -551,6 +581,12 @@ namespace JueMingZ.Runtime
             return true;
         }
 
+        private static bool ShouldDispatchFishingAutomation(RuntimeSettingsSnapshot settings, bool hasResidualState)
+        {
+            settings = settings ?? RuntimeSettingsSnapshotProvider.GetCurrent();
+            return settings.FishingAutomationNeedsTick || hasResidualState;
+        }
+
         private static GameStateReadOptions BuildGameStateReadOptions(RuntimeSettingsSnapshot settingsSnapshot, bool diagnosticSnapshotDue)
         {
             var settings = settingsSnapshot ?? RuntimeSettingsSnapshotProvider.GetCurrent();
@@ -630,17 +666,18 @@ namespace JueMingZ.Runtime
 
         private static void RecordRuntimePerformance(RuntimeTickContext context)
         {
+            var informationDrawMs = InformationOverlayService.GetLastDrawElapsedMs();
             RuntimePerformanceDiagnostics.Record(
                 context.RuntimeElapsedMs,
                 context.UpdateStartGapMs,
                 context.GameStateReadMs,
                 context.ActionQueueUpdateMs,
                 context.InputActionUpdateMs,
+                informationDrawMs,
                 context.SlowestStageName,
                 context.SlowestStageElapsedMs,
                 context.SlowestOperationName,
                 context.SlowestOperationElapsedMs);
-            var informationDrawMs = InformationOverlayService.GetLastDrawElapsedMs();
             PerformanceHitchRecorder.RecordIfNeeded(
                 context.UpdateStartGapMs,
                 context.RuntimeElapsedMs,
@@ -675,6 +712,9 @@ namespace JueMingZ.Runtime
                 SlowestOperationElapsedMs = context.SlowestOperationElapsedMs,
                 InformationLastDrawElapsedMs = information == null ? 0d : information.LastDrawElapsedMs,
                 InformationEnabledSummary = information == null ? string.Empty : information.EnabledSummary,
+                FishingAutomationNeedsTick = settings.FishingAutomationNeedsTick,
+                FishingDisplayNeedsCatchResolver = settings.FishingDisplayNeedsCatchResolver,
+                FishingHasResidualState = FishingAutomationService.HasResidualState,
                 InformationLastSkipReason = information == null ? string.Empty : information.LastSkipReason,
                 LateBootstrapCompleted = State != null && State.LateBootstrapCompleted,
                 IsInWorld = gameState.IsInWorld,
@@ -778,6 +818,11 @@ namespace JueMingZ.Runtime
             return ShouldDispatchAutomation(snapshot);
         }
 
+        internal static bool ShouldDispatchFishingAutomationForTesting(RuntimeSettingsSnapshot settings, bool hasResidualState)
+        {
+            return ShouldDispatchFishingAutomation(settings, hasResidualState);
+        }
+
         public static void ResetServiceSchedulerForTesting()
         {
             lock (ServiceSchedulerSyncRoot)
@@ -846,6 +891,8 @@ namespace JueMingZ.Runtime
             var magicStringClicker = CombatMagicStringClickerService.GetDiagnostics();
             var information = InformationOverlayService.GetDiagnostics();
             var fishing = FishingAutomationService.GetDiagnostics();
+            var settingsSnapshot = RuntimeSettingsSnapshotProvider.GetCurrent();
+            var fishingHasResidualState = FishingAutomationService.HasResidualState;
             var simulatedJump = MovementSimulatedJumpService.GetDiagnostics();
             var continuousDash = MovementContinuousDashService.GetDiagnostics();
             var teleportCorrection = MovementTeleportCorrectionService.GetDiagnostics();
@@ -1028,6 +1075,10 @@ namespace JueMingZ.Runtime
                 HoveredButtonHitY = DiagnosticInteractionDiagnostics.HoveredButtonHitY,
                 HoveredButtonHitWidth = DiagnosticInteractionDiagnostics.HoveredButtonHitWidth,
                 HoveredButtonHitHeight = DiagnosticInteractionDiagnostics.HoveredButtonHitHeight,
+                LegacyUiLayoutCacheHitCount = LegacyMainWindow.PageLayoutCacheHitCount,
+                LegacyUiLayoutCacheMissCount = LegacyMainWindow.PageLayoutCacheMissCount,
+                LegacyUiLastFrameVisibleElementCount = LegacyUiElementFrame.LastFrameElementCount,
+                LegacyUiHoverReuseCount = LegacyUiElementFrame.HoverReuseCount,
                 LastDiagnosticHotkey = DiagnosticActionHotkeyService.LastDiagnosticHotkey,
                 LastDiagnosticHotkeyUtc = DiagnosticActionHotkeyService.LastDiagnosticHotkeyUtc,
                 LastDiagnosticHotkeyMessage = DiagnosticActionHotkeyService.LastDiagnosticHotkeyMessage,
@@ -1045,6 +1096,16 @@ namespace JueMingZ.Runtime
                 LastGameStateReadMs = RuntimePerformanceDiagnostics.LastGameStateReadMs,
                 LastActionQueueUpdateMs = RuntimePerformanceDiagnostics.LastActionQueueUpdateMs,
                 LastInputActionUpdateMs = RuntimePerformanceDiagnostics.LastInputActionUpdateMs,
+                LastInformationDrawMs = RuntimePerformanceDiagnostics.LastInformationDrawMs,
+                RecentPerformanceWindowCapacitySamples = RuntimePerformanceDiagnostics.RecentWindowCapacitySamples,
+                RecentPerformanceWindowSampleCount = RuntimePerformanceDiagnostics.RecentWindowSampleCount,
+                RecentRuntimeUpdateAverageMs = RuntimePerformanceDiagnostics.RecentRuntimeUpdateAverageMs,
+                RecentGameStateReadAverageMs = RuntimePerformanceDiagnostics.RecentGameStateReadAverageMs,
+                RecentActionQueueUpdateAverageMs = RuntimePerformanceDiagnostics.RecentActionQueueUpdateAverageMs,
+                RecentInputActionUpdateAverageMs = RuntimePerformanceDiagnostics.RecentInputActionUpdateAverageMs,
+                RecentInformationDrawAverageMs = RuntimePerformanceDiagnostics.RecentInformationDrawAverageMs,
+                UiTextFastPathHitCount = UiTextRenderer.AnchorFreeFastPathHitCount,
+                UiTextFallbackCount = UiTextRenderer.AnchorFreeFastPathFallbackCount,
                 LastSlowestStageName = RuntimePerformanceDiagnostics.LastSlowestStageName,
                 LastSlowestStageElapsedMs = RuntimePerformanceDiagnostics.LastSlowestStageElapsedMs,
                 LastSlowestOperationName = RuntimePerformanceDiagnostics.LastSlowestOperationName,
@@ -1150,6 +1211,17 @@ namespace JueMingZ.Runtime
                 InformationStatusLinesDrawn = information == null ? 0 : information.StatusLinesDrawn,
                 InformationLastDrawElapsedMs = information == null ? 0d : information.LastDrawElapsedMs,
                 InformationLastSkipReason = information == null ? string.Empty : information.LastSkipReason,
+                InformationStatusPanelLayoutCacheHitCount = InformationStatusPanelService.LayoutCacheHitCount,
+                InformationStatusPanelLayoutCacheMissCount = InformationStatusPanelService.LayoutCacheMissCount,
+                InformationSignTextLayoutCacheHitCount = information == null ? 0 : information.SignTextLayoutCacheHitCount,
+                InformationSignTextLayoutCacheMissCount = information == null ? 0 : information.SignTextLayoutCacheMissCount,
+                InformationWorldLabelSnapshotRefreshCount = information == null ? 0 : information.WorldLabelSnapshotRefreshCount,
+                InformationNpcLabelSnapshotRefreshCount = information == null ? 0 : information.NpcLabelSnapshotRefreshCount,
+                InformationChestLabelSnapshotRefreshCount = information == null ? 0 : information.ChestLabelSnapshotRefreshCount,
+                InformationChestLabelSortRefreshCount = information == null ? 0 : information.ChestLabelSortRefreshCount,
+                FishingAutomationNeedsTick = settingsSnapshot.FishingAutomationNeedsTick,
+                FishingDisplayNeedsCatchResolver = settingsSnapshot.FishingDisplayNeedsCatchResolver,
+                FishingHasResidualState = fishingHasResidualState,
                 FishingSessionActive = fishing != null && fishing.FishingSessionActive,
                 FishingLastDecision = fishing == null ? string.Empty : fishing.FishingLastDecision,
                 FishingLastSkipReason = fishing == null ? string.Empty : fishing.FishingLastSkipReason,
@@ -1186,8 +1258,11 @@ namespace JueMingZ.Runtime
                 FishingAutoStoreLastDiagnosticMessage = fishing == null ? string.Empty : fishing.FishingAutoStoreLastDiagnosticMessage,
                 FishingHookInstalled = fishing != null && fishing.FishingHookInstalled,
                 FishingHookLastObservationTick = fishing == null ? 0 : fishing.FishingHookLastObservationTick,
-                FishingFilterMode = fishing == null ? string.Empty : fishing.FishingFilterMode,
-                FishingFilterMatchMode = fishing == null ? string.Empty : fishing.FishingFilterMatchMode,
+                FishingFallbackScanExecutedCount = fishing == null ? 0 : fishing.FishingFallbackScanExecutedCount,
+                FishingFallbackScanSkippedHookFreshCount = fishing == null ? 0 : fishing.FishingFallbackScanSkippedHookFreshCount,
+                FishingFallbackScanForcedDisappearanceConfirmationCount = fishing == null ? 0 : fishing.FishingFallbackScanForcedDisappearanceConfirmationCount,
+                FishingFilterMode = fishing == null || string.IsNullOrWhiteSpace(fishing.FishingFilterMode) ? settingsSnapshot.FishingFilterMode : fishing.FishingFilterMode,
+                FishingFilterMatchMode = fishing == null || string.IsNullOrWhiteSpace(fishing.FishingFilterMatchMode) ? settingsSnapshot.FishingFilterMatchMode : fishing.FishingFilterMatchMode,
                 FishingFilterCatchKind = fishing == null ? string.Empty : fishing.FishingFilterCatchKind,
                 FishingFilterCatchId = fishing == null ? 0 : fishing.FishingFilterCatchId,
                 FishingFilterCatchName = fishing == null ? string.Empty : fishing.FishingFilterCatchName,
@@ -1195,7 +1270,7 @@ namespace JueMingZ.Runtime
                 FishingFilterDecisionReason = fishing == null ? string.Empty : fishing.FishingFilterDecisionReason,
                 FishingFilterMatchedRule = fishing == null ? string.Empty : fishing.FishingFilterMatchedRule,
                 FishingFilterDryRun = fishing != null && fishing.FishingFilterDryRun,
-                FishingFilterCutRodSkipEnabled = fishing != null && fishing.FishingFilterCutRodSkipEnabled,
+                FishingFilterCutRodSkipEnabled = settingsSnapshot.FishingFilterCutRodSkipEnabled,
                 MovementSimulatedJumpEnabled = simulatedJump != null && simulatedJump.Enabled,
                 MovementSimulatedJumpLastTriggered = simulatedJump != null && simulatedJump.LastTriggered,
                 MovementSimulatedJumpLastTriggerUtc = simulatedJump == null ? null : simulatedJump.LastTriggerUtc,
@@ -1381,7 +1456,11 @@ namespace JueMingZ.Runtime
                 MovementSafeLandingRecoveryStateSummary = safeLanding == null ? string.Empty : safeLanding.RecoveryStateSummary,
                 MovementSafeLandingSubmittedCount = safeLanding == null ? 0 : safeLanding.SubmittedCount,
                 MovementSafeLandingSkippedCount = safeLanding == null ? 0 : safeLanding.SkippedCount,
+                MovementSafeLandingFullAnalysisCount = safeLanding == null ? 0 : safeLanding.FullAnalysisCount,
+                MovementSafeLandingCheapPrecheckSkipCount = safeLanding == null ? 0 : safeLanding.CheapPrecheckSkipCount,
+                MovementSafeLandingLandingProbeCount = safeLanding == null ? 0 : safeLanding.LandingProbeCount,
                 MovementSafeLandingLastCompatError = safeLanding == null ? string.Empty : safeLanding.LastCompatError,
+                MovementSafeLandingCollisionFastPathStatus = safeLanding == null ? string.Empty : safeLanding.CollisionFastPathStatus ?? string.Empty,
                 MovementSafeLandingPlayerUpdateHookInstalled = safeLanding != null && safeLanding.PlayerUpdateHookInstalled,
                 MovementSafeLandingPlayerUpdateHookMessage = safeLanding == null ? string.Empty : safeLanding.PlayerUpdateHookMessage,
                 MovementSafeLandingQueuedJumpPulseActive = safeLanding != null && safeLanding.QueuedJumpPulseActive,

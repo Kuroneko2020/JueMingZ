@@ -14,7 +14,7 @@ namespace JueMingZ.UI.Legacy.Controls
 
         protected override void DrawSelf(LegacyUiContext context)
         {
-            var hovered = context.IsMouseOver(Bounds);
+            var hovered = context.IsElementHovered(Id, Bounds);
             var pressed = hovered && context.Mouse != null && context.Mouse.LeftDown;
             LegacyUiTheme.DrawButton(context.SpriteBatch, Bounds, hovered, pressed, Selected, Enabled);
             UiTextRenderer.DrawAlignedText(

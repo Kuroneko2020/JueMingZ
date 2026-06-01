@@ -64,6 +64,21 @@ namespace JueMingZ.Automation.Fishing
             get { lock (SyncRoot) { return _lastDiagnosticMessage; } }
         }
 
+        internal static bool HasResidualState
+        {
+            get
+            {
+                lock (SyncRoot)
+                {
+                    return _lastRequestId != Guid.Empty ||
+                           _lastAllRequestId != Guid.Empty ||
+                           _allStorePending ||
+                           PendingPullCatchItemIds.Count > 0 ||
+                           PendingCaughtItemIds.Count > 0;
+                }
+            }
+        }
+
         public static void RegisterExpectedCaughtItem(Guid pullRequestId, int itemId)
         {
             if (pullRequestId == Guid.Empty || itemId <= 0)

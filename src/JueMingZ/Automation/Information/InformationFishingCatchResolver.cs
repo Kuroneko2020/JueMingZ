@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
+using System.Text;
 using JueMingZ.Automation.Fishing.Filtering;
 
 namespace JueMingZ.Automation.Information
@@ -12,12 +13,59 @@ namespace JueMingZ.Automation.Information
         private const int TileSize = 16;
         private const int MinimumWaterTilesForFishingRules = 75;
         private const int MaxCatchItems = 96;
+        private const int CatchCacheLimit = 16;
         private static FieldInfo _fishRulesField;
         private static bool _crateSetsInitialized;
         private static object _isFishingCrateSet;
         private static object _isFishingCrateHardmodeSet;
         private static readonly Dictionary<Type, MethodInfo> MeetsConditionsMethods = new Dictionary<Type, MethodInfo>();
         private static readonly Dictionary<int, string> ItemInternalNameCache = new Dictionary<int, string>();
+        private static readonly object CatchCacheSyncRoot = new object();
+        private static readonly Dictionary<FishingCatchQueryKey, FishingCatchCacheEntry> CatchCache =
+            new Dictionary<FishingCatchQueryKey, FishingCatchCacheEntry>();
+        private static readonly Queue<FishingCatchQueryKey> CatchCacheOrder = new Queue<FishingCatchQueryKey>();
+        private static readonly string[] QueryPlayerZoneFields =
+        {
+            "ZoneCorrupt",
+            "ZoneCrimson",
+            "ZoneJungle",
+            "ZoneSnow",
+            "ZoneDesert",
+            "ZoneUndergroundDesert",
+            "ZoneBeach",
+            "ZoneDungeon",
+            "ZoneHallow",
+            "ZoneMeteor",
+            "ZoneGlowshroom",
+            "ZoneUnderworldHeight",
+            "ZoneOverworldHeight",
+            "ZoneSkyHeight",
+            "ZoneDirtLayerHeight",
+            "ZoneRockLayerHeight",
+            "ZoneRain"
+        };
+        private static readonly string[] QueryWorldBoolFields =
+        {
+            "hardMode",
+            "expertMode",
+            "masterMode",
+            "dayTime",
+            "bloodMoon",
+            "eclipse",
+            "pumpkinMoon",
+            "snowMoon",
+            "raining",
+            "remixWorld",
+            "notTheBeesWorld",
+            "drunkWorld",
+            "getGoodWorld",
+            "tenthAnniversaryWorld",
+            "dontStarveWorld",
+            "zenithWorld",
+            "xMas",
+            "halloween",
+            "slimeRain"
+        };
 
         public static IList<string> ResolveCatchNames(InformationWorldContext context, float bobberWorldX, float bobberWorldY, out string message)
         {
@@ -41,6 +89,11 @@ namespace JueMingZ.Automation.Information
         }
 
         public static IList<FishingCatchCandidate> ResolveCatchCandidates(InformationWorldContext context, float bobberWorldX, float bobberWorldY, out string message)
+        {
+            return ResolveCatchCandidates(context, bobberWorldX, bobberWorldY, string.Empty, out message);
+        }
+
+        public static IList<FishingCatchCandidate> ResolveCatchCandidates(InformationWorldContext context, float bobberWorldX, float bobberWorldY, string filterSignature, out string message)
         {
             message = string.Empty;
             var candidates = new List<FishingCatchCandidate>();
@@ -75,6 +128,9 @@ namespace JueMingZ.Automation.Information
             }
 
             var baitItemType = ReadInt(fishingConditions, "BaitItemType", 0);
+            var baitPower = ReadInt(fishingConditions, "BaitPower", 0);
+            var poleItemType = ReadInt(fishingConditions, "PoleItemType", 0);
+            var polePower = ReadInt(fishingConditions, "PolePower", 0);
             if (baitItemType == 2673)
             {
                 message = "松露虫不列入普通鱼获";
@@ -84,6 +140,31 @@ namespace JueMingZ.Automation.Information
             var fishingLevel = ApplyFishingWaterPenalty(context, bobberWorldY, water, finalFishingLevel, out var waterNeeded, out var junkPossible);
             var questFish = ReadQuestFishItem(context);
             var canFishInLava = CanFishInLava(context, fishingConditions);
+            var queryKey = BuildCatchQueryKey(
+                context,
+                tileX,
+                tileY,
+                ResolveLiquidKind(water),
+                water.TotalTiles,
+                water.Chums,
+                waterNeeded,
+                junkPossible,
+                finalFishingLevel,
+                fishingLevel,
+                polePower,
+                poleItemType,
+                baitPower,
+                baitItemType,
+                canFishInLava,
+                questFish,
+                filterSignature);
+            FishingCatchCacheEntry cached;
+            if (TryGetCatchCache(queryKey, out cached))
+            {
+                message = cached.Message;
+                return cached.Candidates;
+            }
+
             var heightLevels = BuildHeightLevels(context, tileY);
             var catchIds = new List<int>();
             var seen = new HashSet<int>();
@@ -180,6 +261,7 @@ namespace JueMingZ.Automation.Information
                 message = "暂无可解析鱼获";
             }
 
+            StoreCatchCache(queryKey, candidates, message);
             return candidates;
         }
 
@@ -313,6 +395,234 @@ namespace JueMingZ.Automation.Information
             }
 
             return StringComparer.Ordinal.Compare(left.Kind ?? string.Empty, right.Kind ?? string.Empty);
+        }
+
+        internal static void ResetCatchCacheForTesting()
+        {
+            lock (CatchCacheSyncRoot)
+            {
+                CatchCache.Clear();
+                CatchCacheOrder.Clear();
+            }
+        }
+
+        internal static string BuildCatchQuerySignatureForTesting(
+            InformationWorldContext context,
+            int tileX,
+            int tileY,
+            string liquidKind,
+            int waterTiles,
+            int finalFishingLevel,
+            int poleItemType,
+            int baitItemType,
+            int questFish,
+            string filterSignature)
+        {
+            return BuildCatchQueryKey(
+                context,
+                tileX,
+                tileY,
+                liquidKind,
+                waterTiles,
+                0,
+                300,
+                false,
+                finalFishingLevel,
+                finalFishingLevel,
+                0,
+                poleItemType,
+                0,
+                baitItemType,
+                false,
+                questFish,
+                filterSignature).Signature;
+        }
+
+        private static bool TryGetCatchCache(FishingCatchQueryKey key, out FishingCatchCacheEntry entry)
+        {
+            lock (CatchCacheSyncRoot)
+            {
+                return CatchCache.TryGetValue(key, out entry) && entry != null;
+            }
+        }
+
+        private static void StoreCatchCache(FishingCatchQueryKey key, IList<FishingCatchCandidate> candidates, string message)
+        {
+            lock (CatchCacheSyncRoot)
+            {
+                if (!CatchCache.ContainsKey(key))
+                {
+                    CatchCacheOrder.Enqueue(key);
+                }
+
+                CatchCache[key] = new FishingCatchCacheEntry
+                {
+                    Candidates = candidates ?? new List<FishingCatchCandidate>(),
+                    Message = message ?? string.Empty
+                };
+
+                while (CatchCacheOrder.Count > CatchCacheLimit)
+                {
+                    var oldest = CatchCacheOrder.Dequeue();
+                    CatchCache.Remove(oldest);
+                }
+            }
+        }
+
+        private static FishingCatchQueryKey BuildCatchQueryKey(
+            InformationWorldContext context,
+            int tileX,
+            int tileY,
+            string liquidKind,
+            int waterTiles,
+            int chums,
+            int waterNeeded,
+            bool junkPossible,
+            int finalFishingLevel,
+            int fishingLevel,
+            int polePower,
+            int poleItemType,
+            int baitPower,
+            int baitItemType,
+            bool canFishInLava,
+            int questFish,
+            string filterSignature)
+        {
+            var builder = new StringBuilder(512);
+            AppendKeyPart(builder, "world", context == null ? string.Empty : context.WorldKey);
+            AppendKeyPart(builder, "tile", tileX.ToString(CultureInfo.InvariantCulture) + "," + tileY.ToString(CultureInfo.InvariantCulture));
+            AppendKeyPart(builder, "liquid", liquidKind);
+            AppendKeyPart(builder, "water", waterTiles.ToString(CultureInfo.InvariantCulture));
+            AppendKeyPart(builder, "chums", chums.ToString(CultureInfo.InvariantCulture));
+            AppendKeyPart(builder, "waterNeeded", waterNeeded.ToString(CultureInfo.InvariantCulture));
+            AppendKeyPart(builder, "junk", junkPossible ? "1" : "0");
+            AppendKeyPart(builder, "final", finalFishingLevel.ToString(CultureInfo.InvariantCulture));
+            AppendKeyPart(builder, "level", fishingLevel.ToString(CultureInfo.InvariantCulture));
+            AppendKeyPart(builder, "pole", polePower.ToString(CultureInfo.InvariantCulture) + ":" + poleItemType.ToString(CultureInfo.InvariantCulture));
+            AppendKeyPart(builder, "bait", baitPower.ToString(CultureInfo.InvariantCulture) + ":" + baitItemType.ToString(CultureInfo.InvariantCulture));
+            AppendKeyPart(builder, "lava", canFishInLava ? "1" : "0");
+            AppendKeyPart(builder, "quest", questFish.ToString(CultureInfo.InvariantCulture));
+            AppendKeyPart(builder, "filter", filterSignature);
+            AppendKeyPart(builder, "player", BuildPlayerEnvironmentSignature(context));
+            AppendKeyPart(builder, "worldState", BuildWorldStateSignature(context));
+            AppendKeyPart(builder, "language", BuildLanguageSignature());
+            return new FishingCatchQueryKey(builder.ToString());
+        }
+
+        private static string ResolveLiquidKind(FishingWaterScan water)
+        {
+            if (water != null && water.InLava)
+            {
+                return "lava";
+            }
+
+            if (water != null && water.InHoney)
+            {
+                return "honey";
+            }
+
+            return "water";
+        }
+
+        private static string BuildPlayerEnvironmentSignature(InformationWorldContext context)
+        {
+            var player = context == null ? null : context.LocalPlayer;
+            var builder = new StringBuilder(192);
+            double luck;
+            AppendKeyPart(builder, "luck", TryReadNumber(player, "luck", out luck) ? luck.ToString("0.###", CultureInfo.InvariantCulture) : "unknown");
+            AppendKeyPart(builder, "fishSkill", ReadInt(player, "fishingSkill", 0).ToString(CultureInfo.InvariantCulture));
+            AppendKeyPart(builder, "accLavaFishing", ReadBool(player, "accLavaFishing", false) ? "1" : "0");
+            AppendKeyPart(builder, "heightTile", context == null ? "0" : ((int)Math.Floor(context.PlayerCenterY / TileSize)).ToString(CultureInfo.InvariantCulture));
+            for (var index = 0; index < QueryPlayerZoneFields.Length; index++)
+            {
+                AppendKeyPart(builder, QueryPlayerZoneFields[index], HasZone(player, QueryPlayerZoneFields[index]) ? "1" : "0");
+            }
+
+            return builder.ToString();
+        }
+
+        private static string BuildWorldStateSignature(InformationWorldContext context)
+        {
+            var mainType = context == null ? null : context.MainType;
+            var builder = new StringBuilder(256);
+            for (var index = 0; index < QueryWorldBoolFields.Length; index++)
+            {
+                AppendKeyPart(builder, QueryWorldBoolFields[index], ReadStaticBool(mainType, QueryWorldBoolFields[index], false) ? "1" : "0");
+            }
+
+            AppendKeyPart(builder, "moonPhase", ReadStaticInt(mainType, "moonPhase", -1).ToString(CultureInfo.InvariantCulture));
+            AppendKeyPart(builder, "maxTilesX", ReadStaticInt(mainType, "maxTilesX", 0).ToString(CultureInfo.InvariantCulture));
+            AppendKeyPart(builder, "maxTilesY", ReadStaticInt(mainType, "maxTilesY", 0).ToString(CultureInfo.InvariantCulture));
+            AppendKeyPart(builder, "worldSurface", ReadStaticDouble(mainType, "worldSurface", 0d).ToString("0.###", CultureInfo.InvariantCulture));
+            AppendKeyPart(builder, "rockLayer", ReadStaticDouble(mainType, "rockLayer", 0d).ToString("0.###", CultureInfo.InvariantCulture));
+            AppendKeyPart(builder, "timeBucket", ((int)(ReadStaticDouble(mainType, "time", 0d) / 3600d)).ToString(CultureInfo.InvariantCulture));
+            return builder.ToString();
+        }
+
+        private static string BuildLanguageSignature()
+        {
+            return CultureInfo.CurrentCulture.Name + "/" +
+                   CultureInfo.CurrentUICulture.Name + "/" +
+                   ReadTerrariaLanguageSignature();
+        }
+
+        private static string ReadTerrariaLanguageSignature()
+        {
+            try
+            {
+                var managerType = InformationReflection.FindType("Terraria.Localization.LanguageManager");
+                var manager = InformationReflection.GetStaticMember(managerType, "Instance");
+                var activeCulture = InformationReflection.GetMember(manager, "ActiveCulture");
+                var cultureName = FirstNonEmpty(
+                    InformationReflection.TryReadString(activeCulture, "Name"),
+                    InformationReflection.TryReadString(activeCulture, "CultureInfoName"),
+                    InformationReflection.TryReadString(activeCulture, "LegacyId"));
+                if (!string.IsNullOrWhiteSpace(cultureName))
+                {
+                    return cultureName.Trim();
+                }
+
+                return activeCulture == null ? string.Empty : Convert.ToString(activeCulture, CultureInfo.InvariantCulture) ?? string.Empty;
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        private static void AppendKeyPart(StringBuilder builder, string name, string value)
+        {
+            if (builder == null)
+            {
+                return;
+            }
+
+            if (builder.Length > 0)
+            {
+                builder.Append('|');
+            }
+
+            builder.Append(name ?? string.Empty);
+            builder.Append('=');
+            builder.Append(value ?? string.Empty);
+        }
+
+        private static string FirstNonEmpty(params string[] values)
+        {
+            if (values == null)
+            {
+                return string.Empty;
+            }
+
+            for (var index = 0; index < values.Length; index++)
+            {
+                if (!string.IsNullOrWhiteSpace(values[index]))
+                {
+                    return values[index].Trim();
+                }
+            }
+
+            return string.Empty;
         }
 
         private static bool TryGetFishDropRules(InformationWorldContext context, out IList rules)
@@ -1437,6 +1747,48 @@ namespace JueMingZ.Automation.Information
             catch
             {
                 return false;
+            }
+        }
+
+        internal struct FishingCatchQueryKey : IEquatable<FishingCatchQueryKey>
+        {
+            public string Signature { get; private set; }
+
+            public FishingCatchQueryKey(string signature)
+            {
+                Signature = signature ?? string.Empty;
+            }
+
+            public bool Equals(FishingCatchQueryKey other)
+            {
+                return string.Equals(Signature, other.Signature, StringComparison.Ordinal);
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is FishingCatchQueryKey && Equals((FishingCatchQueryKey)obj);
+            }
+
+            public override int GetHashCode()
+            {
+                return StringComparer.Ordinal.GetHashCode(Signature ?? string.Empty);
+            }
+
+            public override string ToString()
+            {
+                return Signature ?? string.Empty;
+            }
+        }
+
+        private sealed class FishingCatchCacheEntry
+        {
+            public IList<FishingCatchCandidate> Candidates { get; set; }
+            public string Message { get; set; }
+
+            public FishingCatchCacheEntry()
+            {
+                Candidates = new List<FishingCatchCandidate>();
+                Message = string.Empty;
             }
         }
 

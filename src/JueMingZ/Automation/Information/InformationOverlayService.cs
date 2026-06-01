@@ -21,25 +21,45 @@ namespace JueMingZ.Automation.Information
         private const int MaxChestLabelsPerFrame = 240;
         private const int MaxSignTextLabelsPerFrame = 40;
         private const int MaxTombstoneTextLabelsPerFrame = 40;
+        private const int SignTextLayoutCacheLimit = 512;
         private const int TileSize = 16;
+        private const int TileHighlightScanMarginTiles = 4;
+        private const int TileHighlightPlayerChunkTiles = 16;
+        private const int TileHighlightLifeCrystalMask = 1 << 0;
+        private const int TileHighlightManaCrystalMask = 1 << 1;
+        private const int TileHighlightDigtoiseMask = 1 << 2;
+        private const int TileHighlightLifeFruitMask = 1 << 3;
+        private const int TileHighlightDragonEggMask = 1 << 4;
         private const float ChestLabelMaxDistance = 1600f;
         private const int ChestTileScanMarginTiles = 6;
         private const float ChestCacheCullPadding = ChestTileScanMarginTiles * TileSize;
+        private const float ChestLabelSortRefreshDistance = 64f;
+        private const float ChestLabelSortRefreshDistanceSquared = ChestLabelSortRefreshDistance * ChestLabelSortRefreshDistance;
         private const ulong NpcScanIntervalTicks = 12;
         private const ulong TileScanIntervalTicks = 60;
         private const ulong ChestScanIntervalTicks = 60;
         private const ulong SignScanIntervalTicks = 60;
         private const ulong StatusRefreshTicks = 30;
+        private const ulong FishingBobberObserverFreshTicks = 2;
         private const string ChestLabelsModeAlways = "Always";
         private const string ChestLabelsModeOpened = "Opened";
         private const string ChestLabelsModeOff = "Off";
         private static readonly object SyncRoot = new object();
         private static readonly InformationWorldLabelRenderer LabelRenderer = new InformationWorldLabelRenderer();
-        private static readonly List<NpcLabel> CachedNpcLabels = new List<NpcLabel>();
+        private static readonly NpcLabel[] EmptyNpcLabels = new NpcLabel[0];
+        private static readonly ChestLabel[] EmptyChestLabels = new ChestLabel[0];
+        private static readonly List<NpcLabel> NpcLabelBuildBuffer = new List<NpcLabel>();
+        private static readonly List<ChestLabel> ChestLabelBuildBuffer = new List<ChestLabel>();
+        private static NpcLabel[] CachedNpcLabels = EmptyNpcLabels;
         private static readonly List<TileHighlight> CachedTileHighlights = new List<TileHighlight>();
-        private static readonly List<ChestLabel> CachedChestLabels = new List<ChestLabel>();
+        private static readonly HashSet<long> TileHighlightVisited = new HashSet<long>();
+        private static readonly List<TilePoint> TileHighlightStack = new List<TilePoint>(64);
+        private static ChestLabel[] CachedChestLabels = EmptyChestLabels;
+        private static ChestLabel[] CachedSortedChestLabels = EmptyChestLabels;
+        private static ChestLabel[] _lastSortedChestLabelSource = EmptyChestLabels;
         private static readonly List<SignTextLabel> CachedSignTextLabels = new List<SignTextLabel>();
         private static readonly List<SignTextLabel> CachedTombstoneTextLabels = new List<SignTextLabel>();
+        private static readonly Dictionary<SignTextLayoutKey, SignTextLayout> SignTextLayoutCache = new Dictionary<SignTextLayoutKey, SignTextLayout>();
         private static readonly List<InformationStatusLine> CachedStatusLines = new List<InformationStatusLine>();
         private static readonly HashSet<int> GoldCritterNpcTypes = new HashSet<int>
         {
@@ -50,8 +70,14 @@ namespace JueMingZ.Automation.Information
         private static ulong _lastNpcScanTick;
         private static uint _lastNpcLabelSignatureHash;
         private static ulong _lastTileScanTick;
+        private static uint _lastTileHighlightSignatureHash;
         private static ulong _lastChestScanTick;
         private static uint _lastChestLabelSignatureHash;
+        private static uint _lastChestSortSignatureHash;
+        private static float _lastChestSortPlayerCenterX;
+        private static float _lastChestSortPlayerCenterY;
+        private static float _lastChestSortScreenCenterX;
+        private static float _lastChestSortScreenCenterY;
         private static string _lastOpenedChestsHash = "0";
         private static string _lastOpenedChestsHashPlayerKey = string.Empty;
         private static string _lastOpenedChestsHashWorldKey = string.Empty;
@@ -59,8 +85,17 @@ namespace JueMingZ.Automation.Information
         private static bool _openedChestsHashDirty = true;
         private static ulong _lastSignScanTick;
         private static ulong _lastTombstoneScanTick;
+        private static int _signTextLayoutCacheRebuildCount;
+        private static string _signTextLayoutFontSignature = string.Empty;
+        private static int _signTextLayoutCacheGeneration;
         private static ulong _lastStatusRefreshTick;
         private static string _lastStatusStyleSignature = string.Empty;
+        private static long _signTextLayoutCacheHitCount;
+        private static long _signTextLayoutCacheMissCount;
+        private static long _worldLabelSnapshotRefreshCount;
+        private static long _npcLabelSnapshotRefreshCount;
+        private static long _chestLabelSnapshotRefreshCount;
+        private static long _chestLabelSortRefreshCount;
         private static bool _dragonEggMissingLogged;
         private static bool _tileIdsResolved;
         private static int _lifeCrystalTileType = 12;
@@ -88,7 +123,13 @@ namespace JueMingZ.Automation.Information
                     TileHighlightsDrawn = Diagnostics.TileHighlightsDrawn,
                     StatusLinesDrawn = Diagnostics.StatusLinesDrawn,
                     LastDrawElapsedMs = Diagnostics.LastDrawElapsedMs,
-                    LastSkipReason = Diagnostics.LastSkipReason
+                    LastSkipReason = Diagnostics.LastSkipReason,
+                    SignTextLayoutCacheHitCount = _signTextLayoutCacheHitCount,
+                    SignTextLayoutCacheMissCount = _signTextLayoutCacheMissCount,
+                    WorldLabelSnapshotRefreshCount = _worldLabelSnapshotRefreshCount,
+                    NpcLabelSnapshotRefreshCount = _npcLabelSnapshotRefreshCount,
+                    ChestLabelSnapshotRefreshCount = _chestLabelSnapshotRefreshCount,
+                    ChestLabelSortRefreshCount = _chestLabelSortRefreshCount
                 };
             }
         }
@@ -217,7 +258,7 @@ namespace JueMingZ.Automation.Information
 
             var labels = GetNpcLabels(context, settings);
             var drawn = 0;
-            for (var index = 0; index < labels.Count && drawn < MaxNpcLabelsPerFrame; index++)
+            for (var index = 0; index < labels.Length && drawn < MaxNpcLabelsPerFrame; index++)
             {
                 var label = labels[index];
                 if (LabelRenderer.DrawWorldLabel(spriteBatch, context, label.WorldX, label.WorldY, label.Text, label.Color, label.MaxDistance, false, -1f, label.FontScale))
@@ -229,7 +270,7 @@ namespace JueMingZ.Automation.Information
             return drawn;
         }
 
-        private static List<NpcLabel> GetNpcLabels(InformationWorldContext context, AppSettings settings)
+        private static NpcLabel[] GetNpcLabels(InformationWorldContext context, AppSettings settings)
         {
             lock (SyncRoot)
             {
@@ -240,14 +281,23 @@ namespace JueMingZ.Automation.Information
                     context.GameUpdateCount >= _lastNpcScanTick &&
                     context.GameUpdateCount - _lastNpcScanTick < NpcScanIntervalTicks)
                 {
-                    RefreshCachedNpcLabelPositions(context, CachedNpcLabels);
-                    return CachedNpcLabels;
+                    if (RefreshCachedNpcLabelPositions(context, CachedNpcLabels))
+                    {
+                        return CachedNpcLabels;
+                    }
                 }
 
-                CachedNpcLabels.Clear();
-                ScanNpcLabels(context, settings, CachedNpcLabels);
+                NpcLabelBuildBuffer.Clear();
+                ScanNpcLabels(context, settings, NpcLabelBuildBuffer);
+                CachedNpcLabels = NpcLabelBuildBuffer.Count == 0 ? EmptyNpcLabels : NpcLabelBuildBuffer.ToArray();
                 _lastNpcScanTick = context.GameUpdateCount;
                 _lastNpcLabelSignatureHash = signatureHash;
+                unchecked
+                {
+                    _npcLabelSnapshotRefreshCount++;
+                    _worldLabelSnapshotRefreshCount++;
+                }
+
                 return CachedNpcLabels;
             }
         }
@@ -315,6 +365,12 @@ namespace JueMingZ.Automation.Information
                         Type = snapshot.Type,
                         WorldX = snapshot.WorldX,
                         WorldY = snapshot.WorldY,
+                        Life = snapshot.Life,
+                        LifeMax = snapshot.LifeMax,
+                        TownNpc = snapshot.TownNpc,
+                        Friendly = snapshot.Friendly,
+                        Hidden = snapshot.Hidden,
+                        Critter = snapshot.Critter,
                         Text = InformationNpcNameCompat.ResolveDisplayName(npc, snapshot.Type, snapshot.WhoAmI, npcMode, context.GameUpdateCount),
                         Color = InformationColorHelper.NpcName(settings),
                         MaxDistance = 1800f,
@@ -331,6 +387,12 @@ namespace JueMingZ.Automation.Information
                         Type = snapshot.Type,
                         WorldX = snapshot.WorldX,
                         WorldY = snapshot.WorldY,
+                        Life = snapshot.Life,
+                        LifeMax = snapshot.LifeMax,
+                        TownNpc = snapshot.TownNpc,
+                        Friendly = snapshot.Friendly,
+                        Hidden = snapshot.Hidden,
+                        Critter = snapshot.Critter,
                         Text = InformationNpcNameCompat.ResolveNpcTypeName(npc, snapshot.Type),
                         Color = IsGoldCritter(snapshot.Type)
                             ? InformationColorHelper.GoldCritterName()
@@ -370,6 +432,12 @@ namespace JueMingZ.Automation.Information
                         Type = snapshot.Type,
                         WorldX = snapshot.WorldX,
                         WorldY = snapshot.WorldY,
+                        Life = snapshot.Life,
+                        LifeMax = snapshot.LifeMax,
+                        TownNpc = snapshot.TownNpc,
+                        Friendly = snapshot.Friendly,
+                        Hidden = snapshot.Hidden,
+                        Critter = snapshot.Critter,
                         Text = InformationNpcNameCompat.ResolveNpcTypeName(npc, snapshot.Type),
                         Color = InformationColorHelper.EnemyName(settings),
                         MaxDistance = 1400f,
@@ -384,11 +452,11 @@ namespace JueMingZ.Automation.Information
             }
         }
 
-        private static void RefreshCachedNpcLabelPositions(InformationWorldContext context, IList<NpcLabel> labels)
+        private static bool RefreshCachedNpcLabelPositions(InformationWorldContext context, NpcLabel[] labels)
         {
-            if (context == null || labels == null || labels.Count == 0)
+            if (context == null || labels == null || labels.Length == 0)
             {
-                return;
+                return true;
             }
 
             NPC[] typedNpcs;
@@ -396,32 +464,56 @@ namespace JueMingZ.Automation.Information
             int count;
             if (!TryGetNpcCollection(context, out typedNpcs, out reflectedNpcs, out count))
             {
-                labels.Clear();
-                return;
+                return false;
             }
 
-            for (var labelIndex = labels.Count - 1; labelIndex >= 0; labelIndex--)
+            for (var labelIndex = 0; labelIndex < labels.Length; labelIndex++)
             {
                 var label = labels[labelIndex];
                 if (label == null || label.Index < 0 || label.Index >= count)
                 {
-                    labels.RemoveAt(labelIndex);
-                    continue;
+                    return false;
                 }
 
                 var npc = typedNpcs != null ? (object)typedNpcs[label.Index] : InformationReflection.GetIndexedValue(reflectedNpcs, label.Index);
                 NpcLabelSnapshot snapshot;
                 if (!TryReadNpcLabelSnapshot(npc, label.Index, out snapshot) ||
-                    snapshot.Type != label.Type ||
-                    (label.WhoAmI >= 0 && snapshot.WhoAmI >= 0 && snapshot.WhoAmI != label.WhoAmI))
+                    !CanReuseNpcLabelSnapshot(label, snapshot))
                 {
-                    labels.RemoveAt(labelIndex);
-                    continue;
+                    return false;
                 }
 
                 label.WorldX = snapshot.WorldX;
                 label.WorldY = snapshot.WorldY;
             }
+
+            return true;
+        }
+
+        private static bool CanReuseNpcLabelSnapshot(NpcLabel label, NpcLabelSnapshot snapshot)
+        {
+            if (label == null ||
+                snapshot.Type != label.Type ||
+                (label.WhoAmI >= 0 && snapshot.WhoAmI >= 0 && snapshot.WhoAmI != label.WhoAmI))
+            {
+                return false;
+            }
+
+            return label.TownNpc == snapshot.TownNpc &&
+                   label.Friendly == snapshot.Friendly &&
+                   label.Hidden == snapshot.Hidden &&
+                   label.Critter == snapshot.Critter &&
+                   GetNpcLifeEligibilityKey(label.Life, label.LifeMax) == GetNpcLifeEligibilityKey(snapshot.Life, snapshot.LifeMax);
+        }
+
+        private static int GetNpcLifeEligibilityKey(int life, int lifeMax)
+        {
+            if (life <= 0)
+            {
+                return 0;
+            }
+
+            return lifeMax > 5 ? 2 : 1;
         }
 
         private static bool TryGetNpcCollection(InformationWorldContext context, out NPC[] typedNpcs, out object reflectedNpcs, out int count)
@@ -533,12 +625,11 @@ namespace JueMingZ.Automation.Information
                 return 0;
             }
 
-            var labels = GetChestLabels(context, settings, mode);
-            SortChestLabelsForDrawing(context, labels);
+            var labels = GetChestLabelsForDrawing(context, settings, mode);
             var drawn = 0;
             var color = InformationColorHelper.ChestName(settings);
             var fontScale = InformationStyleHelper.GetFontScale(settings, InformationStyleHelper.ChestNameFeatureId);
-            for (var index = 0; index < labels.Count && drawn < MaxChestLabelsPerFrame; index++)
+            for (var index = 0; index < labels.Length && drawn < MaxChestLabelsPerFrame; index++)
             {
                 var label = labels[index];
                 if (LabelRenderer.DrawWorldLabel(spriteBatch, context, label.WorldX, label.WorldY, label.Name, color, ChestLabelMaxDistance, false, 0f, (float)fontScale))
@@ -548,6 +639,39 @@ namespace JueMingZ.Automation.Information
             }
 
             return drawn;
+        }
+
+        private static ChestLabel[] GetChestLabelsForDrawing(InformationWorldContext context, AppSettings settings, string mode)
+        {
+            lock (SyncRoot)
+            {
+                var labels = GetChestLabels(context, settings, mode);
+                var sourceSignatureHash = _lastChestLabelSignatureHash;
+                if (!ShouldRefreshSortedChestLabels(context, labels, sourceSignatureHash))
+                {
+                    return CachedSortedChestLabels;
+                }
+
+                var sorted = labels == null || labels.Length == 0
+                    ? EmptyChestLabels
+                    : labels.Length == 1
+                        ? labels
+                        : (ChestLabel[])labels.Clone();
+                SortChestLabelsForDrawing(context, sorted);
+                CachedSortedChestLabels = sorted;
+                _lastSortedChestLabelSource = labels ?? EmptyChestLabels;
+                _lastChestSortSignatureHash = BuildChestLabelSortSignatureHash(context, sourceSignatureHash);
+                _lastChestSortPlayerCenterX = GetChestSortPlayerCenterX(context);
+                _lastChestSortPlayerCenterY = GetChestSortPlayerCenterY(context);
+                _lastChestSortScreenCenterX = GetChestSortScreenCenterX(context);
+                _lastChestSortScreenCenterY = GetChestSortScreenCenterY(context);
+                unchecked
+                {
+                    _chestLabelSortRefreshCount++;
+                }
+
+                return CachedSortedChestLabels;
+            }
         }
 
         private static bool CanCacheChestLabel(InformationWorldContext context, float worldX, float worldY)
@@ -573,14 +697,34 @@ namespace JueMingZ.Automation.Information
             return dx * dx + dy * dy <= maxDistance * maxDistance;
         }
 
-        private static void SortChestLabelsForDrawing(InformationWorldContext context, List<ChestLabel> labels)
+        private static bool ShouldRefreshSortedChestLabels(InformationWorldContext context, ChestLabel[] labels, uint sourceSignatureHash)
         {
-            if (context == null || labels == null || labels.Count <= 1)
+            if (!ReferenceEquals(_lastSortedChestLabelSource, labels ?? EmptyChestLabels))
+            {
+                return true;
+            }
+
+            return IsChestLabelSortDirty(
+                _lastChestSortSignatureHash,
+                _lastChestSortPlayerCenterX,
+                _lastChestSortPlayerCenterY,
+                _lastChestSortScreenCenterX,
+                _lastChestSortScreenCenterY,
+                BuildChestLabelSortSignatureHash(context, sourceSignatureHash),
+                GetChestSortPlayerCenterX(context),
+                GetChestSortPlayerCenterY(context),
+                GetChestSortScreenCenterX(context),
+                GetChestSortScreenCenterY(context));
+        }
+
+        private static void SortChestLabelsForDrawing(InformationWorldContext context, ChestLabel[] labels)
+        {
+            if (context == null || labels == null || labels.Length <= 1)
             {
                 return;
             }
 
-            labels.Sort((left, right) => CompareChestLabelsForDrawing(context, left, right));
+            Array.Sort(labels, (left, right) => CompareChestLabelsForDrawing(context, left, right));
         }
 
         private static int CompareChestLabelsForDrawing(InformationWorldContext context, ChestLabel left, ChestLabel right)
@@ -647,6 +791,78 @@ namespace JueMingZ.Automation.Information
             return dx * dx + dy * dy;
         }
 
+        private static uint BuildChestLabelSortSignatureHash(InformationWorldContext context, uint sourceSignatureHash)
+        {
+            return BuildChestLabelSortSignatureHash(
+                sourceSignatureHash,
+                context == null ? 0 : context.ScreenWidth,
+                context == null ? 0 : context.ScreenHeight);
+        }
+
+        private static uint BuildChestLabelSortSignatureHash(uint sourceSignatureHash, int screenWidth, int screenHeight)
+        {
+            unchecked
+            {
+                var hash = 2166136261u;
+                AddHashInt(ref hash, (int)sourceSignatureHash);
+                AddHashInt(ref hash, screenWidth);
+                AddHashInt(ref hash, screenHeight);
+                return hash;
+            }
+        }
+
+        private static bool IsChestLabelSortDirty(
+            uint previousSignatureHash,
+            float previousPlayerCenterX,
+            float previousPlayerCenterY,
+            float previousScreenCenterX,
+            float previousScreenCenterY,
+            uint currentSignatureHash,
+            float currentPlayerCenterX,
+            float currentPlayerCenterY,
+            float currentScreenCenterX,
+            float currentScreenCenterY)
+        {
+            if (previousSignatureHash != currentSignatureHash)
+            {
+                return true;
+            }
+
+            if (DistanceSquared(previousPlayerCenterX, previousPlayerCenterY, currentPlayerCenterX, currentPlayerCenterY) >= ChestLabelSortRefreshDistanceSquared)
+            {
+                return true;
+            }
+
+            return DistanceSquared(previousScreenCenterX, previousScreenCenterY, currentScreenCenterX, currentScreenCenterY) >= ChestLabelSortRefreshDistanceSquared;
+        }
+
+        private static float DistanceSquared(float leftX, float leftY, float rightX, float rightY)
+        {
+            var dx = leftX - rightX;
+            var dy = leftY - rightY;
+            return dx * dx + dy * dy;
+        }
+
+        private static float GetChestSortPlayerCenterX(InformationWorldContext context)
+        {
+            return context == null ? 0f : context.PlayerCenterX;
+        }
+
+        private static float GetChestSortPlayerCenterY(InformationWorldContext context)
+        {
+            return context == null ? 0f : context.PlayerCenterY;
+        }
+
+        private static float GetChestSortScreenCenterX(InformationWorldContext context)
+        {
+            return context == null ? 0f : context.ScreenX + context.ScreenWidth * 0.5f;
+        }
+
+        private static float GetChestSortScreenCenterY(InformationWorldContext context)
+        {
+            return context == null ? 0f : context.ScreenY + context.ScreenHeight * 0.5f;
+        }
+
         private static int DrawSignTextLabels(object spriteBatch, InformationWorldContext context, AppSettings settings)
         {
             var mode = NormalizeSignTextMode(settings);
@@ -662,13 +878,19 @@ namespace JueMingZ.Automation.Information
             for (var index = 0; index < labels.Count && drawn < MaxSignTextLabelsPerFrame; index++)
             {
                 var label = labels[index];
-                IList<string> lines;
-                if (!TryBuildSignTextDisplayLines(label.Text, mode, settings.InformationSignTextMaxLines, settings.InformationSignTextMaxCharacters, fontScale, out lines))
+                var layout = GetOrBuildSignTextLayout(
+                    label.Text,
+                    label.TextHash,
+                    mode,
+                    settings.InformationSignTextMaxLines,
+                    settings.InformationSignTextMaxCharacters,
+                    fontScale);
+                if (layout == null)
                 {
                     continue;
                 }
 
-                if (DrawSignTextBlock(spriteBatch, context, label, lines, color, fontScale))
+                if (DrawSignTextBlock(spriteBatch, context, label, layout, color))
                 {
                     drawn++;
                 }
@@ -692,13 +914,19 @@ namespace JueMingZ.Automation.Information
             for (var index = 0; index < labels.Count && drawn < MaxTombstoneTextLabelsPerFrame; index++)
             {
                 var label = labels[index];
-                IList<string> lines;
-                if (!TryBuildSignTextDisplayLines(label.Text, mode, settings.InformationTombstoneTextMaxLines, settings.InformationTombstoneTextMaxCharacters, fontScale, out lines))
+                var layout = GetOrBuildSignTextLayout(
+                    label.Text,
+                    label.TextHash,
+                    mode,
+                    settings.InformationTombstoneTextMaxLines,
+                    settings.InformationTombstoneTextMaxCharacters,
+                    fontScale);
+                if (layout == null)
                 {
                     continue;
                 }
 
-                if (DrawSignTextBlock(spriteBatch, context, label, lines, color, fontScale))
+                if (DrawSignTextBlock(spriteBatch, context, label, layout, color))
                 {
                     drawn++;
                 }
@@ -707,26 +935,15 @@ namespace JueMingZ.Automation.Information
             return drawn;
         }
 
-        private static bool DrawSignTextBlock(object spriteBatch, InformationWorldContext context, SignTextLabel label, IList<string> lines, InformationColor color, float scale)
+        private static bool DrawSignTextBlock(object spriteBatch, InformationWorldContext context, SignTextLabel label, SignTextLayout layout, InformationColor color)
         {
             if (spriteBatch == null ||
                 context == null ||
                 label == null ||
-                lines == null ||
-                lines.Count <= 0 ||
+                layout == null ||
+                layout.DisplayLines.Length <= 0 ||
+                !layout.HasVisibleText ||
                 !LabelRenderer.CanDraw(context, label.WorldLeft, label.WorldTop, 1600f, false))
-            {
-                return false;
-            }
-
-            var lineHeight = Math.Max(16, UiTextRenderer.EstimateTextHeight(scale) + 5);
-            var anyVisibleText = false;
-            for (var index = 0; index < lines.Count; index++)
-            {
-                anyVisibleText |= UiTextRenderer.EstimateTextWidth(lines[index], scale) > 0;
-            }
-
-            if (!anyVisibleText)
             {
                 return false;
             }
@@ -734,11 +951,11 @@ namespace JueMingZ.Automation.Information
             var signCenterX = ((label.WorldLeft + label.WorldRight) * 0.5f) - context.ScreenX;
             var signTop = label.WorldTop - context.ScreenY;
             var ok = false;
-            for (var index = 0; index < lines.Count; index++)
+            for (var index = 0; index < layout.DisplayLines.Length; index++)
             {
-                var lineWidth = UiTextRenderer.EstimateTextWidth(lines[index], scale);
+                var lineWidth = index < layout.LineWidths.Length ? layout.LineWidths[index] : 0;
                 var drawX = CalculateSignTextLineX(signCenterX, lineWidth, context.ScreenWidth);
-                ok |= UiTextRenderer.DrawText(spriteBatch, lines[index], drawX, signTop + index * lineHeight, color.R, color.G, color.B, color.A, scale);
+                ok |= UiTextRenderer.DrawText(spriteBatch, layout.DisplayLines[index], drawX, signTop + index * layout.LineHeight, color.R, color.G, color.B, color.A, layout.Scale);
             }
 
             return ok;
@@ -758,6 +975,16 @@ namespace JueMingZ.Automation.Information
         {
             EnsureTileIdsResolved();
             return tileType == _manaCrystalTileType;
+        }
+
+        internal static string BuildTileHighlightCacheSignatureForTesting(InformationWorldContext context, AppSettings settings)
+        {
+            return BuildTileHighlightScanSignature(context, settings).Hash.ToString("X8", CultureInfo.InvariantCulture);
+        }
+
+        internal static bool ShouldRefreshTileHighlightCacheForTesting(ulong lastScanTick, uint previousSignatureHash, ulong currentTick, uint currentSignatureHash)
+        {
+            return ShouldRefreshTileHighlightsCore(lastScanTick, previousSignatureHash, currentTick, currentSignatureHash);
         }
 
         internal static bool IsChestTileTypeForTesting(int tileType)
@@ -787,28 +1014,100 @@ namespace JueMingZ.Automation.Information
 
         internal static int[] SortChestLabelIndicesForTesting(InformationWorldContext context, float[] worldXs, float[] worldYs)
         {
-            var labels = new List<ChestLabel>();
             var count = worldXs == null ? 0 : worldXs.Length;
+            var labels = new ChestLabel[count];
             for (var index = 0; index < count; index++)
             {
-                labels.Add(new ChestLabel
+                labels[index] = new ChestLabel
                 {
                     TileX = index,
                     TileY = 0,
                     WorldX = worldXs[index],
                     WorldY = worldYs != null && index < worldYs.Length ? worldYs[index] : 0f,
                     Name = "宝箱"
-                });
+                };
             }
 
             SortChestLabelsForDrawing(context, labels);
-            var result = new int[labels.Count];
-            for (var index = 0; index < labels.Count; index++)
+            var result = new int[labels.Length];
+            for (var index = 0; index < labels.Length; index++)
             {
                 result[index] = labels[index].TileX;
             }
 
             return result;
+        }
+
+        internal static bool ShouldRefreshChestLabelSortForTesting(
+            float previousPlayerCenterX,
+            float previousPlayerCenterY,
+            float previousScreenX,
+            float previousScreenY,
+            int previousScreenWidth,
+            int previousScreenHeight,
+            uint previousSourceSignatureHash,
+            float currentPlayerCenterX,
+            float currentPlayerCenterY,
+            float currentScreenX,
+            float currentScreenY,
+            int currentScreenWidth,
+            int currentScreenHeight,
+            uint currentSourceSignatureHash)
+        {
+            return IsChestLabelSortDirty(
+                BuildChestLabelSortSignatureHash(previousSourceSignatureHash, previousScreenWidth, previousScreenHeight),
+                previousPlayerCenterX,
+                previousPlayerCenterY,
+                previousScreenX + previousScreenWidth * 0.5f,
+                previousScreenY + previousScreenHeight * 0.5f,
+                BuildChestLabelSortSignatureHash(currentSourceSignatureHash, currentScreenWidth, currentScreenHeight),
+                currentPlayerCenterX,
+                currentPlayerCenterY,
+                currentScreenX + currentScreenWidth * 0.5f,
+                currentScreenY + currentScreenHeight * 0.5f);
+        }
+
+        internal static bool CanReuseNpcLabelSnapshotForTesting(
+            int labelWhoAmI,
+            int labelType,
+            int labelLife,
+            int labelLifeMax,
+            bool labelTownNpc,
+            bool labelFriendly,
+            bool labelHidden,
+            bool labelCritter,
+            int snapshotWhoAmI,
+            int snapshotType,
+            int snapshotLife,
+            int snapshotLifeMax,
+            bool snapshotTownNpc,
+            bool snapshotFriendly,
+            bool snapshotHidden,
+            bool snapshotCritter)
+        {
+            return CanReuseNpcLabelSnapshot(
+                new NpcLabel
+                {
+                    WhoAmI = labelWhoAmI,
+                    Type = labelType,
+                    Life = labelLife,
+                    LifeMax = labelLifeMax,
+                    TownNpc = labelTownNpc,
+                    Friendly = labelFriendly,
+                    Hidden = labelHidden,
+                    Critter = labelCritter
+                },
+                new NpcLabelSnapshot
+                {
+                    WhoAmI = snapshotWhoAmI,
+                    Type = snapshotType,
+                    Life = snapshotLife,
+                    LifeMax = snapshotLifeMax,
+                    TownNpc = snapshotTownNpc,
+                    Friendly = snapshotFriendly,
+                    Hidden = snapshotHidden,
+                    Critter = snapshotCritter
+                });
         }
 
         internal static bool TryParseChestKeyForTesting(string key, string currentWorldKey, out int x, out int y)
@@ -852,15 +1151,15 @@ namespace JueMingZ.Automation.Information
 
             var highlights = GetTileHighlights(context, settings);
             var drawn = 0;
+            var pulse = 155 + (int)(Math.Abs(Math.Sin(context.GameUpdateCount / 12d)) * 80d);
             for (var index = 0; index < highlights.Count; index++)
             {
                 var highlight = highlights[index];
                 var x = (int)Math.Round(highlight.TileX * TileSize - context.ScreenX);
                 var y = (int)Math.Round(highlight.TileY * TileSize - context.ScreenY);
-                var width = Math.Max(TileSize, highlight.Width * TileSize);
-                var height = Math.Max(TileSize, highlight.Height * TileSize);
+                var width = highlight.PixelWidth;
+                var height = highlight.PixelHeight;
                 var color = highlight.Color;
-                var pulse = 155 + (int)(Math.Abs(Math.Sin(context.GameUpdateCount / 12d)) * 80d);
                 var borderAlpha = Math.Min(255, Math.Max(color.A, pulse));
                 var ok = DrawTileHighlightFrame(spriteBatch, x, y, width, height, color, borderAlpha);
                 if (ok)
@@ -915,7 +1214,7 @@ namespace JueMingZ.Automation.Information
                     if (hasFishingBobber &&
                         (settings.InformationFishingCatchesEnabled || !IsFishingFilterDisabled(settings)))
                     {
-                        fishingCandidates = ResolveFishingCatchCandidates(context, bobberX, bobberY, out fishingMessage);
+                        fishingCandidates = ResolveFishingCatchCandidates(context, bobberX, bobberY, BuildFishingFilterStatusSignature(settings), out fishingMessage);
                     }
                 }
 
@@ -1095,65 +1394,69 @@ namespace JueMingZ.Automation.Information
             return _lastOpenedChestsHash;
         }
 
-        private static List<ChestLabel> GetChestLabels(InformationWorldContext context, AppSettings settings, string mode)
+        private static ChestLabel[] GetChestLabels(InformationWorldContext context, AppSettings settings, string mode)
         {
-            lock (SyncRoot)
+            var signatureHash = BuildChestLabelCacheSignatureHash(context, settings, mode);
+            if (context.GameUpdateCount != 0 &&
+                _lastChestScanTick != 0 &&
+                _lastChestLabelSignatureHash == signatureHash &&
+                context.GameUpdateCount >= _lastChestScanTick &&
+                context.GameUpdateCount - _lastChestScanTick < ChestScanIntervalTicks)
             {
-                var signatureHash = BuildChestLabelCacheSignatureHash(context, settings, mode);
-                if (context.GameUpdateCount != 0 &&
-                    _lastChestScanTick != 0 &&
-                    _lastChestLabelSignatureHash == signatureHash &&
-                    context.GameUpdateCount >= _lastChestScanTick &&
-                    context.GameUpdateCount - _lastChestScanTick < ChestScanIntervalTicks)
-                {
-                    return CachedChestLabels;
-                }
-
-                CachedChestLabels.Clear();
-                if (string.Equals(mode, ChestLabelsModeAlways, StringComparison.OrdinalIgnoreCase))
-                {
-                    AddAllChestLabels(context, CachedChestLabels);
-                }
-                else
-                {
-                    var chestNames = BuildChestNameLookup(context.MainType);
-                    var openedChests = PlayerWorldBehaviorStore.GetOpenedChests(BuildBehaviorContext(context));
-                    for (var index = 0; index < openedChests.Count; index++)
-                    {
-                        var opened = openedChests[index];
-                        if (opened == null || opened.X <= 0 || opened.Y <= 0)
-                        {
-                            continue;
-                        }
-
-                        string name;
-                        if (!chestNames.TryGetValue(BuildChestPositionKey(opened.X, opened.Y), out name))
-                        {
-                            name = "宝箱";
-                        }
-
-                        var worldX = opened.X * TileSize + TileSize;
-                        var worldY = opened.Y * TileSize + TileSize;
-                        if (!CanCacheChestLabel(context, worldX, worldY))
-                        {
-                            continue;
-                        }
-
-                        CachedChestLabels.Add(new ChestLabel
-                        {
-                            TileX = opened.X,
-                            TileY = opened.Y,
-                            WorldX = worldX,
-                            WorldY = worldY,
-                            Name = string.IsNullOrWhiteSpace(name) ? "宝箱" : name
-                        });
-                    }
-                }
-
-                _lastChestScanTick = context.GameUpdateCount;
-                _lastChestLabelSignatureHash = signatureHash;
                 return CachedChestLabels;
             }
+
+            ChestLabelBuildBuffer.Clear();
+            if (string.Equals(mode, ChestLabelsModeAlways, StringComparison.OrdinalIgnoreCase))
+            {
+                AddAllChestLabels(context, ChestLabelBuildBuffer);
+            }
+            else
+            {
+                var chestNames = BuildChestNameLookup(context.MainType);
+                var openedChests = PlayerWorldBehaviorStore.GetOpenedChests(BuildBehaviorContext(context));
+                for (var index = 0; index < openedChests.Count; index++)
+                {
+                    var opened = openedChests[index];
+                    if (opened == null || opened.X <= 0 || opened.Y <= 0)
+                    {
+                        continue;
+                    }
+
+                    string name;
+                    if (!chestNames.TryGetValue(BuildChestPositionKey(opened.X, opened.Y), out name))
+                    {
+                        name = "宝箱";
+                    }
+
+                    var worldX = opened.X * TileSize + TileSize;
+                    var worldY = opened.Y * TileSize + TileSize;
+                    if (!CanCacheChestLabel(context, worldX, worldY))
+                    {
+                        continue;
+                    }
+
+                    ChestLabelBuildBuffer.Add(new ChestLabel
+                    {
+                        TileX = opened.X,
+                        TileY = opened.Y,
+                        WorldX = worldX,
+                        WorldY = worldY,
+                        Name = string.IsNullOrWhiteSpace(name) ? "宝箱" : name
+                    });
+                }
+            }
+
+            CachedChestLabels = ChestLabelBuildBuffer.Count == 0 ? EmptyChestLabels : ChestLabelBuildBuffer.ToArray();
+            _lastChestScanTick = context.GameUpdateCount;
+            _lastChestLabelSignatureHash = signatureHash;
+            unchecked
+            {
+                _chestLabelSnapshotRefreshCount++;
+                _worldLabelSnapshotRefreshCount++;
+            }
+
+            return CachedChestLabels;
         }
 
         private static string BuildChestLabelCacheSignature(InformationWorldContext context, AppSettings settings, string mode)
@@ -1721,7 +2024,8 @@ namespace JueMingZ.Automation.Information
                     WorldLeft = worldLeft,
                     WorldTop = worldTop,
                     WorldRight = worldRight,
-                    Text = text
+                    Text = text,
+                    TextHash = HashText(text)
                 });
             }
         }
@@ -1787,22 +2091,161 @@ namespace JueMingZ.Automation.Information
         {
             lock (SyncRoot)
             {
-                if (context.GameUpdateCount != 0 &&
-                    _lastTileScanTick != 0 &&
-                    context.GameUpdateCount >= _lastTileScanTick &&
-                    context.GameUpdateCount - _lastTileScanTick < TileScanIntervalTicks)
+                var signature = BuildTileHighlightScanSignature(context, settings);
+                if (!ShouldRefreshTileHighlights(context, signature.Hash))
                 {
                     return CachedTileHighlights;
                 }
 
                 CachedTileHighlights.Clear();
-                ScanTileHighlights(context, settings, CachedTileHighlights);
-                _lastTileScanTick = context.GameUpdateCount;
+                ScanTileHighlights(context, settings, signature.Bounds, BuildTileHighlightColors(settings), CachedTileHighlights);
+                _lastTileScanTick = context == null ? 0 : context.GameUpdateCount;
+                _lastTileHighlightSignatureHash = signature.Hash;
                 return CachedTileHighlights;
             }
         }
 
-        private static void ScanTileHighlights(InformationWorldContext context, AppSettings settings, IList<TileHighlight> results)
+        private static bool ShouldRefreshTileHighlights(InformationWorldContext context, uint currentSignatureHash)
+        {
+            return ShouldRefreshTileHighlightsCore(
+                _lastTileScanTick,
+                _lastTileHighlightSignatureHash,
+                context == null ? 0 : context.GameUpdateCount,
+                currentSignatureHash);
+        }
+
+        private static bool ShouldRefreshTileHighlightsCore(ulong lastScanTick, uint previousSignatureHash, ulong currentTick, uint currentSignatureHash)
+        {
+            if (lastScanTick == 0 || previousSignatureHash != currentSignatureHash)
+            {
+                return true;
+            }
+
+            if (currentTick == 0)
+            {
+                return false;
+            }
+
+            if (currentTick < lastScanTick)
+            {
+                return true;
+            }
+
+            return currentTick - lastScanTick >= TileScanIntervalTicks;
+        }
+
+        private static TileHighlightScanSignature BuildTileHighlightScanSignature(InformationWorldContext context, AppSettings settings)
+        {
+            var bounds = BuildTileHighlightScanBounds(context);
+            var enabledMask = BuildTileHighlightEnabledMask(settings);
+            unchecked
+            {
+                var hash = 2166136261u;
+                AddHashValue(ref hash, context == null ? string.Empty : context.WorldKey);
+                AddHashValue(ref hash, context == null ? string.Empty : context.WorldRecordKey);
+                AddHashInt(ref hash, bounds.MinX);
+                AddHashInt(ref hash, bounds.MinY);
+                AddHashInt(ref hash, bounds.MaxX);
+                AddHashInt(ref hash, bounds.MaxY);
+                AddHashInt(ref hash, BuildTileHighlightPlayerChunkX(context));
+                AddHashInt(ref hash, BuildTileHighlightPlayerChunkY(context));
+                AddHashInt(ref hash, enabledMask);
+                if ((enabledMask & TileHighlightLifeCrystalMask) != 0)
+                {
+                    AddHashValue(ref hash, BuildTileHighlightColorSignature(settings == null ? null : settings.InformationLifeCrystalHighlightColor));
+                }
+
+                if ((enabledMask & TileHighlightManaCrystalMask) != 0)
+                {
+                    AddHashValue(ref hash, BuildTileHighlightColorSignature(settings == null ? null : settings.InformationManaCrystalHighlightColor));
+                }
+
+                if ((enabledMask & TileHighlightLifeFruitMask) != 0)
+                {
+                    AddHashValue(ref hash, BuildTileHighlightColorSignature(settings == null ? null : settings.InformationLifeFruitHighlightColor));
+                }
+
+                if ((enabledMask & TileHighlightDragonEggMask) != 0)
+                {
+                    AddHashValue(ref hash, BuildTileHighlightColorSignature(settings == null ? null : settings.InformationDragonEggHighlightColor));
+                }
+
+                return new TileHighlightScanSignature(hash, bounds);
+            }
+        }
+
+        private static TileHighlightScanBounds BuildTileHighlightScanBounds(InformationWorldContext context)
+        {
+            var screenX = context == null ? 0f : context.ScreenX;
+            var screenY = context == null ? 0f : context.ScreenY;
+            var screenWidth = context == null ? 0 : context.ScreenWidth;
+            var screenHeight = context == null ? 0 : context.ScreenHeight;
+            var minX = Math.Max(0, (int)Math.Floor(screenX / TileSize) - TileHighlightScanMarginTiles);
+            var minY = Math.Max(0, (int)Math.Floor(screenY / TileSize) - TileHighlightScanMarginTiles);
+            var maxX = Math.Max(minX, (int)Math.Ceiling((screenX + screenWidth) / TileSize) + TileHighlightScanMarginTiles);
+            var maxY = Math.Max(minY, (int)Math.Ceiling((screenY + screenHeight) / TileSize) + TileHighlightScanMarginTiles);
+            return new TileHighlightScanBounds(minX, minY, maxX, maxY);
+        }
+
+        private static int BuildTileHighlightEnabledMask(AppSettings settings)
+        {
+            var mask = 0;
+            if (settings == null)
+            {
+                return mask;
+            }
+
+            if (settings.InformationHighlightLifeCrystalEnabled) mask |= TileHighlightLifeCrystalMask;
+            if (settings.InformationHighlightManaCrystalEnabled) mask |= TileHighlightManaCrystalMask;
+            if (settings.InformationHighlightDigtoiseEnabled) mask |= TileHighlightDigtoiseMask;
+            if (settings.InformationHighlightLifeFruitEnabled) mask |= TileHighlightLifeFruitMask;
+            if (settings.InformationHighlightDragonEggEnabled) mask |= TileHighlightDragonEggMask;
+            return mask;
+        }
+
+        private static int BuildTileHighlightPlayerChunkX(InformationWorldContext context)
+        {
+            var tileX = context == null ? 0 : (int)Math.Floor(context.PlayerCenterX / TileSize);
+            return FloorDiv(tileX, TileHighlightPlayerChunkTiles);
+        }
+
+        private static int BuildTileHighlightPlayerChunkY(InformationWorldContext context)
+        {
+            var tileY = context == null ? 0 : (int)Math.Floor(context.PlayerCenterY / TileSize);
+            return FloorDiv(tileY, TileHighlightPlayerChunkTiles);
+        }
+
+        private static int FloorDiv(int value, int divisor)
+        {
+            if (divisor <= 0)
+            {
+                return 0;
+            }
+
+            if (value >= 0)
+            {
+                return value / divisor;
+            }
+
+            return -(((-value) + divisor - 1) / divisor);
+        }
+
+        private static string BuildTileHighlightColorSignature(string value)
+        {
+            return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
+        }
+
+        private static TileHighlightColors BuildTileHighlightColors(AppSettings settings)
+        {
+            return new TileHighlightColors(
+                InformationColorHelper.LifeCrystal(settings),
+                InformationColorHelper.ManaCrystal(settings),
+                InformationColorHelper.Digtoise(settings),
+                InformationColorHelper.LifeFruit(settings),
+                InformationColorHelper.DragonEgg(settings));
+        }
+
+        private static void ScanTileHighlights(InformationWorldContext context, AppSettings settings, TileHighlightScanBounds bounds, TileHighlightColors colors, IList<TileHighlight> results)
         {
             var tiles = InformationReflection.GetStaticMember(context.MainType, "tile");
             if (tiles == null)
@@ -1831,11 +2274,12 @@ namespace JueMingZ.Automation.Information
                     "TileID.DragonEgg is unavailable; dragon egg highlight skipped.");
             }
 
-            var minX = Math.Max(0, (int)Math.Floor(context.ScreenX / TileSize) - 4);
-            var minY = Math.Max(0, (int)Math.Floor(context.ScreenY / TileSize) - 4);
-            var maxX = Math.Max(minX, (int)Math.Ceiling((context.ScreenX + context.ScreenWidth) / TileSize) + 4);
-            var maxY = Math.Max(minY, (int)Math.Ceiling((context.ScreenY + context.ScreenHeight) / TileSize) + 4);
-            var visited = new HashSet<long>();
+            var minX = bounds.MinX;
+            var minY = bounds.MinY;
+            var maxX = bounds.MaxX;
+            var maxY = bounds.MaxY;
+            TileHighlightVisited.Clear();
+            TileHighlightStack.Clear();
             for (var x = minX; x <= maxX; x++)
             {
                 for (var y = minY; y <= maxY; y++)
@@ -1849,29 +2293,32 @@ namespace JueMingZ.Automation.Information
 
                     if (settings.InformationHighlightLifeCrystalEnabled && tileType == lifeCrystalType)
                     {
-                        AddTileHighlightGroup(tiles, x, y, minX, minY, maxX, maxY, tileType, InformationColorHelper.LifeCrystal(settings), visited, results);
+                        AddTileHighlightGroup(tiles, x, y, minX, minY, maxX, maxY, tileType, colors.LifeCrystal, TileHighlightVisited, TileHighlightStack, results);
                     }
                     else if (settings.InformationHighlightManaCrystalEnabled && tileType == manaCrystalType)
                     {
-                        AddTileHighlightGroup(tiles, x, y, minX, minY, maxX, maxY, tileType, InformationColorHelper.ManaCrystal(settings), visited, results);
+                        AddTileHighlightGroup(tiles, x, y, minX, minY, maxX, maxY, tileType, colors.ManaCrystal, TileHighlightVisited, TileHighlightStack, results);
                     }
                     else if (settings.InformationHighlightDigtoiseEnabled && tileType == digtoiseType)
                     {
-                        AddTileHighlightGroup(tiles, x, y, minX, minY, maxX, maxY, tileType, InformationColorHelper.Digtoise(settings), visited, results);
+                        AddTileHighlightGroup(tiles, x, y, minX, minY, maxX, maxY, tileType, colors.Digtoise, TileHighlightVisited, TileHighlightStack, results);
                     }
                     else if (settings.InformationHighlightLifeFruitEnabled && tileType == lifeFruitType)
                     {
-                        AddTileHighlightGroup(tiles, x, y, minX, minY, maxX, maxY, tileType, InformationColorHelper.LifeFruit(settings), visited, results);
+                        AddTileHighlightGroup(tiles, x, y, minX, minY, maxX, maxY, tileType, colors.LifeFruit, TileHighlightVisited, TileHighlightStack, results);
                     }
                     else if (settings.InformationHighlightDragonEggEnabled && dragonEggType >= 0 && tileType == dragonEggType)
                     {
-                        AddTileHighlightGroup(tiles, x, y, minX, minY, maxX, maxY, tileType, InformationColorHelper.DragonEgg(settings), visited, results);
+                        AddTileHighlightGroup(tiles, x, y, minX, minY, maxX, maxY, tileType, colors.DragonEgg, TileHighlightVisited, TileHighlightStack, results);
                     }
                 }
             }
+
+            TileHighlightStack.Clear();
+            TileHighlightVisited.Clear();
         }
 
-        private static void AddTileHighlightGroup(object tiles, int startX, int startY, int minX, int minY, int maxX, int maxY, int tileType, InformationColor color, ISet<long> visited, IList<TileHighlight> results)
+        private static void AddTileHighlightGroup(object tiles, int startX, int startY, int minX, int minY, int maxX, int maxY, int tileType, InformationColor color, ISet<long> visited, IList<TilePoint> stack, IList<TileHighlight> results)
         {
             var startKey = BuildTileVisitKey(tileType, startX, startY);
             if (visited.Contains(startKey))
@@ -1879,7 +2326,7 @@ namespace JueMingZ.Automation.Information
                 return;
             }
 
-            var stack = new List<TilePoint>();
+            stack.Clear();
             stack.Add(new TilePoint(startX, startY));
             var groupMinX = startX;
             var groupMaxX = startX;
@@ -2128,9 +2575,16 @@ namespace JueMingZ.Automation.Information
         {
             lock (SyncRoot)
             {
-                CachedChestLabels.Clear();
+                CachedChestLabels = EmptyChestLabels;
+                CachedSortedChestLabels = EmptyChestLabels;
+                _lastSortedChestLabelSource = EmptyChestLabels;
                 _lastChestScanTick = 0;
                 _lastChestLabelSignatureHash = 0;
+                _lastChestSortSignatureHash = 0;
+                _lastChestSortPlayerCenterX = 0f;
+                _lastChestSortPlayerCenterY = 0f;
+                _lastChestSortScreenCenterX = 0f;
+                _lastChestSortScreenCenterY = 0f;
                 _openedChestsHashDirty = true;
             }
         }
@@ -2431,6 +2885,13 @@ namespace JueMingZ.Automation.Information
             y = 0f;
             int myPlayer;
             InformationReflection.TryReadStaticInt(context.MainType, "myPlayer", out myPlayer);
+            FishingBobberObservation observation;
+            if (FishingBobberObserver.TryGetLatest(out observation) &&
+                TryUseObservedLocalBobber(observation, myPlayer, context.GameUpdateCount, out x, out y))
+            {
+                return true;
+            }
+
             var projectiles = InformationReflection.GetStaticMember(context.MainType, "projectile");
             var count = GetCollectionCount(projectiles);
             for (var index = 0; index < count; index++)
@@ -2464,6 +2925,49 @@ namespace JueMingZ.Automation.Information
             }
 
             return false;
+        }
+
+        internal static bool TryUseObservedLocalBobberForTesting(FishingBobberObservation observation, int myPlayer, ulong currentGameUpdateCount, out float x, out float y)
+        {
+            return TryUseObservedLocalBobber(observation, myPlayer, currentGameUpdateCount, out x, out y);
+        }
+
+        private static bool TryUseObservedLocalBobber(FishingBobberObservation observation, int myPlayer, ulong currentGameUpdateCount, out float x, out float y)
+        {
+            x = 0f;
+            y = 0f;
+            if (observation == null ||
+                !observation.Active ||
+                !observation.Bobber ||
+                observation.Owner != myPlayer ||
+                !observation.LiquidStateKnown ||
+                !observation.InLiquid ||
+                !IsFreshObservedBobber(observation, currentGameUpdateCount) ||
+                !IsFinite(observation.CenterX) ||
+                !IsFinite(observation.CenterY))
+            {
+                return false;
+            }
+
+            x = observation.CenterX;
+            y = observation.CenterY;
+            return true;
+        }
+
+        private static bool IsFreshObservedBobber(FishingBobberObservation observation, ulong currentGameUpdateCount)
+        {
+            if (observation == null || observation.GameUpdateCount < 0 || currentGameUpdateCount > long.MaxValue)
+            {
+                return false;
+            }
+
+            var age = (long)currentGameUpdateCount - observation.GameUpdateCount;
+            return age >= 0 && age <= (long)FishingBobberObserverFreshTicks;
+        }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
 
         private static string ResolveChestName(Type mainType, int x, int y)
@@ -3449,11 +3953,11 @@ namespace JueMingZ.Automation.Information
             return false;
         }
 
-        private static IList<FishingCatchCandidate> ResolveFishingCatchCandidates(InformationWorldContext context, float bobberX, float bobberY, out string message)
+        private static IList<FishingCatchCandidate> ResolveFishingCatchCandidates(InformationWorldContext context, float bobberX, float bobberY, string filterSignature, out string message)
         {
             try
             {
-                return InformationFishingCatchResolver.ResolveCatchCandidates(context, bobberX, bobberY, out message);
+                return InformationFishingCatchResolver.ResolveCatchCandidates(context, bobberX, bobberY, filterSignature, out message);
             }
             catch (Exception error)
             {
@@ -3651,6 +4155,152 @@ namespace JueMingZ.Automation.Information
                 : new string[0];
         }
 
+        internal static void ResetSignTextLayoutCacheForTesting()
+        {
+            lock (SyncRoot)
+            {
+                SignTextLayoutCache.Clear();
+                _signTextLayoutCacheRebuildCount = 0;
+                _signTextLayoutCacheHitCount = 0;
+                _signTextLayoutCacheMissCount = 0;
+                _signTextLayoutFontSignature = UiTextRenderer.FontSignatureForLayoutCache;
+                _signTextLayoutCacheGeneration = UiTextRenderer.CacheGenerationForLayoutCache;
+            }
+        }
+
+        internal static InformationSignTextLayoutSnapshot BuildSignTextLayoutSnapshotForTesting(string text, string mode, int maxLines, int maxCharacters, float scale)
+        {
+            var layout = GetOrBuildSignTextLayout(text, HashText(text), mode, maxLines, maxCharacters, scale);
+            int rebuildCount;
+            lock (SyncRoot)
+            {
+                rebuildCount = _signTextLayoutCacheRebuildCount;
+            }
+
+            if (layout == null)
+            {
+                return new InformationSignTextLayoutSnapshot(0, string.Empty, 0, 0, 0, rebuildCount);
+            }
+
+            return new InformationSignTextLayoutSnapshot(
+                layout.DisplayLines.Length,
+                layout.DisplayLines.Length <= 0 ? string.Empty : layout.DisplayLines[0],
+                layout.LineWidths.Length <= 0 ? 0 : layout.LineWidths[0],
+                layout.LineHeight,
+                layout.TotalHeight,
+                rebuildCount);
+        }
+
+        private static SignTextLayout GetOrBuildSignTextLayout(string text, int textHash, string mode, int maxLines, int maxCharacters, float scale)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return null;
+            }
+
+            var normalizedMode = NormalizeSignTextMode(mode);
+            if (string.Equals(normalizedMode, InformationSignTextModes.Off, StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            var fontSignature = UiTextRenderer.FontSignatureForLayoutCache;
+            var cacheGeneration = UiTextRenderer.CacheGenerationForLayoutCache;
+            var key = new SignTextLayoutKey(
+                text,
+                textHash,
+                normalizedMode,
+                InformationSignTextModes.ClampLines(maxLines),
+                InformationSignTextModes.ClampCharacters(maxCharacters),
+                ScaleKey(scale),
+                fontSignature,
+                cacheGeneration);
+
+            SignTextLayout cached;
+            lock (SyncRoot)
+            {
+                ClearSignTextLayoutCacheIfFontChangedLocked(fontSignature, cacheGeneration);
+                if (SignTextLayoutCache.TryGetValue(key, out cached))
+                {
+                    unchecked
+                    {
+                        _signTextLayoutCacheHitCount++;
+                    }
+
+                    return cached;
+                }
+            }
+
+            var layout = BuildSignTextLayout(text, normalizedMode, maxLines, maxCharacters, scale);
+            if (layout == null)
+            {
+                return null;
+            }
+
+            lock (SyncRoot)
+            {
+                ClearSignTextLayoutCacheIfFontChangedLocked(fontSignature, cacheGeneration);
+                if (SignTextLayoutCache.TryGetValue(key, out cached))
+                {
+                    unchecked
+                    {
+                        _signTextLayoutCacheHitCount++;
+                    }
+
+                    return cached;
+                }
+
+                if (SignTextLayoutCache.Count >= SignTextLayoutCacheLimit)
+                {
+                    SignTextLayoutCache.Clear();
+                }
+
+                SignTextLayoutCache[key] = layout;
+                unchecked
+                {
+                    _signTextLayoutCacheRebuildCount++;
+                    _signTextLayoutCacheMissCount++;
+                }
+            }
+
+            return layout;
+        }
+
+        private static void ClearSignTextLayoutCacheIfFontChangedLocked(string fontSignature, int cacheGeneration)
+        {
+            if (_signTextLayoutCacheGeneration == cacheGeneration &&
+                string.Equals(_signTextLayoutFontSignature, fontSignature ?? string.Empty, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            SignTextLayoutCache.Clear();
+            _signTextLayoutFontSignature = fontSignature ?? string.Empty;
+            _signTextLayoutCacheGeneration = cacheGeneration;
+        }
+
+        private static SignTextLayout BuildSignTextLayout(string text, string mode, int maxLines, int maxCharacters, float scale)
+        {
+            IList<string> lines;
+            if (!TryBuildSignTextDisplayLines(text, mode, maxLines, maxCharacters, scale, out lines))
+            {
+                return null;
+            }
+
+            var displayLines = ToArray(lines);
+            var lineWidths = new int[displayLines.Length];
+            var hasVisibleText = false;
+            for (var index = 0; index < displayLines.Length; index++)
+            {
+                var width = UiTextRenderer.EstimateTextWidth(displayLines[index], scale);
+                lineWidths[index] = width;
+                hasVisibleText |= width > 0;
+            }
+
+            var lineHeight = Math.Max(16, UiTextRenderer.EstimateTextHeight(scale) + 5);
+            return new SignTextLayout(displayLines, lineWidths, lineHeight, lineHeight * displayLines.Length, scale, hasVisibleText);
+        }
+
         private static bool TryBuildSignTextDisplayLines(string text, string mode, int maxLines, int maxCharacters, float scale, out IList<string> lines)
         {
             lines = new List<string>();
@@ -3842,6 +4492,39 @@ namespace JueMingZ.Automation.Information
             return result;
         }
 
+        private static int HashText(string text)
+        {
+            unchecked
+            {
+                var hash = (int)2166136261;
+                if (text == null)
+                {
+                    return hash;
+                }
+
+                for (var index = 0; index < text.Length; index++)
+                {
+                    hash ^= text[index];
+                    hash *= 16777619;
+                }
+
+                return hash;
+            }
+        }
+
+        private static int AddHash(int hash, int value)
+        {
+            unchecked
+            {
+                return (hash * 16777619) ^ value;
+            }
+        }
+
+        private static int ScaleKey(float scale)
+        {
+            return (int)Math.Round(scale * 10000f);
+        }
+
         private static int GetCollectionCount(object source)
         {
             if (source == null)
@@ -4019,6 +4702,128 @@ namespace JueMingZ.Automation.Information
             public float WorldTop;
             public float WorldRight;
             public string Text;
+            public int TextHash;
+        }
+
+        private sealed class SignTextLayout
+        {
+            public SignTextLayout(string[] displayLines, int[] lineWidths, int lineHeight, int totalHeight, float scale, bool hasVisibleText)
+            {
+                DisplayLines = displayLines ?? new string[0];
+                LineWidths = lineWidths ?? new int[0];
+                LineHeight = lineHeight;
+                TotalHeight = totalHeight;
+                Scale = scale;
+                HasVisibleText = hasVisibleText;
+            }
+
+            public string[] DisplayLines { get; private set; }
+
+            public int[] LineWidths { get; private set; }
+
+            public int LineHeight { get; private set; }
+
+            public int TotalHeight { get; private set; }
+
+            public float Scale { get; private set; }
+
+            public bool HasVisibleText { get; private set; }
+        }
+
+        private struct SignTextLayoutKey : IEquatable<SignTextLayoutKey>
+        {
+            private readonly string _text;
+            private readonly int _textHash;
+            private readonly int _textLength;
+            private readonly string _mode;
+            private readonly int _maxLines;
+            private readonly int _maxCharacters;
+            private readonly int _scaleKey;
+            private readonly string _fontSignature;
+            private readonly int _cacheGeneration;
+
+            public SignTextLayoutKey(
+                string text,
+                int textHash,
+                string mode,
+                int maxLines,
+                int maxCharacters,
+                int scaleKey,
+                string fontSignature,
+                int cacheGeneration)
+            {
+                _text = text ?? string.Empty;
+                _textHash = textHash;
+                _textLength = _text.Length;
+                _mode = mode ?? string.Empty;
+                _maxLines = maxLines;
+                _maxCharacters = maxCharacters;
+                _scaleKey = scaleKey;
+                _fontSignature = fontSignature ?? string.Empty;
+                _cacheGeneration = cacheGeneration;
+            }
+
+            public bool Equals(SignTextLayoutKey other)
+            {
+                return _textHash == other._textHash &&
+                       _textLength == other._textLength &&
+                       _maxLines == other._maxLines &&
+                       _maxCharacters == other._maxCharacters &&
+                       _scaleKey == other._scaleKey &&
+                       _cacheGeneration == other._cacheGeneration &&
+                       string.Equals(_text, other._text, StringComparison.Ordinal) &&
+                       string.Equals(_mode, other._mode, StringComparison.Ordinal) &&
+                       string.Equals(_fontSignature, other._fontSignature, StringComparison.Ordinal);
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is SignTextLayoutKey && Equals((SignTextLayoutKey)obj);
+            }
+
+            public override int GetHashCode()
+            {
+                var hash = AddHash(17, _textHash);
+                hash = AddHash(hash, _textLength);
+                hash = AddHash(hash, HashText(_mode));
+                hash = AddHash(hash, _maxLines);
+                hash = AddHash(hash, _maxCharacters);
+                hash = AddHash(hash, _scaleKey);
+                hash = AddHash(hash, HashText(_fontSignature));
+                hash = AddHash(hash, _cacheGeneration);
+                return hash;
+            }
+        }
+
+        internal sealed class InformationSignTextLayoutSnapshot
+        {
+            public InformationSignTextLayoutSnapshot(
+                int lineCount,
+                string firstLineText,
+                int firstLineWidth,
+                int lineHeight,
+                int totalHeight,
+                int rebuildCount)
+            {
+                LineCount = lineCount;
+                FirstLineText = firstLineText ?? string.Empty;
+                FirstLineWidth = firstLineWidth;
+                LineHeight = lineHeight;
+                TotalHeight = totalHeight;
+                RebuildCount = rebuildCount;
+            }
+
+            public int LineCount { get; private set; }
+
+            public string FirstLineText { get; private set; }
+
+            public int FirstLineWidth { get; private set; }
+
+            public int LineHeight { get; private set; }
+
+            public int TotalHeight { get; private set; }
+
+            public int RebuildCount { get; private set; }
         }
 
         private sealed class NpcLabel
@@ -4028,6 +4833,12 @@ namespace JueMingZ.Automation.Information
             public int Type;
             public float WorldX;
             public float WorldY;
+            public int Life;
+            public int LifeMax;
+            public bool TownNpc;
+            public bool Friendly;
+            public bool Hidden;
+            public bool Critter;
             public string Text;
             public InformationColor Color;
             public float MaxDistance;
@@ -4067,12 +4878,60 @@ namespace JueMingZ.Automation.Information
             Tail
         }
 
-        private sealed class TileHighlight
+        private struct TileHighlightScanSignature
+        {
+            public uint Hash { get; private set; }
+            public TileHighlightScanBounds Bounds { get; private set; }
+
+            public TileHighlightScanSignature(uint hash, TileHighlightScanBounds bounds)
+            {
+                Hash = hash;
+                Bounds = bounds;
+            }
+        }
+
+        private struct TileHighlightScanBounds
+        {
+            public int MinX { get; private set; }
+            public int MinY { get; private set; }
+            public int MaxX { get; private set; }
+            public int MaxY { get; private set; }
+
+            public TileHighlightScanBounds(int minX, int minY, int maxX, int maxY)
+            {
+                MinX = minX;
+                MinY = minY;
+                MaxX = maxX;
+                MaxY = maxY;
+            }
+        }
+
+        private struct TileHighlightColors
+        {
+            public InformationColor LifeCrystal { get; private set; }
+            public InformationColor ManaCrystal { get; private set; }
+            public InformationColor Digtoise { get; private set; }
+            public InformationColor LifeFruit { get; private set; }
+            public InformationColor DragonEgg { get; private set; }
+
+            public TileHighlightColors(InformationColor lifeCrystal, InformationColor manaCrystal, InformationColor digtoise, InformationColor lifeFruit, InformationColor dragonEgg)
+            {
+                LifeCrystal = lifeCrystal;
+                ManaCrystal = manaCrystal;
+                Digtoise = digtoise;
+                LifeFruit = lifeFruit;
+                DragonEgg = dragonEgg;
+            }
+        }
+
+        private struct TileHighlight
         {
             public int TileX { get; private set; }
             public int TileY { get; private set; }
             public int Width { get; private set; }
             public int Height { get; private set; }
+            public int PixelWidth { get; private set; }
+            public int PixelHeight { get; private set; }
             public InformationColor Color { get; private set; }
 
             public TileHighlight(int tileX, int tileY, int width, int height, InformationColor color)
@@ -4081,6 +4940,8 @@ namespace JueMingZ.Automation.Information
                 TileY = tileY;
                 Width = Math.Max(1, width);
                 Height = Math.Max(1, height);
+                PixelWidth = Width * TileSize;
+                PixelHeight = Height * TileSize;
                 Color = color;
             }
         }

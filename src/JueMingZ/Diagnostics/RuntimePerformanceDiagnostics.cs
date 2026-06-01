@@ -3,6 +3,16 @@ namespace JueMingZ.Diagnostics
     public static class RuntimePerformanceDiagnostics
     {
         private static readonly object SyncRoot = new object();
+        private const int RecentWindowCapacity = 600;
+        private static readonly RecentPerformanceSample[] RecentWindow =
+            new RecentPerformanceSample[RecentWindowCapacity];
+        private static int _recentWindowNextIndex;
+        private static int _recentWindowCount;
+        private static double _recentRuntimeUpdateSumMs;
+        private static double _recentGameStateReadSumMs;
+        private static double _recentActionQueueUpdateSumMs;
+        private static double _recentInputActionUpdateSumMs;
+        private static double _recentInformationDrawSumMs;
 
         public static long RuntimeUpdateCount { get; private set; }
         public static double LastRuntimeUpdateMs { get; private set; }
@@ -10,7 +20,15 @@ namespace JueMingZ.Diagnostics
         public static double LastGameStateReadMs { get; private set; }
         public static double LastActionQueueUpdateMs { get; private set; }
         public static double LastInputActionUpdateMs { get; private set; }
+        public static double LastInformationDrawMs { get; private set; }
         public static double AverageRuntimeUpdateMs { get; private set; }
+        public static int RecentWindowCapacitySamples { get { return RecentWindowCapacity; } }
+        public static int RecentWindowSampleCount { get; private set; }
+        public static double RecentRuntimeUpdateAverageMs { get; private set; }
+        public static double RecentGameStateReadAverageMs { get; private set; }
+        public static double RecentActionQueueUpdateAverageMs { get; private set; }
+        public static double RecentInputActionUpdateAverageMs { get; private set; }
+        public static double RecentInformationDrawAverageMs { get; private set; }
         public static string LastSlowestStageName { get; private set; }
         public static double LastSlowestStageElapsedMs { get; private set; }
         public static string LastSlowestOperationName { get; private set; }
@@ -41,6 +59,31 @@ namespace JueMingZ.Diagnostics
             string slowestOperationName,
             double slowestOperationElapsedMs)
         {
+            Record(
+                runtimeUpdateMs,
+                updateStartGapMs,
+                gameStateReadMs,
+                actionQueueUpdateMs,
+                inputActionUpdateMs,
+                0d,
+                slowestStageName,
+                slowestStageElapsedMs,
+                slowestOperationName,
+                slowestOperationElapsedMs);
+        }
+
+        public static void Record(
+            double runtimeUpdateMs,
+            double updateStartGapMs,
+            double gameStateReadMs,
+            double actionQueueUpdateMs,
+            double inputActionUpdateMs,
+            double informationDrawMs,
+            string slowestStageName,
+            double slowestStageElapsedMs,
+            string slowestOperationName,
+            double slowestOperationElapsedMs)
+        {
             lock (SyncRoot)
             {
                 RuntimeUpdateCount++;
@@ -49,6 +92,7 @@ namespace JueMingZ.Diagnostics
                 LastGameStateReadMs = gameStateReadMs;
                 LastActionQueueUpdateMs = actionQueueUpdateMs;
                 LastInputActionUpdateMs = inputActionUpdateMs;
+                LastInformationDrawMs = informationDrawMs;
                 LastSlowestStageName = slowestStageName ?? string.Empty;
                 LastSlowestStageElapsedMs = slowestStageElapsedMs;
                 LastSlowestOperationName = slowestOperationName ?? string.Empty;
@@ -56,6 +100,12 @@ namespace JueMingZ.Diagnostics
                 AverageRuntimeUpdateMs = RuntimeUpdateCount <= 1
                     ? runtimeUpdateMs
                     : AverageRuntimeUpdateMs + ((runtimeUpdateMs - AverageRuntimeUpdateMs) / RuntimeUpdateCount);
+                RecordRecentWindow(
+                    runtimeUpdateMs,
+                    gameStateReadMs,
+                    actionQueueUpdateMs,
+                    inputActionUpdateMs,
+                    informationDrawMs);
             }
         }
 
@@ -83,6 +133,122 @@ namespace JueMingZ.Diagnostics
                 LastPerformanceHitchSlowestOperationName = sample.SlowestOperationName ?? string.Empty;
                 LastPerformanceHitchSlowestOperationMs = sample.SlowestOperationElapsedMs;
             }
+        }
+
+        internal static void ResetForTesting()
+        {
+            lock (SyncRoot)
+            {
+                RuntimeUpdateCount = 0;
+                LastRuntimeUpdateMs = 0d;
+                LastUpdateStartGapMs = 0d;
+                LastGameStateReadMs = 0d;
+                LastActionQueueUpdateMs = 0d;
+                LastInputActionUpdateMs = 0d;
+                LastInformationDrawMs = 0d;
+                AverageRuntimeUpdateMs = 0d;
+                LastSlowestStageName = string.Empty;
+                LastSlowestStageElapsedMs = 0d;
+                LastSlowestOperationName = string.Empty;
+                LastSlowestOperationElapsedMs = 0d;
+                PerformanceHitchCount = 0;
+                PerformanceEventsPath = string.Empty;
+                LastPerformanceHitchReason = string.Empty;
+                LastPerformanceHitchUtc = null;
+                LastPerformanceHitchUpdateGapMs = 0d;
+                LastPerformanceHitchRuntimeUpdateMs = 0d;
+                LastPerformanceHitchGameStateReadMs = 0d;
+                LastPerformanceHitchActionQueueUpdateMs = 0d;
+                LastPerformanceHitchInputActionUpdateMs = 0d;
+                LastPerformanceHitchInformationDrawMs = 0d;
+                LastPerformanceHitchSlowestStageName = string.Empty;
+                LastPerformanceHitchSlowestStageMs = 0d;
+                LastPerformanceHitchSlowestOperationName = string.Empty;
+                LastPerformanceHitchSlowestOperationMs = 0d;
+                ClearRecentWindow();
+            }
+        }
+
+        private static void RecordRecentWindow(
+            double runtimeUpdateMs,
+            double gameStateReadMs,
+            double actionQueueUpdateMs,
+            double inputActionUpdateMs,
+            double informationDrawMs)
+        {
+            var replacing = _recentWindowCount >= RecentWindowCapacity;
+            if (replacing)
+            {
+                var old = RecentWindow[_recentWindowNextIndex];
+                _recentRuntimeUpdateSumMs -= old.RuntimeUpdateMs;
+                _recentGameStateReadSumMs -= old.GameStateReadMs;
+                _recentActionQueueUpdateSumMs -= old.ActionQueueUpdateMs;
+                _recentInputActionUpdateSumMs -= old.InputActionUpdateMs;
+                _recentInformationDrawSumMs -= old.InformationDrawMs;
+            }
+            else
+            {
+                _recentWindowCount++;
+            }
+
+            RecentWindow[_recentWindowNextIndex] = new RecentPerformanceSample
+            {
+                RuntimeUpdateMs = runtimeUpdateMs,
+                GameStateReadMs = gameStateReadMs,
+                ActionQueueUpdateMs = actionQueueUpdateMs,
+                InputActionUpdateMs = inputActionUpdateMs,
+                InformationDrawMs = informationDrawMs
+            };
+            _recentWindowNextIndex++;
+            if (_recentWindowNextIndex >= RecentWindowCapacity)
+            {
+                _recentWindowNextIndex = 0;
+            }
+
+            _recentRuntimeUpdateSumMs += runtimeUpdateMs;
+            _recentGameStateReadSumMs += gameStateReadMs;
+            _recentActionQueueUpdateSumMs += actionQueueUpdateMs;
+            _recentInputActionUpdateSumMs += inputActionUpdateMs;
+            _recentInformationDrawSumMs += informationDrawMs;
+
+            RecentWindowSampleCount = _recentWindowCount;
+            RecentRuntimeUpdateAverageMs = Average(_recentRuntimeUpdateSumMs, _recentWindowCount);
+            RecentGameStateReadAverageMs = Average(_recentGameStateReadSumMs, _recentWindowCount);
+            RecentActionQueueUpdateAverageMs = Average(_recentActionQueueUpdateSumMs, _recentWindowCount);
+            RecentInputActionUpdateAverageMs = Average(_recentInputActionUpdateSumMs, _recentWindowCount);
+            RecentInformationDrawAverageMs = Average(_recentInformationDrawSumMs, _recentWindowCount);
+        }
+
+        private static void ClearRecentWindow()
+        {
+            System.Array.Clear(RecentWindow, 0, RecentWindow.Length);
+            _recentWindowNextIndex = 0;
+            _recentWindowCount = 0;
+            _recentRuntimeUpdateSumMs = 0d;
+            _recentGameStateReadSumMs = 0d;
+            _recentActionQueueUpdateSumMs = 0d;
+            _recentInputActionUpdateSumMs = 0d;
+            _recentInformationDrawSumMs = 0d;
+            RecentWindowSampleCount = 0;
+            RecentRuntimeUpdateAverageMs = 0d;
+            RecentGameStateReadAverageMs = 0d;
+            RecentActionQueueUpdateAverageMs = 0d;
+            RecentInputActionUpdateAverageMs = 0d;
+            RecentInformationDrawAverageMs = 0d;
+        }
+
+        private static double Average(double sum, int count)
+        {
+            return count <= 0 ? 0d : sum / count;
+        }
+
+        private struct RecentPerformanceSample
+        {
+            public double RuntimeUpdateMs;
+            public double GameStateReadMs;
+            public double ActionQueueUpdateMs;
+            public double InputActionUpdateMs;
+            public double InformationDrawMs;
         }
     }
 }

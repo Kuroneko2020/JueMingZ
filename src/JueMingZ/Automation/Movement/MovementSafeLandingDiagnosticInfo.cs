@@ -117,7 +117,11 @@ namespace JueMingZ.Automation.Movement
 
         public long SubmittedCount { get; set; }
         public long SkippedCount { get; set; }
+        public long FullAnalysisCount { get; set; }
+        public long CheapPrecheckSkipCount { get; set; }
+        public long LandingProbeCount { get; set; }
         public string LastCompatError { get; set; }
+        public string CollisionFastPathStatus { get; set; }
         public bool PlayerUpdateHookInstalled { get; set; }
         public string PlayerUpdateHookMessage { get; set; }
         public bool QueuedJumpPulseActive { get; set; }
@@ -164,6 +168,7 @@ namespace JueMingZ.Automation.Movement
             EquippedGrappleProjectileType = 0;
             InventoryGrappleProjectileType = 0;
             LastCompatError = string.Empty;
+            CollisionFastPathStatus = string.Empty;
             PlayerUpdateHookMessage = string.Empty;
             QueuedJumpPulseStatus = string.Empty;
             QueuedJumpPulseApplySite = string.Empty;
@@ -276,7 +281,11 @@ namespace JueMingZ.Automation.Movement
                 RecoveryStateSummary = RecoveryStateSummary,
                 SubmittedCount = SubmittedCount,
                 SkippedCount = SkippedCount,
+                FullAnalysisCount = FullAnalysisCount,
+                CheapPrecheckSkipCount = CheapPrecheckSkipCount,
+                LandingProbeCount = LandingProbeCount,
                 LastCompatError = LastCompatError,
+                CollisionFastPathStatus = CollisionFastPathStatus,
                 PlayerUpdateHookInstalled = PlayerUpdateHookInstalled,
                 PlayerUpdateHookMessage = PlayerUpdateHookMessage,
                 QueuedJumpPulseActive = QueuedJumpPulseActive,

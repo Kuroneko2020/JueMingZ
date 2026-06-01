@@ -130,7 +130,8 @@ namespace JueMingZ.UI.Legacy
         private static LegacyUiElement DrawFishingFilterButton(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, LegacyUiRect rect, string id, string label, bool selected, string tooltip)
         {
             var hit = rect.Intersect(area.Viewport);
-            var hovered = hit.Width > 0 && hit.Height > 0 && hit.Contains(mouse.X, mouse.Y);
+            var elementRect = hit.Width > 0 && hit.Height > 0 ? hit : rect;
+            var hovered = IsFrameElementHovered(id, elementRect, mouse);
             LegacyUiTheme.DrawButtonClipped(spriteBatch, rect, hovered, hovered && mouse.LeftDown, selected, true, area.Viewport);
             var scale = rect.Width < 36
                 ? 0.52f
@@ -143,23 +144,16 @@ namespace JueMingZ.UI.Legacy
                 LegacyUiTheme.DrawSelectedTextMarkersClipped(spriteBatch, new LegacyUiRect(rect.X + 3, rect.Y, rect.Width - 6, rect.Height), area.Viewport, label, scale);
             }
 
-            var element = new LegacyUiElement
-            {
-                Id = id,
-                Label = label,
-                Kind = "button",
-                Rect = hit.Width > 0 && hit.Height > 0 ? hit : rect,
-                Selected = selected,
-                TooltipLines = string.IsNullOrWhiteSpace(tooltip) ? null : new[] { tooltip }
-            };
-            elements.Add(element);
+            var element = AddFrameElement(elements, id, label, "button", elementRect, selected: selected, tooltipLines: string.IsNullOrWhiteSpace(tooltip) ? null : new[] { tooltip });
+            RecordFrameElementHover(element, hovered);
             return hovered ? element : null;
         }
 
         private static LegacyUiElement DrawFishingFilterActionButton(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, LegacyUiRect rect, string id, string label, bool selected, bool enabled, string tooltip)
         {
             var hit = rect.Intersect(area.Viewport);
-            var hovered = enabled && hit.Width > 0 && hit.Height > 0 && hit.Contains(mouse.X, mouse.Y);
+            var elementRect = hit.Width > 0 && hit.Height > 0 ? hit : rect;
+            var hovered = enabled && IsFrameElementHovered(id, elementRect, mouse);
             LegacyUiTheme.DrawButtonClipped(spriteBatch, rect, hovered, hovered && mouse.LeftDown, selected, enabled, area.Viewport);
             var scale = FitFishingFilterActionButtonScale(label, rect.Width, label != null && label.Length >= 5 ? 0.60f : label != null && label.Length >= 4 ? 0.66f : 0.72f);
             UiTextRenderer.DrawCenteredTextClipped(spriteBatch, label, rect.X + 3, rect.Y, rect.Width - 6, rect.Height, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, enabled ? 230 : 150, enabled ? 232 : 154, enabled ? 224 : 160, enabled ? 255 : 180, scale);
@@ -168,37 +162,21 @@ namespace JueMingZ.UI.Legacy
                 LegacyUiTheme.DrawSelectedTextMarkersClipped(spriteBatch, new LegacyUiRect(rect.X + 3, rect.Y, rect.Width - 6, rect.Height), area.Viewport, label, scale);
             }
 
-            var element = new LegacyUiElement
-            {
-                Id = id,
-                Label = label,
-                Kind = "button",
-                Rect = hit.Width > 0 && hit.Height > 0 ? hit : rect,
-                Enabled = enabled,
-                Selected = selected,
-                TooltipLines = string.IsNullOrWhiteSpace(tooltip) ? null : new[] { tooltip }
-            };
-            elements.Add(element);
+            var element = AddFrameElement(elements, id, label, "button", elementRect, enabled: enabled, selected: selected, tooltipLines: string.IsNullOrWhiteSpace(tooltip) ? null : new[] { tooltip });
+            RecordFrameElementHover(element, hovered);
             return hovered ? element : null;
         }
 
         private static LegacyUiElement DrawFishingFilterUiOnlyButton(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, LegacyUiRect rect, string id, string label, string tooltip)
         {
             var hit = rect.Intersect(area.Viewport);
-            var hovered = hit.Width > 0 && hit.Height > 0 && hit.Contains(mouse.X, mouse.Y);
+            var elementRect = hit.Width > 0 && hit.Height > 0 ? hit : rect;
+            var hovered = IsFrameElementHovered(id, elementRect, mouse);
             LegacyUiTheme.DrawButtonClipped(spriteBatch, rect, hovered, hovered && mouse.LeftDown, false, true, area.Viewport);
             var scale = label != null && label.Length >= 5 ? 0.60f : label != null && label.Length >= 4 && rect.Width < 64 ? 0.56f : 0.74f;
             UiTextRenderer.DrawCenteredTextClipped(spriteBatch, label, rect.X + 3, rect.Y, rect.Width - 6, rect.Height, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 230, 232, 224, 255, scale);
-            var element = new LegacyUiElement
-            {
-                Id = id,
-                Label = label,
-                Kind = "button",
-                Rect = hit.Width > 0 && hit.Height > 0 ? hit : rect,
-                Enabled = false,
-                TooltipLines = string.IsNullOrWhiteSpace(tooltip) ? null : new[] { tooltip }
-            };
-            elements.Add(element);
+            var element = AddFrameElement(elements, id, label, "button", elementRect, enabled: false, tooltipLines: string.IsNullOrWhiteSpace(tooltip) ? null : new[] { tooltip });
+            RecordFrameElementHover(element, hovered);
             return hovered ? element : null;
         }
     }

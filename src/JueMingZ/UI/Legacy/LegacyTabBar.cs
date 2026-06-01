@@ -27,14 +27,20 @@ namespace JueMingZ.UI.Legacy
             for (var index = 0; index < Tabs.Length; index++)
             {
                 var tab = Tabs[index];
-                elements.Add(new LegacyUiElement
-                {
-                    Id = "tab:" + tab.Id,
-                    Label = tab.DisplayName,
-                    Kind = "tab",
-                    Rect = GetTabRect(windowRect, index),
-                    Selected = tab.Id == selectedPageId
-                });
+                LegacyUiElementFrame.Add(
+                    elements,
+                    "tab:" + tab.Id,
+                    tab.DisplayName,
+                    "tab",
+                    GetTabRect(windowRect, index),
+                    true,
+                    tab.Id == selectedPageId,
+                    0,
+                    0,
+                    0,
+                    null,
+                    null,
+                    null);
             }
 
             return elements;

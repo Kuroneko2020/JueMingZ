@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Terraria;
 using Terraria.GameContent;
+using Terraria.UI.Chat;
 using ReLogic.Graphics;
 using JueMingZ.Config;
 using JueMingZ.Diagnostics;
@@ -42,11 +44,36 @@ namespace JueMingZ.UI
         private static DateTime _nextFontSignatureCheckUtc = DateTime.MinValue;
         private static DynamicSpriteFont _measureFont;
         private static string _fontSignature = string.Empty;
+        private static int _cacheGeneration;
         private static string _lastError = "UI text renderer has not initialized.";
+        private static bool _anchorFreeFastPathSuspended;
+        private static DateTime _anchorFreeFastPathRetryUtc = DateTime.MinValue;
+        private static long _anchorFreeFastPathHitCount;
+        private static long _anchorFreeFastPathFallbackCount;
+
+        public static long AnchorFreeFastPathHitCount
+        {
+            get { return Interlocked.Read(ref _anchorFreeFastPathHitCount); }
+        }
+
+        public static long AnchorFreeFastPathFallbackCount
+        {
+            get { return Interlocked.Read(ref _anchorFreeFastPathFallbackCount); }
+        }
 
         public static string LastError
         {
             get { lock (SyncRoot) { return _lastError; } }
+        }
+
+        internal static string FontSignatureForLayoutCache
+        {
+            get { lock (SyncRoot) { return _fontSignature ?? string.Empty; } }
+        }
+
+        internal static int CacheGenerationForLayoutCache
+        {
+            get { return _cacheGeneration; }
         }
 
         public static object GetSpriteBatch()
@@ -276,6 +303,80 @@ namespace JueMingZ.UI
             return true;
         }
 
+        internal static bool IsAnchorFreeFastPathEligibleForTesting(bool hasSpriteBatch, bool hasFont, string text, float scale, float anchorX, float anchorY)
+        {
+            float effectiveScale;
+            var scaleIsSafe = TryResolveEffectiveScale(scale, out effectiveScale);
+            return CanUseAnchorFreeFastPath(hasSpriteBatch, hasFont, text, scaleIsSafe, effectiveScale, anchorX, anchorY);
+        }
+
+        internal static float ResolveEffectiveScaleForTesting(float scale)
+        {
+            float effectiveScale;
+            TryResolveEffectiveScale(scale, out effectiveScale);
+            return effectiveScale;
+        }
+
+        internal static bool FontSignatureChangeClearsCachesForTesting()
+        {
+            lock (SyncRoot)
+            {
+                var savedReady = _ready;
+                var savedMeasureFont = _measureFont;
+                var savedFontSignature = _fontSignature;
+                var savedCacheGeneration = _cacheGeneration;
+                var savedLastError = _lastError;
+                var savedNextRetryUtc = _nextRetryUtc;
+                var savedNextFontSignatureCheckUtc = _nextFontSignatureCheckUtc;
+                var savedFastPathSuspended = _anchorFreeFastPathSuspended;
+                var savedFastPathRetryUtc = _anchorFreeFastPathRetryUtc;
+                var savedMeasureCache = new Dictionary<string, CachedTextMeasure>(MeasureCache, StringComparer.Ordinal);
+                var savedEllipsizeCache = new Dictionary<string, string>(EllipsizeCache, StringComparer.Ordinal);
+
+                try
+                {
+                    MeasureCache.Clear();
+                    EllipsizeCache.Clear();
+                    MeasureCache["old\ntext"] = new CachedTextMeasure(12f, 18f);
+                    EllipsizeCache["old\nellipsize"] = "text";
+                    _fontSignature = "old";
+                    _anchorFreeFastPathSuspended = true;
+                    _anchorFreeFastPathRetryUtc = DateTime.UtcNow.AddMinutes(1);
+
+                    ApplyFontSignatureLocked("old", "new", false);
+                    return string.Equals(_fontSignature, "new", StringComparison.Ordinal) &&
+                           MeasureCache.Count == 0 &&
+                           EllipsizeCache.Count == 0 &&
+                           !_anchorFreeFastPathSuspended &&
+                           _anchorFreeFastPathRetryUtc == DateTime.MinValue;
+                }
+                finally
+                {
+                    _ready = savedReady;
+                    _measureFont = savedMeasureFont;
+                    _fontSignature = savedFontSignature;
+                    _cacheGeneration = savedCacheGeneration;
+                    _lastError = savedLastError;
+                    _nextRetryUtc = savedNextRetryUtc;
+                    _nextFontSignatureCheckUtc = savedNextFontSignatureCheckUtc;
+                    _anchorFreeFastPathSuspended = savedFastPathSuspended;
+                    _anchorFreeFastPathRetryUtc = savedFastPathRetryUtc;
+
+                    MeasureCache.Clear();
+                    foreach (var entry in savedMeasureCache)
+                    {
+                        MeasureCache[entry.Key] = entry.Value;
+                    }
+
+                    EllipsizeCache.Clear();
+                    foreach (var entry in savedEllipsizeCache)
+                    {
+                        EllipsizeCache[entry.Key] = entry.Value;
+                    }
+                }
+            }
+        }
+
         public static string Ellipsize(string text, int maxWidth, float scale)
         {
             if (string.IsNullOrEmpty(text))
@@ -452,18 +553,27 @@ namespace JueMingZ.UI
             {
                 var drawX = x;
                 var drawY = y;
-                var effectiveScale = Math.Max(0.1f, scale);
+                float effectiveScale;
+                var scaleIsSafe = TryResolveEffectiveScale(scale, out effectiveScale);
                 var batch = spriteBatch as SpriteBatch;
                 if (batch == null)
                 {
                     return Fail("DrawText failed: SpriteBatch type is unavailable.");
                 }
 
+                var color = CreateColor(r, g, b, a);
+                if (TryDrawAnchorFreeFastPath(batch, text, new Vector2(drawX, drawY), color, scaleIsSafe, effectiveScale, anchorX, anchorY))
+                {
+                    Interlocked.Increment(ref _anchorFreeFastPathHitCount);
+                    return true;
+                }
+
+                Interlocked.Increment(ref _anchorFreeFastPathFallbackCount);
                 Utils.DrawBorderString(
                     batch,
                     text,
                     new Vector2(drawX, drawY),
-                    CreateColor(r, g, b, a),
+                    color,
                     effectiveScale,
                     anchorX,
                     anchorY);
@@ -473,6 +583,96 @@ namespace JueMingZ.UI
             {
                 return Fail("DrawText failed: " + GetRootMessage(error));
             }
+        }
+
+        private static bool TryDrawAnchorFreeFastPath(SpriteBatch batch, string text, Vector2 position, Color color, bool scaleIsSafe, float effectiveScale, float anchorX, float anchorY)
+        {
+            var font = _measureFont;
+            if (!CanUseAnchorFreeFastPath(batch != null, font != null, text, scaleIsSafe, effectiveScale, anchorX, anchorY) ||
+                IsAnchorFreeFastPathSuspended())
+            {
+                return false;
+            }
+
+            try
+            {
+                ChatManager.DrawColorCodedStringWithShadow(
+                    batch,
+                    font,
+                    text,
+                    position,
+                    color,
+                    0f,
+                    Vector2.Zero,
+                    new Vector2(effectiveScale),
+                    -1f,
+                    1.5f);
+                return true;
+            }
+            catch (Exception error)
+            {
+                SuspendAnchorFreeFastPath(error);
+                return false;
+            }
+        }
+
+        private static bool CanUseAnchorFreeFastPath(bool hasSpriteBatch, bool hasFont, string text, bool scaleIsSafe, float effectiveScale, float anchorX, float anchorY)
+        {
+            return hasSpriteBatch &&
+                   hasFont &&
+                   !string.IsNullOrEmpty(text) &&
+                   scaleIsSafe &&
+                   effectiveScale > 0f &&
+                   anchorX == 0f &&
+                   anchorY == 0f;
+        }
+
+        private static bool TryResolveEffectiveScale(float scale, out float effectiveScale)
+        {
+            effectiveScale = Math.Max(0.1f, scale);
+            return !float.IsNaN(scale) && !float.IsInfinity(scale) &&
+                   !float.IsNaN(effectiveScale) && !float.IsInfinity(effectiveScale);
+        }
+
+        private static bool IsAnchorFreeFastPathSuspended()
+        {
+            if (!_anchorFreeFastPathSuspended)
+            {
+                return false;
+            }
+
+            lock (SyncRoot)
+            {
+                if (!_anchorFreeFastPathSuspended)
+                {
+                    return false;
+                }
+
+                if (DateTime.UtcNow < _anchorFreeFastPathRetryUtc)
+                {
+                    return true;
+                }
+
+                _anchorFreeFastPathSuspended = false;
+                _anchorFreeFastPathRetryUtc = DateTime.MinValue;
+                return false;
+            }
+        }
+
+        private static void SuspendAnchorFreeFastPath(Exception error)
+        {
+            lock (SyncRoot)
+            {
+                _anchorFreeFastPathSuspended = true;
+                _anchorFreeFastPathRetryUtc = DateTime.UtcNow.AddSeconds(5);
+                _lastError = "UI text fast path temporarily disabled: " + GetRootMessage(error);
+            }
+
+            LogThrottle.WarnThrottled(
+                "ui-text-fast-path-disabled",
+                TimeSpan.FromSeconds(10),
+                "UiTextRenderer",
+                _lastError);
         }
 
         private static bool TryMeasureText(string text, float scale, out int width, out int height)
@@ -552,6 +752,11 @@ namespace JueMingZ.UI
             var previousSignature = _fontSignature ?? string.Empty;
             ResolveMeasureFontLocked();
             var signature = BuildFontSignatureLocked();
+            ApplyFontSignatureLocked(previousSignature, signature, true);
+        }
+
+        private static void ApplyFontSignatureLocked(string previousSignature, string signature, bool logChange)
+        {
             if (string.IsNullOrEmpty(previousSignature))
             {
                 _fontSignature = signature;
@@ -561,14 +766,16 @@ namespace JueMingZ.UI
             if (!string.Equals(previousSignature, signature, StringComparison.Ordinal))
             {
                 _fontSignature = signature;
-                MeasureCache.Clear();
-                EllipsizeCache.Clear();
+                ClearTextRenderCachesLocked();
                 _lastError = "UI text font resources changed; text caches were invalidated.";
-                LogThrottle.InfoThrottled(
-                    "ui-text-font-resource-changed",
-                    TimeSpan.FromSeconds(5),
-                    "UiTextRenderer",
-                    "FontAssets.MouseText changed; cleared UI text measure caches.");
+                if (logChange)
+                {
+                    LogThrottle.InfoThrottled(
+                        "ui-text-font-resource-changed",
+                        TimeSpan.FromSeconds(5),
+                        "UiTextRenderer",
+                        "FontAssets.MouseText changed; cleared UI text measure caches.");
+                }
             }
         }
 
@@ -889,11 +1096,23 @@ namespace JueMingZ.UI
             _ready = false;
             _measureFont = null;
             _fontSignature = string.Empty;
-            MeasureCache.Clear();
-            EllipsizeCache.Clear();
+            ClearTextRenderCachesLocked();
             _lastError = message ?? "UI text renderer unavailable.";
             _nextRetryUtc = DateTime.UtcNow.AddSeconds(1);
             _nextFontSignatureCheckUtc = DateTime.MinValue;
+        }
+
+        private static void ClearTextRenderCachesLocked()
+        {
+            MeasureCache.Clear();
+            EllipsizeCache.Clear();
+            unchecked
+            {
+                _cacheGeneration++;
+            }
+
+            _anchorFreeFastPathSuspended = false;
+            _anchorFreeFastPathRetryUtc = DateTime.MinValue;
         }
 
         private sealed class CachedTextMeasure

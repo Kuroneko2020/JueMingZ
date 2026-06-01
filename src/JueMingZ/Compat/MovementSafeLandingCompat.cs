@@ -2,9 +2,11 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Threading;
 using JueMingZ.Automation.Movement;
 using JueMingZ.Config;
 using JueMingZ.Diagnostics;
+using XnaVector2 = Microsoft.Xna.Framework.Vector2;
 
 namespace JueMingZ.Compat
 {
@@ -39,10 +41,20 @@ namespace JueMingZ.Compat
         private const float ImpactCollisionProbeVelocity = 4f;
         private static bool _collisionMethodResolved;
         private static MethodInfo _solidCollisionMethod;
+        private static SolidCollisionDelegate _solidCollisionDelegate;
         private static bool _solidCollisionTopSurfaceMethodResolved;
         private static MethodInfo _solidCollisionTopSurfaceMethod;
+        private static SolidCollisionTopSurfaceDelegate _solidCollisionTopSurfaceDelegate;
         private static bool _tileCollisionMethodResolved;
         private static MethodInfo _tileCollisionMethod;
+        private static TileCollisionDelegate _tileCollisionDelegate;
+        private static bool _typedSolidCollisionDisabled;
+        private static bool _typedSolidTopSurfaceCollisionDisabled;
+        private static bool _typedTileCollisionDisabled;
+        private static int _lastCollisionFastPath;
+        private static readonly object CollisionCacheSyncRoot = new object();
+        private static TileStaticTableCache _tileStaticTableCache;
+        private static Type _mainTypeOverrideForTesting;
         private static bool _slotUsabilityMethodResolved;
         private static MethodInfo _slotUsabilityMethod;
         private static string _lastError = string.Empty;
@@ -50,6 +62,7 @@ namespace JueMingZ.Compat
         private static SafeLandingJumpPulseState _queuedJumpPulse;
         private static bool _playerUpdateHookInstalled;
         private static string _playerUpdateHookMessage = string.Empty;
+        private static long _landingProbeCount;
         // GrappleHookSpeedTable: itemType -> shootSpeed (px/tick) from Terraria 1.4.5.6
         // Fallback lookup: itemType -> shootSpeed (px/tick).
         // Only used when actual item.shootSpeed cannot be read from the live Item instance.
@@ -77,9 +90,48 @@ namespace JueMingZ.Compat
             // its shootSpeed is not a standard hook speed and is excluded from this table.
         };
 
+        private delegate bool SolidCollisionDelegate(XnaVector2 position, int width, int height);
+
+        private delegate bool SolidCollisionTopSurfaceDelegate(XnaVector2 position, int width, int height, bool acceptTopSurfaces);
+
+        private delegate XnaVector2 TileCollisionDelegate(
+            XnaVector2 position,
+            XnaVector2 velocity,
+            int width,
+            int height,
+            bool fallThrough,
+            bool fall2,
+            int gravDir,
+            bool damage,
+            bool noLiquid,
+            bool waterWalk);
+
+        private const int CollisionPathNone = 0;
+        private const int CollisionPathTypedSolidTop = 1;
+        private const int CollisionPathTypedSolid = 2;
+        private const int CollisionPathTypedTile = 3;
+        private const int CollisionPathDelegateSolidTop = 4;
+        private const int CollisionPathDelegateSolid = 5;
+        private const int CollisionPathDelegateTile = 6;
+        private const int CollisionPathReflectionSolidTop = 7;
+        private const int CollisionPathReflectionSolid = 8;
+        private const int CollisionPathReflectionTile = 9;
+        private const int CollisionPathManualSurface = 10;
+        private const int CollisionPathUnavailable = 11;
+
         public static string LastError
         {
             get { return _lastError; }
+        }
+
+        public static string CollisionFastPathStatus
+        {
+            get { return CollisionFastPathToString(_lastCollisionFastPath); }
+        }
+
+        public static long LandingProbeCount
+        {
+            get { return Interlocked.Read(ref _landingProbeCount); }
         }
 
         public static bool PlayerUpdateHookInstalled
@@ -98,7 +150,53 @@ namespace JueMingZ.Compat
             _playerUpdateHookMessage = message ?? string.Empty;
         }
 
+        internal static void InvalidateCollisionFastPathCaches(string reason)
+        {
+            lock (CollisionCacheSyncRoot)
+            {
+                _tileStaticTableCache = null;
+                _collisionMethodResolved = false;
+                _solidCollisionMethod = null;
+                _solidCollisionDelegate = null;
+                _solidCollisionTopSurfaceMethodResolved = false;
+                _solidCollisionTopSurfaceMethod = null;
+                _solidCollisionTopSurfaceDelegate = null;
+                _tileCollisionMethodResolved = false;
+                _tileCollisionMethod = null;
+                _tileCollisionDelegate = null;
+                _typedSolidCollisionDisabled = false;
+                _typedSolidTopSurfaceCollisionDisabled = false;
+                _typedTileCollisionDisabled = false;
+                _lastCollisionFastPath = CollisionPathNone;
+                Interlocked.Exchange(ref _landingProbeCount, 0);
+            }
+        }
+
+        internal static void ResetCollisionFastPathCachesForTesting()
+        {
+            InvalidateCollisionFastPathCaches("test");
+        }
+
+        internal static void SetMainTypeForTesting(Type mainType)
+        {
+            lock (CollisionCacheSyncRoot)
+            {
+                _mainTypeOverrideForTesting = mainType;
+                _tileStaticTableCache = null;
+                _lastCollisionFastPath = CollisionPathNone;
+            }
+        }
+
         public static bool TryAnalyze(object player, AppSettings settings, out MovementSafeLandingAnalysis analysis)
+        {
+            return TryAnalyze(player, settings, null, out analysis);
+        }
+
+        internal static bool TryAnalyze(
+            object player,
+            AppSettings settings,
+            MovementInputFrameCache.MovementInputFrame inputFrame,
+            out MovementSafeLandingAnalysis analysis)
         {
             analysis = new MovementSafeLandingAnalysis();
             try
@@ -109,11 +207,13 @@ namespace JueMingZ.Compat
                 }
 
                 JumpInputProfile jump;
-                if (!TerrariaInputCompat.TryReadJumpInputProfile(player, out jump))
+                string jumpProfileError;
+                if (!TryReadJumpInputProfile(player, inputFrame, out jump, out jumpProfileError))
                 {
-                    return Fail("Safe landing jump profile failed: " + TerrariaInputCompat.LastInputCompatError);
+                    return Fail("Safe landing jump profile failed: " + jumpProfileError);
                 }
 
+                var basicMotion = inputFrame == null ? null : inputFrame.GetBasicMotion(out _);
                 analysis.PlayerControllable = jump.PlayerControllable;
                 analysis.VelocityY = jump.VelocityY;
                 analysis.GravityDirection = Math.Abs(jump.GravityDirection) > 0.001f ? jump.GravityDirection : 1f;
@@ -162,14 +262,25 @@ namespace JueMingZ.Compat
 
                 float positionX;
                 float positionY;
-                if (!TryReadVectorMember(player, "position", out positionX, out positionY))
+                if (basicMotion != null && basicMotion.PositionAvailable)
+                {
+                    positionX = basicMotion.PositionX;
+                    positionY = basicMotion.PositionY;
+                }
+                else if (!TryReadVectorMember(player, "position", out positionX, out positionY))
                 {
                     return Fail("Safe landing analysis failed: cannot read player.position.");
                 }
 
                 float velocityX;
                 float velocityY;
-                if (TryReadVectorMember(player, "velocity", out velocityX, out velocityY))
+                if (basicMotion != null && basicMotion.VelocityAvailable)
+                {
+                    analysis.VelocityX = basicMotion.VelocityX;
+                    analysis.VelocityY = basicMotion.VelocityY;
+                    analysis.FallingSpeed = basicMotion.VelocityY * analysis.GravityDirection;
+                }
+                else if (TryReadVectorMember(player, "velocity", out velocityX, out velocityY))
                 {
                     analysis.VelocityX = velocityX;
                     analysis.VelocityY = velocityY;
@@ -178,8 +289,12 @@ namespace JueMingZ.Compat
 
                 analysis.PositionX = positionX;
                 analysis.PositionY = positionY;
-                analysis.Width = TryReadInt(player, "width", 20);
-                analysis.Height = TryReadInt(player, "height", 42);
+                analysis.Width = basicMotion != null && basicMotion.DimensionsAvailable
+                    ? basicMotion.Width
+                    : TryReadInt(player, "width", 20);
+                analysis.Height = basicMotion != null && basicMotion.DimensionsAvailable
+                    ? basicMotion.Height
+                    : TryReadInt(player, "height", 42);
                 analysis.FallStartKnown = TryReadInt(player, "fallStart", out var fallStart);
                 analysis.FallStartTileY = fallStart;
                 analysis.RawExtraFall = Math.Max(0, TryReadInt(player, "extraFall", 0));
@@ -298,6 +413,131 @@ namespace JueMingZ.Compat
             {
                 RuntimeDiagnostics.RecordError("MovementSafeLandingCompat.TryAnalyze", error);
                 return Fail("Safe landing analysis exception: " + error.GetType().Name + ": " + error.Message);
+            }
+        }
+
+        internal static bool TryCheapDangerPrecheck(
+            object player,
+            out MovementSafeLandingAnalysis analysis,
+            out bool shouldRunFullAnalysis)
+        {
+            return TryCheapDangerPrecheck(player, null, out analysis, out shouldRunFullAnalysis);
+        }
+
+        internal static bool TryCheapDangerPrecheck(
+            object player,
+            MovementInputFrameCache.MovementInputFrame inputFrame,
+            out MovementSafeLandingAnalysis analysis,
+            out bool shouldRunFullAnalysis)
+        {
+            analysis = new MovementSafeLandingAnalysis();
+            shouldRunFullAnalysis = true;
+            try
+            {
+                if (player == null)
+                {
+                    return Fail("Safe landing cheap precheck failed: local player unavailable.");
+                }
+
+                var basicMotion = inputFrame == null ? null : inputFrame.GetBasicMotion(out _);
+                if (basicMotion != null)
+                {
+                    if (!basicMotion.PlayerStateAvailable)
+                    {
+                        analysis.SkipReason = "cheapPrecheckUnavailable:playerState";
+                        return ClearError();
+                    }
+
+                    analysis.PlayerControllable = basicMotion.PlayerControllable;
+                    if (!analysis.PlayerControllable)
+                    {
+                        analysis.SkipReason = "playerNotControllable:cheap";
+                        shouldRunFullAnalysis = false;
+                        return ClearError();
+                    }
+
+                    if (!basicMotion.GravityDirectionAvailable)
+                    {
+                        analysis.SkipReason = "cheapPrecheckUnavailable:gravDir";
+                        return ClearError();
+                    }
+
+                    if (!basicMotion.VelocityAvailable)
+                    {
+                        analysis.SkipReason = "cheapPrecheckUnavailable:velocity";
+                        return ClearError();
+                    }
+
+                    analysis.GravityDirection = basicMotion.GravityDirection;
+                    analysis.VelocityX = basicMotion.VelocityX;
+                    analysis.VelocityY = basicMotion.VelocityY;
+                    analysis.FallingSpeed = basicMotion.VelocityY * analysis.GravityDirection;
+                    if (analysis.FallingSpeed < MinimumDangerFallingSpeed)
+                    {
+                        analysis.SkipReason = "notFallingFastEnough:cheap";
+                        shouldRunFullAnalysis = false;
+                        return ClearError();
+                    }
+
+                    analysis.SkipReason = "cheapPrecheckPassed";
+                    return ClearError();
+                }
+
+                bool playerActive;
+                bool playerDead;
+                bool playerGhost;
+                bool playerCrowdControlled;
+                if (!TryReadBool(player, "active", out playerActive) ||
+                    !TryReadBool(player, "dead", out playerDead) ||
+                    !TryReadBool(player, "ghost", out playerGhost) ||
+                    !TryReadBool(player, "CCed", out playerCrowdControlled))
+                {
+                    analysis.SkipReason = "cheapPrecheckUnavailable:playerState";
+                    return ClearError();
+                }
+
+                analysis.PlayerControllable = playerActive && !playerDead && !playerGhost && !playerCrowdControlled;
+                if (!analysis.PlayerControllable)
+                {
+                    analysis.SkipReason = "playerNotControllable:cheap";
+                    shouldRunFullAnalysis = false;
+                    return ClearError();
+                }
+
+                float gravityDirection;
+                if (!TryReadFloat(player, "gravDir", out gravityDirection))
+                {
+                    analysis.SkipReason = "cheapPrecheckUnavailable:gravDir";
+                    return ClearError();
+                }
+
+                float velocityX;
+                float velocityY;
+                if (!TryReadVectorMember(player, "velocity", out velocityX, out velocityY))
+                {
+                    analysis.SkipReason = "cheapPrecheckUnavailable:velocity";
+                    return ClearError();
+                }
+
+                analysis.GravityDirection = Math.Abs(gravityDirection) > 0.001f ? gravityDirection : 1f;
+                analysis.VelocityX = velocityX;
+                analysis.VelocityY = velocityY;
+                analysis.FallingSpeed = velocityY * analysis.GravityDirection;
+                if (analysis.FallingSpeed < MinimumDangerFallingSpeed)
+                {
+                    analysis.SkipReason = "notFallingFastEnough:cheap";
+                    shouldRunFullAnalysis = false;
+                    return ClearError();
+                }
+
+                analysis.SkipReason = "cheapPrecheckPassed";
+                return ClearError();
+            }
+            catch (Exception error)
+            {
+                RuntimeDiagnostics.RecordError("MovementSafeLandingCompat.TryCheapDangerPrecheck", error);
+                analysis.SkipReason = "cheapPrecheckException:" + error.GetType().Name;
+                return Fail("Safe landing cheap precheck exception: " + error.GetType().Name + ": " + error.Message);
             }
         }
 
@@ -1405,6 +1645,7 @@ namespace JueMingZ.Compat
                 return false;
             }
 
+            Interlocked.Increment(ref _landingProbeCount);
             var probe = Math.Min(768, Math.Max(128, (int)(analysis.FallingSpeed * 24f) + 96));
             const int coarseStep = 16;
             var previous = 0;
@@ -1756,7 +1997,7 @@ namespace JueMingZ.Compat
 
         private static Type ResolveMainType()
         {
-            return TerrariaRuntimeTypes.MainType ?? FindType("Terraria.Main");
+            return _mainTypeOverrideForTesting ?? TerrariaRuntimeTypes.MainType ?? FindType("Terraria.Main");
         }
 
         private static object GetTile(Array tiles, int x, int y)
@@ -2287,6 +2528,12 @@ namespace JueMingZ.Compat
             if (TryManualLandingSurfaceImpact(x, y, width, height, gravityDirection, fallingSpeed, out var manualSurfaceHit))
             {
                 solid = manualSurfaceHit;
+                if (solid)
+                {
+                    MarkCollisionFastPath(CollisionPathManualSurface);
+                    ClearError();
+                }
+
                 return true;
             }
 
@@ -2320,11 +2567,10 @@ namespace JueMingZ.Compat
                 return new MovementLandingSurfaceHit();
             }
 
-            var mainType = ResolveMainType();
-            var solidTiles = GetStaticMember(mainType, "tileSolid") as Array;
-            var solidTopTiles = GetStaticMember(mainType, "tileSolidTop") as Array;
-            var setsType = FindType("Terraria.ID.TileID+Sets");
-            var platformTiles = GetStaticMember(setsType, "Platforms") as Array;
+            Array solidTiles;
+            Array solidTopTiles;
+            Array platformTiles;
+            TryGetTileStaticTables(out solidTiles, out solidTopTiles, out platformTiles);
             var bottomY = y + height;
             var topY = y;
             var tolerance = Math.Max(8f, Math.Min(24f, Math.Abs(fallingSpeed) + 6f));
@@ -2348,9 +2594,9 @@ namespace JueMingZ.Compat
                         continue;
                     }
 
-                    for (var sampleIndex = 0; sampleIndex < samples.Length; sampleIndex++)
+                    for (var sampleIndex = 0; sampleIndex < samples.Count; sampleIndex++)
                     {
-                        var sample = samples[sampleIndex];
+                        var sample = samples.Get(sampleIndex);
                         var sampleX = sample.X;
                         var tileLeft = tileX * 16f;
                         if (sampleX < tileLeft - 0.25f || sampleX > tileLeft + 16.25f)
@@ -2391,14 +2637,7 @@ namespace JueMingZ.Compat
                             SlopeDirection = slopeDirection,
                             ContactSample = sample.Label,
                             MovingIntoSlope = movingIntoSlope,
-                            MovingWithSlope = movingWithSlope,
-                            Summary = surfaceKind +
-                                      (slopeDirection.Length > 0 ? " " + slopeDirection : "") +
-                                      " contact=" + sample.Label +
-                                      " movingIntoSlope=" + BoolText(movingIntoSlope) +
-                                      " movingWithSlope=" + BoolText(movingWithSlope) +
-                                      " world=(" + sampleX.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) +
-                                      "," + surfaceY.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + ")"
+                            MovingWithSlope = movingWithSlope
                         };
 
                         if (IsBetterManualSurfaceHit(candidate, bestHit, velocityX, center, gravityDirection))
@@ -2412,67 +2651,224 @@ namespace JueMingZ.Compat
             return bestHit ?? new MovementLandingSurfaceHit();
         }
 
+        private static bool TryGetTileStaticTables(out Array solidTiles, out Array solidTopTiles, out Array platformTiles)
+        {
+            var cache = _tileStaticTableCache;
+            if (cache != null)
+            {
+                solidTiles = cache.SolidTiles;
+                solidTopTiles = cache.SolidTopTiles;
+                platformTiles = cache.PlatformTiles;
+                return solidTiles != null || solidTopTiles != null || platformTiles != null;
+            }
+
+            lock (CollisionCacheSyncRoot)
+            {
+                cache = _tileStaticTableCache;
+                if (cache == null)
+                {
+                    var mainType = ResolveMainType();
+                    var setsType = FindType("Terraria.ID.TileID+Sets");
+                    cache = new TileStaticTableCache
+                    {
+                        MainType = mainType,
+                        SetsType = setsType,
+                        SolidTiles = GetStaticMember(mainType, "tileSolid") as Array,
+                        SolidTopTiles = GetStaticMember(mainType, "tileSolidTop") as Array,
+                        PlatformTiles = GetStaticMember(setsType, "Platforms") as Array
+                    };
+                    _tileStaticTableCache = cache;
+                }
+
+                solidTiles = cache.SolidTiles;
+                solidTopTiles = cache.SolidTopTiles;
+                platformTiles = cache.PlatformTiles;
+                return solidTiles != null || solidTopTiles != null || platformTiles != null;
+            }
+        }
+
+        private sealed class TileStaticTableCache
+        {
+            public Type MainType;
+            public Type SetsType;
+            public Array SolidTiles;
+            public Array SolidTopTiles;
+            public Array PlatformTiles;
+        }
+
+        private const int LandingSurfaceSampleCapacity = 16;
+        private const int LandingSurfaceSampleLeftFoot = 1;
+        private const int LandingSurfaceSampleCenterFoot = 2;
+        private const int LandingSurfaceSampleRightFoot = 3;
+        private const int LandingSurfaceSampleLeadingFoot = 4;
+        private const int LandingSurfaceSampleTileSegment = 5;
+
         private struct LandingSurfaceSample
         {
-            public LandingSurfaceSample(float x, string label, int priority)
+            public LandingSurfaceSample(float x, int labelKind, int priority)
             {
                 X = x;
-                Label = label ?? string.Empty;
+                LabelKind = labelKind;
                 Priority = priority;
             }
 
             public float X;
-            public string Label;
+            public int LabelKind;
             public int Priority;
+
+            public string Label
+            {
+                get { return LandingSurfaceSampleLabelToString(LabelKind); }
+            }
         }
 
-        private static LandingSurfaceSample[] BuildLandingSurfaceSamples(float x, int width, float velocityX)
+        private struct LandingSurfaceSampleBuffer
         {
-            var samples = new List<LandingSurfaceSample>();
+            private LandingSurfaceSample _sample0;
+            private LandingSurfaceSample _sample1;
+            private LandingSurfaceSample _sample2;
+            private LandingSurfaceSample _sample3;
+            private LandingSurfaceSample _sample4;
+            private LandingSurfaceSample _sample5;
+            private LandingSurfaceSample _sample6;
+            private LandingSurfaceSample _sample7;
+            private LandingSurfaceSample _sample8;
+            private LandingSurfaceSample _sample9;
+            private LandingSurfaceSample _sample10;
+            private LandingSurfaceSample _sample11;
+            private LandingSurfaceSample _sample12;
+            private LandingSurfaceSample _sample13;
+            private LandingSurfaceSample _sample14;
+            private LandingSurfaceSample _sample15;
+
+            public int Count { get; private set; }
+
+            public LandingSurfaceSample Get(int index)
+            {
+                switch (index)
+                {
+                    case 0: return _sample0;
+                    case 1: return _sample1;
+                    case 2: return _sample2;
+                    case 3: return _sample3;
+                    case 4: return _sample4;
+                    case 5: return _sample5;
+                    case 6: return _sample6;
+                    case 7: return _sample7;
+                    case 8: return _sample8;
+                    case 9: return _sample9;
+                    case 10: return _sample10;
+                    case 11: return _sample11;
+                    case 12: return _sample12;
+                    case 13: return _sample13;
+                    case 14: return _sample14;
+                    case 15: return _sample15;
+                    default: return default(LandingSurfaceSample);
+                }
+            }
+
+            public void Set(int index, LandingSurfaceSample sample)
+            {
+                switch (index)
+                {
+                    case 0: _sample0 = sample; break;
+                    case 1: _sample1 = sample; break;
+                    case 2: _sample2 = sample; break;
+                    case 3: _sample3 = sample; break;
+                    case 4: _sample4 = sample; break;
+                    case 5: _sample5 = sample; break;
+                    case 6: _sample6 = sample; break;
+                    case 7: _sample7 = sample; break;
+                    case 8: _sample8 = sample; break;
+                    case 9: _sample9 = sample; break;
+                    case 10: _sample10 = sample; break;
+                    case 11: _sample11 = sample; break;
+                    case 12: _sample12 = sample; break;
+                    case 13: _sample13 = sample; break;
+                    case 14: _sample14 = sample; break;
+                    case 15: _sample15 = sample; break;
+                }
+            }
+
+            public bool Add(float x, int labelKind, int priority)
+            {
+                for (var index = 0; index < Count; index++)
+                {
+                    var existing = Get(index);
+                    if (Math.Abs(existing.X - x) < 0.25f)
+                    {
+                        if (priority > existing.Priority)
+                        {
+                            Set(index, new LandingSurfaceSample(existing.X, labelKind, priority));
+                        }
+
+                        return true;
+                    }
+                }
+
+                if (Count >= LandingSurfaceSampleCapacity)
+                {
+                    return false;
+                }
+
+                Set(Count, new LandingSurfaceSample(x, labelKind, priority));
+                Count++;
+                return true;
+            }
+        }
+
+        private static LandingSurfaceSampleBuffer BuildLandingSurfaceSamples(float x, int width, float velocityX)
+        {
+            var samples = new LandingSurfaceSampleBuffer();
             var left = x + 1f;
             var right = x + Math.Max(1, width) - 1f;
             var center = (left + right) / 2f;
 
-            AddLandingSurfaceSample(samples, left, "left_foot", 2);
-            AddLandingSurfaceSample(samples, center, "center_foot", 2);
-            AddLandingSurfaceSample(samples, right, "right_foot", 2);
+            AddLandingSurfaceSample(ref samples, left, LandingSurfaceSampleLeftFoot, 2);
+            AddLandingSurfaceSample(ref samples, center, LandingSurfaceSampleCenterFoot, 2);
+            AddLandingSurfaceSample(ref samples, right, LandingSurfaceSampleRightFoot, 2);
 
             if (velocityX < -0.01f)
             {
-                AddLandingSurfaceSample(samples, left, "leading_foot", 4);
+                AddLandingSurfaceSample(ref samples, left, LandingSurfaceSampleLeadingFoot, 4);
             }
             else if (velocityX > 0.01f)
             {
-                AddLandingSurfaceSample(samples, right, "leading_foot", 4);
+                AddLandingSurfaceSample(ref samples, right, LandingSurfaceSampleLeadingFoot, 4);
             }
 
             var footLeftTile = (int)Math.Floor((x + 0.5f) / 16f);
             var footRightTile = (int)Math.Floor((x + Math.Max(1, width) - 0.5f) / 16f);
             for (var tileCol = footLeftTile; tileCol <= footRightTile; tileCol++)
             {
-                AddLandingSurfaceSample(samples, ClampFloat(tileCol * 16f + 8f, left, right), "tile_segment", 1);
+                AddLandingSurfaceSample(ref samples, ClampFloat(tileCol * 16f + 8f, left, right), LandingSurfaceSampleTileSegment, 1);
             }
 
-            return samples.ToArray();
+            return samples;
         }
 
-        private static void AddLandingSurfaceSample(List<LandingSurfaceSample> samples, float x, string label, int priority)
+        private static void AddLandingSurfaceSample(ref LandingSurfaceSampleBuffer samples, float x, int labelKind, int priority)
         {
-            for (var index = 0; index < samples.Count; index++)
+            samples.Add(x, labelKind, priority);
+        }
+
+        private static string LandingSurfaceSampleLabelToString(int labelKind)
+        {
+            switch (labelKind)
             {
-                var existing = samples[index];
-                if (Math.Abs(existing.X - x) < 0.25f)
-                {
-                    if (priority > existing.Priority)
-                    {
-                        samples[index] = new LandingSurfaceSample(existing.X, label, priority);
-                    }
-
-                    return;
-                }
+                case LandingSurfaceSampleLeftFoot:
+                    return "left_foot";
+                case LandingSurfaceSampleCenterFoot:
+                    return "center_foot";
+                case LandingSurfaceSampleRightFoot:
+                    return "right_foot";
+                case LandingSurfaceSampleLeadingFoot:
+                    return "leading_foot";
+                case LandingSurfaceSampleTileSegment:
+                    return "tile_segment";
+                default:
+                    return string.Empty;
             }
-
-            samples.Add(new LandingSurfaceSample(x, label, priority));
         }
 
         private static bool IsBetterManualSurfaceHit(
@@ -2608,11 +3004,6 @@ namespace JueMingZ.Compat
             return false;
         }
 
-        private static string BoolText(bool value)
-        {
-            return value ? "true" : "false";
-        }
-
         // Extracted helper: resolve tile surface Y for a given sample X.
         private static bool TryResolveTileSurfaceY(int tileX, int tileY, object tile, float sampleX, out float surfaceY)
         {
@@ -2649,6 +3040,7 @@ namespace JueMingZ.Compat
                 return true;
             }
 
+            MarkCollisionFastPath(CollisionPathUnavailable);
             return false;
         }
 
@@ -2757,25 +3149,37 @@ namespace JueMingZ.Compat
         private static bool TrySolidOrTopSurfaceCollision(float x, float y, int width, int height, out bool solid)
         {
             solid = false;
+            if (TryTypedSolidOrTopSurfaceCollision(x, y, width, height, out solid))
+            {
+                return true;
+            }
+
             if (!EnsureSolidCollisionTopSurfaceMethod())
             {
                 return TrySolidCollision(x, y, width, height, out solid);
             }
 
-            var vectorType = TerrariaRuntimeTypes.Vector2Type;
-            if (vectorType == null)
-            {
-                return Fail("Microsoft.Xna.Framework.Vector2 type unavailable.");
-            }
-
             try
             {
-                var vector = Activator.CreateInstance(vectorType, new object[] { x, y });
+                if (_solidCollisionTopSurfaceDelegate != null)
+                {
+                    solid = _solidCollisionTopSurfaceDelegate(new XnaVector2(x, y), width, height, true);
+                    MarkCollisionFastPath(CollisionPathDelegateSolidTop);
+                    return ClearError();
+                }
+
+                var vector = CreateCollisionVector2(x, y);
+                if (vector == null)
+                {
+                    return Fail("Microsoft.Xna.Framework.Vector2 type unavailable.");
+                }
+
                 var result = _solidCollisionTopSurfaceMethod.Invoke(null, new object[] { vector, width, height, true });
                 if (result is bool)
                 {
                     solid = (bool)result;
-                    return true;
+                    MarkCollisionFastPath(CollisionPathReflectionSolidTop);
+                    return ClearError();
                 }
 
                 return Fail("Collision.SolidCollision(Vector2,int,int,bool) returned a non-bool result.");
@@ -2789,27 +3193,50 @@ namespace JueMingZ.Compat
         private static bool TryTileCollisionImpact(float x, float y, int width, int height, float gravityDirection, float fallingSpeed, out bool collided)
         {
             collided = false;
-            if (!EnsureTileCollisionMethod())
-            {
-                return false;
-            }
-
-            var vectorType = TerrariaRuntimeTypes.Vector2Type;
-            if (vectorType == null)
-            {
-                return Fail("Microsoft.Xna.Framework.Vector2 type unavailable.");
-            }
-
             var direction = gravityDirection >= 0f ? 1 : -1;
             var requestedSpeed = Math.Max(
                 ImpactCollisionProbeVelocity,
                 Math.Min(24f, Math.Abs(fallingSpeed) + 2f));
             var requestedVelocityY = requestedSpeed * direction;
 
+            if (TryTypedTileCollisionImpact(x, y, width, height, direction, requestedVelocityY, out collided))
+            {
+                return true;
+            }
+
+            if (!EnsureTileCollisionMethod())
+            {
+                MarkCollisionFastPath(CollisionPathUnavailable);
+                return false;
+            }
+
             try
             {
-                var position = Activator.CreateInstance(vectorType, new object[] { x, y });
-                var velocity = Activator.CreateInstance(vectorType, new object[] { 0f, requestedVelocityY });
+                if (_tileCollisionDelegate != null)
+                {
+                    var typedVelocity = _tileCollisionDelegate(
+                        new XnaVector2(x, y),
+                        new XnaVector2(0f, requestedVelocityY),
+                        width,
+                        height,
+                        false,
+                        false,
+                        direction,
+                        false,
+                        false,
+                        false);
+                    collided = IsTileCollisionVelocityChanged(typedVelocity.X, typedVelocity.Y, direction, requestedVelocityY);
+                    MarkCollisionFastPath(CollisionPathDelegateTile);
+                    return ClearError();
+                }
+
+                var position = CreateCollisionVector2(x, y);
+                var velocity = CreateCollisionVector2(0f, requestedVelocityY);
+                if (position == null || velocity == null)
+                {
+                    return Fail("Microsoft.Xna.Framework.Vector2 type unavailable.");
+                }
+
                 var result = _tileCollisionMethod.Invoke(null, new object[]
                 {
                     position,
@@ -2828,8 +3255,9 @@ namespace JueMingZ.Compat
                     return Fail("Collision.TileCollision returned an unreadable Vector2 result.");
                 }
 
-                collided = returnedY * direction < requestedVelocityY * direction - 0.01f || Math.Abs(returnedX) > 0.01f;
-                return true;
+                collided = IsTileCollisionVelocityChanged(returnedX, returnedY, direction, requestedVelocityY);
+                MarkCollisionFastPath(CollisionPathReflectionTile);
+                return ClearError();
             }
             catch (Exception error)
             {
@@ -2840,25 +3268,38 @@ namespace JueMingZ.Compat
         private static bool TrySolidCollision(float x, float y, int width, int height, out bool solid)
         {
             solid = false;
-            if (!EnsureSolidCollisionMethod())
+            if (TryTypedSolidCollision(x, y, width, height, out solid))
             {
-                return false;
+                return true;
             }
 
-            var vectorType = TerrariaRuntimeTypes.Vector2Type;
-            if (vectorType == null)
+            if (!EnsureSolidCollisionMethod())
             {
-                return Fail("Microsoft.Xna.Framework.Vector2 type unavailable.");
+                MarkCollisionFastPath(CollisionPathUnavailable);
+                return false;
             }
 
             try
             {
-                var vector = Activator.CreateInstance(vectorType, new object[] { x, y });
+                if (_solidCollisionDelegate != null)
+                {
+                    solid = _solidCollisionDelegate(new XnaVector2(x, y), width, height);
+                    MarkCollisionFastPath(CollisionPathDelegateSolid);
+                    return ClearError();
+                }
+
+                var vector = CreateCollisionVector2(x, y);
+                if (vector == null)
+                {
+                    return Fail("Microsoft.Xna.Framework.Vector2 type unavailable.");
+                }
+
                 var result = _solidCollisionMethod.Invoke(null, new object[] { vector, width, height });
                 if (result is bool)
                 {
                     solid = (bool)result;
-                    return true;
+                    MarkCollisionFastPath(CollisionPathReflectionSolid);
+                    return ClearError();
                 }
 
                 return Fail("Collision.SolidCollision returned a non-bool result.");
@@ -2897,6 +3338,7 @@ namespace JueMingZ.Compat
                 return false;
             }
 
+            _solidCollisionDelegate = CreateDelegate<SolidCollisionDelegate>(_solidCollisionMethod);
             return true;
         }
 
@@ -2934,6 +3376,9 @@ namespace JueMingZ.Compat
                     typeof(bool)
                 },
                 null);
+            _tileCollisionDelegate = _tileCollisionMethod == null
+                ? null
+                : CreateDelegate<TileCollisionDelegate>(_tileCollisionMethod);
             return _tileCollisionMethod != null;
         }
 
@@ -2959,7 +3404,223 @@ namespace JueMingZ.Compat
                 null,
                 new[] { vectorType, typeof(int), typeof(int), typeof(bool) },
                 null);
+            _solidCollisionTopSurfaceDelegate = _solidCollisionTopSurfaceMethod == null
+                ? null
+                : CreateDelegate<SolidCollisionTopSurfaceDelegate>(_solidCollisionTopSurfaceMethod);
             return _solidCollisionTopSurfaceMethod != null;
+        }
+
+        private static bool TryTypedSolidOrTopSurfaceCollision(float x, float y, int width, int height, out bool solid)
+        {
+            solid = false;
+            if (_typedSolidTopSurfaceCollisionDisabled)
+            {
+                return false;
+            }
+
+            try
+            {
+                solid = global::Terraria.Collision.SolidCollision(new XnaVector2(x, y), width, height, true);
+                MarkCollisionFastPath(CollisionPathTypedSolidTop);
+                return ClearError();
+            }
+            catch (Exception error)
+            {
+                DisableTypedCollisionPath(
+                    ref _typedSolidTopSurfaceCollisionDisabled,
+                    "safe-landing-typed-solid-top-disabled",
+                    "Collision.SolidCollision(Vector2,int,int,bool)",
+                    error);
+                return false;
+            }
+        }
+
+        private static bool TryTypedSolidCollision(float x, float y, int width, int height, out bool solid)
+        {
+            solid = false;
+            if (_typedSolidCollisionDisabled)
+            {
+                return false;
+            }
+
+            try
+            {
+                solid = global::Terraria.Collision.SolidCollision(new XnaVector2(x, y), width, height);
+                MarkCollisionFastPath(CollisionPathTypedSolid);
+                return ClearError();
+            }
+            catch (Exception error)
+            {
+                DisableTypedCollisionPath(
+                    ref _typedSolidCollisionDisabled,
+                    "safe-landing-typed-solid-disabled",
+                    "Collision.SolidCollision(Vector2,int,int)",
+                    error);
+                return false;
+            }
+        }
+
+        private static bool TryTypedTileCollisionImpact(
+            float x,
+            float y,
+            int width,
+            int height,
+            int direction,
+            float requestedVelocityY,
+            out bool collided)
+        {
+            collided = false;
+            if (_typedTileCollisionDisabled)
+            {
+                return false;
+            }
+
+            try
+            {
+                var returnedVelocity = global::Terraria.Collision.TileCollision(
+                    new XnaVector2(x, y),
+                    new XnaVector2(0f, requestedVelocityY),
+                    width,
+                    height,
+                    false,
+                    false,
+                    direction,
+                    false,
+                    false,
+                    false);
+                collided = IsTileCollisionVelocityChanged(returnedVelocity.X, returnedVelocity.Y, direction, requestedVelocityY);
+                MarkCollisionFastPath(CollisionPathTypedTile);
+                return ClearError();
+            }
+            catch (Exception error)
+            {
+                DisableTypedCollisionPath(
+                    ref _typedTileCollisionDisabled,
+                    "safe-landing-typed-tile-collision-disabled",
+                    "Collision.TileCollision(Vector2,Vector2,int,int,bool,bool,int,bool,bool,bool)",
+                    error);
+                return false;
+            }
+        }
+
+        private static bool IsTileCollisionVelocityChanged(float returnedX, float returnedY, int direction, float requestedVelocityY)
+        {
+            return returnedY * direction < requestedVelocityY * direction - 0.01f || Math.Abs(returnedX) > 0.01f;
+        }
+
+        private static object CreateCollisionVector2(float x, float y)
+        {
+            var vectorType = TerrariaRuntimeTypes.Vector2Type;
+            if (vectorType == typeof(XnaVector2))
+            {
+                return new XnaVector2(x, y);
+            }
+
+            if (vectorType == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                return Activator.CreateInstance(vectorType, new object[] { x, y });
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static TDelegate CreateDelegate<TDelegate>(MethodInfo method) where TDelegate : class
+        {
+            if (method == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                return Delegate.CreateDelegate(typeof(TDelegate), method, false) as TDelegate;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static void DisableTypedCollisionPath(ref bool disabled, string throttleKey, string path, Exception error)
+        {
+            disabled = true;
+            MarkCollisionFastPath(CollisionPathUnavailable);
+            var message = path + " typed fast path failed; using delegate/reflection/manual fallback: " +
+                          (error == null ? string.Empty : error.GetType().Name + ": " + error.Message);
+            _lastError = message;
+            LogThrottle.WarnThrottled(
+                throttleKey,
+                TimeSpan.FromSeconds(30),
+                "MovementSafeLandingCompat",
+                message);
+        }
+
+        private static void MarkCollisionFastPath(int path)
+        {
+            _lastCollisionFastPath = path;
+        }
+
+        private static string CollisionFastPathToString(int path)
+        {
+            switch (path)
+            {
+                case CollisionPathTypedSolidTop:
+                    return "typed_solid_top";
+                case CollisionPathTypedSolid:
+                    return "typed_solid";
+                case CollisionPathTypedTile:
+                    return "typed_tile_collision";
+                case CollisionPathDelegateSolidTop:
+                    return "delegate_solid_top";
+                case CollisionPathDelegateSolid:
+                    return "delegate_solid";
+                case CollisionPathDelegateTile:
+                    return "delegate_tile_collision";
+                case CollisionPathReflectionSolidTop:
+                    return "reflection_solid_top";
+                case CollisionPathReflectionSolid:
+                    return "reflection_solid";
+                case CollisionPathReflectionTile:
+                    return "reflection_tile_collision";
+                case CollisionPathManualSurface:
+                    return "manual_surface";
+                case CollisionPathUnavailable:
+                    return "unavailable";
+                default:
+                    return "none";
+            }
+        }
+
+        private static bool TryReadJumpInputProfile(
+            object player,
+            MovementInputFrameCache.MovementInputFrame inputFrame,
+            out JumpInputProfile jump,
+            out string failureReason)
+        {
+            jump = null;
+            failureReason = string.Empty;
+            if (inputFrame != null && inputFrame.TryGetJumpProfile(out jump, out failureReason))
+            {
+                return true;
+            }
+
+            if (TerrariaInputCompat.TryReadJumpInputProfile(player, out jump) && jump != null)
+            {
+                failureReason = string.Empty;
+                return true;
+            }
+
+            failureReason = !string.IsNullOrWhiteSpace(TerrariaInputCompat.LastInputCompatError)
+                ? TerrariaInputCompat.LastInputCompatError
+                : failureReason ?? string.Empty;
+            return false;
         }
 
         private static bool TryReadMountNoFallDamage(object player)

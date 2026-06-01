@@ -29,6 +29,19 @@ namespace JueMingZ.Automation.Fishing
             get { lock (SyncRoot) { return _targetLoadoutIndex; } }
         }
 
+        internal static bool HasResidualState
+        {
+            get
+            {
+                lock (SyncRoot)
+                {
+                    return _loadoutSessionActive ||
+                           _switchRequestId != Guid.Empty ||
+                           _restoreRequestId != Guid.Empty;
+                }
+            }
+        }
+
         public static void Tick(InputActionQueue queue, GameStateSnapshot snapshot, bool enabled, bool sessionActive, long tick, string inactiveReason = null)
         {
             if (!enabled || !sessionActive)

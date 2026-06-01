@@ -92,7 +92,7 @@ namespace JueMingZ.UI.Legacy
                     _movementSafeLandingConfigAnchorVisible = true;
                 }
 
-                if (element != null && context.IsMouseOver(rect))
+                if (element != null && context.IsElementHovered(element.Id, rect))
                 {
                     hovered = element;
                 }
@@ -166,7 +166,7 @@ namespace JueMingZ.UI.Legacy
                 Bounds = rect,
                 TooltipLines = string.IsNullOrWhiteSpace(tooltip) ? null : new[] { tooltip }
             }.Draw(context);
-            return element != null && context.IsMouseOver(rect) ? element : null;
+            return element != null && context.IsElementHovered(element.Id, rect) ? element : null;
         }
 
         private static LegacyUiElement DrawMovementSafeLandingOption(object spriteBatch, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, LegacyUiRect rect, MovementSafeLandingOptionDefinition option, bool enabled)
@@ -189,7 +189,7 @@ namespace JueMingZ.UI.Legacy
                 element.Label = "智能防摔:" + option.Label;
             }
 
-            return element != null && context.IsMouseOver(rect) ? element : null;
+            return element != null && context.IsElementHovered(element.Id, rect) ? element : null;
         }
 
         private static bool IsMovementSafeLandingGrappleOption(MovementSafeLandingOptionDefinition option)

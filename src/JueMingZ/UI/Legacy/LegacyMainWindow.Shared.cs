@@ -69,14 +69,7 @@ namespace JueMingZ.UI.Legacy
                 return;
             }
 
-            elements.Add(new LegacyUiElement
-            {
-                Id = id,
-                Label = label,
-                Kind = "blocker",
-                Rect = rect,
-                Enabled = true
-            });
+            AddFrameElement(elements, id, label, "blocker", rect);
         }
 
         private static void HandleClicks(List<LegacyUiElement> elements, LegacyMouseSnapshot mouse, LegacyUiRect titleRect, LegacyUiRect resizeRect)

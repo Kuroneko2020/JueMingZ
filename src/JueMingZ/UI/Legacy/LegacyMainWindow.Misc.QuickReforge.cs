@@ -54,7 +54,8 @@ namespace JueMingZ.UI.Legacy
         private static LegacyUiElement DrawQuickReforgeInputElement(object spriteBatch, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, LegacyUiRect clip, LegacyUiRect rect, bool selected, string text)
         {
             var hit = rect.Intersect(clip);
-            var hovered = hit.Width > 0 && hit.Height > 0 && hit.Contains(mouse.X, mouse.Y);
+            var elementRect = hit.Width > 0 && hit.Height > 0 ? hit : rect;
+            var hovered = IsFrameElementHovered("misc-quick-reforge:input", elementRect, mouse);
             LegacyUiTheme.DrawButtonClipped(spriteBatch, rect, hovered, hovered && mouse.LeftDown, selected, true, clip);
             UiTextRenderer.DrawTextClipped(
                 spriteBatch,
@@ -77,23 +78,16 @@ namespace JueMingZ.UI.Legacy
                 LegacyUiTheme.DrawSelectedTextMarkersClipped(spriteBatch, new LegacyUiRect(rect.X + 8, rect.Y + 3, rect.Width - 16, rect.Height - 6), clip, text ?? string.Empty, 0.72f);
             }
 
-            var element = new LegacyUiElement
-            {
-                Id = "misc-quick-reforge:input",
-                Label = "快速重铸:词缀输入",
-                Kind = "button",
-                Rect = hit.Width > 0 && hit.Height > 0 ? hit : rect,
-                Selected = selected,
-                TooltipLines = new[] { "双击输入完整词缀名。", "不支持只填单字模糊匹配。" }
-            };
-            elements.Add(element);
+            var element = AddFrameElement(elements, "misc-quick-reforge:input", "快速重铸:词缀输入", "button", elementRect, selected: selected, tooltipLines: new[] { "双击输入完整词缀名。", "不支持只填单字模糊匹配。" });
+            RecordFrameElementHover(element, hovered);
             return hovered ? element : null;
         }
 
         private static LegacyUiElement DrawQuickReforgeActionButton(object spriteBatch, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, LegacyUiRect clip, LegacyUiRect rect, string id, string label, string text, bool selected, string tooltip)
         {
             var hit = rect.Intersect(clip);
-            var hovered = hit.Width > 0 && hit.Height > 0 && hit.Contains(mouse.X, mouse.Y);
+            var elementRect = hit.Width > 0 && hit.Height > 0 ? hit : rect;
+            var hovered = IsFrameElementHovered(id, elementRect, mouse);
             LegacyUiTheme.DrawButtonClipped(spriteBatch, rect, hovered, hovered && mouse.LeftDown, selected, true, clip);
             UiTextRenderer.DrawCenteredTextClipped(
                 spriteBatch,
@@ -116,16 +110,8 @@ namespace JueMingZ.UI.Legacy
                 LegacyUiTheme.DrawSelectedTextMarkersClipped(spriteBatch, new LegacyUiRect(rect.X + 3, rect.Y, rect.Width - 6, rect.Height), clip, text, 0.78f);
             }
 
-            var element = new LegacyUiElement
-            {
-                Id = id,
-                Label = label,
-                Kind = "button",
-                Rect = hit.Width > 0 && hit.Height > 0 ? hit : rect,
-                Selected = selected,
-                TooltipLines = string.IsNullOrWhiteSpace(tooltip) ? null : new[] { tooltip }
-            };
-            elements.Add(element);
+            var element = AddFrameElement(elements, id, label, "button", elementRect, selected: selected, tooltipLines: string.IsNullOrWhiteSpace(tooltip) ? null : new[] { tooltip });
+            RecordFrameElementHover(element, hovered);
             return hovered ? element : null;
         }
 
@@ -159,6 +145,11 @@ namespace JueMingZ.UI.Legacy
                         bodyRect.Y + 8 + rowIndex * (AutoSellGridCellHeight + QuickItemCardGap),
                         cardWidth,
                         AutoSellGridCellHeight);
+                    if (!entryRect.Intersects(area.Viewport))
+                    {
+                        continue;
+                    }
+
                     hovered = DrawQuickReforgePrefixEntry(spriteBatch, mouse, elements, area.Viewport, entryRect, prefixes[index], index) ?? hovered;
                 }
             }
@@ -176,9 +167,12 @@ namespace JueMingZ.UI.Legacy
             LegacyUiTheme.DrawRowClipped(spriteBatch, rect, clip);
             var entryRect = new LegacyUiRect(rect.X + 4, rect.Y + 3, Math.Max(1, rect.Width - 8), Math.Max(1, rect.Height - 6));
             var entryHit = entryRect.Intersect(clip);
-            var entryHovered = entryHit.Width > 0 && entryHit.Height > 0 && entryHit.Contains(mouse.X, mouse.Y);
+            var entryId = "misc-quick-reforge:prefix:" + index.ToString(CultureInfo.InvariantCulture);
+            var entryElementRect = entryHit.Width > 0 && entryHit.Height > 0 ? entryHit : entryRect;
+            var entryAreaHovered = mouse != null && entryElementRect.Contains(mouse.X, mouse.Y);
+            var entryHovered = IsFrameElementHovered(entryId, entryElementRect, mouse);
             var display = string.IsNullOrWhiteSpace(prefix) ? "?" : prefix.Trim();
-            LegacyUiTheme.DrawButtonClipped(spriteBatch, entryRect, entryHovered, entryHovered && mouse.LeftDown, false, true, clip);
+            LegacyUiTheme.DrawButtonClipped(spriteBatch, entryRect, entryAreaHovered, entryAreaHovered && mouse.LeftDown, false, true, clip);
             UiTextRenderer.DrawCenteredTextClipped(
                 spriteBatch,
                 display,
@@ -196,33 +190,21 @@ namespace JueMingZ.UI.Legacy
                 246,
                 0.62f);
 
-            var entryElement = new LegacyUiElement
-            {
-                Id = "misc-quick-reforge:prefix:" + index.ToString(CultureInfo.InvariantCulture),
-                Label = "快速重铸词缀",
-                Kind = "blocker",
-                Rect = entryHit.Width > 0 && entryHit.Height > 0 ? entryHit : entryRect,
-                TooltipLines = new[] { display, "悬停后点击 x 可移除。" }
-            };
-            elements.Add(entryElement);
+            var entryElement = AddFrameElement(elements, entryId, "快速重铸词缀", "blocker", entryElementRect, tooltipLines: new[] { display, "悬停后点击 x 可移除。" });
+            RecordFrameElementHover(entryElement, entryHovered);
             var hovered = entryHovered ? entryElement : null;
 
-            if (entryHovered)
+            if (entryAreaHovered)
             {
                 var removeRect = new LegacyUiRect(entryRect.Right - 15, entryRect.Y + 1, 14, 14);
                 var removeHit = removeRect.Intersect(clip);
-                var removeHovered = removeHit.Width > 0 && removeHit.Height > 0 && removeHit.Contains(mouse.X, mouse.Y);
+                var removeId = "misc-quick-reforge:remove:" + index.ToString(CultureInfo.InvariantCulture);
+                var removeElementRect = removeHit.Width > 0 && removeHit.Height > 0 ? removeHit : removeRect;
+                var removeHovered = IsFrameElementHovered(removeId, removeElementRect, mouse);
                 LegacyUiTheme.DrawButtonClipped(spriteBatch, removeRect, removeHovered, removeHovered && mouse.LeftDown, false, true, clip);
                 UiTextRenderer.DrawCenteredTextClipped(spriteBatch, "x", removeRect.X + 1, removeRect.Y, removeRect.Width - 2, removeRect.Height, clip.X, clip.Y, clip.Width, clip.Height, 238, 196, 180, 255, 0.64f);
-                var removeElement = new LegacyUiElement
-                {
-                    Id = "misc-quick-reforge:remove:" + index.ToString(CultureInfo.InvariantCulture),
-                    Label = "从快速重铸名单移除",
-                    Kind = "button",
-                    Rect = removeHit.Width > 0 && removeHit.Height > 0 ? removeHit : removeRect,
-                    TooltipLines = new[] { "从快速重铸名单移除这个词缀。" }
-                };
-                elements.Add(removeElement);
+                var removeElement = AddFrameElement(elements, removeId, "从快速重铸名单移除", "button", removeElementRect, tooltipLines: new[] { "从快速重铸名单移除这个词缀。" });
+                RecordFrameElementHover(removeElement, removeHovered);
                 if (removeHovered)
                 {
                     hovered = removeElement;

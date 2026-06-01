@@ -83,6 +83,8 @@ namespace JueMingZ.Automation.Movement
         private static float _descentRescueGuardImpactWorldX;
         private static float _descentRescueGuardImpactWorldY;
         private static float _descentRescueGuardPositionX;
+        private static long _fullAnalysisCount;
+        private static long _cheapPrecheckSkipCount;
         private static MovementSafeLandingDiagnosticInfo _diagnostics = new MovementSafeLandingDiagnosticInfo();
 
         public static MovementSafeLandingDiagnosticInfo GetDiagnostics()
@@ -91,6 +93,11 @@ namespace JueMingZ.Automation.Movement
             {
                 return _diagnostics.Clone();
             }
+        }
+
+        internal static bool RequiresRuntimeTickWhenDisabled()
+        {
+            return HasSafeLandingResidualState();
         }
 
         public static void Tick(InputActionQueue queue, GameStateSnapshot snapshot, RuntimeState runtimeState)
@@ -126,6 +133,7 @@ namespace JueMingZ.Automation.Movement
 
                 if (snapshot == null || !snapshot.IsInWorld || snapshot.IsInMainMenu)
                 {
+                    MovementSafeLandingCompat.InvalidateCollisionFastPathCaches("notInWorld");
                     ResetCooldown();
                     RecordDecision(true, "skipped", "notInWorld", tick, null, null, false, MovementSafeLandingOptionCatalog.BuildConfigSummary(settings), string.Empty);
                     return;
@@ -166,31 +174,56 @@ namespace JueMingZ.Automation.Movement
                     return;
                 }
 
+                var inputFrame = MovementInputFrameCache.GetOrCreate(runtimeState, settingsSnapshot);
                 object player;
-                if (!TerrariaInputCompat.TryGetLocalPlayer(out player) || player == null)
+                if (inputFrame == null || !inputFrame.TryGetPlayer(out player))
                 {
-                    RecordDecision(true, "skipped", "localPlayerUnavailable", tick, queueSnapshot, null, false, MovementSafeLandingOptionCatalog.BuildConfigSummary(settings), TerrariaInputCompat.LastInputCompatError);
-                    return;
+                    if (!TerrariaInputCompat.TryGetLocalPlayer(out player) || player == null)
+                    {
+                        RecordDecision(true, "skipped", "localPlayerUnavailable", tick, queueSnapshot, null, false, MovementSafeLandingOptionCatalog.BuildConfigSummary(settings), TerrariaInputCompat.LastInputCompatError);
+                        return;
+                    }
                 }
 
-                if (TryHandlePendingSafeLandingGravityRestore(queue, tick, queueSnapshot, player, settings))
+                if (TryHandlePendingSafeLandingGravityRestore(queue, tick, queueSnapshot, player, inputFrame, settings))
                 {
                     return;
                 }
 
                 if (HasTemporaryEquipmentRecordsOrInflight())
                 {
-                    HandleTemporaryEquipmentRestore(queue, tick, queueSnapshot, player, settings);
+                    HandleTemporaryEquipmentRestore(queue, tick, queueSnapshot, player, inputFrame, settings);
                     return;
                 }
 
-                if (TryHandlePendingSafeLandingMountCancel(queue, tick, queueSnapshot, player, settings))
+                if (TryHandlePendingSafeLandingMountCancel(queue, tick, queueSnapshot, player, inputFrame, settings))
                 {
                     return;
                 }
 
                 MovementSafeLandingAnalysis analysis;
-                if (!MovementSafeLandingCompat.TryAnalyze(player, settings, out analysis) || analysis == null)
+                bool shouldRunFullAnalysis;
+                if (!HasActiveSafeLandingJumpPulse() &&
+                    MovementSafeLandingCompat.TryCheapDangerPrecheck(player, inputFrame, out analysis, out shouldRunFullAnalysis) &&
+                    !shouldRunFullAnalysis)
+                {
+                    IncrementCheapPrecheckSkipCount();
+                    ClearDescentRescueGuard("notDangerous");
+                    RecordDecision(
+                        true,
+                        "skipped",
+                        FirstNonEmpty(analysis.SkipReason, "notDangerous:cheap"),
+                        tick,
+                        queueSnapshot,
+                        analysis,
+                        false,
+                        MovementSafeLandingOptionCatalog.BuildConfigSummary(settings),
+                        string.Empty);
+                    return;
+                }
+
+                IncrementFullAnalysisCount();
+                if (!MovementSafeLandingCompat.TryAnalyze(player, settings, inputFrame, out analysis) || analysis == null)
                 {
                     RecordDecision(true, "skipped", "analysisFailed", tick, queueSnapshot, analysis, false, MovementSafeLandingOptionCatalog.BuildConfigSummary(settings), MovementSafeLandingCompat.LastError);
                     return;
@@ -516,16 +549,16 @@ namespace JueMingZ.Automation.Movement
 
             if (HasTemporaryEquipmentRecordsOrInflight())
             {
-                HandleTemporaryEquipmentRestore(queue, tick, queueSnapshot, player, settings);
+                HandleTemporaryEquipmentRestore(queue, tick, queueSnapshot, player, null, settings);
                 return true;
             }
 
-            if (TryHandlePendingSafeLandingGravityRestore(queue, tick, queueSnapshot, player, settings))
+            if (TryHandlePendingSafeLandingGravityRestore(queue, tick, queueSnapshot, player, null, settings))
             {
                 return true;
             }
 
-            if (TryHandlePendingSafeLandingMountCancel(queue, tick, queueSnapshot, player, settings))
+            if (TryHandlePendingSafeLandingMountCancel(queue, tick, queueSnapshot, player, null, settings))
             {
                 return true;
             }
@@ -539,6 +572,7 @@ namespace JueMingZ.Automation.Movement
             long tick,
             InputActionQueueFastState queueSnapshot,
             object player,
+            MovementInputFrameCache.MovementInputFrame inputFrame,
             AppSettings settings)
         {
             bool pending;
@@ -572,11 +606,12 @@ namespace JueMingZ.Automation.Movement
             }
 
             JumpInputProfile profile;
-            if (!TerrariaInputCompat.TryReadJumpInputProfile(player, out profile) || profile == null)
+            string profileError;
+            if (!TryReadJumpInputProfile(inputFrame, player, out profile, out profileError) || profile == null)
             {
                 ResetSafeLandingGravityRestoreReadiness();
                 RecordGravityRestoreState("restoreWaiting", "jumpProfileUnavailable");
-                RecordDecision(true, "gravityRestorePending", "jumpProfileUnavailable", tick, queueSnapshot, null, false, MovementSafeLandingOptionCatalog.BuildConfigSummary(settings), TerrariaInputCompat.LastInputCompatError);
+                RecordDecision(true, "gravityRestorePending", "jumpProfileUnavailable", tick, queueSnapshot, null, false, MovementSafeLandingOptionCatalog.BuildConfigSummary(settings), profileError);
                 return true;
             }
 
@@ -653,6 +688,7 @@ namespace JueMingZ.Automation.Movement
             long tick,
             InputActionQueueFastState queueSnapshot,
             object player,
+            MovementInputFrameCache.MovementInputFrame inputFrame,
             AppSettings settings)
         {
             bool pending;
@@ -675,10 +711,11 @@ namespace JueMingZ.Automation.Movement
             }
 
             JumpInputProfile profile;
-            if (!TerrariaInputCompat.TryReadJumpInputProfile(player, out profile) || profile == null)
+            string profileError;
+            if (!TryReadJumpInputProfile(inputFrame, player, out profile, out profileError) || profile == null)
             {
                 ResetSafeLandingMountCancelReadiness();
-                RecordDecision(true, "mountCancelPending", "jumpProfileUnavailable", tick, queueSnapshot, null, false, MovementSafeLandingOptionCatalog.BuildConfigSummary(settings), TerrariaInputCompat.LastInputCompatError);
+                RecordDecision(true, "mountCancelPending", "jumpProfileUnavailable", tick, queueSnapshot, null, false, MovementSafeLandingOptionCatalog.BuildConfigSummary(settings), profileError);
                 return true;
             }
 
@@ -784,6 +821,7 @@ namespace JueMingZ.Automation.Movement
             long tick,
             InputActionQueueFastState queueSnapshot,
             object player,
+            MovementInputFrameCache.MovementInputFrame inputFrame,
             AppSettings settings)
         {
             if (HasTemporaryEquipmentApplyInflight() || HasTemporaryEquipmentActivationInflight() || HasTemporaryEquipmentRestoreInflight())
@@ -797,7 +835,7 @@ namespace JueMingZ.Automation.Movement
                 return;
             }
 
-            if (TryHandleTemporaryEquipmentActivation(queue, tick, queueSnapshot, player, settings))
+            if (TryHandleTemporaryEquipmentActivation(queue, tick, queueSnapshot, player, inputFrame, settings))
             {
                 return;
             }
@@ -891,6 +929,7 @@ namespace JueMingZ.Automation.Movement
             long tick,
             InputActionQueueFastState queueSnapshot,
             object player,
+            MovementInputFrameCache.MovementInputFrame inputFrame,
             AppSettings settings)
         {
             var records = GetTemporaryEquipmentRecordsCopy();
@@ -924,7 +963,7 @@ namespace JueMingZ.Automation.Movement
             }
 
             MovementSafeLandingAnalysis analysis;
-            if (!MovementSafeLandingCompat.TryAnalyze(player, settings, out analysis) || analysis == null)
+            if (!MovementSafeLandingCompat.TryAnalyze(player, settings, inputFrame, out analysis) || analysis == null)
             {
                 RecordDecision(true, "temporaryEquipmentActive", "activationAnalysisFailed", tick, queueSnapshot, analysis, false, MovementSafeLandingOptionCatalog.BuildConfigSummary(settings), MovementSafeLandingCompat.LastError);
                 return false;
@@ -1776,6 +1815,30 @@ namespace JueMingZ.Automation.Movement
             }
         }
 
+        private static bool HasActiveSafeLandingJumpPulse()
+        {
+            SafeLandingJumpPulseSnapshot pulse;
+            return MovementSafeLandingCompat.TryGetAnySafeLandingJumpPulseSnapshot(out pulse) &&
+                   pulse != null &&
+                   pulse.Active;
+        }
+
+        private static void IncrementFullAnalysisCount()
+        {
+            lock (SyncRoot)
+            {
+                _fullAnalysisCount++;
+            }
+        }
+
+        private static void IncrementCheapPrecheckSkipCount()
+        {
+            lock (SyncRoot)
+            {
+                _cheapPrecheckSkipCount++;
+            }
+        }
+
         private static bool HasTemporaryEquipmentApplyInflight()
         {
             lock (SyncRoot)
@@ -2351,6 +2414,8 @@ namespace JueMingZ.Automation.Movement
                 current.StrategyCatalogVersion = MovementSafeLandingStrategyCatalog.Version;
                 current.RecoveryStateSummary = BuildRecoveryStateSummary(tick);
                 current.LastCompatError = compatError ?? string.Empty;
+                current.CollisionFastPathStatus = MovementSafeLandingCompat.CollisionFastPathStatus;
+                current.LandingProbeCount = MovementSafeLandingCompat.LandingProbeCount;
                 current.PlayerUpdateHookInstalled = MovementSafeLandingCompat.PlayerUpdateHookInstalled;
                 current.PlayerUpdateHookMessage = MovementSafeLandingCompat.PlayerUpdateHookMessage;
                 SafeLandingJumpPulseSnapshot pulse;
@@ -2381,6 +2446,8 @@ namespace JueMingZ.Automation.Movement
                     current.TemporaryEquipmentSelectedTargetSlot = _temporaryEquipmentSelectedTargetSlot;
                     current.TemporaryEquipmentSelectedItemType = _temporaryEquipmentSelectedItemType;
                     current.TemporaryEquipmentSelectedMountType = _temporaryEquipmentSelectedMountType;
+                    current.FullAnalysisCount = _fullAnalysisCount;
+                    current.CheapPrecheckSkipCount = _cheapPrecheckSkipCount;
                     current.GravityRestorePending = _safeLandingGravityRestorePending;
                     current.GravityRestoreOriginalDirection = _safeLandingGravityOriginalDirection;
                     current.GravityRestorePendingTicks = _safeLandingGravityRestorePending && _safeLandingGravityActivationTick >= 0
@@ -2589,6 +2656,29 @@ namespace JueMingZ.Automation.Movement
                     : 0;
                 return state.BuildSummary() + ",gravityPendingTicks=" + pendingTicks.ToString(CultureInfo.InvariantCulture);
             }
+        }
+
+        private static bool TryReadJumpInputProfile(
+            MovementInputFrameCache.MovementInputFrame inputFrame,
+            object player,
+            out JumpInputProfile profile,
+            out string failureReason)
+        {
+            profile = null;
+            failureReason = string.Empty;
+            if (inputFrame != null && inputFrame.TryGetJumpProfile(out profile, out failureReason))
+            {
+                return true;
+            }
+
+            if (TerrariaInputCompat.TryReadJumpInputProfile(player, out profile) && profile != null)
+            {
+                failureReason = string.Empty;
+                return true;
+            }
+
+            failureReason = FirstNonEmpty(TerrariaInputCompat.LastInputCompatError, failureReason);
+            return false;
         }
 
         private static string FirstNonEmpty(string first, string second)

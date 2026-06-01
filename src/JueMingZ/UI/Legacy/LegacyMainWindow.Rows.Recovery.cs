@@ -63,46 +63,33 @@ namespace JueMingZ.UI.Legacy
             }
 
             LegacyFeatureRow.DrawLabel(spriteBatch, row, label, enabled ? "ON" : "OFF");
-            var toggle = new LegacyUiElement
-            {
-                Id = toggleId,
-                Label = label,
-                Kind = "button",
-                Rect = new LegacyUiRect(row.X + 116, row.Y + 5, 72, LegacyUiMetrics.ButtonHeight),
-                Selected = enabled
-            };
-            var slider = new LegacyUiElement
+            var toggleRect = new LegacyUiRect(row.X + 116, row.Y + 5, 72, LegacyUiMetrics.ButtonHeight);
+            var sliderRect = new LegacyUiRect(row.X + 208, row.Y + 4, row.Width - 218, LegacyUiMetrics.SliderHeight);
+            var sliderValue = LegacyMainUiState.Clamp(threshold, LegacySlider.MinPercent, LegacySlider.MaxPercent);
+
+            var toggleHovered = IsFrameElementHovered(toggleId, toggleRect, mouse);
+            LegacyUiTheme.DrawButton(spriteBatch, toggleRect, toggleHovered, toggleHovered && mouse.LeftDown, enabled, true);
+            UiTextRenderer.DrawCenteredText(spriteBatch, enabled ? "ON" : "OFF", toggleRect.X + 3, toggleRect.Y, toggleRect.Width - 6, toggleRect.Height, 245, 238, 210, 255, 0.82f);
+
+            var sliderElement = new LegacySliderControl
             {
                 Id = sliderId,
                 Label = sliderLabel,
                 Kind = "slider",
-                Rect = new LegacyUiRect(row.X + 208, row.Y + 4, row.Width - 218, LegacyUiMetrics.SliderHeight),
-                IntValue = LegacyMainUiState.Clamp(threshold, LegacySlider.MinPercent, LegacySlider.MaxPercent),
+                Bounds = sliderRect,
+                IntValue = sliderValue,
                 MinValue = LegacySlider.MinPercent,
-                MaxValue = LegacySlider.MaxPercent
-            };
-
-            var toggleHovered = toggle.Rect.Contains(mouse.X, mouse.Y);
-            LegacyUiTheme.DrawButton(spriteBatch, toggle.Rect, toggleHovered, toggleHovered && mouse.LeftDown, enabled, true);
-            UiTextRenderer.DrawCenteredText(spriteBatch, enabled ? "ON" : "OFF", toggle.Rect.X + 3, toggle.Rect.Y, toggle.Rect.Width - 6, toggle.Rect.Height, 245, 238, 210, 255, 0.82f);
-
-            var sliderElement = new LegacySliderControl
-            {
-                Id = slider.Id,
-                Label = slider.Label,
-                Kind = slider.Kind,
-                Bounds = slider.Rect,
-                IntValue = slider.IntValue,
-                MinValue = slider.MinValue,
-                MaxValue = slider.MaxValue,
+                MaxValue = LegacySlider.MaxPercent,
                 SliderLabel = sliderLabel,
                 Suffix = "%"
             }.RegisterAndUpdate(LegacyUiContext.ForScrollArea(spriteBatch, mouse, area, elements, ConfigService.AppSettings ?? AppSettings.CreateDefault()));
-            var sliderDragging = string.Equals(LegacyUiInput.ActiveSliderId, slider.Id, StringComparison.Ordinal);
-            var sliderValue = LegacyUiInput.GetSliderDisplayValue(slider.Id, slider.IntValue);
-            LegacySlider.Draw(spriteBatch, slider.Rect, sliderLabel, sliderValue, slider.Rect.Contains(mouse.X, mouse.Y), sliderDragging);
-            elements.Add(toggle);
-            return toggleHovered ? toggle : (slider.Rect.Contains(mouse.X, mouse.Y) ? sliderElement : null);
+            var sliderDragging = string.Equals(LegacyUiInput.ActiveSliderId, sliderId, StringComparison.Ordinal);
+            var sliderDisplayValue = LegacyUiInput.GetSliderDisplayValue(sliderId, sliderValue);
+            var sliderHovered = IsFrameElementHovered(sliderId, sliderRect, mouse);
+            LegacySlider.Draw(spriteBatch, sliderRect, sliderLabel, sliderDisplayValue, sliderHovered, sliderDragging);
+            var toggle = AddFrameElement(elements, toggleId, label, "button", toggleRect, selected: enabled);
+            RecordFrameElementHover(toggle, toggleHovered);
+            return toggleHovered ? toggle : (sliderHovered ? sliderElement : null);
         }
     }
 }

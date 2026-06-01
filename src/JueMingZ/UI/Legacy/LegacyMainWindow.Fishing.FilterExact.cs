@@ -93,7 +93,9 @@ namespace JueMingZ.UI.Legacy
         private static LegacyUiElement DrawFishingFilterPickerCandidate(object spriteBatch, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, LegacyUiRect rect, LegacyUiRect clip, FishingCatchCandidate candidate, bool selected)
         {
             var hit = rect.Intersect(clip);
-            var hovered = hit.Width > 0 && hit.Height > 0 && hit.Contains(mouse.X, mouse.Y);
+            var elementId = "fishing-filter-exact-picker:toggle:" + FishingFilterUiState.BuildKey(candidate.Kind, candidate.Id);
+            var elementRect = hit.Width > 0 && hit.Height > 0 ? hit : rect;
+            var hovered = IsFrameElementHovered(elementId, elementRect, mouse);
             LegacyUiTheme.DrawRowClipped(spriteBatch, rect, clip);
             if (selected)
             {
@@ -126,16 +128,8 @@ namespace JueMingZ.UI.Legacy
                 224,
                 245,
                 0.56f);
-            var element = new LegacyUiElement
-            {
-                Id = "fishing-filter-exact-picker:toggle:" + FishingFilterUiState.BuildKey(candidate.Kind, candidate.Id),
-                Label = label,
-                Kind = "button",
-                Rect = hit.Width > 0 && hit.Height > 0 ? hit : rect,
-                Selected = selected,
-                TooltipLines = new[] { "点击选择 / 取消选择：" + label }
-            };
-            elements.Add(element);
+            var element = AddFrameElement(elements, elementId, label, "button", elementRect, selected: selected, tooltipLines: new[] { "点击选择 / 取消选择：" + label });
+            RecordFrameElementHover(element, hovered);
             return hovered ? element : null;
         }
 
@@ -214,19 +208,14 @@ namespace JueMingZ.UI.Legacy
             var label = BuildFishingFilterDisplayLabel(entry.Kind, entry.Id, entry.DisplayNameSnapshot);
             var deleteRect = new LegacyUiRect(row.Right - 25, row.Y + 5, 20, 20);
             UiTextRenderer.DrawTextClipped(spriteBatch, label, row.X + 33, row.Y + 8, Math.Max(1, deleteRect.X - row.X - 39), 16, clip.X, clip.Y, clip.Width, clip.Height, 238, 236, 220, 248, 0.66f);
-            var deleteHovered = deleteRect.Intersect(clip).Contains(mouse.X, mouse.Y);
+            var elementId = "fishing-filter-exact-entry:delete:" + FishingFilterUiState.BuildKey(entry.Kind, entry.Id);
+            var elementRect = deleteRect.Intersect(clip);
+            var deleteHovered = IsFrameElementHovered(elementId, elementRect, mouse);
             LegacyUiTheme.DrawButtonClipped(spriteBatch, deleteRect, deleteHovered, deleteHovered && mouse.LeftDown, false, true, clip);
             UiTextRenderer.DrawCenteredTextClipped(spriteBatch, "x", deleteRect.X + 2, deleteRect.Y + 1, deleteRect.Width - 4, deleteRect.Height, clip.X, clip.Y, clip.Width, clip.Height, 238, 196, 180, 255, 0.74f);
 
-            var element = new LegacyUiElement
-            {
-                Id = "fishing-filter-exact-entry:delete:" + FishingFilterUiState.BuildKey(entry.Kind, entry.Id),
-                Label = "删除 " + label,
-                Kind = "button",
-                Rect = deleteRect.Intersect(clip),
-                TooltipLines = new[] { "删除：" + label }
-            };
-            elements.Add(element);
+            var element = AddFrameElement(elements, elementId, "删除 " + label, "button", elementRect, tooltipLines: new[] { "删除：" + label });
+            RecordFrameElementHover(element, deleteHovered);
             return deleteHovered ? element : null;
         }
 

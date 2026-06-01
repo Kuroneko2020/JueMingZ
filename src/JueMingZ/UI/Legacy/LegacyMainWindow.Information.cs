@@ -251,19 +251,12 @@ namespace JueMingZ.UI.Legacy
         private static LegacyUiElement DrawInformationSignTextLimitButton(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, LegacyUiRect rect, string id, string label, string text, string tooltip)
         {
             var hit = rect.Intersect(area.Viewport);
-            var hovered = hit.Width > 0 && hit.Height > 0 && hit.Contains(mouse.X, mouse.Y);
+            var elementRect = hit.Width > 0 && hit.Height > 0 ? hit : rect;
+            var hovered = IsFrameElementHovered(id, elementRect, mouse);
             LegacyUiTheme.DrawButtonClipped(spriteBatch, rect, hovered, hovered && mouse.LeftDown, false, true, area.Viewport);
             UiTextRenderer.DrawCenteredTextClipped(spriteBatch, text, rect.X + 3, rect.Y, rect.Width - 6, rect.Height, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 230, 232, 224, 255, 0.84f);
-            var element = new LegacyUiElement
-            {
-                Id = id,
-                Label = label,
-                Kind = "button",
-                Rect = hit.Width > 0 && hit.Height > 0 ? hit : rect,
-                Selected = false,
-                TooltipLines = string.IsNullOrWhiteSpace(tooltip) ? null : new[] { tooltip }
-            };
-            elements.Add(element);
+            var element = AddFrameElement(elements, id, label, "button", elementRect, tooltipLines: string.IsNullOrWhiteSpace(tooltip) ? null : new[] { tooltip });
+            RecordFrameElementHover(element, hovered);
             return hovered ? element : null;
         }
 
@@ -296,19 +289,13 @@ namespace JueMingZ.UI.Legacy
             UiTextRenderer.DrawAlignedTextClipped(spriteBatch, label, row.X + 10, row.Y, labelWidth, row.Height, UiTextHorizontalAlignment.Left, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 238, 226, 255, 0.86f);
 
             var hit = buttonRect.Intersect(area.Viewport);
-            var hovered = hit.Width > 0 && hit.Height > 0 && hit.Contains(mouse.X, mouse.Y);
+            var elementRect = hit.Width > 0 && hit.Height > 0 ? hit : buttonRect;
+            var hovered = IsFrameElementHovered("information-info-panel-position-start", elementRect, mouse);
             LegacyUiTheme.DrawButtonClipped(spriteBatch, buttonRect, hovered, hovered && mouse.LeftDown, false, true, area.Viewport);
             UiTextRenderer.DrawCenteredTextClipped(spriteBatch, buttonLabel, buttonRect.X + 3, buttonRect.Y, buttonRect.Width - 6, buttonRect.Height, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 230, 232, 224, 255, 0.78f);
 
-            var element = new LegacyUiElement
-            {
-                Id = "information-info-panel-position-start",
-                Label = label + ":" + buttonLabel,
-                Kind = "button",
-                Rect = hit.Width > 0 && hit.Height > 0 ? hit : buttonRect,
-                TooltipLines = new[] { "点击开始拖动信息窗口" }
-            };
-            elements.Add(element);
+            var element = AddFrameElement(elements, "information-info-panel-position-start", label + ":" + buttonLabel, "button", elementRect, tooltipLines: new[] { "点击开始拖动信息窗口" });
+            RecordFrameElementHover(element, hovered);
             return hovered ? element : null;
         }
 
@@ -352,13 +339,7 @@ namespace JueMingZ.UI.Legacy
             UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, popup.X, popup.Y, popup.Width, popup.Height, LegacyUiTheme.Radius, 48, 58, 88, 238);
             UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, popup.X + 1, popup.Y + 1, popup.Width - 2, popup.Height - 2, LegacyUiTheme.Radius - 1, 18, 23, 38, 238);
             UiPrimitiveRenderer.DrawFilledRect(spriteBatch, popup.X + 8, popup.Y + 32, popup.Width - 16, 1, 116, 136, 176, 145);
-            elements.Add(new LegacyUiElement
-            {
-                Id = "information-style-popup",
-                Label = "信息样式配置",
-                Kind = "blocker",
-                Rect = popup
-            });
+            AddFrameElement(elements, "information-style-popup", "信息样式配置", "blocker", popup);
             UiTextRenderer.DrawText(spriteBatch, InformationStyleHelper.GetDisplayName(featureId) + " 配置", popup.X + 14, popup.Y + 10, 246, 242, 220, 255, 0.82f);
             hovered = DrawInformationStyleSmallButton(spriteBatch, mouse, elements, "information-style-reset:" + featureId, "回归默认", popup.Right - 86, popup.Y + 7, 72, 22) ?? hovered;
 
@@ -374,20 +355,13 @@ namespace JueMingZ.UI.Legacy
             hovered = DrawInformationStyleSlider(spriteBatch, mouse, elements, lightnessId, "L", displayLightness, 0, 100, sliderLabelX, sliderValueX, sliderX, popup.Y + 108, sliderWidth, "%") ?? hovered;
 
             var inputRect = new LegacyUiRect(popup.X + 74, popup.Y + 142, 118, 28);
-            var inputHovered = inputRect.Contains(mouse.X, mouse.Y);
+            var inputHovered = IsFrameElementHovered(inputId, inputRect, mouse);
             var inputFocused = LegacyHexColorInput.IsFocused(inputId);
             UiTextRenderer.DrawAlignedText(spriteBatch, "HTML", popup.X + 16, inputRect.Y, 54, inputRect.Height, UiTextHorizontalAlignment.Left, 220, 226, 238, 240, 0.62f);
             UiTextRenderer.DrawAlignedText(spriteBatch, LegacyHexColorInput.GetDisplayText(inputId, colorHex), inputRect.X + 1, inputRect.Y, inputRect.Width - 2, inputRect.Height - 3, UiTextHorizontalAlignment.Left, 242, 244, 236, 255, 0.66f);
             UiPrimitiveRenderer.DrawFilledRect(spriteBatch, inputRect.X, inputRect.Bottom - 3, inputRect.Width, inputFocused ? 2 : 1, inputFocused ? 255 : 126, inputFocused ? 230 : 142, inputFocused ? 160 : 176, inputHovered || inputFocused ? 235 : 180);
-            var inputElement = new LegacyUiElement
-            {
-                Id = inputId,
-                Label = InformationStyleHelper.GetDisplayName(featureId) + ":HTML颜色",
-                Kind = "button",
-                Rect = inputRect,
-                TooltipLines = new[] { "点击后输入 6 位 HTML 颜色代码" }
-            };
-            elements.Add(inputElement);
+            var inputElement = AddFrameElement(elements, inputId, InformationStyleHelper.GetDisplayName(featureId) + ":HTML颜色", "button", inputRect, tooltipLines: new[] { "点击后输入 6 位 HTML 颜色代码" });
+            RecordFrameElementHover(inputElement, inputHovered);
             if (inputHovered)
             {
                 hovered = inputElement;
@@ -431,7 +405,7 @@ namespace JueMingZ.UI.Legacy
             };
             var element = slider.RegisterAndUpdate(new LegacyUiContext(spriteBatch, mouse, LegacyMainUiState.WindowRect, LegacyMainUiState.SelectedPageId, ConfigService.AppSettings ?? AppSettings.CreateDefault(), elements));
             var dragging = string.Equals(LegacyUiInput.ActiveSliderId, slider.Id, StringComparison.Ordinal);
-            var hovered = slider.Bounds.Contains(mouse.X, mouse.Y);
+            var hovered = IsFrameElementHovered(slider.Id, slider.Bounds, mouse);
             DrawInformationStyleSliderTrack(spriteBatch, slider.Bounds, value, minValue, maxValue, hovered, dragging);
             UiTextRenderer.DrawAlignedText(
                 spriteBatch,
@@ -498,36 +472,22 @@ namespace JueMingZ.UI.Legacy
         private static LegacyUiElement DrawInformationStyleSmallButton(object spriteBatch, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, string id, string label, int x, int y, int width, int height)
         {
             var rect = new LegacyUiRect(x, y, width, height);
-            var hovered = rect.Contains(mouse.X, mouse.Y);
+            var hovered = IsFrameElementHovered(id, rect, mouse);
             LegacyUiTheme.DrawButton(spriteBatch, rect, hovered, hovered && mouse.LeftDown, false, true);
             UiTextRenderer.DrawCenteredText(spriteBatch, label, rect.X + 4, rect.Y, rect.Width - 8, rect.Height, 232, 236, 224, 255, 0.62f);
-            var element = new LegacyUiElement
-            {
-                Id = id,
-                Label = label,
-                Kind = "button",
-                Rect = rect,
-                TooltipLines = new[] { "恢复默认颜色和字号" }
-            };
-            elements.Add(element);
+            var element = AddFrameElement(elements, id, label, "button", rect, tooltipLines: new[] { "恢复默认颜色和字号" });
+            RecordFrameElementHover(element, hovered);
             return hovered ? element : null;
         }
 
         private static LegacyUiElement DrawInformationStyleButton(object spriteBatch, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, string id, string label, int x, int y, int width)
         {
             var rect = new LegacyUiRect(x, y, width, LegacyUiMetrics.ButtonHeight);
-            var hovered = rect.Contains(mouse.X, mouse.Y);
+            var hovered = IsFrameElementHovered(id, rect, mouse);
             LegacyUiTheme.DrawButton(spriteBatch, rect, hovered, hovered && mouse.LeftDown, false, true);
             UiTextRenderer.DrawCenteredText(spriteBatch, label, rect.X + 4, rect.Y, rect.Width - 8, rect.Height, 232, 236, 224, 255, 0.66f);
-            var element = new LegacyUiElement
-            {
-                Id = id,
-                Label = label,
-                Kind = "button",
-                Rect = rect,
-                TooltipLines = new[] { "每次调整 0.10" }
-            };
-            elements.Add(element);
+            var element = AddFrameElement(elements, id, label, "button", rect, tooltipLines: new[] { "每次调整 0.10" });
+            RecordFrameElementHover(element, hovered);
             return hovered ? element : null;
         }
     }
