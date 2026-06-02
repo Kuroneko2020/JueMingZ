@@ -9,6 +9,7 @@ using JueMingZ.Automation.Fishing.Filtering;
 using JueMingZ.Automation.Information;
 using JueMingZ.Automation.InventoryAndItems;
 using JueMingZ.Automation.Movement;
+using JueMingZ.Automation.NpcServices;
 using JueMingZ.Automation.WorldAutomation;
 using JueMingZ.Common;
 using JueMingZ.Compat;
@@ -305,6 +306,35 @@ namespace JueMingZ.Input
                 before,
                 BuildUiOptionStateJson(),
                 "{\"submitted\":false,\"implemented\":true,\"featureId\":\"" + EscapeJson(FeatureIds.InventoryAutoDepositCoins) + "\",\"enabled\":" + BoolRaw(enabled) + ",\"changed\":" + BoolRaw(changed) + ",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                "Button");
+        }
+
+        private static void HandleMiscAutoTaxCollectMode(LegacyUiCommand command, string payload)
+        {
+            var before = BuildUiOptionStateJson();
+            var enabled = IsOnMode(payload);
+            var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
+            var changed = settings.NpcAutoTaxCollectEnabled != enabled;
+            settings.NpcAutoTaxCollectEnabled = enabled;
+            if (!enabled)
+            {
+                AutoTaxCollectorService.ClearState("ui disabled");
+            }
+
+            ConfigService.SaveAll();
+            var message = changed
+                ? (enabled ? "Auto tax collect enabled." : "Auto tax collect disabled.")
+                : (enabled ? "Auto tax collect already enabled." : "Auto tax collect already disabled.");
+
+            Record(
+                command,
+                "Ui.Toggle.MiscAutoTaxCollect",
+                "NpcServices",
+                changed ? "Succeeded" : "NotApplicable",
+                message,
+                before,
+                BuildUiOptionStateJson(),
+                "{\"submitted\":false,\"implemented\":true,\"featureId\":\"" + EscapeJson(FeatureIds.NpcAutoTaxCollect) + "\",\"enabled\":" + BoolRaw(enabled) + ",\"changed\":" + BoolRaw(changed) + ",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
                 "Button");
         }
 

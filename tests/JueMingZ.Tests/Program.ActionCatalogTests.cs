@@ -908,6 +908,40 @@ namespace JueMingZ.Tests
             AssertMetadata(request, "CurrentAffix", "强力");
         }
 
+        private static void AutoTaxCollectRequestUsesNpcMetadata()
+        {
+            var request = AutoTaxCollectorService.BuildAutoTaxCollectRequestForTesting(
+                new TaxCollectorTarget
+                {
+                    NpcIndex = 6,
+                    WhoAmI = 42,
+                    Name = "Tax Collector",
+                    TaxMoney = 12345
+                });
+
+            if (request.Kind != InputActionKind.NpcInteract)
+            {
+                throw new InvalidOperationException("Expected auto tax collect to use NpcInteract action.");
+            }
+
+            if (request.Priority != InputActionPriority.Low)
+            {
+                throw new InvalidOperationException("Expected auto tax collect to stay low priority.");
+            }
+
+            AssertStringEquals(request.SourceFeatureId, FeatureIds.NpcAutoTaxCollect, "source feature id");
+            AssertStringEquals(request.AdmissionKey, FeatureIds.NpcAutoTaxCollect, "admission key");
+            AssertMetadata(request, ActionMetadataKeys.Scenario, ScenarioNames.NpcAutoTaxCollect);
+            AssertMetadata(request, ActionMetadataKeys.SourceKind, "Automation");
+            AssertMetadata(request, "ExecutionMode", "TaxCollectorChatCollect");
+            AssertMetadata(request, "Interaction", "TaxCollect");
+            AssertMetadata(request, "NpcIndex", "6");
+            AssertMetadata(request, "NpcType", "441");
+            AssertMetadata(request, "NpcWhoAmI", "42");
+            AssertMetadata(request, "NpcName", "Tax Collector");
+            AssertMetadata(request, "TaxMoneyBefore", "12345");
+        }
+
         private static void FeatureCatalogExposesAutoDiscard()
         {
             var registry = FeatureRegistry.CreateDefault();
@@ -963,6 +997,50 @@ namespace JueMingZ.Tests
             {
                 throw new InvalidOperationException("Quick reforge must stay NpcServices code-domain and Misc UI category.");
             }
+        }
+
+        private static void FeatureCatalogExposesAutoTaxCollect()
+        {
+            var registry = FeatureRegistry.CreateDefault();
+            FeatureDefinition feature;
+            if (!registry.TryGet(FeatureIds.NpcAutoTaxCollect, out feature) || feature == null)
+            {
+                throw new InvalidOperationException("Expected auto tax collect feature to be registered.");
+            }
+
+            if (!feature.VisibleInMainUi || !feature.IsImplemented)
+            {
+                throw new InvalidOperationException("Auto tax collect must be visible and implemented.");
+            }
+
+            if (feature.DefaultEnabled)
+            {
+                throw new InvalidOperationException("Auto tax collect must default to disabled.");
+            }
+
+            if (feature.CodeDomain != FeatureCodeDomain.NpcServices ||
+                feature.UserCategory != FeatureUserCategory.Misc)
+            {
+                throw new InvalidOperationException("Auto tax collect must stay NpcServices code-domain and Misc UI category.");
+            }
+
+            if (feature.RequiredActions.Count != 1 || feature.RequiredActions[0] != InputActionKind.NpcInteract)
+            {
+                throw new InvalidOperationException("Auto tax collect must require only NpcInteract.");
+            }
+
+            if (feature.ConfigUiKind != FeatureConfigUiKind.None)
+            {
+                throw new InvalidOperationException("Auto tax collect must use a simple inline switch without a config window.");
+            }
+
+            if (feature.MultiplayerSupport != FeatureMultiplayerSupport.SupportedByOriginalAction)
+            {
+                throw new InvalidOperationException("Auto tax collect must use original-action multiplayer metadata.");
+            }
+
+            AssertStringEquals(feature.DisplayName, "自动收税", "auto tax collect display name");
+            AssertStringEquals(feature.Description, "靠近税收官且有可领取税款时自动领取", "auto tax collect description");
         }
 
         private static void FeatureCatalogExposesAutoMining()
@@ -1858,6 +1936,30 @@ namespace JueMingZ.Tests
             AssertContains(json, "\"AutoDepositCoinsLastCoinItemIds\": \"71,72,74\"");
         }
 
+        private static void DiagnosticSnapshotWritesAutoTaxCollectState()
+        {
+            var snapshot = new DiagnosticSnapshot
+            {
+                AutoTaxCollectLastDecision = "submitted auto tax collect request",
+                AutoTaxCollectLastDecisionUtc = new DateTime(2026, 6, 2, 1, 2, 3, DateTimeKind.Utc),
+                AutoTaxCollectTargetNpcIndex = 8,
+                AutoTaxCollectTargetWhoAmI = 77,
+                AutoTaxCollectTargetName = "Tax Collector",
+                AutoTaxCollectTaxMoney = 12345,
+                AutoTaxCollectLastRequestId = "request-123"
+            };
+
+            var json = InvokeDiagnosticSnapshotJson(snapshot);
+
+            AssertContains(json, "\"AutoTaxCollectLastDecision\": \"submitted auto tax collect request\"");
+            AssertContains(json, "\"AutoTaxCollectLastDecisionUtc\": \"2026-06-02T01:02:03.0000000Z\"");
+            AssertContains(json, "\"AutoTaxCollectTargetNpcIndex\": 8");
+            AssertContains(json, "\"AutoTaxCollectTargetWhoAmI\": 77");
+            AssertContains(json, "\"AutoTaxCollectTargetName\": \"Tax Collector\"");
+            AssertContains(json, "\"AutoTaxCollectTaxMoney\": 12345");
+            AssertContains(json, "\"AutoTaxCollectLastRequestId\": \"request-123\"");
+        }
+
         private static void DiagnosticSnapshotWritesAutoCaptureCritterState()
         {
             var snapshot = new DiagnosticSnapshot
@@ -2016,6 +2118,21 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void GameStateReadOptionsKeepAutoTaxCollectLightweight()
+        {
+            var settings = AppSettings.CreateDefault();
+            settings.NpcAutoTaxCollectEnabled = true;
+
+            var options = JueMingZRuntime.BuildGameStateReadOptionsForTesting(settings, false);
+
+            if (options.InventoryProfile != InventoryReadProfile.None ||
+                options.NpcProfile != NpcReadProfile.None ||
+                options.TileProfile != TileReadProfile.None)
+            {
+                throw new InvalidOperationException("Auto tax collect must not upgrade GameState inventory, NPC, or tile profiles.");
+            }
+        }
+
         private static void GameStateReadOptionsMergeCaptureAndStackProfiles()
         {
             var settings = AppSettings.CreateDefault();
@@ -2086,6 +2203,7 @@ namespace JueMingZ.Tests
             settings.WorldAutomationAutoMiningMode = AutoMiningModes.Auto;
             settings.MiscAutoCaptureCritterEnabled = true;
             settings.WorldAutomationAutoCaptureCritterMode = AutoCaptureCritterModes.Auto;
+            settings.NpcAutoTaxCollectEnabled = true;
 
             var snapshot = RuntimeSettingsSnapshot.FromSettings(settings);
 
@@ -2114,6 +2232,11 @@ namespace JueMingZ.Tests
                 !snapshot.WorldAutomationAutoCaptureCritterEnabled)
             {
                 throw new InvalidOperationException("Runtime settings snapshot must expose normalized world automation enabled flags.");
+            }
+
+            if (!snapshot.NpcAutoTaxCollectEnabled || !snapshot.NpcAutomationAnyEnabled)
+            {
+                throw new InvalidOperationException("Runtime settings snapshot must expose auto tax collect as NPC automation.");
             }
         }
 
@@ -2497,6 +2620,7 @@ namespace JueMingZ.Tests
             AssertDefault(!settings.MiscAutoSellEnabled, "misc auto sell off");
             AssertDefault(!settings.MiscAutoDiscardEnabled, "misc auto discard off");
             AssertDefault(!settings.MiscQuickReforgeEnabled, "misc quick reforge off");
+            AssertDefault(!settings.MiscAutoTaxCollectEnabled, "misc auto tax collect off");
             AssertDefault(!settings.WorldAutomationAutoMiningEnabled, "misc auto mining off");
             AssertDefault(!settings.MiscAutoCaptureCritterEnabled, "misc auto capture critter off");
             AssertStringEquals(settings.WorldAutomationAutoCaptureCritterMode, AutoCaptureCritterModes.Off, "misc auto capture critter mode off");
@@ -2595,6 +2719,7 @@ namespace JueMingZ.Tests
             settings.InventoryQuickItemHotkeysEnabled = true;
             settings.InventoryAutoDepositCoinsEnabled = true;
             settings.NpcAutoReforgeEnabled = true;
+            settings.NpcAutoTaxCollectEnabled = true;
             settings.WorldAutomationAutoMiningMode = AutoMiningModes.Auto;
             settings.WorldAutomationAutoCaptureCritterEnabled = true;
             settings.WorldAutomationTravelMenuEnabled = true;
@@ -2607,6 +2732,7 @@ namespace JueMingZ.Tests
                 !settings.MiscQuickItemHotkeysEnabled ||
                 !settings.MiscAutoDepositCoinsEnabled ||
                 !settings.MiscQuickReforgeEnabled ||
+                !settings.MiscAutoTaxCollectEnabled ||
                 !settings.WorldAutomationAutoMiningEnabled ||
                 !string.Equals(settings.MiscAutoMiningMode, AutoMiningModes.Auto, StringComparison.Ordinal) ||
                 !settings.MiscAutoCaptureCritterEnabled ||

@@ -141,6 +141,7 @@ namespace JueMingZ.Bootstrap
             {
                 try
                 {
+                    UiInputFrameClock.BeginUpdateFrame("Main.Update.Prefix");
                     DiagnosticUiInteractionBridge.UpdatePrefixGuard();
                     LegacyUiInput.UpdatePrefixGuard();
                     CombatAutoClickerService.UpdatePrefixGuard();

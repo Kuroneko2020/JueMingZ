@@ -363,6 +363,12 @@ namespace JueMingZ.Input
                 return;
             }
 
+            if (command.ElementId.StartsWith("misc-auto-tax-collect-mode:", StringComparison.Ordinal))
+            {
+                HandleMiscAutoTaxCollectMode(command, command.ElementId.Substring("misc-auto-tax-collect-mode:".Length));
+                return;
+            }
+
             if (command.ElementId.StartsWith("misc-quick-bag-open-mode:", StringComparison.Ordinal))
             {
                 HandleMiscQuickBagOpenMode(command, command.ElementId.Substring("misc-quick-bag-open-mode:".Length));

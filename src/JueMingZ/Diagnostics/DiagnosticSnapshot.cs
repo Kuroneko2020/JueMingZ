@@ -265,6 +265,13 @@ namespace JueMingZ.Diagnostics
         public string QuickReforgeLastTargetPrefixes { get; set; }
         public string QuickReforgeLastMatchedPrefix { get; set; }
         public DateTime? QuickReforgeLastDecisionUtc { get; set; }
+        public string AutoTaxCollectLastDecision { get; set; }
+        public DateTime? AutoTaxCollectLastDecisionUtc { get; set; }
+        public int AutoTaxCollectTargetNpcIndex { get; set; }
+        public int AutoTaxCollectTargetWhoAmI { get; set; }
+        public string AutoTaxCollectTargetName { get; set; }
+        public int AutoTaxCollectTaxMoney { get; set; }
+        public string AutoTaxCollectLastRequestId { get; set; }
         public string AutoCaptureCritterLastDecision { get; set; }
         public DateTime? AutoCaptureCritterLastDecisionUtc { get; set; }
         public int AutoCaptureCritterBugNetSlot { get; set; }
@@ -784,6 +791,11 @@ namespace JueMingZ.Diagnostics
             QuickReforgeLastDecision = string.Empty;
             QuickReforgeLastTargetPrefixes = string.Empty;
             QuickReforgeLastMatchedPrefix = string.Empty;
+            AutoTaxCollectLastDecision = string.Empty;
+            AutoTaxCollectTargetNpcIndex = -1;
+            AutoTaxCollectTargetWhoAmI = -1;
+            AutoTaxCollectTargetName = string.Empty;
+            AutoTaxCollectLastRequestId = string.Empty;
             AutoCaptureCritterLastDecision = string.Empty;
             AutoCaptureCritterBugNetSlot = -1;
             AutoCaptureCritterTargetNpcIndex = -1;

@@ -219,6 +219,7 @@ namespace JueMingZ.Input
                    "\"miscQuickReforgeEnabled\":" + BoolRaw(settings.NpcAutoReforgeEnabled) + "," +
                    "\"miscQuickReforgePrefixCount\":" + IntRaw(CountValidQuickReforgePrefixes(settings.NpcAutoReforgePrefixes)) + "," +
                    "\"miscQuickReforgeInputActive\":" + BoolRaw(LegacyTextInput.IsFocused("misc-quick-reforge:prefix")) + "," +
+                   "\"miscAutoTaxCollectEnabled\":" + BoolRaw(settings.NpcAutoTaxCollectEnabled) + "," +
                    "\"miscDeveloperEasterEggPending\":" + BoolRaw(LegacyMainWindow.IsDeveloperEasterEggConfirmPending()) +
                    "}";
         }

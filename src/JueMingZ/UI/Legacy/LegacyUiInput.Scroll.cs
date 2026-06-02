@@ -11,6 +11,7 @@ namespace JueMingZ.UI.Legacy
     {
         public static void UpdatePrefixGuard()
         {
+            UiInputFrameClock.BeginUpdateFrame("LegacyMainUi.UpdatePrefix");
             try
             {
                 ResetWheelFrameState();
@@ -62,6 +63,7 @@ namespace JueMingZ.UI.Legacy
 
         public static void UpdateAfterPlayerInputGuard(string source)
         {
+            UiInputFrameClock.BeginInputFrame(string.IsNullOrWhiteSpace(source) ? "LegacyMainUi.PlayerInputScroll" : source);
             try
             {
                 if (!LegacyMainUiState.Visible)
@@ -119,6 +121,7 @@ namespace JueMingZ.UI.Legacy
 
         public static bool ShouldSuppressHotbarScrollFromHook()
         {
+            UiInputFrameClock.BeginInputFrame("LegacyMainUi.ScrollHotbarHook");
             try
             {
                 if (!LegacyMainUiState.Visible)

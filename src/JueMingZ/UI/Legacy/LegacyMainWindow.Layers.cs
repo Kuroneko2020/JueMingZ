@@ -22,6 +22,7 @@ namespace JueMingZ.UI.Legacy
     {
         public static bool DrawInterfaceLayer()
         {
+            UiInputFrameClock.BeginDrawFrame("LegacyMainWindow.Draw");
             var elementFrameStarted = false;
             try
             {
@@ -196,6 +197,7 @@ namespace JueMingZ.UI.Legacy
 
         public static bool DrawInputGuardLayer()
         {
+            UiInputFrameClock.BeginDrawFrame("LegacyMainWindow.InputGuard");
             try
             {
                 if (!LegacyMainUiState.Visible)
@@ -222,6 +224,7 @@ namespace JueMingZ.UI.Legacy
 
         public static bool DrawMouseTextGuardLayer()
         {
+            UiInputFrameClock.BeginDrawFrame("LegacyMainWindow.MouseTextGuard");
             try
             {
                 if (!LegacyMainUiState.Visible)

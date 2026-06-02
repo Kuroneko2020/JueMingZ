@@ -24,6 +24,7 @@ namespace JueMingZ.Common
         public const string InventoryAutoExtractinator = "Inventory.AutoExtractinator";
         public const string InventoryKeepFavorited = "Inventory.KeepFavorited";
         public const string NpcQuickReforge = "Npc.QuickReforge";
+        public const string NpcAutoTaxCollect = "Npc.AutoTaxCollect";
         public const string WorldAutomationAutoMining = "WorldAutomation.AutoMining";
         public const string WorldAutomationAutoCaptureCritter = "WorldAutomation.AutoCaptureCritter";
         public const string WorldAutomationAutoCaptureCritterRecast = "WorldAutomation.AutoCaptureCritter.Recast";

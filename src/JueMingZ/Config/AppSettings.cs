@@ -283,6 +283,9 @@ namespace JueMingZ.Config
         [DataMember(Order = 160)]
         public List<string> MiscQuickReforgePrefixes { get; set; } = new List<string>();
 
+        [DataMember(Order = 172)]
+        public bool MiscAutoTaxCollectEnabled { get; set; }
+
         [DataMember(Order = 162)]
         public string MiscAutoMiningMode { get; set; } = "Off";
 
@@ -384,6 +387,13 @@ namespace JueMingZ.Config
         {
             get { return MiscQuickReforgePrefixes; }
             set { MiscQuickReforgePrefixes = value; }
+        }
+
+        [IgnoreDataMember]
+        public bool NpcAutoTaxCollectEnabled
+        {
+            get { return MiscAutoTaxCollectEnabled; }
+            set { MiscAutoTaxCollectEnabled = value; }
         }
 
         [IgnoreDataMember]
@@ -753,6 +763,7 @@ namespace JueMingZ.Config
                 MiscAutoDiscardItemIds = new List<int>(),
                 MiscQuickReforgeEnabled = false,
                 MiscQuickReforgePrefixes = new List<string>(),
+                MiscAutoTaxCollectEnabled = false,
                 MiscAutoMiningMode = "Off",
                 MiscAutoCaptureCritterEnabled = false,
                 MiscAutoCaptureCritterMode = AutoCaptureCritterModes.Off,

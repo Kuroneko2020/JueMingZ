@@ -90,7 +90,9 @@ namespace JueMingZ.Runtime
                                                 settings.InventoryAutoExtractinatorEnabled ||
                                                 settings.InventoryKeepFavoritedEnabled,
                 NpcAutoReforgeEnabled = settings.NpcAutoReforgeEnabled,
-                NpcAutomationAnyEnabled = settings.NpcAutoReforgeEnabled,
+                NpcAutoTaxCollectEnabled = settings.NpcAutoTaxCollectEnabled,
+                NpcAutomationAnyEnabled = settings.NpcAutoReforgeEnabled ||
+                                          settings.NpcAutoTaxCollectEnabled,
                 WorldAutomationTravelMenuEnabled = settings.WorldAutomationTravelMenuEnabled,
                 WorldAutomationAutoMiningMode = autoMiningMode,
                 WorldAutomationAutoMiningEnabled = AutoMiningModes.IsEnabled(autoMiningMode),
@@ -183,6 +185,7 @@ namespace JueMingZ.Runtime
         public bool InventoryKeepFavoritedEnabled { get; private set; }
         public bool InventoryAutomationAnyEnabled { get; private set; }
         public bool NpcAutoReforgeEnabled { get; private set; }
+        public bool NpcAutoTaxCollectEnabled { get; private set; }
         public bool NpcAutomationAnyEnabled { get; private set; }
         public bool WorldAutomationTravelMenuEnabled { get; private set; }
         public string WorldAutomationAutoMiningMode { get; private set; }

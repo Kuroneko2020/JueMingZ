@@ -95,5 +95,79 @@ namespace JueMingZ.Tests
                 throw new InvalidOperationException("Expected UI text renderer cache generation to dirty F5 page layout.");
             }
         }
+
+        private static void LegacyUiHoverLayoutTokenIgnoresWindowAndContentPosition()
+        {
+            LegacyMainWindow.ResetPageLayoutCacheForTesting();
+            var settings = AppSettings.CreateDefault();
+            var window = new LegacyUiRect(40, 50, LegacyUiMetrics.DefaultWidth, LegacyUiMetrics.DefaultHeight);
+            var content = new LegacyUiRect(58, 134, 520, 180);
+            var area = LegacyScrollArea.Create(content, 700, 24);
+            var first = LegacyMainWindow.BuildFrameHoverLayoutTokenForTesting("information", window, content, area, settings);
+
+            var movedWindow = new LegacyUiRect(240, 170, window.Width, window.Height);
+            var movedContent = new LegacyUiRect(258, 254, content.Width, content.Height);
+            var movedArea = LegacyScrollArea.Create(movedContent, 700, 24);
+            var moved = LegacyMainWindow.BuildFrameHoverLayoutTokenForTesting("information", movedWindow, movedContent, movedArea, settings);
+
+            if (moved != first)
+            {
+                throw new InvalidOperationException("Expected hover layout token to ignore window/content origin-only movement.");
+            }
+        }
+
+        private static void LegacyUiHoverLayoutTokenDirtiesOnPageSizeScrollSettingsAndFont()
+        {
+            LegacyMainWindow.ResetPageLayoutCacheForTesting();
+            var settings = AppSettings.CreateDefault();
+            var window = new LegacyUiRect(40, 50, LegacyUiMetrics.DefaultWidth, LegacyUiMetrics.DefaultHeight);
+            var content = new LegacyUiRect(58, 134, 520, 180);
+            var area = LegacyScrollArea.Create(content, 700, 24);
+            var first = LegacyMainWindow.BuildFrameHoverLayoutTokenForTesting("information", window, content, area, settings);
+
+            var pageChanged = LegacyMainWindow.BuildFrameHoverLayoutTokenForTesting("movement", window, content, area, settings);
+            if (pageChanged == first)
+            {
+                throw new InvalidOperationException("Expected page changes to dirty the hover layout token.");
+            }
+
+            var resizedContent = new LegacyUiRect(content.X, content.Y, content.Width + 16, content.Height);
+            var resizedArea = LegacyScrollArea.Create(resizedContent, 700, 24);
+            var resized = LegacyMainWindow.BuildFrameHoverLayoutTokenForTesting("information", window, resizedContent, resizedArea, settings);
+            if (resized == first)
+            {
+                throw new InvalidOperationException("Expected content size changes to dirty the hover layout token.");
+            }
+
+            var scrolledArea = LegacyScrollArea.Create(content, 700, 80);
+            var scrolled = LegacyMainWindow.BuildFrameHoverLayoutTokenForTesting("information", window, content, scrolledArea, settings);
+            if (scrolled == first)
+            {
+                throw new InvalidOperationException("Expected scroll changes to dirty the hover layout token.");
+            }
+
+            var configChanged = AppSettings.CreateDefault();
+            configChanged.ConfigVersion = settings.ConfigVersion + 1;
+            var configToken = LegacyMainWindow.BuildFrameHoverLayoutTokenForTesting("information", window, content, area, configChanged);
+            if (configToken == first)
+            {
+                throw new InvalidOperationException("Expected config version changes to dirty the hover layout token.");
+            }
+
+            var stateChanged = AppSettings.CreateDefault();
+            stateChanged.InformationEnemyNameLabelsEnabled = !settings.InformationEnemyNameLabelsEnabled;
+            var stateToken = LegacyMainWindow.BuildFrameHoverLayoutTokenForTesting("information", window, content, area, stateChanged);
+            if (stateToken == first)
+            {
+                throw new InvalidOperationException("Expected page state changes to dirty the hover layout token.");
+            }
+
+            UiTextRenderer.InvalidateCachedResources("legacy UI hover token test");
+            var fontToken = LegacyMainWindow.BuildFrameHoverLayoutTokenForTesting("information", window, content, area, settings);
+            if (fontToken == first)
+            {
+                throw new InvalidOperationException("Expected UI font cache generation changes to dirty the hover layout token.");
+            }
+        }
     }
 }

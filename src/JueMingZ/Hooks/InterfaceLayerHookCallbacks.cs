@@ -128,6 +128,7 @@ namespace JueMingZ.Hooks
 
         public static bool DrawGameOverlayDispatcherLayer()
         {
+            UiInputFrameClock.BeginDrawFrame("GameOverlayDispatcher");
             var keepDrawing = true;
             keepDrawing &= InformationWorldOverlay.DrawInterfaceLayer();
             keepDrawing &= FishingStatusPromptOverlay.DrawInterfaceLayer();
@@ -139,6 +140,7 @@ namespace JueMingZ.Hooks
 
         public static bool DrawUiOverlayDispatcherLayer()
         {
+            UiInputFrameClock.BeginDrawFrame("UiOverlayDispatcher");
             var keepDrawing = true;
             keepDrawing &= InformationStatusPanelOverlay.DrawInterfaceLayer();
             keepDrawing &= LegacyMainWindow.DrawInterfaceLayer();

@@ -11,10 +11,10 @@ namespace JueMingZ.UI
     {
         private const int VkLeftButton = 0x01;
         private static readonly object ReadCacheSyncRoot = new object();
-        private static readonly TimeSpan ReadCacheWindow = TimeSpan.FromMilliseconds(8);
         private static bool _mainResolved;
-        private static DateTime _cachedReadUtc = DateTime.MinValue;
         private static DiagnosticMouseState _cachedReadState;
+        private static UiInputFrameKey _cachedFrameKey;
+        private static bool _cachedFrameKeyValid;
         private static FieldInfo _mouseXField;
         private static FieldInfo _mouseYField;
         private static FieldInfo _mouseLeftField;
@@ -34,10 +34,13 @@ namespace JueMingZ.UI
 
         public static DiagnosticMouseState Read()
         {
-            var nowUtc = DateTime.UtcNow;
+            var frameKey = UiInputFrameClock.CurrentFrameKey;
             lock (ReadCacheSyncRoot)
             {
-                if (_cachedReadState != null && nowUtc - _cachedReadUtc <= ReadCacheWindow)
+                if (frameKey.IsValid &&
+                    _cachedFrameKeyValid &&
+                    _cachedReadState != null &&
+                    _cachedFrameKey.Equals(frameKey))
                 {
                     return _cachedReadState;
                 }
@@ -82,14 +85,50 @@ namespace JueMingZ.UI
                 state.LastError = "Mouse read unavailable: Terraria mouse fields and OS client mouse were not available.";
             }
 
-            var cachedUtc = DateTime.UtcNow;
             lock (ReadCacheSyncRoot)
             {
-                _cachedReadState = state;
-                _cachedReadUtc = cachedUtc;
+                if (frameKey.IsValid)
+                {
+                    _cachedReadState = state;
+                    _cachedFrameKey = frameKey;
+                    _cachedFrameKeyValid = true;
+                }
+                else
+                {
+                    _cachedReadState = null;
+                    _cachedFrameKey = UiInputFrameKey.None;
+                    _cachedFrameKeyValid = false;
+                }
             }
 
             return state;
+        }
+
+        internal static void ResetForTesting()
+        {
+            lock (ReadCacheSyncRoot)
+            {
+                _cachedReadState = null;
+                _cachedFrameKey = UiInputFrameKey.None;
+                _cachedFrameKeyValid = false;
+                _mainResolved = false;
+                _mouseXField = null;
+                _mouseYField = null;
+                _mouseLeftField = null;
+                _mouseLeftReleaseField = null;
+                _mouseScrollWheelField = null;
+                _oldMouseScrollWheelField = null;
+                _uiScaleField = null;
+                _uiScaleMatrixField = null;
+                _mouseXProperty = null;
+                _mouseYProperty = null;
+                _mouseLeftProperty = null;
+                _mouseLeftReleaseProperty = null;
+                _mouseScrollWheelProperty = null;
+                _oldMouseScrollWheelProperty = null;
+                _uiScaleProperty = null;
+                _uiScaleMatrixProperty = null;
+            }
         }
 
         private static void ReadTerrariaMouse(DiagnosticMouseState state)

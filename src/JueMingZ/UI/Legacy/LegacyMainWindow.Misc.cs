@@ -33,6 +33,8 @@ namespace JueMingZ.UI.Legacy
             int quickReforgePanelHeight;
             hovered = DrawQuickReforgeListPanel(spriteBatch, area, mouse, elements, y + LegacyUiMetrics.RowHeight, out quickReforgePanelHeight) ?? hovered;
             y += MiscExpandableRowHeight(quickReforgePanelHeight);
+            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "自动收税", settings.NpcAutoTaxCollectEnabled, "misc-auto-tax-collect-mode:", "靠近税收官自动收钱") ?? hovered;
+            y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawAutoMiningRow(spriteBatch, area, mouse, elements, y, settings) ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawRightModeRow(

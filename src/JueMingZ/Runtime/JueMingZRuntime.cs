@@ -48,7 +48,7 @@ namespace JueMingZ.Runtime
         private static readonly Dictionary<string, long> ServiceSchedulerLastRunTick =
             new Dictionary<string, long>(StringComparer.Ordinal);
 
-        public const string Version = "1.7.409-goblin-execution";
+        public const string Version = "1.7.411-f5-ui-frame-input";
 
         public static RuntimeState State { get; private set; } = new RuntimeState();
         public static FeatureRegistry FeatureRegistry { get; private set; }
@@ -374,6 +374,14 @@ namespace JueMingZ.Runtime
             {
                 QuickReforgeService.Tick(ActionQueue, gameState, State, settings);
                 RecordOperationTiming(context, "dispatch.quick-reforge", operationStart);
+                operationStart = Stopwatch.GetTimestamp();
+            }
+
+            operationStart = Stopwatch.GetTimestamp();
+            if (ShouldRunService("auto-tax-collect", settings.NpcAutoTaxCollectEnabled, 30, tick))
+            {
+                AutoTaxCollectorService.Tick(ActionQueue, gameState, State, settings);
+                RecordOperationTiming(context, "dispatch.auto-tax-collect", operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
@@ -885,6 +893,7 @@ namespace JueMingZ.Runtime
             var autoDepositCoins = AutoDepositCoinsService.GetDiagnostics();
             var autoExtractinator = AutoExtractinatorService.GetDiagnostics();
             var keepFavorited = KeepFavoritedService.GetDiagnostics();
+            var autoTaxCollect = AutoTaxCollectorService.GetDiagnostics();
             var autoFacing = CombatAutoFacingService.GetDiagnostics();
             var autoClicker = CombatAutoClickerService.GetDiagnostics();
             var perfectRevolver = CombatPerfectRevolverService.GetDiagnostics();
@@ -1167,6 +1176,13 @@ namespace JueMingZ.Runtime
                 QuickReforgeLastTargetPrefixes = quickReforge == null ? string.Empty : quickReforge.LastTargetPrefixes,
                 QuickReforgeLastMatchedPrefix = quickReforge == null ? string.Empty : quickReforge.LastMatchedPrefix,
                 QuickReforgeLastDecisionUtc = quickReforge == null ? null : quickReforge.LastDecisionUtc,
+                AutoTaxCollectLastDecision = autoTaxCollect == null ? string.Empty : autoTaxCollect.LastDecision,
+                AutoTaxCollectLastDecisionUtc = autoTaxCollect == null ? null : autoTaxCollect.LastDecisionUtc,
+                AutoTaxCollectTargetNpcIndex = autoTaxCollect == null ? -1 : autoTaxCollect.LastTargetNpcIndex,
+                AutoTaxCollectTargetWhoAmI = autoTaxCollect == null ? -1 : autoTaxCollect.LastTargetWhoAmI,
+                AutoTaxCollectTargetName = autoTaxCollect == null ? string.Empty : autoTaxCollect.LastTargetName,
+                AutoTaxCollectTaxMoney = autoTaxCollect == null ? 0 : autoTaxCollect.LastTaxMoney,
+                AutoTaxCollectLastRequestId = autoTaxCollect == null ? string.Empty : autoTaxCollect.LastRequestId,
                 AutoCaptureCritterLastDecision = autoCaptureCritter == null ? string.Empty : autoCaptureCritter.LastDecision,
                 AutoCaptureCritterLastDecisionUtc = autoCaptureCritter == null ? null : autoCaptureCritter.LastDecisionUtc,
                 AutoCaptureCritterBugNetSlot = autoCaptureCritter == null ? -1 : autoCaptureCritter.BugNetSlot,

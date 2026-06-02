@@ -5,12 +5,13 @@ namespace JueMingZ.UI
     public static class UiMouseCaptureService
     {
         private static readonly object SyncRoot = new object();
-        private static readonly System.TimeSpan CaptureThrottleWindow = System.TimeSpan.FromMilliseconds(8);
-        private static readonly System.TimeSpan SuppressThrottleWindow = System.TimeSpan.FromMilliseconds(8);
-        private static System.DateTime _lastCaptureUtc = System.DateTime.MinValue;
-        private static System.DateTime _lastSuppressUtc = System.DateTime.MinValue;
+        private static UiInputFrameKey _lastCaptureFrameKey;
+        private static UiInputFrameKey _lastSuppressFrameKey;
+        private static bool _lastCaptureFrameKeyValid;
+        private static bool _lastSuppressFrameKeyValid;
         private static bool _captureActive;
         private static bool _lastCaptureSucceeded;
+        private static bool _lastSuppressSucceeded;
 
         public static bool CaptureForOperationWindow()
         {
@@ -20,25 +21,30 @@ namespace JueMingZ.UI
                 return false;
             }
 
-            var now = System.DateTime.UtcNow;
+            var frameKey = UiInputFrameClock.CurrentFrameKey;
             lock (SyncRoot)
             {
                 if (_captureActive &&
                     _lastCaptureSucceeded &&
-                    now - _lastCaptureUtc <= CaptureThrottleWindow)
+                    frameKey.IsValid &&
+                    _lastCaptureFrameKeyValid &&
+                    _lastCaptureFrameKey.Equals(frameKey))
                 {
                     return true;
                 }
             }
 
             var captured = TerrariaUiMouseCompat.TryMarkUiMouseCapture();
-            TerrariaUiMouseCompat.TrySuppressMouseText();
+            var suppressed = TerrariaUiMouseCompat.TrySuppressMouseText();
             lock (SyncRoot)
             {
-                _lastCaptureUtc = now;
-                _lastSuppressUtc = now;
+                _lastCaptureFrameKey = frameKey;
+                _lastSuppressFrameKey = frameKey;
+                _lastCaptureFrameKeyValid = frameKey.IsValid;
+                _lastSuppressFrameKeyValid = frameKey.IsValid;
                 _captureActive = captured;
                 _lastCaptureSucceeded = captured;
+                _lastSuppressSucceeded = suppressed;
             }
             return captured;
         }
@@ -50,11 +56,14 @@ namespace JueMingZ.UI
                 return false;
             }
 
-            var now = System.DateTime.UtcNow;
+            var frameKey = UiInputFrameClock.CurrentFrameKey;
             lock (SyncRoot)
             {
                 if (_captureActive &&
-                    now - _lastSuppressUtc <= SuppressThrottleWindow)
+                    _lastSuppressSucceeded &&
+                    frameKey.IsValid &&
+                    _lastSuppressFrameKeyValid &&
+                    _lastSuppressFrameKey.Equals(frameKey))
                 {
                     return true;
                 }
@@ -63,7 +72,9 @@ namespace JueMingZ.UI
             var suppressed = TerrariaUiMouseCompat.TrySuppressMouseText();
             lock (SyncRoot)
             {
-                _lastSuppressUtc = now;
+                _lastSuppressFrameKey = frameKey;
+                _lastSuppressFrameKeyValid = frameKey.IsValid;
+                _lastSuppressSucceeded = suppressed;
             }
             return suppressed;
         }
@@ -75,8 +86,11 @@ namespace JueMingZ.UI
             {
                 _captureActive = false;
                 _lastCaptureSucceeded = false;
-                _lastCaptureUtc = System.DateTime.MinValue;
-                _lastSuppressUtc = System.DateTime.MinValue;
+                _lastSuppressSucceeded = false;
+                _lastCaptureFrameKey = UiInputFrameKey.None;
+                _lastSuppressFrameKey = UiInputFrameKey.None;
+                _lastCaptureFrameKeyValid = false;
+                _lastSuppressFrameKeyValid = false;
             }
             return released;
         }
@@ -87,8 +101,11 @@ namespace JueMingZ.UI
             {
                 _captureActive = false;
                 _lastCaptureSucceeded = false;
-                _lastCaptureUtc = System.DateTime.MinValue;
-                _lastSuppressUtc = System.DateTime.MinValue;
+                _lastSuppressSucceeded = false;
+                _lastCaptureFrameKey = UiInputFrameKey.None;
+                _lastSuppressFrameKey = UiInputFrameKey.None;
+                _lastCaptureFrameKeyValid = false;
+                _lastSuppressFrameKeyValid = false;
             }
         }
     }

@@ -100,6 +100,7 @@ namespace JueMingZ.Runtime
             private bool _inventoryKeepFavoritedEnabled;
             private bool _npcAutoReforgeEnabled;
             private int _npcAutoReforgePrefixesHash;
+            private bool _npcAutoTaxCollectEnabled;
             private bool _worldAutomationTravelMenuEnabled;
             private string _worldAutomationAutoMiningMode;
             private bool _worldAutomationAutoCaptureCritterEnabled;
@@ -206,6 +207,7 @@ namespace JueMingZ.Runtime
                     _inventoryKeepFavoritedEnabled = settings.InventoryKeepFavoritedEnabled,
                     _npcAutoReforgeEnabled = settings.NpcAutoReforgeEnabled,
                     _npcAutoReforgePrefixesHash = settings.NpcAutoReforgeEnabled ? HashStrings(settings.NpcAutoReforgePrefixes) : 0,
+                    _npcAutoTaxCollectEnabled = settings.NpcAutoTaxCollectEnabled,
                     _worldAutomationTravelMenuEnabled = settings.WorldAutomationTravelMenuEnabled,
                     _worldAutomationAutoMiningMode = settings.WorldAutomationAutoMiningMode,
                     _worldAutomationAutoCaptureCritterEnabled = settings.MiscAutoCaptureCritterEnabled,
@@ -307,6 +309,7 @@ namespace JueMingZ.Runtime
                        _inventoryKeepFavoritedEnabled == other._inventoryKeepFavoritedEnabled &&
                        _npcAutoReforgeEnabled == other._npcAutoReforgeEnabled &&
                        _npcAutoReforgePrefixesHash == other._npcAutoReforgePrefixesHash &&
+                       _npcAutoTaxCollectEnabled == other._npcAutoTaxCollectEnabled &&
                        _worldAutomationTravelMenuEnabled == other._worldAutomationTravelMenuEnabled &&
                        Same(_worldAutomationAutoMiningMode, other._worldAutomationAutoMiningMode) &&
                        _worldAutomationAutoCaptureCritterEnabled == other._worldAutomationAutoCaptureCritterEnabled &&

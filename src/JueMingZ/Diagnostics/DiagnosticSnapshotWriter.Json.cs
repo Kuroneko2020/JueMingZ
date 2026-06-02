@@ -278,6 +278,13 @@ namespace JueMingZ.Diagnostics
             Append(builder, "QuickReforgeLastTargetPrefixes", snapshot.QuickReforgeLastTargetPrefixes, true);
             Append(builder, "QuickReforgeLastMatchedPrefix", snapshot.QuickReforgeLastMatchedPrefix, true);
             Append(builder, "QuickReforgeLastDecisionUtc", FormatDate(snapshot.QuickReforgeLastDecisionUtc), true);
+            Append(builder, "AutoTaxCollectLastDecision", snapshot.AutoTaxCollectLastDecision, true);
+            Append(builder, "AutoTaxCollectLastDecisionUtc", FormatDate(snapshot.AutoTaxCollectLastDecisionUtc), true);
+            Append(builder, "AutoTaxCollectTargetNpcIndex", snapshot.AutoTaxCollectTargetNpcIndex, true);
+            Append(builder, "AutoTaxCollectTargetWhoAmI", snapshot.AutoTaxCollectTargetWhoAmI, true);
+            Append(builder, "AutoTaxCollectTargetName", snapshot.AutoTaxCollectTargetName, true);
+            Append(builder, "AutoTaxCollectTaxMoney", snapshot.AutoTaxCollectTaxMoney, true);
+            Append(builder, "AutoTaxCollectLastRequestId", snapshot.AutoTaxCollectLastRequestId, true);
             Append(builder, "AutoCaptureCritterLastDecision", snapshot.AutoCaptureCritterLastDecision, true);
             Append(builder, "AutoCaptureCritterLastDecisionUtc", FormatDate(snapshot.AutoCaptureCritterLastDecisionUtc), true);
             Append(builder, "AutoCaptureCritterBugNetSlot", snapshot.AutoCaptureCritterBugNetSlot, true);

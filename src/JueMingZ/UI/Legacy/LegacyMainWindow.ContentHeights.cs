@@ -76,7 +76,7 @@ namespace JueMingZ.UI.Legacy
                    MiscExpandableRowHeight(autoSellPanelHeight) +
                    MiscExpandableRowHeight(autoDiscardPanelHeight) +
                    MiscExpandableRowHeight(quickReforgePanelHeight) +
-                   (LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap) * 9 +
+                   (LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap) * 10 +
                    LegacyUiMetrics.RowHeight +
                    24;
         }

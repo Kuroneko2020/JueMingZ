@@ -165,6 +165,7 @@ namespace JueMingZ.Config
             SetFeatureEnabledLocked(FeatureIds.InventoryAutoExtractinator, settings.InventoryAutoExtractinatorEnabled);
             SetFeatureEnabledLocked(FeatureIds.InventoryKeepFavorited, settings.InventoryKeepFavoritedEnabled);
             SetFeatureEnabledLocked(FeatureIds.NpcAutoReforge, settings.NpcAutoReforgeEnabled);
+            SetFeatureEnabledLocked(FeatureIds.NpcAutoTaxCollect, settings.NpcAutoTaxCollectEnabled);
             SetFeatureEnabledLocked(FeatureIds.WorldAutomationAutoMining, settings.WorldAutomationAutoMiningEnabled);
             SetFeatureEnabledLocked(FeatureIds.WorldAutomationAutoCaptureCritter, settings.WorldAutomationAutoCaptureCritterEnabled);
             SetFeatureEnabledLocked(FeatureIds.WorldAutomationAutoHarvest, settings.WorldAutomationAutoHarvestEnabled);
@@ -233,6 +234,7 @@ namespace JueMingZ.Config
             if (settings.InventoryAutoExtractinatorEnabled) count++;
             if (settings.InventoryKeepFavoritedEnabled) count++;
             if (settings.NpcAutoReforgeEnabled) count++;
+            if (settings.NpcAutoTaxCollectEnabled) count++;
             if (settings.WorldAutomationAutoMiningEnabled) count++;
             if (settings.WorldAutomationAutoCaptureCritterEnabled) count++;
             if (settings.WorldAutomationAutoHarvestEnabled) count++;

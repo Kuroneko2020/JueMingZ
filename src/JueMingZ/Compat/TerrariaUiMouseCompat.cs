@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -38,6 +39,27 @@ namespace JueMingZ.Compat
         private static bool _lastPlayerInputCleared;
         private static bool _lastMainScrollSuppressed;
         private static bool _lastScrollHotbarHookSuppressed;
+        private static readonly object UiMouseAccessorSyncRoot = new object();
+        private static readonly Dictionary<Type, object> EmptyHoverItemsByType = new Dictionary<Type, object>();
+        private static Type _uiMouseAccessorMainType;
+        private static Type _uiMouseAccessorMainInstanceType;
+        private static Type _localPlayerMouseInterfaceType;
+        private static BooleanMemberAccessor _localPlayerMouseInterfaceAccessor = BooleanMemberAccessor.Empty;
+        private static BooleanMemberAccessor _mainMouseInterfaceAccessor = BooleanMemberAccessor.Empty;
+        private static BooleanMemberAccessor _mainBlockMouseAccessor = BooleanMemberAccessor.Empty;
+        private static BooleanMemberAccessor _mainMouseLeftAccessor = BooleanMemberAccessor.Empty;
+        private static BooleanMemberAccessor _mainMouseRightAccessor = BooleanMemberAccessor.Empty;
+        private static BooleanMemberAccessor _mainMouseLeftReleaseAccessor = BooleanMemberAccessor.Empty;
+        private static BooleanMemberAccessor _mainMouseRightReleaseAccessor = BooleanMemberAccessor.Empty;
+        private static BooleanMemberAccessor _mainMouseTextAccessor = BooleanMemberAccessor.Empty;
+        private static StringMemberAccessor _mainHoverItemNameAccessor = StringMemberAccessor.Empty;
+        private static StringMemberAccessor _mainHoverItemName2Accessor = StringMemberAccessor.Empty;
+        private static ObjectMemberAccessor _mainHoverItemAccessor = ObjectMemberAccessor.Empty;
+        private static ObjectMemberAccessor _mainHoverItemLowerAccessor = ObjectMemberAccessor.Empty;
+        private static ObjectMemberAccessor _mainInstanceAccessor = ObjectMemberAccessor.Empty;
+        private static ObjectMemberAccessor _mainInstanceCapsAccessor = ObjectMemberAccessor.Empty;
+        private static ObjectMemberAccessor _mainInstanceHoverItemAccessor = ObjectMemberAccessor.Empty;
+        private static ObjectMemberAccessor _mainInstanceHoverItemLowerAccessor = ObjectMemberAccessor.Empty;
 
         public static bool UiMouseReadAvailable { get; private set; }
         public static string UiMouseReadLastMessage { get { return _mouseReadLastMessage; } }
@@ -96,18 +118,19 @@ namespace JueMingZ.Compat
                 var captured = false;
                 if (TerrariaInputCompat.TryGetLocalPlayer(out player))
                 {
-                    captured |= TrySetMember(player, "mouseInterface", true);
+                    captured |= TrySetLocalPlayerMouseInterface(player, true);
                 }
 
                 var mainType = TerrariaRuntimeTypes.MainType;
                 if (mainType != null)
                 {
-                    captured |= TrySetStatic(mainType, "mouseInterface", true);
-                    captured |= TrySetStatic(mainType, "blockMouse", true);
-                    TrySetStatic(mainType, "mouseLeft", false);
-                    TrySetStatic(mainType, "mouseRight", false);
-                    TrySetStatic(mainType, "mouseLeftRelease", false);
-                    TrySetStatic(mainType, "mouseRightRelease", false);
+                    EnsureUiMouseAccessors(mainType);
+                    captured |= _mainMouseInterfaceAccessor.TrySet(null, true);
+                    captured |= _mainBlockMouseAccessor.TrySet(null, true);
+                    _mainMouseLeftAccessor.TrySet(null, false);
+                    _mainMouseRightAccessor.TrySet(null, false);
+                    _mainMouseLeftReleaseAccessor.TrySet(null, false);
+                    _mainMouseRightReleaseAccessor.TrySet(null, false);
                 }
 
                 TrySuppressMouseText();
@@ -148,14 +171,15 @@ namespace JueMingZ.Compat
                 var released = false;
                 if (TerrariaInputCompat.TryGetLocalPlayer(out player))
                 {
-                    released |= TrySetMember(player, "mouseInterface", false);
+                    released |= TrySetLocalPlayerMouseInterface(player, false);
                 }
 
                 var mainType = TerrariaRuntimeTypes.MainType;
                 if (mainType != null)
                 {
-                    released |= TrySetStatic(mainType, "mouseInterface", false);
-                    released |= TrySetStatic(mainType, "blockMouse", false);
+                    EnsureUiMouseAccessors(mainType);
+                    released |= _mainMouseInterfaceAccessor.TrySet(null, false);
+                    released |= _mainBlockMouseAccessor.TrySet(null, false);
                 }
 
                 UiMouseCaptureAvailable = false;
@@ -187,18 +211,19 @@ namespace JueMingZ.Compat
                     return false;
                 }
 
+                EnsureUiMouseAccessors(mainType);
                 var suppressed = false;
-                suppressed |= TrySetStaticStringIfExists(mainType, "hoverItemName", string.Empty);
-                suppressed |= TrySetStaticStringIfExists(mainType, "hoverItemName2", string.Empty);
-                suppressed |= TrySetStaticBoolIfExists(mainType, "mouseText", false);
-                suppressed |= TryClearHoverItem(mainType, "HoverItem");
-                suppressed |= TryClearHoverItem(mainType, "hoverItem");
+                suppressed |= _mainHoverItemNameAccessor.TrySet(null, string.Empty);
+                suppressed |= _mainHoverItemName2Accessor.TrySet(null, string.Empty);
+                suppressed |= _mainMouseTextAccessor.TrySet(null, false);
+                suppressed |= _mainHoverItemAccessor.TrySet(null, GetEmptyHoverItem(_mainHoverItemAccessor.MemberType));
+                suppressed |= _mainHoverItemLowerAccessor.TrySet(null, GetEmptyHoverItem(_mainHoverItemLowerAccessor.MemberType));
                 object mainInstance;
-                if (TryGetStaticMember(mainType, "instance", out mainInstance) ||
-                    TryGetStaticMember(mainType, "Instance", out mainInstance))
+                if (TryGetMainInstance(out mainInstance))
                 {
-                    suppressed |= TryClearHoverItem(mainInstance, "HoverItem");
-                    suppressed |= TryClearHoverItem(mainInstance, "hoverItem");
+                    EnsureUiMouseMainInstanceAccessors(mainInstance.GetType());
+                    suppressed |= _mainInstanceHoverItemAccessor.TrySet(mainInstance, GetEmptyHoverItem(_mainInstanceHoverItemAccessor.MemberType));
+                    suppressed |= _mainInstanceHoverItemLowerAccessor.TrySet(mainInstance, GetEmptyHoverItem(_mainInstanceHoverItemLowerAccessor.MemberType));
                 }
 
                 return suppressed;
@@ -391,6 +416,171 @@ namespace JueMingZ.Compat
         public static void MarkScrollHotbarHookSuppressed()
         {
             _lastScrollHotbarHookSuppressed = true;
+        }
+
+        internal static void ResetUiMouseCaptureAccessorsForTesting()
+        {
+            lock (UiMouseAccessorSyncRoot)
+            {
+                _uiMouseAccessorMainType = null;
+                _uiMouseAccessorMainInstanceType = null;
+                _localPlayerMouseInterfaceType = null;
+                _localPlayerMouseInterfaceAccessor = BooleanMemberAccessor.Empty;
+                _mainMouseInterfaceAccessor = BooleanMemberAccessor.Empty;
+                _mainBlockMouseAccessor = BooleanMemberAccessor.Empty;
+                _mainMouseLeftAccessor = BooleanMemberAccessor.Empty;
+                _mainMouseRightAccessor = BooleanMemberAccessor.Empty;
+                _mainMouseLeftReleaseAccessor = BooleanMemberAccessor.Empty;
+                _mainMouseRightReleaseAccessor = BooleanMemberAccessor.Empty;
+                _mainMouseTextAccessor = BooleanMemberAccessor.Empty;
+                _mainHoverItemNameAccessor = StringMemberAccessor.Empty;
+                _mainHoverItemName2Accessor = StringMemberAccessor.Empty;
+                _mainHoverItemAccessor = ObjectMemberAccessor.Empty;
+                _mainHoverItemLowerAccessor = ObjectMemberAccessor.Empty;
+                _mainInstanceAccessor = ObjectMemberAccessor.Empty;
+                _mainInstanceCapsAccessor = ObjectMemberAccessor.Empty;
+                _mainInstanceHoverItemAccessor = ObjectMemberAccessor.Empty;
+                _mainInstanceHoverItemLowerAccessor = ObjectMemberAccessor.Empty;
+                EmptyHoverItemsByType.Clear();
+            }
+        }
+
+        private static void EnsureUiMouseAccessors(Type mainType)
+        {
+            if (mainType == null)
+            {
+                return;
+            }
+
+            if (_uiMouseAccessorMainType == mainType)
+            {
+                return;
+            }
+
+            lock (UiMouseAccessorSyncRoot)
+            {
+                if (_uiMouseAccessorMainType == mainType)
+                {
+                    return;
+                }
+
+                _uiMouseAccessorMainType = mainType;
+                _uiMouseAccessorMainInstanceType = null;
+                _mainMouseInterfaceAccessor = BooleanMemberAccessor.Resolve(mainType, "mouseInterface", true);
+                _mainBlockMouseAccessor = BooleanMemberAccessor.Resolve(mainType, "blockMouse", true);
+                _mainMouseLeftAccessor = BooleanMemberAccessor.Resolve(mainType, "mouseLeft", true);
+                _mainMouseRightAccessor = BooleanMemberAccessor.Resolve(mainType, "mouseRight", true);
+                _mainMouseLeftReleaseAccessor = BooleanMemberAccessor.Resolve(mainType, "mouseLeftRelease", true);
+                _mainMouseRightReleaseAccessor = BooleanMemberAccessor.Resolve(mainType, "mouseRightRelease", true);
+                _mainMouseTextAccessor = BooleanMemberAccessor.Resolve(mainType, "mouseText", true);
+                _mainHoverItemNameAccessor = StringMemberAccessor.Resolve(mainType, "hoverItemName", true);
+                _mainHoverItemName2Accessor = StringMemberAccessor.Resolve(mainType, "hoverItemName2", true);
+                _mainHoverItemAccessor = ObjectMemberAccessor.Resolve(mainType, "HoverItem", true, true);
+                _mainHoverItemLowerAccessor = ObjectMemberAccessor.Resolve(mainType, "hoverItem", true, true);
+                _mainInstanceAccessor = ObjectMemberAccessor.Resolve(mainType, "instance", true, false);
+                _mainInstanceCapsAccessor = ObjectMemberAccessor.Resolve(mainType, "Instance", true, false);
+                _mainInstanceHoverItemAccessor = ObjectMemberAccessor.Empty;
+                _mainInstanceHoverItemLowerAccessor = ObjectMemberAccessor.Empty;
+            }
+        }
+
+        private static void EnsureUiMouseMainInstanceAccessors(Type instanceType)
+        {
+            if (instanceType == null)
+            {
+                return;
+            }
+
+            if (_uiMouseAccessorMainInstanceType == instanceType)
+            {
+                return;
+            }
+
+            lock (UiMouseAccessorSyncRoot)
+            {
+                if (_uiMouseAccessorMainInstanceType == instanceType)
+                {
+                    return;
+                }
+
+                _uiMouseAccessorMainInstanceType = instanceType;
+                _mainInstanceHoverItemAccessor = ObjectMemberAccessor.Resolve(instanceType, "HoverItem", false, true);
+                _mainInstanceHoverItemLowerAccessor = ObjectMemberAccessor.Resolve(instanceType, "hoverItem", false, true);
+            }
+        }
+
+        private static bool TrySetLocalPlayerMouseInterface(object player, bool value)
+        {
+            if (player == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                var playerType = player.GetType();
+                if (_localPlayerMouseInterfaceType != playerType)
+                {
+                    lock (UiMouseAccessorSyncRoot)
+                    {
+                        if (_localPlayerMouseInterfaceType != playerType)
+                        {
+                            _localPlayerMouseInterfaceType = playerType;
+                            _localPlayerMouseInterfaceAccessor = BooleanMemberAccessor.Resolve(playerType, "mouseInterface", false);
+                        }
+                    }
+                }
+
+                return _localPlayerMouseInterfaceAccessor.TrySet(player, value);
+            }
+            catch (Exception error)
+            {
+                _mouseCaptureLastMessage = "Set UI mouse member failed: " + error.Message;
+                return false;
+            }
+        }
+
+        private static bool TryGetMainInstance(out object mainInstance)
+        {
+            mainInstance = null;
+            if (_mainInstanceAccessor.TryGet(null, out mainInstance) && mainInstance != null)
+            {
+                return true;
+            }
+
+            return _mainInstanceCapsAccessor.TryGet(null, out mainInstance) && mainInstance != null;
+        }
+
+        private static object GetEmptyHoverItem(Type itemType)
+        {
+            if (itemType == null || itemType == typeof(string) || itemType == typeof(bool))
+            {
+                return null;
+            }
+
+            object item;
+            lock (UiMouseAccessorSyncRoot)
+            {
+                if (!EmptyHoverItemsByType.TryGetValue(itemType, out item))
+                {
+                    item = CreateEmptyItem(itemType);
+                    EmptyHoverItemsByType[itemType] = item;
+                }
+            }
+
+            ResetEmptyItem(item);
+            return item;
+        }
+
+        private static void ResetEmptyItem(object item)
+        {
+            if (item == null)
+            {
+                return;
+            }
+
+            TrySetInstanceMember(item, "type", 0);
+            TrySetInstanceMember(item, "stack", 0);
         }
 
         private static bool EnsureMainMouseAccessors()
@@ -990,6 +1180,248 @@ namespace JueMingZ.Compat
             }
 
             return null;
+        }
+
+        private sealed class BooleanMemberAccessor
+        {
+            public static readonly BooleanMemberAccessor Empty = new BooleanMemberAccessor(null, null);
+
+            private readonly FieldInfo _field;
+            private readonly PropertyInfo _property;
+
+            private BooleanMemberAccessor(FieldInfo field, PropertyInfo property)
+            {
+                _field = field;
+                _property = property;
+            }
+
+            public static BooleanMemberAccessor Resolve(Type type, string name, bool isStatic)
+            {
+                if (type == null || string.IsNullOrWhiteSpace(name))
+                {
+                    return Empty;
+                }
+
+                var flags = BindingFlags.Public | BindingFlags.NonPublic | (isStatic ? BindingFlags.Static : BindingFlags.Instance);
+                try
+                {
+                    var field = type.GetField(name, flags);
+                    if (field != null && field.FieldType == typeof(bool))
+                    {
+                        return new BooleanMemberAccessor(field, null);
+                    }
+
+                    var property = type.GetProperty(name, flags);
+                    if (property != null &&
+                        property.CanWrite &&
+                        property.PropertyType == typeof(bool) &&
+                        property.GetIndexParameters().Length == 0)
+                    {
+                        return new BooleanMemberAccessor(null, property);
+                    }
+                }
+                catch
+                {
+                }
+
+                return Empty;
+            }
+
+            public bool TrySet(object instance, bool value)
+            {
+                try
+                {
+                    if (_field != null)
+                    {
+                        _field.SetValue(instance, value);
+                        return true;
+                    }
+
+                    if (_property != null)
+                    {
+                        _property.SetValue(instance, value, null);
+                        return true;
+                    }
+                }
+                catch (Exception error)
+                {
+                    _mouseCaptureLastMessage = "Set UI mouse bool failed: " + error.Message;
+                }
+
+                return false;
+            }
+        }
+
+        private sealed class StringMemberAccessor
+        {
+            public static readonly StringMemberAccessor Empty = new StringMemberAccessor(null, null);
+
+            private readonly FieldInfo _field;
+            private readonly PropertyInfo _property;
+
+            private StringMemberAccessor(FieldInfo field, PropertyInfo property)
+            {
+                _field = field;
+                _property = property;
+            }
+
+            public static StringMemberAccessor Resolve(Type type, string name, bool isStatic)
+            {
+                if (type == null || string.IsNullOrWhiteSpace(name))
+                {
+                    return Empty;
+                }
+
+                var flags = BindingFlags.Public | BindingFlags.NonPublic | (isStatic ? BindingFlags.Static : BindingFlags.Instance);
+                try
+                {
+                    var field = type.GetField(name, flags);
+                    if (field != null && field.FieldType == typeof(string))
+                    {
+                        return new StringMemberAccessor(field, null);
+                    }
+
+                    var property = type.GetProperty(name, flags);
+                    if (property != null &&
+                        property.CanWrite &&
+                        property.PropertyType == typeof(string) &&
+                        property.GetIndexParameters().Length == 0)
+                    {
+                        return new StringMemberAccessor(null, property);
+                    }
+                }
+                catch
+                {
+                }
+
+                return Empty;
+            }
+
+            public bool TrySet(object instance, string value)
+            {
+                try
+                {
+                    if (_field != null)
+                    {
+                        _field.SetValue(instance, value ?? string.Empty);
+                        return true;
+                    }
+
+                    if (_property != null)
+                    {
+                        _property.SetValue(instance, value ?? string.Empty, null);
+                        return true;
+                    }
+                }
+                catch (Exception error)
+                {
+                    _mouseCaptureLastMessage = "Set UI mouse string failed: " + error.Message;
+                }
+
+                return false;
+            }
+        }
+
+        private sealed class ObjectMemberAccessor
+        {
+            public static readonly ObjectMemberAccessor Empty = new ObjectMemberAccessor(null, null, null);
+
+            private readonly FieldInfo _field;
+            private readonly PropertyInfo _property;
+
+            private ObjectMemberAccessor(FieldInfo field, PropertyInfo property, Type memberType)
+            {
+                _field = field;
+                _property = property;
+                MemberType = memberType;
+            }
+
+            public Type MemberType { get; private set; }
+
+            public static ObjectMemberAccessor Resolve(Type type, string name, bool isStatic, bool requireWrite)
+            {
+                if (type == null || string.IsNullOrWhiteSpace(name))
+                {
+                    return Empty;
+                }
+
+                var flags = BindingFlags.Public | BindingFlags.NonPublic | (isStatic ? BindingFlags.Static : BindingFlags.Instance);
+                try
+                {
+                    var field = type.GetField(name, flags);
+                    if (field != null)
+                    {
+                        return new ObjectMemberAccessor(field, null, field.FieldType);
+                    }
+
+                    var property = type.GetProperty(name, flags);
+                    if (property != null &&
+                        property.GetIndexParameters().Length == 0 &&
+                        (!requireWrite || property.CanWrite))
+                    {
+                        return new ObjectMemberAccessor(null, property, property.PropertyType);
+                    }
+                }
+                catch
+                {
+                }
+
+                return Empty;
+            }
+
+            public bool TryGet(object instance, out object value)
+            {
+                value = null;
+                try
+                {
+                    if (_field != null)
+                    {
+                        value = _field.GetValue(instance);
+                        return true;
+                    }
+
+                    if (_property != null && _property.CanRead)
+                    {
+                        value = _property.GetValue(instance, null);
+                        return true;
+                    }
+                }
+                catch (Exception error)
+                {
+                    _mouseCaptureLastMessage = "Read UI mouse object failed: " + error.Message;
+                }
+
+                return false;
+            }
+
+            public bool TrySet(object instance, object value)
+            {
+                if (MemberType == null)
+                {
+                    return false;
+                }
+
+                try
+                {
+                    if (_field != null)
+                    {
+                        _field.SetValue(instance, value);
+                        return true;
+                    }
+
+                    if (_property != null && _property.CanWrite)
+                    {
+                        _property.SetValue(instance, value, null);
+                        return true;
+                    }
+                }
+                catch (Exception error)
+                {
+                    _mouseCaptureLastMessage = "Set UI mouse object failed: " + error.Message;
+                }
+
+                return false;
+            }
         }
 
         [DllImport("user32.dll")]

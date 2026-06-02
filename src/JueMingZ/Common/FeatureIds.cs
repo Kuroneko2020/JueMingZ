@@ -20,6 +20,7 @@ namespace JueMingZ.Common
         public const string InventoryAutoExtractinator = "inventory.auto_extractinator";
         public const string InventoryKeepFavorited = "inventory.keep_favorited";
         public const string NpcAutoReforge = "npc.auto_reforge";
+        public const string NpcAutoTaxCollect = "npc.auto_tax_collect";
         public const string WorldAutomationAutoMining = "automation.auto_mining";
         public const string WorldAutomationAutoCaptureCritter = "automation.auto_capture_critter";
         public const string WorldAutomationAutoHarvest = "automation.auto_harvest";

@@ -112,17 +112,16 @@ namespace JueMingZ.UI.Legacy
             {
                 var hash = 17;
                 AddHash(ref hash, selectedPage);
-                AddHash(ref hash, windowRect.X);
-                AddHash(ref hash, windowRect.Y);
                 AddHash(ref hash, windowRect.Width);
                 AddHash(ref hash, windowRect.Height);
-                AddHash(ref hash, contentRect.X);
-                AddHash(ref hash, contentRect.Y);
                 AddHash(ref hash, contentRect.Width);
                 AddHash(ref hash, contentRect.Height);
                 AddHash(ref hash, scrollArea == null ? 0 : scrollArea.ScrollOffset);
                 AddHash(ref hash, scrollArea == null ? 0 : scrollArea.MaxScroll);
                 AddHash(ref hash, settings == null ? 0 : settings.ConfigVersion);
+                AddHash(ref hash, BuildPageStateSignature(selectedPage, settings));
+                AddHash(ref hash, UiTextRenderer.FontSignatureForLayoutCache);
+                AddHash(ref hash, UiTextRenderer.CacheGenerationForLayoutCache);
                 AddHash(ref hash, _pageLayoutCacheRebuildCount);
                 return hash;
             }
@@ -486,6 +485,16 @@ namespace JueMingZ.UI.Legacy
             _pageLayoutCacheRebuildCount = 0;
             _pageLayoutCacheHitCount = 0;
             _contentHeightCacheValid = false;
+        }
+
+        internal static int BuildFrameHoverLayoutTokenForTesting(
+            string selectedPage,
+            LegacyUiRect windowRect,
+            LegacyUiRect contentRect,
+            LegacyScrollArea scrollArea,
+            AppSettings settings)
+        {
+            return BuildFrameHoverLayoutToken(selectedPage, windowRect, contentRect, scrollArea, settings);
         }
 
         internal sealed class LegacyUiPageLayoutSnapshot
