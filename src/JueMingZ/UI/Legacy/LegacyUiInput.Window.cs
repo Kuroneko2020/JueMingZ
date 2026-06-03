@@ -30,7 +30,7 @@ namespace JueMingZ.UI.Legacy
                 active = !string.IsNullOrWhiteSpace(_activeMode);
             }
 
-            return active || LegacyTextInput.IsAnyFocused;
+            return active || LegacyTextInput.IsAnyFocused || LegacyHexColorInput.IsAnyFocused;
         }
 
         public static bool IsMouseInWindow(LegacyMouseSnapshot mouse)

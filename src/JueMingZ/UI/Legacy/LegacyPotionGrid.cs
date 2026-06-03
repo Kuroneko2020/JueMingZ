@@ -9,9 +9,9 @@ namespace JueMingZ.UI.Legacy
     public static class LegacyPotionGrid
     {
         public const int CardHeight = 68;
-        public const int CellWidth = 56;
-        public const int CellHeight = 56;
-        public const int IconSize = 42;
+        public const int CellWidth = 36;
+        public const int CellHeight = 36;
+        public const int IconSize = 28;
 
         public static void DrawCandidate(object spriteBatch, LegacyUiRect rect, BuffPotionCandidate candidate, bool hovered)
         {
@@ -117,11 +117,11 @@ namespace JueMingZ.UI.Legacy
 
             if (missing)
             {
-                UiPrimitiveRenderer.DrawRoundedRectClipped(spriteBatch, rect.Right - 15, rect.Y + 5, 10, 10, clip.X, clip.Y, clip.Width, clip.Height, 5, 236, 58, 66, 248);
+                UiPrimitiveRenderer.DrawRoundedRectClipped(spriteBatch, rect.Right - 12, rect.Y + 4, 8, 8, clip.X, clip.Y, clip.Width, clip.Height, 4, 236, 58, 66, 248);
             }
             else if (active)
             {
-                UiPrimitiveRenderer.DrawRoundedRectClipped(spriteBatch, rect.Right - 15, rect.Y + 5, 10, 10, clip.X, clip.Y, clip.Width, clip.Height, 5, 126, 226, 156, 245);
+                UiPrimitiveRenderer.DrawRoundedRectClipped(spriteBatch, rect.Right - 12, rect.Y + 4, 8, 8, clip.X, clip.Y, clip.Width, clip.Height, 4, 126, 226, 156, 245);
             }
         }
 

@@ -17,6 +17,7 @@ namespace JueMingZ.UI.Legacy
         public BuffPotionCandidate Candidate { get; set; }
         public BuffPotionWhitelistEntry WhitelistEntry { get; set; }
         public string[] TooltipLines { get; set; }
+        public int TooltipContentSignature { get; set; }
 
         public LegacyUiElement()
         {
@@ -52,6 +53,7 @@ namespace JueMingZ.UI.Legacy
             Candidate = candidate;
             WhitelistEntry = whitelistEntry;
             TooltipLines = tooltipLines;
+            TooltipContentSignature = 0;
         }
     }
 }

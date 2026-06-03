@@ -20,6 +20,9 @@ namespace JueMingZ.UI.Legacy
 {
     public static partial class LegacyMainWindow
     {
+        private const int MiscFixedRowCount = 12;
+        private const int PageContentBottomPadding = 24;
+
         private static int CalculateBuffContentHeight(LegacyUiRect contentRect)
         {
             var viewportWidth = contentRect.Width - LegacyUiMetrics.ContentPadding * 2 - LegacyUiMetrics.ScrollbarWidth - 8;
@@ -76,9 +79,9 @@ namespace JueMingZ.UI.Legacy
                    MiscExpandableRowHeight(autoSellPanelHeight) +
                    MiscExpandableRowHeight(autoDiscardPanelHeight) +
                    MiscExpandableRowHeight(quickReforgePanelHeight) +
-                   (LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap) * 10 +
+                   (LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap) * Math.Max(0, MiscFixedRowCount - 1) +
                    LegacyUiMetrics.RowHeight +
-                   24;
+                   PageContentBottomPadding;
         }
 
         private static int CalculateInformationContentHeight(AppSettings settings)
@@ -105,6 +108,11 @@ namespace JueMingZ.UI.Legacy
         internal static int CalculateInformationContentHeightForTesting(AppSettings settings)
         {
             return CalculateInformationContentHeight(settings);
+        }
+
+        internal static int CalculateMiscContentHeightForTesting(LegacyUiRect contentRect)
+        {
+            return CalculateMiscContentHeight(contentRect);
         }
 
         private static int CalculateFishingContentHeight(LegacyUiRect contentRect)

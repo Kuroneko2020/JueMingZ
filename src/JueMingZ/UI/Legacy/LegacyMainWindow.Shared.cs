@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
+using System.Threading;
 using JueMingZ.Automation.AutoRecovery;
 using JueMingZ.Automation.BuffAndRecovery;
 using JueMingZ.Automation.Fishing.Filtering;
@@ -20,6 +21,37 @@ namespace JueMingZ.UI.Legacy
 {
     public static partial class LegacyMainWindow
     {
+        private const int HoverTooltipDiagnosticCadenceMs = 1000;
+        private static readonly object HoverTooltipCacheSyncRoot = new object();
+        private static string _hoverTooltipCacheElementId = string.Empty;
+        private static string _hoverTooltipCachePageId = string.Empty;
+        private static int _hoverTooltipCacheSettingsVersion;
+        private static string _hoverTooltipCacheFontSignature = string.Empty;
+        private static int _hoverTooltipCacheFontGeneration;
+        private static int _hoverTooltipCacheContentSignature;
+        private static LegacyUiTooltipModel _hoverTooltipCacheModel;
+        private static string _lastHoverTooltipDiagnosticElementId = string.Empty;
+        private static int _lastHoverTooltipDiagnosticContentSignature;
+        private static DateTime _lastHoverTooltipDiagnosticUtc = DateTime.MinValue;
+        private static long _hoverTooltipCacheHitCount;
+        private static long _hoverTooltipCacheMissCount;
+        private static long _hoverTooltipDiagnosticSuppressedCount;
+
+        internal static long HoverTooltipCacheHitCount
+        {
+            get { return Interlocked.Read(ref _hoverTooltipCacheHitCount); }
+        }
+
+        internal static long HoverTooltipCacheMissCount
+        {
+            get { return Interlocked.Read(ref _hoverTooltipCacheMissCount); }
+        }
+
+        internal static long HoverTooltipDiagnosticSuppressedCount
+        {
+            get { return Interlocked.Read(ref _hoverTooltipDiagnosticSuppressedCount); }
+        }
+
         private static LegacyUiElement DrawEmptyPage(object spriteBatch, LegacyScrollArea area, string pageId, LegacyMouseSnapshot mouse)
         {
             var title = LegacyTabBar.GetDisplayName(pageId);
@@ -153,20 +185,243 @@ namespace JueMingZ.UI.Legacy
 
         private static void DrawTooltip(object spriteBatch, LegacyUiElement element, LegacyMouseSnapshot mouse)
         {
-            if (element == null || mouse == null || (element.Candidate == null && element.WhitelistEntry == null && (element.TooltipLines == null || element.TooltipLines.Length <= 0)))
+            if (mouse == null)
             {
                 return;
             }
 
-            var lines = BuildTooltipLines(element);
-            if (lines == null || lines.Length <= 0)
+            var model = BuildTooltipModel(element, LegacyMainUiState.SelectedPageId, ConfigService.AppSettings ?? AppSettings.CreateDefault());
+            if (model == null || model.Lines == null || model.Lines.Length <= 0)
             {
                 return;
             }
 
             var window = LegacyMainUiState.WindowRect;
+            LegacyTooltipHostControl.Draw(spriteBatch, window, mouse, model);
+        }
+
+        private static LegacyUiTooltipModel BuildTooltipModel(LegacyUiElement element, string pageId, AppSettings settings)
+        {
+            if (element == null ||
+                (element.Candidate == null &&
+                 element.WhitelistEntry == null &&
+                 (element.TooltipLines == null || element.TooltipLines.Length <= 0)))
+            {
+                return null;
+            }
+
+            pageId = pageId ?? string.Empty;
+            settings = settings ?? AppSettings.CreateDefault();
+            var elementId = element.Id ?? string.Empty;
+            var settingsVersion = settings.ConfigVersion;
+            var fontSignature = UiTextRenderer.FontSignatureForLayoutCache ?? string.Empty;
+            var fontGeneration = UiTextRenderer.CacheGenerationForLayoutCache;
+            var contentSignature = BuildTooltipContentSignature(element);
+
+            lock (HoverTooltipCacheSyncRoot)
+            {
+                if (_hoverTooltipCacheModel != null &&
+                    string.Equals(_hoverTooltipCacheElementId, elementId, StringComparison.Ordinal) &&
+                    string.Equals(_hoverTooltipCachePageId, pageId, StringComparison.Ordinal) &&
+                    _hoverTooltipCacheSettingsVersion == settingsVersion &&
+                    string.Equals(_hoverTooltipCacheFontSignature, fontSignature, StringComparison.Ordinal) &&
+                    _hoverTooltipCacheFontGeneration == fontGeneration &&
+                    _hoverTooltipCacheContentSignature == contentSignature)
+                {
+                    Interlocked.Increment(ref _hoverTooltipCacheHitCount);
+                    RecordHoverTooltipDiagnosticDecisionLocked(elementId, contentSignature, false);
+                    return _hoverTooltipCacheModel;
+                }
+            }
+
+            var lines = BuildTooltipLines(element);
+            if (lines == null || lines.Length <= 0)
+            {
+                return null;
+            }
+
             var centered = element.Candidate == null && element.WhitelistEntry == null;
-            LegacyTooltipHostControl.Draw(spriteBatch, window, mouse, new LegacyUiTooltipModel(lines, centered));
+            var model = new LegacyUiTooltipModel(CloneTooltipLines(lines), centered);
+            lock (HoverTooltipCacheSyncRoot)
+            {
+                _hoverTooltipCacheElementId = elementId;
+                _hoverTooltipCachePageId = pageId;
+                _hoverTooltipCacheSettingsVersion = settingsVersion;
+                _hoverTooltipCacheFontSignature = fontSignature;
+                _hoverTooltipCacheFontGeneration = fontGeneration;
+                _hoverTooltipCacheContentSignature = contentSignature;
+                _hoverTooltipCacheModel = model;
+                Interlocked.Increment(ref _hoverTooltipCacheMissCount);
+                RecordHoverTooltipDiagnosticDecisionLocked(elementId, contentSignature, true);
+            }
+
+            return model;
+        }
+
+        private static void RecordHoverTooltipDiagnosticDecisionLocked(string elementId, int contentSignature, bool changed)
+        {
+            var now = DateTime.UtcNow;
+            var sameTooltip =
+                string.Equals(_lastHoverTooltipDiagnosticElementId, elementId ?? string.Empty, StringComparison.Ordinal) &&
+                _lastHoverTooltipDiagnosticContentSignature == contentSignature;
+            if (!changed &&
+                sameTooltip &&
+                now - _lastHoverTooltipDiagnosticUtc < TimeSpan.FromMilliseconds(HoverTooltipDiagnosticCadenceMs))
+            {
+                Interlocked.Increment(ref _hoverTooltipDiagnosticSuppressedCount);
+                return;
+            }
+
+            _lastHoverTooltipDiagnosticElementId = elementId ?? string.Empty;
+            _lastHoverTooltipDiagnosticContentSignature = contentSignature;
+            _lastHoverTooltipDiagnosticUtc = now;
+        }
+
+        private static string[] CloneTooltipLines(string[] lines)
+        {
+            if (lines == null || lines.Length <= 0)
+            {
+                return new string[0];
+            }
+
+            var clone = new string[lines.Length];
+            for (var index = 0; index < lines.Length; index++)
+            {
+                clone[index] = lines[index] ?? string.Empty;
+            }
+
+            return clone;
+        }
+
+        private static int BuildTooltipContentSignature(LegacyUiElement element)
+        {
+            if (element == null)
+            {
+                return 0;
+            }
+
+            if (element.TooltipContentSignature != 0)
+            {
+                return element.TooltipContentSignature;
+            }
+
+            unchecked
+            {
+                var hash = 17;
+                AddHash(ref hash, element.Id);
+                AddHash(ref hash, element.Label);
+                AddHash(ref hash, element.Kind);
+                AddHash(ref hash, element.Selected);
+                AddHash(ref hash, element.IntValue);
+                AddHash(ref hash, element.MinValue);
+                AddHash(ref hash, element.MaxValue);
+                AddTooltipLinesHash(ref hash, element.TooltipLines);
+                AddCandidateTooltipHash(ref hash, element.Candidate);
+                AddWhitelistTooltipHash(ref hash, element.WhitelistEntry);
+                return hash;
+            }
+        }
+
+        private static int BuildTooltipContentSignature(BuffPotionCandidate candidate)
+        {
+            unchecked
+            {
+                var hash = 17;
+                AddCandidateTooltipHash(ref hash, candidate);
+                return hash;
+            }
+        }
+
+        private static int BuildTooltipContentSignature(BuffPotionWhitelistEntry entry, BuffPotionCandidate liveCandidate, bool active)
+        {
+            unchecked
+            {
+                var hash = 17;
+                AddWhitelistTooltipHash(ref hash, entry);
+                AddCandidateTooltipHash(ref hash, liveCandidate);
+                AddHash(ref hash, active);
+                return hash;
+            }
+        }
+
+        private static void AddTooltipLinesHash(ref int hash, string[] lines)
+        {
+            AddHash(ref hash, lines == null ? 0 : lines.Length);
+            if (lines == null)
+            {
+                return;
+            }
+
+            for (var index = 0; index < lines.Length; index++)
+            {
+                AddHash(ref hash, lines[index]);
+            }
+        }
+
+        private static void AddCandidateTooltipHash(ref int hash, BuffPotionCandidate candidate)
+        {
+            if (candidate == null)
+            {
+                AddHash(ref hash, 0);
+                return;
+            }
+
+            AddHash(ref hash, 1);
+            AddHash(ref hash, candidate.SourceContainer);
+            AddHash(ref hash, candidate.SourceSlot);
+            AddHash(ref hash, candidate.ItemType);
+            AddHash(ref hash, candidate.ItemName);
+            AddHash(ref hash, candidate.Stack);
+            AddHash(ref hash, candidate.BuffType);
+            AddHash(ref hash, candidate.BuffName);
+            AddHash(ref hash, candidate.BuffTime);
+            AddHash(ref hash, candidate.EstimatedDurationSeconds);
+            AddHash(ref hash, candidate.IsActive);
+            AddHash(ref hash, candidate.IsWhitelisted);
+            AddHash(ref hash, candidate.CanApply);
+            AddHash(ref hash, candidate.SkipReason);
+            AddHash(ref hash, candidate.ConflictGroup);
+            AddHash(ref hash, candidate.NetworkMode);
+        }
+
+        private static void AddWhitelistTooltipHash(ref int hash, BuffPotionWhitelistEntry entry)
+        {
+            if (entry == null)
+            {
+                AddHash(ref hash, 0);
+                return;
+            }
+
+            AddHash(ref hash, 1);
+            AddHash(ref hash, entry.ItemType);
+            AddHash(ref hash, entry.BuffType);
+            AddHash(ref hash, entry.ItemName);
+            AddHash(ref hash, entry.BuffName);
+        }
+
+        internal static LegacyUiTooltipModel BuildTooltipModelForTesting(LegacyUiElement element, string pageId, AppSettings settings)
+        {
+            return BuildTooltipModel(element, pageId, settings);
+        }
+
+        internal static void ResetHoverTooltipCacheForTesting()
+        {
+            lock (HoverTooltipCacheSyncRoot)
+            {
+                _hoverTooltipCacheElementId = string.Empty;
+                _hoverTooltipCachePageId = string.Empty;
+                _hoverTooltipCacheSettingsVersion = 0;
+                _hoverTooltipCacheFontSignature = string.Empty;
+                _hoverTooltipCacheFontGeneration = 0;
+                _hoverTooltipCacheContentSignature = 0;
+                _hoverTooltipCacheModel = null;
+                _lastHoverTooltipDiagnosticElementId = string.Empty;
+                _lastHoverTooltipDiagnosticContentSignature = 0;
+                _lastHoverTooltipDiagnosticUtc = DateTime.MinValue;
+                Interlocked.Exchange(ref _hoverTooltipCacheHitCount, 0);
+                Interlocked.Exchange(ref _hoverTooltipCacheMissCount, 0);
+                Interlocked.Exchange(ref _hoverTooltipDiagnosticSuppressedCount, 0);
+            }
         }
 
         private static int ClampInt(int value, int min, int max)

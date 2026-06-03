@@ -120,6 +120,14 @@ namespace JueMingZ.Automation.Movement
         public long FullAnalysisCount { get; set; }
         public long CheapPrecheckSkipCount { get; set; }
         public long LandingProbeCount { get; set; }
+        public long ConfigSummaryCacheHitCount { get; set; }
+        public long ConfigSummaryCacheMissCount { get; set; }
+        public long StageSummaryCacheHitCount { get; set; }
+        public long CheapSkipDiagnosticSuppressedCount { get; set; }
+        public long CheapSkipDiagnosticWrittenCount { get; set; }
+        public string CheapSkipLastReason { get; set; }
+        public int CheapSkipDiagnosticCadenceTicks { get; set; }
+        public long RecoverySummarySkippedCount { get; set; }
         public string LastCompatError { get; set; }
         public string CollisionFastPathStatus { get; set; }
         public bool PlayerUpdateHookInstalled { get; set; }
@@ -165,6 +173,7 @@ namespace JueMingZ.Automation.Movement
             LandingSurfaceSummary = string.Empty;
             GrappleTargetSource = string.Empty;
             GrappleTimingSummary = string.Empty;
+            CheapSkipLastReason = string.Empty;
             EquippedGrappleProjectileType = 0;
             InventoryGrappleProjectileType = 0;
             LastCompatError = string.Empty;
@@ -284,6 +293,14 @@ namespace JueMingZ.Automation.Movement
                 FullAnalysisCount = FullAnalysisCount,
                 CheapPrecheckSkipCount = CheapPrecheckSkipCount,
                 LandingProbeCount = LandingProbeCount,
+                ConfigSummaryCacheHitCount = ConfigSummaryCacheHitCount,
+                ConfigSummaryCacheMissCount = ConfigSummaryCacheMissCount,
+                StageSummaryCacheHitCount = StageSummaryCacheHitCount,
+                CheapSkipDiagnosticSuppressedCount = CheapSkipDiagnosticSuppressedCount,
+                CheapSkipDiagnosticWrittenCount = CheapSkipDiagnosticWrittenCount,
+                CheapSkipLastReason = CheapSkipLastReason,
+                CheapSkipDiagnosticCadenceTicks = CheapSkipDiagnosticCadenceTicks,
+                RecoverySummarySkippedCount = RecoverySummarySkippedCount,
                 LastCompatError = LastCompatError,
                 CollisionFastPathStatus = CollisionFastPathStatus,
                 PlayerUpdateHookInstalled = PlayerUpdateHookInstalled,

@@ -3,7 +3,9 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
 using JueMingZ.Automation.Fishing.Filtering;
 
 namespace JueMingZ.Automation.Information
@@ -14,6 +16,7 @@ namespace JueMingZ.Automation.Information
         private const int MinimumWaterTilesForFishingRules = 75;
         private const int MaxCatchItems = 96;
         private const int CatchCacheLimit = 16;
+        private const int EarlyCatchCacheLimit = 8;
         private static FieldInfo _fishRulesField;
         private static bool _crateSetsInitialized;
         private static object _isFishingCrateSet;
@@ -24,6 +27,13 @@ namespace JueMingZ.Automation.Information
         private static readonly Dictionary<FishingCatchQueryKey, FishingCatchCacheEntry> CatchCache =
             new Dictionary<FishingCatchQueryKey, FishingCatchCacheEntry>();
         private static readonly Queue<FishingCatchQueryKey> CatchCacheOrder = new Queue<FishingCatchQueryKey>();
+        private static readonly Dictionary<FishingCatchEarlyCacheKey, FishingCatchCacheEntry> EarlyCatchCache =
+            new Dictionary<FishingCatchEarlyCacheKey, FishingCatchCacheEntry>();
+        private static readonly Queue<FishingCatchEarlyCacheKey> EarlyCatchCacheOrder = new Queue<FishingCatchEarlyCacheKey>();
+        private static long _earlyCacheHitCount;
+        private static long _earlyCacheMissCount;
+        private static long _waterScanCount;
+        private static long _conditionsReadCount;
         private static readonly string[] QueryPlayerZoneFields =
         {
             "ZoneCorrupt",
@@ -90,10 +100,15 @@ namespace JueMingZ.Automation.Information
 
         public static IList<FishingCatchCandidate> ResolveCatchCandidates(InformationWorldContext context, float bobberWorldX, float bobberWorldY, out string message)
         {
-            return ResolveCatchCandidates(context, bobberWorldX, bobberWorldY, string.Empty, out message);
+            return ResolveCatchCandidates(context, bobberWorldX, bobberWorldY, -1, string.Empty, out message);
         }
 
         public static IList<FishingCatchCandidate> ResolveCatchCandidates(InformationWorldContext context, float bobberWorldX, float bobberWorldY, string filterSignature, out string message)
+        {
+            return ResolveCatchCandidates(context, bobberWorldX, bobberWorldY, -1, filterSignature, out message);
+        }
+
+        public static IList<FishingCatchCandidate> ResolveCatchCandidates(InformationWorldContext context, float bobberWorldX, float bobberWorldY, int bobberIdentity, string filterSignature, out string message)
         {
             message = string.Empty;
             var candidates = new List<FishingCatchCandidate>();
@@ -112,18 +127,43 @@ namespace JueMingZ.Automation.Information
 
             var tileX = (int)Math.Floor(bobberWorldX / TileSize);
             var tileY = (int)Math.Floor(bobberWorldY / TileSize);
+            int earlyPolePower;
+            int earlyPoleItemType;
+            int earlyBaitPower;
+            int earlyBaitItemType;
+            int earlyQuestFish;
+            var earlyKey = BuildEarlyCatchCacheKey(
+                context,
+                tileX,
+                tileY,
+                bobberIdentity,
+                out earlyPolePower,
+                out earlyPoleItemType,
+                out earlyBaitPower,
+                out earlyBaitItemType,
+                out earlyQuestFish);
+            FishingCatchCacheEntry earlyCached;
+            if (TryGetEarlyCatchCache(earlyKey, out earlyCached))
+            {
+                message = earlyCached.Message;
+                return earlyCached.Candidates;
+            }
+
             var water = ScanFishingWater(context, tileX, tileY);
             if (water.TotalTiles < MinimumWaterTilesForFishingRules)
             {
                 message = "水体不足";
+                StoreEarlyCatchCache(earlyKey, candidates, message);
                 return candidates;
             }
 
+            Interlocked.Increment(ref _conditionsReadCount);
             var fishingConditions = EnsureFishingConditionsForDisplay(context, InvokeInstance(context.LocalPlayer, "GetFishingConditions", null));
             var finalFishingLevel = ReadInt(fishingConditions, "FinalFishingLevel", 0);
             if (finalFishingLevel <= 0)
             {
                 message = "暂无可解析鱼获";
+                StoreEarlyCatchCache(earlyKey, candidates, message);
                 return candidates;
             }
 
@@ -134,11 +174,12 @@ namespace JueMingZ.Automation.Information
             if (baitItemType == 2673)
             {
                 message = "松露虫不列入普通鱼获";
+                StoreEarlyCatchCache(earlyKey, candidates, message);
                 return candidates;
             }
 
             var fishingLevel = ApplyFishingWaterPenalty(context, bobberWorldY, water, finalFishingLevel, out var waterNeeded, out var junkPossible);
-            var questFish = ReadQuestFishItem(context);
+            var questFish = earlyQuestFish;
             var canFishInLava = CanFishInLava(context, fishingConditions);
             var queryKey = BuildCatchQueryKey(
                 context,
@@ -162,6 +203,7 @@ namespace JueMingZ.Automation.Information
             if (TryGetCatchCache(queryKey, out cached))
             {
                 message = cached.Message;
+                StoreEarlyCatchCache(earlyKey, cached.Candidates, message);
                 return cached.Candidates;
             }
 
@@ -262,6 +304,7 @@ namespace JueMingZ.Automation.Information
             }
 
             StoreCatchCache(queryKey, candidates, message);
+            StoreEarlyCatchCache(earlyKey, candidates, message);
             return candidates;
         }
 
@@ -403,7 +446,34 @@ namespace JueMingZ.Automation.Information
             {
                 CatchCache.Clear();
                 CatchCacheOrder.Clear();
+                EarlyCatchCache.Clear();
+                EarlyCatchCacheOrder.Clear();
             }
+
+            Interlocked.Exchange(ref _earlyCacheHitCount, 0);
+            Interlocked.Exchange(ref _earlyCacheMissCount, 0);
+            Interlocked.Exchange(ref _waterScanCount, 0);
+            Interlocked.Exchange(ref _conditionsReadCount, 0);
+        }
+
+        public static long EarlyCacheHitCount
+        {
+            get { return Interlocked.Read(ref _earlyCacheHitCount); }
+        }
+
+        public static long EarlyCacheMissCount
+        {
+            get { return Interlocked.Read(ref _earlyCacheMissCount); }
+        }
+
+        public static long WaterScanCount
+        {
+            get { return Interlocked.Read(ref _waterScanCount); }
+        }
+
+        public static long ConditionsReadCount
+        {
+            get { return Interlocked.Read(ref _conditionsReadCount); }
         }
 
         internal static string BuildCatchQuerySignatureForTesting(
@@ -438,12 +508,149 @@ namespace JueMingZ.Automation.Information
                 filterSignature).Signature;
         }
 
+        internal static string BuildEarlyCatchQuerySignatureForTesting(
+            InformationWorldContext context,
+            int tileX,
+            int tileY,
+            int bobberIdentity,
+            int polePower,
+            int poleItemType,
+            int baitPower,
+            int baitItemType,
+            int questFish)
+        {
+            return BuildEarlyCatchCacheKey(
+                context,
+                tileX,
+                tileY,
+                bobberIdentity,
+                polePower,
+                poleItemType,
+                baitPower,
+                baitItemType,
+                questFish).Signature;
+        }
+
+        internal static void StoreEarlyCatchCacheForTesting(string signature, IList<FishingCatchCandidate> candidates, string message)
+        {
+            StoreEarlyCatchCache(new FishingCatchEarlyCacheKey(signature), candidates, message);
+        }
+
+        internal static bool TryGetEarlyCatchCacheForTesting(string signature, out IList<FishingCatchCandidate> candidates, out string message)
+        {
+            FishingCatchCacheEntry entry;
+            if (TryGetEarlyCatchCache(new FishingCatchEarlyCacheKey(signature), out entry))
+            {
+                candidates = entry.Candidates;
+                message = entry.Message;
+                return true;
+            }
+
+            candidates = new List<FishingCatchCandidate>();
+            message = string.Empty;
+            return false;
+        }
+
+        private static bool TryGetEarlyCatchCache(FishingCatchEarlyCacheKey key, out FishingCatchCacheEntry entry)
+        {
+            lock (CatchCacheSyncRoot)
+            {
+                if (EarlyCatchCache.TryGetValue(key, out entry) && entry != null)
+                {
+                    Interlocked.Increment(ref _earlyCacheHitCount);
+                    return true;
+                }
+            }
+
+            Interlocked.Increment(ref _earlyCacheMissCount);
+            entry = null;
+            return false;
+        }
+
+        private static void StoreEarlyCatchCache(FishingCatchEarlyCacheKey key, IList<FishingCatchCandidate> candidates, string message)
+        {
+            lock (CatchCacheSyncRoot)
+            {
+                if (!EarlyCatchCache.ContainsKey(key))
+                {
+                    EarlyCatchCacheOrder.Enqueue(key);
+                }
+
+                EarlyCatchCache[key] = new FishingCatchCacheEntry
+                {
+                    Candidates = candidates ?? new List<FishingCatchCandidate>(),
+                    Message = message ?? string.Empty
+                };
+
+                while (EarlyCatchCacheOrder.Count > EarlyCatchCacheLimit)
+                {
+                    var oldest = EarlyCatchCacheOrder.Dequeue();
+                    EarlyCatchCache.Remove(oldest);
+                }
+            }
+        }
+
         private static bool TryGetCatchCache(FishingCatchQueryKey key, out FishingCatchCacheEntry entry)
         {
             lock (CatchCacheSyncRoot)
             {
                 return CatchCache.TryGetValue(key, out entry) && entry != null;
             }
+        }
+
+        private static FishingCatchEarlyCacheKey BuildEarlyCatchCacheKey(
+            InformationWorldContext context,
+            int tileX,
+            int tileY,
+            int bobberIdentity,
+            out int polePower,
+            out int poleItemType,
+            out int baitPower,
+            out int baitItemType,
+            out int questFish)
+        {
+            polePower = 0;
+            poleItemType = 0;
+            baitPower = 0;
+            baitItemType = 0;
+            FillDisplayPoleAndBait(context, ref polePower, ref poleItemType, ref baitPower, ref baitItemType);
+            questFish = ReadQuestFishItem(context);
+            return BuildEarlyCatchCacheKey(
+                context,
+                tileX,
+                tileY,
+                bobberIdentity,
+                polePower,
+                poleItemType,
+                baitPower,
+                baitItemType,
+                questFish);
+        }
+
+        private static FishingCatchEarlyCacheKey BuildEarlyCatchCacheKey(
+            InformationWorldContext context,
+            int tileX,
+            int tileY,
+            int bobberIdentity,
+            int polePower,
+            int poleItemType,
+            int baitPower,
+            int baitItemType,
+            int questFish)
+        {
+            var builder = new StringBuilder(512);
+            AppendKeyPart(builder, "world", context == null ? string.Empty : context.WorldKey);
+            AppendKeyPart(builder, "bobber", bobberIdentity.ToString(CultureInfo.InvariantCulture));
+            AppendKeyPart(builder, "tile", tileX.ToString(CultureInfo.InvariantCulture) + "," + tileY.ToString(CultureInfo.InvariantCulture));
+            AppendKeyPart(builder, "pole", polePower.ToString(CultureInfo.InvariantCulture) + ":" + poleItemType.ToString(CultureInfo.InvariantCulture));
+            AppendKeyPart(builder, "bait", baitPower.ToString(CultureInfo.InvariantCulture) + ":" + baitItemType.ToString(CultureInfo.InvariantCulture));
+            AppendKeyPart(builder, "quest", questFish.ToString(CultureInfo.InvariantCulture));
+            AppendKeyPart(builder, "playerIdentity", BuildPlayerIdentitySignature(context));
+            AppendKeyPart(builder, "player", BuildPlayerEnvironmentSignature(context));
+            AppendKeyPart(builder, "buffs", BuildPlayerActiveBuffSignature(context));
+            AppendKeyPart(builder, "worldState", BuildWorldStateSignature(context));
+            AppendKeyPart(builder, "language", BuildLanguageSignature());
+            return new FishingCatchEarlyCacheKey(builder.ToString());
         }
 
         private static void StoreCatchCache(FishingCatchQueryKey key, IList<FishingCatchCandidate> candidates, string message)
@@ -503,6 +710,7 @@ namespace JueMingZ.Automation.Information
             AppendKeyPart(builder, "lava", canFishInLava ? "1" : "0");
             AppendKeyPart(builder, "quest", questFish.ToString(CultureInfo.InvariantCulture));
             AppendKeyPart(builder, "filter", filterSignature);
+            AppendKeyPart(builder, "playerIdentity", BuildPlayerIdentitySignature(context));
             AppendKeyPart(builder, "player", BuildPlayerEnvironmentSignature(context));
             AppendKeyPart(builder, "worldState", BuildWorldStateSignature(context));
             AppendKeyPart(builder, "language", BuildLanguageSignature());
@@ -536,6 +744,68 @@ namespace JueMingZ.Automation.Information
             for (var index = 0; index < QueryPlayerZoneFields.Length; index++)
             {
                 AppendKeyPart(builder, QueryPlayerZoneFields[index], HasZone(player, QueryPlayerZoneFields[index]) ? "1" : "0");
+            }
+
+            return builder.ToString();
+        }
+
+        private static string BuildPlayerIdentitySignature(InformationWorldContext context)
+        {
+            if (context == null)
+            {
+                return string.Empty;
+            }
+
+            if (!string.IsNullOrWhiteSpace(context.PlayerRecordKey))
+            {
+                return "record:" + context.PlayerRecordKey.Trim();
+            }
+
+            var player = context.LocalPlayer;
+            if (player == null)
+            {
+                return string.Empty;
+            }
+
+            var builder = new StringBuilder(96);
+            AppendKeyPart(builder, "object", RuntimeHelpers.GetHashCode(player).ToString(CultureInfo.InvariantCulture));
+            AppendKeyPart(builder, "whoAmI", ReadInt(player, "whoAmI", -1).ToString(CultureInfo.InvariantCulture));
+            AppendKeyPart(
+                builder,
+                "name",
+                FirstNonEmpty(
+                    InformationReflection.TryReadString(player, "name"),
+                    InformationReflection.TryReadString(player, "Name")));
+            return builder.ToString();
+        }
+
+        private static string BuildPlayerActiveBuffSignature(InformationWorldContext context)
+        {
+            var player = context == null ? null : context.LocalPlayer;
+            var buffTypes = InformationReflection.GetMember(player, "buffType");
+            var buffTimes = InformationReflection.GetMember(player, "buffTime");
+            var count = Math.Min(GetCollectionCount(buffTypes), GetCollectionCount(buffTimes));
+            if (count <= 0)
+            {
+                return string.Empty;
+            }
+
+            var builder = new StringBuilder(128);
+            for (var index = 0; index < count && index < 64; index++)
+            {
+                var type = ToInt(InformationReflection.GetIndexedValue(buffTypes, index), 0);
+                var time = ToInt(InformationReflection.GetIndexedValue(buffTimes, index), 0);
+                if (type <= 0 || time <= 0)
+                {
+                    continue;
+                }
+
+                if (builder.Length > 0)
+                {
+                    builder.Append(',');
+                }
+
+                builder.Append(type.ToString(CultureInfo.InvariantCulture));
             }
 
             return builder.ToString();
@@ -851,6 +1121,7 @@ namespace JueMingZ.Automation.Information
 
         private static FishingWaterScan ScanFishingWater(InformationWorldContext context, int tileX, int tileY)
         {
+            Interlocked.Increment(ref _waterScanCount);
             var result = new FishingWaterScan();
             result.Chums = 0;
             var tiles = InformationReflection.GetStaticMember(context.MainType, "tile");
@@ -1767,6 +2038,36 @@ namespace JueMingZ.Automation.Information
             public override bool Equals(object obj)
             {
                 return obj is FishingCatchQueryKey && Equals((FishingCatchQueryKey)obj);
+            }
+
+            public override int GetHashCode()
+            {
+                return StringComparer.Ordinal.GetHashCode(Signature ?? string.Empty);
+            }
+
+            public override string ToString()
+            {
+                return Signature ?? string.Empty;
+            }
+        }
+
+        internal struct FishingCatchEarlyCacheKey : IEquatable<FishingCatchEarlyCacheKey>
+        {
+            public string Signature { get; private set; }
+
+            public FishingCatchEarlyCacheKey(string signature)
+            {
+                Signature = signature ?? string.Empty;
+            }
+
+            public bool Equals(FishingCatchEarlyCacheKey other)
+            {
+                return string.Equals(Signature, other.Signature, StringComparison.Ordinal);
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is FishingCatchEarlyCacheKey && Equals((FishingCatchEarlyCacheKey)obj);
             }
 
             public override int GetHashCode()

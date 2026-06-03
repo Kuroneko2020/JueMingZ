@@ -10,6 +10,7 @@ namespace JueMingZ.Automation.Fishing
             new Dictionary<int, ObservationRecord>();
         private static readonly List<int> RemoveIdentities = new List<int>();
         private static long _lastObservationTick;
+        private static long _lastNoActiveObservationTick;
         private static long _scanGeneration;
         private static bool _hasLatest;
         private static int _latestIdentity;
@@ -33,29 +34,18 @@ namespace JueMingZ.Automation.Fishing
             {
                 lock (SyncRoot)
                 {
-                    if (Observations.Count == 0)
-                    {
-                        return false;
-                    }
+                    return HasActiveObservationLocked();
+                }
+            }
+        }
 
-                    ObservationRecord latest;
-                    if (_hasLatest &&
-                        Observations.TryGetValue(_latestIdentity, out latest) &&
-                        latest != null &&
-                        IsActiveBobber(latest.Observation))
-                    {
-                        return true;
-                    }
-
-                    foreach (var pair in Observations)
-                    {
-                        if (pair.Value != null && IsActiveBobber(pair.Value.Observation))
-                        {
-                            return true;
-                        }
-                    }
-
-                    return false;
+        public static long LastNoActiveObservationTick
+        {
+            get
+            {
+                lock (SyncRoot)
+                {
+                    return _lastNoActiveObservationTick;
                 }
             }
         }
@@ -70,6 +60,19 @@ namespace JueMingZ.Automation.Fishing
             lock (SyncRoot)
             {
                 UpsertLocked(observation, _scanGeneration);
+            }
+        }
+
+        public static void MarkNoActiveObservation(long gameUpdateCount)
+        {
+            if (gameUpdateCount <= 0)
+            {
+                return;
+            }
+
+            lock (SyncRoot)
+            {
+                _lastNoActiveObservationTick = Math.Max(_lastNoActiveObservationTick, gameUpdateCount);
             }
         }
 
@@ -129,6 +132,7 @@ namespace JueMingZ.Automation.Fishing
                 {
                     Observations.Clear();
                     RemoveIdentities.Clear();
+                    _lastNoActiveObservationTick = 0;
                     ResetLatestLocked();
                     return;
                 }
@@ -159,6 +163,39 @@ namespace JueMingZ.Automation.Fishing
                 RemoveIdentities.Clear();
                 FishingBobberObservation latest;
                 RebuildLatestLocked(out latest);
+            }
+        }
+
+        public static bool HasFreshActiveObservation(long currentGameUpdateCount, int maxAgeTicks)
+        {
+            lock (SyncRoot)
+            {
+                if (!HasActiveObservationLocked() ||
+                    _lastObservationTick <= 0 ||
+                    currentGameUpdateCount <= 0)
+                {
+                    return false;
+                }
+
+                var age = currentGameUpdateCount - _lastObservationTick;
+                return age >= 0 && age <= Math.Max(0, maxAgeTicks);
+            }
+        }
+
+        public static bool HasFreshNoActiveObservation(long currentGameUpdateCount, int maxAgeTicks)
+        {
+            lock (SyncRoot)
+            {
+                if (_lastNoActiveObservationTick <= 0 ||
+                    currentGameUpdateCount <= 0 ||
+                    _lastObservationTick > _lastNoActiveObservationTick ||
+                    HasActiveObservationLocked())
+                {
+                    return false;
+                }
+
+                var age = currentGameUpdateCount - _lastNoActiveObservationTick;
+                return age >= 0 && age <= Math.Max(0, maxAgeTicks);
             }
         }
 
@@ -236,6 +273,33 @@ namespace JueMingZ.Automation.Fishing
         private static bool IsActiveBobber(FishingBobberObservation observation)
         {
             return observation != null && observation.Active && observation.Bobber;
+        }
+
+        private static bool HasActiveObservationLocked()
+        {
+            if (Observations.Count == 0)
+            {
+                return false;
+            }
+
+            ObservationRecord latest;
+            if (_hasLatest &&
+                Observations.TryGetValue(_latestIdentity, out latest) &&
+                latest != null &&
+                IsActiveBobber(latest.Observation))
+            {
+                return true;
+            }
+
+            foreach (var pair in Observations)
+            {
+                if (pair.Value != null && IsActiveBobber(pair.Value.Observation))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static void SetLatestLocked(FishingBobberObservation observation)

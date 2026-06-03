@@ -15,35 +15,144 @@ using JueMingZ.UI.Legacy;
 
 namespace JueMingZ.Automation.Fishing
 {
+    internal enum FishingObserverFreshness
+    {
+        HookUnavailable,
+        FreshActive,
+        FreshInactive,
+        Stale
+    }
+
     public static class FishingAutomationService
     {
         private static readonly object SyncRoot = new object();
         private static readonly FishingRuntimeState State = new FishingRuntimeState();
         internal const int SonarBuffType = 122;
+        internal const int IdleWatchdogCadenceTicks = 10;
+        private const int ActiveDispatchCadenceTicks = 1;
         private const int RecastBobberWaitTimeoutTicks = 120;
         private const int MaxRecastRetryCount = 3;
         private const int WaitingForBobberGoneTimeoutTicks = 90;
         private const int FallbackScanIntervalTicks = 5;
         private const int HookFreshFallbackSkipTicks = 2;
+        private const int ResidualSessionActive = 1 << 0;
+        private const int ResidualWaitingForBobberGone = 1 << 1;
+        private const int ResidualRecastDelay = 1 << 2;
+        private const int ResidualRecastWaitingForBobber = 1 << 3;
+        private const int ResidualPullRequest = 1 << 4;
+        private const int ResidualRecastRequest = 1 << 5;
+        private const int ResidualFilterSkipInProgress = 1 << 6;
+        private const int ResidualFilterSkipRequest = 1 << 7;
+        private const int ResidualFilterSkipWaitingForBobberGone = 1 << 8;
+        private const int ResidualAutoEquipmentRestore = 1 << 9;
+        private const int ResidualLoadoutRestore = 1 << 10;
+        private const int ResidualQuestFishStorage = 1 << 11;
         private static long _lastFallbackScanTick;
         private static long _lastCompletedActionTick;
         private static long _fallbackScanExecutedCount;
         private static long _fallbackScanSkippedHookFreshCount;
         private static long _fallbackScanForcedDisappearanceConfirmationCount;
+        private static long _fallbackScanIdleSkippedCount;
+        private static long _fallbackScanHookStaleCount;
+        private static long _idleFastSkipCount;
+        private static long _idleWatchdogTickCount;
+        private static long _observerFreshActiveCount;
+        private static long _observerFreshInactiveSkipCount;
+        private static string _lastDispatchReason = "disabled";
+        private static int _lastDispatchCadenceTicks = ActiveDispatchCadenceTicks;
+        private static string _lastTickSubpath = string.Empty;
 
         public static FishingAutomationDiagnosticInfo GetDiagnostics()
         {
-            return FishingAutomationDiagnostics.GetSnapshot();
+            var snapshot = FishingAutomationDiagnostics.GetSnapshot();
+            lock (SyncRoot)
+            {
+                snapshot.FishingAutomationDispatchReason = _lastDispatchReason;
+                snapshot.FishingAutomationDispatchCadenceTicks = _lastDispatchCadenceTicks;
+                snapshot.FishingAutomationIdleFastSkipCount = _idleFastSkipCount;
+                snapshot.FishingAutomationIdleWatchdogTickCount = _idleWatchdogTickCount;
+                snapshot.FishingObserverFreshActiveCount = _observerFreshActiveCount;
+                snapshot.FishingObserverFreshInactiveSkipCount = _observerFreshInactiveSkipCount;
+                snapshot.FishingFallbackScanIdleSkippedCount = _fallbackScanIdleSkippedCount;
+                snapshot.FishingFallbackScanHookStaleCount = _fallbackScanHookStaleCount;
+                snapshot.FishingTickSubpathLast = _lastTickSubpath;
+                snapshot.FishingResidualStateMask = GetResidualStateMask();
+            }
+
+            return snapshot;
         }
 
         public static bool HasResidualState
         {
             get
             {
-                return HasLocalResidualState() ||
-                       FishingAutoEquipmentService.HasPendingRestore ||
-                       FishingLoadoutService.HasResidualState ||
-                       FishingQuestFishStorageService.HasResidualState;
+                return GetResidualStateMask() != 0;
+            }
+        }
+
+        internal static int GetResidualStateMask()
+        {
+            var mask = HasLocalResidualState();
+            if (FishingAutoEquipmentService.HasPendingRestore)
+            {
+                mask |= ResidualAutoEquipmentRestore;
+            }
+
+            if (FishingLoadoutService.HasResidualState)
+            {
+                mask |= ResidualLoadoutRestore;
+            }
+
+            if (FishingQuestFishStorageService.HasResidualState)
+            {
+                mask |= ResidualQuestFishStorage;
+            }
+
+            return mask;
+        }
+
+        internal static bool HasFreshActiveBobberForRuntime(long tick)
+        {
+            return GetObserverFreshness(tick) == FishingObserverFreshness.FreshActive;
+        }
+
+        internal static void ResetForTesting()
+        {
+            lock (SyncRoot)
+            {
+                State.Reset();
+                _lastFallbackScanTick = 0;
+                _lastCompletedActionTick = 0;
+                _fallbackScanExecutedCount = 0;
+                _fallbackScanSkippedHookFreshCount = 0;
+                _fallbackScanForcedDisappearanceConfirmationCount = 0;
+                _fallbackScanIdleSkippedCount = 0;
+                _fallbackScanHookStaleCount = 0;
+                _idleFastSkipCount = 0;
+                _idleWatchdogTickCount = 0;
+                _observerFreshActiveCount = 0;
+                _observerFreshInactiveSkipCount = 0;
+                _lastDispatchReason = "disabled";
+                _lastDispatchCadenceTicks = ActiveDispatchCadenceTicks;
+                _lastTickSubpath = string.Empty;
+            }
+
+            FishingAutomationDiagnostics.ResetForTesting();
+        }
+
+        internal static string GetDispatchReasonForResidualMask(int residualMask)
+        {
+            return residualMask == 0
+                ? "idle"
+                : "residual:0x" + residualMask.ToString("X", CultureInfo.InvariantCulture);
+        }
+
+        internal static void RecordDispatchState(string reason, int cadenceTicks)
+        {
+            lock (SyncRoot)
+            {
+                _lastDispatchReason = string.IsNullOrWhiteSpace(reason) ? "unknown" : reason;
+                _lastDispatchCadenceTicks = cadenceTicks <= 0 ? ActiveDispatchCadenceTicks : cadenceTicks;
             }
         }
 
@@ -57,17 +166,21 @@ namespace JueMingZ.Automation.Fishing
             var tick = runtimeState == null ? 0 : runtimeState.UpdateCount;
             try
             {
+                if (IsIdleWatchdogDispatch())
+                {
+                    _idleWatchdogTickCount++;
+                }
+
+                SetTickSubpath("enter");
                 settingsSnapshot = settingsSnapshot ?? RuntimeSettingsSnapshotProvider.GetCurrent();
                 var settings = settingsSnapshot.SourceSettings ?? AppSettings.CreateDefault();
                 var autoStoreMode = settingsSnapshot.FishingAutoStoreMode;
-                var truffleWormBaitActive = IsCurrentBaitTruffleWorm(settings);
-                var equipmentDisabledReason = truffleWormBaitActive ? "currentBaitTruffleWorm" : "disabled";
-                var autoLoadoutEnabled = settingsSnapshot.FishingAutoLoadoutEnabled && !truffleWormBaitActive;
-                var autoEquipmentEnabled = settingsSnapshot.FishingAutoEquipmentEnabled && !truffleWormBaitActive;
+                var residualMask = GetResidualStateMask();
                 var anyEnabled = settingsSnapshot.FishingAutomationNeedsTick ||
-                                 FishingAutoEquipmentService.HasPendingRestore;
+                                 residualMask != 0;
                 if (!anyEnabled)
                 {
+                    SetTickSubpath("disabledCleanup");
                     EndSession(queue, snapshot, tick, "allDisabled");
                     FishingQuestFishStorageService.Tick(queue, snapshot, State, autoStoreMode, tick);
                     PublishDiagnostics();
@@ -76,17 +189,43 @@ namespace JueMingZ.Automation.Fishing
 
                 if (!CanRun(snapshot))
                 {
-                    FishingAutoEquipmentService.Tick(queue, snapshot, autoEquipmentEnabled, false, FishingLiquidKind.Unknown, tick, equipmentDisabledReason);
+                    SetTickSubpath("blocked:notInWorldOrPlayerUnavailable");
+                    FishingAutoEquipmentService.Tick(queue, snapshot, settingsSnapshot.FishingAutoEquipmentEnabled, false, FishingLiquidKind.Unknown, tick, "notInWorldOrPlayerUnavailable");
                     EndSession(queue, snapshot, tick, "notInWorldOrPlayerUnavailable");
                     Record("skipped", "notInWorldOrPlayerUnavailable");
                     PublishDiagnostics();
                     return;
                 }
 
+                var observerFreshness = GetObserverFreshness(tick);
+                if (TryRunIdleFastPath(settingsSnapshot, observerFreshness, tick))
+                {
+                    PublishDiagnostics();
+                    return;
+                }
+
+                var truffleWormBaitActive = IsCurrentBaitTruffleWorm(settings);
+                var equipmentDisabledReason = truffleWormBaitActive ? "currentBaitTruffleWorm" : "disabled";
+                var autoLoadoutEnabled = settingsSnapshot.FishingAutoLoadoutEnabled && !truffleWormBaitActive;
+                var autoEquipmentEnabled = settingsSnapshot.FishingAutoEquipmentEnabled && !truffleWormBaitActive;
+
                 List<FishingBobberObservation> scanned;
-                var scanAvailable = TryRefreshFallbackScan(tick, out scanned);
+                var scanAvailable = TryRefreshFallbackScan(tick, observerFreshness, out scanned);
                 FishingBobberObservation observation;
                 var hasObservation = TrySelectObservation(scanned, out observation);
+                if (hasObservation)
+                {
+                    SetTickSubpath("observation");
+                }
+                else if (scanAvailable)
+                {
+                    SetTickSubpath("fallbackScanNoObservation");
+                }
+                else if (string.Equals(_lastTickSubpath, "enter", StringComparison.Ordinal))
+                {
+                    SetTickSubpath("noObservation");
+                }
+
                 UpdateSessionFromObservation(queue, snapshot, observation, hasObservation, tick);
                 var hasFishingEquipmentBobber = State.SessionActive &&
                                                 hasObservation &&
@@ -97,6 +236,7 @@ namespace JueMingZ.Automation.Fishing
 
                 if (State.SessionActive)
                 {
+                    SetTickSubpath("sessionActive");
                     var autoFishDispatchedBeforeLoadout = false;
                     if (settingsSnapshot.FishingAutoFishEnabled && ShouldDispatchAutoFishBeforeLoadout(hasObservation, observation))
                     {
@@ -119,6 +259,11 @@ namespace JueMingZ.Automation.Fishing
                 }
                 else
                 {
+                    if (string.Equals(_lastTickSubpath, "observation", StringComparison.Ordinal))
+                    {
+                        SetTickSubpath("observationNoSession");
+                    }
+
                     FishingLoadoutService.Tick(queue, snapshot, autoLoadoutEnabled, false, tick, truffleWormBaitActive ? "currentBaitTruffleWorm" : null);
                 }
 
@@ -150,17 +295,90 @@ namespace JueMingZ.Automation.Fishing
                    observation.Identity != State.LastProcessedHookIdentity;
         }
 
-        private static bool HasLocalResidualState()
+        private static bool TryRunIdleFastPath(
+            RuntimeSettingsSnapshot settingsSnapshot,
+            FishingObserverFreshness observerFreshness,
+            long tick)
         {
-            return State.SessionActive ||
-                   State.WaitingForBobberGone ||
-                   State.RecastDelayTicks > 0 ||
-                   State.RecastWaitingForBobber ||
-                   State.PullRequestId != Guid.Empty ||
-                   State.RecastRequestId != Guid.Empty ||
-                   State.FilterSkipInProgress ||
-                   State.FilterSkipRequestId != Guid.Empty ||
-                   State.FilterSkipWaitingForBobberGone;
+            if (settingsSnapshot == null ||
+                !settingsSnapshot.FishingAutomationNeedsTick ||
+                GetResidualStateMask() != 0 ||
+                observerFreshness != FishingObserverFreshness.FreshInactive)
+            {
+                return false;
+            }
+
+            FishingBobberObserver.MarkNoActiveObservation(GetCurrentFishingTick(tick));
+            _idleFastSkipCount++;
+            _observerFreshInactiveSkipCount++;
+            _fallbackScanIdleSkippedCount++;
+            SetTickSubpath("idleFastSkip:freshInactiveNoLocalBobber");
+            Record("idleFastSkip", "freshInactiveNoLocalBobber");
+            return true;
+        }
+
+        private static bool IsIdleWatchdogDispatch()
+        {
+            lock (SyncRoot)
+            {
+                return string.Equals(_lastDispatchReason, "idleWatchdog", StringComparison.Ordinal);
+            }
+        }
+
+        private static void SetTickSubpath(string subpath)
+        {
+            _lastTickSubpath = subpath ?? string.Empty;
+        }
+
+        private static int HasLocalResidualState()
+        {
+            var mask = 0;
+            if (State.SessionActive)
+            {
+                mask |= ResidualSessionActive;
+            }
+
+            if (State.WaitingForBobberGone)
+            {
+                mask |= ResidualWaitingForBobberGone;
+            }
+
+            if (State.RecastDelayTicks > 0)
+            {
+                mask |= ResidualRecastDelay;
+            }
+
+            if (State.RecastWaitingForBobber)
+            {
+                mask |= ResidualRecastWaitingForBobber;
+            }
+
+            if (State.PullRequestId != Guid.Empty)
+            {
+                mask |= ResidualPullRequest;
+            }
+
+            if (State.RecastRequestId != Guid.Empty)
+            {
+                mask |= ResidualRecastRequest;
+            }
+
+            if (State.FilterSkipInProgress)
+            {
+                mask |= ResidualFilterSkipInProgress;
+            }
+
+            if (State.FilterSkipRequestId != Guid.Empty)
+            {
+                mask |= ResidualFilterSkipRequest;
+            }
+
+            if (State.FilterSkipWaitingForBobberGone)
+            {
+                mask |= ResidualFilterSkipWaitingForBobberGone;
+            }
+
+            return mask;
         }
 
         private static bool IsCurrentBaitTruffleWorm(AppSettings settings)
@@ -1019,7 +1237,7 @@ namespace JueMingZ.Automation.Fishing
             return FishingBobberObserver.TryGetLatest(out observation);
         }
 
-        private static bool TryRefreshFallbackScan(long tick, out List<FishingBobberObservation> scanned)
+        private static bool TryRefreshFallbackScan(long tick, FishingObserverFreshness observerFreshness, out List<FishingBobberObservation> scanned)
         {
             scanned = null;
             var forceDisappearanceConfirmation = State.WaitingForBobberGone || State.RecastWaitingForBobber;
@@ -1031,15 +1249,19 @@ namespace JueMingZ.Automation.Fishing
                 return false;
             }
 
-            if (ShouldSkipFallbackScanBecauseHookFresh(forceBobberTransitionScan))
+            if (ShouldSkipFallbackScanBecauseHookFresh(forceBobberTransitionScan, observerFreshness, tick))
             {
                 _lastFallbackScanTick = tick;
-                _fallbackScanSkippedHookFreshCount++;
                 return false;
             }
 
             _lastFallbackScanTick = tick;
             _fallbackScanExecutedCount++;
+            if (observerFreshness == FishingObserverFreshness.Stale)
+            {
+                _fallbackScanHookStaleCount++;
+            }
+
             if (forceDisappearanceConfirmation)
             {
                 _fallbackScanForcedDisappearanceConfirmationCount++;
@@ -1052,28 +1274,42 @@ namespace JueMingZ.Automation.Fishing
             }
 
             FishingBobberObserver.RemoveMissing(scanned);
+            if (scanned.Count == 0)
+            {
+                FishingBobberObserver.MarkNoActiveObservation(GetCurrentFishingTick(tick));
+            }
+
             return true;
         }
 
-        private static bool ShouldSkipFallbackScanBecauseHookFresh(bool forceBobberTransitionScan)
+        private static bool ShouldSkipFallbackScanBecauseHookFresh(
+            bool forceBobberTransitionScan,
+            FishingObserverFreshness observerFreshness,
+            long tick)
         {
             if (forceBobberTransitionScan)
             {
                 return false;
             }
 
-            long currentGameUpdateCount;
-            if (!TerrariaFishingCompat.TryReadGameUpdateCount(out currentGameUpdateCount))
+            if (observerFreshness == FishingObserverFreshness.FreshActive)
             {
-                return false;
+                _fallbackScanSkippedHookFreshCount++;
+                _observerFreshActiveCount++;
+                SetTickSubpath("fallbackScanSkipped:freshActive");
+                return true;
             }
 
-            return ShouldSkipFallbackScanForFreshHook(
-                FishingAutomationDiagnostics.HookInstalled,
-                FishingBobberObserver.HasActiveObservation,
-                FishingBobberObserver.LastObservationTick,
-                currentGameUpdateCount,
-                false);
+            if (observerFreshness == FishingObserverFreshness.FreshInactive)
+            {
+                FishingBobberObserver.MarkNoActiveObservation(GetCurrentFishingTick(tick));
+                _fallbackScanIdleSkippedCount++;
+                _observerFreshInactiveSkipCount++;
+                SetTickSubpath("fallbackScanSkipped:freshInactiveNoLocalBobber");
+                return true;
+            }
+
+            return false;
         }
 
         internal static bool ShouldSkipFallbackScanForTesting(
@@ -1087,6 +1323,24 @@ namespace JueMingZ.Automation.Fishing
                 hookInstalled,
                 observerHasActiveObservation,
                 hookLastObservationTick,
+                0,
+                currentGameUpdateCount,
+                forceBobberTransitionScan);
+        }
+
+        internal static bool ShouldSkipFallbackScanForTesting(
+            bool hookInstalled,
+            bool observerHasActiveObservation,
+            long hookLastObservationTick,
+            long hookLastNoActiveObservationTick,
+            long currentGameUpdateCount,
+            bool forceBobberTransitionScan)
+        {
+            return ShouldSkipFallbackScanForFreshHook(
+                hookInstalled,
+                observerHasActiveObservation,
+                hookLastObservationTick,
+                hookLastNoActiveObservationTick,
                 currentGameUpdateCount,
                 forceBobberTransitionScan);
         }
@@ -1095,20 +1349,35 @@ namespace JueMingZ.Automation.Fishing
             bool hookInstalled,
             bool observerHasActiveObservation,
             long hookLastObservationTick,
+            long hookLastNoActiveObservationTick,
             long currentGameUpdateCount,
             bool forceBobberTransitionScan)
         {
             if (forceBobberTransitionScan ||
                 !hookInstalled ||
-                !observerHasActiveObservation ||
-                hookLastObservationTick <= 0 ||
                 currentGameUpdateCount <= 0)
             {
                 return false;
             }
 
-            var age = currentGameUpdateCount - hookLastObservationTick;
-            return age >= 0 && age <= HookFreshFallbackSkipTicks;
+            if (observerHasActiveObservation && hookLastObservationTick > 0)
+            {
+                var activeAge = currentGameUpdateCount - hookLastObservationTick;
+                if (activeAge >= 0 && activeAge <= HookFreshFallbackSkipTicks)
+                {
+                    return true;
+                }
+            }
+
+            if (!observerHasActiveObservation &&
+                hookLastNoActiveObservationTick > 0 &&
+                hookLastObservationTick <= hookLastNoActiveObservationTick)
+            {
+                var inactiveAge = currentGameUpdateCount - hookLastNoActiveObservationTick;
+                return inactiveAge >= 0 && inactiveAge <= IdleWatchdogCadenceTicks;
+            }
+
+            return false;
         }
 
         private static bool IsBobberGone(int identity, IReadOnlyList<FishingBobberObservation> scanned, bool scanAvailable, long tick)
@@ -1149,6 +1418,62 @@ namespace JueMingZ.Automation.Fishing
                    snapshot.Player.Active &&
                    !snapshot.Player.Dead &&
                    !snapshot.Player.Ghost;
+        }
+
+        internal static FishingObserverFreshness GetObserverFreshnessForTesting(
+            bool hookInstalled,
+            bool hasFreshActiveObservation,
+            bool hasFreshNoActiveObservation)
+        {
+            return GetObserverFreshness(hookInstalled, hasFreshActiveObservation, hasFreshNoActiveObservation);
+        }
+
+        private static FishingObserverFreshness GetObserverFreshness(long tick)
+        {
+            if (!FishingAutomationDiagnostics.HookInstalled)
+            {
+                return FishingObserverFreshness.HookUnavailable;
+            }
+
+            var currentTick = GetCurrentFishingTick(tick);
+            return GetObserverFreshness(
+                true,
+                FishingBobberObserver.HasFreshActiveObservation(currentTick, HookFreshFallbackSkipTicks),
+                FishingBobberObserver.HasFreshNoActiveObservation(currentTick, IdleWatchdogCadenceTicks));
+        }
+
+        private static FishingObserverFreshness GetObserverFreshness(
+            bool hookInstalled,
+            bool hasFreshActiveObservation,
+            bool hasFreshNoActiveObservation)
+        {
+            if (!hookInstalled)
+            {
+                return FishingObserverFreshness.HookUnavailable;
+            }
+
+            if (hasFreshActiveObservation)
+            {
+                return FishingObserverFreshness.FreshActive;
+            }
+
+            if (hasFreshNoActiveObservation)
+            {
+                return FishingObserverFreshness.FreshInactive;
+            }
+
+            return FishingObserverFreshness.Stale;
+        }
+
+        private static long GetCurrentFishingTick(long fallbackTick)
+        {
+            long currentGameUpdateCount;
+            if (TerrariaFishingCompat.TryReadGameUpdateCount(out currentGameUpdateCount) && currentGameUpdateCount > 0)
+            {
+                return currentGameUpdateCount;
+            }
+
+            return fallbackTick;
         }
 
         internal static bool IsFishingFilterEnabled(AppSettings settings)
@@ -1388,6 +1713,16 @@ namespace JueMingZ.Automation.Fishing
                 FishingFallbackScanExecutedCount = _fallbackScanExecutedCount,
                 FishingFallbackScanSkippedHookFreshCount = _fallbackScanSkippedHookFreshCount,
                 FishingFallbackScanForcedDisappearanceConfirmationCount = _fallbackScanForcedDisappearanceConfirmationCount,
+                FishingAutomationDispatchReason = _lastDispatchReason,
+                FishingAutomationDispatchCadenceTicks = _lastDispatchCadenceTicks,
+                FishingAutomationIdleFastSkipCount = _idleFastSkipCount,
+                FishingAutomationIdleWatchdogTickCount = _idleWatchdogTickCount,
+                FishingObserverFreshActiveCount = _observerFreshActiveCount,
+                FishingObserverFreshInactiveSkipCount = _observerFreshInactiveSkipCount,
+                FishingFallbackScanIdleSkippedCount = _fallbackScanIdleSkippedCount,
+                FishingFallbackScanHookStaleCount = _fallbackScanHookStaleCount,
+                FishingTickSubpathLast = _lastTickSubpath,
+                FishingResidualStateMask = GetResidualStateMask(),
                 FishingFilterMode = State.FishingFilterMode,
                 FishingFilterMatchMode = State.FishingFilterMatchMode,
                 FishingFilterCatchKind = State.FishingFilterCatchKind,

@@ -364,6 +364,14 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void AssertLongEquals(long actual, long expected, string label)
+        {
+            if (actual != expected)
+            {
+                throw new InvalidOperationException("Expected " + label + " to be " + expected.ToString(CultureInfo.InvariantCulture) + ", got " + actual.ToString(CultureInfo.InvariantCulture));
+            }
+        }
+
         private static void AssertHas(InputActionChannel actual, InputActionChannel expected, string label)
         {
             if ((actual & expected) == 0)

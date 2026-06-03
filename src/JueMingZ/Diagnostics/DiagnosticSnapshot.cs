@@ -181,6 +181,22 @@ namespace JueMingZ.Diagnostics
         public long LegacyUiLayoutCacheMissCount { get; set; }
         public int LegacyUiLastFrameVisibleElementCount { get; set; }
         public long LegacyUiHoverReuseCount { get; set; }
+        public long LegacyUiHoverTooltipCacheHitCount { get; set; }
+        public long LegacyUiHoverTooltipCacheMissCount { get; set; }
+        public long LegacyUiHoverDiagnosticSuppressedCount { get; set; }
+        public long LegacyUiScrollSnapshotSkippedCount { get; set; }
+        public long LegacyUiScrollEventCoalescedCount { get; set; }
+        public long LegacyUiRetainedFrameCacheHitCount { get; set; }
+        public long LegacyUiRetainedFrameCacheMissCount { get; set; }
+        public long LegacyUiRetainedFrameFallbackCount { get; set; }
+        public int LegacyUiRetainedFrameVisibleElementCount { get; set; }
+        public long LegacyUiActionUpdateSkippedCount { get; set; }
+        public long LegacyUiActionUpdateRanCount { get; set; }
+        public int LegacyUiPendingCommandCountLast { get; set; }
+        public int LegacyUiDispatchedCommandCountLast { get; set; }
+        public double LegacyUiDispatchElapsedMsLast { get; set; }
+        public long LegacyUiCommandCoalescedCount { get; set; }
+        public long LegacyUiDragFrameActionSkipCount { get; set; }
         public string LastDiagnosticHotkey { get; set; }
         public DateTime? LastDiagnosticHotkeyUtc { get; set; }
         public string LastDiagnosticHotkeyMessage { get; set; }
@@ -326,6 +342,29 @@ namespace JueMingZ.Diagnostics
         public long InformationNpcLabelSnapshotRefreshCount { get; set; }
         public long InformationChestLabelSnapshotRefreshCount { get; set; }
         public long InformationChestLabelSortRefreshCount { get; set; }
+        public long InformationChestAlwaysScanCacheHitCount { get; set; }
+        public long InformationChestAlwaysScanCacheMissCount { get; set; }
+        public string InformationChestAlwaysLastDirtyReason { get; set; }
+        public long InformationChestAlwaysSafeRefreshCount { get; set; }
+        public int InformationChestAlwaysTilesVisitedLast { get; set; }
+        public string InformationChestAlwaysTypedTileFastPathStatus { get; set; }
+        public long InformationChestAlwaysNameCacheHitCount { get; set; }
+        public long InformationChestAlwaysNameCacheMissCount { get; set; }
+        public int InformationChestAlwaysPartialScanFrameCount { get; set; }
+        public int InformationChestAlwaysPartialScanPendingCount { get; set; }
+        public long InformationChestAlwaysStableSnapshotId { get; set; }
+        public long InformationWorldContextCacheHitCount { get; set; }
+        public long InformationWorldContextCacheMissCount { get; set; }
+        public string InformationWorldContextProfile { get; set; }
+        public long InformationWorldContextFileDataRefreshCount { get; set; }
+        public long InformationStatusLineCacheHitCount { get; set; }
+        public long InformationStatusLineCacheMissCount { get; set; }
+        public long InformationFishingCatchEarlyCacheHitCount { get; set; }
+        public long InformationFishingCatchEarlyCacheMissCount { get; set; }
+        public long InformationFishingWaterScanCount { get; set; }
+        public long InformationFishingConditionsReadCount { get; set; }
+        public long InformationFishingBobberObserverFreshInactiveSkipCount { get; set; }
+        public long InformationFishingProjectileFallbackScanCount { get; set; }
         public bool FishingAutomationNeedsTick { get; set; }
         public bool FishingDisplayNeedsCatchResolver { get; set; }
         public bool FishingHasResidualState { get; set; }
@@ -368,6 +407,16 @@ namespace JueMingZ.Diagnostics
         public long FishingFallbackScanExecutedCount { get; set; }
         public long FishingFallbackScanSkippedHookFreshCount { get; set; }
         public long FishingFallbackScanForcedDisappearanceConfirmationCount { get; set; }
+        public string FishingAutomationDispatchReason { get; set; }
+        public int FishingAutomationDispatchCadenceTicks { get; set; }
+        public long FishingAutomationIdleFastSkipCount { get; set; }
+        public long FishingAutomationIdleWatchdogTickCount { get; set; }
+        public long FishingObserverFreshActiveCount { get; set; }
+        public long FishingObserverFreshInactiveSkipCount { get; set; }
+        public long FishingFallbackScanIdleSkippedCount { get; set; }
+        public long FishingFallbackScanHookStaleCount { get; set; }
+        public string FishingTickSubpathLast { get; set; }
+        public int FishingResidualStateMask { get; set; }
         public string FishingFilterMode { get; set; }
         public string FishingFilterMatchMode { get; set; }
         public string FishingFilterCatchKind { get; set; }
@@ -597,6 +646,14 @@ namespace JueMingZ.Diagnostics
         public long MovementSafeLandingFullAnalysisCount { get; set; }
         public long MovementSafeLandingCheapPrecheckSkipCount { get; set; }
         public long MovementSafeLandingLandingProbeCount { get; set; }
+        public long MovementSafeLandingConfigSummaryCacheHitCount { get; set; }
+        public long MovementSafeLandingConfigSummaryCacheMissCount { get; set; }
+        public long MovementSafeLandingStageSummaryCacheHitCount { get; set; }
+        public long MovementSafeLandingCheapSkipDiagnosticSuppressedCount { get; set; }
+        public long MovementSafeLandingCheapSkipDiagnosticWrittenCount { get; set; }
+        public string MovementSafeLandingCheapSkipLastReason { get; set; }
+        public int MovementSafeLandingCheapSkipDiagnosticCadenceTicks { get; set; }
+        public long MovementSafeLandingRecoverySummarySkippedCount { get; set; }
         public string MovementSafeLandingLastCompatError { get; set; }
         public string MovementSafeLandingCollisionFastPathStatus { get; set; }
         public bool MovementSafeLandingPlayerUpdateHookInstalled { get; set; }
@@ -667,6 +724,15 @@ namespace JueMingZ.Diagnostics
         public long LastAutoBuffTick { get; set; }
         public long LastAutoNurseTick { get; set; }
         public long LastAutoStationBuffTick { get; set; }
+        public long AutoStationBuffCooldownFastSkipCount { get; set; }
+        public long AutoStationBuffActiveBuffFastSkipCount { get; set; }
+        public long AutoStationBuffScanCount { get; set; }
+        public long AutoStationBuffScanCacheHitCount { get; set; }
+        public long AutoStationBuffScanCacheMissCount { get; set; }
+        public int AutoStationBuffTilesVisitedLast { get; set; }
+        public double AutoStationBuffLastScanMs { get; set; }
+        public string AutoStationBuffTileFastPathStatus { get; set; }
+        public string AutoStationBuffLastDecision { get; set; }
         public int LastAutoBuffCountBefore { get; set; }
         public int LastAutoBuffCountAfter { get; set; }
         public string QuickHealCapability { get; set; }
@@ -820,10 +886,15 @@ namespace JueMingZ.Diagnostics
             KeepFavoritedSignature = string.Empty;
             InformationEnabledSummary = string.Empty;
             InformationLastSkipReason = string.Empty;
+            InformationChestAlwaysLastDirtyReason = string.Empty;
+            InformationChestAlwaysTypedTileFastPathStatus = string.Empty;
+            InformationWorldContextProfile = string.Empty;
             FishingLastDecision = string.Empty;
             FishingLastSkipReason = string.Empty;
             FishingAutoEquipmentLastDecision = string.Empty;
             FishingAutoEquipmentLastSkipReason = string.Empty;
+            FishingAutomationDispatchReason = string.Empty;
+            FishingTickSubpathLast = string.Empty;
             FishingFilterMode = string.Empty;
             FishingFilterMatchMode = string.Empty;
             FishingFilterCatchKind = string.Empty;
@@ -881,6 +952,7 @@ namespace JueMingZ.Diagnostics
             MovementSafeLandingRejectedStrategiesSummary = string.Empty;
             MovementSafeLandingPostApplyVerificationSummary = string.Empty;
             MovementSafeLandingRecoveryStateSummary = string.Empty;
+            MovementSafeLandingCheapSkipLastReason = string.Empty;
             MovementSafeLandingLastCompatError = string.Empty;
             MovementSafeLandingCollisionFastPathStatus = string.Empty;
             MovementSafeLandingPlayerUpdateHookMessage = string.Empty;
@@ -918,6 +990,8 @@ namespace JueMingZ.Diagnostics
             LastAutoBuffResult = string.Empty;
             LastAutoNurseResult = string.Empty;
             LastAutoStationBuffResult = string.Empty;
+            AutoStationBuffTileFastPathStatus = string.Empty;
+            AutoStationBuffLastDecision = string.Empty;
             AutoHealMode = string.Empty;
             AutoManaMode = string.Empty;
             QuickHealCapability = "UnknownUntilAttempted";

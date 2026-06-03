@@ -26,6 +26,7 @@ namespace JueMingZ.Automation.AutoRecovery
         private const int BlockedEventThrottleTicks = 60;
         private const int AutoNurseCooldownTicks = 90;
         private const int AutoStationBuffCooldownTicks = 10;
+        private const int AutoStationBuffFastSkipResultThrottleTicks = 60;
         private const int AutoBuffFailedRetryThrottleTicks = 45;
         private const int AutoBuffInflightExpiryTicks = 600;
         private const int ImmediateAutoBuffInventorySignatureIntervalTicks = 15;
@@ -40,6 +41,7 @@ namespace JueMingZ.Automation.AutoRecovery
         private static long _lastAutoManaBlockedEventTick = ForceDueTick;
         private static long _lastAutoBuffBlockedEventTick = ForceDueTick;
         private static long _lastAutoBuffMissingEventTick = ForceDueTick;
+        private static long _lastAutoStationBuffFastSkipResultTick = ForceDueTick;
         private static bool _immediateBuffReconcileRequested;
         private static string _immediateBuffTriggerReason = string.Empty;
         private static bool _hasLastInventorySignature;

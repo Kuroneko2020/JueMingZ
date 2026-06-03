@@ -540,6 +540,145 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void InformationWorldContextCacheScopesStatusProfile()
+        {
+            var player = new object();
+            var cachedStatus = CreateInformationContextForCacheTest(player, "world-a#1", 100, 12f, 24f, 800, 600);
+            var sameProbe = CreateInformationContextForCacheTest(player, "world-a#1", 100, 12f, 24f, 800, 600);
+            if (!InformationWorldContextProvider.CanReuseCachedContextForTesting(
+                    cachedStatus,
+                    InformationWorldContextProfile.Status,
+                    InformationWorldContextProfile.Status,
+                    sameProbe))
+            {
+                throw new InvalidOperationException("Expected same tick, screen, player and world to reuse the status context cache.");
+            }
+
+            if (InformationWorldContextProvider.CanReuseCachedContextForTesting(
+                    cachedStatus,
+                    InformationWorldContextProfile.Status,
+                    InformationWorldContextProfile.FullRecord,
+                    sameProbe))
+            {
+                throw new InvalidOperationException("Expected a status-only cached context not to satisfy full record callers.");
+            }
+
+            if (!InformationWorldContextProvider.CanReuseCachedContextForTesting(
+                    cachedStatus,
+                    InformationWorldContextProfile.FullRecord,
+                    InformationWorldContextProfile.Status,
+                    sameProbe))
+            {
+                throw new InvalidOperationException("Expected a full record cached context to satisfy status callers.");
+            }
+
+            var movedProbe = CreateInformationContextForCacheTest(player, "world-a#1", 100, 16f, 24f, 800, 600);
+            if (InformationWorldContextProvider.CanReuseCachedContextForTesting(
+                    cachedStatus,
+                    InformationWorldContextProfile.FullRecord,
+                    InformationWorldContextProfile.Status,
+                    movedProbe))
+            {
+                throw new InvalidOperationException("Expected screen movement to dirty the information world context cache.");
+            }
+
+            var worldProbe = CreateInformationContextForCacheTest(player, "world-b#2", 100, 12f, 24f, 800, 600);
+            if (InformationWorldContextProvider.CanReuseCachedContextForTesting(
+                    cachedStatus,
+                    InformationWorldContextProfile.FullRecord,
+                    InformationWorldContextProfile.Status,
+                    worldProbe))
+            {
+                throw new InvalidOperationException("Expected world changes to dirty the information world context cache.");
+            }
+
+            if (InformationWorldContextProvider.RequiresFileDataForTesting(InformationWorldContextProfile.Status))
+            {
+                throw new InvalidOperationException("Expected status context profile to avoid full player/world file data.");
+            }
+
+            if (!InformationWorldContextProvider.RequiresFileDataForTesting(InformationWorldContextProfile.FullRecord))
+            {
+                throw new InvalidOperationException("Expected full record context profile to keep player/world file data.");
+            }
+
+            if (InformationWorldContextProvider.ShouldRefreshFileDataForTesting(InformationWorldContextProfile.Status, player, "world-a#1", 100, player, "world-a#1", 160))
+            {
+                throw new InvalidOperationException("Expected status profile to skip file data refresh checks.");
+            }
+
+            if (InformationWorldContextProvider.ShouldRefreshFileDataForTesting(InformationWorldContextProfile.FullRecord, player, "world-a#1", 100, player, "world-a#1", 159))
+            {
+                throw new InvalidOperationException("Expected full record file data to reuse within the low-frequency refresh window.");
+            }
+
+            if (!InformationWorldContextProvider.ShouldRefreshFileDataForTesting(InformationWorldContextProfile.FullRecord, player, "world-a#1", 100, player, "world-a#1", 160))
+            {
+                throw new InvalidOperationException("Expected full record file data to refresh at the low-frequency cadence.");
+            }
+
+            if (!InformationWorldContextProvider.ShouldRefreshFileDataForTesting(InformationWorldContextProfile.FullRecord, player, "world-a#1", 100, new object(), "world-a#1", 110))
+            {
+                throw new InvalidOperationException("Expected player changes to dirty full record file data.");
+            }
+
+            if (!InformationWorldContextProvider.ShouldRefreshFileDataForTesting(InformationWorldContextProfile.FullRecord, player, "world-a#1", 100, player, "world-b#2", 110))
+            {
+                throw new InvalidOperationException("Expected world changes to dirty full record file data.");
+            }
+        }
+
+        private static void InformationStatusLineCacheTracksContextIdentity()
+        {
+            var previousCulture = CultureInfo.CurrentCulture;
+            var previousUiCulture = CultureInfo.CurrentUICulture;
+            try
+            {
+                CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("zh-CN");
+                CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("zh-CN");
+
+                var settings = AppSettings.CreateDefault();
+                settings.InformationBiomeDisplayEnabled = true;
+                var player = new object();
+                var context = CreateInformationContextForCacheTest(player, "world-a#1", 120, 12f, 24f, 800, 600);
+                var signature = InformationOverlayService.BuildStatusLineCacheSignatureForTesting(context, settings);
+                if (!InformationOverlayService.CanReuseStatusLinesForTesting(100, signature, context, settings))
+                {
+                    throw new InvalidOperationException("Expected unchanged status line context to reuse within the refresh cadence.");
+                }
+
+                context.GameUpdateCount = 130;
+                if (InformationOverlayService.CanReuseStatusLinesForTesting(100, signature, context, settings))
+                {
+                    throw new InvalidOperationException("Expected status line cache to refresh at the 30 tick cadence.");
+                }
+
+                context.GameUpdateCount = 120;
+                var worldChanged = CreateInformationContextForCacheTest(player, "world-b#2", 120, 12f, 24f, 800, 600);
+                if (string.Equals(signature, InformationOverlayService.BuildStatusLineCacheSignatureForTesting(worldChanged, settings), StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected status line cache signature to track world identity.");
+                }
+
+                var playerChanged = CreateInformationContextForCacheTest(new object(), "world-a#1", 120, 12f, 24f, 800, 600);
+                if (string.Equals(signature, InformationOverlayService.BuildStatusLineCacheSignatureForTesting(playerChanged, settings), StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected status line cache signature to track local player identity.");
+                }
+
+                CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("en-US");
+                if (string.Equals(signature, InformationOverlayService.BuildStatusLineCacheSignatureForTesting(context, settings), StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected status line cache signature to dirty on UI language changes.");
+                }
+            }
+            finally
+            {
+                CultureInfo.CurrentCulture = previousCulture;
+                CultureInfo.CurrentUICulture = previousUiCulture;
+            }
+        }
+
         private static void InformationStatusPanelLayoutCacheReusesPreparedRows()
         {
             InformationStatusPanelService.ResetLayoutCacheForTesting();
@@ -791,6 +930,39 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void InformationOverlayContextProfilesRouteStatusAndWorldRecord()
+        {
+            var settings = AppSettings.CreateDefault();
+            settings.InformationBiomeDisplayEnabled = true;
+
+            if (InformationOverlayService.BuildStatusContextProfileForTesting(settings) != InformationWorldContextProfile.Status)
+            {
+                throw new InvalidOperationException("Expected status panel rendering to use the lightweight information context profile.");
+            }
+
+            if (InformationOverlayService.BuildWorldOverlayContextProfileForTesting(settings) != InformationWorldContextProfile.FullRecord)
+            {
+                throw new InvalidOperationException("Expected world overlay rendering to keep full record context for player/world scoped records.");
+            }
+        }
+
+        private static InformationWorldContext CreateInformationContextForCacheTest(object player, string worldKey, ulong updateCount, float screenX, float screenY, int screenWidth, int screenHeight)
+        {
+            return new InformationWorldContext
+            {
+                MainType = typeof(Program),
+                LocalPlayer = player,
+                ScreenX = screenX,
+                ScreenY = screenY,
+                ScreenWidth = screenWidth,
+                ScreenHeight = screenHeight,
+                PlayerCenterX = 240f,
+                PlayerCenterY = 320f,
+                GameUpdateCount = updateCount,
+                WorldKey = worldKey
+            };
+        }
+
         private static void InformationTileHighlightCacheKeepsSafetyRefresh()
         {
             if (!InformationOverlayService.ShouldRefreshTileHighlightCacheForTesting(0, 1u, 10, 1u))
@@ -913,6 +1085,284 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void InformationFishingCatchEarlyKeyTracksEnvironment()
+        {
+            var previousCulture = CultureInfo.CurrentCulture;
+            var previousUiCulture = CultureInfo.CurrentUICulture;
+            try
+            {
+                CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("en-US");
+                CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("en-US");
+                var player = new TestInformationFishingEnvironmentPlayer
+                {
+                    luck = 0.25d,
+                    fishingSkill = 12,
+                    accLavaFishing = true,
+                    ZoneJungle = true,
+                    buffType = new[] { 111, 0, 0 },
+                    buffTime = new[] { 30, 0, 0 }
+                };
+                var context = new InformationWorldContext
+                {
+                    LocalPlayer = player,
+                    WorldKey = "world-a#42",
+                    PlayerCenterY = 1200f
+                };
+
+                var signature = InformationFishingCatchResolver.BuildEarlyCatchQuerySignatureForTesting(
+                    context,
+                    80,
+                    120,
+                    77,
+                    20,
+                    TestFishingRod,
+                    15,
+                    267,
+                    2454);
+
+                var same = InformationFishingCatchResolver.BuildEarlyCatchQuerySignatureForTesting(
+                    context,
+                    80,
+                    120,
+                    77,
+                    20,
+                    TestFishingRod,
+                    15,
+                    267,
+                    2454);
+                if (!string.Equals(signature, same, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected identical early fishing catch inputs to reuse the same cache signature.");
+                }
+
+                var changedWorldContext = new InformationWorldContext
+                {
+                    LocalPlayer = player,
+                    WorldKey = "world-b#99",
+                    PlayerCenterY = 1200f
+                };
+                var changedWorld = InformationFishingCatchResolver.BuildEarlyCatchQuerySignatureForTesting(
+                    changedWorldContext,
+                    80,
+                    120,
+                    77,
+                    20,
+                    TestFishingRod,
+                    15,
+                    267,
+                    2454);
+                if (string.Equals(signature, changedWorld, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected world changes to dirty the early fishing catch cache key.");
+                }
+
+                var otherPlayer = new TestInformationFishingEnvironmentPlayer
+                {
+                    luck = 0.25d,
+                    fishingSkill = 12,
+                    accLavaFishing = true,
+                    ZoneJungle = true,
+                    buffType = new[] { 111, 0, 0 },
+                    buffTime = new[] { 30, 0, 0 }
+                };
+                var changedPlayerContext = new InformationWorldContext
+                {
+                    LocalPlayer = otherPlayer,
+                    WorldKey = "world-a#42",
+                    PlayerCenterY = 1200f
+                };
+                var changedPlayer = InformationFishingCatchResolver.BuildEarlyCatchQuerySignatureForTesting(
+                    changedPlayerContext,
+                    80,
+                    120,
+                    77,
+                    20,
+                    TestFishingRod,
+                    15,
+                    267,
+                    2454);
+                if (string.Equals(signature, changedPlayer, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected player identity changes to dirty the early fishing catch cache key.");
+                }
+
+                var movedBobber = InformationFishingCatchResolver.BuildEarlyCatchQuerySignatureForTesting(
+                    context,
+                    81,
+                    120,
+                    77,
+                    20,
+                    TestFishingRod,
+                    15,
+                    267,
+                    2454);
+                if (string.Equals(signature, movedBobber, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected bobber tile changes to dirty the early fishing catch cache key.");
+                }
+
+                var changedQuest = InformationFishingCatchResolver.BuildEarlyCatchQuerySignatureForTesting(
+                    context,
+                    80,
+                    120,
+                    77,
+                    20,
+                    TestFishingRod,
+                    15,
+                    267,
+                    2455);
+                if (string.Equals(signature, changedQuest, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected angler quest fish changes to dirty the early fishing catch cache key.");
+                }
+
+                CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("zh-CN");
+                CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("zh-CN");
+                var changedLanguage = InformationFishingCatchResolver.BuildEarlyCatchQuerySignatureForTesting(
+                    context,
+                    80,
+                    120,
+                    77,
+                    20,
+                    TestFishingRod,
+                    15,
+                    267,
+                    2454);
+                if (string.Equals(signature, changedLanguage, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected language changes to dirty the early fishing catch cache key.");
+                }
+
+                CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("en-US");
+                CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("en-US");
+                player.buffType[1] = 222;
+                player.buffTime[1] = 60;
+                var changedBuff = InformationFishingCatchResolver.BuildEarlyCatchQuerySignatureForTesting(
+                    context,
+                    80,
+                    120,
+                    77,
+                    20,
+                    TestFishingRod,
+                    15,
+                    267,
+                    2454);
+                if (string.Equals(signature, changedBuff, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected active player buff changes to dirty the early fishing catch cache key.");
+                }
+
+                var settings = AppSettings.CreateDefault();
+                settings.InformationFishingFilteredCatchesEnabled = true;
+                settings.FishingFilterMode = FishingFilterModes.AllowList;
+                var filterSignature = InformationOverlayService.BuildStatusLineCacheSignatureForTesting(context, settings);
+                settings.FishingFilterMode = FishingFilterModes.DenyList;
+                var changedFilterSignature = InformationOverlayService.BuildStatusLineCacheSignatureForTesting(context, settings);
+                if (string.Equals(filterSignature, changedFilterSignature, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected fishing filter changes to dirty status-line output without being part of the early environment cache.");
+                }
+            }
+            finally
+            {
+                CultureInfo.CurrentCulture = previousCulture;
+                CultureInfo.CurrentUICulture = previousUiCulture;
+            }
+        }
+
+        private static void InformationFishingCatchEarlyCacheHitSkipsHeavyCounters()
+        {
+            InformationFishingCatchResolver.ResetCatchCacheForTesting();
+            var candidates = new List<FishingCatchCandidate>
+            {
+                new FishingCatchCandidate
+                {
+                    Kind = FishingCatchKinds.Item,
+                    Id = 1,
+                    DisplayName = "Cached Fish",
+                    DisplayNameSnapshot = "Cached Fish"
+                }
+            };
+
+            InformationFishingCatchResolver.StoreEarlyCatchCacheForTesting("early:test", candidates, "cached");
+            IList<FishingCatchCandidate> cached;
+            string message;
+            if (!InformationFishingCatchResolver.TryGetEarlyCatchCacheForTesting("early:test", out cached, out message) ||
+                cached.Count != 1 ||
+                !string.Equals(message, "cached", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected early fishing catch cache to return stored candidates and message.");
+            }
+
+            if (InformationFishingCatchResolver.EarlyCacheHitCount != 1 ||
+                InformationFishingCatchResolver.EarlyCacheMissCount != 0)
+            {
+                throw new InvalidOperationException("Expected early fishing catch cache hit diagnostics to increment once.");
+            }
+
+            if (InformationFishingCatchResolver.WaterScanCount != 0 ||
+                InformationFishingCatchResolver.ConditionsReadCount != 0)
+            {
+                throw new InvalidOperationException("Expected early fishing catch cache hit to bypass water scan and fishing conditions read counters.");
+            }
+        }
+
+        private static void InformationFishingBobberFreshInactiveSkipsProjectileFallback()
+        {
+            InformationOverlayService.ResetFishingBobberLookupDiagnosticsForTesting();
+            FishingBobberObserver.RemoveMissing(null);
+            FishingBobberObserver.MarkNoActiveObservation(200);
+            Terraria.Main.myPlayer = 0;
+            Terraria.Main.projectile = new object[]
+            {
+                new TestInformationProjectile
+                {
+                    active = true,
+                    bobber = true,
+                    owner = 0,
+                    identity = 91,
+                    Center = new Terraria.TestVector2 { X = 320f, Y = 480f }
+                }
+            };
+
+            var context = new InformationWorldContext
+            {
+                MainType = typeof(Terraria.Main),
+                GameUpdateCount = 201
+            };
+            float x;
+            float y;
+            if (InformationOverlayService.TryFindLocalBobberForTesting(context, out x, out y))
+            {
+                throw new InvalidOperationException("Expected fresh inactive observer state to skip projectile fallback.");
+            }
+
+            var diagnostics = InformationOverlayService.GetDiagnostics();
+            if (diagnostics.FishingBobberObserverFreshInactiveSkipCount != 1 ||
+                diagnostics.FishingProjectileFallbackScanCount != 0)
+            {
+                throw new InvalidOperationException("Expected fresh inactive observer diagnostics to record a skip without projectile fallback.");
+            }
+
+            InformationOverlayService.ResetFishingBobberLookupDiagnosticsForTesting();
+            FishingBobberObserver.RemoveMissing(null);
+            FishingBobberObserver.MarkNoActiveObservation(200);
+            context.GameUpdateCount = 204;
+            if (!InformationOverlayService.TryFindLocalBobberForTesting(context, out x, out y) ||
+                Math.Abs(x - 320f) > 0.01f ||
+                Math.Abs(y - 480f) > 0.01f)
+            {
+                throw new InvalidOperationException("Expected stale inactive observer state to fall back to projectile scanning.");
+            }
+
+            diagnostics = InformationOverlayService.GetDiagnostics();
+            if (diagnostics.FishingBobberObserverFreshInactiveSkipCount != 0 ||
+                diagnostics.FishingProjectileFallbackScanCount != 1)
+            {
+                throw new InvalidOperationException("Expected stale inactive observer diagnostics to record projectile fallback.");
+            }
+        }
+
         private static InformationWorldContext CreateInformationTileHighlightContext(float screenX, float screenY, int screenWidth, int screenHeight, float playerCenterX, float playerCenterY, string worldKey, string worldRecordKey)
         {
             return new InformationWorldContext
@@ -974,6 +1424,324 @@ namespace JueMingZ.Tests
                     throw new InvalidOperationException("Expected chest label cache signature to change when opened chest records change.");
                 }
             });
+        }
+
+        private static void InformationChestAlwaysDirtyCacheTracksMovementWorldAndStyle()
+        {
+            WithTemporaryBehaviorStore(() =>
+            {
+                var settings = AppSettings.CreateDefault();
+                var context = CreateInformationChestCacheContext(1024f, 2048f, 800, 600, 1400f, 2300f, "world#42", "world-a", "player-a", 100);
+                var smallMove = CreateInformationChestCacheContext(1055f, 2048f, 800, 600, 1406f, 2300f, "world#42", "world-a", "player-a", 101);
+
+                var signature = InformationOverlayService.BuildChestLabelCacheSignatureForTesting(context, settings, "Always");
+                var smallMoveSignature = InformationOverlayService.BuildChestLabelCacheSignatureForTesting(smallMove, settings, "Always");
+                if (!string.Equals(signature, smallMoveSignature, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected Always chest cache signature to survive movement within the same chunk.");
+                }
+
+                string reason;
+                if (InformationOverlayService.ShouldRefreshChestAlwaysCacheForTesting(100, context, settings, "Always", 101, smallMove, settings, "Always", out reason) ||
+                    !string.Equals(reason, "cacheHit", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected Always chest cache to hit for small movement, got " + reason + ".");
+                }
+
+                var screenChunkMove = CreateInformationChestCacheContext(1088f, 2048f, 800, 600, 1406f, 2300f, "world#42", "world-a", "player-a", 101);
+                if (!InformationOverlayService.ShouldRefreshChestAlwaysCacheForTesting(100, context, settings, "Always", 101, screenChunkMove, settings, "Always", out reason) ||
+                    !string.Equals(reason, "screenChunkChanged", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected screen chunk movement to dirty Always chest cache, got " + reason + ".");
+                }
+
+                var playerChunkMove = CreateInformationChestCacheContext(1024f, 2048f, 800, 600, 1408f, 2300f, "world#42", "world-a", "player-a", 101);
+                if (!InformationOverlayService.ShouldRefreshChestAlwaysCacheForTesting(100, context, settings, "Always", 101, playerChunkMove, settings, "Always", out reason) ||
+                    !string.Equals(reason, "playerChunkChanged", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected player chunk movement to dirty Always chest cache, got " + reason + ".");
+                }
+
+                var resized = CreateInformationChestCacheContext(1024f, 2048f, 801, 600, 1400f, 2300f, "world#42", "world-a", "player-a", 101);
+                if (!InformationOverlayService.ShouldRefreshChestAlwaysCacheForTesting(100, context, settings, "Always", 101, resized, settings, "Always", out reason) ||
+                    !string.Equals(reason, "screenSizeChanged", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected screen size changes to dirty Always chest cache, got " + reason + ".");
+                }
+
+                var otherWorld = CreateInformationChestCacheContext(1024f, 2048f, 800, 600, 1400f, 2300f, "world#43", "world-b", "player-a", 101);
+                if (!InformationOverlayService.ShouldRefreshChestAlwaysCacheForTesting(100, context, settings, "Always", 101, otherWorld, settings, "Always", out reason) ||
+                    !string.Equals(reason, "worldChanged", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected world changes to dirty Always chest cache, got " + reason + ".");
+                }
+
+                var styled = AppSettings.CreateDefault();
+                styled.InformationChestNameFontScale = 0.81d;
+                if (!InformationOverlayService.ShouldRefreshChestAlwaysCacheForTesting(100, context, settings, "Always", 101, context, styled, "Always", out reason) ||
+                    !string.Equals(reason, "styleChanged", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected chest label style changes to dirty Always chest cache, got " + reason + ".");
+                }
+            });
+        }
+
+        private static void InformationChestAlwaysDirtyCacheKeepsSafeRefresh()
+        {
+            var settings = AppSettings.CreateDefault();
+            var context = CreateInformationChestCacheContext(1024f, 2048f, 800, 600, 1400f, 2300f, "world#42", "world-a", "player-a", 100);
+
+            string reason;
+            if (!InformationOverlayService.ShouldRefreshChestAlwaysCacheForTesting(0, context, settings, "Always", 100, context, settings, "Always", out reason) ||
+                !string.Equals(reason, "initial", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected initial Always chest cache scan, got " + reason + ".");
+            }
+
+            if (InformationOverlayService.ShouldRefreshChestAlwaysCacheForTesting(100, context, settings, "Always", 399, context, settings, "Always", out reason) ||
+                !string.Equals(reason, "cacheHit", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected Always chest cache to hit before the safety refresh tick, got " + reason + ".");
+            }
+
+            if (!InformationOverlayService.ShouldRefreshChestAlwaysCacheForTesting(100, context, settings, "Always", 400, context, settings, "Always", out reason) ||
+                !string.Equals(reason, "safeRefresh", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected Always chest cache safety refresh at 300 ticks, got " + reason + ".");
+            }
+        }
+
+        private static void InformationChestAlwaysCacheCountersIgnoreOpenedMode()
+        {
+            WithTemporaryBehaviorStore(() =>
+            {
+                InformationOverlayService.ResetChestLabelCacheForTesting();
+                try
+                {
+                    var settings = AppSettings.CreateDefault();
+                    var context = CreateInformationChestCacheContext(1024f, 2048f, 800, 600, 1400f, 2300f, "world#42", "world-a", "player-a", 100);
+
+                    InformationOverlayService.GetChestLabelCountForTesting(context, settings, "Always");
+                    var diagnostics = InformationOverlayService.GetDiagnostics();
+                    if (diagnostics.ChestAlwaysScanCacheMissCount != 1 ||
+                        diagnostics.ChestAlwaysScanCacheHitCount != 0 ||
+                        !string.Equals(diagnostics.ChestAlwaysLastDirtyReason, "initial", StringComparison.Ordinal))
+                    {
+                        throw new InvalidOperationException("Expected first Always chest scan to record one miss and initial dirty reason.");
+                    }
+
+                    context.GameUpdateCount = 101;
+                    InformationOverlayService.GetChestLabelCountForTesting(context, settings, "Always");
+                    diagnostics = InformationOverlayService.GetDiagnostics();
+                    if (diagnostics.ChestAlwaysScanCacheMissCount != 1 ||
+                        diagnostics.ChestAlwaysScanCacheHitCount != 1)
+                    {
+                        throw new InvalidOperationException("Expected repeated Always scan to hit cache.");
+                    }
+
+                    context.GameUpdateCount = 102;
+                    InformationOverlayService.GetChestLabelCountForTesting(context, settings, "Opened");
+                    diagnostics = InformationOverlayService.GetDiagnostics();
+                    if (diagnostics.ChestAlwaysScanCacheMissCount != 1 ||
+                        diagnostics.ChestAlwaysScanCacheHitCount != 1)
+                    {
+                        throw new InvalidOperationException("Expected Opened mode lookup not to mutate Always cache counters.");
+                    }
+
+                    context.GameUpdateCount = 103;
+                    InformationOverlayService.GetChestLabelCountForTesting(context, settings, "Always");
+                    diagnostics = InformationOverlayService.GetDiagnostics();
+                    if (diagnostics.ChestAlwaysScanCacheMissCount != 1 ||
+                        diagnostics.ChestAlwaysScanCacheHitCount != 2)
+                    {
+                        throw new InvalidOperationException("Expected Always cache to survive switching through Opened mode.");
+                    }
+                }
+                finally
+                {
+                    InformationOverlayService.ResetChestLabelCacheForTesting();
+                }
+            });
+        }
+
+        private static void InformationChestAlwaysTypedScanDiagnosticsTrackFallbackTiles()
+        {
+            WithTemporaryBehaviorStore(() =>
+            {
+                InformationOverlayService.ResetChestLabelCacheForTesting();
+                FakeChestMain.ConfigureChest(5, 6, 21, 0);
+                try
+                {
+                    var settings = AppSettings.CreateDefault();
+                    var context = CreateInformationChestCacheContext(0f, 0f, 320, 240, 96f, 112f, "fake-world#1", "fake-world-record", "player-a", 100);
+                    context.MainType = typeof(FakeChestMain);
+
+                    var count = InformationOverlayService.GetChestLabelCountForTesting(context, settings, "Always");
+                    var diagnostics = InformationOverlayService.GetDiagnostics();
+                    if (count != 1)
+                    {
+                        throw new InvalidOperationException("Expected fake Always chest scan to find one chest, got " + count.ToString(CultureInfo.InvariantCulture) + ".");
+                    }
+
+                    if (diagnostics.ChestAlwaysTilesVisitedLast <= 0)
+                    {
+                        throw new InvalidOperationException("Expected Always chest scan diagnostics to record visited tiles.");
+                    }
+
+                    if (string.IsNullOrWhiteSpace(diagnostics.ChestAlwaysTypedTileFastPathStatus) ||
+                        diagnostics.ChestAlwaysTypedTileFastPathStatus.IndexOf("fallback=", StringComparison.Ordinal) < 0)
+                    {
+                        throw new InvalidOperationException("Expected Always chest scan diagnostics to record typed/fallback tile status.");
+                    }
+
+                    if (diagnostics.ChestAlwaysNameCacheMissCount != 1 ||
+                        diagnostics.ChestAlwaysNameCacheHitCount != 0)
+                    {
+                        throw new InvalidOperationException("Expected first Always chest name resolve to miss the name cache.");
+                    }
+                }
+                finally
+                {
+                    FakeChestMain.Reset();
+                    InformationOverlayService.ResetChestLabelCacheForTesting();
+                }
+            });
+        }
+
+        private static void InformationChestAlwaysNameCacheReusesAcrossDirtyScans()
+        {
+            WithTemporaryBehaviorStore(() =>
+            {
+                InformationOverlayService.ResetChestLabelCacheForTesting();
+                FakeChestMain.ConfigureChest(5, 6, 21, 0);
+                try
+                {
+                    var settings = AppSettings.CreateDefault();
+                    var context = CreateInformationChestCacheContext(0f, 0f, 320, 240, 96f, 112f, "fake-world#1", "fake-world-record", "player-a", 100);
+                    context.MainType = typeof(FakeChestMain);
+
+                    if (InformationOverlayService.GetChestLabelCountForTesting(context, settings, "Always") != 1)
+                    {
+                        throw new InvalidOperationException("Expected first fake Always chest scan to find one chest.");
+                    }
+
+                    var moved = CreateInformationChestCacheContext(64f, 0f, 320, 240, 128f, 112f, "fake-world#1", "fake-world-record", "player-a", 101);
+                    moved.MainType = typeof(FakeChestMain);
+                    if (InformationOverlayService.GetChestLabelCountForTesting(moved, settings, "Always") != 1)
+                    {
+                        throw new InvalidOperationException("Expected dirty fake Always chest scan to keep the same visible chest.");
+                    }
+
+                    var diagnostics = InformationOverlayService.GetDiagnostics();
+                    if (diagnostics.ChestAlwaysNameCacheMissCount != 1 ||
+                        diagnostics.ChestAlwaysNameCacheHitCount != 1)
+                    {
+                        throw new InvalidOperationException(
+                            "Expected Always chest name cache to miss once and hit once, got miss=" +
+                            diagnostics.ChestAlwaysNameCacheMissCount.ToString(CultureInfo.InvariantCulture) +
+                            " hit=" +
+                            diagnostics.ChestAlwaysNameCacheHitCount.ToString(CultureInfo.InvariantCulture) +
+                            ".");
+                    }
+                }
+                finally
+                {
+                    FakeChestMain.Reset();
+                    InformationOverlayService.ResetChestLabelCacheForTesting();
+                }
+            });
+        }
+
+        private static void InformationChestAlwaysPartialScanPublishesStableSnapshots()
+        {
+            WithTemporaryBehaviorStore(() =>
+            {
+                InformationOverlayService.SetChestAlwaysPartialScanBudgetForTesting(10);
+                FakeChestMain.ConfigureChest(5, 6, 21, 0);
+                try
+                {
+                    var settings = AppSettings.CreateDefault();
+                    var context = CreateInformationChestCacheContext(0f, 0f, 320, 240, 96f, 112f, "fake-world#1", "fake-world-record", "player-a", 100);
+                    context.MainType = typeof(FakeChestMain);
+
+                    var firstCount = InformationOverlayService.GetChestLabelCountForTesting(context, settings, "Always");
+                    var diagnostics = InformationOverlayService.GetDiagnostics();
+                    if (firstCount != 0 ||
+                        diagnostics.ChestAlwaysPartialScanPendingCount <= 0 ||
+                        diagnostics.ChestAlwaysStableSnapshotId != 0)
+                    {
+                        throw new InvalidOperationException("Expected initial partial Always scan to return no stable labels while pending.");
+                    }
+
+                    var completedCount = CompleteAlwaysChestPartialScanForTesting(context, settings, 1, 1);
+                    diagnostics = InformationOverlayService.GetDiagnostics();
+                    if (completedCount != 1 ||
+                        diagnostics.ChestAlwaysPartialScanPendingCount != 0 ||
+                        diagnostics.ChestAlwaysPartialScanFrameCount <= 1 ||
+                        diagnostics.ChestAlwaysStableSnapshotId != 1)
+                    {
+                        throw new InvalidOperationException(
+                            "Expected initial partial Always scan to publish stable snapshot 1, count=" +
+                            completedCount.ToString(CultureInfo.InvariantCulture) +
+                            " pending=" +
+                            diagnostics.ChestAlwaysPartialScanPendingCount.ToString(CultureInfo.InvariantCulture) +
+                            " frames=" +
+                            diagnostics.ChestAlwaysPartialScanFrameCount.ToString(CultureInfo.InvariantCulture) +
+                            " stable=" +
+                            diagnostics.ChestAlwaysStableSnapshotId.ToString(CultureInfo.InvariantCulture) +
+                            ".");
+                    }
+
+                    var moved = CreateInformationChestCacheContext(64f, 0f, 320, 240, 96f, 112f, "fake-world#1", "fake-world-record", "player-a", context.GameUpdateCount + 1);
+                    moved.MainType = typeof(FakeChestMain);
+                    var pendingMoveCount = InformationOverlayService.GetChestLabelCountForTesting(moved, settings, "Always");
+                    diagnostics = InformationOverlayService.GetDiagnostics();
+                    if (pendingMoveCount != 1 ||
+                        diagnostics.ChestAlwaysPartialScanPendingCount <= 0 ||
+                        diagnostics.ChestAlwaysStableSnapshotId != 1)
+                    {
+                        throw new InvalidOperationException("Expected dirty partial Always scan to keep drawing previous stable snapshot while pending.");
+                    }
+
+                    var movedCompletedCount = CompleteAlwaysChestPartialScanForTesting(moved, settings, 2, 1);
+                    diagnostics = InformationOverlayService.GetDiagnostics();
+                    if (movedCompletedCount != 1 ||
+                        diagnostics.ChestAlwaysPartialScanPendingCount != 0 ||
+                        diagnostics.ChestAlwaysStableSnapshotId != 2)
+                    {
+                        throw new InvalidOperationException("Expected dirty partial Always scan to publish a second stable snapshot.");
+                    }
+                }
+                finally
+                {
+                    InformationOverlayService.SetChestAlwaysPartialScanBudgetForTesting(0);
+                    FakeChestMain.Reset();
+                    InformationOverlayService.ResetChestLabelCacheForTesting();
+                }
+            });
+        }
+
+        private static int CompleteAlwaysChestPartialScanForTesting(InformationWorldContext context, AppSettings settings, long expectedStableSnapshotId, int expectedCount)
+        {
+            var count = 0;
+            for (var attempt = 0; attempt < 200; attempt++)
+            {
+                context.GameUpdateCount++;
+                count = InformationOverlayService.GetChestLabelCountForTesting(context, settings, "Always");
+                var diagnostics = InformationOverlayService.GetDiagnostics();
+                if (diagnostics.ChestAlwaysPartialScanPendingCount == 0 &&
+                    diagnostics.ChestAlwaysStableSnapshotId >= expectedStableSnapshotId)
+                {
+                    return count;
+                }
+            }
+
+            throw new InvalidOperationException(
+                "Timed out waiting for partial Always chest scan to publish stable snapshot " +
+                expectedStableSnapshotId.ToString(CultureInfo.InvariantCulture) +
+                " with expected count " +
+                expectedCount.ToString(CultureInfo.InvariantCulture) +
+                ".");
         }
 
         private static void PlayerWorldBehaviorRecordsIsolateOpenedChests()
@@ -1085,6 +1853,108 @@ namespace JueMingZ.Tests
             };
         }
 
+        private static InformationWorldContext CreateInformationChestCacheContext(
+            float screenX,
+            float screenY,
+            int screenWidth,
+            int screenHeight,
+            float playerCenterX,
+            float playerCenterY,
+            string worldKey,
+            string worldRecordKey,
+            string playerRecordKey,
+            ulong gameUpdateCount)
+        {
+            return new InformationWorldContext
+            {
+                LocalPlayer = new object(),
+                ScreenX = screenX,
+                ScreenY = screenY,
+                ScreenWidth = screenWidth,
+                ScreenHeight = screenHeight,
+                PlayerCenterX = playerCenterX,
+                PlayerCenterY = playerCenterY,
+                WorldKey = worldKey,
+                WorldRecordKey = worldRecordKey,
+                PlayerRecordKey = playerRecordKey,
+                PlayerName = playerRecordKey,
+                WorldName = worldKey,
+                GameUpdateCount = gameUpdateCount
+            };
+        }
+
+        private static class FakeChestMain
+        {
+            public static FakeChestTile[,] tile = new FakeChestTile[1, 1];
+            public static bool[] tileContainer = new bool[1024];
+            public static int maxTilesX = 1;
+            public static int maxTilesY = 1;
+
+            public static void ConfigureChest(int chestX, int chestY, int tileType, int style)
+            {
+                maxTilesX = Math.Max(24, chestX + 4);
+                maxTilesY = Math.Max(24, chestY + 4);
+                tile = new FakeChestTile[maxTilesX, maxTilesY];
+                tileContainer = new bool[1024];
+                if (tileType >= 0 && tileType < tileContainer.Length)
+                {
+                    tileContainer[tileType] = true;
+                }
+
+                SetTile(chestX, chestY, tileType, style * 36, 0);
+                SetTile(chestX + 1, chestY, tileType, style * 36 + 18, 0);
+                SetTile(chestX, chestY + 1, tileType, style * 36, 18);
+                SetTile(chestX + 1, chestY + 1, tileType, style * 36 + 18, 18);
+            }
+
+            public static void ConfigureDresser(int chestX, int chestY, int tileType, int style)
+            {
+                maxTilesX = Math.Max(24, chestX + 5);
+                maxTilesY = Math.Max(24, chestY + 4);
+                tile = new FakeChestTile[maxTilesX, maxTilesY];
+                tileContainer = new bool[1024];
+                if (tileType >= 0 && tileType < tileContainer.Length)
+                {
+                    tileContainer[tileType] = true;
+                }
+
+                var frameX = style * 54;
+                SetTile(chestX, chestY, tileType, frameX, 0);
+                SetTile(chestX + 1, chestY, tileType, frameX + 18, 0);
+                SetTile(chestX + 2, chestY, tileType, frameX + 36, 0);
+                SetTile(chestX, chestY + 1, tileType, frameX, 18);
+                SetTile(chestX + 1, chestY + 1, tileType, frameX + 18, 18);
+                SetTile(chestX + 2, chestY + 1, tileType, frameX + 36, 18);
+            }
+
+            public static void Reset()
+            {
+                tile = new FakeChestTile[1, 1];
+                tileContainer = new bool[1024];
+                maxTilesX = 1;
+                maxTilesY = 1;
+            }
+
+            private static void SetTile(int x, int y, int tileType, int frameX, int frameY)
+            {
+                tile[x, y] = new FakeChestTile
+                {
+                    IsActive = true,
+                    type = tileType,
+                    frameX = frameX,
+                    frameY = frameY
+                };
+            }
+        }
+
+        private sealed class FakeChestTile
+        {
+            public bool IsActive { get; set; }
+            public int type;
+            public int frameX;
+            public int frameY;
+        }
+
         private static void WithTemporaryBehaviorStore(Action action)
         {
             var directory = Path.Combine(Path.GetTempPath(), "JueMingZ.Tests", "behavior-" + Guid.NewGuid().ToString("N"));
@@ -1145,6 +2015,24 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void InformationChestTileFallbackIncludesDressersAndExcludesDisplayContainers()
+        {
+            if (!InformationOverlayService.IsChestTileTypeForTesting(88) ||
+                !InformationOverlayService.IsChestTileTypeForTesting(441) ||
+                !InformationOverlayService.IsChestTileTypeForTesting(468))
+            {
+                throw new InvalidOperationException("Expected chest labels to include dressers and fake container tile ids.");
+            }
+
+            if (InformationOverlayService.IsChestTileTypeForTesting(470) ||
+                InformationOverlayService.IsChestTileTypeForTesting(475) ||
+                InformationOverlayService.IsChestTileTypeForTesting(128) ||
+                InformationOverlayService.IsChestTileTypeForTesting(269))
+            {
+                throw new InvalidOperationException("Expected chest labels to reject display dolls, hat racks, and mannequin tile ids.");
+            }
+        }
+
         private static void InformationChestTileFallbackNormalizesTwoByTwoFrameOrigin()
         {
             int x;
@@ -1161,6 +2049,75 @@ namespace JueMingZ.Tests
                 y != 200)
             {
                 throw new InvalidOperationException("Expected top-left chest frame tile to keep its origin.");
+            }
+        }
+
+        private static void InformationDresserChestLabelsUseThreeByTwoFrameRules()
+        {
+            int x;
+            int y;
+            if (!InformationOverlayService.TryNormalizeChestOriginFromFrameForTesting(88, 102, 201, 36, 18, out x, out y) ||
+                x != 100 ||
+                y != 200)
+            {
+                throw new InvalidOperationException("Expected bottom-right dresser frame tile to normalize with 3x2 dresser geometry.");
+            }
+
+            if (InformationOverlayService.BuildChestTileStyleForTesting(88, 54 * 2 + 36) != 2)
+            {
+                throw new InvalidOperationException("Expected dresser style to use 54px frame width.");
+            }
+
+            if (InformationOverlayService.BuildChestTileStyleForTesting(21, 36 * 2 + 18) != 2)
+            {
+                throw new InvalidOperationException("Expected normal chest style to keep 36px frame width.");
+            }
+
+            WithTemporaryBehaviorStore(() =>
+            {
+                InformationOverlayService.ResetChestLabelCacheForTesting();
+                FakeChestMain.ConfigureDresser(5, 6, 88, 1);
+                try
+                {
+                    var settings = AppSettings.CreateDefault();
+                    var context = CreateInformationChestCacheContext(0f, 0f, 320, 240, 112f, 112f, "fake-world#1", "fake-world-record", "player-a", 100);
+                    context.MainType = typeof(FakeChestMain);
+
+                    var count = InformationOverlayService.GetChestLabelCountForTesting(context, settings, "Always");
+                    if (count != 1)
+                    {
+                        throw new InvalidOperationException("Expected one 3x2 dresser to produce one chest label, got " + count.ToString(CultureInfo.InvariantCulture) + ".");
+                    }
+                }
+                finally
+                {
+                    FakeChestMain.Reset();
+                    InformationOverlayService.ResetChestLabelCacheForTesting();
+                }
+            });
+        }
+
+        private static void InformationDresserDisplayNameAvoidsMapObjectOptionBleed()
+        {
+            var name = InformationOverlayService.ResolveChestTileDisplayNameForTesting(88, 30);
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                throw new InvalidOperationException("Expected dresser display name to resolve to a dresser name or fallback.");
+            }
+
+            if (name.IndexOf("梳妆", StringComparison.OrdinalIgnoreCase) < 0 &&
+                name.IndexOf("Dresser", StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                throw new InvalidOperationException("Expected dresser display name to use dresser naming, got " + name + ".");
+            }
+
+            if (string.Equals(name, "机关", StringComparison.Ordinal) ||
+                string.Equals(name, "雕像", StringComparison.Ordinal) ||
+                string.Equals(name, "长椅", StringComparison.Ordinal) ||
+                string.Equals(name, "熔炉", StringComparison.Ordinal) ||
+                string.Equals(name, "未录制的音乐盒", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected dresser display name not to bleed into unrelated map object names, got " + name + ".");
             }
         }
 
@@ -1426,6 +2383,17 @@ namespace JueMingZ.Tests
             public int fishingSkill;
             public bool accLavaFishing;
             public bool ZoneJungle;
+            public int[] buffType = new int[0];
+            public int[] buffTime = new int[0];
+        }
+
+        private sealed class TestInformationProjectile
+        {
+            public bool active;
+            public bool bobber;
+            public int owner;
+            public int identity;
+            public Terraria.TestVector2 Center;
         }
 
         private sealed class TestInformationPropertyTile

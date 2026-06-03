@@ -33,11 +33,29 @@ namespace JueMingZ.UI.Legacy
 
         private static void DrawTabs(LegacyUiContext context)
         {
+            if (context == null)
+            {
+                return;
+            }
+
+            var tabContext = context.HasClip ? context.CreateUnclippedCopy() : context;
             new LegacyTabBarControl
             {
-                Bounds = context.WindowRect,
-                SelectedPageId = context.SelectedPageId
-            }.Draw(context);
+                Bounds = tabContext.WindowRect,
+                SelectedPageId = tabContext.SelectedPageId
+            }.Draw(tabContext);
+        }
+
+        internal static int DrawTabsForTesting(LegacyUiContext context)
+        {
+            if (context == null || context.Elements == null)
+            {
+                return 0;
+            }
+
+            var before = context.Elements.Count;
+            DrawTabs(context);
+            return context.Elements.Count - before;
         }
     }
 }

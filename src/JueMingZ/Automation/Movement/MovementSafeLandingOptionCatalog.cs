@@ -34,6 +34,16 @@ namespace JueMingZ.Automation.Movement
             new MovementSafeLandingOptionDefinition { Id = GravityGlobe, Label = "重力球", DefaultEnabled = true }
         };
 
+        private static readonly object ConfigSummaryCacheSyncRoot = new object();
+        private static bool _configSummaryCacheInitialized;
+        private static bool _configSummaryEnabled;
+        private static long _configSummaryOptionMask;
+        private static int _configSummaryOptionCount;
+        private static string _configSummaryStrategyVersion = string.Empty;
+        private static string _configSummary = string.Empty;
+        private static long _configSummaryCacheHitCount;
+        private static long _configSummaryCacheMissCount;
+
         public static bool IsKnown(string id)
         {
             return Find(id) != null;
@@ -155,17 +165,72 @@ namespace JueMingZ.Automation.Movement
         public static string BuildConfigSummary(AppSettings settings)
         {
             settings = settings ?? AppSettings.CreateDefault();
-            var enabled = 0;
+            int enabled;
+            var optionMask = BuildConfigSignature(settings, out enabled);
+            var strategyVersion = MovementSafeLandingStrategyCatalog.Version;
+
+            lock (ConfigSummaryCacheSyncRoot)
+            {
+                if (_configSummaryCacheInitialized &&
+                    _configSummaryEnabled == settings.MovementSafeLandingEnabled &&
+                    _configSummaryOptionMask == optionMask &&
+                    _configSummaryOptionCount == Options.Length &&
+                    string.Equals(_configSummaryStrategyVersion, strategyVersion, StringComparison.Ordinal))
+                {
+                    _configSummaryCacheHitCount++;
+                    return _configSummary;
+                }
+
+                _configSummaryCacheMissCount++;
+                _configSummaryCacheInitialized = true;
+                _configSummaryEnabled = settings.MovementSafeLandingEnabled;
+                _configSummaryOptionMask = optionMask;
+                _configSummaryOptionCount = Options.Length;
+                _configSummaryStrategyVersion = strategyVersion;
+                _configSummary = enabled.ToString(System.Globalization.CultureInfo.InvariantCulture) + "/" +
+                                 Options.Length.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                return _configSummary;
+            }
+        }
+
+        public static void GetConfigSummaryCacheStats(out long hitCount, out long missCount)
+        {
+            lock (ConfigSummaryCacheSyncRoot)
+            {
+                hitCount = _configSummaryCacheHitCount;
+                missCount = _configSummaryCacheMissCount;
+            }
+        }
+
+        internal static void ResetConfigSummaryCacheForTesting()
+        {
+            lock (ConfigSummaryCacheSyncRoot)
+            {
+                _configSummaryCacheInitialized = false;
+                _configSummaryEnabled = false;
+                _configSummaryOptionMask = 0;
+                _configSummaryOptionCount = 0;
+                _configSummaryStrategyVersion = string.Empty;
+                _configSummary = string.Empty;
+                _configSummaryCacheHitCount = 0;
+                _configSummaryCacheMissCount = 0;
+            }
+        }
+
+        private static long BuildConfigSignature(AppSettings settings, out int enabled)
+        {
+            enabled = 0;
+            long mask = 0;
             for (var index = 0; index < Options.Length; index++)
             {
                 if (GetEnabled(settings, Options[index].Id))
                 {
                     enabled++;
+                    mask |= 1L << index;
                 }
             }
 
-            return enabled.ToString(System.Globalization.CultureInfo.InvariantCulture) + "/" +
-                   Options.Length.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            return mask;
         }
     }
 }

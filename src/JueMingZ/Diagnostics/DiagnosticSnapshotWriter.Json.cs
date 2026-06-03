@@ -194,6 +194,22 @@ namespace JueMingZ.Diagnostics
             Append(builder, "LegacyUiLayoutCacheMissCount", snapshot.LegacyUiLayoutCacheMissCount, true);
             Append(builder, "LegacyUiLastFrameVisibleElementCount", snapshot.LegacyUiLastFrameVisibleElementCount, true);
             Append(builder, "LegacyUiHoverReuseCount", snapshot.LegacyUiHoverReuseCount, true);
+            Append(builder, "LegacyUiHoverTooltipCacheHitCount", snapshot.LegacyUiHoverTooltipCacheHitCount, true);
+            Append(builder, "LegacyUiHoverTooltipCacheMissCount", snapshot.LegacyUiHoverTooltipCacheMissCount, true);
+            Append(builder, "LegacyUiHoverDiagnosticSuppressedCount", snapshot.LegacyUiHoverDiagnosticSuppressedCount, true);
+            Append(builder, "LegacyUiScrollSnapshotSkippedCount", snapshot.LegacyUiScrollSnapshotSkippedCount, true);
+            Append(builder, "LegacyUiScrollEventCoalescedCount", snapshot.LegacyUiScrollEventCoalescedCount, true);
+            Append(builder, "LegacyUiRetainedFrameCacheHitCount", snapshot.LegacyUiRetainedFrameCacheHitCount, true);
+            Append(builder, "LegacyUiRetainedFrameCacheMissCount", snapshot.LegacyUiRetainedFrameCacheMissCount, true);
+            Append(builder, "LegacyUiRetainedFrameFallbackCount", snapshot.LegacyUiRetainedFrameFallbackCount, true);
+            Append(builder, "LegacyUiRetainedFrameVisibleElementCount", snapshot.LegacyUiRetainedFrameVisibleElementCount, true);
+            Append(builder, "LegacyUiActionUpdateSkippedCount", snapshot.LegacyUiActionUpdateSkippedCount, true);
+            Append(builder, "LegacyUiActionUpdateRanCount", snapshot.LegacyUiActionUpdateRanCount, true);
+            Append(builder, "LegacyUiPendingCommandCountLast", snapshot.LegacyUiPendingCommandCountLast, true);
+            Append(builder, "LegacyUiDispatchedCommandCountLast", snapshot.LegacyUiDispatchedCommandCountLast, true);
+            Append(builder, "LegacyUiDispatchElapsedMsLast", snapshot.LegacyUiDispatchElapsedMsLast, true);
+            Append(builder, "LegacyUiCommandCoalescedCount", snapshot.LegacyUiCommandCoalescedCount, true);
+            Append(builder, "LegacyUiDragFrameActionSkipCount", snapshot.LegacyUiDragFrameActionSkipCount, true);
             Append(builder, "LastDiagnosticHotkey", snapshot.LastDiagnosticHotkey, true);
             Append(builder, "LastDiagnosticHotkeyUtc", FormatDate(snapshot.LastDiagnosticHotkeyUtc), true);
             Append(builder, "LastDiagnosticHotkeyMessage", snapshot.LastDiagnosticHotkeyMessage, true);
@@ -339,6 +355,29 @@ namespace JueMingZ.Diagnostics
             Append(builder, "InformationNpcLabelSnapshotRefreshCount", snapshot.InformationNpcLabelSnapshotRefreshCount, true);
             Append(builder, "InformationChestLabelSnapshotRefreshCount", snapshot.InformationChestLabelSnapshotRefreshCount, true);
             Append(builder, "InformationChestLabelSortRefreshCount", snapshot.InformationChestLabelSortRefreshCount, true);
+            Append(builder, "InformationChestAlwaysScanCacheHitCount", snapshot.InformationChestAlwaysScanCacheHitCount, true);
+            Append(builder, "InformationChestAlwaysScanCacheMissCount", snapshot.InformationChestAlwaysScanCacheMissCount, true);
+            Append(builder, "InformationChestAlwaysLastDirtyReason", snapshot.InformationChestAlwaysLastDirtyReason, true);
+            Append(builder, "InformationChestAlwaysSafeRefreshCount", snapshot.InformationChestAlwaysSafeRefreshCount, true);
+            Append(builder, "InformationChestAlwaysTilesVisitedLast", snapshot.InformationChestAlwaysTilesVisitedLast, true);
+            Append(builder, "InformationChestAlwaysTypedTileFastPathStatus", snapshot.InformationChestAlwaysTypedTileFastPathStatus, true);
+            Append(builder, "InformationChestAlwaysNameCacheHitCount", snapshot.InformationChestAlwaysNameCacheHitCount, true);
+            Append(builder, "InformationChestAlwaysNameCacheMissCount", snapshot.InformationChestAlwaysNameCacheMissCount, true);
+            Append(builder, "InformationChestAlwaysPartialScanFrameCount", snapshot.InformationChestAlwaysPartialScanFrameCount, true);
+            Append(builder, "InformationChestAlwaysPartialScanPendingCount", snapshot.InformationChestAlwaysPartialScanPendingCount, true);
+            Append(builder, "InformationChestAlwaysStableSnapshotId", snapshot.InformationChestAlwaysStableSnapshotId, true);
+            Append(builder, "InformationWorldContextCacheHitCount", snapshot.InformationWorldContextCacheHitCount, true);
+            Append(builder, "InformationWorldContextCacheMissCount", snapshot.InformationWorldContextCacheMissCount, true);
+            Append(builder, "InformationWorldContextProfile", snapshot.InformationWorldContextProfile, true);
+            Append(builder, "InformationWorldContextFileDataRefreshCount", snapshot.InformationWorldContextFileDataRefreshCount, true);
+            Append(builder, "InformationStatusLineCacheHitCount", snapshot.InformationStatusLineCacheHitCount, true);
+            Append(builder, "InformationStatusLineCacheMissCount", snapshot.InformationStatusLineCacheMissCount, true);
+            Append(builder, "InformationFishingCatchEarlyCacheHitCount", snapshot.InformationFishingCatchEarlyCacheHitCount, true);
+            Append(builder, "InformationFishingCatchEarlyCacheMissCount", snapshot.InformationFishingCatchEarlyCacheMissCount, true);
+            Append(builder, "InformationFishingWaterScanCount", snapshot.InformationFishingWaterScanCount, true);
+            Append(builder, "InformationFishingConditionsReadCount", snapshot.InformationFishingConditionsReadCount, true);
+            Append(builder, "InformationFishingBobberObserverFreshInactiveSkipCount", snapshot.InformationFishingBobberObserverFreshInactiveSkipCount, true);
+            Append(builder, "InformationFishingProjectileFallbackScanCount", snapshot.InformationFishingProjectileFallbackScanCount, true);
             Append(builder, "FishingAutomationNeedsTick", snapshot.FishingAutomationNeedsTick, true);
             Append(builder, "FishingDisplayNeedsCatchResolver", snapshot.FishingDisplayNeedsCatchResolver, true);
             Append(builder, "FishingHasResidualState", snapshot.FishingHasResidualState, true);
@@ -381,6 +420,16 @@ namespace JueMingZ.Diagnostics
             Append(builder, "FishingFallbackScanExecutedCount", snapshot.FishingFallbackScanExecutedCount, true);
             Append(builder, "FishingFallbackScanSkippedHookFreshCount", snapshot.FishingFallbackScanSkippedHookFreshCount, true);
             Append(builder, "FishingFallbackScanForcedDisappearanceConfirmationCount", snapshot.FishingFallbackScanForcedDisappearanceConfirmationCount, true);
+            Append(builder, "FishingAutomationDispatchReason", snapshot.FishingAutomationDispatchReason, true);
+            Append(builder, "FishingAutomationDispatchCadenceTicks", snapshot.FishingAutomationDispatchCadenceTicks, true);
+            Append(builder, "FishingAutomationIdleFastSkipCount", snapshot.FishingAutomationIdleFastSkipCount, true);
+            Append(builder, "FishingAutomationIdleWatchdogTickCount", snapshot.FishingAutomationIdleWatchdogTickCount, true);
+            Append(builder, "FishingObserverFreshActiveCount", snapshot.FishingObserverFreshActiveCount, true);
+            Append(builder, "FishingObserverFreshInactiveSkipCount", snapshot.FishingObserverFreshInactiveSkipCount, true);
+            Append(builder, "FishingFallbackScanIdleSkippedCount", snapshot.FishingFallbackScanIdleSkippedCount, true);
+            Append(builder, "FishingFallbackScanHookStaleCount", snapshot.FishingFallbackScanHookStaleCount, true);
+            Append(builder, "FishingTickSubpathLast", snapshot.FishingTickSubpathLast, true);
+            Append(builder, "FishingResidualStateMask", snapshot.FishingResidualStateMask, true);
             Append(builder, "FishingFilterMode", snapshot.FishingFilterMode, true);
             Append(builder, "FishingFilterMatchMode", snapshot.FishingFilterMatchMode, true);
             Append(builder, "FishingFilterCatchKind", snapshot.FishingFilterCatchKind, true);
@@ -608,6 +657,14 @@ namespace JueMingZ.Diagnostics
             Append(builder, "MovementSafeLandingFullAnalysisCount", snapshot.MovementSafeLandingFullAnalysisCount, true);
             Append(builder, "MovementSafeLandingCheapPrecheckSkipCount", snapshot.MovementSafeLandingCheapPrecheckSkipCount, true);
             Append(builder, "MovementSafeLandingLandingProbeCount", snapshot.MovementSafeLandingLandingProbeCount, true);
+            Append(builder, "MovementSafeLandingConfigSummaryCacheHitCount", snapshot.MovementSafeLandingConfigSummaryCacheHitCount, true);
+            Append(builder, "MovementSafeLandingConfigSummaryCacheMissCount", snapshot.MovementSafeLandingConfigSummaryCacheMissCount, true);
+            Append(builder, "MovementSafeLandingStageSummaryCacheHitCount", snapshot.MovementSafeLandingStageSummaryCacheHitCount, true);
+            Append(builder, "MovementSafeLandingCheapSkipDiagnosticSuppressedCount", snapshot.MovementSafeLandingCheapSkipDiagnosticSuppressedCount, true);
+            Append(builder, "MovementSafeLandingCheapSkipDiagnosticWrittenCount", snapshot.MovementSafeLandingCheapSkipDiagnosticWrittenCount, true);
+            Append(builder, "MovementSafeLandingCheapSkipLastReason", snapshot.MovementSafeLandingCheapSkipLastReason, true);
+            Append(builder, "MovementSafeLandingCheapSkipDiagnosticCadenceTicks", snapshot.MovementSafeLandingCheapSkipDiagnosticCadenceTicks, true);
+            Append(builder, "MovementSafeLandingRecoverySummarySkippedCount", snapshot.MovementSafeLandingRecoverySummarySkippedCount, true);
             Append(builder, "MovementSafeLandingLastCompatError", snapshot.MovementSafeLandingLastCompatError, true);
             Append(builder, "MovementSafeLandingCollisionFastPathStatus", snapshot.MovementSafeLandingCollisionFastPathStatus, true);
             Append(builder, "MovementSafeLandingPlayerUpdateHookInstalled", snapshot.MovementSafeLandingPlayerUpdateHookInstalled, true);
@@ -776,6 +833,15 @@ namespace JueMingZ.Diagnostics
             AppendNested(builder, "lastAutoBuffTick", snapshot.LastAutoBuffTick, true);
             AppendNested(builder, "lastAutoNurseTick", snapshot.LastAutoNurseTick, true);
             AppendNested(builder, "lastAutoStationBuffTick", snapshot.LastAutoStationBuffTick, true);
+            AppendNested(builder, "autoStationBuffCooldownFastSkipCount", snapshot.AutoStationBuffCooldownFastSkipCount, true);
+            AppendNested(builder, "autoStationBuffActiveBuffFastSkipCount", snapshot.AutoStationBuffActiveBuffFastSkipCount, true);
+            AppendNested(builder, "autoStationBuffScanCount", snapshot.AutoStationBuffScanCount, true);
+            AppendNested(builder, "autoStationBuffScanCacheHitCount", snapshot.AutoStationBuffScanCacheHitCount, true);
+            AppendNested(builder, "autoStationBuffScanCacheMissCount", snapshot.AutoStationBuffScanCacheMissCount, true);
+            AppendNested(builder, "autoStationBuffTilesVisitedLast", snapshot.AutoStationBuffTilesVisitedLast, true);
+            AppendNested(builder, "autoStationBuffLastScanMs", snapshot.AutoStationBuffLastScanMs, true);
+            AppendNested(builder, "autoStationBuffTileFastPathStatus", snapshot.AutoStationBuffTileFastPathStatus, true);
+            AppendNested(builder, "autoStationBuffLastDecision", snapshot.AutoStationBuffLastDecision, true);
             AppendNested(builder, "lastAutoBuffCountBefore", snapshot.LastAutoBuffCountBefore, true);
             AppendNested(builder, "lastAutoBuffCountAfter", snapshot.LastAutoBuffCountAfter, true);
             AppendNested(builder, "quickHealCapability", snapshot.QuickHealCapability, true);
@@ -826,6 +892,17 @@ namespace JueMingZ.Diagnostics
         private static void AppendNested(StringBuilder builder, string name, long value, bool comma)
         {
             builder.Append("    \"").Append(Escape(name)).Append("\": ").Append(value.ToString(CultureInfo.InvariantCulture));
+            if (comma)
+            {
+                builder.Append(",");
+            }
+
+            builder.AppendLine();
+        }
+
+        private static void AppendNested(StringBuilder builder, string name, double value, bool comma)
+        {
+            builder.Append("    \"").Append(Escape(name)).Append("\": ").Append(value.ToString("0.###", CultureInfo.InvariantCulture));
             if (comma)
             {
                 builder.Append(",");

@@ -2012,6 +2012,36 @@ namespace JueMingZ.Tests
             AssertContains(json, "\"AutoHarvestPendingReplantCount\": 2");
         }
 
+        private static void DiagnosticSnapshotWritesFishingIdlePipelineState()
+        {
+            var snapshot = new DiagnosticSnapshot
+            {
+                FishingAutomationDispatchReason = "idleWatchdog",
+                FishingAutomationDispatchCadenceTicks = 10,
+                FishingAutomationIdleFastSkipCount = 21,
+                FishingAutomationIdleWatchdogTickCount = 3,
+                FishingObserverFreshActiveCount = 4,
+                FishingObserverFreshInactiveSkipCount = 17,
+                FishingFallbackScanIdleSkippedCount = 18,
+                FishingFallbackScanHookStaleCount = 2,
+                FishingTickSubpathLast = "idleFastSkip:freshInactiveNoLocalBobber",
+                FishingResidualStateMask = 512
+            };
+
+            var json = InvokeDiagnosticSnapshotJson(snapshot);
+
+            AssertContains(json, "\"FishingAutomationDispatchReason\": \"idleWatchdog\"");
+            AssertContains(json, "\"FishingAutomationDispatchCadenceTicks\": 10");
+            AssertContains(json, "\"FishingAutomationIdleFastSkipCount\": 21");
+            AssertContains(json, "\"FishingAutomationIdleWatchdogTickCount\": 3");
+            AssertContains(json, "\"FishingObserverFreshActiveCount\": 4");
+            AssertContains(json, "\"FishingObserverFreshInactiveSkipCount\": 17");
+            AssertContains(json, "\"FishingFallbackScanIdleSkippedCount\": 18");
+            AssertContains(json, "\"FishingFallbackScanHookStaleCount\": 2");
+            AssertContains(json, "\"FishingTickSubpathLast\": \"idleFastSkip:freshInactiveNoLocalBobber\"");
+            AssertContains(json, "\"FishingResidualStateMask\": 512");
+        }
+
         private static void PerformanceHitchRecorderDetectsRuntimeGaps()
         {
             var normal = new PerformanceHitchSample
@@ -2344,6 +2374,132 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void RuntimeFishingDispatchUsesIdleWatchdogCadence()
+        {
+            try
+            {
+                FishingAutomationDiagnostics.ResetForTesting();
+                FishingBobberObserver.RemoveMissing(null);
+                var settings = AppSettings.CreateDefault();
+                settings.FishingAutoFishEnabled = true;
+                var snapshot = RuntimeSettingsSnapshot.FromSettings(settings);
+
+                if (!JueMingZRuntime.ShouldDispatchFishingAutomationForTesting(snapshot, false, 50))
+                {
+                    throw new InvalidOperationException("Auto fishing idle watchdog must keep runtime dispatch enabled.");
+                }
+
+                var cadence = JueMingZRuntime.GetFishingAutomationDispatchCadenceForTesting(snapshot, false, 50);
+                if (cadence != FishingAutomationService.IdleWatchdogCadenceTicks)
+                {
+                    throw new InvalidOperationException("Auto fishing idle dispatch must use watchdog cadence.");
+                }
+
+                var reason = JueMingZRuntime.GetFishingAutomationDispatchReasonForTesting(snapshot, false, 50);
+                if (!string.Equals(reason, "idleWatchdog", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Auto fishing idle dispatch must expose idleWatchdog reason.");
+                }
+            }
+            finally
+            {
+                FishingBobberObserver.RemoveMissing(null);
+                FishingAutomationDiagnostics.ResetForTesting();
+            }
+        }
+
+        private static void RuntimeFishingDispatchPromotesFreshActiveBobber()
+        {
+            try
+            {
+                Terraria.Main.GameUpdateCount = 200;
+                FishingAutomationDiagnostics.ResetForTesting();
+                FishingAutomationDiagnostics.MarkHookInstalled();
+                FishingBobberObserver.RemoveMissing(null);
+                FishingBobberObserver.Observe(new FishingBobberObservation
+                {
+                    Identity = 700,
+                    WhoAmI = 3,
+                    GameUpdateCount = 200,
+                    Active = true,
+                    Bobber = true,
+                    InLiquid = true,
+                    LiquidStateKnown = true
+                });
+
+                var settings = AppSettings.CreateDefault();
+                settings.FishingAutoFishEnabled = true;
+                var snapshot = RuntimeSettingsSnapshot.FromSettings(settings);
+                var cadence = JueMingZRuntime.GetFishingAutomationDispatchCadenceForTesting(snapshot, false, 201);
+                if (cadence != 1)
+                {
+                    throw new InvalidOperationException("Fresh active bobber must promote fishing dispatch to per-tick cadence.");
+                }
+
+                var reason = JueMingZRuntime.GetFishingAutomationDispatchReasonForTesting(snapshot, false, 201);
+                if (!string.Equals(reason, "freshActiveBobber", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Fresh active bobber dispatch must expose freshActiveBobber reason.");
+                }
+            }
+            finally
+            {
+                FishingBobberObserver.RemoveMissing(null);
+                FishingAutomationDiagnostics.ResetForTesting();
+                Terraria.Main.GameUpdateCount = 0;
+            }
+        }
+
+        private static void FishingIdleFastPathSkipsBaitAndEquipmentDetails()
+        {
+            try
+            {
+                Terraria.Main.GameUpdateCount = 300;
+                FishingAutomationService.ResetForTesting();
+                FishingBobberObserver.RemoveMissing(null);
+                FishingAutomationDiagnostics.MarkHookInstalled();
+                FishingBobberObserver.MarkNoActiveObservation(300);
+                TerrariaFishingCompat.ResetTruffleWormQueryCountForTesting();
+                FishingAutomationService.RecordDispatchState("idleWatchdog", FishingAutomationService.IdleWatchdogCadenceTicks);
+
+                var settings = AppSettings.CreateDefault();
+                settings.FishingAutoFishEnabled = true;
+                settings.FishingAutoEquipmentEnabled = true;
+                settings.FishingAutoLoadoutEnabled = true;
+                var settingsSnapshot = RuntimeSettingsSnapshot.FromSettings(settings);
+                var gameState = new GameStateSnapshot
+                {
+                    IsInWorld = true,
+                    Player = new PlayerStateSnapshot
+                    {
+                        Exists = true,
+                        Active = true
+                    }
+                };
+                var runtimeState = new RuntimeState { UpdateCount = 300 };
+
+                FishingAutomationService.Tick(null, gameState, runtimeState, settingsSnapshot);
+
+                var diagnostics = FishingAutomationService.GetDiagnostics();
+                if (diagnostics.FishingAutomationIdleFastSkipCount <= 0)
+                {
+                    throw new InvalidOperationException("Fresh inactive observer should use the fishing idle fast path.");
+                }
+
+                if (TerrariaFishingCompat.TruffleWormQueryCountForTesting != 0)
+                {
+                    throw new InvalidOperationException("Fishing idle fast path must return before bait/truffle worm queries.");
+                }
+            }
+            finally
+            {
+                TerrariaFishingCompat.ResetTruffleWormQueryCountForTesting();
+                FishingBobberObserver.RemoveMissing(null);
+                FishingAutomationService.ResetForTesting();
+                Terraria.Main.GameUpdateCount = 0;
+            }
+        }
+
         private static void RuntimeSettingsSnapshotProviderRebuildsAfterConfigMutation()
         {
             var settings = ConfigService.AppSettings;
@@ -2512,11 +2668,58 @@ namespace JueMingZ.Tests
                 InformationNpcLabelSnapshotRefreshCount = 4,
                 InformationChestLabelSnapshotRefreshCount = 3,
                 InformationChestLabelSortRefreshCount = 2,
+                InformationChestAlwaysScanCacheHitCount = 18,
+                InformationChestAlwaysScanCacheMissCount = 3,
+                InformationChestAlwaysLastDirtyReason = "screenChunkChanged",
+                InformationChestAlwaysSafeRefreshCount = 1,
+                InformationChestAlwaysTilesVisitedLast = 1776,
+                InformationChestAlwaysTypedTileFastPathStatus = "typed=1776;fallback=0;failed=0",
+                InformationChestAlwaysNameCacheHitCount = 5,
+                InformationChestAlwaysNameCacheMissCount = 2,
+                InformationChestAlwaysPartialScanFrameCount = 6,
+                InformationChestAlwaysPartialScanPendingCount = 128,
+                InformationChestAlwaysStableSnapshotId = 9,
+                InformationWorldContextCacheHitCount = 23,
+                InformationWorldContextCacheMissCount = 9,
+                InformationWorldContextProfile = "status",
+                InformationWorldContextFileDataRefreshCount = 2,
+                InformationStatusLineCacheHitCount = 17,
+                InformationStatusLineCacheMissCount = 4,
+                InformationFishingCatchEarlyCacheHitCount = 14,
+                InformationFishingCatchEarlyCacheMissCount = 5,
+                InformationFishingWaterScanCount = 6,
+                InformationFishingConditionsReadCount = 7,
+                InformationFishingBobberObserverFreshInactiveSkipCount = 8,
+                InformationFishingProjectileFallbackScanCount = 9,
                 LegacyUiLayoutCacheHitCount = 13,
                 LegacyUiLayoutCacheMissCount = 6,
                 LegacyUiLastFrameVisibleElementCount = 42,
                 LegacyUiHoverReuseCount = 8,
+                LegacyUiHoverTooltipCacheHitCount = 9,
+                LegacyUiHoverTooltipCacheMissCount = 3,
+                LegacyUiHoverDiagnosticSuppressedCount = 7,
+                LegacyUiScrollSnapshotSkippedCount = 12,
+                LegacyUiScrollEventCoalescedCount = 6,
+                LegacyUiRetainedFrameCacheHitCount = 14,
+                LegacyUiRetainedFrameCacheMissCount = 5,
+                LegacyUiRetainedFrameFallbackCount = 2,
+                LegacyUiRetainedFrameVisibleElementCount = 38,
+                LegacyUiActionUpdateSkippedCount = 21,
+                LegacyUiActionUpdateRanCount = 5,
+                LegacyUiPendingCommandCountLast = 2,
+                LegacyUiDispatchedCommandCountLast = 2,
+                LegacyUiDispatchElapsedMsLast = 0.375d,
+                LegacyUiCommandCoalescedCount = 1,
+                LegacyUiDragFrameActionSkipCount = 4,
                 MovementSafeLandingLandingProbeCount = 29,
+                MovementSafeLandingConfigSummaryCacheHitCount = 31,
+                MovementSafeLandingConfigSummaryCacheMissCount = 2,
+                MovementSafeLandingStageSummaryCacheHitCount = 30,
+                MovementSafeLandingCheapSkipDiagnosticSuppressedCount = 120,
+                MovementSafeLandingCheapSkipDiagnosticWrittenCount = 4,
+                MovementSafeLandingCheapSkipLastReason = "notFallingFastEnough:cheap",
+                MovementSafeLandingCheapSkipDiagnosticCadenceTicks = 30,
+                MovementSafeLandingRecoverySummarySkippedCount = 119,
                 LastSlowestStageName = "game-state-read",
                 LastSlowestStageElapsedMs = 12.25d,
                 PerformanceEventsPath = "diagnostics/performance-events-20260525.jsonl",
@@ -2546,9 +2749,55 @@ namespace JueMingZ.Tests
             AssertContains(json, "\"InformationStatusPanelLayoutCacheHitCount\": 11");
             AssertContains(json, "\"InformationSignTextLayoutCacheMissCount\": 5");
             AssertContains(json, "\"InformationWorldLabelSnapshotRefreshCount\": 7");
+            AssertContains(json, "\"InformationChestAlwaysScanCacheHitCount\": 18");
+            AssertContains(json, "\"InformationChestAlwaysScanCacheMissCount\": 3");
+            AssertContains(json, "\"InformationChestAlwaysLastDirtyReason\": \"screenChunkChanged\"");
+            AssertContains(json, "\"InformationChestAlwaysSafeRefreshCount\": 1");
+            AssertContains(json, "\"InformationChestAlwaysTilesVisitedLast\": 1776");
+            AssertContains(json, "\"InformationChestAlwaysTypedTileFastPathStatus\": \"typed=1776;fallback=0;failed=0\"");
+            AssertContains(json, "\"InformationChestAlwaysNameCacheHitCount\": 5");
+            AssertContains(json, "\"InformationChestAlwaysNameCacheMissCount\": 2");
+            AssertContains(json, "\"InformationChestAlwaysPartialScanFrameCount\": 6");
+            AssertContains(json, "\"InformationChestAlwaysPartialScanPendingCount\": 128");
+            AssertContains(json, "\"InformationChestAlwaysStableSnapshotId\": 9");
+            AssertContains(json, "\"InformationWorldContextCacheHitCount\": 23");
+            AssertContains(json, "\"InformationWorldContextProfile\": \"status\"");
+            AssertContains(json, "\"InformationWorldContextFileDataRefreshCount\": 2");
+            AssertContains(json, "\"InformationStatusLineCacheHitCount\": 17");
+            AssertContains(json, "\"InformationStatusLineCacheMissCount\": 4");
+            AssertContains(json, "\"InformationFishingCatchEarlyCacheHitCount\": 14");
+            AssertContains(json, "\"InformationFishingCatchEarlyCacheMissCount\": 5");
+            AssertContains(json, "\"InformationFishingWaterScanCount\": 6");
+            AssertContains(json, "\"InformationFishingConditionsReadCount\": 7");
+            AssertContains(json, "\"InformationFishingBobberObserverFreshInactiveSkipCount\": 8");
+            AssertContains(json, "\"InformationFishingProjectileFallbackScanCount\": 9");
             AssertContains(json, "\"LegacyUiLastFrameVisibleElementCount\": 42");
             AssertContains(json, "\"LegacyUiHoverReuseCount\": 8");
+            AssertContains(json, "\"LegacyUiHoverTooltipCacheHitCount\": 9");
+            AssertContains(json, "\"LegacyUiHoverTooltipCacheMissCount\": 3");
+            AssertContains(json, "\"LegacyUiHoverDiagnosticSuppressedCount\": 7");
+            AssertContains(json, "\"LegacyUiScrollSnapshotSkippedCount\": 12");
+            AssertContains(json, "\"LegacyUiScrollEventCoalescedCount\": 6");
+            AssertContains(json, "\"LegacyUiRetainedFrameCacheHitCount\": 14");
+            AssertContains(json, "\"LegacyUiRetainedFrameCacheMissCount\": 5");
+            AssertContains(json, "\"LegacyUiRetainedFrameFallbackCount\": 2");
+            AssertContains(json, "\"LegacyUiRetainedFrameVisibleElementCount\": 38");
+            AssertContains(json, "\"LegacyUiActionUpdateSkippedCount\": 21");
+            AssertContains(json, "\"LegacyUiActionUpdateRanCount\": 5");
+            AssertContains(json, "\"LegacyUiPendingCommandCountLast\": 2");
+            AssertContains(json, "\"LegacyUiDispatchedCommandCountLast\": 2");
+            AssertContains(json, "\"LegacyUiDispatchElapsedMsLast\": 0.375");
+            AssertContains(json, "\"LegacyUiCommandCoalescedCount\": 1");
+            AssertContains(json, "\"LegacyUiDragFrameActionSkipCount\": 4");
             AssertContains(json, "\"MovementSafeLandingLandingProbeCount\": 29");
+            AssertContains(json, "\"MovementSafeLandingConfigSummaryCacheHitCount\": 31");
+            AssertContains(json, "\"MovementSafeLandingConfigSummaryCacheMissCount\": 2");
+            AssertContains(json, "\"MovementSafeLandingStageSummaryCacheHitCount\": 30");
+            AssertContains(json, "\"MovementSafeLandingCheapSkipDiagnosticSuppressedCount\": 120");
+            AssertContains(json, "\"MovementSafeLandingCheapSkipDiagnosticWrittenCount\": 4");
+            AssertContains(json, "\"MovementSafeLandingCheapSkipLastReason\": \"notFallingFastEnough:cheap\"");
+            AssertContains(json, "\"MovementSafeLandingCheapSkipDiagnosticCadenceTicks\": 30");
+            AssertContains(json, "\"MovementSafeLandingRecoverySummarySkippedCount\": 119");
             AssertContains(json, "\"LastSlowestStageName\": \"game-state-read\"");
             AssertContains(json, "\"PerformanceEventsPath\": \"diagnostics/performance-events-20260525.jsonl\"");
             AssertContains(json, "\"PerformanceHitchCount\": 3");

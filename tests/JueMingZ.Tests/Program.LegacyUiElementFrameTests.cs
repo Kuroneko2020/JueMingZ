@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using JueMingZ.Config;
 using JueMingZ.UI.Legacy;
 using JueMingZ.UI.Legacy.Framework;
 
@@ -167,6 +168,76 @@ namespace JueMingZ.Tests
             if (!matching)
             {
                 throw new InvalidOperationException("Expected context hover checks to accept the cached visible element id.");
+            }
+        }
+
+        private static void LegacyUiTooltipCacheReusesStableHoverModel()
+        {
+            LegacyMainWindow.ResetHoverTooltipCacheForTesting();
+            var settings = AppSettings.CreateDefault();
+            var element = new LegacyUiElement
+            {
+                Id = "tooltip:test",
+                Label = "Tooltip test",
+                Kind = "button",
+                TooltipLines = new[] { "same tooltip" },
+                TooltipContentSignature = 101
+            };
+
+            var first = LegacyMainWindow.BuildTooltipModelForTesting(element, "misc", settings);
+            var second = LegacyMainWindow.BuildTooltipModelForTesting(element, "misc", settings);
+
+            if (first == null || second == null || !object.ReferenceEquals(first, second))
+            {
+                throw new InvalidOperationException("Expected stable hover tooltip model to be reused.");
+            }
+
+            if (LegacyMainWindow.HoverTooltipCacheMissCount != 1 ||
+                LegacyMainWindow.HoverTooltipCacheHitCount != 1 ||
+                LegacyMainWindow.HoverTooltipDiagnosticSuppressedCount != 1)
+            {
+                throw new InvalidOperationException("Expected tooltip cache diagnostics to count one miss, one hit, and one suppressed stable-hover diagnostic.");
+            }
+        }
+
+        private static void LegacyUiTooltipCacheDirtiesOnContentChange()
+        {
+            LegacyMainWindow.ResetHoverTooltipCacheForTesting();
+            var settings = AppSettings.CreateDefault();
+            var firstElement = new LegacyUiElement
+            {
+                Id = "tooltip:test",
+                Label = "Tooltip test",
+                Kind = "button",
+                TooltipLines = new[] { "first tooltip" },
+                TooltipContentSignature = 201
+            };
+            var changedElement = new LegacyUiElement
+            {
+                Id = "tooltip:test",
+                Label = "Tooltip test",
+                Kind = "button",
+                TooltipLines = new[] { "changed tooltip" },
+                TooltipContentSignature = 202
+            };
+
+            var first = LegacyMainWindow.BuildTooltipModelForTesting(firstElement, "misc", settings);
+            var changed = LegacyMainWindow.BuildTooltipModelForTesting(changedElement, "misc", settings);
+
+            if (first == null || changed == null || object.ReferenceEquals(first, changed))
+            {
+                throw new InvalidOperationException("Expected tooltip content changes to rebuild the cached model.");
+            }
+
+            if (changed.Lines.Length != 1 || changed.Lines[0] != "changed tooltip")
+            {
+                throw new InvalidOperationException("Expected rebuilt tooltip model to expose the changed content immediately.");
+            }
+
+            if (LegacyMainWindow.HoverTooltipCacheMissCount != 2 ||
+                LegacyMainWindow.HoverTooltipCacheHitCount != 0)
+            {
+                throw new InvalidOperationException("Expected tooltip content changes to be recorded as cache misses, not stale hits.");
             }
         }
     }

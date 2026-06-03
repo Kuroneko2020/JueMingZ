@@ -59,22 +59,11 @@ namespace JueMingZ.UI.Legacy
                 LegacyUiInput.CaptureIfNeeded(inWindow);
                 var selectedPage = LegacyMainUiState.SelectedPageId;
                 var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
-                var elements = PrepareFrameElements();
-                elementFrameStarted = true;
-                var frameContext = new LegacyUiContext(spriteBatch, mouse, window, selectedPage, settings, elements);
-
-                DrawFrame(spriteBatch, window, shell.TitleRect, shell.ResizeRect);
-
-                DrawTabs(frameContext);
-
                 var contentRect = shell.ContentRect;
-                frameContext.SetContentRect(contentRect);
-                LegacyUiTheme.DrawContentPanel(spriteBatch, contentRect);
                 var pageLayout = GetCachedPageLayout(selectedPage, window, contentRect, settings, LegacyMainUiState.ScrollOffset);
                 var contentHeight = pageLayout.ContentHeight;
                 var scrollArea = pageLayout.CreateScrollArea(contentRect);
                 LegacyMainUiState.SetScrollOffset(scrollArea.ScrollOffset, scrollArea.MaxScroll);
-                frameContext.SetScrollArea(scrollArea);
 
                 if (inWindow && mouse.ScrollDelta != 0)
                 {
@@ -115,8 +104,18 @@ namespace JueMingZ.UI.Legacy
                 pageLayout = GetCachedPageLayout(selectedPage, window, contentRect, settings, LegacyMainUiState.ScrollOffset);
                 contentHeight = pageLayout.ContentHeight;
                 scrollArea = pageLayout.CreateScrollArea(contentRect);
-                frameContext.SetScrollArea(scrollArea);
+                BeginRetainedFrameModel(selectedPage, window, contentRect, scrollArea, settings, contentHeight);
+                var elements = PrepareFrameElements();
+                elementFrameStarted = true;
+                var frameContext = new LegacyUiContext(spriteBatch, mouse, window, selectedPage, settings, elements);
+                frameContext.SetContentRect(contentRect);
                 BeginFrameHoverCache(mouse, selectedPage, window, contentRect, scrollArea, settings);
+
+                DrawFrame(spriteBatch, window, shell.TitleRect, shell.ResizeRect);
+
+                DrawTabs(frameContext);
+
+                LegacyUiTheme.DrawContentPanel(spriteBatch, contentRect);
 
                 LegacyUiElement hoveredElement = null;
                 if (string.Equals(selectedPage, "buff", StringComparison.Ordinal))
@@ -174,9 +173,11 @@ namespace JueMingZ.UI.Legacy
 
                 HandleClicks(elements, mouse, shell.TitleRect, shell.ResizeRect);
                 LegacyUiInput.FinishFrame(mouse, inWindow);
+                FinishRetainedFrameModel(elements);
             }
             catch (Exception error)
             {
+                CancelRetainedFrameModel();
                 UiDrawLifecycleGuard.RecordDrawException("LegacyMainWindow", error);
                 LogThrottle.ErrorThrottled(
                     "legacy-main-window-draw-error",

@@ -48,7 +48,7 @@ namespace JueMingZ.Runtime
         private static readonly Dictionary<string, long> ServiceSchedulerLastRunTick =
             new Dictionary<string, long>(StringComparer.Ordinal);
 
-        public const string Version = "1.7.411-f5-ui-frame-input";
+        public const string Version = "1.7.427-dresser-label-name-fix";
 
         public static RuntimeState State { get; private set; } = new RuntimeState();
         public static FeatureRegistry FeatureRegistry { get; private set; }
@@ -282,10 +282,12 @@ namespace JueMingZ.Runtime
             }
 
             var fishingHasResidualState = FishingAutomationService.HasResidualState;
+            var fishingDispatch = GetFishingAutomationDispatchDecision(settings, fishingHasResidualState, tick);
+            FishingAutomationService.RecordDispatchState(fishingDispatch.Reason, fishingDispatch.CadenceTicks);
             if (ShouldRunService(
                 "fishing-automation",
-                ShouldDispatchFishingAutomation(settings, fishingHasResidualState),
-                1,
+                fishingDispatch.Enabled,
+                fishingDispatch.CadenceTicks,
                 tick))
             {
                 FishingAutomationService.Tick(ActionQueue, gameState, State, settings);
@@ -589,10 +591,60 @@ namespace JueMingZ.Runtime
             return true;
         }
 
-        private static bool ShouldDispatchFishingAutomation(RuntimeSettingsSnapshot settings, bool hasResidualState)
+        private static FishingDispatchDecision GetFishingAutomationDispatchDecision(
+            RuntimeSettingsSnapshot settings,
+            bool hasResidualState,
+            long tick)
         {
             settings = settings ?? RuntimeSettingsSnapshotProvider.GetCurrent();
-            return settings.FishingAutomationNeedsTick || hasResidualState;
+            var residualMask = FishingAutomationService.GetResidualStateMask();
+            if (hasResidualState || residualMask != 0)
+            {
+                return FishingDispatchDecision.EnabledDecision(
+                    FishingAutomationService.GetDispatchReasonForResidualMask(residualMask),
+                    1);
+            }
+
+            if (!settings.FishingAutomationNeedsTick)
+            {
+                return FishingDispatchDecision.Disabled("disabled");
+            }
+
+            if (FishingAutomationService.HasFreshActiveBobberForRuntime(tick))
+            {
+                return FishingDispatchDecision.EnabledDecision("freshActiveBobber", 1);
+            }
+
+            return FishingDispatchDecision.EnabledDecision(
+                "idleWatchdog",
+                FishingAutomationService.IdleWatchdogCadenceTicks);
+        }
+
+        private struct FishingDispatchDecision
+        {
+            public bool Enabled;
+            public string Reason;
+            public int CadenceTicks;
+
+            public static FishingDispatchDecision EnabledDecision(string reason, int cadenceTicks)
+            {
+                return new FishingDispatchDecision
+                {
+                    Enabled = true,
+                    Reason = reason ?? string.Empty,
+                    CadenceTicks = cadenceTicks <= 0 ? 1 : cadenceTicks
+                };
+            }
+
+            public static FishingDispatchDecision Disabled(string reason)
+            {
+                return new FishingDispatchDecision
+                {
+                    Enabled = false,
+                    Reason = reason ?? string.Empty,
+                    CadenceTicks = 1
+                };
+            }
         }
 
         private static GameStateReadOptions BuildGameStateReadOptions(RuntimeSettingsSnapshot settingsSnapshot, bool diagnosticSnapshotDue)
@@ -665,7 +717,9 @@ namespace JueMingZ.Runtime
             return new GameStateReadOptions
             {
                 InventoryProfile = inventoryProfile,
-                IncludeActiveBuffs = settings.AutoBuffEnabled || fishingFilterNeedsActiveBuffs,
+                IncludeActiveBuffs = settings.AutoBuffEnabled ||
+                                     (settings.AutoRecovery != null && settings.AutoRecovery.AutoStationBuffEnabled) ||
+                                     fishingFilterNeedsActiveBuffs,
                 NpcProfile = npcProfile,
                 TileProfile = TileReadProfile.None,
                 IncludeWorldSummary = false
@@ -828,7 +882,22 @@ namespace JueMingZ.Runtime
 
         internal static bool ShouldDispatchFishingAutomationForTesting(RuntimeSettingsSnapshot settings, bool hasResidualState)
         {
-            return ShouldDispatchFishingAutomation(settings, hasResidualState);
+            return GetFishingAutomationDispatchDecision(settings, hasResidualState, 0).Enabled;
+        }
+
+        internal static bool ShouldDispatchFishingAutomationForTesting(RuntimeSettingsSnapshot settings, bool hasResidualState, long tick)
+        {
+            return GetFishingAutomationDispatchDecision(settings, hasResidualState, tick).Enabled;
+        }
+
+        internal static int GetFishingAutomationDispatchCadenceForTesting(RuntimeSettingsSnapshot settings, bool hasResidualState, long tick)
+        {
+            return GetFishingAutomationDispatchDecision(settings, hasResidualState, tick).CadenceTicks;
+        }
+
+        internal static string GetFishingAutomationDispatchReasonForTesting(RuntimeSettingsSnapshot settings, bool hasResidualState, long tick)
+        {
+            return GetFishingAutomationDispatchDecision(settings, hasResidualState, tick).Reason;
         }
 
         public static void ResetServiceSchedulerForTesting()
@@ -879,6 +948,7 @@ namespace JueMingZ.Runtime
             var lastActionResultCode = GetLastActionResultCode(actionSnapshot);
             var lastActionKind = GetLastActionKind(actionSnapshot);
             var autoRecovery = AutoRecoveryService.GetStateSnapshot();
+            var stationBuff = StationBuffCompat.GetDiagnostics();
             var configSave = ConfigService.LastSaveSummary;
             var configAppSave = configSave == null ? null : configSave.AppSettings;
             var configFeatureSave = configSave == null ? null : configSave.FeatureSettings;
@@ -1090,6 +1160,22 @@ namespace JueMingZ.Runtime
                 LegacyUiLayoutCacheMissCount = LegacyMainWindow.PageLayoutCacheMissCount,
                 LegacyUiLastFrameVisibleElementCount = LegacyUiElementFrame.LastFrameElementCount,
                 LegacyUiHoverReuseCount = LegacyUiElementFrame.HoverReuseCount,
+                LegacyUiHoverTooltipCacheHitCount = LegacyMainWindow.HoverTooltipCacheHitCount,
+                LegacyUiHoverTooltipCacheMissCount = LegacyMainWindow.HoverTooltipCacheMissCount,
+                LegacyUiHoverDiagnosticSuppressedCount = LegacyMainWindow.HoverTooltipDiagnosticSuppressedCount,
+                LegacyUiScrollSnapshotSkippedCount = LegacyUiInput.ScrollSnapshotSkippedCount,
+                LegacyUiScrollEventCoalescedCount = LegacyUiInput.ScrollEventCoalescedCount,
+                LegacyUiRetainedFrameCacheHitCount = LegacyMainWindow.RetainedFrameCacheHitCount,
+                LegacyUiRetainedFrameCacheMissCount = LegacyMainWindow.RetainedFrameCacheMissCount,
+                LegacyUiRetainedFrameFallbackCount = LegacyMainWindow.RetainedFrameFallbackCount,
+                LegacyUiRetainedFrameVisibleElementCount = LegacyMainWindow.RetainedFrameVisibleElementCount,
+                LegacyUiActionUpdateSkippedCount = LegacyUiActionService.ActionUpdateSkippedCount,
+                LegacyUiActionUpdateRanCount = LegacyUiActionService.ActionUpdateRanCount,
+                LegacyUiPendingCommandCountLast = LegacyUiActionService.PendingCommandCountLast,
+                LegacyUiDispatchedCommandCountLast = LegacyUiActionService.DispatchedCommandCountLast,
+                LegacyUiDispatchElapsedMsLast = LegacyUiActionService.DispatchElapsedMsLast,
+                LegacyUiCommandCoalescedCount = LegacyUiActionService.CommandCoalescedCount,
+                LegacyUiDragFrameActionSkipCount = LegacyUiActionService.DragFrameActionSkipCount,
                 LastDiagnosticHotkey = DiagnosticActionHotkeyService.LastDiagnosticHotkey,
                 LastDiagnosticHotkeyUtc = DiagnosticActionHotkeyService.LastDiagnosticHotkeyUtc,
                 LastDiagnosticHotkeyMessage = DiagnosticActionHotkeyService.LastDiagnosticHotkeyMessage,
@@ -1237,6 +1323,29 @@ namespace JueMingZ.Runtime
                 InformationNpcLabelSnapshotRefreshCount = information == null ? 0 : information.NpcLabelSnapshotRefreshCount,
                 InformationChestLabelSnapshotRefreshCount = information == null ? 0 : information.ChestLabelSnapshotRefreshCount,
                 InformationChestLabelSortRefreshCount = information == null ? 0 : information.ChestLabelSortRefreshCount,
+                InformationChestAlwaysScanCacheHitCount = information == null ? 0 : information.ChestAlwaysScanCacheHitCount,
+                InformationChestAlwaysScanCacheMissCount = information == null ? 0 : information.ChestAlwaysScanCacheMissCount,
+                InformationChestAlwaysLastDirtyReason = information == null ? string.Empty : information.ChestAlwaysLastDirtyReason,
+                InformationChestAlwaysSafeRefreshCount = information == null ? 0 : information.ChestAlwaysSafeRefreshCount,
+                InformationChestAlwaysTilesVisitedLast = information == null ? 0 : information.ChestAlwaysTilesVisitedLast,
+                InformationChestAlwaysTypedTileFastPathStatus = information == null ? string.Empty : information.ChestAlwaysTypedTileFastPathStatus,
+                InformationChestAlwaysNameCacheHitCount = information == null ? 0 : information.ChestAlwaysNameCacheHitCount,
+                InformationChestAlwaysNameCacheMissCount = information == null ? 0 : information.ChestAlwaysNameCacheMissCount,
+                InformationChestAlwaysPartialScanFrameCount = information == null ? 0 : information.ChestAlwaysPartialScanFrameCount,
+                InformationChestAlwaysPartialScanPendingCount = information == null ? 0 : information.ChestAlwaysPartialScanPendingCount,
+                InformationChestAlwaysStableSnapshotId = information == null ? 0 : information.ChestAlwaysStableSnapshotId,
+                InformationWorldContextCacheHitCount = information == null ? 0 : information.WorldContextCacheHitCount,
+                InformationWorldContextCacheMissCount = information == null ? 0 : information.WorldContextCacheMissCount,
+                InformationWorldContextProfile = information == null ? string.Empty : information.WorldContextProfile,
+                InformationWorldContextFileDataRefreshCount = information == null ? 0 : information.WorldContextFileDataRefreshCount,
+                InformationStatusLineCacheHitCount = information == null ? 0 : information.StatusLineCacheHitCount,
+                InformationStatusLineCacheMissCount = information == null ? 0 : information.StatusLineCacheMissCount,
+                InformationFishingCatchEarlyCacheHitCount = information == null ? 0 : information.FishingCatchEarlyCacheHitCount,
+                InformationFishingCatchEarlyCacheMissCount = information == null ? 0 : information.FishingCatchEarlyCacheMissCount,
+                InformationFishingWaterScanCount = information == null ? 0 : information.FishingWaterScanCount,
+                InformationFishingConditionsReadCount = information == null ? 0 : information.FishingConditionsReadCount,
+                InformationFishingBobberObserverFreshInactiveSkipCount = information == null ? 0 : information.FishingBobberObserverFreshInactiveSkipCount,
+                InformationFishingProjectileFallbackScanCount = information == null ? 0 : information.FishingProjectileFallbackScanCount,
                 FishingAutomationNeedsTick = settingsSnapshot.FishingAutomationNeedsTick,
                 FishingDisplayNeedsCatchResolver = settingsSnapshot.FishingDisplayNeedsCatchResolver,
                 FishingHasResidualState = fishingHasResidualState,
@@ -1279,6 +1388,16 @@ namespace JueMingZ.Runtime
                 FishingFallbackScanExecutedCount = fishing == null ? 0 : fishing.FishingFallbackScanExecutedCount,
                 FishingFallbackScanSkippedHookFreshCount = fishing == null ? 0 : fishing.FishingFallbackScanSkippedHookFreshCount,
                 FishingFallbackScanForcedDisappearanceConfirmationCount = fishing == null ? 0 : fishing.FishingFallbackScanForcedDisappearanceConfirmationCount,
+                FishingAutomationDispatchReason = fishing == null ? string.Empty : fishing.FishingAutomationDispatchReason,
+                FishingAutomationDispatchCadenceTicks = fishing == null ? 0 : fishing.FishingAutomationDispatchCadenceTicks,
+                FishingAutomationIdleFastSkipCount = fishing == null ? 0 : fishing.FishingAutomationIdleFastSkipCount,
+                FishingAutomationIdleWatchdogTickCount = fishing == null ? 0 : fishing.FishingAutomationIdleWatchdogTickCount,
+                FishingObserverFreshActiveCount = fishing == null ? 0 : fishing.FishingObserverFreshActiveCount,
+                FishingObserverFreshInactiveSkipCount = fishing == null ? 0 : fishing.FishingObserverFreshInactiveSkipCount,
+                FishingFallbackScanIdleSkippedCount = fishing == null ? 0 : fishing.FishingFallbackScanIdleSkippedCount,
+                FishingFallbackScanHookStaleCount = fishing == null ? 0 : fishing.FishingFallbackScanHookStaleCount,
+                FishingTickSubpathLast = fishing == null ? string.Empty : fishing.FishingTickSubpathLast,
+                FishingResidualStateMask = fishing == null ? 0 : fishing.FishingResidualStateMask,
                 FishingFilterMode = fishing == null || string.IsNullOrWhiteSpace(fishing.FishingFilterMode) ? settingsSnapshot.FishingFilterMode : fishing.FishingFilterMode,
                 FishingFilterMatchMode = fishing == null || string.IsNullOrWhiteSpace(fishing.FishingFilterMatchMode) ? settingsSnapshot.FishingFilterMatchMode : fishing.FishingFilterMatchMode,
                 FishingFilterCatchKind = fishing == null ? string.Empty : fishing.FishingFilterCatchKind,
@@ -1477,6 +1596,14 @@ namespace JueMingZ.Runtime
                 MovementSafeLandingFullAnalysisCount = safeLanding == null ? 0 : safeLanding.FullAnalysisCount,
                 MovementSafeLandingCheapPrecheckSkipCount = safeLanding == null ? 0 : safeLanding.CheapPrecheckSkipCount,
                 MovementSafeLandingLandingProbeCount = safeLanding == null ? 0 : safeLanding.LandingProbeCount,
+                MovementSafeLandingConfigSummaryCacheHitCount = safeLanding == null ? 0 : safeLanding.ConfigSummaryCacheHitCount,
+                MovementSafeLandingConfigSummaryCacheMissCount = safeLanding == null ? 0 : safeLanding.ConfigSummaryCacheMissCount,
+                MovementSafeLandingStageSummaryCacheHitCount = safeLanding == null ? 0 : safeLanding.StageSummaryCacheHitCount,
+                MovementSafeLandingCheapSkipDiagnosticSuppressedCount = safeLanding == null ? 0 : safeLanding.CheapSkipDiagnosticSuppressedCount,
+                MovementSafeLandingCheapSkipDiagnosticWrittenCount = safeLanding == null ? 0 : safeLanding.CheapSkipDiagnosticWrittenCount,
+                MovementSafeLandingCheapSkipLastReason = safeLanding == null ? string.Empty : safeLanding.CheapSkipLastReason,
+                MovementSafeLandingCheapSkipDiagnosticCadenceTicks = safeLanding == null ? 0 : safeLanding.CheapSkipDiagnosticCadenceTicks,
+                MovementSafeLandingRecoverySummarySkippedCount = safeLanding == null ? 0 : safeLanding.RecoverySummarySkippedCount,
                 MovementSafeLandingLastCompatError = safeLanding == null ? string.Empty : safeLanding.LastCompatError,
                 MovementSafeLandingCollisionFastPathStatus = safeLanding == null ? string.Empty : safeLanding.CollisionFastPathStatus ?? string.Empty,
                 MovementSafeLandingPlayerUpdateHookInstalled = safeLanding != null && safeLanding.PlayerUpdateHookInstalled,
@@ -1573,6 +1700,15 @@ namespace JueMingZ.Runtime
                 LastAutoBuffTick = autoRecovery.LastAutoBuffTick,
                 LastAutoNurseTick = autoRecovery.LastAutoNurseTick,
                 LastAutoStationBuffTick = autoRecovery.LastAutoStationBuffTick,
+                AutoStationBuffCooldownFastSkipCount = autoRecovery.AutoStationBuffCooldownFastSkipCount,
+                AutoStationBuffActiveBuffFastSkipCount = autoRecovery.AutoStationBuffActiveBuffFastSkipCount,
+                AutoStationBuffScanCount = stationBuff == null ? 0 : stationBuff.ScanCount,
+                AutoStationBuffScanCacheHitCount = stationBuff == null ? 0 : stationBuff.CacheHitCount,
+                AutoStationBuffScanCacheMissCount = stationBuff == null ? 0 : stationBuff.CacheMissCount,
+                AutoStationBuffTilesVisitedLast = stationBuff == null ? 0 : stationBuff.TilesVisitedLast,
+                AutoStationBuffLastScanMs = stationBuff == null ? 0d : stationBuff.LastScanMs,
+                AutoStationBuffTileFastPathStatus = stationBuff == null ? string.Empty : stationBuff.TileFastPathStatus ?? string.Empty,
+                AutoStationBuffLastDecision = stationBuff == null ? string.Empty : stationBuff.LastDecision ?? string.Empty,
                 LastAutoBuffCountBefore = autoRecovery.LastAutoBuffCountBefore,
                 LastAutoBuffCountAfter = autoRecovery.LastAutoBuffCountAfter,
                 QuickHealCapability = autoRecovery.QuickHealCapability,

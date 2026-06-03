@@ -41,6 +41,16 @@ namespace JueMingZ.Automation.Fishing
         public long FishingFallbackScanExecutedCount { get; set; }
         public long FishingFallbackScanSkippedHookFreshCount { get; set; }
         public long FishingFallbackScanForcedDisappearanceConfirmationCount { get; set; }
+        public string FishingAutomationDispatchReason { get; set; }
+        public int FishingAutomationDispatchCadenceTicks { get; set; }
+        public long FishingAutomationIdleFastSkipCount { get; set; }
+        public long FishingAutomationIdleWatchdogTickCount { get; set; }
+        public long FishingObserverFreshActiveCount { get; set; }
+        public long FishingObserverFreshInactiveSkipCount { get; set; }
+        public long FishingFallbackScanIdleSkippedCount { get; set; }
+        public long FishingFallbackScanHookStaleCount { get; set; }
+        public string FishingTickSubpathLast { get; set; }
+        public int FishingResidualStateMask { get; set; }
         public string FishingFilterMode { get; set; }
         public string FishingFilterMatchMode { get; set; }
         public string FishingFilterCatchKind { get; set; }
@@ -64,6 +74,8 @@ namespace JueMingZ.Automation.Fishing
             FishingAutoStoreLastInventorySignature = string.Empty;
             FishingAutoStoreLastPendingItemIds = string.Empty;
             FishingAutoStoreLastDiagnosticMessage = string.Empty;
+            FishingAutomationDispatchReason = string.Empty;
+            FishingTickSubpathLast = string.Empty;
             FishingFilterCatchKind = string.Empty;
             FishingFilterCatchName = string.Empty;
             FishingFilterDecision = string.Empty;

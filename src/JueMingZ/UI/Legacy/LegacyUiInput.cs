@@ -43,6 +43,11 @@ namespace JueMingZ.UI.Legacy
         private static DateTime _lastClickUtc = DateTime.MinValue;
         private static int _lastClickX = -1;
         private static int _lastClickY = -1;
+        private const int ScrollActionEventCoalesceMs = 100;
+        private static long _scrollSnapshotSkippedCount;
+        private static long _scrollEventCoalescedCount;
+        private static DateTime _lastScrollActionEventUtc = DateTime.MinValue;
+        private static string _lastScrollActionEventSignature = string.Empty;
 
         public static string ActiveMode
         {
@@ -62,6 +67,16 @@ namespace JueMingZ.UI.Legacy
         public static bool WheelConsumedThisFrame
         {
             get { lock (SyncRoot) { return _wheelConsumedThisFrame; } }
+        }
+
+        public static long ScrollSnapshotSkippedCount
+        {
+            get { lock (SyncRoot) { return _scrollSnapshotSkippedCount; } }
+        }
+
+        public static long ScrollEventCoalescedCount
+        {
+            get { lock (SyncRoot) { return _scrollEventCoalescedCount; } }
         }
 
         private sealed class MouseCoordinate

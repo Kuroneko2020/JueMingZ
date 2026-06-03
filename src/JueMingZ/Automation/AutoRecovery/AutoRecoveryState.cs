@@ -26,6 +26,8 @@ namespace JueMingZ.Automation.AutoRecovery
         public long LastAutoBuffTick { get; set; }
         public long LastAutoNurseTick { get; set; }
         public long LastAutoStationBuffTick { get; set; }
+        public long AutoStationBuffCooldownFastSkipCount { get; set; }
+        public long AutoStationBuffActiveBuffFastSkipCount { get; set; }
         public int LastAutoBuffCountBefore { get; set; }
         public int LastAutoBuffCountAfter { get; set; }
         public bool ImmediateBuffReconcileRequested { get; set; }
@@ -83,6 +85,8 @@ namespace JueMingZ.Automation.AutoRecovery
                 LastAutoBuffTick = LastAutoBuffTick,
                 LastAutoNurseTick = LastAutoNurseTick,
                 LastAutoStationBuffTick = LastAutoStationBuffTick,
+                AutoStationBuffCooldownFastSkipCount = AutoStationBuffCooldownFastSkipCount,
+                AutoStationBuffActiveBuffFastSkipCount = AutoStationBuffActiveBuffFastSkipCount,
                 LastAutoBuffCountBefore = LastAutoBuffCountBefore,
                 LastAutoBuffCountAfter = LastAutoBuffCountAfter,
                 ImmediateBuffReconcileRequested = ImmediateBuffReconcileRequested,

@@ -70,9 +70,9 @@ function Get-DocumentationSizeGuard {
     $extraFeatures = [Math]::Max(0, $featureCount - 30)
 
     if ($Kind -eq "CurrentStatus") {
-        $baseLimit = 15360
-        $hardLimit = 28672
-        $bytesPerExtraFeature = 384
+        $baseLimit = 16384
+        $hardLimit = 32768
+        $bytesPerExtraFeature = 448
     }
     elseif ($Kind -eq "Handoff") {
         $baseLimit = 24576

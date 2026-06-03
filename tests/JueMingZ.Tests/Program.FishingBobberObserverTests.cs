@@ -153,6 +153,42 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void FishingFallbackScanGateSkipsFreshInactiveObserver()
+        {
+            if (!FishingAutomationService.ShouldSkipFallbackScanForTesting(
+                    hookInstalled: true,
+                    observerHasActiveObservation: false,
+                    hookLastObservationTick: 0,
+                    hookLastNoActiveObservationTick: 100,
+                    currentGameUpdateCount: 110,
+                    forceBobberTransitionScan: false))
+            {
+                throw new InvalidOperationException("Expected fresh no-local observer state to skip fallback scan.");
+            }
+
+            if (FishingAutomationService.ShouldSkipFallbackScanForTesting(
+                    hookInstalled: true,
+                    observerHasActiveObservation: false,
+                    hookLastObservationTick: 0,
+                    hookLastNoActiveObservationTick: 100,
+                    currentGameUpdateCount: 111,
+                    forceBobberTransitionScan: false))
+            {
+                throw new InvalidOperationException("Expected stale no-local observer state to keep fallback scan.");
+            }
+
+            if (FishingAutomationService.ShouldSkipFallbackScanForTesting(
+                    hookInstalled: true,
+                    observerHasActiveObservation: false,
+                    hookLastObservationTick: 101,
+                    hookLastNoActiveObservationTick: 100,
+                    currentGameUpdateCount: 101,
+                    forceBobberTransitionScan: false))
+            {
+                throw new InvalidOperationException("Expected newer active hook observation to invalidate no-local skip.");
+            }
+        }
+
         private static void FishingFallbackScanGateKeepsOldFallbackForSensitiveStages()
         {
             if (FishingAutomationService.ShouldSkipFallbackScanForTesting(

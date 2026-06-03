@@ -44,6 +44,7 @@ namespace JueMingZ.Automation.Information
         public string WorldRecordKey { get; set; }
         public string PlayerName { get; set; }
         public string WorldName { get; set; }
+        public string WorldContextProfile { get; set; }
 
         public InformationWorldContext()
         {
@@ -52,6 +53,7 @@ namespace JueMingZ.Automation.Information
             WorldRecordKey = string.Empty;
             PlayerName = string.Empty;
             WorldName = string.Empty;
+            WorldContextProfile = string.Empty;
         }
     }
 
@@ -72,11 +74,37 @@ namespace JueMingZ.Automation.Information
         public long NpcLabelSnapshotRefreshCount { get; set; }
         public long ChestLabelSnapshotRefreshCount { get; set; }
         public long ChestLabelSortRefreshCount { get; set; }
+        public long ChestAlwaysScanCacheHitCount { get; set; }
+        public long ChestAlwaysScanCacheMissCount { get; set; }
+        public string ChestAlwaysLastDirtyReason { get; set; }
+        public long ChestAlwaysSafeRefreshCount { get; set; }
+        public int ChestAlwaysTilesVisitedLast { get; set; }
+        public string ChestAlwaysTypedTileFastPathStatus { get; set; }
+        public long ChestAlwaysNameCacheHitCount { get; set; }
+        public long ChestAlwaysNameCacheMissCount { get; set; }
+        public int ChestAlwaysPartialScanFrameCount { get; set; }
+        public int ChestAlwaysPartialScanPendingCount { get; set; }
+        public long ChestAlwaysStableSnapshotId { get; set; }
+        public long WorldContextCacheHitCount { get; set; }
+        public long WorldContextCacheMissCount { get; set; }
+        public string WorldContextProfile { get; set; }
+        public long WorldContextFileDataRefreshCount { get; set; }
+        public long StatusLineCacheHitCount { get; set; }
+        public long StatusLineCacheMissCount { get; set; }
+        public long FishingCatchEarlyCacheHitCount { get; set; }
+        public long FishingCatchEarlyCacheMissCount { get; set; }
+        public long FishingWaterScanCount { get; set; }
+        public long FishingConditionsReadCount { get; set; }
+        public long FishingBobberObserverFreshInactiveSkipCount { get; set; }
+        public long FishingProjectileFallbackScanCount { get; set; }
 
         public InformationOverlayDiagnostics()
         {
             EnabledSummary = string.Empty;
             LastSkipReason = string.Empty;
+            WorldContextProfile = string.Empty;
+            ChestAlwaysLastDirtyReason = string.Empty;
+            ChestAlwaysTypedTileFastPathStatus = string.Empty;
         }
     }
 

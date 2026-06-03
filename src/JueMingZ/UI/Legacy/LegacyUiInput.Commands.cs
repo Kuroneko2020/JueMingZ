@@ -136,6 +136,7 @@ namespace JueMingZ.UI.Legacy
             while (PendingCommands.Count >= 32)
             {
                 PendingCommands.Dequeue();
+                _commandCoalescedCount++;
             }
 
             PendingCommands.Enqueue(command);

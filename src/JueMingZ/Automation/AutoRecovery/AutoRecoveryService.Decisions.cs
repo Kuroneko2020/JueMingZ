@@ -320,6 +320,25 @@ namespace JueMingZ.Automation.AutoRecovery
                 return false;
             }
 
+            long lastTick;
+            lock (SyncRoot)
+            {
+                lastTick = State.LastAutoStationBuffTick;
+            }
+
+            if (tick - lastTick < AutoStationBuffCooldownTicks)
+            {
+                RecordAutoStationBuffCooldownFastSkip(tick, Math.Max(0, AutoStationBuffCooldownTicks - (tick - lastTick)));
+                return false;
+            }
+
+            var missingBuffMask = BuildAutoStationBuffMissingMask(snapshot.ActiveBuffs);
+            if (missingBuffMask == 0)
+            {
+                RecordAutoStationBuffActiveBuffFastSkip(tick);
+                return false;
+            }
+
             object player;
             if (!TerrariaInputCompat.TryGetLocalPlayer(out player))
             {
@@ -328,7 +347,7 @@ namespace JueMingZ.Automation.AutoRecovery
 
             List<StationBuffTarget> targets;
             string message;
-            if (!StationBuffCompat.TryFindMissingStationBuffs(player, out targets, out message) || targets == null || targets.Count <= 0)
+            if (!StationBuffCompat.TryFindMissingStationBuffs(player, missingBuffMask, tick, out targets, out message) || targets == null || targets.Count <= 0)
             {
                 lock (SyncRoot)
                 {
@@ -368,15 +387,9 @@ namespace JueMingZ.Automation.AutoRecovery
                 StationBuffTargets = targets
             };
 
-            long lastTick;
-            lock (SyncRoot)
-            {
-                lastTick = State.LastAutoStationBuffTick;
-            }
-
-            decision.AutoRecoveryCooldownBlocked = tick - lastTick < AutoStationBuffCooldownTicks;
-            decision.CooldownBlocked = decision.AutoRecoveryCooldownBlocked;
-            decision.ShouldEnqueue = !decision.CooldownBlocked;
+            decision.AutoRecoveryCooldownBlocked = false;
+            decision.CooldownBlocked = false;
+            decision.ShouldEnqueue = true;
             return true;
         }
 
@@ -505,6 +518,65 @@ namespace JueMingZ.Automation.AutoRecovery
             }
 
             return builder.ToString();
+        }
+
+        private static int BuildAutoStationBuffMissingMask(IReadOnlyList<BuffSnapshot> activeBuffs)
+        {
+            var missingMask = StationBuffCompat.AllKnownStationBuffMask;
+            if (activeBuffs == null || activeBuffs.Count <= 0)
+            {
+                return missingMask;
+            }
+
+            for (var index = 0; index < activeBuffs.Count; index++)
+            {
+                var buff = activeBuffs[index];
+                if (buff == null || buff.BuffType <= 0 || buff.BuffTime <= 0)
+                {
+                    continue;
+                }
+
+                missingMask &= ~StationBuffCompat.GetStationBuffMaskForBuffType(buff.BuffType);
+                if (missingMask == 0)
+                {
+                    return 0;
+                }
+            }
+
+            return missingMask;
+        }
+
+        private static void RecordAutoStationBuffCooldownFastSkip(long tick, long remainingTicks)
+        {
+            lock (SyncRoot)
+            {
+                State.AutoStationBuffCooldownFastSkipCount++;
+                if (ShouldUpdateAutoStationBuffFastSkipResultLocked(tick))
+                {
+                    State.LastAutoStationBuffResult = "AutoStationBuff idle: cooldownFastSkip remaining " + remainingTicks.ToString(CultureInfo.InvariantCulture) + " tick(s).";
+                    _lastAutoStationBuffFastSkipResultTick = tick;
+                }
+            }
+        }
+
+        private static void RecordAutoStationBuffActiveBuffFastSkip(long tick)
+        {
+            lock (SyncRoot)
+            {
+                State.AutoStationBuffActiveBuffFastSkipCount++;
+                if (ShouldUpdateAutoStationBuffFastSkipResultLocked(tick))
+                {
+                    State.LastAutoStationBuffResult = "AutoStationBuff idle: activeBuffFastSkip all known station buffs are active.";
+                    _lastAutoStationBuffFastSkipResultTick = tick;
+                }
+            }
+        }
+
+        private static bool ShouldUpdateAutoStationBuffFastSkipResultLocked(long tick)
+        {
+            return _lastAutoStationBuffFastSkipResultTick == ForceDueTick ||
+                   tick < _lastAutoStationBuffFastSkipResultTick ||
+                   tick - _lastAutoStationBuffFastSkipResultTick >= AutoStationBuffFastSkipResultThrottleTicks;
         }
 
         private static int Percent(int current, int max)

@@ -30,8 +30,6 @@ namespace JueMingZ.UI.Legacy
                 var inWindow = IsMouseInWindow(mouse);
                 var active = IsActiveInteraction();
                 var diagnosticMainScrollDelta = ReadRawScrollDeltaLocked(raw);
-                var scroll = TerrariaUiMouseCompat.ReadScrollSnapshot(diagnosticMainScrollDelta);
-                var rawScrollDelta = scroll.EffectiveScrollDelta;
                 if (!inWindow && !active)
                 {
                     return;
@@ -39,9 +37,18 @@ namespace JueMingZ.UI.Legacy
 
                 LegacyHotbarScrollGuard.ArmBeforeTerrariaUpdate(inWindow, active);
                 var captured = UiMouseCaptureService.CaptureForOperationWindow();
-                if (rawScrollDelta != 0)
+                if (diagnosticMainScrollDelta != 0)
                 {
-                    ConsumeWheelDelta(scroll, captured, false, inWindow, active, mouse);
+                    var scroll = TerrariaUiMouseCompat.ReadScrollSnapshot(diagnosticMainScrollDelta);
+                    var rawScrollDelta = scroll.EffectiveScrollDelta;
+                    if (rawScrollDelta != 0)
+                    {
+                        ConsumeWheelDelta(scroll, captured, false, inWindow, active, mouse);
+                    }
+                }
+                else
+                {
+                    RecordScrollSnapshotSkipped();
                 }
 
                 DiagnosticInteractionDiagnostics.RecordUiClickSuppression(
@@ -215,6 +222,17 @@ namespace JueMingZ.UI.Legacy
             }
         }
 
+        private static void RecordScrollSnapshotSkipped()
+        {
+            lock (SyncRoot)
+            {
+                unchecked
+                {
+                    _scrollSnapshotSkippedCount++;
+                }
+            }
+        }
+
         private static void ConsumeWheelDelta(UiScrollDeltaSnapshot scroll, bool mouseCaptured, bool fromScrollHotbarHook, bool mouseInLegacyWindow, bool activeInteraction, LegacyMouseSnapshot mouse)
         {
             if (scroll == null || scroll.EffectiveScrollDelta == 0)
@@ -288,6 +306,11 @@ namespace JueMingZ.UI.Legacy
             var playerInputDelta = scroll == null ? 0 : scroll.PlayerInputScrollDelta;
             var playerInputDeltaForUi = scroll == null ? 0 : scroll.PlayerInputScrollDeltaForUI;
             var mainScrollDelta = scroll == null ? 0 : scroll.MainScrollDelta;
+            if (!ShouldRecordScrollActionEvent(LegacyMainUiState.SelectedPageId, hotbarScrollSuppressed, before, after))
+            {
+                return;
+            }
+
             DiagnosticActionRecorder.RecordCustomEvent(
                 Guid.Empty,
                 "Ui.WheelCaptured",
@@ -401,6 +424,34 @@ namespace JueMingZ.UI.Legacy
                 "LegacyMainWindow",
                 string.Empty,
                 string.Empty);
+        }
+
+        private static bool ShouldRecordScrollActionEvent(string pageId, bool hotbarScrollSuppressed, int before, int after)
+        {
+            var signature = (pageId ?? string.Empty) + "|" + (hotbarScrollSuppressed ? "hotbar" : "scroll") + "|" + (before == after ? "stable" : "moved");
+            var now = DateTime.UtcNow;
+            lock (SyncRoot)
+            {
+                if (string.Equals(_lastScrollActionEventSignature, signature, StringComparison.Ordinal) &&
+                    now - _lastScrollActionEventUtc < TimeSpan.FromMilliseconds(ScrollActionEventCoalesceMs))
+                {
+                    unchecked
+                    {
+                        _scrollEventCoalescedCount++;
+                    }
+
+                    return false;
+                }
+
+                _lastScrollActionEventSignature = signature;
+                _lastScrollActionEventUtc = now;
+                return true;
+            }
+        }
+
+        internal static bool ShouldRecordScrollActionEventForTesting(string pageId, bool hotbarScrollSuppressed, int before, int after)
+        {
+            return ShouldRecordScrollActionEvent(pageId, hotbarScrollSuppressed, before, after);
         }
 
         private static void RecordHotbarSuppressedByHookOnly(int playerInputDelta, int playerInputDeltaForUi, int mainScrollDelta)

@@ -33,8 +33,6 @@ namespace JueMingZ.UI.Legacy
             int quickReforgePanelHeight;
             hovered = DrawQuickReforgeListPanel(spriteBatch, area, mouse, elements, y + LegacyUiMetrics.RowHeight, out quickReforgePanelHeight) ?? hovered;
             y += MiscExpandableRowHeight(quickReforgePanelHeight);
-            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "自动收税", settings.NpcAutoTaxCollectEnabled, "misc-auto-tax-collect-mode:", "靠近税收官自动收钱") ?? hovered;
-            y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawAutoMiningRow(spriteBatch, area, mouse, elements, y, settings) ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawRightModeRow(
@@ -59,6 +57,8 @@ namespace JueMingZ.UI.Legacy
             hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "自动提炼", settings.InventoryAutoExtractinatorEnabled, "misc-auto-extractinator-mode:", "靠近提炼机尝试自动提炼") ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "保持收藏", settings.InventoryKeepFavoritedEnabled, "misc-keep-favorited-mode:", "让收藏的物品保持状态") ?? hovered;
+            y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
+            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "自动收税", settings.NpcAutoTaxCollectEnabled, "misc-auto-tax-collect-mode:", "靠近税收官自动收钱") ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "旅行菜单", settings.WorldAutomationTravelMenuEnabled, "misc-travel-menu-mode:", "单机临时开启原版旅行菜单") ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;

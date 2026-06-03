@@ -66,6 +66,13 @@ namespace JueMingZ.UI.Legacy.Framework
             ContentRect = contentRect;
         }
 
+        public LegacyUiContext CreateUnclippedCopy()
+        {
+            var context = new LegacyUiContext(SpriteBatch, Mouse, WindowRect, SelectedPageId, Settings, Elements);
+            context.SetContentRect(ContentRect);
+            return context;
+        }
+
         public void SetScrollArea(LegacyScrollArea area)
         {
             ScrollArea = area;

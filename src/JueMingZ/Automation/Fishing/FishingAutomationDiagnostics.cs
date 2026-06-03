@@ -104,6 +104,16 @@ namespace JueMingZ.Automation.Fishing
                     FishingFallbackScanExecutedCount = _last.FishingFallbackScanExecutedCount,
                     FishingFallbackScanSkippedHookFreshCount = _last.FishingFallbackScanSkippedHookFreshCount,
                     FishingFallbackScanForcedDisappearanceConfirmationCount = _last.FishingFallbackScanForcedDisappearanceConfirmationCount,
+                    FishingAutomationDispatchReason = _last.FishingAutomationDispatchReason ?? string.Empty,
+                    FishingAutomationDispatchCadenceTicks = _last.FishingAutomationDispatchCadenceTicks,
+                    FishingAutomationIdleFastSkipCount = _last.FishingAutomationIdleFastSkipCount,
+                    FishingAutomationIdleWatchdogTickCount = _last.FishingAutomationIdleWatchdogTickCount,
+                    FishingObserverFreshActiveCount = _last.FishingObserverFreshActiveCount,
+                    FishingObserverFreshInactiveSkipCount = _last.FishingObserverFreshInactiveSkipCount,
+                    FishingFallbackScanIdleSkippedCount = _last.FishingFallbackScanIdleSkippedCount,
+                    FishingFallbackScanHookStaleCount = _last.FishingFallbackScanHookStaleCount,
+                    FishingTickSubpathLast = _last.FishingTickSubpathLast ?? string.Empty,
+                    FishingResidualStateMask = _last.FishingResidualStateMask,
                     FishingFilterMode = _last.FishingFilterMode ?? string.Empty,
                     FishingFilterMatchMode = _last.FishingFilterMatchMode ?? string.Empty,
                     FishingFilterCatchKind = _last.FishingFilterCatchKind ?? string.Empty,
@@ -115,6 +125,16 @@ namespace JueMingZ.Automation.Fishing
                     FishingFilterDryRun = _last.FishingFilterDryRun,
                     FishingFilterCutRodSkipEnabled = _last.FishingFilterCutRodSkipEnabled
                 };
+            }
+        }
+
+        internal static void ResetForTesting()
+        {
+            lock (SyncRoot)
+            {
+                _hookInstalled = false;
+                _hookLastObservationTick = 0;
+                _last = new FishingAutomationDiagnosticInfo();
             }
         }
     }

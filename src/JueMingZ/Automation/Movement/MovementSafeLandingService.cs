@@ -32,6 +32,7 @@ namespace JueMingZ.Automation.Movement
         private const int DescentRescueGuardMaxTicks = 180;
         private const float DescentRescueGuardLandingChangePixels = 128f;
         private const float DescentRescueGuardHorizontalChangePixels = 192f;
+        private const int CheapSkipDiagnosticCadenceTicks = 30;
         private const string StrategyMountCancel = "safe_landing_mount_cancel";
         private const string StrategyGravityRestore = "safe_landing_gravity_restore";
         private static readonly object SyncRoot = new object();
@@ -85,6 +86,15 @@ namespace JueMingZ.Automation.Movement
         private static float _descentRescueGuardPositionX;
         private static long _fullAnalysisCount;
         private static long _cheapPrecheckSkipCount;
+        private static long _cheapSkipDiagnosticSuppressedCount;
+        private static long _cheapSkipDiagnosticWrittenCount;
+        private static long _recoverySummarySkippedCount;
+        private static long _lastCheapSkipDiagnosticTick = -1;
+        private static string _lastCheapSkipReason = string.Empty;
+        private static long _lastCheapSkipBoundarySignature = long.MinValue;
+        private static bool _lastFullDiagnosticWasException;
+        private static string _stageSummaryCache;
+        private static long _stageSummaryCacheHitCount;
         private static MovementSafeLandingDiagnosticInfo _diagnostics = new MovementSafeLandingDiagnosticInfo();
 
         public static MovementSafeLandingDiagnosticInfo GetDiagnostics()
@@ -209,16 +219,12 @@ namespace JueMingZ.Automation.Movement
                 {
                     IncrementCheapPrecheckSkipCount();
                     ClearDescentRescueGuard("notDangerous");
-                    RecordDecision(
-                        true,
-                        "skipped",
-                        FirstNonEmpty(analysis.SkipReason, "notDangerous:cheap"),
+                    RecordCheapPrecheckSkipDecision(
                         tick,
                         queueSnapshot,
                         analysis,
-                        false,
-                        MovementSafeLandingOptionCatalog.BuildConfigSummary(settings),
-                        string.Empty);
+                        FirstNonEmpty(analysis.SkipReason, "notDangerous:cheap"),
+                        settings);
                     return;
                 }
 
@@ -1415,6 +1421,69 @@ namespace JueMingZ.Automation.Movement
             }
         }
 
+        internal static void ResetDiagnosticsForTesting()
+        {
+            lock (DiagnosticsSyncRoot)
+            {
+                lock (SyncRoot)
+                {
+                    _fullAnalysisCount = 0;
+                    _cheapPrecheckSkipCount = 0;
+                    _cheapSkipDiagnosticSuppressedCount = 0;
+                    _cheapSkipDiagnosticWrittenCount = 0;
+                    _recoverySummarySkippedCount = 0;
+                    _lastCheapSkipDiagnosticTick = -1;
+                    _lastCheapSkipReason = string.Empty;
+                    _lastCheapSkipBoundarySignature = long.MinValue;
+                    _lastFullDiagnosticWasException = false;
+                    _stageSummaryCache = null;
+                    _stageSummaryCacheHitCount = 0;
+                }
+
+                _diagnostics = new MovementSafeLandingDiagnosticInfo();
+            }
+
+            MovementSafeLandingOptionCatalog.ResetConfigSummaryCacheForTesting();
+        }
+
+        internal static void RecordCheapPrecheckSkipForTesting(long tick, string reason, bool playerControllable)
+        {
+            IncrementCheapPrecheckSkipCount();
+            RecordCheapPrecheckSkipDecision(
+                tick,
+                InputActionQueueFastState.Empty,
+                new MovementSafeLandingAnalysis
+                {
+                    PlayerControllable = playerControllable,
+                    SkipReason = reason ?? string.Empty,
+                    FallingSpeed = playerControllable ? 0.25f : 0f,
+                    VelocityY = playerControllable ? 0.25f : 0f,
+                    GravityDirection = 1f
+                },
+                reason,
+                AppSettings.CreateDefault());
+        }
+
+        internal static void RecordFullDecisionForTesting(string decision, string reason, long tick)
+        {
+            RecordDecision(
+                true,
+                decision,
+                reason,
+                tick,
+                InputActionQueueFastState.Empty,
+                new MovementSafeLandingAnalysis
+                {
+                    PlayerControllable = true,
+                    Dangerous = string.Equals(decision, "submitted", StringComparison.Ordinal),
+                    RescueWindow = string.Equals(decision, "submitted", StringComparison.Ordinal),
+                    SkipReason = reason ?? string.Empty
+                },
+                string.Equals(decision, "submitted", StringComparison.Ordinal),
+                MovementSafeLandingOptionCatalog.BuildConfigSummary(AppSettings.CreateDefault()),
+                string.Empty);
+        }
+
         internal static void MarkDescentRescueSubmittedForTesting(
             long tick,
             MovementSafeLandingAnalysis analysis,
@@ -2387,6 +2456,167 @@ namespace JueMingZ.Automation.Movement
             }
         }
 
+        private static void RecordCheapPrecheckSkipDecision(
+            long tick,
+            InputActionQueueFastState queueSnapshot,
+            MovementSafeLandingAnalysis analysis,
+            string reason,
+            AppSettings settings)
+        {
+            reason = reason ?? string.Empty;
+            var boundarySignature = BuildCheapSkipBoundarySignature(queueSnapshot, analysis);
+            if (ShouldRecordCheapSkipDiagnostics(reason, boundarySignature, tick))
+            {
+                MarkCheapSkipDiagnosticWritten(reason, boundarySignature, tick);
+                RecordDecision(
+                    true,
+                    "skipped",
+                    reason,
+                    tick,
+                    queueSnapshot,
+                    analysis,
+                    false,
+                    MovementSafeLandingOptionCatalog.BuildConfigSummary(settings),
+                    string.Empty);
+                return;
+            }
+
+            MarkCheapSkipDiagnosticSuppressed();
+            RecordLightweightCheapSkipDecision(tick, queueSnapshot, analysis, reason);
+        }
+
+        private static bool ShouldRecordCheapSkipDiagnostics(string reason, long boundarySignature, long tick)
+        {
+            lock (SyncRoot)
+            {
+                if (_lastFullDiagnosticWasException)
+                {
+                    return true;
+                }
+
+                if (!string.Equals(_lastCheapSkipReason, reason, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+
+                if (_lastCheapSkipBoundarySignature != boundarySignature)
+                {
+                    return true;
+                }
+
+                if (_lastCheapSkipDiagnosticTick < 0 || tick < _lastCheapSkipDiagnosticTick)
+                {
+                    return true;
+                }
+
+                return tick - _lastCheapSkipDiagnosticTick >= CheapSkipDiagnosticCadenceTicks;
+            }
+        }
+
+        private static long BuildCheapSkipBoundarySignature(
+            InputActionQueueFastState queueSnapshot,
+            MovementSafeLandingAnalysis analysis)
+        {
+            unchecked
+            {
+                long signature = 17;
+                signature = signature * 31 + (queueSnapshot == null ? 0 : queueSnapshot.PendingCount);
+                signature = signature * 31 + (queueSnapshot != null && queueSnapshot.HasRunningAction ? 1 : 0);
+                signature = signature * 31 + (queueSnapshot == null ? 0 : (int)queueSnapshot.RunningActionKindValue);
+                signature = signature * 31 + (ItemUseBridge.PendingRequestId == Guid.Empty ? 0 : 1);
+                if (analysis != null)
+                {
+                    signature = signature * 31 + (analysis.TextInputFocused ? 1 : 0);
+                    signature = signature * 31 + (analysis.PlayerControllable ? 1 : 0);
+                    signature = signature * 31 + (analysis.Dangerous ? 1 : 0);
+                    signature = signature * 31 + (analysis.RescueWindow ? 1 : 0);
+                    signature = signature * 31 + (analysis.AlreadySafe ? 1 : 0);
+                    signature = signature * 31 + (analysis.RawNoFallDmg ? 1 : 0);
+                    signature = signature * 31 + (analysis.RawSlowFall ? 1 : 0);
+                    signature = signature * 31 + (analysis.RawWet ? 1 : 0);
+                    signature = signature * 31 + (analysis.RawHoneyWet ? 1 : 0);
+                    signature = signature * 31 + (analysis.RawShimmering ? 1 : 0);
+                    signature = signature * 31 + (analysis.RawWebbed ? 1 : 0);
+                    signature = signature * 31 + (analysis.RawStoned ? 1 : 0);
+                }
+
+                lock (SyncRoot)
+                {
+                    signature = signature * 31 + (_safeLandingGravityRestorePending ? 1 : 0);
+                    signature = signature * 31 + (_safeLandingMountCancelPending ? 1 : 0);
+                    signature = signature * 31 + (TemporaryEquipmentRecords.Count > 0 ? 1 : 0);
+                    signature = signature * 31 + (_temporaryEquipmentApplyRequestId == Guid.Empty ? 0 : 1);
+                    signature = signature * 31 + (_temporaryEquipmentActivationRequestId == Guid.Empty ? 0 : 1);
+                    signature = signature * 31 + (_temporaryEquipmentRestoreRequestId == Guid.Empty ? 0 : 1);
+                }
+
+                return signature;
+            }
+        }
+
+        private static void MarkCheapSkipDiagnosticWritten(string reason, long boundarySignature, long tick)
+        {
+            lock (SyncRoot)
+            {
+                _cheapSkipDiagnosticWrittenCount++;
+                _lastCheapSkipReason = reason ?? string.Empty;
+                _lastCheapSkipBoundarySignature = boundarySignature;
+                _lastCheapSkipDiagnosticTick = tick;
+                _lastFullDiagnosticWasException = false;
+            }
+        }
+
+        private static void MarkCheapSkipDiagnosticSuppressed()
+        {
+            lock (SyncRoot)
+            {
+                _cheapSkipDiagnosticSuppressedCount++;
+                _recoverySummarySkippedCount++;
+            }
+        }
+
+        private static void RecordLightweightCheapSkipDecision(
+            long tick,
+            InputActionQueueFastState queueSnapshot,
+            MovementSafeLandingAnalysis analysis,
+            string reason)
+        {
+            lock (DiagnosticsSyncRoot)
+            {
+                var current = _diagnostics ?? new MovementSafeLandingDiagnosticInfo();
+                current.Enabled = true;
+                current.LastTriggered = false;
+                current.LastDecision = "skipped";
+                current.LastSkipReason = reason ?? string.Empty;
+                current.LastDecisionUtc = DateTime.UtcNow;
+                current.LastTick = tick;
+                current.PendingActionCount = queueSnapshot == null ? 0 : queueSnapshot.PendingCount;
+                current.RunningActionKind = queueSnapshot == null ? string.Empty : queueSnapshot.RunningActionKind ?? string.Empty;
+                current.LastCompatError = string.Empty;
+                current.CollisionFastPathStatus = MovementSafeLandingCompat.CollisionFastPathStatus;
+                current.LandingProbeCount = MovementSafeLandingCompat.LandingProbeCount;
+                current.PlayerUpdateHookInstalled = MovementSafeLandingCompat.PlayerUpdateHookInstalled;
+                current.PlayerUpdateHookMessage = MovementSafeLandingCompat.PlayerUpdateHookMessage;
+                if (analysis != null)
+                {
+                    current.TextInputFocused = analysis.TextInputFocused;
+                    current.TextInputReason = analysis.TextInputReason ?? string.Empty;
+                    current.PlayerControllable = analysis.PlayerControllable;
+                    current.Dangerous = analysis.Dangerous;
+                    current.RescueWindow = analysis.RescueWindow;
+                    current.AlreadySafe = analysis.AlreadySafe;
+                    current.SafeReason = analysis.SafeReason ?? string.Empty;
+                    current.FallingSpeed = analysis.FallingSpeed;
+                    current.VelocityY = analysis.VelocityY;
+                    current.GravityDirection = analysis.GravityDirection;
+                }
+
+                current.SkippedCount++;
+                ApplySafeLandingOptimizationCounters(current);
+                _diagnostics = current;
+            }
+        }
+
         private static void RecordDecision(
             bool enabled,
             string decision,
@@ -2410,7 +2640,7 @@ namespace JueMingZ.Automation.Movement
                 current.PendingActionCount = queueSnapshot == null ? 0 : queueSnapshot.PendingCount;
                 current.RunningActionKind = queueSnapshot == null ? string.Empty : queueSnapshot.RunningActionKind ?? string.Empty;
                 current.ConfigSummary = configSummary ?? string.Empty;
-                current.StageSummary = "priority0-safe(no-action),singleActiveRescuePerDescent=true,strictPriorityWait=true,priority1-equipped-active(order=double_jump>rocket_boots>flying_carpet>gravity_globe>flying_mount>non_flying_safe_mount,nearGroundDistanceGate=true,no-equipped-wings-input,no-grapple,gravityRestoreImmediate=true,gravityRestoreRetryTicks=" + SafeLandingGravityRestoreRetryTicks.ToString(CultureInfo.InvariantCulture) + ",mountCancelPreImpact=true,mountCancelRetryTicks=" + SafeLandingMountCancelRetryTicks.ToString(CultureInfo.InvariantCulture) + "),priority2-temporary-equipment(order=horseshoe>wings>fairy_boots>double_jump>rocket_boots>flying_carpet>gravity_globe>flying_mount>non_flying_safe_mount,activationCapabilityGate=true,temporaryActiveNearGroundDistanceGate=true,restoreStableTicks=" + TemporaryEquipmentStableRestoreTicks.ToString(CultureInfo.InvariantCulture) + "),priority3-temporary-held-item(order=umbrella,nearGroundDistanceGate=true,restoreStableTicks=" + TemporaryUmbrellaStableRestoreTicks.ToString(CultureInfo.InvariantCulture) + "),priority4-grapple(order=equipped_grapple>inventory_grapple,vanillaQuickGrappleInventoryScan=true,landingSurfaceTarget=true,relativeHookTiming=true,failOpenWhenTooLate=true),priority5-teleport-rod(order=inventory_teleport_rod,vanillaUseHotbarItem=true,nearGroundDistanceGate=true,noDirectPositionMutation=true)";
+                current.StageSummary = GetStageSummary();
                 current.StrategyCatalogVersion = MovementSafeLandingStrategyCatalog.Version;
                 current.RecoveryStateSummary = BuildRecoveryStateSummary(tick);
                 current.LastCompatError = compatError ?? string.Empty;
@@ -2627,7 +2857,63 @@ namespace JueMingZ.Automation.Movement
                     current.SkippedCount++;
                 }
 
+                ApplySafeLandingOptimizationCounters(current);
+                lock (SyncRoot)
+                {
+                    _lastFullDiagnosticWasException = string.Equals(decision, "exception", StringComparison.Ordinal);
+                }
+
                 _diagnostics = current;
+            }
+        }
+
+        private static string GetStageSummary()
+        {
+            if (_stageSummaryCache != null)
+            {
+                lock (SyncRoot)
+                {
+                    _stageSummaryCacheHitCount++;
+                }
+
+                return _stageSummaryCache;
+            }
+
+            _stageSummaryCache =
+                "priority0-safe(no-action),singleActiveRescuePerDescent=true,strictPriorityWait=true,priority1-equipped-active(order=double_jump>rocket_boots>flying_carpet>gravity_globe>flying_mount>non_flying_safe_mount,nearGroundDistanceGate=true,no-equipped-wings-input,no-grapple,gravityRestoreImmediate=true,gravityRestoreRetryTicks=" +
+                SafeLandingGravityRestoreRetryTicks.ToString(CultureInfo.InvariantCulture) +
+                ",mountCancelPreImpact=true,mountCancelRetryTicks=" +
+                SafeLandingMountCancelRetryTicks.ToString(CultureInfo.InvariantCulture) +
+                "),priority2-temporary-equipment(order=horseshoe>wings>fairy_boots>double_jump>rocket_boots>flying_carpet>gravity_globe>flying_mount>non_flying_safe_mount,activationCapabilityGate=true,temporaryActiveNearGroundDistanceGate=true,restoreStableTicks=" +
+                TemporaryEquipmentStableRestoreTicks.ToString(CultureInfo.InvariantCulture) +
+                "),priority3-temporary-held-item(order=umbrella,nearGroundDistanceGate=true,restoreStableTicks=" +
+                TemporaryUmbrellaStableRestoreTicks.ToString(CultureInfo.InvariantCulture) +
+                "),priority4-grapple(order=equipped_grapple>inventory_grapple,vanillaQuickGrappleInventoryScan=true,landingSurfaceTarget=true,relativeHookTiming=true,failOpenWhenTooLate=true),priority5-teleport-rod(order=inventory_teleport_rod,vanillaUseHotbarItem=true,nearGroundDistanceGate=true,noDirectPositionMutation=true)";
+            return _stageSummaryCache;
+        }
+
+        private static void ApplySafeLandingOptimizationCounters(MovementSafeLandingDiagnosticInfo current)
+        {
+            if (current == null)
+            {
+                return;
+            }
+
+            long configHitCount;
+            long configMissCount;
+            MovementSafeLandingOptionCatalog.GetConfigSummaryCacheStats(out configHitCount, out configMissCount);
+            current.ConfigSummaryCacheHitCount = configHitCount;
+            current.ConfigSummaryCacheMissCount = configMissCount;
+            lock (SyncRoot)
+            {
+                current.StageSummaryCacheHitCount = _stageSummaryCacheHitCount;
+                current.CheapSkipDiagnosticSuppressedCount = _cheapSkipDiagnosticSuppressedCount;
+                current.CheapSkipDiagnosticWrittenCount = _cheapSkipDiagnosticWrittenCount;
+                current.CheapSkipLastReason = _lastCheapSkipReason ?? string.Empty;
+                current.CheapSkipDiagnosticCadenceTicks = CheapSkipDiagnosticCadenceTicks;
+                current.RecoverySummarySkippedCount = _recoverySummarySkippedCount;
+                current.FullAnalysisCount = _fullAnalysisCount;
+                current.CheapPrecheckSkipCount = _cheapPrecheckSkipCount;
             }
         }
 

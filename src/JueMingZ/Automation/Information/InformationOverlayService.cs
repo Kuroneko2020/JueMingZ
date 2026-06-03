@@ -3,6 +3,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.CompilerServices;
+using System.Threading;
 using JueMingZ.Automation.Fishing;
 using JueMingZ.Automation.Fishing.Filtering;
 using JueMingZ.Compat;
@@ -12,6 +14,7 @@ using JueMingZ.Records;
 using JueMingZ.UI;
 using JueMingZ.UI.Information;
 using Terraria;
+using Terraria.Map;
 
 namespace JueMingZ.Automation.Information
 {
@@ -23,6 +26,17 @@ namespace JueMingZ.Automation.Information
         private const int MaxTombstoneTextLabelsPerFrame = 40;
         private const int SignTextLayoutCacheLimit = 512;
         private const int TileSize = 16;
+        private const int TileFrameSize = 18;
+        private const int ChestTileTypeContainers = 21;
+        private const int ChestTileTypeDressers = 88;
+        private const int ChestTileTypeFakeContainers = 441;
+        private const int ChestTileTypeContainers2 = 467;
+        private const int ChestTileTypeFakeContainers2 = 468;
+        private const int ChestFrameColumns = 2;
+        private const int ChestFrameRows = 2;
+        private const int ChestStyleFrameWidth = ChestFrameColumns * TileFrameSize;
+        private const int DresserFrameColumns = 3;
+        private const int DresserStyleFrameWidth = DresserFrameColumns * TileFrameSize;
         private const int TileHighlightScanMarginTiles = 4;
         private const int TileHighlightPlayerChunkTiles = 16;
         private const int TileHighlightLifeCrystalMask = 1 << 0;
@@ -37,7 +51,11 @@ namespace JueMingZ.Automation.Information
         private const float ChestLabelSortRefreshDistanceSquared = ChestLabelSortRefreshDistance * ChestLabelSortRefreshDistance;
         private const ulong NpcScanIntervalTicks = 12;
         private const ulong TileScanIntervalTicks = 60;
-        private const ulong ChestScanIntervalTicks = 60;
+        private const int ChestLabelCacheMovementChunkPixels = 64;
+        private const ulong ChestOpenedCacheRefreshTicks = 60;
+        private const ulong ChestAlwaysScanSafeRefreshTicks = 300;
+        private const int ChestAlwaysNameCacheLimit = 512;
+        private const int ChestAlwaysPartialScanBudgetTiles = 2048;
         private const ulong SignScanIntervalTicks = 60;
         private const ulong StatusRefreshTicks = 30;
         private const ulong FishingBobberObserverFreshTicks = 2;
@@ -50,11 +68,17 @@ namespace JueMingZ.Automation.Information
         private static readonly ChestLabel[] EmptyChestLabels = new ChestLabel[0];
         private static readonly List<NpcLabel> NpcLabelBuildBuffer = new List<NpcLabel>();
         private static readonly List<ChestLabel> ChestLabelBuildBuffer = new List<ChestLabel>();
+        private static readonly List<ChestScanCandidate> ChestScanCandidateBuffer = new List<ChestScanCandidate>();
+        private static readonly List<ChestScanCandidate> ChestAlwaysPartialScanCandidateBuffer = new List<ChestScanCandidate>();
+        private static readonly HashSet<long> ChestAlwaysPartialScanAdded = new HashSet<long>();
+        private static readonly Dictionary<ChestNameCacheKey, string> ChestAlwaysNameCache = new Dictionary<ChestNameCacheKey, string>();
+        private static readonly Queue<ChestNameCacheKey> ChestAlwaysNameCacheOrder = new Queue<ChestNameCacheKey>();
         private static NpcLabel[] CachedNpcLabels = EmptyNpcLabels;
         private static readonly List<TileHighlight> CachedTileHighlights = new List<TileHighlight>();
         private static readonly HashSet<long> TileHighlightVisited = new HashSet<long>();
         private static readonly List<TilePoint> TileHighlightStack = new List<TilePoint>(64);
-        private static ChestLabel[] CachedChestLabels = EmptyChestLabels;
+        private static ChestLabel[] CachedAlwaysChestLabels = EmptyChestLabels;
+        private static ChestLabel[] CachedOpenedChestLabels = EmptyChestLabels;
         private static ChestLabel[] CachedSortedChestLabels = EmptyChestLabels;
         private static ChestLabel[] _lastSortedChestLabelSource = EmptyChestLabels;
         private static readonly List<SignTextLabel> CachedSignTextLabels = new List<SignTextLabel>();
@@ -66,13 +90,17 @@ namespace JueMingZ.Automation.Information
             442, 443, 444, 445, 446, 447, 448, 539, 592, 593, 601, 605, 613, 627
         };
         private static readonly InformationOverlayDiagnostics Diagnostics = new InformationOverlayDiagnostics();
-        private static readonly Dictionary<int, bool> ChestTileTypeCache = new Dictionary<int, bool>();
         private static ulong _lastNpcScanTick;
         private static uint _lastNpcLabelSignatureHash;
         private static ulong _lastTileScanTick;
         private static uint _lastTileHighlightSignatureHash;
-        private static ulong _lastChestScanTick;
-        private static uint _lastChestLabelSignatureHash;
+        private static ulong _lastChestAlwaysScanTick;
+        private static uint _lastChestAlwaysSignatureHash;
+        private static ChestLabelCacheSignature _lastChestAlwaysSignature;
+        private static uint _lastChestAlwaysStableSourceSignatureHash;
+        private static ulong _lastChestOpenedScanTick;
+        private static uint _lastChestOpenedSignatureHash;
+        private static ChestLabelCacheSignature _lastChestOpenedSignature;
         private static uint _lastChestSortSignatureHash;
         private static float _lastChestSortPlayerCenterX;
         private static float _lastChestSortPlayerCenterY;
@@ -92,10 +120,40 @@ namespace JueMingZ.Automation.Information
         private static string _lastStatusStyleSignature = string.Empty;
         private static long _signTextLayoutCacheHitCount;
         private static long _signTextLayoutCacheMissCount;
+        private static long _statusLineCacheHitCount;
+        private static long _statusLineCacheMissCount;
         private static long _worldLabelSnapshotRefreshCount;
         private static long _npcLabelSnapshotRefreshCount;
         private static long _chestLabelSnapshotRefreshCount;
         private static long _chestLabelSortRefreshCount;
+        private static long _chestAlwaysScanCacheHitCount;
+        private static long _chestAlwaysScanCacheMissCount;
+        private static long _chestAlwaysSafeRefreshCount;
+        private static long _chestAlwaysNameCacheHitCount;
+        private static long _chestAlwaysNameCacheMissCount;
+        private static int _chestAlwaysTilesVisitedLast;
+        private static string _chestAlwaysLastDirtyReason = string.Empty;
+        private static string _chestAlwaysTypedTileFastPathStatus = string.Empty;
+        private static bool _chestAlwaysPartialScanActive;
+        private static bool _chestAlwaysPartialScanReturnsEmptyUntilComplete;
+        private static ChestLabelCacheSignature _chestAlwaysPartialScanSignature;
+        private static string _chestAlwaysPartialScanDirtyReason = string.Empty;
+        private static int _chestAlwaysPartialScanMinX;
+        private static int _chestAlwaysPartialScanMaxX;
+        private static int _chestAlwaysPartialScanMinY;
+        private static int _chestAlwaysPartialScanMaxY;
+        private static int _chestAlwaysPartialScanNextX;
+        private static int _chestAlwaysPartialScanNextY;
+        private static int _chestAlwaysPartialScanTilesVisited;
+        private static int _chestAlwaysPartialScanTypedTileReads;
+        private static int _chestAlwaysPartialScanFallbackTileReads;
+        private static int _chestAlwaysPartialScanFailedTileReads;
+        private static int _chestAlwaysPartialScanFrameCount;
+        private static int _chestAlwaysPartialScanPendingCount;
+        private static int _chestAlwaysPartialScanBudgetForTesting;
+        private static long _chestAlwaysStableSnapshotId;
+        private static long _informationFishingBobberObserverFreshInactiveSkipCount;
+        private static long _informationFishingProjectileFallbackScanCount;
         private static bool _dragonEggMissingLogged;
         private static bool _tileIdsResolved;
         private static int _lifeCrystalTileType = 12;
@@ -129,7 +187,30 @@ namespace JueMingZ.Automation.Information
                     WorldLabelSnapshotRefreshCount = _worldLabelSnapshotRefreshCount,
                     NpcLabelSnapshotRefreshCount = _npcLabelSnapshotRefreshCount,
                     ChestLabelSnapshotRefreshCount = _chestLabelSnapshotRefreshCount,
-                    ChestLabelSortRefreshCount = _chestLabelSortRefreshCount
+                    ChestLabelSortRefreshCount = _chestLabelSortRefreshCount,
+                    ChestAlwaysScanCacheHitCount = _chestAlwaysScanCacheHitCount,
+                    ChestAlwaysScanCacheMissCount = _chestAlwaysScanCacheMissCount,
+                    ChestAlwaysLastDirtyReason = _chestAlwaysLastDirtyReason,
+                    ChestAlwaysSafeRefreshCount = _chestAlwaysSafeRefreshCount,
+                    ChestAlwaysTilesVisitedLast = _chestAlwaysTilesVisitedLast,
+                    ChestAlwaysTypedTileFastPathStatus = _chestAlwaysTypedTileFastPathStatus,
+                    ChestAlwaysNameCacheHitCount = _chestAlwaysNameCacheHitCount,
+                    ChestAlwaysNameCacheMissCount = _chestAlwaysNameCacheMissCount,
+                    ChestAlwaysPartialScanFrameCount = _chestAlwaysPartialScanFrameCount,
+                    ChestAlwaysPartialScanPendingCount = _chestAlwaysPartialScanPendingCount,
+                    ChestAlwaysStableSnapshotId = _chestAlwaysStableSnapshotId,
+                    WorldContextCacheHitCount = InformationWorldContextProvider.CacheHitCount,
+                    WorldContextCacheMissCount = InformationWorldContextProvider.CacheMissCount,
+                    WorldContextProfile = InformationWorldContextProvider.LastProfile,
+                    WorldContextFileDataRefreshCount = InformationWorldContextProvider.FileDataRefreshCount,
+                    StatusLineCacheHitCount = _statusLineCacheHitCount,
+                    StatusLineCacheMissCount = _statusLineCacheMissCount,
+                    FishingCatchEarlyCacheHitCount = InformationFishingCatchResolver.EarlyCacheHitCount,
+                    FishingCatchEarlyCacheMissCount = InformationFishingCatchResolver.EarlyCacheMissCount,
+                    FishingWaterScanCount = InformationFishingCatchResolver.WaterScanCount,
+                    FishingConditionsReadCount = InformationFishingCatchResolver.ConditionsReadCount,
+                    FishingBobberObserverFreshInactiveSkipCount = Interlocked.Read(ref _informationFishingBobberObserverFreshInactiveSkipCount),
+                    FishingProjectileFallbackScanCount = Interlocked.Read(ref _informationFishingProjectileFallbackScanCount)
                 };
             }
         }
@@ -173,7 +254,7 @@ namespace JueMingZ.Automation.Information
                 }
 
                 InformationWorldContext context;
-                if (!TryBuildContext(out context, out skip))
+                if (!TryBuildContext(BuildWorldOverlayContextProfile(settings), out context, out skip))
                 {
                     return;
                 }
@@ -218,7 +299,7 @@ namespace JueMingZ.Automation.Information
                 }
 
                 InformationWorldContext context;
-                if (!TryBuildContext(out context, out skip))
+                if (!TryBuildContext(BuildStatusContextProfile(settings), out context, out skip))
                 {
                     return;
                 }
@@ -245,6 +326,11 @@ namespace JueMingZ.Automation.Information
         private static bool TryBuildContext(out InformationWorldContext context, out string skipReason)
         {
             return InformationWorldContextProvider.TryBuild(out context, out skipReason);
+        }
+
+        private static bool TryBuildContext(InformationWorldContextProfile profile, out InformationWorldContext context, out string skipReason)
+        {
+            return InformationWorldContextProvider.TryBuild(profile, out context, out skipReason);
         }
 
         private static int DrawNpcLabels(object spriteBatch, InformationWorldContext context, AppSettings settings)
@@ -645,8 +731,8 @@ namespace JueMingZ.Automation.Information
         {
             lock (SyncRoot)
             {
-                var labels = GetChestLabels(context, settings, mode);
-                var sourceSignatureHash = _lastChestLabelSignatureHash;
+                uint sourceSignatureHash;
+                var labels = GetChestLabels(context, settings, mode, out sourceSignatureHash);
                 if (!ShouldRefreshSortedChestLabels(context, labels, sourceSignatureHash))
                 {
                     return CachedSortedChestLabels;
@@ -994,12 +1080,114 @@ namespace JueMingZ.Automation.Information
 
         internal static bool TryNormalizeChestOriginFromFrameForTesting(int tileX, int tileY, int frameX, int frameY, out int chestX, out int chestY)
         {
-            return TryNormalizeChestOriginFromFrame(tileX, tileY, frameX, frameY, out chestX, out chestY);
+            return TryNormalizeChestOriginFromFrame(ChestTileTypeContainers, tileX, tileY, frameX, frameY, out chestX, out chestY);
+        }
+
+        internal static bool TryNormalizeChestOriginFromFrameForTesting(int tileType, int tileX, int tileY, int frameX, int frameY, out int chestX, out int chestY)
+        {
+            return TryNormalizeChestOriginFromFrame(tileType, tileX, tileY, frameX, frameY, out chestX, out chestY);
+        }
+
+        internal static int BuildChestTileStyleForTesting(int tileType, int frameX)
+        {
+            return BuildChestTileStyle(tileType, frameX);
+        }
+
+        internal static string ResolveChestTileDisplayNameForTesting(int tileType, int tileStyle)
+        {
+            return ResolveChestTileDisplayName(null, tileType, tileStyle);
         }
 
         internal static string BuildChestLabelCacheSignatureForTesting(InformationWorldContext context, AppSettings settings, string mode)
         {
             return BuildChestLabelCacheSignature(context, settings, mode);
+        }
+
+        internal static bool ShouldRefreshChestAlwaysCacheForTesting(
+            ulong lastScanTick,
+            InformationWorldContext previousContext,
+            AppSettings previousSettings,
+            string previousMode,
+            ulong currentTick,
+            InformationWorldContext currentContext,
+            AppSettings currentSettings,
+            string currentMode,
+            out string dirtyReason)
+        {
+            var previousSignature = BuildChestLabelCacheSignatureData(previousContext, previousSettings, previousMode);
+            var currentSignature = BuildChestLabelCacheSignatureData(currentContext, currentSettings, currentMode);
+            return ShouldRefreshChestAlwaysLabelsCore(
+                lastScanTick,
+                previousSignature.Hash,
+                currentTick,
+                currentSignature.Hash,
+                previousSignature,
+                currentSignature,
+                out dirtyReason);
+        }
+
+        internal static int GetChestLabelCountForTesting(InformationWorldContext context, AppSettings settings, string mode)
+        {
+            lock (SyncRoot)
+            {
+                uint signatureHash;
+                return GetChestLabels(context, settings, mode, out signatureHash).Length;
+            }
+        }
+
+        internal static void ResetChestLabelCacheForTesting()
+        {
+            lock (SyncRoot)
+            {
+                ResetChestLabelCacheStateLocked();
+                _chestAlwaysScanCacheHitCount = 0;
+                _chestAlwaysScanCacheMissCount = 0;
+                _chestAlwaysSafeRefreshCount = 0;
+                _chestAlwaysNameCacheHitCount = 0;
+                _chestAlwaysNameCacheMissCount = 0;
+                _chestAlwaysTilesVisitedLast = 0;
+                _chestAlwaysLastDirtyReason = string.Empty;
+                _chestAlwaysTypedTileFastPathStatus = string.Empty;
+                _chestAlwaysPartialScanFrameCount = 0;
+                _chestAlwaysPartialScanPendingCount = 0;
+                _chestAlwaysStableSnapshotId = 0;
+                _lastChestAlwaysStableSourceSignatureHash = 0;
+                _chestLabelSnapshotRefreshCount = 0;
+                _chestLabelSortRefreshCount = 0;
+            }
+        }
+
+        internal static void SetChestAlwaysPartialScanBudgetForTesting(int budgetTiles)
+        {
+            lock (SyncRoot)
+            {
+                _chestAlwaysPartialScanBudgetForTesting = Math.Max(0, budgetTiles);
+                ResetChestLabelCacheStateLocked();
+                _chestAlwaysPartialScanFrameCount = 0;
+                _chestAlwaysPartialScanPendingCount = 0;
+                _chestAlwaysStableSnapshotId = 0;
+                _lastChestAlwaysStableSourceSignatureHash = 0;
+            }
+        }
+
+        internal static string BuildStatusLineCacheSignatureForTesting(InformationWorldContext context, AppSettings settings)
+        {
+            return BuildStatusLineCacheSignature(context, settings);
+        }
+
+        internal static InformationWorldContextProfile BuildStatusContextProfileForTesting(AppSettings settings)
+        {
+            return BuildStatusContextProfile(settings);
+        }
+
+        internal static InformationWorldContextProfile BuildWorldOverlayContextProfileForTesting(AppSettings settings)
+        {
+            return BuildWorldOverlayContextProfile(settings);
+        }
+
+        internal static bool CanReuseStatusLinesForTesting(ulong lastRefreshTick, string lastSignature, InformationWorldContext context, AppSettings settings)
+        {
+            return CanReuseStatusLines(lastRefreshTick, lastSignature, context, BuildStatusLineCacheSignature(context, settings));
         }
 
         internal static int MaxChestLabelsPerFrameForTesting()
@@ -1175,16 +1363,14 @@ namespace JueMingZ.Automation.Information
         {
             lock (SyncRoot)
             {
-                var styleSignature = BuildStatusStyleSignature(settings);
-                if (context.GameUpdateCount != 0 &&
-                    _lastStatusRefreshTick != 0 &&
-                    string.Equals(_lastStatusStyleSignature, styleSignature, StringComparison.Ordinal) &&
-                    context.GameUpdateCount >= _lastStatusRefreshTick &&
-                    context.GameUpdateCount - _lastStatusRefreshTick < StatusRefreshTicks)
+                var cacheSignature = BuildStatusLineCacheSignature(context, settings);
+                if (CanReuseStatusLines(_lastStatusRefreshTick, _lastStatusStyleSignature, context, cacheSignature))
                 {
+                    _statusLineCacheHitCount++;
                     return CachedStatusLines;
                 }
 
+                _statusLineCacheMissCount++;
                 CachedStatusLines.Clear();
                 if (settings.InformationBiomeDisplayEnabled)
                 {
@@ -1210,11 +1396,12 @@ namespace JueMingZ.Automation.Information
                     fishingFilterSonarActive = FishingAutomationService.HasSonarBuffOnPlayer(context.LocalPlayer);
                     float bobberX;
                     float bobberY;
-                    hasFishingBobber = TryFindLocalBobber(context, out bobberX, out bobberY);
+                    int bobberIdentity;
+                    hasFishingBobber = TryFindLocalBobber(context, out bobberX, out bobberY, out bobberIdentity);
                     if (hasFishingBobber &&
                         (settings.InformationFishingCatchesEnabled || !IsFishingFilterDisabled(settings)))
                     {
-                        fishingCandidates = ResolveFishingCatchCandidates(context, bobberX, bobberY, BuildFishingFilterStatusSignature(settings), out fishingMessage);
+                        fishingCandidates = ResolveFishingCatchCandidates(context, bobberX, bobberY, bobberIdentity, BuildFishingFilterStatusSignature(settings), out fishingMessage);
                     }
                 }
 
@@ -1234,9 +1421,28 @@ namespace JueMingZ.Automation.Information
                 }
 
                 _lastStatusRefreshTick = context.GameUpdateCount;
-                _lastStatusStyleSignature = styleSignature;
+                _lastStatusStyleSignature = cacheSignature;
                 return CachedStatusLines;
             }
+        }
+
+        private static bool CanReuseStatusLines(ulong lastRefreshTick, string lastSignature, InformationWorldContext context, string currentSignature)
+        {
+            return context != null &&
+                   context.GameUpdateCount != 0 &&
+                   lastRefreshTick != 0 &&
+                   string.Equals(lastSignature, currentSignature, StringComparison.Ordinal) &&
+                   context.GameUpdateCount >= lastRefreshTick &&
+                   context.GameUpdateCount - lastRefreshTick < StatusRefreshTicks;
+        }
+
+        private static string BuildStatusLineCacheSignature(InformationWorldContext context, AppSettings settings)
+        {
+            return BuildStatusStyleSignature(settings) + "|ctx:" +
+                   (context == null ? string.Empty : context.WorldKey ?? string.Empty) + "|" +
+                   BuildLocalPlayerIdentity(context == null ? null : context.LocalPlayer) + "|" +
+                   CultureInfo.CurrentUICulture.Name + "|" +
+                   CultureInfo.CurrentCulture.Name;
         }
 
         private static string BuildStatusStyleSignature(AppSettings settings)
@@ -1261,6 +1467,13 @@ namespace JueMingZ.Automation.Information
                    (settings.InformationAnglerQuestEnabled ? "1" : "0") + "|" +
                    InformationStyleHelper.GetColorHex(settings, InformationStyleHelper.AnglerQuestFeatureId) + "|" +
                    InformationStyleHelper.GetFontScale(settings, InformationStyleHelper.AnglerQuestFeatureId).ToString("0.00", CultureInfo.InvariantCulture);
+        }
+
+        private static string BuildLocalPlayerIdentity(object player)
+        {
+            return player == null
+                ? string.Empty
+                : RuntimeHelpers.GetHashCode(player).ToString(CultureInfo.InvariantCulture);
         }
 
         private static string BuildFishingFilterStatusSignature(AppSettings settings)
@@ -1381,7 +1594,7 @@ namespace JueMingZ.Automation.Information
                 sameIdentity &&
                 _lastOpenedChestsHashTick != 0 &&
                 context.GameUpdateCount >= _lastOpenedChestsHashTick &&
-                context.GameUpdateCount - _lastOpenedChestsHashTick < ChestScanIntervalTicks)
+                context.GameUpdateCount - _lastOpenedChestsHashTick < ChestOpenedCacheRefreshTicks)
             {
                 return _lastOpenedChestsHash;
             }
@@ -1394,69 +1607,146 @@ namespace JueMingZ.Automation.Information
             return _lastOpenedChestsHash;
         }
 
-        private static ChestLabel[] GetChestLabels(InformationWorldContext context, AppSettings settings, string mode)
+        private static ChestLabel[] GetChestLabels(InformationWorldContext context, AppSettings settings, string mode, out uint sourceSignatureHash)
         {
-            var signatureHash = BuildChestLabelCacheSignatureHash(context, settings, mode);
-            if (context.GameUpdateCount != 0 &&
-                _lastChestScanTick != 0 &&
-                _lastChestLabelSignatureHash == signatureHash &&
-                context.GameUpdateCount >= _lastChestScanTick &&
-                context.GameUpdateCount - _lastChestScanTick < ChestScanIntervalTicks)
-            {
-                return CachedChestLabels;
-            }
+            return string.Equals(mode, ChestLabelsModeAlways, StringComparison.OrdinalIgnoreCase)
+                ? GetAlwaysChestLabels(context, settings, mode, out sourceSignatureHash)
+                : GetOpenedChestLabels(context, settings, mode, out sourceSignatureHash);
+        }
 
-            ChestLabelBuildBuffer.Clear();
-            if (string.Equals(mode, ChestLabelsModeAlways, StringComparison.OrdinalIgnoreCase))
+        private static ChestLabel[] GetAlwaysChestLabels(InformationWorldContext context, AppSettings settings, string mode, out uint sourceSignatureHash)
+        {
+            var signature = BuildChestLabelCacheSignatureData(context, settings, mode);
+            if (_chestAlwaysPartialScanActive)
             {
-                AddAllChestLabels(context, ChestLabelBuildBuffer);
-            }
-            else
-            {
-                var chestNames = BuildChestNameLookup(context.MainType);
-                var openedChests = PlayerWorldBehaviorStore.GetOpenedChests(BuildBehaviorContext(context));
-                for (var index = 0; index < openedChests.Count; index++)
+                if (AreChestLabelCacheSignaturesSame(_chestAlwaysPartialScanSignature, signature))
                 {
-                    var opened = openedChests[index];
-                    if (opened == null || opened.X <= 0 || opened.Y <= 0)
+                    if (AdvanceChestAlwaysPartialScan(context))
                     {
-                        continue;
+                        PublishChestAlwaysPartialScan(context);
+                        sourceSignatureHash = _lastChestAlwaysStableSourceSignatureHash;
+                        return CachedAlwaysChestLabels;
                     }
 
-                    string name;
-                    if (!chestNames.TryGetValue(BuildChestPositionKey(opened.X, opened.Y), out name))
-                    {
-                        name = "宝箱";
-                    }
+                    sourceSignatureHash = GetChestAlwaysPendingSourceSignatureHash();
+                    return GetChestAlwaysPendingLabels();
+                }
 
-                    var worldX = opened.X * TileSize + TileSize;
-                    var worldY = opened.Y * TileSize + TileSize;
-                    if (!CanCacheChestLabel(context, worldX, worldY))
-                    {
-                        continue;
-                    }
+                ResetChestAlwaysPartialScanState();
+            }
 
-                    ChestLabelBuildBuffer.Add(new ChestLabel
-                    {
-                        TileX = opened.X,
-                        TileY = opened.Y,
-                        WorldX = worldX,
-                        WorldY = worldY,
-                        Name = string.IsNullOrWhiteSpace(name) ? "宝箱" : name
-                    });
+            string dirtyReason;
+            if (!ShouldRefreshChestAlwaysLabels(
+                    context,
+                    signature,
+                    out dirtyReason))
+            {
+                unchecked
+                {
+                    _chestAlwaysScanCacheHitCount++;
+                }
+
+                sourceSignatureHash = _lastChestAlwaysStableSourceSignatureHash;
+                return CachedAlwaysChestLabels;
+            }
+
+            unchecked
+            {
+                _chestAlwaysScanCacheMissCount++;
+                if (string.Equals(dirtyReason, "safeRefresh", StringComparison.Ordinal))
+                {
+                    _chestAlwaysSafeRefreshCount++;
                 }
             }
 
-            CachedChestLabels = ChestLabelBuildBuffer.Count == 0 ? EmptyChestLabels : ChestLabelBuildBuffer.ToArray();
-            _lastChestScanTick = context.GameUpdateCount;
-            _lastChestLabelSignatureHash = signatureHash;
+            _chestAlwaysLastDirtyReason = dirtyReason ?? string.Empty;
+            if (!BeginChestAlwaysPartialScan(context, signature, dirtyReason))
+            {
+                PublishChestAlwaysStableSnapshot(
+                    context,
+                    signature,
+                    EmptyChestLabels,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0);
+                sourceSignatureHash = _lastChestAlwaysStableSourceSignatureHash;
+                return CachedAlwaysChestLabels;
+            }
+
+            if (AdvanceChestAlwaysPartialScan(context))
+            {
+                PublishChestAlwaysPartialScan(context);
+                sourceSignatureHash = _lastChestAlwaysStableSourceSignatureHash;
+                return CachedAlwaysChestLabels;
+            }
+
+            sourceSignatureHash = GetChestAlwaysPendingSourceSignatureHash();
+            return GetChestAlwaysPendingLabels();
+        }
+
+        private static ChestLabel[] GetOpenedChestLabels(InformationWorldContext context, AppSettings settings, string mode, out uint sourceSignatureHash)
+        {
+            var signature = BuildChestLabelCacheSignatureData(context, settings, mode);
+            sourceSignatureHash = signature.Hash;
+            if (!ShouldRefreshOpenedChestLabels(context, signature))
+            {
+                return CachedOpenedChestLabels;
+            }
+
+            ChestLabelBuildBuffer.Clear();
+            var chestNames = BuildChestNameLookup(context == null ? null : context.MainType);
+            var openedChests = PlayerWorldBehaviorStore.GetOpenedChests(BuildBehaviorContext(context));
+            for (var index = 0; index < openedChests.Count; index++)
+            {
+                var opened = openedChests[index];
+                if (opened == null || opened.X <= 0 || opened.Y <= 0)
+                {
+                    continue;
+                }
+
+                int openedTileType;
+                int openedTileStyle;
+                var hasOpenedTileInfo = TryResolveChestTileInfoAt(context, opened.X, opened.Y, out openedTileType, out openedTileStyle);
+
+                string name;
+                if (!chestNames.TryGetValue(BuildChestPositionKey(opened.X, opened.Y), out name) ||
+                    string.IsNullOrWhiteSpace(name))
+                {
+                    name = hasOpenedTileInfo
+                        ? ResolveChestTileDisplayName(context == null ? null : context.MainType, openedTileType, openedTileStyle)
+                        : DefaultChestLabelName(ChestTileTypeContainers);
+                }
+
+                var worldX = BuildChestLabelWorldX(opened.X, openedTileType);
+                var worldY = BuildChestLabelWorldY(opened.Y, openedTileType);
+                if (!CanCacheChestLabel(context, worldX, worldY))
+                {
+                    continue;
+                }
+
+                ChestLabelBuildBuffer.Add(new ChestLabel
+                {
+                    TileX = opened.X,
+                    TileY = opened.Y,
+                    WorldX = worldX,
+                    WorldY = worldY,
+                    Name = string.IsNullOrWhiteSpace(name) ? DefaultChestLabelName(openedTileType) : name
+                });
+            }
+
+            CachedOpenedChestLabels = ChestLabelBuildBuffer.Count == 0 ? EmptyChestLabels : ChestLabelBuildBuffer.ToArray();
+            _lastChestOpenedScanTick = context == null ? 0 : context.GameUpdateCount;
+            _lastChestOpenedSignatureHash = signature.Hash;
+            _lastChestOpenedSignature = signature;
             unchecked
             {
                 _chestLabelSnapshotRefreshCount++;
                 _worldLabelSnapshotRefreshCount++;
             }
 
-            return CachedChestLabels;
+            return CachedOpenedChestLabels;
         }
 
         private static string BuildChestLabelCacheSignature(InformationWorldContext context, AppSettings settings, string mode)
@@ -1466,28 +1756,486 @@ namespace JueMingZ.Automation.Information
 
         private static uint BuildChestLabelCacheSignatureHash(InformationWorldContext context, AppSettings settings, string mode)
         {
-            var screenBucketX = context == null ? 0 : (int)Math.Floor(context.ScreenX / 128f);
-            var screenBucketY = context == null ? 0 : (int)Math.Floor(context.ScreenY / 128f);
-            var screenWidthBucket = context == null ? 0 : Math.Max(0, context.ScreenWidth / 128);
-            var screenHeightBucket = context == null ? 0 : Math.Max(0, context.ScreenHeight / 128);
+            return BuildChestLabelCacheSignatureData(context, settings, mode).Hash;
+        }
+
+        private static ChestLabelCacheSignature BuildChestLabelCacheSignatureData(InformationWorldContext context, AppSettings settings, string mode)
+        {
+            var normalizedMode = NormalizeChestLabelCacheMode(mode);
+            var worldKey = context == null ? string.Empty : context.WorldKey ?? string.Empty;
+            var worldRecordKey = context == null ? string.Empty : context.WorldRecordKey ?? string.Empty;
+            var playerRecordKey = context == null ? string.Empty : context.PlayerRecordKey ?? string.Empty;
+            var screenChunkX = BuildChestLabelScreenChunkX(context);
+            var screenChunkY = BuildChestLabelScreenChunkY(context);
+            var screenWidth = context == null ? 0 : Math.Max(0, context.ScreenWidth);
+            var screenHeight = context == null ? 0 : Math.Max(0, context.ScreenHeight);
+            var playerChunkX = BuildChestLabelPlayerChunkX(context);
+            var playerChunkY = BuildChestLabelPlayerChunkY(context);
+            var styleSignature = BuildChestLabelStyleSignature(settings);
+            var openedChestsHash = string.Equals(normalizedMode, ChestLabelsModeOpened, StringComparison.Ordinal)
+                ? GetOpenedChestsHashCached(context)
+                : string.Empty;
             unchecked
             {
                 var hash = 2166136261u;
-                AddHashValue(ref hash, mode);
-                AddHashValue(ref hash, context == null ? string.Empty : context.WorldKey);
-                AddHashInt(ref hash, screenBucketX);
-                AddHashInt(ref hash, screenBucketY);
-                AddHashInt(ref hash, screenWidthBucket);
-                AddHashInt(ref hash, screenHeightBucket);
-                AddHashValue(ref hash, context == null ? string.Empty : context.PlayerRecordKey);
-                AddHashValue(ref hash, context == null ? string.Empty : context.WorldRecordKey);
-                if (string.Equals(mode, ChestLabelsModeOpened, StringComparison.OrdinalIgnoreCase))
+                AddHashValue(ref hash, normalizedMode);
+                AddHashValue(ref hash, worldKey);
+                AddHashValue(ref hash, worldRecordKey);
+                AddHashValue(ref hash, playerRecordKey);
+                AddHashInt(ref hash, screenChunkX);
+                AddHashInt(ref hash, screenChunkY);
+                AddHashInt(ref hash, screenWidth);
+                AddHashInt(ref hash, screenHeight);
+                AddHashInt(ref hash, playerChunkX);
+                AddHashInt(ref hash, playerChunkY);
+                AddHashValue(ref hash, styleSignature);
+                AddHashValue(ref hash, openedChestsHash);
+                return new ChestLabelCacheSignature(
+                    hash,
+                    normalizedMode,
+                    worldKey,
+                    worldRecordKey,
+                    playerRecordKey,
+                    screenChunkX,
+                    screenChunkY,
+                    screenWidth,
+                    screenHeight,
+                    playerChunkX,
+                    playerChunkY,
+                    styleSignature,
+                    openedChestsHash);
+            }
+        }
+
+        private static bool ShouldRefreshChestAlwaysLabels(InformationWorldContext context, ChestLabelCacheSignature currentSignature, out string dirtyReason)
+        {
+            return ShouldRefreshChestAlwaysLabelsCore(
+                _lastChestAlwaysScanTick,
+                _lastChestAlwaysSignatureHash,
+                context == null ? 0 : context.GameUpdateCount,
+                currentSignature.Hash,
+                _lastChestAlwaysSignature,
+                currentSignature,
+                out dirtyReason);
+        }
+
+        private static bool ShouldRefreshChestAlwaysLabelsCore(
+            ulong lastScanTick,
+            uint previousSignatureHash,
+            ulong currentTick,
+            uint currentSignatureHash,
+            ChestLabelCacheSignature previousSignature,
+            ChestLabelCacheSignature currentSignature,
+            out string dirtyReason)
+        {
+            if (lastScanTick == 0)
+            {
+                dirtyReason = "initial";
+                return true;
+            }
+
+            if (previousSignatureHash != currentSignatureHash)
+            {
+                dirtyReason = DescribeChestLabelSignatureChange(previousSignature, currentSignature);
+                return true;
+            }
+
+            if (currentTick == 0)
+            {
+                dirtyReason = "cacheHit";
+                return false;
+            }
+
+            if (currentTick < lastScanTick)
+            {
+                dirtyReason = "tickReset";
+                return true;
+            }
+
+            if (currentTick - lastScanTick >= ChestAlwaysScanSafeRefreshTicks)
+            {
+                dirtyReason = "safeRefresh";
+                return true;
+            }
+
+            dirtyReason = "cacheHit";
+            return false;
+        }
+
+        private static bool ShouldRefreshOpenedChestLabels(InformationWorldContext context, ChestLabelCacheSignature currentSignature)
+        {
+            var currentTick = context == null ? 0 : context.GameUpdateCount;
+            if (_lastChestOpenedScanTick == 0 || _lastChestOpenedSignatureHash != currentSignature.Hash)
+            {
+                return true;
+            }
+
+            if (currentTick == 0)
+            {
+                return false;
+            }
+
+            if (currentTick < _lastChestOpenedScanTick)
+            {
+                return true;
+            }
+
+            return currentTick - _lastChestOpenedScanTick >= ChestOpenedCacheRefreshTicks;
+        }
+
+        private static string DescribeChestLabelSignatureChange(ChestLabelCacheSignature previous, ChestLabelCacheSignature current)
+        {
+            if (!string.Equals(previous.Mode, current.Mode, StringComparison.Ordinal))
+            {
+                return "modeChanged";
+            }
+
+            if (!string.Equals(previous.WorldKey, current.WorldKey, StringComparison.Ordinal) ||
+                !string.Equals(previous.WorldRecordKey, current.WorldRecordKey, StringComparison.Ordinal))
+            {
+                return "worldChanged";
+            }
+
+            if (previous.ScreenWidth != current.ScreenWidth ||
+                previous.ScreenHeight != current.ScreenHeight)
+            {
+                return "screenSizeChanged";
+            }
+
+            if (previous.ScreenChunkX != current.ScreenChunkX ||
+                previous.ScreenChunkY != current.ScreenChunkY)
+            {
+                return "screenChunkChanged";
+            }
+
+            if (previous.PlayerChunkX != current.PlayerChunkX ||
+                previous.PlayerChunkY != current.PlayerChunkY)
+            {
+                return "playerChunkChanged";
+            }
+
+            if (!string.Equals(previous.PlayerRecordKey, current.PlayerRecordKey, StringComparison.Ordinal))
+            {
+                return "playerChanged";
+            }
+
+            if (!string.Equals(previous.StyleSignature, current.StyleSignature, StringComparison.Ordinal))
+            {
+                return "styleChanged";
+            }
+
+            if (!string.Equals(previous.OpenedChestsHash, current.OpenedChestsHash, StringComparison.Ordinal))
+            {
+                return "openedRecordsChanged";
+            }
+
+            return previous.Hash == current.Hash ? "cacheHit" : "signatureChanged";
+        }
+
+        private static string NormalizeChestLabelCacheMode(string mode)
+        {
+            if (string.Equals(mode, ChestLabelsModeAlways, StringComparison.OrdinalIgnoreCase))
+            {
+                return ChestLabelsModeAlways;
+            }
+
+            if (string.Equals(mode, ChestLabelsModeOpened, StringComparison.OrdinalIgnoreCase))
+            {
+                return ChestLabelsModeOpened;
+            }
+
+            if (string.Equals(mode, ChestLabelsModeOff, StringComparison.OrdinalIgnoreCase))
+            {
+                return ChestLabelsModeOff;
+            }
+
+            return mode ?? string.Empty;
+        }
+
+        private static int BuildChestLabelScreenChunkX(InformationWorldContext context)
+        {
+            return FloorDiv((int)Math.Floor(context == null ? 0f : context.ScreenX), ChestLabelCacheMovementChunkPixels);
+        }
+
+        private static int BuildChestLabelScreenChunkY(InformationWorldContext context)
+        {
+            return FloorDiv((int)Math.Floor(context == null ? 0f : context.ScreenY), ChestLabelCacheMovementChunkPixels);
+        }
+
+        private static int BuildChestLabelPlayerChunkX(InformationWorldContext context)
+        {
+            return FloorDiv((int)Math.Floor(context == null ? 0f : context.PlayerCenterX), ChestLabelCacheMovementChunkPixels);
+        }
+
+        private static int BuildChestLabelPlayerChunkY(InformationWorldContext context)
+        {
+            return FloorDiv((int)Math.Floor(context == null ? 0f : context.PlayerCenterY), ChestLabelCacheMovementChunkPixels);
+        }
+
+        private static string BuildChestLabelStyleSignature(AppSettings settings)
+        {
+            settings = settings ?? AppSettings.CreateDefault();
+            return InformationStyleHelper.GetColorHex(settings, InformationStyleHelper.ChestNameFeatureId) + "|" +
+                   InformationStyleHelper.GetFontScale(settings, InformationStyleHelper.ChestNameFeatureId).ToString("0.00", CultureInfo.InvariantCulture);
+        }
+
+        private static bool BeginChestAlwaysPartialScan(InformationWorldContext context, ChestLabelCacheSignature signature, string dirtyReason)
+        {
+            ResetChestAlwaysPartialScanState();
+            _chestAlwaysPartialScanFrameCount = 0;
+            _chestAlwaysPartialScanPendingCount = 0;
+            _chestAlwaysTilesVisitedLast = 0;
+            _chestAlwaysTypedTileFastPathStatus = "none";
+            if (context == null || context.MainType == null)
+            {
+                return false;
+            }
+
+            var tiles = InformationReflection.GetStaticMember(context.MainType, "tile");
+            if (tiles == null)
+            {
+                return false;
+            }
+
+            int minX;
+            int maxX;
+            int minY;
+            int maxY;
+            if (!TryGetChestTileScanBounds(context, tiles, out minX, out maxX, out minY, out maxY))
+            {
+                return false;
+            }
+
+            _chestAlwaysPartialScanActive = true;
+            _chestAlwaysPartialScanReturnsEmptyUntilComplete = ShouldReturnEmptyChestAlwaysSnapshotWhilePending(dirtyReason);
+            _chestAlwaysPartialScanSignature = signature;
+            _chestAlwaysPartialScanDirtyReason = dirtyReason ?? string.Empty;
+            _chestAlwaysPartialScanMinX = minX;
+            _chestAlwaysPartialScanMaxX = maxX;
+            _chestAlwaysPartialScanMinY = minY;
+            _chestAlwaysPartialScanMaxY = maxY;
+            _chestAlwaysPartialScanNextX = minX;
+            _chestAlwaysPartialScanNextY = minY;
+            _chestAlwaysPartialScanPendingCount = CalculateChestAlwaysPartialScanPendingCount();
+            return true;
+        }
+
+        private static bool AdvanceChestAlwaysPartialScan(InformationWorldContext context)
+        {
+            if (!_chestAlwaysPartialScanActive)
+            {
+                _chestAlwaysPartialScanPendingCount = 0;
+                return true;
+            }
+
+            if (context == null || context.MainType == null)
+            {
+                _chestAlwaysPartialScanPendingCount = 0;
+                return true;
+            }
+
+            var tiles = InformationReflection.GetStaticMember(context.MainType, "tile");
+            if (tiles == null)
+            {
+                _chestAlwaysPartialScanPendingCount = 0;
+                return true;
+            }
+
+            var budget = GetChestAlwaysPartialScanBudgetTiles();
+            var allowTypedTileRead = CanUseTypedTileRead(tiles);
+            var scannedThisFrame = 0;
+            while (_chestAlwaysPartialScanNextX <= _chestAlwaysPartialScanMaxX && scannedThisFrame < budget)
+            {
+                CollectVisibleChestTileCandidate(
+                    context,
+                    tiles,
+                    ChestAlwaysPartialScanAdded,
+                    ChestAlwaysPartialScanCandidateBuffer,
+                    _chestAlwaysPartialScanNextX,
+                    _chestAlwaysPartialScanNextY,
+                    allowTypedTileRead,
+                    ref _chestAlwaysPartialScanTilesVisited,
+                    ref _chestAlwaysPartialScanTypedTileReads,
+                    ref _chestAlwaysPartialScanFallbackTileReads,
+                    ref _chestAlwaysPartialScanFailedTileReads);
+                scannedThisFrame++;
+                AdvanceChestAlwaysPartialScanCursor();
+            }
+
+            unchecked
+            {
+                _chestAlwaysPartialScanFrameCount++;
+            }
+
+            _chestAlwaysPartialScanPendingCount = CalculateChestAlwaysPartialScanPendingCount();
+            _chestAlwaysTilesVisitedLast = _chestAlwaysPartialScanTilesVisited;
+            _chestAlwaysTypedTileFastPathStatus = BuildChestAlwaysTypedTileFastPathStatus(
+                _chestAlwaysPartialScanTypedTileReads,
+                _chestAlwaysPartialScanFallbackTileReads,
+                _chestAlwaysPartialScanFailedTileReads);
+            return _chestAlwaysPartialScanPendingCount == 0;
+        }
+
+        private static void AdvanceChestAlwaysPartialScanCursor()
+        {
+            if (_chestAlwaysPartialScanNextY < _chestAlwaysPartialScanMaxY)
+            {
+                _chestAlwaysPartialScanNextY++;
+                return;
+            }
+
+            _chestAlwaysPartialScanNextY = _chestAlwaysPartialScanMinY;
+            _chestAlwaysPartialScanNextX++;
+        }
+
+        private static int CalculateChestAlwaysPartialScanPendingCount()
+        {
+            if (!_chestAlwaysPartialScanActive || _chestAlwaysPartialScanNextX > _chestAlwaysPartialScanMaxX)
+            {
+                return 0;
+            }
+
+            var rows = _chestAlwaysPartialScanMaxY - _chestAlwaysPartialScanMinY + 1;
+            if (rows <= 0)
+            {
+                return 0;
+            }
+
+            long pending = _chestAlwaysPartialScanMaxY - _chestAlwaysPartialScanNextY + 1;
+            pending += (long)(_chestAlwaysPartialScanMaxX - _chestAlwaysPartialScanNextX) * rows;
+            if (pending <= 0)
+            {
+                return 0;
+            }
+
+            return pending > int.MaxValue ? int.MaxValue : (int)pending;
+        }
+
+        private static int GetChestAlwaysPartialScanBudgetTiles()
+        {
+            return _chestAlwaysPartialScanBudgetForTesting > 0
+                ? _chestAlwaysPartialScanBudgetForTesting
+                : ChestAlwaysPartialScanBudgetTiles;
+        }
+
+        private static ChestLabel[] GetChestAlwaysPendingLabels()
+        {
+            return _chestAlwaysPartialScanReturnsEmptyUntilComplete ? EmptyChestLabels : CachedAlwaysChestLabels;
+        }
+
+        private static uint GetChestAlwaysPendingSourceSignatureHash()
+        {
+            return _chestAlwaysPartialScanReturnsEmptyUntilComplete ? 0u : _lastChestAlwaysStableSourceSignatureHash;
+        }
+
+        private static bool ShouldReturnEmptyChestAlwaysSnapshotWhilePending(string dirtyReason)
+        {
+            return string.Equals(dirtyReason, "initial", StringComparison.Ordinal) ||
+                   string.Equals(dirtyReason, "worldChanged", StringComparison.Ordinal) ||
+                   string.Equals(dirtyReason, "playerChanged", StringComparison.Ordinal) ||
+                   string.Equals(dirtyReason, "tickReset", StringComparison.Ordinal);
+        }
+
+        private static void PublishChestAlwaysPartialScan(InformationWorldContext context)
+        {
+            ChestLabelBuildBuffer.Clear();
+            AddChestLabelsFromCandidates(context, ChestLabelBuildBuffer, ChestAlwaysPartialScanCandidateBuffer, null);
+            var labels = ChestLabelBuildBuffer.Count == 0 ? EmptyChestLabels : ChestLabelBuildBuffer.ToArray();
+            PublishChestAlwaysStableSnapshot(
+                context,
+                _chestAlwaysPartialScanSignature,
+                labels,
+                _chestAlwaysPartialScanTilesVisited,
+                _chestAlwaysPartialScanTypedTileReads,
+                _chestAlwaysPartialScanFallbackTileReads,
+                _chestAlwaysPartialScanFailedTileReads,
+                _chestAlwaysPartialScanFrameCount);
+            ResetChestAlwaysPartialScanState();
+        }
+
+        private static void PublishChestAlwaysStableSnapshot(
+            InformationWorldContext context,
+            ChestLabelCacheSignature signature,
+            ChestLabel[] labels,
+            int tilesVisited,
+            int typedTileReads,
+            int fallbackTileReads,
+            int failedTileReads,
+            int partialScanFrameCount)
+        {
+            CachedAlwaysChestLabels = labels == null || labels.Length == 0 ? EmptyChestLabels : labels;
+            _lastChestAlwaysScanTick = context == null ? 0 : context.GameUpdateCount;
+            _lastChestAlwaysSignatureHash = signature.Hash;
+            _lastChestAlwaysSignature = signature;
+            _chestAlwaysTilesVisitedLast = Math.Max(0, tilesVisited);
+            _chestAlwaysTypedTileFastPathStatus = BuildChestAlwaysTypedTileFastPathStatus(
+                typedTileReads,
+                fallbackTileReads,
+                failedTileReads);
+            _chestAlwaysPartialScanFrameCount = Math.Max(0, partialScanFrameCount);
+            _chestAlwaysPartialScanPendingCount = 0;
+            unchecked
+            {
+                _chestAlwaysStableSnapshotId++;
+                if (_chestAlwaysStableSnapshotId <= 0)
                 {
-                    AddHashValue(ref hash, GetOpenedChestsHashCached(context));
+                    _chestAlwaysStableSnapshotId = 1;
                 }
 
-                return hash;
+                _chestLabelSnapshotRefreshCount++;
+                _worldLabelSnapshotRefreshCount++;
             }
+
+            _lastChestAlwaysStableSourceSignatureHash = BuildChestAlwaysStableSourceSignatureHash(signature.Hash, _chestAlwaysStableSnapshotId);
+        }
+
+        private static uint BuildChestAlwaysStableSourceSignatureHash(uint sourceSignatureHash, long stableSnapshotId)
+        {
+            unchecked
+            {
+                var hash = sourceSignatureHash == 0 ? 2166136261u : sourceSignatureHash;
+                AddHashInt(ref hash, (int)stableSnapshotId);
+                AddHashInt(ref hash, (int)(stableSnapshotId >> 32));
+                return hash == 0 ? 1u : hash;
+            }
+        }
+
+        private static bool AreChestLabelCacheSignaturesSame(ChestLabelCacheSignature left, ChestLabelCacheSignature right)
+        {
+            return left.Hash == right.Hash &&
+                   string.Equals(left.Mode, right.Mode, StringComparison.Ordinal) &&
+                   string.Equals(left.WorldKey, right.WorldKey, StringComparison.Ordinal) &&
+                   string.Equals(left.WorldRecordKey, right.WorldRecordKey, StringComparison.Ordinal) &&
+                   string.Equals(left.PlayerRecordKey, right.PlayerRecordKey, StringComparison.Ordinal) &&
+                   left.ScreenChunkX == right.ScreenChunkX &&
+                   left.ScreenChunkY == right.ScreenChunkY &&
+                   left.ScreenWidth == right.ScreenWidth &&
+                   left.ScreenHeight == right.ScreenHeight &&
+                   left.PlayerChunkX == right.PlayerChunkX &&
+                   left.PlayerChunkY == right.PlayerChunkY &&
+                   string.Equals(left.StyleSignature, right.StyleSignature, StringComparison.Ordinal) &&
+                   string.Equals(left.OpenedChestsHash, right.OpenedChestsHash, StringComparison.Ordinal);
+        }
+
+        private static void ResetChestAlwaysPartialScanState()
+        {
+            _chestAlwaysPartialScanActive = false;
+            _chestAlwaysPartialScanReturnsEmptyUntilComplete = false;
+            _chestAlwaysPartialScanSignature = new ChestLabelCacheSignature();
+            _chestAlwaysPartialScanDirtyReason = string.Empty;
+            _chestAlwaysPartialScanMinX = 0;
+            _chestAlwaysPartialScanMaxX = -1;
+            _chestAlwaysPartialScanMinY = 0;
+            _chestAlwaysPartialScanMaxY = -1;
+            _chestAlwaysPartialScanNextX = 0;
+            _chestAlwaysPartialScanNextY = 0;
+            _chestAlwaysPartialScanTilesVisited = 0;
+            _chestAlwaysPartialScanTypedTileReads = 0;
+            _chestAlwaysPartialScanFallbackTileReads = 0;
+            _chestAlwaysPartialScanFailedTileReads = 0;
+            _chestAlwaysPartialScanPendingCount = 0;
+            ChestAlwaysPartialScanCandidateBuffer.Clear();
+            ChestAlwaysPartialScanAdded.Clear();
         }
 
         private static void AddAllChestLabels(InformationWorldContext context, IList<ChestLabel> labels)
@@ -1498,6 +2246,8 @@ namespace JueMingZ.Automation.Information
 
         private static void AddVisibleChestTileLabels(InformationWorldContext context, IList<ChestLabel> labels, IDictionary<long, string> loadedChestNames, ISet<long> added)
         {
+            _chestAlwaysTilesVisitedLast = 0;
+            _chestAlwaysTypedTileFastPathStatus = string.Empty;
             if (context == null || context.MainType == null || labels == null)
             {
                 return;
@@ -1518,67 +2268,321 @@ namespace JueMingZ.Automation.Information
                 return;
             }
 
+            ChestScanCandidateBuffer.Clear();
+            int tilesVisited;
+            int typedTileReads;
+            int fallbackTileReads;
+            int failedTileReads;
+            CollectVisibleChestTileCandidates(
+                context,
+                tiles,
+                added,
+                ChestScanCandidateBuffer,
+                minX,
+                maxX,
+                minY,
+                maxY,
+                out tilesVisited,
+                out typedTileReads,
+                out fallbackTileReads,
+                out failedTileReads);
+
+            _chestAlwaysTilesVisitedLast = tilesVisited;
+            _chestAlwaysTypedTileFastPathStatus = BuildChestAlwaysTypedTileFastPathStatus(
+                typedTileReads,
+                fallbackTileReads,
+                failedTileReads);
+
+            AddChestLabelsFromCandidates(context, labels, ChestScanCandidateBuffer, loadedChestNames);
+
+            ChestScanCandidateBuffer.Clear();
+        }
+
+        private static void AddChestLabelsFromCandidates(
+            InformationWorldContext context,
+            IList<ChestLabel> labels,
+            IList<ChestScanCandidate> candidates,
+            IDictionary<long, string> loadedChestNames)
+        {
+            if (labels == null || candidates == null || candidates.Count == 0)
+            {
+                return;
+            }
+
+            var languageSignature = BuildChestNameLanguageSignature();
+            for (var index = 0; index < candidates.Count; index++)
+            {
+                var candidate = candidates[index];
+                string name;
+                if (loadedChestNames == null || !loadedChestNames.TryGetValue(candidate.Key, out name))
+                {
+                    name = ResolveChestNameWithCache(context, candidate, languageSignature);
+                }
+
+                labels.Add(new ChestLabel
+                {
+                    TileX = candidate.ChestX,
+                    TileY = candidate.ChestY,
+                    WorldX = candidate.WorldX,
+                    WorldY = candidate.WorldY,
+                    Name = string.IsNullOrWhiteSpace(name) ? DefaultChestLabelName(candidate.TileType) : name
+                });
+            }
+        }
+
+        private static void CollectVisibleChestTileCandidates(
+            InformationWorldContext context,
+            object tiles,
+            ISet<long> added,
+            IList<ChestScanCandidate> candidates,
+            int minX,
+            int maxX,
+            int minY,
+            int maxY,
+            out int tilesVisited,
+            out int typedTileReads,
+            out int fallbackTileReads,
+            out int failedTileReads)
+        {
+            tilesVisited = 0;
+            typedTileReads = 0;
+            fallbackTileReads = 0;
+            failedTileReads = 0;
+            var allowTypedTileRead = CanUseTypedTileRead(tiles);
+            if (context == null || context.MainType == null || tiles == null || candidates == null)
+            {
+                return;
+            }
+
             for (var x = minX; x <= maxX; x++)
             {
                 for (var y = minY; y <= maxY; y++)
                 {
-                    bool active;
-                    int tileType;
-                    int frameX;
-                    int frameY;
-                    if (!TryReadTileActiveTypeAndFrame(tiles, x, y, out active, out tileType, out frameX, out frameY) || !active)
-                    {
-                        continue;
-                    }
-
-                    if (!IsChestTileType(context.MainType, tileType))
-                    {
-                        continue;
-                    }
-
-                    int chestX;
-                    int chestY;
-                    if (!TryNormalizeChestOriginFromFrame(x, y, frameX, frameY, out chestX, out chestY))
-                    {
-                        continue;
-                    }
-
-                    var key = BuildChestPositionKey(chestX, chestY);
-                    if (added != null && added.Contains(key))
-                    {
-                        continue;
-                    }
-
-                    var worldX = chestX * TileSize + TileSize;
-                    var worldY = chestY * TileSize + TileSize;
-                    if (!CanCacheChestLabel(context, worldX, worldY))
-                    {
-                        continue;
-                    }
-
-                    string name;
-                    if (loadedChestNames == null || !loadedChestNames.TryGetValue(key, out name))
-                    {
-                        if (!TryResolveLoadedChestNameAt(context.MainType, chestX, chestY, out name))
-                        {
-                            name = ResolveChestTileDisplayName(context.MainType, tileType);
-                        }
-                    }
-
-                    if (added != null)
-                    {
-                        added.Add(key);
-                    }
-
-                    labels.Add(new ChestLabel
-                    {
-                        TileX = chestX,
-                        TileY = chestY,
-                        WorldX = worldX,
-                        WorldY = worldY,
-                        Name = string.IsNullOrWhiteSpace(name) ? "宝箱" : name
-                    });
+                    CollectVisibleChestTileCandidate(
+                        context,
+                        tiles,
+                        added,
+                        candidates,
+                        x,
+                        y,
+                        allowTypedTileRead,
+                        ref tilesVisited,
+                        ref typedTileReads,
+                        ref fallbackTileReads,
+                        ref failedTileReads);
                 }
+            }
+        }
+
+        private static void CollectVisibleChestTileCandidate(
+            InformationWorldContext context,
+            object tiles,
+            ISet<long> added,
+            IList<ChestScanCandidate> candidates,
+            int x,
+            int y,
+            bool allowTypedTileRead,
+            ref int tilesVisited,
+            ref int typedTileReads,
+            ref int fallbackTileReads,
+            ref int failedTileReads)
+        {
+            tilesVisited++;
+            bool active;
+            int tileType;
+            int frameX;
+            int frameY;
+            bool usedTypedTileRead;
+            if (!TryReadTileActiveTypeAndFrame(
+                    tiles,
+                    x,
+                    y,
+                    out active,
+                    out tileType,
+                    out frameX,
+                    out frameY,
+                    allowTypedTileRead,
+                    out usedTypedTileRead))
+            {
+                failedTileReads++;
+                return;
+            }
+
+            if (usedTypedTileRead)
+            {
+                typedTileReads++;
+            }
+            else
+            {
+                fallbackTileReads++;
+            }
+
+            if (!active)
+            {
+                return;
+            }
+
+            if (!IsChestTileType(context.MainType, tileType))
+            {
+                return;
+            }
+
+            int chestX;
+            int chestY;
+            if (!TryNormalizeChestOriginFromFrame(tileType, x, y, frameX, frameY, out chestX, out chestY))
+            {
+                return;
+            }
+
+            var key = BuildChestPositionKey(chestX, chestY);
+            if (added != null && added.Contains(key))
+            {
+                return;
+            }
+
+            var worldX = BuildChestLabelWorldX(chestX, tileType);
+            var worldY = BuildChestLabelWorldY(chestY, tileType);
+            if (!CanCacheChestLabel(context, worldX, worldY))
+            {
+                return;
+            }
+
+            if (added != null)
+            {
+                added.Add(key);
+            }
+
+            candidates.Add(new ChestScanCandidate
+            {
+                ChestX = chestX,
+                ChestY = chestY,
+                Key = key,
+                TileType = tileType,
+                TileStyle = BuildChestTileStyle(tileType, frameX),
+                WorldX = worldX,
+                WorldY = worldY
+            });
+        }
+
+        private static string ResolveChestNameWithCache(InformationWorldContext context, ChestScanCandidate candidate, string languageSignature)
+        {
+            string recordSignature;
+            string loadedName;
+            if (!TryReadChestRecordIdentityAt(context == null ? null : context.MainType, candidate.ChestX, candidate.ChestY, out recordSignature, out loadedName))
+            {
+                recordSignature = "missing";
+                loadedName = string.Empty;
+            }
+
+            var key = new ChestNameCacheKey(
+                context == null ? string.Empty : context.WorldKey,
+                context == null ? string.Empty : context.WorldRecordKey,
+                candidate.ChestX,
+                candidate.ChestY,
+                candidate.TileType,
+                candidate.TileStyle,
+                languageSignature,
+                recordSignature);
+
+            string cached;
+            if (ChestAlwaysNameCache.TryGetValue(key, out cached))
+            {
+                unchecked
+                {
+                    _chestAlwaysNameCacheHitCount++;
+                }
+
+                return cached;
+            }
+
+            unchecked
+            {
+                _chestAlwaysNameCacheMissCount++;
+            }
+
+            var name = !string.IsNullOrWhiteSpace(loadedName)
+                ? loadedName
+                : ResolveChestTileDisplayName(context == null ? null : context.MainType, candidate.TileType, candidate.TileStyle);
+            name = string.IsNullOrWhiteSpace(name) ? DefaultChestLabelName(candidate.TileType) : name;
+            StoreChestNameCache(key, name, candidate.TileType);
+            return name;
+        }
+
+        private static void StoreChestNameCache(ChestNameCacheKey key, string name, int tileType)
+        {
+            if (!ChestAlwaysNameCache.ContainsKey(key))
+            {
+                ChestAlwaysNameCacheOrder.Enqueue(key);
+            }
+
+            ChestAlwaysNameCache[key] = string.IsNullOrWhiteSpace(name) ? DefaultChestLabelName(tileType) : name;
+            while (ChestAlwaysNameCacheOrder.Count > ChestAlwaysNameCacheLimit)
+            {
+                var oldest = ChestAlwaysNameCacheOrder.Dequeue();
+                ChestAlwaysNameCache.Remove(oldest);
+            }
+        }
+
+        private static string BuildChestAlwaysTypedTileFastPathStatus(int typedTileReads, int fallbackTileReads, int failedTileReads)
+        {
+            if (typedTileReads <= 0 && fallbackTileReads <= 0 && failedTileReads <= 0)
+            {
+                return "none";
+            }
+
+            return "typed=" + typedTileReads.ToString(CultureInfo.InvariantCulture) +
+                   ";fallback=" + fallbackTileReads.ToString(CultureInfo.InvariantCulture) +
+                   ";failed=" + failedTileReads.ToString(CultureInfo.InvariantCulture);
+        }
+
+        private static int BuildChestTileStyle(int tileType, int frameX)
+        {
+            if (tileType < 0 || frameX < 0)
+            {
+                return 0;
+            }
+
+            return Math.Max(0, frameX / GetChestTileStyleFrameWidth(tileType));
+        }
+
+        private static float BuildChestLabelWorldX(int chestX, int tileType)
+        {
+            return (chestX * TileSize) + (GetChestTileFrameColumns(tileType) * TileSize * 0.5f);
+        }
+
+        private static float BuildChestLabelWorldY(int chestY, int tileType)
+        {
+            return (chestY * TileSize) + (GetChestTileFrameRows(tileType) * TileSize * 0.5f);
+        }
+
+        private static string BuildChestNameLanguageSignature()
+        {
+            return CultureInfo.CurrentCulture.Name + "/" +
+                   CultureInfo.CurrentUICulture.Name + "/" +
+                   ReadTerrariaLanguageSignature();
+        }
+
+        private static string ReadTerrariaLanguageSignature()
+        {
+            try
+            {
+                var managerType = InformationReflection.FindType("Terraria.Localization.LanguageManager");
+                var manager = InformationReflection.GetStaticMember(managerType, "Instance");
+                var activeCulture = InformationReflection.GetMember(manager, "ActiveCulture");
+                var cultureName = FirstNonEmpty(
+                    InformationReflection.TryReadString(activeCulture, "Name"),
+                    InformationReflection.TryReadString(activeCulture, "CultureInfoName"),
+                    InformationReflection.TryReadString(activeCulture, "LegacyId"));
+                if (!string.IsNullOrWhiteSpace(cultureName))
+                {
+                    return cultureName.Trim();
+                }
+
+                return activeCulture == null ? string.Empty : Convert.ToString(activeCulture, CultureInfo.InvariantCulture) ?? string.Empty;
+            }
+            catch
+            {
+                return string.Empty;
             }
         }
 
@@ -1691,25 +2695,45 @@ namespace JueMingZ.Automation.Information
 
         private static bool TryReadTileActiveTypeAndFrame(object tiles, int x, int y, out bool active, out int tileType, out int frameX, out int frameY)
         {
+            bool usedTypedTileRead;
+            return TryReadTileActiveTypeAndFrame(
+                tiles,
+                x,
+                y,
+                out active,
+                out tileType,
+                out frameX,
+                out frameY,
+                true,
+                out usedTypedTileRead);
+        }
+
+        private static bool TryReadTileActiveTypeAndFrame(object tiles, int x, int y, out bool active, out int tileType, out int frameX, out int frameY, bool allowTypedTileRead, out bool usedTypedTileRead)
+        {
             active = false;
             tileType = -1;
             frameX = 0;
             frameY = 0;
+            usedTypedTileRead = false;
 
-            try
+            if (allowTypedTileRead)
             {
-                Tile typedTile;
-                if (TerrariaTileReadCompat.TryGetTile(x, y, out typedTile))
+                try
                 {
-                    active = TerrariaTileReadCompat.IsActive(typedTile);
-                    tileType = TerrariaTileReadCompat.Type(typedTile);
-                    frameX = TerrariaTileReadCompat.FrameX(typedTile);
-                    frameY = TerrariaTileReadCompat.FrameY(typedTile);
-                    return true;
+                    Tile typedTile;
+                    if (TerrariaTileReadCompat.TryGetTile(x, y, out typedTile))
+                    {
+                        active = TerrariaTileReadCompat.IsActive(typedTile);
+                        tileType = TerrariaTileReadCompat.Type(typedTile);
+                        frameX = TerrariaTileReadCompat.FrameX(typedTile);
+                        frameY = TerrariaTileReadCompat.FrameY(typedTile);
+                        usedTypedTileRead = true;
+                        return true;
+                    }
                 }
-            }
-            catch
-            {
+                catch
+                {
+                }
             }
 
             var tile = InformationTileAccess.GetTileAt(tiles, x, y);
@@ -1725,6 +2749,18 @@ namespace JueMingZ.Automation.Information
             return true;
         }
 
+        private static bool CanUseTypedTileRead(object tiles)
+        {
+            try
+            {
+                return tiles != null && ReferenceEquals(tiles, TerrariaMainCompat.Tiles);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private static int ReadTileFrameX(object tile)
         {
             return InformationTileAccess.ReadFrameX(tile);
@@ -1738,14 +2774,29 @@ namespace JueMingZ.Automation.Information
         private static bool TryResolveLoadedChestNameAt(Type mainType, int x, int y, out string name)
         {
             name = string.Empty;
+            string recordSignature;
+            return TryReadChestRecordIdentityAt(mainType, x, y, out recordSignature, out name) &&
+                   !string.IsNullOrWhiteSpace(name);
+        }
+
+        private static bool TryReadChestRecordIdentityAt(Type mainType, int x, int y, out string recordSignature, out string loadedName)
+        {
+            recordSignature = string.Empty;
+            loadedName = string.Empty;
             try
             {
                 var typedChestIndex = Chest.FindChest(x, y);
                 Chest typedChest;
                 if (TerrariaMainCompat.TryGetChest(typedChestIndex, out typedChest))
                 {
-                    name = typedChest.name ?? string.Empty;
-                    return !string.IsNullOrWhiteSpace(name);
+                    loadedName = typedChest.name ?? string.Empty;
+                    recordSignature = "typed:" +
+                                      typedChestIndex.ToString(CultureInfo.InvariantCulture) +
+                                      ":" +
+                                      RuntimeHelpers.GetHashCode(typedChest).ToString(CultureInfo.InvariantCulture) +
+                                      ":" +
+                                      (loadedName ?? string.Empty);
+                    return true;
                 }
             }
             catch
@@ -1781,17 +2832,38 @@ namespace JueMingZ.Automation.Information
                 return false;
             }
 
-            name = FirstNonEmpty(
+            loadedName = FirstNonEmpty(
                 InformationReflection.TryReadString(chest, "name"),
                 InformationReflection.TryReadString(chest, "Name"));
-            return !string.IsNullOrWhiteSpace(name);
+            recordSignature = "ref:" +
+                              chestIndex.ToString(CultureInfo.InvariantCulture) +
+                              ":" +
+                              RuntimeHelpers.GetHashCode(chest).ToString(CultureInfo.InvariantCulture) +
+                              ":" +
+                              (loadedName ?? string.Empty);
+            return true;
         }
 
-        private static bool TryNormalizeChestOriginFromFrame(int tileX, int tileY, int frameX, int frameY, out int chestX, out int chestY)
+        private static bool TryNormalizeChestOriginFromFrame(int tileType, int tileX, int tileY, int frameX, int frameY, out int chestX, out int chestY)
         {
-            chestX = tileX - PositiveModulo(frameX / 18, 2);
-            chestY = tileY - PositiveModulo(frameY / 18, 2);
+            chestX = tileX - PositiveModulo(frameX / TileFrameSize, GetChestTileFrameColumns(tileType));
+            chestY = tileY - PositiveModulo(frameY / TileFrameSize, GetChestTileFrameRows(tileType));
             return chestX >= 0 && chestY >= 0;
+        }
+
+        private static int GetChestTileFrameColumns(int tileType)
+        {
+            return IsDresserTileType(tileType) ? DresserFrameColumns : ChestFrameColumns;
+        }
+
+        private static int GetChestTileFrameRows(int tileType)
+        {
+            return ChestFrameRows;
+        }
+
+        private static int GetChestTileStyleFrameWidth(int tileType)
+        {
+            return IsDresserTileType(tileType) ? DresserStyleFrameWidth : ChestStyleFrameWidth;
         }
 
         private static int PositiveModulo(int value, int divisor)
@@ -1807,59 +2879,42 @@ namespace JueMingZ.Automation.Information
 
         private static bool IsChestTileType(Type mainType, int tileType)
         {
-            if (tileType < 0)
-            {
-                return false;
-            }
-
-            bool cached;
-            if (ChestTileTypeCache.TryGetValue(tileType, out cached))
-            {
-                return cached;
-            }
-
-            bool value;
-            if (TryReadBoolSet(InformationReflection.GetStaticMember(mainType, "tileContainer"), tileType, out value) && value)
-            {
-                ChestTileTypeCache[tileType] = true;
-                return true;
-            }
-
-            var setsType = InformationReflection.FindType("Terraria.ID.TileID+Sets");
-            if (TryReadBoolSet(InformationReflection.GetStaticMember(setsType, "BasicChest"), tileType, out value) && value)
-            {
-                ChestTileTypeCache[tileType] = true;
-                return true;
-            }
-
-            if (TryReadBoolSet(InformationReflection.GetStaticMember(setsType, "BasicChestFake"), tileType, out value) && value)
-            {
-                ChestTileTypeCache[tileType] = true;
-                return true;
-            }
-
-            var fallback = tileType == 21 || tileType == 467;
-            ChestTileTypeCache[tileType] = fallback;
-            return fallback;
+            return tileType == ChestTileTypeContainers ||
+                   tileType == ChestTileTypeContainers2 ||
+                   tileType == ChestTileTypeDressers ||
+                   tileType == ChestTileTypeFakeContainers ||
+                   tileType == ChestTileTypeFakeContainers2;
         }
 
-        private static bool TryReadBoolSet(object source, int index, out bool value)
+        private static bool IsDresserTileType(int tileType)
         {
-            value = false;
-            if (source == null || index < 0)
-            {
-                return false;
-            }
-
-            return TryConvertBool(InformationReflection.GetIndexedValue(source, index), out value);
+            return tileType == ChestTileTypeDressers;
         }
 
-        private static string ResolveChestTileDisplayName(Type mainType, int tileType)
+        private static string ResolveChestTileDisplayName(Type mainType, int tileType, int tileStyle)
         {
+            if (IsDresserTileType(tileType))
+            {
+                return ResolveDresserTileDisplayName(tileStyle);
+            }
+
+            try
+            {
+                var typedLookup = MapHelper.TileToLookup(tileType, Math.Max(0, tileStyle));
+                var name = Lang.GetMapObjectName(typedLookup);
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    return name;
+                }
+            }
+            catch
+            {
+            }
+
             object lookup;
             var mapHelperType = InformationReflection.FindType("Terraria.Map.MapHelper") ??
                                 InformationReflection.FindType("Terraria.MapHelper");
-            if (InformationReflection.TryInvokeStatic(mapHelperType, "TileToLookup", new object[] { tileType, 0 }, out lookup) && lookup != null)
+            if (InformationReflection.TryInvokeStatic(mapHelperType, "TileToLookup", new object[] { tileType, Math.Max(0, tileStyle) }, out lookup) && lookup != null)
             {
                 object rawName;
                 var langType = InformationReflection.FindType("Terraria.Lang") ??
@@ -1874,7 +2929,94 @@ namespace JueMingZ.Automation.Information
                 }
             }
 
-            return "宝箱";
+            return DefaultChestLabelName(tileType);
+        }
+
+        private static string ResolveDresserTileDisplayName(int tileStyle)
+        {
+            if (tileStyle >= 0)
+            {
+                try
+                {
+                    var dresserTypes = Lang.dresserType;
+                    if (dresserTypes != null && tileStyle < dresserTypes.Length && dresserTypes[tileStyle] != null)
+                    {
+                        var name = dresserTypes[tileStyle].Value;
+                        if (!string.IsNullOrWhiteSpace(name))
+                        {
+                            return name;
+                        }
+                    }
+                }
+                catch
+                {
+                }
+
+                try
+                {
+                    var langType = InformationReflection.FindType("Terraria.Lang") ??
+                                   InformationReflection.FindType("Terraria.Localization.Lang");
+                    var dresserTypes = InformationReflection.GetStaticMember(langType, "dresserType");
+                    var rawName = InformationReflection.GetIndexedValue(dresserTypes, tileStyle);
+                    var name = FirstNonEmpty(
+                        InformationReflection.TryReadString(rawName, "Value"),
+                        Convert.ToString(rawName, CultureInfo.InvariantCulture));
+                    if (!string.IsNullOrWhiteSpace(name))
+                    {
+                        return name;
+                    }
+                }
+                catch
+                {
+                }
+            }
+
+            return DefaultChestLabelName(ChestTileTypeDressers);
+        }
+
+        private static string DefaultChestLabelName(int tileType)
+        {
+            return IsDresserTileType(tileType) ? "梳妆台" : "宝箱";
+        }
+
+        private static bool TryResolveChestTileInfoAt(InformationWorldContext context, int tileX, int tileY, out int tileType, out int tileStyle)
+        {
+            tileType = ChestTileTypeContainers;
+            tileStyle = 0;
+            if (context == null || context.MainType == null || tileX < 0 || tileY < 0)
+            {
+                return false;
+            }
+
+            var tiles = InformationReflection.GetStaticMember(context.MainType, "tile");
+            if (tiles == null)
+            {
+                return false;
+            }
+
+            bool active;
+            int frameX;
+            int frameY;
+            if (!TryReadTileActiveTypeAndFrame(
+                    tiles,
+                    tileX,
+                    tileY,
+                    out active,
+                    out tileType,
+                    out frameX,
+                    out frameY) ||
+                !active ||
+                frameX < 0 ||
+                frameY < 0 ||
+                !IsChestTileType(context.MainType, tileType))
+            {
+                tileType = ChestTileTypeContainers;
+                tileStyle = 0;
+                return false;
+            }
+
+            tileStyle = BuildChestTileStyle(tileType, frameX);
+            return true;
         }
 
         private static Dictionary<long, string> BuildChestNameLookup(Type mainType)
@@ -1893,7 +3035,7 @@ namespace JueMingZ.Automation.Information
                             continue;
                         }
 
-                        result[BuildChestPositionKey(chest.x, chest.y)] = string.IsNullOrWhiteSpace(chest.name) ? "宝箱" : chest.name;
+                        result[BuildChestPositionKey(chest.x, chest.y)] = chest.name ?? string.Empty;
                     }
 
                     return result;
@@ -1927,7 +3069,7 @@ namespace JueMingZ.Automation.Information
                 var name = FirstNonEmpty(
                     InformationReflection.TryReadString(chest, "name"),
                     InformationReflection.TryReadString(chest, "Name"));
-                result[BuildChestPositionKey(chestX, chestY)] = string.IsNullOrWhiteSpace(name) ? "宝箱" : name;
+                result[BuildChestPositionKey(chestX, chestY)] = name ?? string.Empty;
             }
 
             return result;
@@ -2575,18 +3717,33 @@ namespace JueMingZ.Automation.Information
         {
             lock (SyncRoot)
             {
-                CachedChestLabels = EmptyChestLabels;
-                CachedSortedChestLabels = EmptyChestLabels;
-                _lastSortedChestLabelSource = EmptyChestLabels;
-                _lastChestScanTick = 0;
-                _lastChestLabelSignatureHash = 0;
-                _lastChestSortSignatureHash = 0;
-                _lastChestSortPlayerCenterX = 0f;
-                _lastChestSortPlayerCenterY = 0f;
-                _lastChestSortScreenCenterX = 0f;
-                _lastChestSortScreenCenterY = 0f;
-                _openedChestsHashDirty = true;
+                ResetChestLabelCacheStateLocked();
             }
+        }
+
+        private static void ResetChestLabelCacheStateLocked()
+        {
+            CachedAlwaysChestLabels = EmptyChestLabels;
+            CachedOpenedChestLabels = EmptyChestLabels;
+            CachedSortedChestLabels = EmptyChestLabels;
+            ChestAlwaysNameCache.Clear();
+            ChestAlwaysNameCacheOrder.Clear();
+            ChestScanCandidateBuffer.Clear();
+            ResetChestAlwaysPartialScanState();
+            _lastSortedChestLabelSource = EmptyChestLabels;
+            _lastChestAlwaysScanTick = 0;
+            _lastChestAlwaysSignatureHash = 0;
+            _lastChestAlwaysSignature = new ChestLabelCacheSignature();
+            _lastChestAlwaysStableSourceSignatureHash = 0;
+            _lastChestOpenedScanTick = 0;
+            _lastChestOpenedSignatureHash = 0;
+            _lastChestOpenedSignature = new ChestLabelCacheSignature();
+            _lastChestSortSignatureHash = 0;
+            _lastChestSortPlayerCenterX = 0f;
+            _lastChestSortPlayerCenterY = 0f;
+            _lastChestSortScreenCenterX = 0f;
+            _lastChestSortScreenCenterY = 0f;
+            _openedChestsHashDirty = true;
         }
 
         private static string BuildBiomeLine(object player)
@@ -2881,18 +4038,37 @@ namespace JueMingZ.Automation.Information
 
         private static bool TryFindLocalBobber(InformationWorldContext context, out float x, out float y)
         {
+            int identity;
+            return TryFindLocalBobber(context, out x, out y, out identity);
+        }
+
+        private static bool TryFindLocalBobber(InformationWorldContext context, out float x, out float y, out int identity)
+        {
             x = 0f;
             y = 0f;
+            identity = -1;
             int myPlayer;
             InformationReflection.TryReadStaticInt(context.MainType, "myPlayer", out myPlayer);
             FishingBobberObservation observation;
             if (FishingBobberObserver.TryGetLatest(out observation) &&
-                TryUseObservedLocalBobber(observation, myPlayer, context.GameUpdateCount, out x, out y))
+                TryUseObservedLocalBobber(observation, myPlayer, context.GameUpdateCount, out x, out y, out identity))
             {
                 return true;
             }
 
+            if (ShouldSkipProjectileFallbackForFreshInactiveObserver(context.GameUpdateCount))
+            {
+                Interlocked.Increment(ref _informationFishingBobberObserverFreshInactiveSkipCount);
+                return false;
+            }
+
+            Interlocked.Increment(ref _informationFishingProjectileFallbackScanCount);
             var projectiles = InformationReflection.GetStaticMember(context.MainType, "projectile");
+            if (projectiles == null)
+            {
+                return false;
+            }
+
             var count = GetCollectionCount(projectiles);
             for (var index = 0; index < count; index++)
             {
@@ -2915,27 +4091,44 @@ namespace JueMingZ.Automation.Information
 
                 if (InformationReflection.TryReadVectorMember(projectile, "Center", out x, out y))
                 {
+                    InformationReflection.TryReadInt(projectile, "identity", out identity);
                     return true;
                 }
 
                 if (InformationReflection.TryReadVectorMember(projectile, "position", out x, out y))
                 {
+                    InformationReflection.TryReadInt(projectile, "identity", out identity);
                     return true;
                 }
             }
 
+            MarkNoActiveFishingBobberObservation(context.GameUpdateCount);
             return false;
         }
 
         internal static bool TryUseObservedLocalBobberForTesting(FishingBobberObservation observation, int myPlayer, ulong currentGameUpdateCount, out float x, out float y)
         {
-            return TryUseObservedLocalBobber(observation, myPlayer, currentGameUpdateCount, out x, out y);
+            int identity;
+            return TryUseObservedLocalBobber(observation, myPlayer, currentGameUpdateCount, out x, out y, out identity);
         }
 
-        private static bool TryUseObservedLocalBobber(FishingBobberObservation observation, int myPlayer, ulong currentGameUpdateCount, out float x, out float y)
+        internal static bool TryFindLocalBobberForTesting(InformationWorldContext context, out float x, out float y)
+        {
+            int identity;
+            return TryFindLocalBobber(context, out x, out y, out identity);
+        }
+
+        internal static void ResetFishingBobberLookupDiagnosticsForTesting()
+        {
+            Interlocked.Exchange(ref _informationFishingBobberObserverFreshInactiveSkipCount, 0);
+            Interlocked.Exchange(ref _informationFishingProjectileFallbackScanCount, 0);
+        }
+
+        private static bool TryUseObservedLocalBobber(FishingBobberObservation observation, int myPlayer, ulong currentGameUpdateCount, out float x, out float y, out int identity)
         {
             x = 0f;
             y = 0f;
+            identity = -1;
             if (observation == null ||
                 !observation.Active ||
                 !observation.Bobber ||
@@ -2951,7 +4144,30 @@ namespace JueMingZ.Automation.Information
 
             x = observation.CenterX;
             y = observation.CenterY;
+            identity = observation.Identity;
             return true;
+        }
+
+        private static bool ShouldSkipProjectileFallbackForFreshInactiveObserver(ulong currentGameUpdateCount)
+        {
+            if (currentGameUpdateCount == 0 || currentGameUpdateCount > long.MaxValue)
+            {
+                return false;
+            }
+
+            return FishingBobberObserver.HasFreshNoActiveObservation(
+                (long)currentGameUpdateCount,
+                (int)FishingBobberObserverFreshTicks);
+        }
+
+        private static void MarkNoActiveFishingBobberObservation(ulong currentGameUpdateCount)
+        {
+            if (currentGameUpdateCount == 0 || currentGameUpdateCount > long.MaxValue)
+            {
+                return;
+            }
+
+            FishingBobberObserver.MarkNoActiveObservation((long)currentGameUpdateCount);
         }
 
         private static bool IsFreshObservedBobber(FishingBobberObservation observation, ulong currentGameUpdateCount)
@@ -3024,6 +4240,16 @@ namespace JueMingZ.Automation.Information
                     settings.InformationFishingCatchesEnabled ||
                     settings.InformationFishingFilteredCatchesEnabled ||
                     settings.InformationAnglerQuestEnabled);
+        }
+
+        private static InformationWorldContextProfile BuildStatusContextProfile(AppSettings settings)
+        {
+            return InformationWorldContextProfile.Status;
+        }
+
+        private static InformationWorldContextProfile BuildWorldOverlayContextProfile(AppSettings settings)
+        {
+            return InformationWorldContextProfile.FullRecord;
         }
 
         private static void UpdateDiagnostics(int? npcLabels, int? chestLabels, int? signTextLabels, int? tombstoneTextLabels, int? tileHighlights, int? statusLines, double elapsedMs, string skipReason)
@@ -3953,11 +5179,11 @@ namespace JueMingZ.Automation.Information
             return false;
         }
 
-        private static IList<FishingCatchCandidate> ResolveFishingCatchCandidates(InformationWorldContext context, float bobberX, float bobberY, string filterSignature, out string message)
+        private static IList<FishingCatchCandidate> ResolveFishingCatchCandidates(InformationWorldContext context, float bobberX, float bobberY, int bobberIdentity, string filterSignature, out string message)
         {
             try
             {
-                return InformationFishingCatchResolver.ResolveCatchCandidates(context, bobberX, bobberY, filterSignature, out message);
+                return InformationFishingCatchResolver.ResolveCatchCandidates(context, bobberX, bobberY, bobberIdentity, filterSignature, out message);
             }
             catch (Exception error)
             {
@@ -4683,6 +5909,130 @@ namespace JueMingZ.Automation.Information
             }
 
             return worldKey.Substring(marker + 1).Trim();
+        }
+
+        private struct ChestScanCandidate
+        {
+            public int ChestX;
+            public int ChestY;
+            public long Key;
+            public int TileType;
+            public int TileStyle;
+            public float WorldX;
+            public float WorldY;
+        }
+
+        private struct ChestNameCacheKey : IEquatable<ChestNameCacheKey>
+        {
+            private readonly string _worldKey;
+            private readonly string _worldRecordKey;
+            private readonly int _chestX;
+            private readonly int _chestY;
+            private readonly int _tileType;
+            private readonly int _tileStyle;
+            private readonly string _languageSignature;
+            private readonly string _recordSignature;
+
+            public ChestNameCacheKey(
+                string worldKey,
+                string worldRecordKey,
+                int chestX,
+                int chestY,
+                int tileType,
+                int tileStyle,
+                string languageSignature,
+                string recordSignature)
+            {
+                _worldKey = worldKey ?? string.Empty;
+                _worldRecordKey = worldRecordKey ?? string.Empty;
+                _chestX = chestX;
+                _chestY = chestY;
+                _tileType = tileType;
+                _tileStyle = tileStyle;
+                _languageSignature = languageSignature ?? string.Empty;
+                _recordSignature = recordSignature ?? string.Empty;
+            }
+
+            public bool Equals(ChestNameCacheKey other)
+            {
+                return _chestX == other._chestX &&
+                       _chestY == other._chestY &&
+                       _tileType == other._tileType &&
+                       _tileStyle == other._tileStyle &&
+                       string.Equals(_worldKey, other._worldKey, StringComparison.Ordinal) &&
+                       string.Equals(_worldRecordKey, other._worldRecordKey, StringComparison.Ordinal) &&
+                       string.Equals(_languageSignature, other._languageSignature, StringComparison.Ordinal) &&
+                       string.Equals(_recordSignature, other._recordSignature, StringComparison.Ordinal);
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is ChestNameCacheKey && Equals((ChestNameCacheKey)obj);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    var hash = 17;
+                    hash = hash * 31 + StringComparer.Ordinal.GetHashCode(_worldKey ?? string.Empty);
+                    hash = hash * 31 + StringComparer.Ordinal.GetHashCode(_worldRecordKey ?? string.Empty);
+                    hash = hash * 31 + _chestX;
+                    hash = hash * 31 + _chestY;
+                    hash = hash * 31 + _tileType;
+                    hash = hash * 31 + _tileStyle;
+                    hash = hash * 31 + StringComparer.Ordinal.GetHashCode(_languageSignature ?? string.Empty);
+                    hash = hash * 31 + StringComparer.Ordinal.GetHashCode(_recordSignature ?? string.Empty);
+                    return hash;
+                }
+            }
+        }
+
+        private struct ChestLabelCacheSignature
+        {
+            public uint Hash;
+            public string Mode;
+            public string WorldKey;
+            public string WorldRecordKey;
+            public string PlayerRecordKey;
+            public int ScreenChunkX;
+            public int ScreenChunkY;
+            public int ScreenWidth;
+            public int ScreenHeight;
+            public int PlayerChunkX;
+            public int PlayerChunkY;
+            public string StyleSignature;
+            public string OpenedChestsHash;
+
+            public ChestLabelCacheSignature(
+                uint hash,
+                string mode,
+                string worldKey,
+                string worldRecordKey,
+                string playerRecordKey,
+                int screenChunkX,
+                int screenChunkY,
+                int screenWidth,
+                int screenHeight,
+                int playerChunkX,
+                int playerChunkY,
+                string styleSignature,
+                string openedChestsHash)
+            {
+                Hash = hash;
+                Mode = mode ?? string.Empty;
+                WorldKey = worldKey ?? string.Empty;
+                WorldRecordKey = worldRecordKey ?? string.Empty;
+                PlayerRecordKey = playerRecordKey ?? string.Empty;
+                ScreenChunkX = screenChunkX;
+                ScreenChunkY = screenChunkY;
+                ScreenWidth = screenWidth;
+                ScreenHeight = screenHeight;
+                PlayerChunkX = playerChunkX;
+                PlayerChunkY = playerChunkY;
+                StyleSignature = styleSignature ?? string.Empty;
+                OpenedChestsHash = openedChestsHash ?? string.Empty;
+            }
         }
 
         private sealed class ChestLabel

@@ -153,6 +153,28 @@ namespace JueMingZ.Automation.AutoRecovery
             return enabled;
         }
 
+        internal static void ResetAutoStationBuffDiagnosticsForTesting()
+        {
+            lock (SyncRoot)
+            {
+                State.LastAutoStationBuffTick = ForceDueTick;
+                State.LastAutoStationBuffResult = string.Empty;
+                State.AutoStationBuffCooldownFastSkipCount = 0;
+                State.AutoStationBuffActiveBuffFastSkipCount = 0;
+                _lastAutoStationBuffFastSkipResultTick = ForceDueTick;
+                _lastF5ControlUtc = DateTime.MinValue;
+            }
+        }
+
+        internal static void SetAutoStationBuffLastTickForTesting(long tick)
+        {
+            lock (SyncRoot)
+            {
+                State.LastAutoStationBuffTick = tick;
+                _lastF5ControlUtc = DateTime.MinValue;
+            }
+        }
+
         public static void RequestImmediateAutoBuffReconcile(string triggerReason)
         {
             lock (SyncRoot)

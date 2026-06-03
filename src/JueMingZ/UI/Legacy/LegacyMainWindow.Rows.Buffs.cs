@@ -183,6 +183,7 @@ namespace JueMingZ.UI.Legacy
                 var isHovered = IsFrameElementHovered(elementId, elementRect, mouse);
                 LegacyPotionGrid.DrawCandidateCell(spriteBatch, rect, area.Viewport, candidate, isHovered);
                 var element = AddFrameElement(elements, elementId, candidate.BuffName, "candidate", elementRect, candidate: candidate);
+                element.TooltipContentSignature = BuildTooltipContentSignature(candidate);
                 RecordFrameElementHover(element, isHovered);
                 if (isHovered)
                 {
@@ -228,6 +229,7 @@ namespace JueMingZ.UI.Legacy
                 var active = entry.BuffType > 0 && activeBuffs.Contains(entry.BuffType);
                 LegacyPotionGrid.DrawWhitelistCell(spriteBatch, rect, area.Viewport, entry, liveCandidate, isHovered, active);
                 var element = AddFrameElement(elements, elementId, entry.BuffName, "whitelist", elementRect, whitelistEntry: entry);
+                element.TooltipContentSignature = BuildTooltipContentSignature(entry, liveCandidate, active);
                 RecordFrameElementHover(element, isHovered);
                 if (isHovered)
                 {

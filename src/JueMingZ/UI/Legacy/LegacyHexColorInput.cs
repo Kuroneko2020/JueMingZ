@@ -18,6 +18,11 @@ namespace JueMingZ.UI.Legacy
         private static string _draft = "#";
         private static bool _replaceOnNextHex;
 
+        public static bool IsAnyFocused
+        {
+            get { lock (SyncRoot) { return !string.IsNullOrWhiteSpace(_activeId); } }
+        }
+
         public static void Focus(string id, string currentColor)
         {
             lock (SyncRoot)

@@ -15,6 +15,7 @@ namespace JueMingZ.Compat
         private static MethodInfo _getFishingConditionsMethod;
         private static bool _truffleWormItemTypeResolved;
         private static int _truffleWormItemType = FallbackTruffleWormItemType;
+        private static long _truffleWormQueryCountForTesting;
 
         public static bool TryReadBobberObservation(object projectile, out FishingBobberObservation observation)
         {
@@ -185,6 +186,7 @@ namespace JueMingZ.Compat
 
         public static bool TryIsCurrentBaitTruffleWorm(out bool isTruffleWorm, out int baitItemType)
         {
+            System.Threading.Interlocked.Increment(ref _truffleWormQueryCountForTesting);
             isTruffleWorm = false;
             baitItemType = 0;
 
@@ -196,6 +198,16 @@ namespace JueMingZ.Compat
 
             isTruffleWorm = baitItemType == ResolveTruffleWormItemType();
             return baitItemType > 0;
+        }
+
+        internal static long TruffleWormQueryCountForTesting
+        {
+            get { return System.Threading.Interlocked.Read(ref _truffleWormQueryCountForTesting); }
+        }
+
+        internal static void ResetTruffleWormQueryCountForTesting()
+        {
+            System.Threading.Interlocked.Exchange(ref _truffleWormQueryCountForTesting, 0);
         }
 
         public static bool TryReadCurrentBait(out int baitItemType, out int baitPower)
@@ -316,24 +328,25 @@ namespace JueMingZ.Compat
         public static bool TryReadGameUpdateCount(out long count)
         {
             count = 0;
-            object raw = GetStatic(TerrariaRuntimeTypes.MainType, "GameUpdateCount");
-            if (raw == null)
-            {
-                raw = GetStatic(TerrariaRuntimeTypes.MainType, "gameUpdateCount");
-            }
-
-            if (raw == null)
-            {
-                return false;
-            }
-
             try
             {
+                object raw = GetStatic(TerrariaRuntimeTypes.MainType, "GameUpdateCount");
+                if (raw == null)
+                {
+                    raw = GetStatic(TerrariaRuntimeTypes.MainType, "gameUpdateCount");
+                }
+
+                if (raw == null)
+                {
+                    return false;
+                }
+
                 count = Convert.ToInt64(raw, CultureInfo.InvariantCulture);
                 return true;
             }
             catch
             {
+                count = 0;
                 return false;
             }
         }

@@ -143,6 +143,26 @@ namespace JueMingZ.UI.Legacy
             BuffPotionCandidate candidate,
             BuffPotionWhitelistEntry whitelistEntry)
         {
+            LegacyUiElement retainedElement;
+            if (LegacyMainWindow.TryReplayRetainedFrameElement(
+                elements,
+                id,
+                label,
+                kind,
+                rect,
+                enabled,
+                selected,
+                intValue,
+                minValue,
+                maxValue,
+                tooltipLines,
+                candidate,
+                whitelistEntry,
+                out retainedElement))
+            {
+                return retainedElement;
+            }
+
             var element = Acquire();
             element.Reset(id, label, kind, rect, enabled, selected, intValue, minValue, maxValue, tooltipLines, candidate, whitelistEntry);
             if (elements != null)

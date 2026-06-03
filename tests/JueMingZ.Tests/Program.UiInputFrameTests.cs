@@ -190,6 +190,67 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void LegacyUiUpdatePrefixSkipsScrollSnapshotWhenWheelIdle()
+        {
+            var restoreRuntimeTypes = PushFakeTerrariaMainType();
+            try
+            {
+                ResetUiInputFrameTestState();
+                LegacyUiInput.ResetActionUpdateGateStateForTesting();
+                LegacyMainUiState.SetWindow(40, 80, LegacyUiMetrics.DefaultWidth, LegacyUiMetrics.DefaultHeight, false);
+                LegacyMainUiState.SetVisible(true);
+                Terraria.Main.mouseX = 60;
+                Terraria.Main.mouseY = 100;
+                Terraria.Main.mouseScrollWheel = 0;
+                Terraria.Main.oldMouseScrollWheel = 0;
+
+                UiInputFrameClock.BeginUpdateFrame("test.legacy-scroll-prefix-idle");
+                LegacyUiInput.UpdatePrefixGuard();
+
+                if (LegacyUiInput.ScrollSnapshotSkippedCount != 1)
+                {
+                    throw new InvalidOperationException("Expected Legacy UI prefix guard to skip the full scroll snapshot when the wheel is idle inside F5.");
+                }
+
+                if (LegacyUiInput.WheelConsumedThisFrame)
+                {
+                    throw new InvalidOperationException("Expected an idle wheel frame to leave the Legacy UI wheel-consumed flag clear.");
+                }
+            }
+            finally
+            {
+                LegacyMainUiState.SetVisible(false);
+                LegacyUiInput.ResetActionUpdateGateStateForTesting();
+                ResetUiInputFrameTestState();
+                restoreRuntimeTypes();
+            }
+        }
+
+        private static void LegacyUiScrollActionEventCoalescesStableWheelDiagnostics()
+        {
+            LegacyUiInput.ResetActionUpdateGateStateForTesting();
+
+            if (!LegacyUiInput.ShouldRecordScrollActionEventForTesting("fishing", true, 12, 24))
+            {
+                throw new InvalidOperationException("Expected first stable scroll diagnostic event to be recorded.");
+            }
+
+            if (LegacyUiInput.ShouldRecordScrollActionEventForTesting("fishing", true, 12, 24))
+            {
+                throw new InvalidOperationException("Expected immediate duplicate stable scroll diagnostic event to be coalesced.");
+            }
+
+            if (LegacyUiInput.ScrollEventCoalescedCount != 1)
+            {
+                throw new InvalidOperationException("Expected scroll event coalescing diagnostics to count the duplicate event.");
+            }
+
+            if (!LegacyUiInput.ShouldRecordScrollActionEventForTesting("fishing", false, 12, 24))
+            {
+                throw new InvalidOperationException("Expected changed hotbar suppression status to record a fresh scroll diagnostic event.");
+            }
+        }
+
         private static void ResetUiInputFrameTestState()
         {
             UiInputFrameClock.ResetForTesting();
@@ -211,6 +272,14 @@ namespace JueMingZ.Tests
             Terraria.Main.hoverItem = null;
             Terraria.Main.mouseScrollWheel = 0;
             Terraria.Main.oldMouseScrollWheel = 0;
+            Terraria.Main.gameMenu = false;
+            Terraria.Main.ingameOptionsWindow = false;
+            Terraria.Main.inFancyUI = false;
+            Terraria.Main.gamePaused = false;
+            Terraria.Main.netMode = 0;
+            Terraria.Main.dedServ = false;
+            Terraria.Main.screenWidth = 1280;
+            Terraria.Main.screenHeight = 800;
         }
 
         private static void SetFakeTerrariaMouseText(string value)

@@ -37,12 +37,20 @@ namespace Terraria
         public static object HoverItem;
         public static object hoverItem;
         public static object[,] tile;
+        public static object[] projectile = new object[0];
         public static bool[] tileSolid = new bool[1000];
         public static bool[] tileSolidTop = new bool[1000];
         public static int mouseX;
         public static int mouseY;
         public static int mouseScrollWheel;
         public static int oldMouseScrollWheel;
+        public static bool gameMenu;
+        public static bool ingameOptionsWindow;
+        public static bool inFancyUI;
+        public static bool gamePaused;
+        public static int netMode;
+        public static bool dedServ;
+        public static int screenWidth = 1280;
         public static int screenHeight = 800;
         public static float inventoryScale = 1f;
         public static long GameUpdateCount;
@@ -56,6 +64,31 @@ namespace Terraria
     {
         public float X;
         public float Y;
+    }
+
+    internal sealed class Player
+    {
+        public bool active = true;
+        public bool dead;
+        public bool ghost;
+        public TestVector2 position = new TestVector2();
+        public int width = 20;
+        public int height = 42;
+        public int[] buffType = new int[22];
+        public int[] buffTime = new int[22];
+    }
+
+    internal sealed class Tile
+    {
+        public bool activeValue;
+        public int type;
+        public int frameX;
+        public int frameY;
+
+        public bool active()
+        {
+            return activeValue;
+        }
     }
 }
 
@@ -133,6 +166,11 @@ namespace JueMingZ.Tests
             Run("safe landing cheap precheck opens full analysis when fast", ref failed, SafeLandingCheapPrecheckOpensFullAnalysisWhenFast);
             Run("safe landing cheap precheck fails open when velocity unavailable", ref failed, SafeLandingCheapPrecheckFailsOpenWhenVelocityUnavailable);
             Run("safe landing cheap precheck fails open when player state unavailable", ref failed, SafeLandingCheapPrecheckFailsOpenWhenPlayerStateUnavailable);
+            Run("safe landing config summary cache hits and dirties", ref failed, SafeLandingConfigSummaryCacheHitsAndDirties);
+            Run("safe landing cheap skip suppresses repeated diagnostics", ref failed, SafeLandingCheapSkipSuppressesRepeatedDiagnostics);
+            Run("safe landing cheap skip reason change writes diagnostics", ref failed, SafeLandingCheapSkipReasonChangeWritesDiagnostics);
+            Run("safe landing cheap skip writes after exception", ref failed, SafeLandingCheapSkipWritesAfterException);
+            Run("safe landing submitted path keeps full diagnostics", ref failed, SafeLandingSubmittedPathKeepsFullDiagnostics);
             Run("movement input frame cache reuses profiles within frame", ref failed, MovementInputFrameCacheReusesProfilesWithinFrame);
             Run("safe landing cheap precheck uses cached motion within frame", ref failed, SafeLandingCheapPrecheckUsesCachedMotionWithinFrame);
             Run("safe landing projects horizontal impact probe", ref failed, SafeLandingProjectsHorizontalImpactProbe);
@@ -274,6 +312,7 @@ namespace JueMingZ.Tests
             Run("diagnostic snapshot writes auto tax collect state", ref failed, DiagnosticSnapshotWritesAutoTaxCollectState);
             Run("diagnostic snapshot writes auto capture critter state", ref failed, DiagnosticSnapshotWritesAutoCaptureCritterState);
             Run("diagnostic snapshot writes auto harvest state", ref failed, DiagnosticSnapshotWritesAutoHarvestState);
+            Run("diagnostic snapshot writes fishing idle pipeline state", ref failed, DiagnosticSnapshotWritesFishingIdlePipelineState);
             Run("performance hitch recorder detects runtime gaps", ref failed, PerformanceHitchRecorderDetectsRuntimeGaps);
             Run("diagnostic snapshot writes performance hitch state", ref failed, DiagnosticSnapshotWritesPerformanceHitchState);
             Run("feature catalog exposes implemented misc inventory automation", ref failed, FeatureCatalogExposesImplementedMiscInventoryAutomation);
@@ -291,6 +330,9 @@ namespace JueMingZ.Tests
             Run("runtime settings snapshot splits fishing dispatch layers", ref failed, RuntimeSettingsSnapshotSplitsFishingDispatchLayers);
             Run("runtime fishing dispatch skips filter-only settings", ref failed, RuntimeFishingDispatchSkipsFilterOnlySettings);
             Run("fishing residual state keeps runtime dispatch alive", ref failed, FishingResidualStateKeepsRuntimeDispatchAlive);
+            Run("runtime fishing dispatch uses idle watchdog cadence", ref failed, RuntimeFishingDispatchUsesIdleWatchdogCadence);
+            Run("runtime fishing dispatch promotes fresh active bobber", ref failed, RuntimeFishingDispatchPromotesFreshActiveBobber);
+            Run("fishing idle fast path skips bait and equipment details", ref failed, FishingIdleFastPathSkipsBaitAndEquipmentDetails);
             Run("runtime settings snapshot provider rebuilds after config mutation", ref failed, RuntimeSettingsSnapshotProviderRebuildsAfterConfigMutation);
             Run("runtime settings snapshot provider skips disabled list hashes", ref failed, RuntimeSettingsSnapshotProviderSkipsDisabledListHashes);
             Run("runtime service scheduler honors cadence and disabled cleanup", ref failed, RuntimeServiceSchedulerHonorsCadenceAndDisabledCleanup);
@@ -377,6 +419,7 @@ namespace JueMingZ.Tests
             Run("fishing bobber observer empty scan clears observations", ref failed, FishingBobberObserverEmptyScanClearsObservations);
             Run("information fishing bobber uses fresh observer", ref failed, InformationFishingBobberUsesFreshObserver);
             Run("fishing fallback scan gate skips fresh hook observations", ref failed, FishingFallbackScanGateSkipsFreshHookObservations);
+            Run("fishing fallback scan gate skips fresh inactive observer", ref failed, FishingFallbackScanGateSkipsFreshInactiveObserver);
             Run("fishing fallback scan gate keeps old fallback for sensitive stages", ref failed, FishingFallbackScanGateKeepsOldFallbackForSensitiveStages);
             Run("fishing session waits for bobber liquid", ref failed, FishingSessionWaitsForBobberLiquid);
             Run("fishing filter skip holds selection until bobber gone", ref failed, FishingFilterSkipHoldsSelectionUntilBobberGone);
@@ -400,23 +443,47 @@ namespace JueMingZ.Tests
             Run("information sign text layout cache reuses wrapped lines", ref failed, InformationSignTextLayoutCacheReusesWrappedLines);
             Run("information page content height includes limit rows", ref failed, InformationPageContentHeightIncludesLimitRows);
             Run("UI clipped single line text avoids bottom stick", ref failed, UiClippedSingleLineTextAvoidsBottomStick);
+            Run("information world context cache scopes status profile", ref failed, InformationWorldContextCacheScopesStatusProfile);
+            Run("information overlay context profiles route status and world record", ref failed, InformationOverlayContextProfilesRouteStatusAndWorldRecord);
+            Run("information status line cache tracks context identity", ref failed, InformationStatusLineCacheTracksContextIdentity);
             Run("information status panel layout cache reuses prepared rows", ref failed, InformationStatusPanelLayoutCacheReusesPreparedRows);
             Run("UI text renderer fast path keeps safe fallbacks", ref failed, UiTextRendererFastPathKeepsSafeFallbacks);
             Run("UI text renderer font signature change clears caches", ref failed, UiTextRendererFontSignatureChangeClearsCaches);
             Run("information tombstone text defaults to red and splits tile type", ref failed, InformationTombstoneTextDefaultsToRedAndSplitsTileType);
             Run("information mana crystal highlight defaults to off and uses tile id", ref failed, InformationManaCrystalHighlightDefaultsToOffAndUsesTileId);
             Run("information tile access reads cached tile members", ref failed, InformationTileAccessReadsCachedTileMembers);
+            Run("auto station buff cooldown fast skip avoids scan", ref failed, AutoStationBuffCooldownFastSkipAvoidsScan);
+            Run("auto station buff active buff fast skip avoids scan", ref failed, AutoStationBuffActiveBuffFastSkipAvoidsScan);
+            Run("station buff scan cache reuses reachable target", ref failed, StationBuffScanCacheReusesReachableTarget);
+            Run("station buff tile read fallback preserves scan result", ref failed, StationBuffTileReadFallbackPreservesScanResult);
+            Run("auto station buff requests active buff snapshot", ref failed, AutoStationBuffRequestsActiveBuffSnapshot);
             Run("information tile highlight cache signature tracks bounds settings and world", ref failed, InformationTileHighlightCacheSignatureTracksBoundsSettingsAndWorld);
             Run("information tile highlight cache keeps safety refresh", ref failed, InformationTileHighlightCacheKeepsSafetyRefresh);
             Run("information fishing catch query key tracks environment", ref failed, InformationFishingCatchQueryKeyTracksEnvironment);
+            Run("information fishing catch early key tracks environment", ref failed, InformationFishingCatchEarlyKeyTracksEnvironment);
+            Run("information fishing catch early cache hit skips heavy counters", ref failed, InformationFishingCatchEarlyCacheHitSkipsHeavyCounters);
+            Run("information fishing bobber fresh inactive skips projectile fallback", ref failed, InformationFishingBobberFreshInactiveSkipsProjectileFallback);
             Run("legacy UI page layout cache ignores window position", ref failed, LegacyUiPageLayoutCacheIgnoresWindowPosition);
             Run("legacy UI page layout cache dirties on scroll size and state", ref failed, LegacyUiPageLayoutCacheDirtiesOnScrollSizeAndState);
             Run("legacy UI page layout cache dirties on font generation", ref failed, LegacyUiPageLayoutCacheDirtiesOnFontGeneration);
+            Run("legacy potion grid fits six buttons per default buff pane", ref failed, LegacyPotionGridFitsSixButtonsPerDefaultBuffPane);
+            Run("legacy misc content height includes bottom action rows", ref failed, LegacyMiscContentHeightIncludesBottomActionRows);
             Run("legacy UI hover layout token ignores window and content position", ref failed, LegacyUiHoverLayoutTokenIgnoresWindowAndContentPosition);
             Run("legacy UI hover layout token dirties on page size scroll settings and font", ref failed, LegacyUiHoverLayoutTokenDirtiesOnPageSizeScrollSettingsAndFont);
+            Run("legacy UI tabs ignore content scroll clip", ref failed, LegacyUiTabsIgnoreContentScrollClip);
+            Run("legacy UI retained frame model reuses window translation", ref failed, LegacyUiRetainedFrameModelReusesWindowTranslation);
+            Run("legacy UI retained frame model dirties on scroll settings and font", ref failed, LegacyUiRetainedFrameModelDirtiesOnScrollSettingsAndFont);
+            Run("legacy UI retained frame model falls back on element mismatch", ref failed, LegacyUiRetainedFrameModelFallsBackOnElementMismatch);
             Run("legacy UI element frame reuses pooled elements", ref failed, LegacyUiElementFrameReusesPooledElements);
             Run("legacy UI hover cache reuses stable hover id", ref failed, LegacyUiHoverCacheReusesStableHoverId);
             Run("legacy UI context hover uses cached element id", ref failed, LegacyUiContextHoverUsesCachedElementId);
+            Run("legacy UI tooltip cache reuses stable hover model", ref failed, LegacyUiTooltipCacheReusesStableHoverModel);
+            Run("legacy UI tooltip cache dirties on content change", ref failed, LegacyUiTooltipCacheDirtiesOnContentChange);
+            Run("legacy UI action update gate skips idle frames", ref failed, LegacyUiActionUpdateGateSkipsIdleFrames);
+            Run("legacy UI action update gate runs pending commands when hidden", ref failed, LegacyUiActionUpdateGateRunsPendingCommandsWhenHidden);
+            Run("legacy UI action update gate skips drag dispatch without commands", ref failed, LegacyUiActionUpdateGateSkipsDragDispatchWithoutCommands);
+            Run("legacy UI update prefix skips scroll snapshot when wheel idle", ref failed, LegacyUiUpdatePrefixSkipsScrollSnapshotWhenWheelIdle);
+            Run("legacy UI scroll action event coalesces stable wheel diagnostics", ref failed, LegacyUiScrollActionEventCoalescesStableWheelDiagnostics);
             Run("diagnostic mouse state reader reuses snapshot within draw frame", ref failed, DiagnosticMouseStateReaderReusesSnapshotWithinDrawFrame);
             Run("diagnostic mouse state reader refreshes on new fast draw frame", ref failed, DiagnosticMouseStateReaderRefreshesOnNewFastDrawFrame);
             Run("diagnostic mouse state reader refreshes when draw frame changes under same update", ref failed, DiagnosticMouseStateReaderRefreshesWhenDrawFrameChangesUnderSameUpdate);
@@ -426,11 +493,20 @@ namespace JueMingZ.Tests
             Run("runtime performance diagnostics records slowest operation", ref failed, RuntimePerformanceDiagnosticsRecordsSlowestOperation);
             Run("information NPC label snapshot reuses movement only", ref failed, InformationNpcLabelSnapshotReusesMovementOnly);
             Run("information chest labels cache signature changes with mode and player-world records", ref failed, InformationChestLabelsCacheSignatureChangesWithModeAndKnownKeys);
+            Run("information chest always dirty cache tracks movement world and style", ref failed, InformationChestAlwaysDirtyCacheTracksMovementWorldAndStyle);
+            Run("information chest always dirty cache keeps safe refresh", ref failed, InformationChestAlwaysDirtyCacheKeepsSafeRefresh);
+            Run("information chest always cache counters ignore opened mode", ref failed, InformationChestAlwaysCacheCountersIgnoreOpenedMode);
+            Run("information chest always typed scan diagnostics track fallback tiles", ref failed, InformationChestAlwaysTypedScanDiagnosticsTrackFallbackTiles);
+            Run("information chest always name cache reuses across dirty scans", ref failed, InformationChestAlwaysNameCacheReusesAcrossDirtyScans);
+            Run("information chest always partial scan publishes stable snapshots", ref failed, InformationChestAlwaysPartialScanPublishesStableSnapshots);
             Run("player-world behavior records isolate opened chests", ref failed, PlayerWorldBehaviorRecordsIsolateOpenedChests);
             Run("legacy opened chest keys migrate to current player-world only", ref failed, LegacyOpenedChestKeysMigrateToCurrentPlayerWorldOnly);
             Run("information chest key parsing survives world rename with same id", ref failed, InformationChestKeyParsingSurvivesWorldRenameWithSameId);
             Run("information chest tile fallback detects basic container ids", ref failed, InformationChestTileFallbackDetectsBasicContainerIds);
+            Run("information chest tile fallback includes dressers and excludes display containers", ref failed, InformationChestTileFallbackIncludesDressersAndExcludesDisplayContainers);
             Run("information chest tile fallback normalizes two by two frame origin", ref failed, InformationChestTileFallbackNormalizesTwoByTwoFrameOrigin);
+            Run("information dresser chest labels use three by two frame rules", ref failed, InformationDresserChestLabelsUseThreeByTwoFrameRules);
+            Run("information dresser display name avoids map object option bleed", ref failed, InformationDresserDisplayNameAvoidsMapObjectOptionBleed);
             Run("information chest labels frame limit allows dense rooms", ref failed, InformationChestLabelsFrameLimitAllowsDenseRooms);
             Run("information chest labels draw order prioritizes screen center", ref failed, InformationChestLabelsDrawOrderPrioritizesScreenCenter);
             Run("information chest label sort cache dirties on source and movement threshold", ref failed, InformationChestLabelSortCacheDirtiesOnSourceAndMovementThreshold);
