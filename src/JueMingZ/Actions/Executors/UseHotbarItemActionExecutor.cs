@@ -21,6 +21,7 @@ namespace JueMingZ.Actions.Executors
         private const string StageRestoreOriginalSlot = "RestoreOriginalSlot";
         private const string StageVerifyOriginalSlotRestored = "VerifyOriginalSlotRestored";
         private const int MaxRestoreAttempts = 3;
+        private const int MaxSelectionWaitTicks = 45;
         private const int MaxFinalUseIdleWaitTicks = 90;
 
         public override InputActionKind Kind { get { return InputActionKind.UseHotbarItem; } }
@@ -109,6 +110,7 @@ namespace JueMingZ.Actions.Executors
 
             SetState(execution, "Stage", IsButtonSource(execution) ? StageWaitMouseRelease : StageSwitchToTargetSlot);
             SetState(execution, "SlotSwitchRetryTicks", 0);
+            SetState(execution, "SlotSelectionWaitTicks", 0);
             SetState(execution, "StabilizeTicks", 0);
             return InputActionExecutionStepResult.Running("UseHotbarItem validated target slot.");
         }
@@ -219,7 +221,8 @@ namespace JueMingZ.Actions.Executors
             SetState(execution, "SlotSwitchBefore", originalSlot);
             SetState(execution, "SlotSwitchTarget", targetSlot);
 
-            if (!TerrariaInputCompat.TrySelectInventorySlot(player, targetSlot))
+            bool selectedImmediately;
+            if (!TerrariaInputCompat.TryRequestInventorySlotSelection(player, targetSlot, out selectedImmediately))
             {
                 SetState(execution, "SlotSwitchSucceeded", "false");
                 SetState(execution, "SlotSwitchMethod", TerrariaInputCompat.LastSelectionMethod);
@@ -228,6 +231,7 @@ namespace JueMingZ.Actions.Executors
             }
 
             SetState(execution, "SlotSwitchMethod", TerrariaInputCompat.LastSelectionMethod);
+            SetState(execution, "SlotSelectionWaitTicks", 0);
             int selectedSlot;
             if (TerrariaInputCompat.TryGetSelectedItem(player, out selectedSlot))
             {
@@ -235,8 +239,14 @@ namespace JueMingZ.Actions.Executors
                 SetState(execution, "SlotSwitchSucceeded", selectedSlot == targetSlot ? "true" : "false");
             }
 
+            if (selectedImmediately)
+            {
+                SetState(execution, "SlotSwitchSucceeded", "true");
+                SetState(execution, "SlotSwitchAfter", targetSlot);
+            }
+
             SetState(execution, "Stage", StageVerifyTargetSlot);
-            return InputActionExecutionStepResult.Running("UseHotbarItem switched to target slot; verifying selection.");
+            return InputActionExecutionStepResult.Running("UseHotbarItem requested target slot; verifying selection.");
         }
 
         private InputActionExecutionStepResult VerifyTargetSlot(InputActionExecution execution)
@@ -266,12 +276,30 @@ namespace JueMingZ.Actions.Executors
             }
 
             var retryTicks = GetStateInt(execution, "SlotSwitchRetryTicks", 0);
-            if (retryTicks < 3 && TerrariaInputCompat.TrySelectInventorySlot(player, targetSlot))
+            var waitTicks = GetStateInt(execution, "SlotSelectionWaitTicks", 0) + 1;
+            SetState(execution, "SlotSwitchRetryTicks", retryTicks);
+            SetState(execution, "SlotSelectionWaitTicks", waitTicks);
+            if (waitTicks <= MaxSelectionWaitTicks)
             {
-                SetState(execution, "SlotSwitchRetryTicks", retryTicks + 1);
-                SetState(execution, "SlotSwitchMethod", TerrariaInputCompat.LastSelectionMethod);
                 SetState(execution, "SlotSwitchAfter", selectedSlot);
-                return InputActionExecutionStepResult.Running("UseHotbarItem retrying target slot selection.");
+                if (waitTicks % 4 == 0)
+                {
+                    bool selectedImmediately;
+                    if (!TerrariaInputCompat.TryRequestInventorySlotSelection(player, targetSlot, out selectedImmediately))
+                    {
+                        TryRestoreOriginalSlot(execution);
+                        return CompleteDetailed(execution, InputActionStatus.Failed, DiagnosticResultCode.Failed, "UseHotbarItem failed to request target slot: " + TerrariaInputCompat.LastInputCompatError);
+                    }
+
+                    SetState(execution, "SlotSwitchRetryTicks", retryTicks + 1);
+                    SetState(execution, "SlotSwitchMethod", TerrariaInputCompat.LastSelectionMethod);
+                    if (selectedImmediately)
+                    {
+                        SetState(execution, "SlotSwitchAfter", targetSlot);
+                    }
+                }
+
+                return InputActionExecutionStepResult.Running("UseHotbarItem waiting for target slot selection.");
             }
 
             SetState(execution, "SlotSwitchAfter", selectedSlot);
@@ -594,7 +622,8 @@ namespace JueMingZ.Actions.Executors
 
             attemptCount++;
             SetState(execution, "RestoreAttemptCount", attemptCount);
-            if (!TerrariaInputCompat.TrySelectInventorySlot(player, originalSlot))
+            bool selectedImmediately;
+            if (!TerrariaInputCompat.TryRequestInventorySlotSelection(player, originalSlot, out selectedImmediately))
             {
                 SetState(execution, "RestoreSucceeded", "false");
                 SetState(execution, "SelectedSlotRestored", "false");
@@ -605,9 +634,14 @@ namespace JueMingZ.Actions.Executors
             }
 
             SetState(execution, "RestoreMethod", TerrariaInputCompat.LastSelectionMethod);
+            if (selectedImmediately)
+            {
+                SetFinalSelectedSlot(execution, originalSlot);
+            }
+
             SetState(execution, "RestoreVerifyWaitTicks", 0);
             SetState(execution, "Stage", StageVerifyOriginalSlotRestored);
-            return InputActionExecutionStepResult.Running("UseHotbarItem restored original slot; waiting one tick to verify.");
+            return InputActionExecutionStepResult.Running("UseHotbarItem requested original slot restore; waiting to verify.");
         }
 
         private InputActionExecutionStepResult VerifyOriginalSlotRestored(InputActionExecution execution)
@@ -672,10 +706,26 @@ namespace JueMingZ.Actions.Executors
                 return CompleteFinalFromState(execution);
             }
 
-            if (GetStateInt(execution, "RestoreAttemptCount", 0) < MaxRestoreAttempts)
+            if (waitTicks <= MaxSelectionWaitTicks)
             {
-                SetState(execution, "Stage", StageRestoreOriginalSlot);
-                return InputActionExecutionStepResult.Running("UseHotbarItem original slot not restored yet; retrying.");
+                if (waitTicks % 4 == 0)
+                {
+                    bool selectedImmediately;
+                    if (TerrariaInputCompat.TryRequestInventorySlotSelection(player, originalSlot, out selectedImmediately))
+                    {
+                        SetState(execution, "RestoreMethod", TerrariaInputCompat.LastSelectionMethod);
+                        if (selectedImmediately)
+                        {
+                            SetFinalSelectedSlot(execution, originalSlot);
+                        }
+                    }
+                    else
+                    {
+                        SetState(execution, "RestoreMessage", "Restore original slot request failed: " + TerrariaInputCompat.LastInputCompatError);
+                    }
+                }
+
+                return InputActionExecutionStepResult.Running("UseHotbarItem waiting for original slot restore.");
             }
 
             SetState(execution, "RestoreSucceeded", "false");
@@ -933,6 +983,7 @@ namespace JueMingZ.Actions.Executors
             AppendRaw(builder, "slotSwitchAfter", SlotRaw(GetStateInt(execution, "SlotSwitchAfter", -1)), true);
             AppendRaw(builder, "slotSwitchSucceeded", BoolRaw(GetStateBool(execution, "SlotSwitchSucceeded", false)), true);
             AppendString(builder, "slotSwitchMethod", GetState(execution, "SlotSwitchMethod", string.Empty), true);
+            AppendRaw(builder, "slotSelectionWaitTicks", IntRaw(GetStateInt(execution, "SlotSelectionWaitTicks", 0)), true);
             AppendRaw(builder, "selectedSlotAtUseStart", SlotRaw(GetStateInt(execution, "SelectedSlotAtUseStart", -1)), true);
             AppendRaw(builder, "uiClickSuppressionAttempted", BoolRaw(GetStateBool(execution, "UiClickSuppressionAttempted", false)), true);
             AppendString(builder, "uiClickSuppressionMode", GetState(execution, "UiClickSuppressionMode", string.Empty), true);

@@ -55,7 +55,7 @@ namespace JueMingZ.Actions.Executors
                 return Finish(execution, startedUtc, InputActionStatus.Failed, DiagnosticResultCode.BlockedByEnvironment, "Continuous dash failed: " + TerrariaDashCompat.LastDashCompatError, scenario, mode, requestedDirection, before, after, false, false, "profileUnavailable");
             }
 
-            if (requestedDirection == 0 || before.HeldDirection != requestedDirection)
+            if (requestedDirection == 0 || !before.IsDirectionHeld(requestedDirection))
             {
                 return Finish(execution, startedUtc, InputActionStatus.NotApplicable, DiagnosticResultCode.NotApplicable, "Continuous dash skipped: requested direction is no longer held.", scenario, mode, requestedDirection, before, after, false, false, "directionChanged");
             }

@@ -20,9 +20,15 @@ namespace JueMingZ.Automation.InventoryAndItems
         private const int VkShift = 0x10;
         private const int VkControl = 0x11;
         private const int VkAlt = 0x12;
+        private const string QuickItemScenario = "Hotkey.QuickItemHotkeys";
         private static readonly TimeSpan TriggerDebounce = TimeSpan.FromMilliseconds(220);
         private static readonly Dictionary<string, bool> WasDownByBindingKey = new Dictionary<string, bool>(StringComparer.Ordinal);
         private static DateTime _lastTriggerUtc = DateTime.MinValue;
+
+        internal static InputActionRequest BuildUseRequestForTesting(int slot, int itemType, string itemName, int requestedItemType, string displayName, string sourceHotkey)
+        {
+            return BuildUseRequest(slot, itemType, itemName, requestedItemType, displayName, sourceHotkey);
+        }
 
         public static void Tick(InputActionQueue queue, GameStateSnapshot gameState, RuntimeState runtimeState)
         {
@@ -123,26 +129,7 @@ namespace JueMingZ.Automation.InventoryAndItems
                 return false;
             }
 
-            var request = new InputActionRequest
-            {
-                Kind = InputActionKind.UseHotbarItem,
-                Priority = InputActionPriority.Normal,
-                SourceFeatureId = FeatureIds.InventoryQuickItemHotkeys,
-                Description = "Quick item hotkey use",
-                Timeout = TimeSpan.FromSeconds(5)
-            };
-            request.Metadata["Slot"] = slot.ToString(CultureInfo.InvariantCulture);
-            request.Metadata["Scenario"] = "Hotkey.QuickItemHotkeys";
-            request.Metadata[ActionMetadataKeys.SourceKind] = "Hotkey";
-            request.Metadata["SourceHotkey"] = chord.Display;
-            request.Metadata["QuickItemDisplayName"] = binding.DisplayName ?? string.Empty;
-            request.Metadata["QuickItemItemType"] = itemType.ToString(CultureInfo.InvariantCulture);
-            request.Metadata["QuickItemItemName"] = itemName ?? string.Empty;
-            if (requestedItemType > 0)
-            {
-                request.Metadata["QuickItemBoundItemType"] = requestedItemType.ToString(CultureInfo.InvariantCulture);
-                request.Metadata["TargetItemTypeOverride"] = requestedItemType.ToString(CultureInfo.InvariantCulture);
-            }
+            var request = BuildUseRequest(slot, itemType, itemName, requestedItemType, binding.DisplayName, chord.Display);
             queue.Enqueue(request);
 
             DiagnosticActionRecorder.RecordHotkeyEvent(
@@ -151,6 +138,35 @@ namespace JueMingZ.Automation.InventoryAndItems
                 DiagnosticResultCode.Queued,
                 "Quick item hotkey queued UseHotbarItem for slot " + (slot + 1).ToString(CultureInfo.InvariantCulture) + ".");
             return true;
+        }
+
+        private static InputActionRequest BuildUseRequest(int slot, int itemType, string itemName, int requestedItemType, string displayName, string sourceHotkey)
+        {
+            var slotText = slot.ToString(CultureInfo.InvariantCulture);
+            var request = new InputActionRequest
+            {
+                Kind = InputActionKind.UseHotbarItem,
+                Priority = InputActionPriority.Normal,
+                SourceFeatureId = FeatureIds.InventoryQuickItemHotkeys,
+                Description = "Quick item hotkey use",
+                Timeout = TimeSpan.FromSeconds(5)
+            };
+            request.Metadata["Slot"] = slotText;
+            request.Metadata[ActionMetadataKeys.TargetSlot] = slotText;
+            request.Metadata[ActionMetadataKeys.Scenario] = QuickItemScenario;
+            request.Metadata[ActionMetadataKeys.SourceKind] = "Hotkey";
+            request.Metadata["SourceHotkey"] = sourceHotkey ?? string.Empty;
+            request.Metadata["ApplyMainMouseLeftForItemCheck"] = "true";
+            request.Metadata["QuickItemDisplayName"] = displayName ?? string.Empty;
+            request.Metadata["QuickItemItemType"] = itemType.ToString(CultureInfo.InvariantCulture);
+            request.Metadata["QuickItemItemName"] = itemName ?? string.Empty;
+            if (requestedItemType > 0)
+            {
+                request.Metadata["QuickItemBoundItemType"] = requestedItemType.ToString(CultureInfo.InvariantCulture);
+                request.Metadata["TargetItemTypeOverride"] = requestedItemType.ToString(CultureInfo.InvariantCulture);
+            }
+
+            return request;
         }
 
         private static bool TryFindMatchingSlot(

@@ -60,6 +60,19 @@ namespace JueMingZ.Compat
             get { return HeldDirection != 0 && ControlLeft != ControlRight; }
         }
 
+        public bool IsDirectionHeld(int direction)
+        {
+            return direction < 0 ? ControlLeft : direction > 0 && ControlRight;
+        }
+
+        public bool CanDashInDirection(int direction)
+        {
+            return PlayerControllable &&
+                   IsDirectionHeld(direction) &&
+                   DashCooldownReady &&
+                   HasDashAbility;
+        }
+
         public bool DashReady
         {
             get { return PlayerControllable && ExclusiveHorizontalHeld && DashCooldownReady && HasDashAbility; }

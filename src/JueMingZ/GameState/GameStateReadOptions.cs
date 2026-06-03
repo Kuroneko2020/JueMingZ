@@ -16,6 +16,7 @@ namespace JueMingZ.GameState
         ToolFields = 1 << 9,
         TileCreationFields = 1 << 10,
         EquipmentFields = 1 << 11,
+        EquippedItems = 1 << 12,
 
         SelectedOnly = SelectedItem | Name,
         SignatureOnly = InventorySlots | Prefix | Name,
@@ -26,7 +27,7 @@ namespace JueMingZ.GameState
         BugNetOnly = InventorySlots | SelectedItem | Name | BugNetFields,
         StackCandidates = InventorySlots | Favorited | Stackability | EquipmentFields,
         SellDiscardCandidates = InventorySlots | Favorited | Name,
-        KeepFavorited = InventorySlots | TrashItem | Favorited | Prefix | Name,
+        KeepFavorited = InventorySlots | EquippedItems | TrashItem | Favorited | Prefix | Name,
         Full = SelectedItem |
                InventorySlots |
                TrashItem |

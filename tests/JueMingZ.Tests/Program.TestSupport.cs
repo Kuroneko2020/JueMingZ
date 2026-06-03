@@ -640,6 +640,7 @@ namespace JueMingZ.Tests
             public bool noUseGraphic;
             public bool accessory;
             public bool expertOnly;
+            public bool favorited;
 
             public bool IsAir
             {

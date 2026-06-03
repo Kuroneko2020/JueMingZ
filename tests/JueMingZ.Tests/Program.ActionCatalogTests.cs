@@ -601,6 +601,28 @@ namespace JueMingZ.Tests
             AssertMetadata(request, "QuickBagOpenRepeatCount", "8");
         }
 
+        private static void QuickItemHotkeyRequestUsesFreshClickMetadata()
+        {
+            var request = QuickItemHotkeyService.BuildUseRequestForTesting(12, 4263, "魔法海螺", 4263, "回家", "Ctrl+G");
+            if (request.Kind != InputActionKind.UseHotbarItem)
+            {
+                throw new InvalidOperationException("Quick item hotkey must use UseHotbarItem action.");
+            }
+
+            AssertStringEquals(request.SourceFeatureId, FeatureIds.InventoryQuickItemHotkeys, "source feature id");
+            AssertMetadata(request, ActionMetadataKeys.Scenario, "Hotkey.QuickItemHotkeys");
+            AssertMetadata(request, ActionMetadataKeys.SourceKind, "Hotkey");
+            AssertMetadata(request, "Slot", "12");
+            AssertMetadata(request, ActionMetadataKeys.TargetSlot, "12");
+            AssertMetadata(request, "ApplyMainMouseLeftForItemCheck", "true");
+            AssertMetadata(request, "SourceHotkey", "Ctrl+G");
+            AssertMetadata(request, "QuickItemDisplayName", "回家");
+            AssertMetadata(request, "QuickItemItemType", "4263");
+            AssertMetadata(request, "QuickItemItemName", "魔法海螺");
+            AssertMetadata(request, "QuickItemBoundItemType", "4263");
+            AssertMetadata(request, "TargetItemTypeOverride", "4263");
+        }
+
         private static void QuickBagOpenYieldsAfterBatchWhenCleanupEnabled()
         {
             QuickBagOpenService.ClearState("test reset");
@@ -746,6 +768,8 @@ namespace JueMingZ.Tests
             AssertStringEquals(request.SourceFeatureId, FeatureIds.InventoryKeepFavorited, "source feature id");
             AssertMetadata(request, ActionMetadataKeys.Scenario, ScenarioNames.InventoryKeepFavorited);
             AssertMetadata(request, ActionMetadataKeys.TargetSlot, "6");
+            AssertMetadata(request, "SourceContainer", "Inventory");
+            AssertMetadata(request, "KeepFavoritedContainer", "Inventory");
             AssertMetadata(request, "KeepFavoritedItemType", "75");
             AssertMetadata(request, "KeepFavoritedSignature", "75|0|生命水晶");
         }
@@ -770,6 +794,83 @@ namespace JueMingZ.Tests
             if (KeepFavoritedCompat.TryFindLostFavoritedSlot(unfavorited, 12, out slot, out itemType, out signature, out message))
             {
                 throw new InvalidOperationException("Keep favorited should allow a manual unfavorite while inventory is open.");
+            }
+
+            KeepFavoritedCompat.ClearState();
+        }
+
+        private static void KeepFavoritedRestoresArmorSlot()
+        {
+            KeepFavoritedCompat.ClearState();
+            string container;
+            int slot;
+            int itemType;
+            string signature;
+            string message;
+            var tracked = BuildKeepFavoritedSnapshot(
+                true,
+                new[] { BuildInventoryItem(6, 75, "生命水晶", 1, 0, true) },
+                null);
+            KeepFavoritedCompat.TryFindLostFavoritedSlot(tracked, 30, out container, out slot, out itemType, out signature, out message);
+
+            var equipped = BuildKeepFavoritedSnapshot(
+                true,
+                new InventoryItemSnapshot[0],
+                new[] { BuildInventoryItem(3, 75, "生命水晶", 1, 0, false) },
+                null,
+                null);
+            if (!KeepFavoritedCompat.TryFindLostFavoritedSlot(equipped, 32, out container, out slot, out itemType, out signature, out message) ||
+                container != "Armor" ||
+                slot != 3 ||
+                itemType != 75 ||
+                signature != "75|0|生命水晶")
+            {
+                throw new InvalidOperationException("Keep favorited should restore a tracked favorite item after it moves into armor.");
+            }
+
+            var player = new FakePlayer();
+            player.armor[3] = new FakeItem { type = 75, stack = 1, prefix = 0, Name = "生命水晶", favorited = false };
+            bool restored;
+            if (!KeepFavoritedCompat.TryRestoreFavoritedInContainer(player, container, slot, itemType, signature, out restored, out message) ||
+                !restored ||
+                !player.armor[3].favorited)
+            {
+                throw new InvalidOperationException("Keep favorited should set the armor item favorite flag through the controlled compat path: " + message);
+            }
+
+            KeepFavoritedCompat.ClearState();
+        }
+
+        private static void KeepFavoritedRestoresSameInventorySlotAfterLeaving()
+        {
+            KeepFavoritedCompat.ClearState();
+            string container;
+            int slot;
+            int itemType;
+            string signature;
+            string message;
+            var tracked = BuildKeepFavoritedSnapshot(
+                true,
+                new[] { BuildInventoryItem(6, 75, "生命水晶", 1, 0, true) },
+                null);
+            KeepFavoritedCompat.TryFindLostFavoritedSlot(tracked, 40, out container, out slot, out itemType, out signature, out message);
+
+            var absent = BuildKeepFavoritedSnapshot(
+                true,
+                new InventoryItemSnapshot[0],
+                null);
+            KeepFavoritedCompat.TryFindLostFavoritedSlot(absent, 42, out container, out slot, out itemType, out signature, out message);
+
+            var returned = BuildKeepFavoritedSnapshot(
+                true,
+                new[] { BuildInventoryItem(6, 75, "生命水晶", 1, 0, false) },
+                null);
+            if (!KeepFavoritedCompat.TryFindLostFavoritedSlot(returned, 44, out container, out slot, out itemType, out signature, out message) ||
+                container != "Inventory" ||
+                slot != 6 ||
+                itemType != 75)
+            {
+                throw new InvalidOperationException("Keep favorited should not treat an item returning to the same inventory slot as a manual unfavorite.");
             }
 
             KeepFavoritedCompat.ClearState();
@@ -809,7 +910,57 @@ namespace JueMingZ.Tests
             KeepFavoritedCompat.ClearState();
         }
 
+        private static void KeepFavoritedRestoresBucketTransformSameSlot()
+        {
+            KeepFavoritedCompat.ClearState();
+            string container;
+            int slot;
+            int itemType;
+            string signature;
+            string message;
+            var tracked = BuildKeepFavoritedSnapshot(
+                true,
+                new[] { BuildInventoryItem(6, 206, "Water Bucket", 1, 0, true) },
+                null);
+            KeepFavoritedCompat.TryFindLostFavoritedSlot(tracked, 50, out container, out slot, out itemType, out signature, out message);
+
+            var usedBucket = BuildKeepFavoritedSnapshot(
+                true,
+                new[] { BuildInventoryItem(6, 205, "Empty Bucket", 1, 0, false) },
+                null);
+            if (!KeepFavoritedCompat.TryFindLostFavoritedSlot(usedBucket, 52, out container, out slot, out itemType, out signature, out message) ||
+                container != "Inventory" ||
+                slot != 6 ||
+                itemType != 205 ||
+                signature != "205|0|Empty Bucket")
+            {
+                throw new InvalidOperationException("Keep favorited should restore favorite state after a regular bucket transforms in the same slot.");
+            }
+
+            var player = new FakePlayer();
+            player.inventory[6] = new FakeItem { type = 205, stack = 1, prefix = 0, Name = "Empty Bucket", favorited = false };
+            bool restored;
+            if (!KeepFavoritedCompat.TryRestoreFavoritedInContainer(player, container, slot, itemType, signature, out restored, out message) ||
+                !restored ||
+                !player.inventory[6].favorited)
+            {
+                throw new InvalidOperationException("Keep favorited should set the transformed bucket favorite flag through the controlled compat path: " + message);
+            }
+
+            KeepFavoritedCompat.ClearState();
+        }
+
         private static GameStateSnapshot BuildKeepFavoritedSnapshot(bool inventoryOpen, IReadOnlyList<InventoryItemSnapshot> items, InventoryItemSnapshot trashItem)
+        {
+            return BuildKeepFavoritedSnapshot(inventoryOpen, items, null, null, trashItem);
+        }
+
+        private static GameStateSnapshot BuildKeepFavoritedSnapshot(
+            bool inventoryOpen,
+            IReadOnlyList<InventoryItemSnapshot> items,
+            IReadOnlyList<InventoryItemSnapshot> armorItems,
+            IReadOnlyList<InventoryItemSnapshot> miscEquipItems,
+            InventoryItemSnapshot trashItem)
         {
             var snapshot = new GameStateSnapshot
             {
@@ -817,6 +968,8 @@ namespace JueMingZ.Tests
             };
             snapshot.Ui.PlayerInventoryOpen = inventoryOpen;
             snapshot.Inventory.Items = items ?? new List<InventoryItemSnapshot>();
+            snapshot.Inventory.ArmorItems = armorItems ?? new List<InventoryItemSnapshot>();
+            snapshot.Inventory.MiscEquipItems = miscEquipItems ?? new List<InventoryItemSnapshot>();
             snapshot.Inventory.TrashItem = trashItem ?? new InventoryItemSnapshot { SlotIndex = -2 };
             return snapshot;
         }
@@ -1311,6 +1464,27 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void FishingFilterNaturalWaitDoesNotForceTimeoutPull()
+        {
+            if (FishingAutomationService.ShouldForcePullFilterSkipTimeoutForTesting(true, true, 100, 190))
+            {
+                throw new InvalidOperationException("Natural filter skip wait must not turn into a timeout pull.");
+            }
+        }
+
+        private static void FishingFilterCutRodSkipKeepsTimeoutProtection()
+        {
+            if (FishingAutomationService.ShouldForcePullFilterSkipTimeoutForTesting(true, false, 100, 189))
+            {
+                throw new InvalidOperationException("Filter skip timeout protection must not fire before the configured wait window.");
+            }
+
+            if (!FishingAutomationService.ShouldForcePullFilterSkipTimeoutForTesting(true, false, 100, 190))
+            {
+                throw new InvalidOperationException("Cut-rod filter skip must keep timeout protection after the wait window.");
+            }
+        }
+
         private static void SelectedItemStateForceSelectionUpdatesHotbarState()
         {
             var player = new TestSelectedItemStatePlayer(1);
@@ -1329,6 +1503,38 @@ namespace JueMingZ.Tests
                 player.selectedItemState.OverriddenForTesting != -1)
             {
                 throw new InvalidOperationException("selectedItemState direct fallback did not refresh hotbar and clear pending selection state.");
+            }
+        }
+
+        private static void SelectedItemStateRequestAllowsDeferredSelection()
+        {
+            var player = new TestDeferredSelectedItemStatePlayer(1);
+            bool selectedImmediately;
+            if (!TerrariaPlayerSelectionCompat.TryRequestInventorySlotSelection(player, 9, out selectedImmediately))
+            {
+                throw new InvalidOperationException("Expected selectedItemState request selection to accept deferred selection: " + TerrariaPlayerSelectionCompat.LastError);
+            }
+
+            if (selectedImmediately)
+            {
+                throw new InvalidOperationException("Deferred selectedItemState request should not report immediate selection.");
+            }
+
+            if (player.selectedItem != 1 || player.selectedItemState.PendingForTesting != 9)
+            {
+                throw new InvalidOperationException("Deferred selectedItemState request should only buffer the target slot before Terraria applies it.");
+            }
+
+            player.ApplyPendingSelectionForTesting();
+            int selectedItem;
+            if (!TerrariaPlayerSelectionCompat.TryGetSelectedItem(player, out selectedItem) || selectedItem != 9)
+            {
+                throw new InvalidOperationException("Deferred selectedItemState request did not become visible after the pending selection was applied.");
+            }
+
+            if (TerrariaPlayerSelectionCompat.TrySelectInventorySlot(player, 8))
+            {
+                throw new InvalidOperationException("Immediate selected item selection should fail when selectedItemState only buffers the request.");
             }
         }
 
@@ -1383,6 +1589,26 @@ namespace JueMingZ.Tests
             }
         }
 
+        private sealed class TestDeferredSelectedItemStatePlayer
+        {
+            public TestDeferredSelectedItemState selectedItemState;
+
+            public TestDeferredSelectedItemStatePlayer(int selectedItem)
+            {
+                selectedItemState = new TestDeferredSelectedItemState(selectedItem);
+            }
+
+            public int selectedItem
+            {
+                get { return selectedItemState.SelectedForTesting; }
+            }
+
+            public void ApplyPendingSelectionForTesting()
+            {
+                selectedItemState.ApplyPendingForTesting();
+            }
+        }
+
         private struct TestSelectedItemState
         {
             private int selected;
@@ -1411,6 +1637,60 @@ namespace JueMingZ.Tests
             public int BufferedForTesting
             {
                 get { return buffered; }
+            }
+
+            public int OverriddenForTesting
+            {
+                get { return overridden; }
+            }
+        }
+
+        private sealed class TestDeferredSelectedItemState
+        {
+            private int selected;
+            private int hotbar;
+            private int buffered;
+            private int overridden;
+
+            public TestDeferredSelectedItemState(int selected)
+            {
+                this.selected = selected;
+                hotbar = selected;
+                buffered = -1;
+                overridden = -1;
+            }
+
+            public void Select(int slot)
+            {
+                buffered = slot;
+            }
+
+            public void ApplyPendingForTesting()
+            {
+                if (buffered < 0)
+                {
+                    return;
+                }
+
+                selected = buffered;
+                hotbar = buffered;
+                buffered = -1;
+                overridden = -1;
+            }
+
+            public int SelectedForTesting
+            {
+                get { return selected; }
+            }
+
+            public int PendingForTesting
+            {
+                get { return buffered; }
+            }
+
+            public int HotbarForTesting
+            {
+                get { return hotbar; }
             }
 
             public int OverriddenForTesting

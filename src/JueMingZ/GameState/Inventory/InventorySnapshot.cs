@@ -9,6 +9,8 @@ namespace JueMingZ.GameState.Inventory
         public InventoryItemSnapshot SelectedItem { get; set; }
         public InventoryItemSnapshot TrashItem { get; set; }
         public IReadOnlyList<InventoryItemSnapshot> Items { get; set; }
+        public IReadOnlyList<InventoryItemSnapshot> ArmorItems { get; set; }
+        public IReadOnlyList<InventoryItemSnapshot> MiscEquipItems { get; set; }
 
         public InventorySnapshot()
         {
@@ -16,6 +18,8 @@ namespace JueMingZ.GameState.Inventory
             SelectedItem = new InventoryItemSnapshot { SlotIndex = -1 };
             TrashItem = new InventoryItemSnapshot { SlotIndex = -2 };
             Items = new List<InventoryItemSnapshot>();
+            ArmorItems = new List<InventoryItemSnapshot>();
+            MiscEquipItems = new List<InventoryItemSnapshot>();
         }
     }
 }

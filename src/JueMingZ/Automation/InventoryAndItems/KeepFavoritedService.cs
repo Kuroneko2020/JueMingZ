@@ -96,7 +96,12 @@ namespace JueMingZ.Automation.InventoryAndItems
 
         internal static InputActionRequest BuildRequestForTesting(int slot, int itemType, string signature)
         {
-            return BuildRequest(slot, itemType, signature);
+            return BuildRequest("Inventory", slot, itemType, signature);
+        }
+
+        internal static InputActionRequest BuildRequestForTesting(string container, int slot, int itemType, string signature)
+        {
+            return BuildRequest(container, slot, itemType, signature);
         }
 
         private static void TickCore(InputActionQueue queue, GameStateSnapshot gameState, RuntimeState runtimeState, RuntimeSettingsSnapshot settingsSnapshot)
@@ -145,17 +150,18 @@ namespace JueMingZ.Automation.InventoryAndItems
                 return;
             }
 
+            string container;
             int slot;
             int itemType;
             string signature;
             string message;
-            if (!KeepFavoritedCompat.TryFindLostFavoritedSlot(gameState, tick, out slot, out itemType, out signature, out message))
+            if (!KeepFavoritedCompat.TryFindLostFavoritedSlot(gameState, tick, out container, out slot, out itemType, out signature, out message))
             {
                 RecordDecision(message, -1, 0, string.Empty);
                 return;
             }
 
-            var request = BuildRequest(slot, itemType, signature);
+            var request = BuildRequest(container, slot, itemType, signature);
             InputActionAdmissionResult admission;
             if (!queue.TryEnqueue(request, out admission))
             {
@@ -167,7 +173,7 @@ namespace JueMingZ.Automation.InventoryAndItems
             RecordDecision("submitted keep favorited request", slot, itemType, signature);
         }
 
-        private static InputActionRequest BuildRequest(int slot, int itemType, string signature)
+        private static InputActionRequest BuildRequest(string container, int slot, int itemType, string signature)
         {
             var request = new InputActionRequest
             {
@@ -183,6 +189,8 @@ namespace JueMingZ.Automation.InventoryAndItems
             request.Metadata[ActionMetadataKeys.Scenario] = ScenarioNames.InventoryKeepFavorited;
             request.Metadata[ActionMetadataKeys.SourceKind] = "Automation";
             request.Metadata[ActionMetadataKeys.TargetSlot] = slot.ToString(CultureInfo.InvariantCulture);
+            request.Metadata["SourceContainer"] = string.IsNullOrWhiteSpace(container) ? "Inventory" : container;
+            request.Metadata["KeepFavoritedContainer"] = string.IsNullOrWhiteSpace(container) ? "Inventory" : container;
             request.Metadata["KeepFavoritedItemType"] = itemType.ToString(CultureInfo.InvariantCulture);
             request.Metadata["KeepFavoritedSignature"] = signature ?? string.Empty;
             return request;

@@ -16,13 +16,19 @@ namespace JueMingZ.Automation.Movement
     {
         private const string FeatureId = FeatureIds.MovementContinuousDash;
         private const int DoubleTapWindowTicks = 18;
+        private const int DoubleTapHoldReleaseGraceTicks = 2;
         private static readonly TimeSpan PendingQueueTimeout = TimeSpan.FromMilliseconds(200);
         private static readonly object SyncRoot = new object();
         private static readonly object DiagnosticsSyncRoot = new object();
         private static int _previousHeldDirection;
+        private static bool _previousLeftHeld;
+        private static bool _previousRightHeld;
+        private static long _lastLeftPressTick;
+        private static long _lastRightPressTick;
         private static int _lastTapDirection;
         private static long _lastTapTick;
         private static int _armedDirection;
+        private static long _armedLastHeldTick;
         private static string _lastArmedCancelReason = string.Empty;
         private static long _armedCancelCount;
         private static MovementContinuousDashDiagnosticInfo _diagnostics = new MovementContinuousDashDiagnosticInfo();
@@ -117,61 +123,62 @@ namespace JueMingZ.Automation.Movement
                     }
                 }
 
-                var gateReason = EvaluateDirectionAndMode(profile, mode, tick);
+                int effectiveDirection;
+                var gateReason = EvaluateDirectionAndMode(profile, mode, tick, out effectiveDirection);
                 if (!string.IsNullOrWhiteSpace(gateReason))
                 {
-                    RecordDecision(true, mode, "skipped", gateReason, tick, null, profile, false, false, string.Empty);
+                    RecordDecision(true, mode, "skipped", gateReason, tick, null, profile, false, false, string.Empty, effectiveDirection);
                     return;
                 }
 
                 if (!profile.PlayerControllable)
                 {
                     ResetArming("playerNotControllable");
-                    RecordDecision(true, mode, "skipped", "playerNotControllable", tick, null, profile, false, false, string.Empty);
+                    RecordDecision(true, mode, "skipped", "playerNotControllable", tick, null, profile, false, false, string.Empty, effectiveDirection);
                     return;
                 }
 
                 if (!profile.HasDashAbility)
                 {
-                    RecordDecision(true, mode, "skipped", "noDashAbility", tick, null, profile, false, false, string.Empty);
+                    RecordDecision(true, mode, "skipped", "noDashAbility", tick, null, profile, false, false, string.Empty, effectiveDirection);
                     return;
                 }
 
                 if (!profile.DashCooldownReady)
                 {
-                    RecordDecision(true, mode, "skipped", "dashCooldown", tick, null, profile, false, false, string.Empty);
+                    RecordDecision(true, mode, "skipped", "dashCooldown", tick, null, profile, false, false, string.Empty, effectiveDirection);
                     return;
                 }
 
                 if (TerrariaDashCompat.HasQueuedContinuousDashPulse())
                 {
-                    RecordDecision(true, mode, "skipped", "pulseQueued", tick, null, profile, false, false, string.Empty);
+                    RecordDecision(true, mode, "skipped", "pulseQueued", tick, null, profile, false, false, string.Empty, effectiveDirection);
                     return;
                 }
 
                 var queueSnapshot = queue.GetFastState();
                 if (queue.IsSourcePendingOrRunning(FeatureId))
                 {
-                    RecordDecision(true, mode, "skipped", "sourceBusy", tick, queueSnapshot, profile, false, false, string.Empty);
+                    RecordDecision(true, mode, "skipped", "sourceBusy", tick, queueSnapshot, profile, false, false, string.Empty, effectiveDirection);
                     return;
                 }
 
                 if (queue.IsAnyChannelBusy(InputActionChannel.UseItem | InputActionChannel.BridgeItemUse | InputActionChannel.BridgeUseItemPulse))
                 {
-                    RecordDecision(true, mode, "skipped", "useItemChannelBusy", tick, queueSnapshot, profile, false, false, string.Empty);
+                    RecordDecision(true, mode, "skipped", "useItemChannelBusy", tick, queueSnapshot, profile, false, false, string.Empty, effectiveDirection);
                     return;
                 }
 
-                var request = CreateRequest(mode, profile.HeldDirection, profile.DashDelay, profile.DashType, profile.DashAbilitySource, profile.CapabilitySummary, GetArmedDirection());
+                var request = CreateRequest(mode, effectiveDirection, profile.DashDelay, profile.DashType, profile.DashAbilitySource, profile.CapabilitySummary, GetArmedDirection());
 
                 InputActionAdmissionResult admission;
                 if (!queue.TryEnqueue(request, out admission))
                 {
-                    RecordDecision(true, mode, "skipped", "admissionDenied:" + (admission == null ? "unknown" : admission.Reason), tick, queueSnapshot, profile, false, false, string.Empty);
+                    RecordDecision(true, mode, "skipped", "admissionDenied:" + (admission == null ? "unknown" : admission.Reason), tick, queueSnapshot, profile, false, false, string.Empty, effectiveDirection);
                     return;
                 }
 
-                RecordDecision(true, mode, "submitted", string.Empty, tick, queueSnapshot, profile, true, false, string.Empty);
+                RecordDecision(true, mode, "submitted", string.Empty, tick, queueSnapshot, profile, true, false, string.Empty, effectiveDirection);
             }
             catch (Exception error)
             {
@@ -224,58 +231,139 @@ namespace JueMingZ.Automation.Movement
             return request;
         }
 
-        private static string EvaluateDirectionAndMode(DashInputProfile profile, string mode, long tick)
+        private static string EvaluateDirectionAndMode(DashInputProfile profile, string mode, long tick, out int effectiveDirection)
         {
+            effectiveDirection = 0;
             if (profile == null)
             {
                 ResetArming("profileUnavailable");
                 return "profileUnavailable";
             }
 
-            if (!profile.ExclusiveHorizontalHeld)
-            {
-                if (profile.ControlLeft && profile.ControlRight)
-                {
-                    ResetArming("bothDirectionsHeld");
-                    return "bothDirectionsHeld";
-                }
+            var input = UpdateHorizontalInputState(profile, tick);
+            effectiveDirection = input.Direction;
 
+            if (input.Direction == 0)
+            {
                 if (string.Equals(mode, MovementContinuousDashModes.DoubleTapAndHold, StringComparison.Ordinal))
                 {
-                    ReleaseDirectionForDoubleTap("directionNotHeld");
-                    return "directionNotHeld";
+                    if (!profile.PlayerControllable)
+                    {
+                        ResetArming("playerNotControllable");
+                        return "playerNotControllable";
+                    }
+
+                    return ReleaseDirectionForDoubleTap("directionNotHeld", tick);
                 }
 
                 ResetArming("directionNotHeld");
-                return profile.ControlLeft && profile.ControlRight ? "bothDirectionsHeld" : "directionNotHeld";
+                return "directionNotHeld";
             }
 
             if (!string.Equals(mode, MovementContinuousDashModes.DoubleTapAndHold, StringComparison.Ordinal))
             {
-                ResetArming("modeHoldDirection");
-                SetPreviousDirection(profile.HeldDirection);
+                ResetDoubleTapArming("modeHoldDirection");
+                SetPreviousDirection(input.Direction);
                 return string.Empty;
             }
 
-            return UpdateDoubleTapArming(profile.HeldDirection, tick);
+            return UpdateDoubleTapArming(input.Direction, input.PressEdge, tick);
         }
 
-        private static string UpdateDoubleTapArming(int direction, long tick)
+        private static HorizontalInputState UpdateHorizontalInputState(DashInputProfile profile, long tick)
         {
             lock (SyncRoot)
             {
-                var edge = direction != 0 && direction != _previousHeldDirection;
-                if (edge)
-                {
-                    if (_previousHeldDirection != 0 && _previousHeldDirection != direction)
-                    {
-                        CancelArmedLocked("directionSwitched");
-                        _lastTapDirection = direction;
-                        _lastTapTick = tick;
-                        _previousHeldDirection = direction;
-                        return "doubleTapNotArmed";
-                    }
+                var leftHeld = profile != null && profile.ControlLeft;
+                var rightHeld = profile != null && profile.ControlRight;
+                var leftPressed = leftHeld && !_previousLeftHeld;
+                var rightPressed = rightHeld && !_previousRightHeld;
 
+                if (leftPressed)
+                {
+                    _lastLeftPressTick = tick;
+                }
+
+                if (rightPressed)
+                {
+                    _lastRightPressTick = tick;
+                }
+
+                var direction = ResolveDominantDirectionLocked(profile, leftHeld, rightHeld);
+                var pressedDirection = ResolvePressedDirectionLocked(profile, leftPressed, rightPressed);
+                _previousLeftHeld = leftHeld;
+                _previousRightHeld = rightHeld;
+
+                return new HorizontalInputState(direction, pressedDirection != 0 && pressedDirection == direction);
+            }
+        }
+
+        private static int ResolveDominantDirectionLocked(DashInputProfile profile, bool leftHeld, bool rightHeld)
+        {
+            if (leftHeld && !rightHeld)
+            {
+                return -1;
+            }
+
+            if (rightHeld && !leftHeld)
+            {
+                return 1;
+            }
+
+            if (!leftHeld && !rightHeld)
+            {
+                return 0;
+            }
+
+            if (_lastLeftPressTick > _lastRightPressTick)
+            {
+                return -1;
+            }
+
+            if (_lastRightPressTick > _lastLeftPressTick)
+            {
+                return 1;
+            }
+
+            if (profile != null && profile.CurrentDirection != 0 && profile.IsDirectionHeld(profile.CurrentDirection))
+            {
+                return profile.CurrentDirection;
+            }
+
+            return rightHeld ? 1 : -1;
+        }
+
+        private static int ResolvePressedDirectionLocked(DashInputProfile profile, bool leftPressed, bool rightPressed)
+        {
+            if (leftPressed && !rightPressed)
+            {
+                return -1;
+            }
+
+            if (rightPressed && !leftPressed)
+            {
+                return 1;
+            }
+
+            if (!leftPressed && !rightPressed)
+            {
+                return 0;
+            }
+
+            if (profile != null && profile.CurrentDirection != 0 && profile.IsDirectionHeld(profile.CurrentDirection))
+            {
+                return profile.CurrentDirection;
+            }
+
+            return 1;
+        }
+
+        private static string UpdateDoubleTapArming(int direction, bool pressEdge, long tick)
+        {
+            lock (SyncRoot)
+            {
+                if (pressEdge)
+                {
                     if (_armedDirection != 0 && _armedDirection != direction)
                     {
                         CancelArmedLocked("directionSwitched");
@@ -291,6 +379,7 @@ namespace JueMingZ.Automation.Movement
                         tick - _lastTapTick <= DoubleTapWindowTicks)
                     {
                         _armedDirection = direction;
+                        _armedLastHeldTick = tick;
                         _lastArmedCancelReason = string.Empty;
                     }
                     else
@@ -299,8 +388,19 @@ namespace JueMingZ.Automation.Movement
                         _lastTapTick = tick;
                     }
                 }
+                else if (_armedDirection != 0 && _armedDirection != direction)
+                {
+                    CancelArmedLocked("directionSwitched");
+                    _previousHeldDirection = direction;
+                    return "doubleTapNotArmed";
+                }
 
                 _previousHeldDirection = direction;
+                if (_armedDirection == direction)
+                {
+                    _armedLastHeldTick = tick;
+                }
+
                 return _armedDirection == direction ? string.Empty : "doubleTapNotArmed";
             }
         }
@@ -321,7 +421,7 @@ namespace JueMingZ.Automation.Movement
             }
         }
 
-        private static void ResetArming(string reason)
+        private static void ResetDoubleTapArming(string reason)
         {
             lock (SyncRoot)
             {
@@ -332,10 +432,31 @@ namespace JueMingZ.Automation.Movement
             }
         }
 
-        private static void ReleaseDirectionForDoubleTap(string reason)
+        private static void ResetArming(string reason)
         {
             lock (SyncRoot)
             {
+                _previousHeldDirection = 0;
+                _previousLeftHeld = false;
+                _previousRightHeld = false;
+                _lastLeftPressTick = 0;
+                _lastRightPressTick = 0;
+                _lastTapDirection = 0;
+                _lastTapTick = 0;
+                CancelArmedLocked(reason);
+            }
+        }
+
+        private static string ReleaseDirectionForDoubleTap(string reason, long tick)
+        {
+            lock (SyncRoot)
+            {
+                if (CanKeepArmedThroughTransientDirectionGapLocked(tick))
+                {
+                    _previousHeldDirection = 0;
+                    return "directionNotHeldGrace";
+                }
+
                 _previousHeldDirection = 0;
                 if (_armedDirection != 0)
                 {
@@ -344,7 +465,16 @@ namespace JueMingZ.Automation.Movement
                 }
 
                 CancelArmedLocked(reason);
+                return reason ?? string.Empty;
             }
+        }
+
+        private static bool CanKeepArmedThroughTransientDirectionGapLocked(long tick)
+        {
+            return _armedDirection != 0 &&
+                   _armedLastHeldTick > 0 &&
+                   tick >= _armedLastHeldTick &&
+                   tick - _armedLastHeldTick <= DoubleTapHoldReleaseGraceTicks;
         }
 
         private static void CancelArmedLocked(string reason)
@@ -355,6 +485,7 @@ namespace JueMingZ.Automation.Movement
             }
 
             _armedDirection = 0;
+            _armedLastHeldTick = 0;
             _lastArmedCancelReason = reason ?? string.Empty;
         }
 
@@ -373,7 +504,8 @@ namespace JueMingZ.Automation.Movement
             DashInputProfile profile,
             bool submitted,
             bool textInputFocused,
-            string textInputReason)
+            string textInputReason,
+            int effectiveDirection = 0)
         {
             lock (DiagnosticsSyncRoot)
             {
@@ -395,7 +527,7 @@ namespace JueMingZ.Automation.Movement
                     current.PlayerControllable = profile.PlayerControllable;
                     current.LeftHeld = profile.ControlLeft;
                     current.RightHeld = profile.ControlRight;
-                    current.HeldDirection = profile.HeldDirection;
+                    current.HeldDirection = effectiveDirection != 0 ? effectiveDirection : profile.HeldDirection;
                     current.HasDashAbility = profile.HasDashAbility;
                     current.DashAbilitySource = profile.DashAbilitySource ?? string.Empty;
                     current.DashType = profile.DashType;
@@ -447,7 +579,7 @@ namespace JueMingZ.Automation.Movement
                 {
                     current.SubmittedCount++;
                     current.LastTriggerUtc = DateTime.UtcNow;
-                    current.LastTriggerDirection = profile == null ? 0 : profile.HeldDirection;
+                    current.LastTriggerDirection = effectiveDirection != 0 ? effectiveDirection : profile == null ? 0 : profile.HeldDirection;
                 }
                 else
                 {
@@ -456,6 +588,39 @@ namespace JueMingZ.Automation.Movement
 
                 _diagnostics = current;
             }
+        }
+
+        internal static void ResetArmingForTesting()
+        {
+            ResetArming("testing");
+        }
+
+        internal static string EvaluateDirectionAndModeForTesting(DashInputProfile profile, string mode, long tick)
+        {
+            int effectiveDirection;
+            return EvaluateDirectionAndMode(profile, mode, tick, out effectiveDirection);
+        }
+
+        internal static string EvaluateDirectionAndModeForTesting(DashInputProfile profile, string mode, long tick, out int effectiveDirection)
+        {
+            return EvaluateDirectionAndMode(profile, mode, tick, out effectiveDirection);
+        }
+
+        internal static int ArmedDirectionForTesting
+        {
+            get { return GetArmedDirection(); }
+        }
+
+        private struct HorizontalInputState
+        {
+            internal HorizontalInputState(int direction, bool pressEdge)
+            {
+                Direction = direction;
+                PressEdge = pressEdge;
+            }
+
+            internal readonly int Direction;
+            internal readonly bool PressEdge;
         }
     }
 }

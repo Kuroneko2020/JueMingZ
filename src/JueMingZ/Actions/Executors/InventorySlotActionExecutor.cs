@@ -455,6 +455,7 @@ namespace JueMingZ.Actions.Executors
         private InputActionExecutionStepResult StartKeepFavorited(InputActionExecution execution, GameStateSnapshot snapshot, DateTime startedUtc)
         {
             var slot = GetMetadataInt(execution, ActionMetadataKeys.TargetSlot, -1);
+            var container = GetMetadataString(execution, "KeepFavoritedContainer", GetMetadataString(execution, "SourceContainer", "Inventory"));
             var itemType = GetMetadataInt(execution, "KeepFavoritedItemType", 0);
             var signature = GetMetadataString(execution, "KeepFavoritedSignature", string.Empty);
             if (IsBlockedForCombatInput(snapshot))
@@ -475,7 +476,7 @@ namespace JueMingZ.Actions.Executors
 
             bool restored;
             string message;
-            if (!KeepFavoritedCompat.TryRestoreFavoritedInInventory(player, slot, itemType, signature, out restored, out message))
+            if (!KeepFavoritedCompat.TryRestoreFavoritedInContainer(player, container, slot, itemType, signature, out restored, out message))
             {
                 var status = string.Equals(message, "slot item changed before restore", StringComparison.OrdinalIgnoreCase) ||
                              string.Equals(message, "slot item signature changed before restore", StringComparison.OrdinalIgnoreCase)

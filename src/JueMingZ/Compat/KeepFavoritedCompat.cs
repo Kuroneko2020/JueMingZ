@@ -10,10 +10,17 @@ namespace JueMingZ.Compat
     {
         private const int MaxTrackedCount = 512;
         private const long ExpireTicks = 36000;
+        private const string InventoryContainer = "Inventory";
+        private const string ArmorContainer = "Armor";
+        private const string MiscEquipsContainer = "MiscEquips";
+        private const string BucketTransformGroup = "bucket";
         private static readonly object SyncRoot = new object();
         private static readonly Dictionary<string, long> TrackedFavoritedSignatures = new Dictionary<string, long>(StringComparer.Ordinal);
         private static readonly Dictionary<string, long> TrackedFavoritedGlobalSignatures = new Dictionary<string, long>(StringComparer.Ordinal);
+        private static readonly Dictionary<string, long> TrackedFavoritedTransformLocations = new Dictionary<string, long>(StringComparer.Ordinal);
         private static readonly Dictionary<string, long> TrashRoundTripSignatures = new Dictionary<string, long>(StringComparer.Ordinal);
+        private static readonly Dictionary<string, long> PreviousObservedFavoritedLocations = new Dictionary<string, long>(StringComparer.Ordinal);
+        private static readonly List<string> ObservedFavoritedLocationKeysScratch = new List<string>(96);
 
         public static void ClearState()
         {
@@ -21,7 +28,10 @@ namespace JueMingZ.Compat
             {
                 TrackedFavoritedSignatures.Clear();
                 TrackedFavoritedGlobalSignatures.Clear();
+                TrackedFavoritedTransformLocations.Clear();
                 TrashRoundTripSignatures.Clear();
+                PreviousObservedFavoritedLocations.Clear();
+                ObservedFavoritedLocationKeysScratch.Clear();
             }
         }
 
@@ -33,30 +43,82 @@ namespace JueMingZ.Compat
             out string signature,
             out string message)
         {
+            string container;
+            return TryFindLostFavoritedSlot(snapshot, tick, out container, out slot, out itemType, out signature, out message);
+        }
+
+        public static bool TryFindLostFavoritedSlot(
+            GameStateSnapshot snapshot,
+            long tick,
+            out string container,
+            out int slot,
+            out int itemType,
+            out string signature,
+            out string message)
+        {
+            container = InventoryContainer;
             slot = -1;
             itemType = 0;
             signature = string.Empty;
             message = string.Empty;
 
             ObserveFavorited(snapshot, tick);
-            var inventory = snapshot == null || snapshot.Inventory == null ? null : snapshot.Inventory.Items;
+            var inventorySnapshot = snapshot == null ? null : snapshot.Inventory;
+            var inventory = inventorySnapshot == null ? null : inventorySnapshot.Items;
             if (inventory == null || inventory.Count <= 0)
             {
                 message = "inventory snapshot unavailable";
+            }
+            else if (TryFindLostInContainer(InventoryContainer, inventory, 50, out container, out slot, out itemType, out signature))
+            {
+                return true;
+            }
+
+            if (inventorySnapshot != null &&
+                TryFindLostInContainer(ArmorContainer, inventorySnapshot.ArmorItems, int.MaxValue, out container, out slot, out itemType, out signature))
+            {
+                return true;
+            }
+
+            if (inventorySnapshot != null &&
+                TryFindLostInContainer(MiscEquipsContainer, inventorySnapshot.MiscEquipItems, int.MaxValue, out container, out slot, out itemType, out signature))
+            {
+                return true;
+            }
+
+            message = string.IsNullOrWhiteSpace(message) ? "no lost favorited item in tracked containers" : message;
+            return false;
+        }
+
+        private static bool TryFindLostInContainer(
+            string containerName,
+            IReadOnlyList<InventoryItemSnapshot> items,
+            int maxSlots,
+            out string container,
+            out int slot,
+            out int itemType,
+            out string signature)
+        {
+            container = NormalizeContainer(containerName);
+            slot = -1;
+            itemType = 0;
+            signature = string.Empty;
+            if (items == null || items.Count <= 0)
+            {
                 return false;
             }
 
-            var max = Math.Min(50, inventory.Count);
+            var max = maxSlots == int.MaxValue ? items.Count : Math.Min(maxSlots, items.Count);
             for (var index = 0; index < max; index++)
             {
-                var item = inventory[index];
+                var item = items[index];
                 if (item == null || item.Type <= 0 || item.Stack <= 0 || item.Favorited)
                 {
                     continue;
                 }
 
                 var currentSignature = BuildSignature(item);
-                if (string.IsNullOrWhiteSpace(currentSignature) || !IsTracked(item.SlotIndex, currentSignature))
+                if (string.IsNullOrWhiteSpace(currentSignature) || !IsTracked(container, item.SlotIndex, currentSignature, item.Type))
                 {
                     continue;
                 }
@@ -67,7 +129,6 @@ namespace JueMingZ.Compat
                 return true;
             }
 
-            message = "no lost favorited item in inventory";
             return false;
         }
 
@@ -79,30 +140,43 @@ namespace JueMingZ.Compat
             out bool restored,
             out string message)
         {
+            return TryRestoreFavoritedInContainer(player, InventoryContainer, slot, expectedItemType, expectedSignature, out restored, out message);
+        }
+
+        public static bool TryRestoreFavoritedInContainer(
+            object player,
+            string containerName,
+            int slot,
+            int expectedItemType,
+            string expectedSignature,
+            out bool restored,
+            out string message)
+        {
             restored = false;
             message = string.Empty;
+            var container = NormalizeContainer(containerName);
             if (player == null || slot < 0 || expectedItemType <= 0 || string.IsNullOrWhiteSpace(expectedSignature))
             {
                 message = "invalid restore inputs";
                 return false;
             }
 
-            IList inventory;
-            if (!InventoryMutationCompat.TryGetContainerItems(player, "Inventory", out inventory, out message) || inventory == null)
+            IList items;
+            if (!TryGetContainerItems(player, container, out items, out message) || items == null)
             {
                 return false;
             }
 
-            if (slot >= inventory.Count)
+            if (slot >= items.Count)
             {
-                message = "slot outside inventory bounds";
+                message = "slot outside container bounds";
                 return false;
             }
 
-            var item = inventory[slot];
+            var item = items[slot];
             if (item == null)
             {
-                message = "inventory slot item unavailable";
+                message = "slot item unavailable";
                 return false;
             }
 
@@ -114,7 +188,7 @@ namespace JueMingZ.Compat
             string itemName;
             if (!InventoryMutationCompat.TryReadItemFields(item, out itemType, out itemName, out stack, out buffType, out buffTime, out summon))
             {
-                message = "failed to read inventory slot item";
+                message = "failed to read slot item";
                 return false;
             }
 
@@ -149,8 +223,8 @@ namespace JueMingZ.Compat
 
         private static void ObserveFavorited(GameStateSnapshot snapshot, long tick)
         {
-            var inventory = snapshot == null || snapshot.Inventory == null ? null : snapshot.Inventory.Items;
-            if (inventory == null)
+            var inventorySnapshot = snapshot == null ? null : snapshot.Inventory;
+            if (inventorySnapshot == null)
             {
                 return;
             }
@@ -158,63 +232,103 @@ namespace JueMingZ.Compat
             var playerInventoryOpen = snapshot != null &&
                                       snapshot.Ui != null &&
                                       snapshot.Ui.PlayerInventoryOpen;
-            var trashItem = snapshot == null || snapshot.Inventory == null ? null : snapshot.Inventory.TrashItem;
+            var trashItem = inventorySnapshot.TrashItem;
 
             lock (SyncRoot)
             {
+                ObservedFavoritedLocationKeysScratch.Clear();
                 ObserveTrashItemLocked(trashItem, tick);
-
-                var max = Math.Min(50, inventory.Count);
-                for (var index = 0; index < max; index++)
-                {
-                    var item = inventory[index];
-                    if (item == null || item.Type <= 0 || item.Stack <= 0)
-                    {
-                        continue;
-                    }
-
-                    var signature = BuildSignature(item);
-                    if (string.IsNullOrWhiteSpace(signature))
-                    {
-                        continue;
-                    }
-
-                    var trackedKey = BuildTrackedKey(item.SlotIndex, signature);
-                    if (item.Favorited)
-                    {
-                        TrackedFavoritedSignatures[trackedKey] = tick;
-                        TrackedFavoritedGlobalSignatures[signature] = tick;
-                        TrashRoundTripSignatures.Remove(signature);
-                        continue;
-                    }
-
-                    if (playerInventoryOpen)
-                    {
-                        if (TrashRoundTripSignatures.ContainsKey(signature))
-                        {
-                            continue;
-                        }
-
-                        RemoveSignatureLocked(item.SlotIndex, signature);
-                    }
-                }
-
+                ObserveContainerLocked(InventoryContainer, inventorySnapshot.Items, 50, playerInventoryOpen, true, tick);
+                ObserveContainerLocked(ArmorContainer, inventorySnapshot.ArmorItems, int.MaxValue, playerInventoryOpen, false, tick);
+                ObserveContainerLocked(MiscEquipsContainer, inventorySnapshot.MiscEquipItems, int.MaxValue, playerInventoryOpen, false, tick);
+                ReplacePreviousObservedFavoritedLocationsLocked(tick);
                 PruneExpired(tick);
                 PruneOverflow();
             }
         }
 
-        private static bool IsTracked(int slot, string signature)
+        private static void ObserveContainerLocked(
+            string containerName,
+            IReadOnlyList<InventoryItemSnapshot> items,
+            int maxSlots,
+            bool playerInventoryOpen,
+            bool allowManualUnfavorite,
+            long tick)
+        {
+            if (items == null || items.Count <= 0)
+            {
+                return;
+            }
+
+            var container = NormalizeContainer(containerName);
+            var max = maxSlots == int.MaxValue ? items.Count : Math.Min(maxSlots, items.Count);
+            for (var index = 0; index < max; index++)
+            {
+                var item = items[index];
+                if (item == null || item.Type <= 0 || item.Stack <= 0)
+                {
+                    continue;
+                }
+
+                var signature = BuildSignature(item);
+                if (string.IsNullOrWhiteSpace(signature))
+                {
+                    continue;
+                }
+
+                var trackedKey = BuildTrackedKey(container, item.SlotIndex, signature);
+                if (item.Favorited)
+                {
+                    TrackedFavoritedSignatures[trackedKey] = tick;
+                    TrackedFavoritedGlobalSignatures[signature] = tick;
+                    TrackTransformLocationLocked(container, item.SlotIndex, item.Type, tick);
+                    TrashRoundTripSignatures.Remove(signature);
+                    ObservedFavoritedLocationKeysScratch.Add(trackedKey);
+                    continue;
+                }
+
+                if (allowManualUnfavorite &&
+                    playerInventoryOpen &&
+                    PreviousObservedFavoritedLocations.ContainsKey(trackedKey))
+                {
+                    if (TrashRoundTripSignatures.ContainsKey(signature))
+                    {
+                        continue;
+                    }
+
+                    RemoveSignatureLocked(container, item.SlotIndex, signature);
+                }
+            }
+        }
+
+        private static void ReplacePreviousObservedFavoritedLocationsLocked(long tick)
+        {
+            PreviousObservedFavoritedLocations.Clear();
+            for (var index = 0; index < ObservedFavoritedLocationKeysScratch.Count; index++)
+            {
+                var key = ObservedFavoritedLocationKeysScratch[index];
+                if (!string.IsNullOrWhiteSpace(key))
+                {
+                    PreviousObservedFavoritedLocations[key] = tick;
+                }
+            }
+
+            ObservedFavoritedLocationKeysScratch.Clear();
+        }
+
+        private static bool IsTracked(string containerName, int slot, string signature, int itemType)
         {
             if (slot < 0 || string.IsNullOrWhiteSpace(signature))
             {
                 return false;
             }
 
+            var container = NormalizeContainer(containerName);
             lock (SyncRoot)
             {
-                return TrackedFavoritedSignatures.ContainsKey(BuildTrackedKey(slot, signature)) ||
-                       TrackedFavoritedGlobalSignatures.ContainsKey(signature);
+                return TrackedFavoritedSignatures.ContainsKey(BuildTrackedKey(container, slot, signature)) ||
+                       TrackedFavoritedGlobalSignatures.ContainsKey(signature) ||
+                       TrackedFavoritedTransformLocations.ContainsKey(BuildTransformKey(container, slot, BuildTransformGroup(itemType)));
             }
         }
 
@@ -262,16 +376,22 @@ namespace JueMingZ.Compat
             return false;
         }
 
-        private static void RemoveSignatureLocked(int slot, string signature)
+        private static void RemoveSignatureLocked(string containerName, int slot, string signature)
         {
             if (string.IsNullOrWhiteSpace(signature))
             {
                 return;
             }
 
+            var container = NormalizeContainer(containerName);
             if (slot >= 0)
             {
-                TrackedFavoritedSignatures.Remove(BuildTrackedKey(slot, signature));
+                TrackedFavoritedSignatures.Remove(BuildTrackedKey(container, slot, signature));
+                int itemType;
+                if (TryParseSignatureType(signature, out itemType))
+                {
+                    TrackedFavoritedTransformLocations.Remove(BuildTransformKey(container, slot, BuildTransformGroup(itemType)));
+                }
             }
 
             TrackedFavoritedGlobalSignatures.Remove(signature);
@@ -298,14 +418,101 @@ namespace JueMingZ.Compat
             return type.ToString() + "|" + prefix.ToString() + "|" + (name ?? string.Empty);
         }
 
-        private static string BuildTrackedKey(int slot, string signature)
+        private static string BuildTrackedKey(string containerName, int slot, string signature)
         {
             if (slot < 0 || string.IsNullOrWhiteSpace(signature))
             {
                 return string.Empty;
             }
 
-            return slot.ToString() + "|" + signature;
+            return NormalizeContainer(containerName) + "|" + slot.ToString() + "|" + signature;
+        }
+
+        private static string BuildTransformKey(string containerName, int slot, string transformGroup)
+        {
+            if (slot < 0 || string.IsNullOrWhiteSpace(transformGroup))
+            {
+                return string.Empty;
+            }
+
+            return NormalizeContainer(containerName) + "|" + slot.ToString() + "|" + transformGroup;
+        }
+
+        private static void TrackTransformLocationLocked(string containerName, int slot, int itemType, long tick)
+        {
+            var transformGroup = BuildTransformGroup(itemType);
+            if (slot < 0 || string.IsNullOrWhiteSpace(transformGroup))
+            {
+                return;
+            }
+
+            TrackedFavoritedTransformLocations[BuildTransformKey(containerName, slot, transformGroup)] = tick;
+        }
+
+        private static string BuildTransformGroup(int itemType)
+        {
+            switch (itemType)
+            {
+                case 205:
+                case 206:
+                case 207:
+                case 1128:
+                    return BucketTransformGroup;
+                default:
+                    return string.Empty;
+            }
+        }
+
+        private static bool TryParseSignatureType(string signature, out int itemType)
+        {
+            itemType = 0;
+            if (string.IsNullOrWhiteSpace(signature))
+            {
+                return false;
+            }
+
+            var separator = signature.IndexOf('|');
+            var raw = separator < 0 ? signature : signature.Substring(0, separator);
+            return int.TryParse(raw, out itemType);
+        }
+
+        private static string NormalizeContainer(string containerName)
+        {
+            if (string.Equals(containerName, ArmorContainer, StringComparison.OrdinalIgnoreCase))
+            {
+                return ArmorContainer;
+            }
+
+            if (string.Equals(containerName, MiscEquipsContainer, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(containerName, "MiscEquip", StringComparison.OrdinalIgnoreCase))
+            {
+                return MiscEquipsContainer;
+            }
+
+            return InventoryContainer;
+        }
+
+        private static bool TryGetContainerItems(object player, string containerName, out IList items, out string message)
+        {
+            items = null;
+            message = string.Empty;
+            var container = NormalizeContainer(containerName);
+            if (string.Equals(container, InventoryContainer, StringComparison.Ordinal))
+            {
+                return InventoryMutationCompat.TryGetContainerItems(player, InventoryContainer, out items, out message);
+            }
+
+            var memberName = string.Equals(container, ArmorContainer, StringComparison.Ordinal)
+                ? "armor"
+                : "miscEquips";
+            items = GetMember(player, memberName) as IList;
+            if (items == null)
+            {
+                message = container + " item list is unavailable.";
+                return false;
+            }
+
+            return true;
         }
 
         private static int ReadPrefix(object item)
@@ -431,6 +638,7 @@ namespace JueMingZ.Compat
         {
             PruneExpired(TrackedFavoritedSignatures, tick);
             PruneExpired(TrackedFavoritedGlobalSignatures, tick);
+            PruneExpired(TrackedFavoritedTransformLocations, tick);
             PruneExpired(TrashRoundTripSignatures, tick);
         }
 
@@ -438,6 +646,7 @@ namespace JueMingZ.Compat
         {
             PruneOverflow(TrackedFavoritedSignatures);
             PruneOverflow(TrackedFavoritedGlobalSignatures);
+            PruneOverflow(TrackedFavoritedTransformLocations);
             PruneOverflow(TrashRoundTripSignatures);
         }
 

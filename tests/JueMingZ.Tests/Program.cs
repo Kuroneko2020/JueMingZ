@@ -172,6 +172,13 @@ namespace JueMingZ.Tests
             Run("safe landing cheap skip writes after exception", ref failed, SafeLandingCheapSkipWritesAfterException);
             Run("safe landing submitted path keeps full diagnostics", ref failed, SafeLandingSubmittedPathKeepsFullDiagnostics);
             Run("movement input frame cache reuses profiles within frame", ref failed, MovementInputFrameCacheReusesProfilesWithinFrame);
+            Run("continuous dash double tap hold survives brief direction gap", ref failed, ContinuousDashDoubleTapHoldSurvivesBriefDirectionGap);
+            Run("continuous dash double tap hold cancels after release grace", ref failed, ContinuousDashDoubleTapHoldCancelsAfterReleaseGrace);
+            Run("continuous dash double tap hold cancels on direction switch", ref failed, ContinuousDashDoubleTapHoldCancelsOnDirectionSwitch);
+            Run("continuous dash double tap hold cancels when uncontrollable", ref failed, ContinuousDashDoubleTapHoldCancelsWhenUncontrollable);
+            Run("continuous dash double tap requires double tap for opposite direction", ref failed, ContinuousDashDoubleTapRequiresDoubleTapForOppositeDirection);
+            Run("continuous dash hold mode uses later direction when both held", ref failed, ContinuousDashHoldModeUsesLaterDirectionWhenBothHeld);
+            Run("continuous dash requested direction accepts both keys", ref failed, ContinuousDashDirectionHeldAcceptsBothKeys);
             Run("safe landing cheap precheck uses cached motion within frame", ref failed, SafeLandingCheapPrecheckUsesCachedMotionWithinFrame);
             Run("safe landing projects horizontal impact probe", ref failed, SafeLandingProjectsHorizontalImpactProbe);
             Run("safe landing manual probe detects sloped platform", ref failed, SafeLandingManualProbeDetectsSlopedPlatform);
@@ -268,13 +275,17 @@ namespace JueMingZ.Tests
             Run("auto discard allows player inventory open", ref failed, AutoDiscardAllowsPlayerInventoryOpen);
             Run("auto discard candidates use inventory snapshot", ref failed, AutoDiscardCandidatesUseInventorySnapshot);
             Run("quick bag open request uses inventory slot metadata", ref failed, QuickBagOpenRequestUsesInventorySlotMetadata);
+            Run("quick item hotkey request uses fresh click metadata", ref failed, QuickItemHotkeyRequestUsesFreshClickMetadata);
             Run("quick bag open yields after batch when cleanup enabled", ref failed, QuickBagOpenYieldsAfterBatchWhenCleanupEnabled);
             Run("auto deposit coins request uses chest metadata", ref failed, AutoDepositCoinsRequestUsesChestMetadata);
             Run("auto deposit coins candidates use inventory snapshot", ref failed, AutoDepositCoinsCandidatesUseInventorySnapshot);
             Run("auto extractinator request uses item use metadata", ref failed, AutoExtractinatorRequestUsesItemUseMetadata);
             Run("keep favorited request uses inventory slot metadata", ref failed, KeepFavoritedRequestUsesInventorySlotMetadata);
             Run("keep favorited manual unfavorite clears tracking", ref failed, KeepFavoritedManualUnfavoriteClearsTracking);
+            Run("keep favorited restores armor slot", ref failed, KeepFavoritedRestoresArmorSlot);
+            Run("keep favorited restores same inventory slot after leaving", ref failed, KeepFavoritedRestoresSameInventorySlotAfterLeaving);
             Run("keep favorited restores trash round trip", ref failed, KeepFavoritedRestoresTrashRoundTrip);
+            Run("keep favorited restores bucket transform same slot", ref failed, KeepFavoritedRestoresBucketTransformSameSlot);
             Run("quick reforge prefixes normalize blanks and duplicates", ref failed, QuickReforgePrefixesNormalizeBlanksAndDuplicates);
             Run("quick reforge prefix matching accepts full affix names", ref failed, QuickReforgePrefixMatchingAcceptsFullAffixNames);
             Run("quick reforge request uses reforge metadata", ref failed, QuickReforgeRequestUsesReforgeMetadata);
@@ -295,6 +306,7 @@ namespace JueMingZ.Tests
             Run("auto capture critter range uses bug net reach", ref failed, AutoCaptureCritterRangeUsesBugNetReach);
             Run("auto capture critter restore pole keeps fishing slot selected", ref failed, AutoCaptureCritterRestorePoleKeepsFishingSlotSelected);
             Run("selected item state force selection updates hotbar state", ref failed, SelectedItemStateForceSelectionUpdatesHotbarState);
+            Run("selected item state request allows deferred selection", ref failed, SelectedItemStateRequestAllowsDeferredSelection);
             Run("fishing loadout restore attempted keeps session for retry", ref failed, FishingLoadoutRestoreAttemptedKeepsSessionForRetry);
             Run("auto capture critter recognizes bug net item type", ref failed, AutoCaptureCritterRecognizesBugNetItemType);
             Run("auto capture critter manual mode requires held bug net", ref failed, AutoCaptureCritterManualModeRequiresHeldBugNet);
@@ -423,6 +435,8 @@ namespace JueMingZ.Tests
             Run("fishing fallback scan gate keeps old fallback for sensitive stages", ref failed, FishingFallbackScanGateKeepsOldFallbackForSensitiveStages);
             Run("fishing session waits for bobber liquid", ref failed, FishingSessionWaitsForBobberLiquid);
             Run("fishing filter skip holds selection until bobber gone", ref failed, FishingFilterSkipHoldsSelectionUntilBobberGone);
+            Run("fishing filter natural wait does not force timeout pull", ref failed, FishingFilterNaturalWaitDoesNotForceTimeoutPull);
+            Run("fishing filter cut rod skip keeps timeout protection", ref failed, FishingFilterCutRodSkipKeepsTimeoutProtection);
             Run("fishing auto equipment water skips lava hook and covered parts", ref failed, FishingAutoEquipmentWaterSkipsLavaHookAndCoveredParts);
             Run("fishing auto equipment lava prefers lavaproof bag over hook", ref failed, FishingAutoEquipmentLavaPrefersLavaproofBagOverHook);
             Run("fishing auto equipment keeps stackable tackle bags", ref failed, FishingAutoEquipmentKeepsStackableTackleBags);

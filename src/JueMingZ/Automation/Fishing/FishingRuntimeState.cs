@@ -26,6 +26,7 @@ namespace JueMingZ.Automation.Fishing
         public bool FilterSkipInProgress { get; set; }
         public Guid FilterSkipRequestId { get; set; }
         public bool FilterSkipWaitingForBobberGone { get; set; }
+        public bool FilterSkipNaturalWaitForBobberGone { get; set; }
         public int FilterSkipTemporarySlot { get; set; }
         public string FilterSkipLastResult { get; set; }
         public string FilterSkipRestoreFailureReason { get; set; }
@@ -70,6 +71,7 @@ namespace JueMingZ.Automation.Fishing
             FilterSkipInProgress = false;
             FilterSkipRequestId = Guid.Empty;
             FilterSkipWaitingForBobberGone = false;
+            FilterSkipNaturalWaitForBobberGone = false;
             FilterSkipTemporarySlot = -1;
             FilterSkipLastResult = string.Empty;
             FilterSkipRestoreFailureReason = string.Empty;

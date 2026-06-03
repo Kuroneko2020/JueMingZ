@@ -10,6 +10,8 @@ namespace JueMingZ.GameState.Inventory
     public static class InventoryReader
     {
         private const int SnapshotInventorySlots = 58;
+        private const int SnapshotArmorSlots = 20;
+        private const int SnapshotMiscEquipSlots = 5;
 
         public static InventorySnapshot Read(TerrariaPlayer player)
         {
@@ -63,6 +65,12 @@ namespace JueMingZ.GameState.Inventory
                     snapshot.Items = items;
                 }
 
+                if (Has(profile, InventoryReadProfile.EquippedItems))
+                {
+                    snapshot.ArmorItems = ReadItems(TerrariaPlayerReadCompat.Armor(player), SnapshotArmorSlots, profile);
+                    snapshot.MiscEquipItems = ReadItems(TerrariaPlayerReadCompat.MiscEquips(player), SnapshotMiscEquipSlots, profile);
+                }
+
                 if (Has(profile, InventoryReadProfile.SelectedItem) &&
                     (snapshot.SelectedItem == null || snapshot.SelectedItem.SlotIndex != selectedItem) &&
                     selectedItem >= 0 &&
@@ -81,6 +89,23 @@ namespace JueMingZ.GameState.Inventory
             }
 
             return snapshot;
+        }
+
+        private static IReadOnlyList<InventoryItemSnapshot> ReadItems(TerrariaItem[] source, int maxSlots, InventoryReadProfile profile)
+        {
+            if (source == null || source.Length <= 0 || maxSlots <= 0)
+            {
+                return new List<InventoryItemSnapshot>();
+            }
+
+            var max = Math.Min(source.Length, maxSlots);
+            var items = new List<InventoryItemSnapshot>(max);
+            for (var index = 0; index < max; index++)
+            {
+                items.Add(ReadItem(source[index], index, profile));
+            }
+
+            return items;
         }
 
         public static InventorySnapshot ReadSelectedItem(TerrariaPlayer player)

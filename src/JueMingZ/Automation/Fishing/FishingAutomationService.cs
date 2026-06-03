@@ -488,6 +488,7 @@ namespace JueMingZ.Automation.Fishing
                 {
                     State.LastProcessedHookIdentity = State.CurrentBobberIdentity;
                     State.FilterSkipWaitingForBobberGone = false;
+                    State.FilterSkipNaturalWaitForBobberGone = false;
                     State.RecastDelayTicks = 2;
                     State.FishingFilterDecision = "filterSkipDeferredBobberGone";
                     State.FishingFilterDecisionReason = string.Empty;
@@ -610,6 +611,7 @@ namespace JueMingZ.Automation.Fishing
             State.FilterSkipInProgress = false;
             State.FilterSkipRequestId = Guid.Empty;
             State.FilterSkipWaitingForBobberGone = false;
+            State.FilterSkipNaturalWaitForBobberGone = false;
             State.FilterSkipTemporarySlot = -1;
             State.FilterSkipLastResult = string.Empty;
             State.FilterSkipRestoreFailureReason = string.Empty;
@@ -697,6 +699,7 @@ namespace JueMingZ.Automation.Fishing
                     if (State.FilterSkipWaitingForBobberGone)
                     {
                         State.FilterSkipWaitingForBobberGone = false;
+                        State.FilterSkipNaturalWaitForBobberGone = false;
                         if (!State.FilterSkipInProgress)
                         {
                             State.FilterSkipRequestId = Guid.Empty;
@@ -720,6 +723,11 @@ namespace JueMingZ.Automation.Fishing
                 {
                     if (State.FilterSkipWaitingForBobberGone)
                     {
+                        if (!ShouldForcePullFilterSkipTimeout(State.FilterSkipWaitingForBobberGone, State.FilterSkipNaturalWaitForBobberGone))
+                        {
+                            return;
+                        }
+
                         if (IsQueueBusy(queue))
                         {
                             Record("filterSkipTimeoutQueueBusy", "queueBusy");
@@ -739,6 +747,7 @@ namespace JueMingZ.Automation.Fishing
                         }
 
                         State.FilterSkipWaitingForBobberGone = false;
+                        State.FilterSkipNaturalWaitForBobberGone = false;
                         State.FilterSkipInProgress = false;
                         State.FilterSkipRequestId = Guid.Empty;
                         State.FilterSkipTemporarySlot = -1;
@@ -833,6 +842,7 @@ namespace JueMingZ.Automation.Fishing
                 State.WaitingForBobberGone = true;
                 State.WaitingForBobberGoneStartTick = tick;
                 State.FilterSkipWaitingForBobberGone = false;
+                State.FilterSkipNaturalWaitForBobberGone = false;
                 Record("filterKeepPull", string.Empty);
                 return;
             }
@@ -968,6 +978,7 @@ namespace JueMingZ.Automation.Fishing
             State.WaitingForBobberGone = true;
             State.WaitingForBobberGoneStartTick = tick;
             State.FilterSkipWaitingForBobberGone = true;
+            State.FilterSkipNaturalWaitForBobberGone = false;
             State.FilterSkipInProgress = true;
             State.FilterSkipRequestId = request.RequestId;
             State.FilterSkipTemporarySlot = temporarySlot;
@@ -989,6 +1000,7 @@ namespace JueMingZ.Automation.Fishing
             State.WaitingForBobberGone = true;
             State.WaitingForBobberGoneStartTick = tick;
             State.FilterSkipWaitingForBobberGone = true;
+            State.FilterSkipNaturalWaitForBobberGone = true;
             State.FilterSkipInProgress = false;
             State.FilterSkipRequestId = Guid.Empty;
             State.FilterSkipTemporarySlot = -1;
@@ -1009,8 +1021,25 @@ namespace JueMingZ.Automation.Fishing
             State.FilterSkipTemporarySlot = -1;
             State.FilterSkipLastResult = string.Empty;
             State.FilterSkipRestoreFailureReason = string.Empty;
+            State.FilterSkipNaturalWaitForBobberGone = false;
             RecordFishingFilterRun(settings, candidate, decision, "filterSkipDeferred", reason);
             Record("filterSkipDeferred", reason ?? string.Empty);
+        }
+
+        private static bool ShouldForcePullFilterSkipTimeout(bool waitingForBobberGone, bool naturalWaitForBobberGone)
+        {
+            return waitingForBobberGone && !naturalWaitForBobberGone;
+        }
+
+        internal static bool ShouldForcePullFilterSkipTimeoutForTesting(
+            bool waitingForBobberGone,
+            bool naturalWaitForBobberGone,
+            long waitStartTick,
+            long tick)
+        {
+            return waitStartTick > 0 &&
+                   tick - waitStartTick >= WaitingForBobberGoneTimeoutTicks &&
+                   ShouldForcePullFilterSkipTimeout(waitingForBobberGone, naturalWaitForBobberGone);
         }
 
         private static bool IsFilterSkipDeferred()

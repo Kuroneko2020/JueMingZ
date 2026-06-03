@@ -312,14 +312,14 @@ namespace JueMingZ.Compat
             }
 
             result.BeforeProfile = before;
-            if (before.HeldDirection != direction)
+            if (!before.IsDirectionHeld(direction))
             {
                 result.Message = "Dash pulse skipped: held direction changed.";
                 RecordPulse(false, direction, result.Message, fallback);
                 return Fail(result.Message);
             }
 
-            if (!before.DashReady)
+            if (!before.CanDashInDirection(direction))
             {
                 result.Message = "Dash pulse skipped: dash is not ready.";
                 RecordPulse(false, direction, result.Message, fallback);
