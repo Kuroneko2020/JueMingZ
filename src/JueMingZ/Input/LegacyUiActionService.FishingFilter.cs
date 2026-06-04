@@ -1236,6 +1236,7 @@ namespace JueMingZ.Input
 
             ConfigService.SaveAll();
             FishingFilterUiState.ClearSelection();
+            FishingFilterUiState.ClosePresetList(settings);
             Record(
                 command,
                 "Ui.FishingFilter.Preset.Apply",

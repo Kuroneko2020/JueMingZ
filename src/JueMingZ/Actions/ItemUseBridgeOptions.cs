@@ -30,10 +30,6 @@ namespace JueMingZ.Actions
         public bool UiMouseCaptureAvailableAtClick { get; set; }
         public string HitTestModeAtClick { get; set; }
         public string ClickSourceAtClick { get; set; }
-        public bool AutoClickerPlayerInventoryOpen { get; set; }
-        public bool AutoClickerMouseItemPresent { get; set; }
-        public int AutoClickerMouseItemType { get; set; }
-        public string AutoClickerMouseItemName { get; set; }
 
         public ItemUseBridgeOptions()
         {
@@ -46,7 +42,6 @@ namespace JueMingZ.Actions
             UiClickSuppressionMode = string.Empty;
             HitTestModeAtClick = string.Empty;
             ClickSourceAtClick = string.Empty;
-            AutoClickerMouseItemName = string.Empty;
         }
     }
 }

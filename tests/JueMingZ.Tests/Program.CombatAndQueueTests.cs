@@ -15,8 +15,11 @@ using JueMingZ.Automation.WorldAutomation;
 using JueMingZ.Common;
 using JueMingZ.Compat;
 using JueMingZ.Config;
+using JueMingZ.Diagnostics;
 using JueMingZ.Features;
 using JueMingZ.GameState;
+using JueMingZ.GameState.Ui;
+using JueMingZ.Runtime;
 using JueMingZ.UI;
 using JueMingZ.UI.Legacy;
 
@@ -24,30 +27,29 @@ namespace JueMingZ.Tests
 {
     internal static partial class Program
     {
-        private static void CombatAutoClickerItemUseRequestAllowsCombatAim()
+        private static void MovementTeleportCorrectionRequiresVanillaUseFrame()
         {
-            var autoClickerProfile = new CombatAutoClickerService.AutoClickerItemProfile
+            var player = new FakePlayer();
+            string reason;
+            if (MovementTeleportCorrectionService.IsVanillaTeleportRodUseFrameForTesting(player, out reason) ||
+                !string.Equals(reason, "notUseFrame:itemAnimation", StringComparison.Ordinal))
             {
-                SelectedSlot = 0,
-                ItemType = 280,
-                ItemName = "Test Spear",
-                UseStyle = 5,
-                UseAnimation = 20,
-                UseTime = 20
-            };
-
-            var request = CombatAutoClickerService.CreateItemUseRequest(autoClickerProfile);
-            string allowCombatAim;
-            if (!request.Metadata.TryGetValue("AllowCombatAim", out allowCombatAim) ||
-                !string.Equals(allowCombatAim, "true", StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidOperationException("Expected combat auto clicker ItemUse request to allow combat aim.");
+                throw new InvalidOperationException("Expected teleport correction to skip when itemAnimation is zero, got " + reason + ".");
             }
 
-            var channelProfile = InputActionChannelResolver.Resolve(request);
-            AssertHas(channelProfile.RequiredChannels, InputActionChannel.UseItem, "auto clicker required");
-            AssertHas(channelProfile.RequiredChannels, InputActionChannel.BridgeItemUse, "auto clicker required");
-            AssertHas(channelProfile.RequiredChannels, InputActionChannel.MouseTarget, "auto clicker required");
+            player.itemAnimation = 8;
+            player.itemTime = 3;
+            if (MovementTeleportCorrectionService.IsVanillaTeleportRodUseFrameForTesting(player, out reason) ||
+                !string.Equals(reason, "notUseFrame:itemTime", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected teleport correction to skip while itemTime is still active, got " + reason + ".");
+            }
+
+            player.itemTime = 0;
+            if (!MovementTeleportCorrectionService.IsVanillaTeleportRodUseFrameForTesting(player, out reason))
+            {
+                throw new InvalidOperationException("Expected teleport correction to allow the original use frame, got " + reason + ".");
+            }
         }
 
         private static void CombatPerfectRevolverItemCheckTakeoverMirrorsHelperCadence()
@@ -136,6 +138,30 @@ namespace JueMingZ.Tests
                 CombatPerfectRevolverService.ShouldScheduleNextTick(profile))
             {
                 throw new InvalidOperationException("Expected perfect revolver to wait while reuseDelay is active.");
+            }
+        }
+
+        private static void CombatAutoClickerInputProbeTargetsReportedItems()
+        {
+            if (!CombatAutoClickerItemCheckInputProbe.IsProbeItemForTesting(29) ||
+                !CombatAutoClickerItemCheckInputProbe.IsProbeItemForTesting(495) ||
+                !CombatAutoClickerItemCheckInputProbe.IsProbeItemForTesting(5335))
+            {
+                throw new InvalidOperationException("Expected auto clicker input probe to cover the reported sample items.");
+            }
+
+            if (CombatAutoClickerItemCheckInputProbe.IsProbeItemForTesting(2269) ||
+                CombatAutoClickerItemCheckInputProbe.IsProbeItemForTesting(1))
+            {
+                throw new InvalidOperationException("Expected auto clicker input probe to stay scoped away from ordinary combat samples.");
+            }
+
+            if (!string.Equals(CombatAutoClickerItemCheckInputProbe.BuildAnimationBucketForTesting(0), "0", StringComparison.Ordinal) ||
+                !string.Equals(CombatAutoClickerItemCheckInputProbe.BuildAnimationBucketForTesting(2), "2", StringComparison.Ordinal) ||
+                !string.Equals(CombatAutoClickerItemCheckInputProbe.BuildAnimationBucketForTesting(8), "6-10", StringComparison.Ordinal) ||
+                !string.Equals(CombatAutoClickerItemCheckInputProbe.BuildAnimationBucketForTesting(24), "21+", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected auto clicker input probe animation buckets to remain stable.");
             }
         }
 
@@ -2310,6 +2336,51 @@ namespace JueMingZ.Tests
             Terraria.GameInput.PlayerInput.Triggers.Current.MouseRight = false;
             Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft = false;
             Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseRight = false;
+        }
+
+        private static void ResetFakeLocalPlayer(Terraria.Player player)
+        {
+            Terraria.Main.LocalPlayer = player;
+            Terraria.Main.myPlayer = player == null ? -1 : player.whoAmI;
+            if (player != null && player.whoAmI >= 0 && player.whoAmI < Terraria.Main.player.Length)
+            {
+                Terraria.Main.player[player.whoAmI] = player;
+            }
+        }
+
+        private static Action CaptureFakeLocalPlayerState()
+        {
+            var previousLocalPlayer = Terraria.Main.LocalPlayer;
+            var previousMyPlayer = Terraria.Main.myPlayer;
+            var previousPlayers = Terraria.Main.player;
+            Terraria.Main.player = new object[256];
+            return () =>
+            {
+                Terraria.Main.LocalPlayer = previousLocalPlayer;
+                Terraria.Main.myPlayer = previousMyPlayer;
+                Terraria.Main.player = previousPlayers;
+            };
+        }
+
+        private static Terraria.Player CreateItemUseBridgePlayer(int itemType, string itemName)
+        {
+            var player = new Terraria.Player
+            {
+                whoAmI = 0,
+                selectedItem = 0,
+                active = true,
+                releaseUseItem = true
+            };
+            player.inventory[0] = new FakeItem
+            {
+                type = itemType,
+                stack = 1,
+                Name = itemName ?? string.Empty,
+                useStyle = 4,
+                useAnimation = 30,
+                useTime = 30
+            };
+            return player;
         }
 
         private static void AssertFlailDecision(CombatAimFlailControlDecision decision, string state, bool pulse, bool suppress, bool release, string reason)

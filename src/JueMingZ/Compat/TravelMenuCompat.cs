@@ -117,7 +117,11 @@ namespace JueMingZ.Compat
 
         public static bool TryBeginNativeJourneyCreativeUiScope(string scope, out TravelMenuScopedJourneyState state, out string message)
         {
-            state = new TravelMenuScopedJourneyState { Scope = scope ?? string.Empty };
+            state = new TravelMenuScopedJourneyState
+            {
+                Scope = scope ?? string.Empty,
+                Source = TravelMenuScopedJourneySource.NativeJourneyCreativeUiScope
+            };
             message = string.Empty;
 
             var mainType = TerrariaRuntimeTypes.MainType;
@@ -307,7 +311,11 @@ namespace JueMingZ.Compat
 
         public static bool TryBeginScopedJourneyState(TravelMenuContext original, string scope, out TravelMenuScopedJourneyState state, out string message)
         {
-            state = new TravelMenuScopedJourneyState { Scope = scope ?? string.Empty };
+            state = new TravelMenuScopedJourneyState
+            {
+                Scope = scope ?? string.Empty,
+                Source = TravelMenuScopedJourneySource.JueMingZTravelMenuScope
+            };
             message = string.Empty;
             if (original == null)
             {
@@ -1109,10 +1117,42 @@ namespace JueMingZ.Compat
                 return false;
             }
 
+            if (state.Source != TravelMenuScopedJourneySource.JueMingZTravelMenuScope)
+            {
+                message = "Creative UI world input guard skipped outside JueMing-Z travel menu scope.";
+                return false;
+            }
+
+            if (!string.Equals(state.Scope, "CreativeUI.Update", StringComparison.Ordinal))
+            {
+                message = "Creative UI world input guard skipped outside CreativeUI.Update.";
+                return false;
+            }
+
             var mainType = TerrariaRuntimeTypes.MainType;
             if (mainType == null)
             {
                 message = "Terraria.Main unavailable for creative UI world input guard.";
+                return false;
+            }
+
+            bool creativeMenuEnabled;
+            string creativeMenuMessage;
+            if (!TryReadCreativeMenuEnabled(out creativeMenuEnabled, out creativeMenuMessage) || !creativeMenuEnabled)
+            {
+                message = string.IsNullOrWhiteSpace(creativeMenuMessage)
+                    ? "Creative UI world input guard skipped because CreativeUI is closed."
+                    : creativeMenuMessage;
+                return false;
+            }
+
+            bool inventoryOpen;
+            string inventoryMessage;
+            if (!TryReadPlayerInventoryOpen(out inventoryOpen, out inventoryMessage) || !inventoryOpen)
+            {
+                message = string.IsNullOrWhiteSpace(inventoryMessage)
+                    ? "Creative UI world input guard skipped because Main.playerInventory is closed."
+                    : inventoryMessage;
                 return false;
             }
 

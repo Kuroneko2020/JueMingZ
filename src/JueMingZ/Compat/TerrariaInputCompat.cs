@@ -50,7 +50,6 @@ namespace JueMingZ.Compat
         private static DateTime _autoFacingOverrideExpiresUtc = DateTime.MinValue;
         private static string _lastAutoFacingOverrideMessage = string.Empty;
         private static readonly object AutoClickerUseItemSuppressionSync = new object();
-        private static DateTime _autoClickerSuppressedUseItemHeldUntilUtc = DateTime.MinValue;
         private static DateTime _perfectRevolverSuppressedUseItemHeldUntilUtc = DateTime.MinValue;
 
         public static bool InputCompatReady { get; private set; }
@@ -1348,11 +1347,31 @@ namespace JueMingZ.Compat
             return ClearInputError();
         }
 
-        public static bool TrySuppressHeldUseItemForAutoClicker(object player)
+        public static bool TryReadPhysicalMouseLeftHeld(out bool held)
         {
-            var ok = SuppressHeldUseItemForQueuedCombat(player);
-            ArmAutoClickerSuppressedUseItemHeld();
-            return ok;
+            held = IsLeftButtonDownFallback();
+            try
+            {
+                var playerInputType = FindType("Terraria.GameInput.PlayerInput");
+                if (playerInputType == null)
+                {
+                    return ClearInputError();
+                }
+
+                var triggers = GetStatic(playerInputType, "Triggers");
+                var current = triggers == null ? null : GetMember(triggers, "Current");
+                bool mouseLeft;
+                if (current != null && TryGetBool(current, "MouseLeft", out mouseLeft))
+                {
+                    held = held || mouseLeft;
+                }
+
+                return ClearInputError();
+            }
+            catch (Exception error)
+            {
+                return Fail("Cannot read physical mouse left state: " + error.Message);
+            }
         }
 
         public static bool TrySuppressHeldUseItemForPerfectRevolver(object player)
@@ -1360,14 +1379,6 @@ namespace JueMingZ.Compat
             var ok = SuppressHeldUseItemForQueuedCombat(player);
             ArmPerfectRevolverSuppressedUseItemHeld();
             return ok;
-        }
-
-        public static void ClearAutoClickerSuppressedUseItem()
-        {
-            lock (AutoClickerUseItemSuppressionSync)
-            {
-                _autoClickerSuppressedUseItemHeldUntilUtc = DateTime.MinValue;
-            }
         }
 
         public static void ClearPerfectRevolverSuppressedUseItem()
@@ -1728,7 +1739,7 @@ namespace JueMingZ.Compat
             return ok ? ClearInputError() : Fail("Cannot apply use item pulse input override.");
         }
 
-        public static bool TryApplyUseItemReleaseForItemCheck(object player, bool preserveUseItemHeldIntent)
+        public static bool TryApplyUseItemReleaseForItemCheck(object player)
         {
             if (player == null)
             {
@@ -1745,11 +1756,6 @@ namespace JueMingZ.Compat
                 TrySetStaticIfExists(mainType, "mouseLeftRelease", true);
                 TrySetStaticIfExists(mainType, "mouseRight", false);
                 TrySetStaticIfExists(mainType, "mouseRightRelease", false);
-            }
-
-            if (preserveUseItemHeldIntent)
-            {
-                ArmAutoClickerSuppressedUseItemHeld();
             }
 
             return ok ? ClearInputError() : Fail("Cannot apply use item release input override.");
@@ -1815,6 +1821,44 @@ namespace JueMingZ.Compat
             }
 
             return ok;
+        }
+
+        public static bool TryRestoreUseItemButtonInputState(object player, UseItemInputState state)
+        {
+            if (player == null || state == null || !state.Captured)
+            {
+                return false;
+            }
+
+            var ok = true;
+            ok &= SetMember(player, "controlUseItem", state.UseItemHeld);
+            ok &= SetMember(player, "releaseUseItem", state.UseItemReleased);
+
+            var mainType = TerrariaRuntimeTypes.MainType;
+            if (mainType != null)
+            {
+                if (state.MainMouseLeftCaptured)
+                {
+                    ok &= TrySetStaticIfExists(mainType, "mouseLeft", state.MainMouseLeft);
+                }
+
+                if (state.MainMouseRightCaptured)
+                {
+                    ok &= TrySetStaticIfExists(mainType, "mouseRight", state.MainMouseRight);
+                }
+
+                if (state.MainMouseLeftReleaseCaptured)
+                {
+                    ok &= TrySetStaticIfExists(mainType, "mouseLeftRelease", state.MainMouseLeftRelease);
+                }
+
+                if (state.MainMouseRightReleaseCaptured)
+                {
+                    ok &= TrySetStaticIfExists(mainType, "mouseRightRelease", state.MainMouseRightRelease);
+                }
+            }
+
+            return ok ? ClearInputError() : Fail("Cannot restore use item button input state.");
         }
 
         public static bool TryCaptureMouseTargetState(out MouseTargetInputState state)
@@ -3018,14 +3062,6 @@ namespace JueMingZ.Compat
             return ok;
         }
 
-        private static void ArmAutoClickerSuppressedUseItemHeld()
-        {
-            lock (AutoClickerUseItemSuppressionSync)
-            {
-                _autoClickerSuppressedUseItemHeldUntilUtc = DateTime.UtcNow.AddMilliseconds(250);
-            }
-        }
-
         private static void ArmPerfectRevolverSuppressedUseItemHeld()
         {
             lock (AutoClickerUseItemSuppressionSync)
@@ -3039,19 +3075,13 @@ namespace JueMingZ.Compat
             lock (AutoClickerUseItemSuppressionSync)
             {
                 var now = DateTime.UtcNow;
-                var autoClickerHeld = _autoClickerSuppressedUseItemHeldUntilUtc > now;
                 var perfectRevolverHeld = _perfectRevolverSuppressedUseItemHeldUntilUtc > now;
-                if (!autoClickerHeld)
-                {
-                    _autoClickerSuppressedUseItemHeldUntilUtc = DateTime.MinValue;
-                }
-
                 if (!perfectRevolverHeld)
                 {
                     _perfectRevolverSuppressedUseItemHeldUntilUtc = DateTime.MinValue;
                 }
 
-                return autoClickerHeld || perfectRevolverHeld;
+                return perfectRevolverHeld;
             }
         }
 

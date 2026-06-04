@@ -4,6 +4,7 @@ using System.Globalization;
 using JueMingZ.Actions;
 using JueMingZ.Automation.AutoRecovery;
 using JueMingZ.Automation.BuffAndRecovery;
+using JueMingZ.Automation.Combat;
 using JueMingZ.Automation.Fishing;
 using JueMingZ.Automation.Fishing.Filtering;
 using JueMingZ.Automation.Information;
@@ -16,6 +17,7 @@ using JueMingZ.Compat;
 using JueMingZ.Config;
 using JueMingZ.Diagnostics;
 using JueMingZ.GameState;
+using JueMingZ.Runtime;
 using JueMingZ.UI;
 using JueMingZ.UI.Information;
 using JueMingZ.UI.Legacy;
@@ -2057,10 +2059,10 @@ namespace JueMingZ.Input
                 changed = settings.CombatAutoClickerEnabled != enabled;
                 settings.CombatAutoClickerEnabled = enabled;
                 scenario = "Ui.Toggle.CombatAutoClicker";
-                implemented = true;
+                implemented = false;
                 message = enabled
-                    ? "自动连点已开启：长按使用物品时，会通过 ItemCheck 补一次可用的非原生连点物品。"
-                    : "自动连点已关闭。";
+                    ? "自动连点旧路线已清理，新核心尚未接入；当前仅保留配置开关。"
+                    : "自动连点已关闭；旧输入源路线已清理。";
             }
             else if (string.Equals(option, "perfectRevolver", StringComparison.Ordinal))
             {

@@ -48,7 +48,7 @@ namespace JueMingZ.Runtime
         private static readonly Dictionary<string, long> ServiceSchedulerLastRunTick =
             new Dictionary<string, long>(StringComparer.Ordinal);
 
-        public const string Version = "1.7.433-keep-favorited-equipment-bucket-fix";
+        public const string Version = "1.7.445-travel-menu-guard-fix";
 
         public static RuntimeState State { get; private set; } = new RuntimeState();
         public static FeatureRegistry FeatureRegistry { get; private set; }
@@ -418,13 +418,6 @@ namespace JueMingZ.Runtime
             FirstWorldLoadPromptService.Tick(gameState, State);
             RecordOperationTiming(context, "dispatch.first-world-load-prompt", operationStart);
             operationStart = Stopwatch.GetTimestamp();
-
-            if (ShouldRunService("combat-auto-clicker", settings.CombatAutoClickerEnabled, 1, tick))
-            {
-                CombatAutoClickerService.Tick(ActionQueue, gameState, State);
-                RecordOperationTiming(context, "dispatch.combat-auto-clicker", operationStart);
-                operationStart = Stopwatch.GetTimestamp();
-            }
 
             if (ShouldRunService(
                 "movement-safe-landing",
@@ -965,7 +958,6 @@ namespace JueMingZ.Runtime
             var keepFavorited = KeepFavoritedService.GetDiagnostics();
             var autoTaxCollect = AutoTaxCollectorService.GetDiagnostics();
             var autoFacing = CombatAutoFacingService.GetDiagnostics();
-            var autoClicker = CombatAutoClickerService.GetDiagnostics();
             var perfectRevolver = CombatPerfectRevolverService.GetDiagnostics();
             var magicStringClicker = CombatMagicStringClickerService.GetDiagnostics();
             var information = InformationOverlayService.GetDiagnostics();
@@ -1669,9 +1661,6 @@ namespace JueMingZ.Runtime
                 CombatAutoFacingTargetName = autoFacing == null ? string.Empty : autoFacing.TargetName,
                 CombatAutoFacingSubmittedCount = autoFacing == null ? 0 : autoFacing.SubmittedCount,
                 CombatAutoFacingSkippedCount = autoFacing == null ? 0 : autoFacing.SkippedCount,
-                CombatAutoClickerLastDecision = autoClicker == null ? string.Empty : autoClicker.LastDecision,
-                CombatAutoClickerLastSkipReason = autoClicker == null ? string.Empty : autoClicker.LastSkipReason,
-                CombatAutoClickerLastDecisionUtc = autoClicker == null ? null : autoClicker.LastDecisionUtc,
                 CombatPerfectRevolverLastDecision = perfectRevolver == null ? string.Empty : perfectRevolver.LastDecision,
                 CombatPerfectRevolverLastSkipReason = perfectRevolver == null ? string.Empty : perfectRevolver.LastSkipReason,
                 CombatPerfectRevolverLastDecisionUtc = perfectRevolver == null ? null : perfectRevolver.LastDecisionUtc,

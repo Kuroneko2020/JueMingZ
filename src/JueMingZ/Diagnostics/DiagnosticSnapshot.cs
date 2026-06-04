@@ -693,9 +693,6 @@ namespace JueMingZ.Diagnostics
         public string CombatAutoFacingTargetName { get; set; }
         public long CombatAutoFacingSubmittedCount { get; set; }
         public long CombatAutoFacingSkippedCount { get; set; }
-        public string CombatAutoClickerLastDecision { get; set; }
-        public string CombatAutoClickerLastSkipReason { get; set; }
-        public DateTime? CombatAutoClickerLastDecisionUtc { get; set; }
         public string CombatPerfectRevolverLastDecision { get; set; }
         public string CombatPerfectRevolverLastSkipReason { get; set; }
         public DateTime? CombatPerfectRevolverLastDecisionUtc { get; set; }
@@ -979,8 +976,6 @@ namespace JueMingZ.Diagnostics
             CombatAutoFacingItemName = string.Empty;
             CombatAutoFacingTargetSource = string.Empty;
             CombatAutoFacingTargetName = string.Empty;
-            CombatAutoClickerLastDecision = string.Empty;
-            CombatAutoClickerLastSkipReason = string.Empty;
             CombatPerfectRevolverLastDecision = string.Empty;
             CombatPerfectRevolverLastSkipReason = string.Empty;
             CombatMagicStringClickerLastDecision = string.Empty;

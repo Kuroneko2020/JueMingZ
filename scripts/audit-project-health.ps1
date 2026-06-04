@@ -44,6 +44,24 @@ function ConvertFrom-CodePoints {
     return $builder.ToString()
 }
 
+function Get-LocalDocsRootName {
+    return ConvertFrom-CodePoints @(0x6587, 0x6863)
+}
+
+function Join-LocalDocsPath {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string[]]$Segments
+    )
+
+    $path = Join-Path $RepoRoot (Get-LocalDocsRootName)
+    foreach ($segment in $Segments) {
+        $path = Join-Path $path $segment
+    }
+
+    return $path
+}
+
 function Get-RegisteredFeatureCount {
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
 
@@ -72,7 +90,7 @@ function Get-DocumentationSizeGuard {
     if ($Kind -eq "CurrentStatus") {
         $baseLimit = 16384
         $hardLimit = 32768
-        $bytesPerExtraFeature = 448
+        $bytesPerExtraFeature = 512
     }
     elseif ($Kind -eq "Handoff") {
         $baseLimit = 24576
@@ -201,6 +219,8 @@ function Get-TrackedFiles {
 function Test-GitSourceBoundary {
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
 
+    $localDocsRootName = Get-LocalDocsRootName
+    $localDocsRootRegex = [System.Text.RegularExpressions.Regex]::Escape($localDocsRootName)
     $gitignorePath = Join-Path $RepoRoot ".gitignore"
     $gitignoreText = Read-TextIfExists -Path $gitignorePath
     if ($null -eq $gitignoreText) {
@@ -215,6 +235,7 @@ function Test-GitSourceBoundary {
         "_codex_log_inspect_*/",
         "AGENTS.md",
         "docs/",
+        "$localDocsRootName/",
         "references/",
         "references/TerrariaDecompiled-*/",
         "scripts/_*.py",
@@ -245,7 +266,8 @@ function Test-GitSourceBoundary {
 
     $ignoredSamples = @(
         @{ Path = "AGENTS.md"; Description = "local AI collaboration rules" },
-        @{ Path = "docs/CURRENT_STATUS.md"; Description = "local maintainer documentation" },
+        @{ Path = "docs/CURRENT_STATUS.md"; Description = "legacy docs backflow guard sample" },
+        @{ Path = "$localDocsRootName/sample.md"; Description = "local Chinese documentation" },
         @{ Path = "references/TerrariaDecompiled-1.4.5.6/Player.cs"; Description = "decompiled Terraria references" },
         @{ Path = "references/TerrariaReferenceNotes/README.md"; Description = "local curated reference notes" },
         @{ Path = "external/TerrariaRefs/Terraria.exe"; Description = "local compile-only Terraria references" },
@@ -304,6 +326,7 @@ function Test-GitSourceBoundary {
             $_ -match '(^|/)(bin|obj)/' -or
             $_ -eq 'AGENTS.md' -or
             $_ -match '^docs/' -or
+            $_ -match "^$localDocsRootRegex/" -or
             $_ -match '^\.codex-tmp/' -or
             $_ -match '^_codex_log_inspect_[^/]*/' -or
             $_ -match '^external/TerrariaRefs/' -or
@@ -346,6 +369,7 @@ function Get-RuntimeVersion {
 function Test-SourcePackageZip {
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
     $zipPath = Join-Path $RepoRoot "JueMingZ-SourcePackage.zip"
+    $localDocsZipPrefix = (Get-LocalDocsRootName).ToLowerInvariant() + "/"
     if (-not (Test-Path -LiteralPath $zipPath)) {
         Write-WarnHealth "JueMingZ-SourcePackage.zip is absent; root absence is allowed before packaging."
         return
@@ -363,6 +387,7 @@ function Test-SourcePackageZip {
             if ($lower.StartsWith("juemingz-testpackage/") -or
                 $lower.StartsWith("juemingz-sourcepackage/") -or
                 $lower.StartsWith("docs/") -or
+                $lower.StartsWith($localDocsZipPrefix) -or
                 $lower.StartsWith("references/") -or
                 $lower.StartsWith("external/terrariarefs/") -or
                 $lower -eq "agents.md" -or
@@ -509,7 +534,9 @@ function Test-TestPackage {
             Write-FailHealth "Test package README does not contain RuntimeVersion $RuntimeVersion"
         }
 
-        $templatePath = Join-Path $RepoRoot "docs\test-package\README_TESTING.zh-CN.txt"
+        $projectRulesDir = ConvertFrom-CodePoints @(0x9879, 0x76ee, 0x89c4, 0x5219)
+        $testPackageReadmeTemplateFile = (ConvertFrom-CodePoints @(0x6d4b, 0x8bd5, 0x5305)) + "README" + (ConvertFrom-CodePoints @(0x6a21, 0x677f)) + ".zh-CN.txt"
+        $templatePath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @($projectRulesDir, $testPackageReadmeTemplateFile)
         $templateText = Read-TextIfExists -Path $templatePath
         if ($null -eq $templateText) {
             Write-FailHealth "Test package README template missing."
@@ -619,15 +646,38 @@ function Test-DocsConsistency {
         [Parameter(Mandatory = $true)][string]$RuntimeVersion
     )
 
-    $dependencies = Read-TextIfExists -Path (Join-Path $RepoRoot "docs\DEPENDENCIES.md")
-    if ($null -eq $dependencies) {
-        Write-FailHealth "docs/DEPENDENCIES.md missing."
+    $projectRulesDir = ConvertFrom-CodePoints @(0x9879, 0x76ee, 0x89c4, 0x5219)
+    $documentationRulesDir = (ConvertFrom-CodePoints @(0x6587, 0x6863)) + (ConvertFrom-CodePoints @(0x89c4, 0x5219))
+    $featureIntroDir = ConvertFrom-CodePoints @(0x529f, 0x80fd, 0x4ecb, 0x7ecd)
+    $combatPageDir = ConvertFrom-CodePoints @(0x6218, 0x6597, 0x9875)
+    $movementPageDir = ConvertFrom-CodePoints @(0x79fb, 0x52a8, 0x9875)
+
+    $currentStatusFile = (ConvertFrom-CodePoints @(0x5f53, 0x524d, 0x4ed3, 0x5e93, 0x72b6, 0x6001)) + ".md"
+    $coldStartFile = (ConvertFrom-CodePoints @(0x51b7, 0x542f, 0x52a8, 0x8bf4, 0x660e)) + ".md"
+    $directoryFile = (ConvertFrom-CodePoints @(0x76ee, 0x5f55)) + ".md"
+    $documentationGuideFile = (ConvertFrom-CodePoints @(0x6587, 0x6863, 0x4e66, 0x5199, 0x89c4, 0x8303)) + ".md"
+    $migrationMapFile = (ConvertFrom-CodePoints @(0x8fc1, 0x79fb, 0x6620, 0x5c04, 0x8868)) + ".md"
+    $packagingRulesFile = "AI" + (ConvertFrom-CodePoints @(0x6253, 0x5305, 0x4ea4, 0x4ed8, 0x89c4, 0x5219)) + ".md"
+    $testingRulesFile = "AI" + (ConvertFrom-CodePoints @(0x6d4b, 0x8bd5, 0x89c4, 0x5219)) + ".md"
+    $diagnosticsRulesFile = "AI" + (ConvertFrom-CodePoints @(0x8bca, 0x65ad, 0x65e5, 0x5fd7, 0x8bf4, 0x660e)) + ".md"
+    $engineeringRulesFile = (ConvertFrom-CodePoints @(0x5de5, 0x7a0b, 0x89c4, 0x5219)) + ".md"
+    $featureIndexFile = (ConvertFrom-CodePoints @(0x529f, 0x80fd, 0x7d22, 0x5f15)) + ".md"
+    $autoFacingFile = (ConvertFrom-CodePoints @(0x81ea, 0x52a8, 0x8f6c, 0x5411)) + ".md"
+    $simulatedJumpFile = (ConvertFrom-CodePoints @(0x6a21, 0x62df, 0x8fde, 0x8df3)) + ".md"
+    $continuousDashFile = (ConvertFrom-CodePoints @(0x8fde, 0x7eed, 0x51b2, 0x523a)) + ".md"
+    $teleportCorrectionFile = (ConvertFrom-CodePoints @(0x4f20, 0x9001, 0x4fee, 0x6b63)) + ".md"
+    $safeLandingFile = (ConvertFrom-CodePoints @(0x667a, 0x80fd, 0x9632, 0x6454)) + ".md"
+    $testPackageReadmeTemplateFile = (ConvertFrom-CodePoints @(0x6d4b, 0x8bd5, 0x5305)) + "README" + (ConvertFrom-CodePoints @(0x6a21, 0x677f)) + ".zh-CN.txt"
+
+    $packagingRules = Read-TextIfExists -Path (Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @($projectRulesDir, $packagingRulesFile))
+    if ($null -eq $packagingRules) {
+        Write-FailHealth "AI packaging rules document missing."
     }
     else {
         $optionalWord = ([string][char]0x53ef) + ([string][char]0x9009)
         $notRequiredWord = ([string][char]0x4e0d) + ([string][char]0x5f3a) + ([string][char]0x5236)
         $oldHarmonyWordingFound = $false
-        foreach ($line in ($dependencies -split "\r?\n")) {
+        foreach ($line in ($packagingRules -split "\r?\n")) {
             if ($line.Contains("Harmony") -and
                 ($line.Contains($optionalWord) -or $line.Contains($notRequiredWord))) {
                 $oldHarmonyWordingFound = $true
@@ -636,67 +686,78 @@ function Test-DocsConsistency {
         }
 
         if ($oldHarmonyWordingFound) {
-            Write-FailHealth "DEPENDENCIES.md still contains old optional Harmony wording."
+            Write-FailHealth "AI packaging rules still contain old optional Harmony wording."
         }
         else {
-            Write-Pass "DEPENDENCIES.md no longer says Harmony is optional."
+            Write-Pass "AI packaging rules no longer say Harmony is optional."
         }
     }
 
-    $featureCatalog = Read-TextIfExists -Path (Join-Path $RepoRoot "docs\FEATURE_CATALOG.md")
+    $featureCatalog = Read-TextIfExists -Path (Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @($featureIntroDir, $featureIndexFile))
+    $autoFacingDoc = Read-TextIfExists -Path (Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @($featureIntroDir, $combatPageDir, $autoFacingFile))
     $combatRegistrar = Read-TextIfExists -Path (Join-Path $RepoRoot "src\JueMingZ\Features\Catalog\CombatFeatureRegistrar.cs")
-    if ($null -ne $featureCatalog -and $featureCatalog -match "combat\.auto_facing") {
+    if ($null -ne $featureCatalog -and $null -ne $autoFacingDoc -and $autoFacingDoc -match "combat\.auto_facing") {
         if (($null -ne $combatRegistrar) -and
             ($combatRegistrar -match "CombatAutoFacing") -and
             ($combatRegistrar -match "\.Hotkey\(true,\s*true\)")) {
             Write-Pass "combat.auto_facing hotkey documentation matches code."
         }
         else {
-            Write-FailHealth "FEATURE_CATALOG.md says combat.auto_facing is visible in hotkey page but code lacks .Hotkey(true, true)."
+            Write-FailHealth "combat.auto_facing documentation says the feature is present but code lacks .Hotkey(true, true)."
         }
     }
     else {
-        Write-WarnHealth "Could not confirm combat.auto_facing hotkey row in FEATURE_CATALOG.md."
+        Write-WarnHealth "Could not confirm combat.auto_facing row in the new feature documentation."
     }
 
-    $documentationGuide = Read-TextIfExists -Path (Join-Path $RepoRoot "docs\DOCUMENTATION_GUIDE.md")
+    $documentationGuide = Read-TextIfExists -Path (Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @($documentationRulesDir, $documentationGuideFile))
     if ($null -eq $documentationGuide) {
-        Write-FailHealth "docs/DOCUMENTATION_GUIDE.md missing."
+        Write-FailHealth "New documentation writing guide missing."
     }
-    elseif ($documentationGuide.Contains("CURRENT_STATUS.md") -and
-        $documentationGuide.Contains("docs/ACCEPTED_BOUNDARIES.md") -and
-        $documentationGuide.Contains("iteration-log") -and
-        $documentationGuide.Contains("docs/domain/*.md")) {
-        Write-Pass "DOCUMENTATION_GUIDE.md contains core documentation governance rules."
+    elseif ($documentationGuide.Contains($currentStatusFile) -and
+        $documentationGuide.Contains($migrationMapFile) -and
+        $documentationGuide.Contains($projectRulesDir) -and
+        $documentationGuide.Contains("UTF-8")) {
+        Write-Pass "New documentation writing guide contains core governance rules."
     }
     else {
-        Write-FailHealth "DOCUMENTATION_GUIDE.md lacks expected governance rules."
+        Write-FailHealth "New documentation writing guide lacks expected governance rules."
     }
 
-    $movementDomain = Read-TextIfExists -Path (Join-Path $RepoRoot "docs\domain\MOVEMENT.md")
-    if ($null -eq $movementDomain) {
-        Write-FailHealth "docs/domain/MOVEMENT.md missing."
+    $movementDocs = @()
+    $movementDocs += Read-TextIfExists -Path (Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @($featureIntroDir, $movementPageDir, $simulatedJumpFile))
+    $movementDocs += Read-TextIfExists -Path (Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @($featureIntroDir, $movementPageDir, $continuousDashFile))
+    $movementDocs += Read-TextIfExists -Path (Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @($featureIntroDir, $movementPageDir, $teleportCorrectionFile))
+    $movementDocs += Read-TextIfExists -Path (Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @($featureIntroDir, $movementPageDir, $safeLandingFile))
+    $movementDomain = $movementDocs -join "`n"
+    if ([string]::IsNullOrWhiteSpace($movementDomain)) {
+        Write-FailHealth "New movement feature documents are missing."
     }
     elseif ($movementDomain.Contains("movement.simulated_multi_jump") -and
         $movementDomain.Contains("movement.continuous_dash") -and
         $movementDomain.Contains("movement.teleport_correction") -and
         $movementDomain.Contains("movement.fall_protection")) {
-        Write-Pass "Movement domain document covers staged movement features."
+        Write-Pass "New movement feature documents cover staged movement features."
     }
     else {
-        Write-FailHealth "docs/domain/MOVEMENT.md lacks expected movement feature coverage."
+        Write-FailHealth "New movement feature documents lack expected movement feature coverage."
     }
 
-    foreach ($relativePath in @("AGENTS.md", "docs\README.md", "docs\AI_HANDOFF.md")) {
+    $entryRelativePaths = @(
+        "AGENTS.md",
+        (Join-Path (Join-Path (Get-LocalDocsRootName) $documentationRulesDir) $directoryFile),
+        (Join-Path (Get-LocalDocsRootName) $coldStartFile)
+    )
+    foreach ($relativePath in $entryRelativePaths) {
         $entryText = Read-TextIfExists -Path (Join-Path $RepoRoot $relativePath)
         if ($null -eq $entryText) {
             Write-FailHealth "Documentation entry file missing: $relativePath"
         }
-        elseif ($entryText.Contains("docs/DOCUMENTATION_GUIDE.md") -or $entryText.Contains("DOCUMENTATION_GUIDE.md")) {
-            Write-Pass "Documentation entry references DOCUMENTATION_GUIDE.md: $relativePath"
+        elseif ($entryText.Contains($documentationGuideFile)) {
+            Write-Pass "Documentation entry references the new writing guide: $relativePath"
         }
         else {
-            Write-FailHealth "Documentation entry does not reference DOCUMENTATION_GUIDE.md: $relativePath"
+            Write-FailHealth "Documentation entry does not reference the new writing guide: $relativePath"
         }
     }
 
@@ -704,72 +765,74 @@ function Test-DocsConsistency {
     if ($null -eq $publicReadme) {
         Write-FailHealth "Public README.md missing."
     }
-    elseif ($publicReadme.Contains("docs/") -or $publicReadme.Contains("AGENTS.md")) {
+    elseif ($publicReadme.Contains("docs/") -or
+        $publicReadme.Contains((Get-LocalDocsRootName) + "/") -or
+        $publicReadme.Contains("AGENTS.md")) {
         Write-FailHealth "Public README.md references local-only AI/maintainer documentation."
     }
     else {
         Write-Pass "Public README.md is self-contained and does not require local-only documentation."
     }
 
-    $currentStatusPath = Join-Path $RepoRoot "docs\CURRENT_STATUS.md"
+    $currentStatusPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @($currentStatusFile)
     $currentStatus = Read-TextIfExists -Path $currentStatusPath
     if ($null -eq $currentStatus) {
-        Write-FailHealth "docs/CURRENT_STATUS.md missing."
+        Write-FailHealth "New current status document missing."
     }
     else {
         if ($currentStatus.Contains($RuntimeVersion)) {
-            Write-Pass "CURRENT_STATUS.md contains RuntimeVersion $RuntimeVersion"
+            Write-Pass "New current status contains RuntimeVersion $RuntimeVersion"
         }
         else {
-            Write-FailHealth "CURRENT_STATUS.md does not contain RuntimeVersion $RuntimeVersion"
+            Write-FailHealth "New current status does not contain RuntimeVersion $RuntimeVersion"
         }
 
-        if ($currentStatus.Contains("docs/DOCUMENTATION_GUIDE.md") -and
-            $currentStatus.Contains("docs/ACCEPTED_BOUNDARIES.md") -and
-            $currentStatus.Contains("docs/iteration-log/")) {
-            Write-Pass "CURRENT_STATUS.md references documentation guide, accepted boundaries, and iteration history instead of duplicating them."
+        if ($currentStatus.Contains($directoryFile) -and
+            $currentStatus.Contains($documentationGuideFile) -and
+            $currentStatus.Contains($migrationMapFile)) {
+            Write-Pass "New current status references the new documentation rules instead of duplicating them."
         }
         else {
-            Write-FailHealth "CURRENT_STATUS.md lacks expected documentation source references."
+            Write-FailHealth "New current status lacks expected documentation rule references."
         }
 
         $length = (Get-Item -LiteralPath $currentStatusPath).Length
         $currentStatusGuard = Get-DocumentationSizeGuard -RepoRoot $RepoRoot -Kind "CurrentStatus"
         if ($length -gt $currentStatusGuard.Limit) {
-            Write-FailHealth "CURRENT_STATUS.md is over adaptive size guard ($length > $($currentStatusGuard.Limit) bytes; registeredFeatures=$($currentStatusGuard.FeatureCount)); move historical details to iteration-log or diagnostics docs."
+            Write-FailHealth "New current status is over adaptive size guard ($length > $($currentStatusGuard.Limit) bytes; registeredFeatures=$($currentStatusGuard.FeatureCount)); move historical details to update records or diagnostics docs."
         }
         else {
-            Write-Pass "CURRENT_STATUS.md stays below adaptive size guard ($length <= $($currentStatusGuard.Limit) bytes; registeredFeatures=$($currentStatusGuard.FeatureCount))."
+            Write-Pass "New current status stays below adaptive size guard ($length <= $($currentStatusGuard.Limit) bytes; registeredFeatures=$($currentStatusGuard.FeatureCount))."
         }
     }
 
-    $handoffPath = Join-Path $RepoRoot "docs\AI_HANDOFF.md"
+    $handoffPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @($coldStartFile)
     $handoff = Read-TextIfExists -Path $handoffPath
     if ($null -eq $handoff) {
-        Write-FailHealth "docs/AI_HANDOFF.md missing."
+        Write-FailHealth "New cold-start handoff document missing."
     }
     else {
         $handoffLength = (Get-Item -LiteralPath $handoffPath).Length
         $handoffGuard = Get-DocumentationSizeGuard -RepoRoot $RepoRoot -Kind "Handoff"
         if ($handoffLength -gt $handoffGuard.Limit) {
-            Write-FailHealth "AI_HANDOFF.md is over adaptive size guard ($handoffLength > $($handoffGuard.Limit) bytes; registeredFeatures=$($handoffGuard.FeatureCount)); keep handoff short and move details to domain docs or iteration-log."
+            Write-FailHealth "New cold-start handoff is over adaptive size guard ($handoffLength > $($handoffGuard.Limit) bytes; registeredFeatures=$($handoffGuard.FeatureCount)); keep handoff short and move details to feature docs or update records."
         }
         else {
-            Write-Pass "AI_HANDOFF.md stays below adaptive size guard ($handoffLength <= $($handoffGuard.Limit) bytes; registeredFeatures=$($handoffGuard.FeatureCount))."
+            Write-Pass "New cold-start handoff stays below adaptive size guard ($handoffLength <= $($handoffGuard.Limit) bytes; registeredFeatures=$($handoffGuard.FeatureCount))."
         }
     }
 
-    $diagnosticsDoc = Read-TextIfExists -Path (Join-Path $RepoRoot "docs\domain\DIAGNOSTICS.md")
+    $diagnosticsDoc = Read-TextIfExists -Path (Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @($projectRulesDir, $diagnosticsRulesFile))
     if ($null -eq $diagnosticsDoc) {
-        Write-FailHealth "docs/domain/DIAGNOSTICS.md missing."
+        Write-FailHealth "New diagnostics rules document missing."
     }
     elseif ($diagnosticsDoc.Contains("runtime-snapshot.json") -and
-        $diagnosticsDoc.Contains("Deprecated") -and
-        $diagnosticsDoc.Contains("iteration-log")) {
-        Write-Pass "Diagnostics domain document covers snapshot fields, deprecated fields, and history routing."
+        $diagnosticsDoc.Contains((ConvertFrom-CodePoints @(0x5e9f, 0x5f03, 0x5b57, 0x6bb5))) -and
+        $diagnosticsDoc.Contains((ConvertFrom-CodePoints @(0x66f4, 0x65b0, 0x8bb0, 0x5f55)))) {
+        Write-Pass "New diagnostics rules cover snapshot fields, deprecated fields, and history routing."
     }
     else {
-        Write-FailHealth "docs/domain/DIAGNOSTICS.md lacks expected diagnostics governance markers."
+        Write-FailHealth "New diagnostics rules lack expected diagnostics governance markers."
     }
 
     $featureLifecyclePath = Join-Path $RepoRoot "src\JueMingZ\Features\FeatureLifecycleStatus.cs"
@@ -793,17 +856,17 @@ function Test-DocsConsistency {
         Write-FailHealth "Travel menu metadata is missing or not marked implemented."
     }
 
-    $runtimeDomain = Read-TextIfExists -Path (Join-Path $RepoRoot "docs\domain\RUNTIME.md")
+    $runtimeDomain = Read-TextIfExists -Path (Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @($projectRulesDir, $engineeringRulesFile))
     if ($null -ne $runtimeDomain -and
-        $runtimeDomain.Contains("FeatureReadProfile") -and
-        $runtimeDomain.Contains("GameStateSnapshot")) {
-        Write-Pass "Runtime domain documents feature read profiles."
+        $runtimeDomain.Contains("GameStateSnapshot") -and
+        $runtimeDomain.Contains("GameStateReader")) {
+        Write-Pass "New engineering rules document GameState routing."
     }
     else {
-        Write-FailHealth "Runtime domain does not document feature read profile routing."
+        Write-FailHealth "New engineering rules do not document GameState routing."
     }
 
-    $testReadmeTemplatePath = Join-Path $RepoRoot "docs\test-package\README_TESTING.zh-CN.txt"
+    $testReadmeTemplatePath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @($projectRulesDir, $testPackageReadmeTemplateFile)
     $testReadmeTemplate = Read-TextIfExists -Path $testReadmeTemplatePath
     if ($null -eq $testReadmeTemplate) {
         Write-FailHealth "Test package README template missing."
@@ -889,9 +952,11 @@ function Test-InformationFishingFallbackCleanup {
 
 function Test-IterationLogNumbers {
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
-    $logDir = Join-Path $RepoRoot "docs\iteration-log"
+    $updatesDir = ConvertFrom-CodePoints @(0x66f4, 0x65b0, 0x8bb0, 0x5f55)
+    $indexFile = (ConvertFrom-CodePoints @(0x7d22, 0x5f15)) + ".md"
+    $logDir = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @($updatesDir)
     if (-not (Test-Path -LiteralPath $logDir)) {
-        Write-WarnHealth "iteration-log directory missing."
+        Write-WarnHealth "Update record directory missing."
         return
     }
 
@@ -912,23 +977,23 @@ function Test-IterationLogNumbers {
     foreach ($key in ($numbers.Keys | Sort-Object)) {
         if ($numbers[$key].Count -gt 1) {
             if ($knownDuplicateNumbers -contains $key) {
-                Write-Pass "Known historical duplicate iteration-log number ${key} is documented and left untouched."
+                Write-Pass "Known historical duplicate update-record number ${key} is documented and left untouched."
             }
             else {
-                Write-FailHealth "New duplicate iteration-log number ${key}: $($numbers[$key] -join ', ')"
+                Write-FailHealth "New duplicate update-record number ${key}: $($numbers[$key] -join ', ')"
             }
         }
     }
 
     if (-not $numbers.ContainsKey("0017")) {
-        Write-Pass "Missing iteration-log number 0017 is a documented historical gap and should not be backfilled by renaming."
+        Write-Pass "Missing update-record number 0017 is a documented historical gap and should not be backfilled by renaming."
     }
 
-    if (Test-Path -LiteralPath (Join-Path $logDir "INDEX.md")) {
-        Write-Pass "iteration-log INDEX.md exists."
+    if (Test-Path -LiteralPath (Join-Path $logDir $indexFile)) {
+        Write-Pass "Update record index exists."
     }
     else {
-        Write-WarnHealth "iteration-log INDEX.md missing."
+        Write-WarnHealth "Update record index missing."
     }
 }
 

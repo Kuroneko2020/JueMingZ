@@ -700,9 +700,6 @@ namespace JueMingZ.Diagnostics
             Append(builder, "CombatAutoFacingTargetName", snapshot.CombatAutoFacingTargetName, true);
             Append(builder, "CombatAutoFacingSubmittedCount", snapshot.CombatAutoFacingSubmittedCount, true);
             Append(builder, "CombatAutoFacingSkippedCount", snapshot.CombatAutoFacingSkippedCount, true);
-            Append(builder, "CombatAutoClickerLastDecision", snapshot.CombatAutoClickerLastDecision, true);
-            Append(builder, "CombatAutoClickerLastSkipReason", snapshot.CombatAutoClickerLastSkipReason, true);
-            Append(builder, "CombatAutoClickerLastDecisionUtc", FormatDate(snapshot.CombatAutoClickerLastDecisionUtc), true);
             Append(builder, "CombatPerfectRevolverLastDecision", snapshot.CombatPerfectRevolverLastDecision, true);
             Append(builder, "CombatPerfectRevolverLastSkipReason", snapshot.CombatPerfectRevolverLastSkipReason, true);
             Append(builder, "CombatPerfectRevolverLastDecisionUtc", FormatDate(snapshot.CombatPerfectRevolverLastDecisionUtc), true);

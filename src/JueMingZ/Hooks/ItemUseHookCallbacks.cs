@@ -22,7 +22,11 @@ namespace JueMingZ.Hooks
             public bool PerfectRevolverTakeoverApplied;
             public bool FlailTakeoverApplied;
             public bool TravelMenuItemCheckGuardApplied;
+            public bool BridgePendingAtStart;
             public Guid RequestId;
+            public Guid PulseRequestId;
+            public Guid AutoHarvestSustainedUseRequestId;
+            public Guid AutoCaptureCritterSustainedUseRequestId;
             public UseItemInputState RestoreState;
             public UseItemInputState PulseRestoreState;
             public UseItemInputState AutoHarvestSustainedUseRestoreState;
@@ -40,6 +44,7 @@ namespace JueMingZ.Hooks
             public ItemUseBridgeContext Context;
             public CombatAimItemCheckDecision AimDecision;
             public AutoBuffFollowItemUseObservation FollowUseObservation;
+            public ItemCheckInputProbeFrame InputProbeBefore;
         }
 
         private static void Prefix(object __instance, ref ItemUseHookState __state)
@@ -52,6 +57,9 @@ namespace JueMingZ.Hooks
                 {
                     return;
                 }
+
+                __state.BridgePendingAtStart = ItemUseBridge.PendingRequestId != Guid.Empty;
+                __state.InputProbeBefore = CombatAutoClickerItemCheckInputProbe.CapturePrefix(__instance, __state.BridgePendingAtStart);
 
                 if (TryApplyTravelMenuItemCheckGuard(__instance, ref __state))
                 {
@@ -73,7 +81,7 @@ namespace JueMingZ.Hooks
                     return;
                 }
 
-                var bridgePendingAtStart = ItemUseBridge.PendingRequestId != Guid.Empty;
+                var bridgePendingAtStart = __state.BridgePendingAtStart;
                 if (!bridgePendingAtStart)
                 {
                     AutoBuffFollowService.TryCaptureManualItemUse(__instance, out __state.FollowUseObservation);
@@ -93,6 +101,7 @@ namespace JueMingZ.Hooks
                     {
                         __state.FollowUseObservation = null;
                         __state.AutoCaptureCritterSustainedUseApplied = true;
+                        __state.AutoCaptureCritterSustainedUseRequestId = autoCaptureUse.RequestId;
                         __state.AutoCaptureCritterSustainedUseRestoreState = autoCaptureUse.RestoreState;
                         __state.AutoCaptureCritterSustainedUseMouseRestoreState = autoCaptureUse.MouseRestoreState;
                         __state.AutoCaptureCritterSustainedUseRestoreSlot = autoCaptureUse.RestoreSelectedSlot;
@@ -105,6 +114,7 @@ namespace JueMingZ.Hooks
                     {
                         __state.FollowUseObservation = null;
                         __state.AutoHarvestSustainedUseApplied = true;
+                        __state.AutoHarvestSustainedUseRequestId = autoHarvestUse.RequestId;
                         __state.AutoHarvestSustainedUseRestoreState = autoHarvestUse.RestoreState;
                         __state.AutoHarvestSustainedUseMouseRestoreState = autoHarvestUse.MouseRestoreState;
                         return;
@@ -114,6 +124,7 @@ namespace JueMingZ.Hooks
                     if (UseItemPulseBridge.TryApplyItemCheckPulse(__instance, out pulse) && pulse != null)
                     {
                         __state.PulseApplied = true;
+                        __state.PulseRequestId = pulse.RequestId;
                         __state.PulsePressed = pulse.Pressed;
                         __state.PulseAllowCombatAim = pulse.AllowCombatAim;
                         __state.PulseRestoreState = pulse.RestoreState;
@@ -190,6 +201,8 @@ namespace JueMingZ.Hooks
 
         private static void Postfix(object __instance, ref ItemUseHookState __state)
         {
+            RecordInputProbe(__instance, ref __state);
+
             if (__state.TravelMenuItemCheckGuardApplied)
             {
                 RestoreTravelMenuItemCheckGuard(__state.TravelMenuItemCheckGuard);
@@ -290,6 +303,40 @@ namespace JueMingZ.Hooks
                     TimeSpan.FromSeconds(10),
                     "ItemUseHookCallbacks",
                     "ItemCheck postfix failed; exception swallowed.", error);
+            }
+        }
+
+        private static void RecordInputProbe(object player, ref ItemUseHookState state)
+        {
+            try
+            {
+                CombatAutoClickerItemCheckInputProbe.RecordPostfix(
+                    player,
+                    state.InputProbeBefore,
+                    state.BridgePendingAtStart,
+                    state.BridgeApplied,
+                    state.BridgeApplied ? state.RequestId : Guid.Empty,
+                    state.Context == null ? string.Empty : state.Context.SourceFeatureId,
+                    state.PulseApplied,
+                    state.PulsePressed,
+                    state.PulseRequestId,
+                    state.AutoHarvestSustainedUseApplied,
+                    state.AutoHarvestSustainedUseRequestId,
+                    state.AutoCaptureCritterSustainedUseApplied,
+                    state.AutoCaptureCritterSustainedUseRequestId,
+                    state.PerfectRevolverTakeoverApplied,
+                    state.FlailTakeoverApplied,
+                    state.TravelMenuItemCheckGuardApplied,
+                    state.AimApplied);
+            }
+            catch (Exception error)
+            {
+                RuntimeDiagnostics.RecordError("ItemUseHookCallbacks.InputProbe", error);
+                LogThrottle.ErrorThrottled(
+                    "itemcheck-input-probe-failed",
+                    TimeSpan.FromSeconds(10),
+                    "ItemUseHookCallbacks",
+                    "ItemCheck input probe failed; exception swallowed.", error);
             }
         }
 

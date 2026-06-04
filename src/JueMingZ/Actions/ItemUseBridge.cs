@@ -167,10 +167,6 @@ namespace JueMingZ.Actions
                     UiMouseCaptureAvailableAtClick = options != null && options.UiMouseCaptureAvailableAtClick,
                     HitTestModeAtClick = options == null ? string.Empty : options.HitTestModeAtClick ?? string.Empty,
                     ClickSourceAtClick = options == null ? string.Empty : options.ClickSourceAtClick ?? string.Empty,
-                    AutoClickerPlayerInventoryOpen = options != null && options.AutoClickerPlayerInventoryOpen,
-                    AutoClickerMouseItemPresent = options != null && options.AutoClickerMouseItemPresent,
-                    AutoClickerMouseItemType = options == null ? 0 : options.AutoClickerMouseItemType,
-                    AutoClickerMouseItemName = options == null ? string.Empty : options.AutoClickerMouseItemName ?? string.Empty,
                     Status = ItemUseBridgeStatus.WaitingForItemCheck,
                     LastMessage = "Waiting for Player.ItemCheck."
                 };
@@ -283,8 +279,15 @@ namespace JueMingZ.Actions
             bool delayUseItem;
             if (TerrariaInputCompat.TryReadDelayUseItem(player, out delayUseItem) && delayUseItem)
             {
-                var releaseApplied = TerrariaInputCompat.TryApplyUseItemReleaseForItemCheck(player, pending.RequireUseItemHeld);
-                MarkDelayUseItemReleaseApplied(pending.RequestId, releaseApplied);
+                UseItemInputState delayRestoreState;
+                if (!TerrariaInputCompat.TryCaptureUseItemInputState(player, out delayRestoreState))
+                {
+                    Complete(pending.RequestId, ItemUseBridgeStatus.Failed, "Cannot capture release-only restore state before delayUseItem wait: " + TerrariaInputCompat.LastInputCompatError);
+                    return false;
+                }
+
+                var releaseApplied = TerrariaInputCompat.TryApplyUseItemReleaseForItemCheck(player);
+                MarkDelayUseItemReleaseApplied(pending.RequestId, releaseApplied, releaseApplied ? player : null, releaseApplied ? delayRestoreState : null);
                 UpdatePendingMessage(
                     pending.RequestId,
                     releaseApplied
@@ -434,6 +437,26 @@ namespace JueMingZ.Actions
             }
         }
 
+        public static bool CancelBySource(string sourceFeatureId, string reason)
+        {
+            if (string.IsNullOrWhiteSpace(sourceFeatureId))
+            {
+                return false;
+            }
+
+            lock (SyncRoot)
+            {
+                if (_pending == null || _pending.Finished ||
+                    !string.Equals(_pending.SourceFeatureId, sourceFeatureId, StringComparison.Ordinal))
+                {
+                    return false;
+                }
+
+                CompleteLocked(_pending, ItemUseBridgeStatus.Cancelled, reason ?? "ItemUseBridge request cancelled by source.");
+                return true;
+            }
+        }
+
         public static void Fail(Guid requestId, string reason)
         {
             lock (SyncRoot)
@@ -498,7 +521,7 @@ namespace JueMingZ.Actions
             }
         }
 
-        private static void MarkDelayUseItemReleaseApplied(Guid requestId, bool applied)
+        private static void MarkDelayUseItemReleaseApplied(Guid requestId, bool applied, object player, UseItemInputState restoreState)
         {
             lock (SyncRoot)
             {
@@ -509,6 +532,12 @@ namespace JueMingZ.Actions
 
                 _pending.DelayUseItemReleaseAttempted = true;
                 _pending.DelayUseItemReleaseApplied |= applied;
+                if (applied && restoreState != null && !_pending.ConsumedByItemCheck)
+                {
+                    _pending.DelayUseItemReleasePlayer = player;
+                    _pending.DelayUseItemReleaseRestoreState = restoreState;
+                    _pending.DelayUseItemReleaseRestoreStateCaptured = true;
+                }
             }
         }
 
@@ -541,6 +570,7 @@ namespace JueMingZ.Actions
             pending.LastMessage = message ?? string.Empty;
             pending.Finished = true;
             pending.AfterState = afterState;
+            RestoreDelayUseItemReleaseIfNeeded(pending);
             _lastMessage = pending.LastMessage;
             _lastResult = new ItemUseBridgeResult
             {
@@ -579,6 +609,25 @@ namespace JueMingZ.Actions
             {
                 RecordActionEvent(pending);
             }
+        }
+
+        private static void RestoreDelayUseItemReleaseIfNeeded(PendingUseRequest pending)
+        {
+            if (pending == null ||
+                pending.ConsumedByItemCheck ||
+                !pending.DelayUseItemReleaseRestoreStateCaptured ||
+                pending.DelayUseItemReleasePlayer == null ||
+                pending.DelayUseItemReleaseRestoreState == null)
+            {
+                return;
+            }
+
+            TerrariaInputCompat.TryRestoreUseItemButtonInputState(
+                pending.DelayUseItemReleasePlayer,
+                pending.DelayUseItemReleaseRestoreState);
+            pending.DelayUseItemReleaseRestoreStateCaptured = false;
+            pending.DelayUseItemReleasePlayer = null;
+            pending.DelayUseItemReleaseRestoreState = null;
         }
 
         private static string MapResultCode(ItemUseBridgeStatus status)
@@ -635,10 +684,6 @@ namespace JueMingZ.Actions
                                "\"earlyItemCheckWindowTicks\":" + pending.EarlyItemCheckWindowTicks.ToString(CultureInfo.InvariantCulture) + "," +
                                "\"delayUseItemReleaseApplied\":" + (pending.DelayUseItemReleaseApplied ? "true" : "false") + "," +
                                "\"allowCombatAim\":" + (pending.AllowCombatAim ? "true" : "false") + "," +
-                               "\"AutoClickerPlayerInventoryOpen\":" + (pending.AutoClickerPlayerInventoryOpen ? "true" : "false") + "," +
-                               "\"AutoClickerMouseItemPresent\":" + (pending.AutoClickerMouseItemPresent ? "true" : "false") + "," +
-                               "\"AutoClickerMouseItemType\":" + pending.AutoClickerMouseItemType.ToString(CultureInfo.InvariantCulture) + "," +
-                               "\"AutoClickerMouseItemName\":\"" + EscapeJson(pending.AutoClickerMouseItemName ?? string.Empty) + "\"," +
                                "\"observableChange\":" + (observableChange ? "true" : "false") + "," +
                                "\"buttonClickSuppressedGameInput\":" + (pending.UiClickSuppressionSucceeded ? "true" : "false") + "," +
                                "\"changedFields\":" + BuildChangedFieldsJson(pending.BeforeState, pending.AfterState) + "," +
@@ -909,6 +954,9 @@ namespace JueMingZ.Actions
             public int EarlyItemCheckWindowTicks;
             public bool DelayUseItemReleaseAttempted;
             public bool DelayUseItemReleaseApplied;
+            public bool DelayUseItemReleaseRestoreStateCaptured;
+            public object DelayUseItemReleasePlayer;
+            public UseItemInputState DelayUseItemReleaseRestoreState;
             public bool AllowCombatAim;
             public bool HasMouseScreenTarget;
             public int MouseScreenX;
@@ -923,10 +971,6 @@ namespace JueMingZ.Actions
             public bool UiMouseCaptureAvailableAtClick;
             public string HitTestModeAtClick;
             public string ClickSourceAtClick;
-            public bool AutoClickerPlayerInventoryOpen;
-            public bool AutoClickerMouseItemPresent;
-            public int AutoClickerMouseItemType;
-            public string AutoClickerMouseItemName;
             public bool ConsumedByItemCheck;
             public bool Finished;
             public ItemUseBridgeStatus Status;

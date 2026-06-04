@@ -520,7 +520,9 @@ namespace JueMingZ.Tests
             public bool channel;
             public bool mouseInterface;
             public int itemAnimation;
+            public int itemTime;
             public int reuseDelay;
+            public bool delayUseItem;
             public bool pendingItemReuse;
             public bool controlJump;
             public bool releaseJump = true;
@@ -635,6 +637,7 @@ namespace JueMingZ.Tests
             public bool thrown;
             public bool sentry;
             public bool consumable;
+            public bool autoReuse;
             public bool channel;
             public bool noMelee;
             public bool noUseGraphic;

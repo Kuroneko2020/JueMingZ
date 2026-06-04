@@ -9,6 +9,13 @@ namespace JueMingZ.Compat
 {
     internal static class TerrariaMainCompat
     {
+        private static bool? _allowsInputProcessingOverrideForTesting;
+
+        internal static void SetAllowsInputProcessingOverrideForTesting(bool? value)
+        {
+            _allowsInputProcessingOverrideForTesting = value;
+        }
+
         public static bool IsInMainMenu
         {
             get { return Main.gameMenu; }
@@ -33,6 +40,11 @@ namespace JueMingZ.Compat
         {
             get
             {
+                if (_allowsInputProcessingOverrideForTesting.HasValue)
+                {
+                    return _allowsInputProcessingOverrideForTesting.Value;
+                }
+
                 bool foreground;
                 if (TryIsCurrentProcessForeground(out foreground))
                 {

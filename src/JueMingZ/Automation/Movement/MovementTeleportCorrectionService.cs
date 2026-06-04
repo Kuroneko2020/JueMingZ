@@ -7,6 +7,7 @@ using JueMingZ.Common;
 using JueMingZ.Compat;
 using JueMingZ.Config;
 using JueMingZ.Diagnostics;
+using JueMingZ.GameState;
 using JueMingZ.UI.Legacy;
 
 namespace JueMingZ.Automation.Movement
@@ -83,6 +84,14 @@ namespace JueMingZ.Automation.Movement
                 {
                     plan.SkipReason = "nonLocalPlayer";
                     RecordAttempt(true, "skipped", "nonLocalPlayer", plan, false, true);
+                    return false;
+                }
+
+                string useFrameReason;
+                if (!IsVanillaTeleportRodUseFrame(player, out useFrameReason))
+                {
+                    plan.SkipReason = useFrameReason;
+                    RecordAttempt(true, "skipped", useFrameReason, plan, false, false);
                     return false;
                 }
 
@@ -201,6 +210,61 @@ namespace JueMingZ.Automation.Movement
                     "MovementTeleportCorrectionService",
                     "Teleport correction mouse restore failed; exception swallowed.", error);
             }
+        }
+
+        internal static bool IsVanillaTeleportRodUseFrameForTesting(object player, out string reason)
+        {
+            return IsVanillaTeleportRodUseFrame(player, out reason);
+        }
+
+        private static bool IsVanillaTeleportRodUseFrame(object player, out string reason)
+        {
+            reason = string.Empty;
+            if (player == null)
+            {
+                reason = "useFrameUnavailable:player";
+                return false;
+            }
+
+            int itemAnimation;
+            if (!GameStateReflection.TryGetInt(player, "itemAnimation", out itemAnimation))
+            {
+                reason = "useFrameUnavailable:itemAnimation";
+                return false;
+            }
+
+            if (itemAnimation <= 0)
+            {
+                reason = "notUseFrame:itemAnimation";
+                return false;
+            }
+
+            bool itemTimeIsZero;
+            if (GameStateReflection.TryGetBool(player, "ItemTimeIsZero", out itemTimeIsZero))
+            {
+                if (!itemTimeIsZero)
+                {
+                    reason = "notUseFrame:itemTime";
+                    return false;
+                }
+
+                return true;
+            }
+
+            int itemTime;
+            if (GameStateReflection.TryGetInt(player, "itemTime", out itemTime))
+            {
+                if (itemTime > 0)
+                {
+                    reason = "notUseFrame:itemTime";
+                    return false;
+                }
+
+                return true;
+            }
+
+            reason = "useFrameUnavailable:itemTime";
+            return false;
         }
 
         private static void RecordAttempt(

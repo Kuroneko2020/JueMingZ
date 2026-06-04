@@ -128,7 +128,7 @@ $configContent = @"
 Set-Content -Path (Join-Path $packageDir "Terraria.exe.config") -Value $configContent -Encoding UTF8
 
 $readmeFileName = "README_测试说明.txt"
-$readmeTemplate = Join-Path $repoRoot "docs\test-package\README_TESTING.zh-CN.txt"
+$readmeTemplate = Join-Path $repoRoot "文档\项目规则\测试包README模板.zh-CN.txt"
 if (-not (Test-Path $readmeTemplate)) {
     Write-Error "README testing template was not found: $readmeTemplate"
 }

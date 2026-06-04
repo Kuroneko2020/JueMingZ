@@ -107,6 +107,7 @@ namespace JueMingZ.Tests
             var restoreRuntimeTypes = PushFakeTerrariaMainType();
             try
             {
+                TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(true);
                 ResetUiInputFrameTestState();
                 SetFakeTerrariaMouseText("vanilla");
 
@@ -135,6 +136,7 @@ namespace JueMingZ.Tests
             finally
             {
                 ResetUiInputFrameTestState();
+                TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(null);
                 restoreRuntimeTypes();
             }
         }
@@ -144,6 +146,7 @@ namespace JueMingZ.Tests
             var restoreRuntimeTypes = PushFakeTerrariaMainType();
             try
             {
+                TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(true);
                 ResetUiInputFrameTestState();
                 SetFakeTerrariaMouseText("vanilla");
 
@@ -186,6 +189,7 @@ namespace JueMingZ.Tests
             finally
             {
                 ResetUiInputFrameTestState();
+                TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(null);
                 restoreRuntimeTypes();
             }
         }

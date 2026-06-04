@@ -13,10 +13,10 @@ namespace JueMingZ.Features.Catalog
                 .Hotkey(true, true)
                 .Notes("Stage 4 special weapon rules implemented for coin gun, rain-from-sky, parallel multi-shot, spread multi-shot, guided cursor, homing/beam, and heavy-gravity projectiles. 鼠标中心提供 0~50 瞄准半径滑条；玩家中心使用屏幕范围。实际攻击点优先中心/安全点，nearestHitboxPoint 仅作低优先级 fallback。智能弹道适配和哨兵免疫是内部默认策略，不登记为独立 Feature。"), true);
 
-            Add(registry, FeatureDefinitionBuilder.Create(FeatureIds.CombatAutoClicker, "自动连点", "长按使用时由队列接管连续点击")
-                .Actions(InputActionKind.RawInput)
+            Add(registry, FeatureDefinitionBuilder.Create(FeatureIds.CombatAutoClicker, "自动连点", "旧输入源路线已清理，等待 ItemCheck 新核心接入")
+                .Actions()
                 .GameState(GameStateKind.Player, GameStateKind.Inventory)
-                .Notes("手持合格物品或鼠标浮动物品时，长按使用键会先压住原版持续使用输入，再通过 ItemUseBridge / Player.ItemCheck 提交 fresh press；不再按 item.autoReuse 跳过，channel 和无效使用参数仍跳过。"), true);
+                .Notes("上一套自动连点 source / policy / input source 路线已按用户实测失败清理。后续新实现必须从自动连点完全重做计划的 ItemCheck scoped takeover 阶段接入。"), false);
 
             Add(registry, FeatureDefinitionBuilder.Create(FeatureIds.CombatPerfectRevolver, "完美左轮", "最大程度发挥左轮威力")
                 .Actions(InputActionKind.ItemUse, InputActionKind.RawInput)

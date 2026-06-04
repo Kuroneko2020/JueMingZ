@@ -9,6 +9,8 @@ if ($ZipOnly) {
     $Zip = $true
 }
 
+$localDocsRootName = ([string][char]0x6587) + ([string][char]0x6863)
+
 function Test-IsInsideDirectory {
     param(
         [Parameter(Mandatory = $true)]
@@ -73,7 +75,7 @@ function Test-IsRuntimeArtifactPath {
         return $false
     }
 
-    if ($segments[0] -in @('.git', '.vs', '.dotnet_home', '.nuget', '.appdata', 'docs', 'JueMingZ-TestPackage', 'JueMingZ-SourcePackage', 'references')) {
+    if ($segments[0] -in @('.git', '.vs', '.dotnet_home', '.nuget', '.appdata', 'docs', $script:localDocsRootName, 'JueMingZ-TestPackage', 'JueMingZ-SourcePackage', 'references')) {
         return $true
     }
 
@@ -211,6 +213,7 @@ $forbiddenRelativePaths = @(
     'JueMing-Z-main.zip',
     'AGENTS.md',
     'docs',
+    $localDocsRootName,
     'references',
     'src\JueMingZ\bin',
     'src\JueMingZ\obj',
@@ -265,7 +268,7 @@ if ($Zip) {
 Write-Host "JueMingZ source package created: $packageDir"
 Write-Host "Included required source directories: Config, Diagnostics, Actions, Automation, UI, Input, Features, tests"
 Write-Host "Excluded runtime artifact roots: logs, config, diagnostics"
-Write-Host "Excluded local docs/reference/generated folders: AGENTS.md, docs, references, bin, obj, JueMingZ-TestPackage, JueMingZ-SourcePackage"
+Write-Host "Excluded local docs/reference/generated folders: AGENTS.md, docs (legacy backflow guard), $localDocsRootName, references, bin, obj, JueMingZ-TestPackage, JueMingZ-SourcePackage"
 Write-Host "First-level entries:"
 $firstLevelEntries | Format-Table -AutoSize
 if ($Zip) {

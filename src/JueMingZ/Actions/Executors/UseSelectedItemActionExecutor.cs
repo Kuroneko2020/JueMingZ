@@ -32,7 +32,7 @@ namespace JueMingZ.Actions.Executors
             var originalSelectedSlot = selectedSlot;
             var targetSlot = HasMetadata(execution, ActionMetadataKeys.TargetSlot)
                 ? GetMetadataInt(execution, ActionMetadataKeys.TargetSlot, selectedSlot)
-                : GetMetadataInt(execution, "AutoClickerSelectedSlot", selectedSlot);
+                : selectedSlot;
             if (!TerrariaInputCompat.IsSupportedItemUseSlot(targetSlot))
             {
                 return InputActionExecutionStepResult.Complete(InputActionStatus.Failed, "UseSelectedItem 当前只支持快捷栏物品和鼠标浮动物品；selected=" + selectedSlot + ", target=" + targetSlot);
@@ -179,10 +179,10 @@ namespace JueMingZ.Actions.Executors
             var skipSelectInItemCheck = targetSlot != 58 &&
                                         (requireSelectedSlotUnchanged || selectedSlotAtUseStart == targetSlot);
             var options = slotSwitchAttempted ||
-                          skipSelectInItemCheck ||
-                          requireUseItemHeld ||
-                          allowCombatAim ||
-                          applyMainMouseLeftForItemCheck ||
+                           skipSelectInItemCheck ||
+                           requireUseItemHeld ||
+                           allowCombatAim ||
+                           applyMainMouseLeftForItemCheck ||
                           allowEarlyItemCheck ||
                           restoreSelectedSlotAfterItemUse ||
                           hasMouseWorldTarget ||
@@ -207,17 +207,7 @@ namespace JueMingZ.Actions.Executors
                     MouseWorldY = hasMouseWorldTarget ? mouseWorldY : 0f,
                     HasMouseScreenTarget = hasMouseScreenTarget,
                     MouseScreenX = hasMouseScreenTarget ? mouseScreenX : 0,
-                    MouseScreenY = hasMouseScreenTarget ? mouseScreenY : 0,
-                    AutoClickerPlayerInventoryOpen = string.Equals(
-                        GetMetadataString(execution, "AutoClickerPlayerInventoryOpen", string.Empty),
-                        "true",
-                        StringComparison.OrdinalIgnoreCase),
-                    AutoClickerMouseItemPresent = string.Equals(
-                        GetMetadataString(execution, "AutoClickerMouseItemPresent", string.Empty),
-                        "true",
-                        StringComparison.OrdinalIgnoreCase),
-                    AutoClickerMouseItemType = GetMetadataInt(execution, "AutoClickerMouseItemType", 0),
-                    AutoClickerMouseItemName = GetMetadataString(execution, "AutoClickerMouseItemName", string.Empty)
+                    MouseScreenY = hasMouseScreenTarget ? mouseScreenY : 0
                 }
                 : null;
 

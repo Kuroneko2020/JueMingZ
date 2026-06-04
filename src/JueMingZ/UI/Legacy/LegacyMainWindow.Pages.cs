@@ -52,7 +52,7 @@ namespace JueMingZ.UI.Legacy
 
             hovered = DrawCombatAimAssistRow(spriteBatch, area, mouse, elements, y, settings) ?? hovered;
             y += CombatAimRowHeight + LegacyUiMetrics.SettingRowGap;
-            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "自动连点", settings.CombatAutoClickerEnabled, "combat-auto-clicker-mode:", "对不支持长按连点的物品进行修补") ?? hovered;
+            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "自动连点", settings.CombatAutoClickerEnabled, "combat-auto-clicker-mode:", "旧路线已清理，等待新核心接入") ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "完美左轮", settings.CombatPerfectRevolverEnabled, "combat-perfect-revolver-mode:", "最大程度发挥左轮威力") ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;

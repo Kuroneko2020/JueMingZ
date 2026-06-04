@@ -10,8 +10,10 @@
 _codex_log_inspect_*/
 
 # Local-only AI/maintainer documents. GitHub should stay a human-facing source tree.
+# The legacy docs/ directory has been deleted; keep the ignore rule as a backflow guard.
 AGENTS.md
 docs/
+文档/
 
 # Local-only reference materials under references are excluded by default.
 references/

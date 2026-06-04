@@ -1,8 +1,16 @@
 ﻿namespace JueMingZ.Automation.WorldAutomation
 {
+    public enum TravelMenuScopedJourneySource
+    {
+        None = 0,
+        NativeJourneyCreativeUiScope = 1,
+        JueMingZTravelMenuScope = 2
+    }
+
     public sealed class TravelMenuScopedJourneyState
     {
         public string Scope { get; set; }
+        public TravelMenuScopedJourneySource Source { get; set; }
         public bool Applied { get; set; }
         public string Message { get; set; }
         public object WorldFile { get; set; }

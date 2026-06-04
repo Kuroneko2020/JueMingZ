@@ -307,7 +307,7 @@ namespace JueMingZ.Automation.WorldAutomation
                 restored = false;
             }
 
-            if (ShouldApplyCreativeUiWorldInputGuard(scope))
+            if (ShouldApplyCreativeUiWorldInputGuard(state))
             {
                 string worldInputGuardMessage;
                 var worldInputGuardApplied = TravelMenuCompat.TryApplyCreativeUiWorldInputGuard(state, out worldInputGuardMessage);
@@ -1139,9 +1139,12 @@ namespace JueMingZ.Automation.WorldAutomation
                    string.Equals(scope, "CreativeUI.Draw", StringComparison.Ordinal);
         }
 
-        private static bool ShouldApplyCreativeUiWorldInputGuard(string scope)
+        private static bool ShouldApplyCreativeUiWorldInputGuard(TravelMenuScopedJourneyState state)
         {
-            return string.Equals(scope, "CreativeUI.Update", StringComparison.Ordinal);
+            return state != null &&
+                   state.Source == TravelMenuScopedJourneySource.JueMingZTravelMenuScope &&
+                   string.Equals(state.Scope, "CreativeUI.Update", StringComparison.Ordinal) &&
+                   ShouldPauseAutomationForTravelMenu();
         }
 
         private static bool RequiresGodmodePowerScopedJourney(string scope)

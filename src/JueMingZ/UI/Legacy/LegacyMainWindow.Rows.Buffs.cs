@@ -79,7 +79,7 @@ namespace JueMingZ.UI.Legacy
             var rightPane = new LegacyUiRect(leftPane.Right + paneGap, leftPane.Y, paneWidth, leftPane.Height);
             var hovered = (LegacyUiElement)null;
 
-            DrawPotionPane(spriteBatch, area, leftPane, "可选增益", available.Count <= 0 ? "未发现可选增益药水，请点击刷新候选。" : string.Empty);
+            DrawPotionPane(spriteBatch, area, leftPane, "可选增益", available.Count <= 0 ? "未发现可选增益物品" : string.Empty);
             DrawPotionPane(spriteBatch, area, rightPane, "已选增益", entries.Count <= 0 ? "已选列表为空。" : string.Empty);
             hovered = DrawAvailablePotionPaneToolbar(spriteBatch, area, mouse, elements, leftPane, settings) ?? hovered;
             hovered = DrawSelectedPotionPaneToolbar(spriteBatch, area, mouse, elements, rightPane) ?? hovered;

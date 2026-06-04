@@ -696,8 +696,12 @@ namespace JueMingZ.Tests
         private static void TravelMenuCreativeUiWorldInputGuardDoesNotOverrideMouseState()
         {
             var restoreRuntimeTypes = PushFakeTerrariaMainType();
+            var previousCreativeMenu = Terraria.Main.CreativeMenu;
+            var previousPlayerInventory = Terraria.Main.playerInventory;
             try
             {
+                Terraria.Main.CreativeMenu = new Terraria.CreativeMenuStub { Enabled = true };
+                Terraria.Main.playerInventory = true;
                 ResetFakeMainMouse(true, true);
                 Terraria.Main.mouseRight = true;
                 Terraria.Main.mouseRightRelease = true;
@@ -710,6 +714,7 @@ namespace JueMingZ.Tests
                 var state = new TravelMenuScopedJourneyState
                 {
                     Scope = "CreativeUI.Update",
+                    Source = TravelMenuScopedJourneySource.JueMingZTravelMenuScope,
                     Player = player,
                     LocalPlayer = player
                 };
@@ -732,6 +737,92 @@ namespace JueMingZ.Tests
             }
             finally
             {
+                Terraria.Main.CreativeMenu = previousCreativeMenu;
+                Terraria.Main.playerInventory = previousPlayerInventory;
+                restoreRuntimeTypes();
+            }
+        }
+
+        private static void TravelMenuCreativeUiWorldInputGuardSkipsNativeJourneyScope()
+        {
+            var restoreRuntimeTypes = PushFakeTerrariaMainType();
+            var previousCreativeMenu = Terraria.Main.CreativeMenu;
+            var previousPlayerInventory = Terraria.Main.playerInventory;
+            try
+            {
+                Terraria.Main.CreativeMenu = new Terraria.CreativeMenuStub { Enabled = true };
+                Terraria.Main.playerInventory = true;
+                var player = new FakePlayer
+                {
+                    controlUseItem = true,
+                    releaseUseItem = false
+                };
+
+                var state = new TravelMenuScopedJourneyState
+                {
+                    Scope = "CreativeUI.Update",
+                    Source = TravelMenuScopedJourneySource.NativeJourneyCreativeUiScope,
+                    Player = player,
+                    LocalPlayer = player
+                };
+
+                string message;
+                if (TravelMenuCompat.TryApplyCreativeUiWorldInputGuard(state, out message))
+                {
+                    throw new InvalidOperationException("Expected native Journey CreativeUI world input guard to skip.");
+                }
+
+                if (!player.controlUseItem || player.releaseUseItem)
+                {
+                    throw new InvalidOperationException("Expected native Journey CreativeUI scope to leave use-item flags untouched.");
+                }
+            }
+            finally
+            {
+                Terraria.Main.CreativeMenu = previousCreativeMenu;
+                Terraria.Main.playerInventory = previousPlayerInventory;
+                restoreRuntimeTypes();
+            }
+        }
+
+        private static void TravelMenuCreativeUiWorldInputGuardRequiresInventory()
+        {
+            var restoreRuntimeTypes = PushFakeTerrariaMainType();
+            var previousCreativeMenu = Terraria.Main.CreativeMenu;
+            var previousPlayerInventory = Terraria.Main.playerInventory;
+            try
+            {
+                Terraria.Main.CreativeMenu = new Terraria.CreativeMenuStub { Enabled = true };
+                Terraria.Main.playerInventory = false;
+                var player = new FakePlayer
+                {
+                    controlUseItem = true,
+                    releaseUseItem = false
+                };
+
+                var state = new TravelMenuScopedJourneyState
+                {
+                    Scope = "CreativeUI.Update",
+                    Source = TravelMenuScopedJourneySource.JueMingZTravelMenuScope,
+                    Player = player,
+                    LocalPlayer = player
+                };
+
+                string message;
+                if (TravelMenuCompat.TryApplyCreativeUiWorldInputGuard(state, out message))
+                {
+                    throw new InvalidOperationException("Expected CreativeUI world input guard to skip while inventory is closed.");
+                }
+
+                if (!player.controlUseItem || player.releaseUseItem)
+                {
+                    throw new InvalidOperationException("Expected closed-inventory CreativeUI scope to leave use-item flags untouched.");
+                }
+            }
+            finally
+            {
+                Terraria.Main.CreativeMenu = previousCreativeMenu;
+                Terraria.Main.playerInventory = previousPlayerInventory;
                 restoreRuntimeTypes();
             }
         }

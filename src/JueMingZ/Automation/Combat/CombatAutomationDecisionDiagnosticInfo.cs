@@ -10,11 +10,17 @@ namespace JueMingZ.Automation.Combat
         public long LastTick { get; set; }
         public long SubmittedCount { get; set; }
         public long SkippedCount { get; set; }
+        public string PolicyDecision { get; set; }
+        public string PolicyReason { get; set; }
+        public int LastItemType { get; set; }
+        public bool LastVanillaAutoReuseEnabled { get; set; }
 
         public CombatAutomationDecisionDiagnosticInfo()
         {
             LastDecision = string.Empty;
             LastSkipReason = string.Empty;
+            PolicyDecision = string.Empty;
+            PolicyReason = string.Empty;
         }
 
         public CombatAutomationDecisionDiagnosticInfo Clone()
@@ -26,7 +32,11 @@ namespace JueMingZ.Automation.Combat
                 LastDecisionUtc = LastDecisionUtc,
                 LastTick = LastTick,
                 SubmittedCount = SubmittedCount,
-                SkippedCount = SkippedCount
+                SkippedCount = SkippedCount,
+                PolicyDecision = PolicyDecision,
+                PolicyReason = PolicyReason,
+                LastItemType = LastItemType,
+                LastVanillaAutoReuseEnabled = LastVanillaAutoReuseEnabled
             };
         }
     }

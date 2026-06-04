@@ -45,9 +45,15 @@ namespace Terraria
         public static int mouseScrollWheel;
         public static int oldMouseScrollWheel;
         public static bool gameMenu;
+        public static bool chatMode;
+        public static bool drawingPlayerChat;
+        public static string npcChatText = string.Empty;
+        public static bool playerInventory;
         public static bool ingameOptionsWindow;
         public static bool inFancyUI;
         public static bool gamePaused;
+        public static bool SettingsEnabled_AutoReuseAllItems;
+        public static object CreativeMenu;
         public static int netMode;
         public static bool dedServ;
         public static int screenWidth = 1280;
@@ -68,14 +74,34 @@ namespace Terraria
 
     internal sealed class Player
     {
+        public int whoAmI;
         public bool active = true;
         public bool dead;
         public bool ghost;
         public TestVector2 position = new TestVector2();
         public int width = 20;
         public int height = 42;
+        public object[] inventory = new object[59];
+        public int selectedItem;
+        public bool controlUseItem;
+        public bool releaseUseItem = true;
+        public bool channel;
+        public bool mouseInterface;
+        public int itemAnimation;
+        public int itemTime;
+        public int reuseDelay;
+        public bool delayUseItem;
+        public int statLife;
+        public int statLifeMax2;
+        public int statMana;
+        public int statManaMax2;
         public int[] buffType = new int[22];
         public int[] buffTime = new int[22];
+    }
+
+    internal sealed class CreativeMenuStub
+    {
+        public bool Enabled;
     }
 
     internal sealed class Tile
@@ -349,13 +375,16 @@ namespace JueMingZ.Tests
             Run("runtime settings snapshot provider skips disabled list hashes", ref failed, RuntimeSettingsSnapshotProviderSkipsDisabledListHashes);
             Run("runtime service scheduler honors cadence and disabled cleanup", ref failed, RuntimeServiceSchedulerHonorsCadenceAndDisabledCleanup);
             Run("runtime input focus guard uses game state focus", ref failed, RuntimeInputFocusGuardUsesGameStateFocus);
-            Run("combat auto clicker item use request allows combat aim", ref failed, CombatAutoClickerItemUseRequestAllowsCombatAim);
+            Run("movement teleport correction requires vanilla use frame", ref failed, MovementTeleportCorrectionRequiresVanillaUseFrame);
             Run("combat perfect revolver ItemCheck takeover mirrors helper cadence", ref failed, CombatPerfectRevolverItemCheckTakeoverMirrorsHelperCadence);
             Run("combat perfect revolver schedules only in fire window", ref failed, CombatPerfectRevolverSchedulesOnlyInFireWindow);
+            Run("combat auto clicker input probe targets reported items", ref failed, CombatAutoClickerInputProbeTargetsReportedItems);
             Run("combat goblin execution allows only tinkerer when enabled", ref failed, CombatGoblinExecutionAllowsOnlyTinkererWhenEnabled);
             Run("travel menu diagnostics clone keeps scoped hook fields", ref failed, TravelMenuDiagnosticsCloneKeepsScopedHookFields);
             Run("travel menu ItemCheck guard suppresses world use and restores click", ref failed, TravelMenuItemCheckGuardSuppressesWorldUseAndRestoresClick);
             Run("travel menu CreativeUI world input guard does not override mouse state", ref failed, TravelMenuCreativeUiWorldInputGuardDoesNotOverrideMouseState);
+            Run("travel menu CreativeUI world input guard skips native journey scope", ref failed, TravelMenuCreativeUiWorldInputGuardSkipsNativeJourneyScope);
+            Run("travel menu CreativeUI world input guard requires inventory", ref failed, TravelMenuCreativeUiWorldInputGuardRequiresInventory);
             Run("travel menu CreativeUI Draw restore preserves vanilla mouse interface", ref failed, TravelMenuCreativeUiDrawRestorePreservesVanillaMouseInterface);
             Run("travel menu CreativeUI Draw release pulse ignores other inventory buttons", ref failed, TravelMenuCreativeUiDrawReleasePulseIgnoresOtherInventoryButtons);
             Run("travel menu CreativeUI input bypass clears using item gate", ref failed, TravelMenuCreativeUiInputBypassClearsUsingItemGate);
