@@ -340,6 +340,51 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void EnemyHealthLabelUsesCompactHealthLine()
+        {
+            var healthText = InformationOverlayService.BuildEnemyHealthTextForTesting(238, 500);
+            if (!string.Equals(healthText, "238/500", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected enemy health label text to use current/max format.");
+            }
+
+            var healthScale = InformationOverlayService.ResolveEnemyHealthFontScaleForTesting(0.80f);
+            if (Math.Abs(healthScale - 0.60f) > 0.001f)
+            {
+                throw new InvalidOperationException("Expected enemy health label scale to be three quarters of the name scale.");
+            }
+
+            var clampedHealthScale = InformationOverlayService.ResolveEnemyHealthFontScaleForTesting(0.50f);
+            if (Math.Abs(clampedHealthScale - 0.50f) > 0.001f)
+            {
+                throw new InvalidOperationException("Expected enemy health label scale to respect the shared minimum font scale.");
+            }
+
+            var tightAdvance = InformationWorldLabelRenderer.ResolveTightStackedLineAdvanceForTesting(0.80f, 0.60f);
+            if (Math.Abs(tightAdvance - 10.4f) > 0.001f)
+            {
+                throw new InvalidOperationException("Expected enemy health label rows to use a tight visual line advance.");
+            }
+        }
+
+        private static void EnemyHealthLabelSnapshotTracksLifeText()
+        {
+            if (!InformationOverlayService.CanReuseNpcLabelHealthValuesForTesting(80, 100, 80, 100))
+            {
+                throw new InvalidOperationException("Expected enemy health label cache to reuse unchanged life text.");
+            }
+
+            if (InformationOverlayService.CanReuseNpcLabelHealthValuesForTesting(80, 100, 79, 100))
+            {
+                throw new InvalidOperationException("Expected enemy health label cache to dirty when current life changes.");
+            }
+
+            if (InformationOverlayService.CanReuseNpcLabelHealthValuesForTesting(80, 100, 80, 120))
+            {
+                throw new InvalidOperationException("Expected enemy health label cache to dirty when max life changes.");
+            }
+        }
+
         private static void AssertSegmentLabelRoles(string name, int[] headOrTailTypes, int[] bodyTypes)
         {
             foreach (var npcType in headOrTailTypes)

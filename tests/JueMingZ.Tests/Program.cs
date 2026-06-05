@@ -491,6 +491,8 @@ namespace JueMingZ.Tests
             Run("enemy segment labels hide middle segments", ref failed, EnemySegmentLabelsHideMiddleSegments);
             Run("known worm segment labels use Terraria NPC roles", ref failed, KnownWormSegmentLabelsUseTerrariaNpcRoles);
             Run("skeleton merchant counts as information NPC label", ref failed, SkeletonMerchantCountsAsInformationNpcLabel);
+            Run("enemy health label uses compact health line", ref failed, EnemyHealthLabelUsesCompactHealthLine);
+            Run("enemy health label snapshot tracks life text", ref failed, EnemyHealthLabelSnapshotTracksLifeText);
             Run("information sign text all mode keeps vanilla line cap", ref failed, InformationSignTextAllModeKeepsVanillaLineCap);
             Run("information sign text line mode respects configured lines", ref failed, InformationSignTextLineModeRespectsConfiguredLines);
             Run("information sign text character mode truncates before wrapping", ref failed, InformationSignTextCharacterModeTruncatesBeforeWrapping);

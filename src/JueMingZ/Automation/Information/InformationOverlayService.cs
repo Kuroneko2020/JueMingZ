@@ -58,6 +58,7 @@ namespace JueMingZ.Automation.Information
         private const ulong SignScanIntervalTicks = 60;
         private const ulong StatusRefreshTicks = 30;
         private const ulong FishingBobberObserverFreshTicks = 2;
+        private const float EnemyHealthFontScaleMultiplier = 0.75f;
         private const string ChestLabelsModeAlways = "Always";
         private const string ChestLabelsModeOpened = "Opened";
         private const string ChestLabelsModeOff = "Off";
@@ -70,6 +71,7 @@ namespace JueMingZ.Automation.Information
         private static readonly List<ChestScanCandidate> ChestScanCandidateBuffer = new List<ChestScanCandidate>();
         private static readonly List<ChestScanCandidate> ChestAlwaysPartialScanCandidateBuffer = new List<ChestScanCandidate>();
         private static readonly HashSet<long> ChestAlwaysPartialScanAdded = new HashSet<long>();
+        private static readonly HashSet<int> EnemyNpcLabelGroupBuildBuffer = new HashSet<int>();
         private static readonly Dictionary<ChestNameCacheKey, string> ChestAlwaysNameCache = new Dictionary<ChestNameCacheKey, string>();
         private static readonly Queue<ChestNameCacheKey> ChestAlwaysNameCacheOrder = new Queue<ChestNameCacheKey>();
         private static NpcLabel[] CachedNpcLabels = EmptyNpcLabels;
@@ -348,7 +350,10 @@ namespace JueMingZ.Automation.Information
             for (var index = 0; index < labels.Length && drawn < MaxNpcLabelsPerFrame; index++)
             {
                 var label = labels[index];
-                if (LabelRenderer.DrawWorldLabel(spriteBatch, context, label.WorldX, label.WorldY, label.Text, label.Color, label.MaxDistance, false, -1f, label.FontScale))
+                var labelDrawn = string.IsNullOrWhiteSpace(label.HealthText)
+                    ? LabelRenderer.DrawWorldLabel(spriteBatch, context, label.WorldX, label.WorldY, label.Text, label.Color, label.MaxDistance, false, -1f, label.FontScale)
+                    : LabelRenderer.DrawWorldLabelWithSubLabel(spriteBatch, context, label.WorldX, label.WorldY, label.Text, label.HealthText, label.Color, label.MaxDistance, false, -1f, label.FontScale, label.HealthFontScale);
+                if (labelDrawn)
                 {
                     drawn++;
                 }
@@ -424,6 +429,7 @@ namespace JueMingZ.Automation.Information
             }
 
             var npcMode = NormalizeNpcMode(settings.InformationNpcNameLabelsMode);
+            EnemyNpcLabelGroupBuildBuffer.Clear();
             var segmentInfos = settings.InformationEnemyNameLabelsEnabled
                 ? typedNpcs != null
                     ? BuildNpcSegmentInfos(typedNpcs, count)
@@ -507,6 +513,24 @@ namespace JueMingZ.Automation.Information
                         continue;
                     }
 
+                    var groupKey = hasSegmentInfo ? segmentInfo.GroupKey : ResolveSegmentGroupKey(index, snapshot.WhoAmI, -1);
+                    if (!EnemyNpcLabelGroupBuildBuffer.Add(groupKey))
+                    {
+                        continue;
+                    }
+
+                    var healthSourceIndex = ResolveEnemyHealthSourceIndex(index, snapshot, segmentInfo, count);
+                    var healthLife = snapshot.Life;
+                    var healthLifeMax = snapshot.LifeMax;
+                    int resolvedHealthLife;
+                    int resolvedHealthLifeMax;
+                    if (TryReadNpcHealthByIndex(typedNpcs, reflectedNpcs, count, healthSourceIndex, out resolvedHealthLife, out resolvedHealthLifeMax))
+                    {
+                        healthLife = resolvedHealthLife;
+                        healthLifeMax = resolvedHealthLifeMax;
+                    }
+
+                    var fontScale = (float)InformationStyleHelper.GetFontScale(settings, InformationStyleHelper.EnemyNameFeatureId);
                     labels.Add(new NpcLabel
                     {
                         Index = index,
@@ -521,9 +545,14 @@ namespace JueMingZ.Automation.Information
                         Hidden = snapshot.Hidden,
                         Critter = snapshot.Critter,
                         Text = InformationNpcNameCompat.ResolveNpcTypeName(npc, snapshot.Type),
+                        HealthText = BuildEnemyHealthText(healthLife, healthLifeMax),
+                        HealthSourceIndex = healthSourceIndex,
+                        HealthLife = healthLife,
+                        HealthLifeMax = healthLifeMax,
                         Color = InformationColorHelper.EnemyName(settings),
                         MaxDistance = 1400f,
-                        FontScale = (float)InformationStyleHelper.GetFontScale(settings, InformationStyleHelper.EnemyNameFeatureId)
+                        FontScale = fontScale,
+                        HealthFontScale = ResolveEnemyHealthFontScale(fontScale)
                     });
                     continue;
                 }
@@ -560,7 +589,8 @@ namespace JueMingZ.Automation.Information
                 var npc = typedNpcs != null ? (object)typedNpcs[label.Index] : InformationReflection.GetIndexedValue(reflectedNpcs, label.Index);
                 NpcLabelSnapshot snapshot;
                 if (!TryReadNpcLabelSnapshot(npc, label.Index, out snapshot) ||
-                    !CanReuseNpcLabelSnapshot(label, snapshot))
+                    !CanReuseNpcLabelSnapshot(label, snapshot) ||
+                    !CanReuseNpcLabelHealth(typedNpcs, reflectedNpcs, count, label, snapshot))
                 {
                     return false;
                 }
@@ -588,6 +618,33 @@ namespace JueMingZ.Automation.Information
                    GetNpcLifeEligibilityKey(label.Life, label.LifeMax) == GetNpcLifeEligibilityKey(snapshot.Life, snapshot.LifeMax);
         }
 
+        private static bool CanReuseNpcLabelHealth(NPC[] typedNpcs, object reflectedNpcs, int count, NpcLabel label, NpcLabelSnapshot snapshot)
+        {
+            if (label == null || string.IsNullOrWhiteSpace(label.HealthText))
+            {
+                return true;
+            }
+
+            var healthSourceIndex = label.HealthSourceIndex >= 0 ? label.HealthSourceIndex : label.Index;
+            int life;
+            int lifeMax;
+            if (!TryReadNpcHealthByIndex(typedNpcs, reflectedNpcs, count, healthSourceIndex, out life, out lifeMax))
+            {
+                life = snapshot.Life;
+                lifeMax = snapshot.LifeMax;
+            }
+
+            return CanReuseNpcLabelHealthValues(label, life, lifeMax);
+        }
+
+        private static bool CanReuseNpcLabelHealthValues(NpcLabel label, int life, int lifeMax)
+        {
+            return label != null &&
+                   string.Equals(label.HealthText, BuildEnemyHealthText(life, lifeMax), StringComparison.Ordinal) &&
+                   label.HealthLife == life &&
+                   label.HealthLifeMax == lifeMax;
+        }
+
         private static bool IsNpcNameLabelCandidate(NpcLabelSnapshot snapshot)
         {
             return snapshot.TownNpc || IsSkeletonMerchant(snapshot.Type);
@@ -611,6 +668,92 @@ namespace JueMingZ.Automation.Information
             }
 
             return lifeMax > 5 ? 2 : 1;
+        }
+
+        private static int ResolveEnemyHealthSourceIndex(int index, NpcLabelSnapshot snapshot, NpcSegmentInfo segmentInfo, int count)
+        {
+            if (segmentInfo != null && segmentInfo.GroupKey >= 0 && segmentInfo.GroupKey < count)
+            {
+                return segmentInfo.GroupKey;
+            }
+
+            if (snapshot.WhoAmI >= 0 && snapshot.WhoAmI < count)
+            {
+                return snapshot.WhoAmI;
+            }
+
+            return index;
+        }
+
+        private static bool TryReadNpcHealthByIndex(NPC[] typedNpcs, object reflectedNpcs, int count, int index, out int life, out int lifeMax)
+        {
+            life = 0;
+            lifeMax = 0;
+            if (index < 0 || index >= count)
+            {
+                return false;
+            }
+
+            if (typedNpcs != null)
+            {
+                if (index >= typedNpcs.Length)
+                {
+                    return false;
+                }
+
+                var npc = typedNpcs[index];
+                if (!TerrariaNpcReadCompat.IsActive(npc))
+                {
+                    return false;
+                }
+
+                life = TerrariaNpcReadCompat.Life(npc);
+                lifeMax = TerrariaNpcReadCompat.LifeMax(npc);
+                return true;
+            }
+
+            var reflectedNpc = InformationReflection.GetIndexedValue(reflectedNpcs, index);
+            if (reflectedNpc == null || !IsNpcActive(reflectedNpc))
+            {
+                return false;
+            }
+
+            var hasLife = InformationReflection.TryReadInt(reflectedNpc, "life", out life);
+            var hasLifeMax = InformationReflection.TryReadInt(reflectedNpc, "lifeMax", out lifeMax);
+            return hasLife && hasLifeMax;
+        }
+
+        private static string BuildEnemyHealthText(int life, int lifeMax)
+        {
+            if (lifeMax <= 0)
+            {
+                return string.Empty;
+            }
+
+            return Math.Max(0, life).ToString(CultureInfo.InvariantCulture) +
+                   "/" +
+                   Math.Max(0, lifeMax).ToString(CultureInfo.InvariantCulture);
+        }
+
+        private static float ResolveEnemyHealthFontScale(float nameFontScale)
+        {
+            if (float.IsNaN(nameFontScale) || float.IsInfinity(nameFontScale) || nameFontScale <= 0.05f)
+            {
+                nameFontScale = 0.70f;
+            }
+
+            var value = Math.Round(nameFontScale * EnemyHealthFontScaleMultiplier, 2);
+            if (value < InformationStyleHelper.MinFontScale)
+            {
+                value = InformationStyleHelper.MinFontScale;
+            }
+
+            if (value > InformationStyleHelper.MaxFontScale)
+            {
+                value = InformationStyleHelper.MaxFontScale;
+            }
+
+            return (float)value;
         }
 
         private static bool TryGetNpcCollection(InformationWorldContext context, out NPC[] typedNpcs, out object reflectedNpcs, out int count)
@@ -1307,6 +1450,29 @@ namespace JueMingZ.Automation.Information
                     Hidden = snapshotHidden,
                     Critter = snapshotCritter
                 });
+        }
+
+        internal static bool CanReuseNpcLabelHealthValuesForTesting(int labelLife, int labelLifeMax, int currentLife, int currentLifeMax)
+        {
+            return CanReuseNpcLabelHealthValues(
+                new NpcLabel
+                {
+                    HealthText = BuildEnemyHealthText(labelLife, labelLifeMax),
+                    HealthLife = labelLife,
+                    HealthLifeMax = labelLifeMax
+                },
+                currentLife,
+                currentLifeMax);
+        }
+
+        internal static string BuildEnemyHealthTextForTesting(int life, int lifeMax)
+        {
+            return BuildEnemyHealthText(life, lifeMax);
+        }
+
+        internal static float ResolveEnemyHealthFontScaleForTesting(float nameFontScale)
+        {
+            return ResolveEnemyHealthFontScale(nameFontScale);
         }
 
         internal static bool TryParseChestKeyForTesting(string key, string currentWorldKey, out int x, out int y)
@@ -6277,9 +6443,14 @@ namespace JueMingZ.Automation.Information
             public bool Hidden;
             public bool Critter;
             public string Text;
+            public string HealthText;
+            public int HealthSourceIndex;
+            public int HealthLife;
+            public int HealthLifeMax;
             public InformationColor Color;
             public float MaxDistance;
             public float FontScale;
+            public float HealthFontScale;
         }
 
         private struct NpcLabelSnapshot
