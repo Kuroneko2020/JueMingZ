@@ -311,6 +311,12 @@ namespace JueMingZ.Automation.Combat
                 return false;
             }
 
+            if (profile.Channel)
+            {
+                reason = "excludedChannelItem";
+                return false;
+            }
+
             if (IsFishingRod(profile))
             {
                 reason = "excludedFishingRod";

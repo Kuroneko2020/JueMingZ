@@ -96,6 +96,7 @@ namespace JueMingZ.UI.Legacy
             var hotkeyElementRect = hotkeyHit.Width > 0 && hotkeyHit.Height > 0 ? hotkeyHit : hotkeyRect;
             var hotkeyHovered = IsFrameElementHovered(hotkeyId, hotkeyElementRect, mouse);
             LegacyUiTheme.DrawButtonClipped(spriteBatch, hotkeyRect, hotkeyHovered, hotkeyHovered && mouse.LeftDown, captureSelected, true, clip);
+            var hotkeyContentRect = LegacyUiTheme.GetSelectedButtonContentRect(hotkeyRect, captureSelected, true);
             var hotkeyScale = hotkeyText.Length >= 12
                 ? 0.52f
                 : hotkeyText.Length >= 10
@@ -103,10 +104,10 @@ namespace JueMingZ.UI.Legacy
                     : hotkeyText.Length >= 8
                         ? 0.60f
                         : 0.68f;
-            UiTextRenderer.DrawCenteredTextClipped(spriteBatch, hotkeyText, hotkeyRect.X + 4, hotkeyRect.Y, hotkeyRect.Width - 8, hotkeyRect.Height, clip.X, clip.Y, clip.Width, clip.Height, captureSelected ? LegacyUiTheme.SelectedTextR : 236, captureSelected ? LegacyUiTheme.SelectedTextG : 234, captureSelected ? LegacyUiTheme.SelectedTextB : 220, 255, hotkeyScale);
+            UiTextRenderer.DrawCenteredTextClipped(spriteBatch, hotkeyText, hotkeyRect.X + 4, hotkeyContentRect.Y, hotkeyRect.Width - 8, hotkeyContentRect.Height, clip.X, clip.Y, clip.Width, clip.Height, captureSelected ? LegacyUiTheme.SelectedTextR : 236, captureSelected ? LegacyUiTheme.SelectedTextG : 234, captureSelected ? LegacyUiTheme.SelectedTextB : 220, 255, hotkeyScale);
             if (captureSelected)
             {
-                LegacyUiTheme.DrawSelectedTextMarkersClipped(spriteBatch, new LegacyUiRect(hotkeyRect.X + 4, hotkeyRect.Y, hotkeyRect.Width - 8, hotkeyRect.Height), clip, hotkeyText, hotkeyScale);
+                LegacyUiTheme.DrawSelectedTextMarkersClipped(spriteBatch, new LegacyUiRect(hotkeyRect.X + 4, hotkeyContentRect.Y, hotkeyRect.Width - 8, hotkeyContentRect.Height), clip, hotkeyText, hotkeyScale);
             }
 
             if (!captureSelected &&

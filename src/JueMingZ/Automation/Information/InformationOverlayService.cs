@@ -14,7 +14,6 @@ using JueMingZ.Records;
 using JueMingZ.UI;
 using JueMingZ.UI.Information;
 using Terraria;
-using Terraria.Map;
 
 namespace JueMingZ.Automation.Information
 {
@@ -2898,38 +2897,79 @@ namespace JueMingZ.Automation.Information
                 return ResolveDresserTileDisplayName(tileStyle);
             }
 
-            try
+            if (tileType == ChestTileTypeContainers || tileType == ChestTileTypeFakeContainers)
             {
-                var typedLookup = MapHelper.TileToLookup(tileType, Math.Max(0, tileStyle));
-                var name = Lang.GetMapObjectName(typedLookup);
-                if (!string.IsNullOrWhiteSpace(name))
-                {
-                    return name;
-                }
-            }
-            catch
-            {
+                return ResolvePrimaryChestTileDisplayName(tileStyle);
             }
 
-            object lookup;
-            var mapHelperType = InformationReflection.FindType("Terraria.Map.MapHelper") ??
-                                InformationReflection.FindType("Terraria.MapHelper");
-            if (InformationReflection.TryInvokeStatic(mapHelperType, "TileToLookup", new object[] { tileType, Math.Max(0, tileStyle) }, out lookup) && lookup != null)
+            if (tileType == ChestTileTypeContainers2 || tileType == ChestTileTypeFakeContainers2)
             {
-                object rawName;
-                var langType = InformationReflection.FindType("Terraria.Lang") ??
-                               InformationReflection.FindType("Terraria.Localization.Lang");
-                if (InformationReflection.TryInvokeStatic(langType, "GetMapObjectName", new[] { lookup }, out rawName) && rawName != null)
+                return ResolveSecondaryChestTileDisplayName(tileType, tileStyle);
+            }
+
+            return DefaultChestLabelName(tileType);
+        }
+
+        private static string ResolvePrimaryChestTileDisplayName(int tileStyle)
+        {
+            var name = ResolveChestLocalizedTextValue("chestType", tileStyle, true);
+            return string.IsNullOrWhiteSpace(name) ? DefaultChestLabelName(ChestTileTypeContainers) : name;
+        }
+
+        private static string ResolveSecondaryChestTileDisplayName(int tileType, int tileStyle)
+        {
+            if (tileType == ChestTileTypeContainers2 && tileStyle == 4)
+            {
+                var goldChestName = ResolveItemName(3988);
+                if (!string.IsNullOrWhiteSpace(goldChestName) &&
+                    !string.Equals(goldChestName, "3988", StringComparison.Ordinal))
                 {
-                    var name = Convert.ToString(rawName, CultureInfo.InvariantCulture);
+                    return goldChestName;
+                }
+            }
+
+            var name = ResolveChestLocalizedTextValue("chestType2", tileStyle, false);
+            return string.IsNullOrWhiteSpace(name) ? DefaultChestLabelName(tileType) : name;
+        }
+
+        private static string ResolveChestLocalizedTextValue(string memberName, int tileStyle, bool primary)
+        {
+            if (tileStyle < 0)
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                var chestTypes = primary ? Lang.chestType : Lang.chestType2;
+                if (chestTypes != null && tileStyle < chestTypes.Length && chestTypes[tileStyle] != null)
+                {
+                    var name = chestTypes[tileStyle].Value;
                     if (!string.IsNullOrWhiteSpace(name))
                     {
                         return name;
                     }
                 }
             }
+            catch
+            {
+            }
 
-            return DefaultChestLabelName(tileType);
+            try
+            {
+                var langType = InformationReflection.FindType("Terraria.Lang") ??
+                               InformationReflection.FindType("Terraria.Localization.Lang");
+                var chestTypes = InformationReflection.GetStaticMember(langType, memberName);
+                var rawName = InformationReflection.GetIndexedValue(chestTypes, tileStyle);
+                var name = FirstNonEmpty(
+                    InformationReflection.TryReadString(rawName, "Value"),
+                    Convert.ToString(rawName, CultureInfo.InvariantCulture));
+                return string.IsNullOrWhiteSpace(name) ? string.Empty : name;
+            }
+            catch
+            {
+                return string.Empty;
+            }
         }
 
         private static string ResolveDresserTileDisplayName(int tileStyle)

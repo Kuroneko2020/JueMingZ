@@ -525,6 +525,7 @@ namespace JueMingZ.Tests
             Run("legacy UI hover layout token ignores window and content position", ref failed, LegacyUiHoverLayoutTokenIgnoresWindowAndContentPosition);
             Run("legacy UI hover layout token dirties on page size scroll settings and font", ref failed, LegacyUiHoverLayoutTokenDirtiesOnPageSizeScrollSettingsAndFont);
             Run("legacy UI tabs ignore content scroll clip", ref failed, LegacyUiTabsIgnoreContentScrollClip);
+            Run("legacy UI selected button content offset requires enabled selection", ref failed, LegacyUiSelectedButtonContentOffsetRequiresEnabledSelection);
             Run("legacy UI retained frame model reuses window translation", ref failed, LegacyUiRetainedFrameModelReusesWindowTranslation);
             Run("legacy UI retained frame model dirties on scroll settings and font", ref failed, LegacyUiRetainedFrameModelDirtiesOnScrollSettingsAndFont);
             Run("legacy UI retained frame model falls back on element mismatch", ref failed, LegacyUiRetainedFrameModelFallsBackOnElementMismatch);
@@ -561,6 +562,7 @@ namespace JueMingZ.Tests
             Run("information chest tile fallback normalizes two by two frame origin", ref failed, InformationChestTileFallbackNormalizesTwoByTwoFrameOrigin);
             Run("information dresser chest labels use three by two frame rules", ref failed, InformationDresserChestLabelsUseThreeByTwoFrameRules);
             Run("information dresser display name avoids map object option bleed", ref failed, InformationDresserDisplayNameAvoidsMapObjectOptionBleed);
+            Run("information chest display name avoids map object option bleed", ref failed, InformationChestDisplayNameAvoidsMapObjectOptionBleed);
             Run("information chest labels frame limit allows dense rooms", ref failed, InformationChestLabelsFrameLimitAllowsDenseRooms);
             Run("information chest labels draw order prioritizes screen center", ref failed, InformationChestLabelsDrawOrderPrioritizesScreenCenter);
             Run("information chest label sort cache dirties on source and movement threshold", ref failed, InformationChestLabelSortCacheDirtiesOnSourceAndMovementThreshold);

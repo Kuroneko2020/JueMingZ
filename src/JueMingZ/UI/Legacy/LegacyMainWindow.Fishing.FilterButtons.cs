@@ -138,10 +138,11 @@ namespace JueMingZ.UI.Legacy
                 : rect.Width < 44
                     ? 0.58f
                     : label != null && label.Length >= 4 ? 0.68f : 0.74f;
-            UiTextRenderer.DrawCenteredTextClipped(spriteBatch, label, rect.X + 3, rect.Y, rect.Width - 6, rect.Height, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, selected ? LegacyUiTheme.SelectedTextR : 230, selected ? LegacyUiTheme.SelectedTextG : 232, selected ? LegacyUiTheme.SelectedTextB : 224, 255, scale);
+            var contentRect = LegacyUiTheme.GetSelectedButtonContentRect(rect, selected, true);
+            UiTextRenderer.DrawCenteredTextClipped(spriteBatch, label, rect.X + 3, contentRect.Y, rect.Width - 6, contentRect.Height, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, selected ? LegacyUiTheme.SelectedTextR : 230, selected ? LegacyUiTheme.SelectedTextG : 232, selected ? LegacyUiTheme.SelectedTextB : 224, 255, scale);
             if (selected)
             {
-                LegacyUiTheme.DrawSelectedTextMarkersClipped(spriteBatch, new LegacyUiRect(rect.X + 3, rect.Y, rect.Width - 6, rect.Height), area.Viewport, label, scale);
+                LegacyUiTheme.DrawSelectedTextMarkersClipped(spriteBatch, new LegacyUiRect(rect.X + 3, contentRect.Y, rect.Width - 6, contentRect.Height), area.Viewport, label, scale);
             }
 
             var element = AddFrameElement(elements, id, label, "button", elementRect, selected: selected, tooltipLines: string.IsNullOrWhiteSpace(tooltip) ? null : new[] { tooltip });
@@ -156,10 +157,11 @@ namespace JueMingZ.UI.Legacy
             var hovered = enabled && IsFrameElementHovered(id, elementRect, mouse);
             LegacyUiTheme.DrawButtonClipped(spriteBatch, rect, hovered, hovered && mouse.LeftDown, selected, enabled, area.Viewport);
             var scale = FitFishingFilterActionButtonScale(label, rect.Width, label != null && label.Length >= 5 ? 0.60f : label != null && label.Length >= 4 ? 0.66f : 0.72f);
-            UiTextRenderer.DrawCenteredTextClipped(spriteBatch, label, rect.X + 3, rect.Y, rect.Width - 6, rect.Height, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, enabled ? 230 : 150, enabled ? 232 : 154, enabled ? 224 : 160, enabled ? 255 : 180, scale);
+            var contentRect = LegacyUiTheme.GetSelectedButtonContentRect(rect, selected, enabled);
+            UiTextRenderer.DrawCenteredTextClipped(spriteBatch, label, rect.X + 3, contentRect.Y, rect.Width - 6, contentRect.Height, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, enabled ? 230 : 150, enabled ? 232 : 154, enabled ? 224 : 160, enabled ? 255 : 180, scale);
             if (selected && enabled)
             {
-                LegacyUiTheme.DrawSelectedTextMarkersClipped(spriteBatch, new LegacyUiRect(rect.X + 3, rect.Y, rect.Width - 6, rect.Height), area.Viewport, label, scale);
+                LegacyUiTheme.DrawSelectedTextMarkersClipped(spriteBatch, new LegacyUiRect(rect.X + 3, contentRect.Y, rect.Width - 6, contentRect.Height), area.Viewport, label, scale);
             }
 
             var element = AddFrameElement(elements, id, label, "button", elementRect, enabled: enabled, selected: selected, tooltipLines: string.IsNullOrWhiteSpace(tooltip) ? null : new[] { tooltip });

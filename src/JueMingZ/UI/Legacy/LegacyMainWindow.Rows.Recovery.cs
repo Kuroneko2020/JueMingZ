@@ -69,7 +69,8 @@ namespace JueMingZ.UI.Legacy
 
             var toggleHovered = IsFrameElementHovered(toggleId, toggleRect, mouse);
             LegacyUiTheme.DrawButton(spriteBatch, toggleRect, toggleHovered, toggleHovered && mouse.LeftDown, enabled, true);
-            UiTextRenderer.DrawCenteredText(spriteBatch, enabled ? "ON" : "OFF", toggleRect.X + 3, toggleRect.Y, toggleRect.Width - 6, toggleRect.Height, 245, 238, 210, 255, 0.82f);
+            var toggleContentRect = LegacyUiTheme.GetSelectedButtonContentRect(toggleRect, enabled, true);
+            UiTextRenderer.DrawCenteredText(spriteBatch, enabled ? "ON" : "OFF", toggleRect.X + 3, toggleContentRect.Y, toggleRect.Width - 6, toggleContentRect.Height, 245, 238, 210, 255, 0.82f);
 
             var sliderElement = new LegacySliderControl
             {

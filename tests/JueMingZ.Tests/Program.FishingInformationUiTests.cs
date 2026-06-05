@@ -2121,6 +2121,53 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void InformationChestDisplayNameAvoidsMapObjectOptionBleed()
+        {
+            var ivyName = InformationOverlayService.ResolveChestTileDisplayNameForTesting(21, 10);
+            AssertChestDisplayNameDoesNotBleedIntoMapObject(ivyName, "primary chest style 10");
+            AssertChestDisplayNameIsIvyOrGenericFallback(ivyName, "primary chest style 10");
+
+            var trappedIvyName = InformationOverlayService.ResolveChestTileDisplayNameForTesting(441, 10);
+            AssertChestDisplayNameDoesNotBleedIntoMapObject(trappedIvyName, "fake primary chest style 10");
+            AssertChestDisplayNameIsIvyOrGenericFallback(trappedIvyName, "fake primary chest style 10");
+
+            var secondaryGoldName = InformationOverlayService.ResolveChestTileDisplayNameForTesting(467, 4);
+            AssertChestDisplayNameDoesNotBleedIntoMapObject(secondaryGoldName, "secondary chest style 4");
+        }
+
+        private static void AssertChestDisplayNameDoesNotBleedIntoMapObject(string name, string label)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                throw new InvalidOperationException("Expected " + label + " to resolve to a non-empty chest display name.");
+            }
+
+            if (string.Equals(name, "猩红祭坛", StringComparison.Ordinal) ||
+                string.Equals(name, "Crimson Altar", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(name, "恶魔祭坛", StringComparison.Ordinal) ||
+                string.Equals(name, "Demon Altar", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("Expected " + label + " not to bleed into map object names, got " + name + ".");
+            }
+        }
+
+        private static void AssertChestDisplayNameIsIvyOrGenericFallback(string name, string label)
+        {
+            if (string.Equals(name, "宝箱", StringComparison.Ordinal) ||
+                string.Equals(name, "Chest", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            if (name.IndexOf("常春藤", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                name.IndexOf("Ivy", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return;
+            }
+
+            throw new InvalidOperationException("Expected " + label + " to resolve to an ivy chest name or generic fallback, got " + name + ".");
+        }
+
         private static void InformationChestLabelsFrameLimitAllowsDenseRooms()
         {
             if (InformationOverlayService.MaxChestLabelsPerFrameForTesting() < 240)

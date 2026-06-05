@@ -216,9 +216,10 @@ namespace JueMingZ.UI.Legacy
             var itemHovered = IsFrameElementHovered(itemId, itemElementRect, mouse);
             LegacyUiTheme.DrawButtonClipped(spriteBatch, itemButtonRect, itemAreaHovered, itemAreaHovered && mouse.LeftDown, selected, true, clip);
 
+            var itemContentRect = LegacyUiTheme.GetSelectedButtonContentRect(itemButtonRect, selected, true);
             var iconRect = new LegacyUiRect(
-                itemButtonRect.X + Math.Max(0, (itemButtonRect.Width - AutoSellGridIconCellSize) / 2),
-                itemButtonRect.Y + Math.Max(0, (itemButtonRect.Height - AutoSellGridIconCellSize) / 2),
+                itemContentRect.X + Math.Max(0, (itemContentRect.Width - AutoSellGridIconCellSize) / 2),
+                itemContentRect.Y + Math.Max(0, (itemContentRect.Height - AutoSellGridIconCellSize) / 2),
                 AutoSellGridIconCellSize,
                 AutoSellGridIconCellSize);
             DrawMiscItemIcon(spriteBatch, iconRect, clip, itemType, itemAreaHovered, false, "+", 0.84f);
@@ -229,6 +230,7 @@ namespace JueMingZ.UI.Legacy
                 openLabel,
                 "button",
                 itemElementRect,
+                selected: selected,
                 tooltipLines: itemType > 0
                     ? new[] { itemLabel + " #" + itemType.ToString(CultureInfo.InvariantCulture), selectedTooltip }
                     : new[] { "未选择", emptyTooltip });

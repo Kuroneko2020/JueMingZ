@@ -272,6 +272,37 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void LegacyUiSelectedButtonContentOffsetRequiresEnabledSelection()
+        {
+            var rect = new LegacyUiRect(10, 20, 60, 24);
+            var selected = LegacyUiTheme.GetSelectedButtonContentRect(rect, true, true);
+            if (selected.X != rect.X ||
+                selected.Y != rect.Y + 1 ||
+                selected.Width != rect.Width ||
+                selected.Height != rect.Height - 1)
+            {
+                throw new InvalidOperationException("Expected enabled selected button content to sink by one pixel.");
+            }
+
+            var unselected = LegacyUiTheme.GetSelectedButtonContentRect(rect, false, true);
+            if (unselected.X != rect.X ||
+                unselected.Y != rect.Y ||
+                unselected.Width != rect.Width ||
+                unselected.Height != rect.Height)
+            {
+                throw new InvalidOperationException("Expected unselected button content to keep its original bounds.");
+            }
+
+            var disabled = LegacyUiTheme.GetSelectedButtonContentRect(rect, true, false);
+            if (disabled.X != rect.X ||
+                disabled.Y != rect.Y ||
+                disabled.Width != rect.Width ||
+                disabled.Height != rect.Height)
+            {
+                throw new InvalidOperationException("Expected disabled selected-looking button content to keep its original bounds.");
+            }
+        }
+
         private static void LegacyUiRetainedFrameModelReusesWindowTranslation()
         {
             LegacyMainWindow.ResetRetainedFrameModelForTesting();

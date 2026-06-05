@@ -110,7 +110,8 @@ namespace JueMingZ.UI.Legacy
             var inputElementRect = inputHit.Width > 0 && inputHit.Height > 0 ? inputHit : inputRect;
             var inputHovered = IsFrameElementHovered("fishing-quick-rename:input", inputElementRect, mouse);
             LegacyUiTheme.DrawButtonClipped(spriteBatch, inputRect, inputHovered, inputHovered && mouse.LeftDown, inputFocused, hasName || inputFocused, area.Viewport);
-            UiTextRenderer.DrawTextClipped(spriteBatch, inputText, inputRect.X + 8, inputRect.Y + 3, inputRect.Width - 16, inputRect.Height - 6, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, inputFocused ? 255 : 230, inputFocused ? 245 : 232, inputFocused ? 205 : 224, 255, 0.72f);
+            var inputContentRect = LegacyUiTheme.GetSelectedButtonContentRect(inputRect, inputFocused, hasName || inputFocused);
+            UiTextRenderer.DrawTextClipped(spriteBatch, inputText, inputRect.X + 8, inputContentRect.Y + 3, inputRect.Width - 16, Math.Max(1, inputContentRect.Height - 6), area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, inputFocused ? 255 : 230, inputFocused ? 245 : 232, inputFocused ? 205 : 224, 255, 0.72f);
 
             var inputElement = AddFrameElement(elements, "fishing-quick-rename:input", "快捷改名:名字", "button", inputElementRect, enabled: hasName || inputFocused, selected: inputFocused, tooltipLines: new[] { hasName || inputFocused ? "双击编辑" : FirstNonEmpty(message, "未进入世界") });
             RecordFrameElementHover(inputElement, inputHovered);

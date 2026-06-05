@@ -227,7 +227,11 @@ namespace JueMingZ.Tests
             ExpectAutoClickDecision(CreateAutoClickerProfile(5335), true, true, true, true, "ready", "Rod of Harmony sample");
 
             var rainbowRod = CreateAutoClickerProfile(495, 74, false, true, true, 0);
-            ExpectAutoClickDecision(rainbowRod, true, true, true, true, "ready", "Rainbow Rod while vanilla channel is already active");
+            ExpectAutoClickDecision(rainbowRod, true, true, false, false, "excludedChannelItem", "Rainbow Rod while vanilla channel is already active");
+
+            var channelWeapon = CreateAutoClickerProfile(113, 35, false, true, false, 0);
+            ExpectAutoClickDecision(channelWeapon, true, false, false, false, "excludedChannelItem", "channel weapon with vanilla auto reuse off");
+            ExpectAutoClickDecision(channelWeapon, true, true, false, false, "excludedChannelItem", "channel weapon with vanilla auto reuse on");
 
             ExpectAutoClickDecision(CreateAutoClickerProfile(2294, 0, false, false, false, 45), true, false, false, false, "excludedFishingRod", "fishing pole field exclusion");
             ExpectAutoClickDecision(CreateAutoClickerProfile(2289, 0, false, false, false, 0), true, false, false, false, "excludedFishingRod", "known fishing pole id fallback");

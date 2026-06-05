@@ -16,14 +16,16 @@ namespace JueMingZ.UI.Legacy.Controls
         {
             var hovered = context.IsElementHovered(Id, Bounds);
             var pressed = hovered && context.Mouse != null && context.Mouse.LeftDown;
+            var contentOffset = LegacyUiTheme.GetSelectedButtonContentOffset(Selected, Enabled);
+            var contentHeight = System.Math.Max(1, Bounds.Height - contentOffset);
             LegacyUiTheme.DrawButton(context.SpriteBatch, Bounds, hovered, pressed, Selected, Enabled);
             UiTextRenderer.DrawAlignedText(
                 context.SpriteBatch,
                 Label,
                 Bounds.X + 10,
-                Bounds.Y,
+                Bounds.Y + contentOffset,
                 System.Math.Max(1, Bounds.Width - 40),
-                Bounds.Height,
+                contentHeight,
                 UiTextHorizontalAlignment.Left,
                 238,
                 238,
@@ -31,7 +33,7 @@ namespace JueMingZ.UI.Legacy.Controls
                 255,
                 TextScale);
 
-            var box = new LegacyUiRect(Bounds.Right - 25, Bounds.Y + System.Math.Max(0, (Bounds.Height - 12) / 2), 12, 12);
+            var box = new LegacyUiRect(Bounds.Right - 25, Bounds.Y + contentOffset + System.Math.Max(0, (contentHeight - 12) / 2), 12, 12);
             UiPrimitiveRenderer.DrawRectBorder(context.SpriteBatch, box.X, box.Y, box.Width, box.Height, 1, Selected ? 88 : 170, Selected ? 250 : 186, Selected ? 136 : 200, 235);
             if (Selected)
             {

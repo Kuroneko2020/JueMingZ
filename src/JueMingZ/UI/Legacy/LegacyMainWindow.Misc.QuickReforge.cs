@@ -57,13 +57,14 @@ namespace JueMingZ.UI.Legacy
             var elementRect = hit.Width > 0 && hit.Height > 0 ? hit : rect;
             var hovered = IsFrameElementHovered("misc-quick-reforge:input", elementRect, mouse);
             LegacyUiTheme.DrawButtonClipped(spriteBatch, rect, hovered, hovered && mouse.LeftDown, selected, true, clip);
+            var contentRect = LegacyUiTheme.GetSelectedButtonContentRect(rect, selected, true);
             UiTextRenderer.DrawTextClipped(
                 spriteBatch,
                 text ?? string.Empty,
                 rect.X + 8,
-                rect.Y + 3,
+                contentRect.Y + 3,
                 rect.Width - 16,
-                rect.Height - 6,
+                Math.Max(1, contentRect.Height - 6),
                 clip.X,
                 clip.Y,
                 clip.Width,
@@ -75,7 +76,7 @@ namespace JueMingZ.UI.Legacy
                 0.72f);
             if (selected)
             {
-                LegacyUiTheme.DrawSelectedTextMarkersClipped(spriteBatch, new LegacyUiRect(rect.X + 8, rect.Y + 3, rect.Width - 16, rect.Height - 6), clip, text ?? string.Empty, 0.72f);
+                LegacyUiTheme.DrawSelectedTextMarkersClipped(spriteBatch, new LegacyUiRect(rect.X + 8, contentRect.Y + 3, rect.Width - 16, Math.Max(1, contentRect.Height - 6)), clip, text ?? string.Empty, 0.72f);
             }
 
             var element = AddFrameElement(elements, "misc-quick-reforge:input", "快速重铸:词缀输入", "button", elementRect, selected: selected, tooltipLines: new[] { "双击输入完整词缀名。", "不支持只填单字模糊匹配。" });
@@ -89,13 +90,14 @@ namespace JueMingZ.UI.Legacy
             var elementRect = hit.Width > 0 && hit.Height > 0 ? hit : rect;
             var hovered = IsFrameElementHovered(id, elementRect, mouse);
             LegacyUiTheme.DrawButtonClipped(spriteBatch, rect, hovered, hovered && mouse.LeftDown, selected, true, clip);
+            var contentRect = LegacyUiTheme.GetSelectedButtonContentRect(rect, selected, true);
             UiTextRenderer.DrawCenteredTextClipped(
                 spriteBatch,
                 text,
                 rect.X + 3,
-                rect.Y,
+                contentRect.Y,
                 rect.Width - 6,
-                rect.Height,
+                contentRect.Height,
                 clip.X,
                 clip.Y,
                 clip.Width,
@@ -107,7 +109,7 @@ namespace JueMingZ.UI.Legacy
                 0.78f);
             if (selected)
             {
-                LegacyUiTheme.DrawSelectedTextMarkersClipped(spriteBatch, new LegacyUiRect(rect.X + 3, rect.Y, rect.Width - 6, rect.Height), clip, text, 0.78f);
+                LegacyUiTheme.DrawSelectedTextMarkersClipped(spriteBatch, new LegacyUiRect(rect.X + 3, contentRect.Y, rect.Width - 6, contentRect.Height), clip, text, 0.78f);
             }
 
             var element = AddFrameElement(elements, id, label, "button", elementRect, selected: selected, tooltipLines: string.IsNullOrWhiteSpace(tooltip) ? null : new[] { tooltip });

@@ -46,6 +46,17 @@ namespace JueMingZ.UI.Legacy
             DrawButtonClipped(spriteBatch, rect, hovered, pressed, selected, enabled, rect);
         }
 
+        public static int GetSelectedButtonContentOffset(bool selected, bool enabled)
+        {
+            return selected && enabled ? 1 : 0;
+        }
+
+        public static LegacyUiRect GetSelectedButtonContentRect(LegacyUiRect rect, bool selected, bool enabled)
+        {
+            var offset = GetSelectedButtonContentOffset(selected, enabled);
+            return new LegacyUiRect(rect.X, rect.Y + offset, rect.Width, Math.Max(1, rect.Height - offset));
+        }
+
         public static void DrawButtonClipped(object spriteBatch, LegacyUiRect rect, bool hovered, bool pressed, bool selected, bool enabled, LegacyUiRect clip)
         {
             object texture;

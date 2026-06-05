@@ -54,13 +54,15 @@ namespace JueMingZ.UI.Legacy
             var elementRect = hit.Width > 0 && hit.Height > 0 ? hit : rect;
             var hovered = IsFrameElementHovered("misc-auto-mining:hotkey", elementRect, mouse);
             LegacyUiTheme.DrawButtonClipped(spriteBatch, rect, hovered, hovered && mouse.LeftDown, _autoMiningHotkeyCaptureActive, true, clip);
+            var contentRect = LegacyUiTheme.GetSelectedButtonContentRect(rect, _autoMiningHotkeyCaptureActive, true);
+            var scale = ResolveAutoMiningInputScale(text, rect.Width - 16);
             UiTextRenderer.DrawTextClipped(
                 spriteBatch,
                 text ?? string.Empty,
                 rect.X + 8,
-                rect.Y + 3,
+                contentRect.Y + 3,
                 rect.Width - 16,
-                rect.Height - 6,
+                Math.Max(1, contentRect.Height - 6),
                 clip.X,
                 clip.Y,
                 clip.Width,
@@ -69,15 +71,15 @@ namespace JueMingZ.UI.Legacy
                 _autoMiningHotkeyCaptureActive ? 245 : 232,
                 _autoMiningHotkeyCaptureActive ? 205 : 224,
                 255,
-                ResolveAutoMiningInputScale(text, rect.Width - 16));
+                scale);
             if (_autoMiningHotkeyCaptureActive)
             {
                 LegacyUiTheme.DrawSelectedTextMarkersClipped(
                     spriteBatch,
-                    new LegacyUiRect(rect.X + 8, rect.Y + 3, rect.Width - 16, rect.Height - 6),
+                    new LegacyUiRect(rect.X + 8, contentRect.Y + 3, rect.Width - 16, Math.Max(1, contentRect.Height - 6)),
                     clip,
                     text ?? string.Empty,
-                    ResolveAutoMiningInputScale(text, rect.Width - 16));
+                    scale);
             }
 
             var element = AddFrameElement(elements, "misc-auto-mining:hotkey", "自动挖矿:采集按键", "button", elementRect, selected: _autoMiningHotkeyCaptureActive, tooltipLines: new[] { "双击录入采集按键。", "Esc 取消录入。" });
@@ -92,10 +94,11 @@ namespace JueMingZ.UI.Legacy
             var elementRect = hit.Width > 0 && hit.Height > 0 ? hit : rect;
             var hovered = IsFrameElementHovered(elementId, elementRect, mouse);
             LegacyUiTheme.DrawButtonClipped(spriteBatch, rect, hovered, hovered && mouse.LeftDown, selected, true, clip);
-            UiTextRenderer.DrawCenteredTextClipped(spriteBatch, text, rect.X + 3, rect.Y, rect.Width - 6, rect.Height, clip.X, clip.Y, clip.Width, clip.Height, selected ? LegacyUiTheme.SelectedTextR : 230, selected ? LegacyUiTheme.SelectedTextG : 232, selected ? LegacyUiTheme.SelectedTextB : 224, 255, 0.78f);
+            var contentRect = LegacyUiTheme.GetSelectedButtonContentRect(rect, selected, true);
+            UiTextRenderer.DrawCenteredTextClipped(spriteBatch, text, rect.X + 3, contentRect.Y, rect.Width - 6, contentRect.Height, clip.X, clip.Y, clip.Width, clip.Height, selected ? LegacyUiTheme.SelectedTextR : 230, selected ? LegacyUiTheme.SelectedTextG : 232, selected ? LegacyUiTheme.SelectedTextB : 224, 255, 0.78f);
             if (selected)
             {
-                LegacyUiTheme.DrawSelectedTextMarkersClipped(spriteBatch, new LegacyUiRect(rect.X + 3, rect.Y, rect.Width - 6, rect.Height), clip, text, 0.78f);
+                LegacyUiTheme.DrawSelectedTextMarkersClipped(spriteBatch, new LegacyUiRect(rect.X + 3, contentRect.Y, rect.Width - 6, contentRect.Height), clip, text, 0.78f);
             }
 
             var element = AddFrameElement(elements, elementId, "自动挖矿:" + text, "button", elementRect, selected: selected, tooltipLines: string.IsNullOrWhiteSpace(tooltip) ? null : new[] { tooltip });

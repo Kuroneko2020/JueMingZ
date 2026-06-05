@@ -36,7 +36,7 @@ namespace JueMingZ.UI.Legacy.Controls
             var hovered = context.IsElementHovered(Id, Bounds);
             var pressed = hovered && context.Mouse != null && context.Mouse.LeftDown;
             var text = string.IsNullOrWhiteSpace(Text) ? Label : Text;
-            var selectedOffset = Selected && Enabled ? 1 : 0;
+            var selectedOffset = LegacyUiTheme.GetSelectedButtonContentOffset(Selected, Enabled);
             if (context.HasClip)
             {
                 LegacyUiTheme.DrawButtonClipped(context.SpriteBatch, Bounds, hovered, pressed, Selected, Enabled, context.ClipRect);
@@ -103,7 +103,7 @@ namespace JueMingZ.UI.Legacy.Controls
             var textWidth = Math.Min(textAvailable, UiTextRenderer.EstimateTextWidth(display, scale));
             var groupWidth = iconSize + gap + textWidth;
             var startX = Bounds.X + Math.Max(5, (Bounds.Width - groupWidth) / 2);
-            var selectedOffset = Selected && Enabled ? 1 : 0;
+            var selectedOffset = LegacyUiTheme.GetSelectedButtonContentOffset(Selected, Enabled);
             var contentY = Bounds.Y + selectedOffset;
             var contentHeight = Math.Max(1, Bounds.Height - selectedOffset);
             var iconY = contentY + (contentHeight - iconSize) / 2;

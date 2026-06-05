@@ -96,10 +96,11 @@ namespace JueMingZ.UI.Legacy
             var elementRect = hit.Width > 0 && hit.Height > 0 ? hit : rect;
             var hovered = IsFrameElementHovered(id, elementRect, mouse);
             LegacyUiTheme.DrawButtonClipped(spriteBatch, rect, hovered, hovered && mouse.LeftDown, selected, true, area.Viewport);
-            UiTextRenderer.DrawCenteredTextClipped(spriteBatch, label, rect.X + 3, rect.Y, rect.Width - 6, rect.Height, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, selected ? LegacyUiTheme.SelectedTextR : 230, selected ? LegacyUiTheme.SelectedTextG : 232, selected ? LegacyUiTheme.SelectedTextB : 224, 255, 0.62f);
+            var contentRect = LegacyUiTheme.GetSelectedButtonContentRect(rect, selected, true);
+            UiTextRenderer.DrawCenteredTextClipped(spriteBatch, label, rect.X + 3, contentRect.Y, rect.Width - 6, contentRect.Height, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, selected ? LegacyUiTheme.SelectedTextR : 230, selected ? LegacyUiTheme.SelectedTextG : 232, selected ? LegacyUiTheme.SelectedTextB : 224, 255, 0.62f);
             if (selected)
             {
-                LegacyUiTheme.DrawSelectedTextMarkersClipped(spriteBatch, new LegacyUiRect(rect.X + 3, rect.Y, rect.Width - 6, rect.Height), area.Viewport, label, 0.62f);
+                LegacyUiTheme.DrawSelectedTextMarkersClipped(spriteBatch, new LegacyUiRect(rect.X + 3, contentRect.Y, rect.Width - 6, contentRect.Height), area.Viewport, label, 0.62f);
             }
 
             var element = AddFrameElement(elements, id, "辅助瞄准:" + label, "button", elementRect, selected: selected);
