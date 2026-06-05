@@ -101,7 +101,7 @@ namespace JueMingZ.UI
             try
             {
                 var batch = (SpriteBatch)spriteBatch;
-                batch.Draw(_magicPixel, new Rectangle(x, y, width, height), CreateColor(r, g, b, a));
+                batch.Draw(_magicPixel, UiDrawTransform.TransformRectangle(x, y, width, height), CreateColor(r, g, b, a));
                 return true;
             }
             catch (Exception error)
@@ -145,7 +145,7 @@ namespace JueMingZ.UI
                     return Fail("DrawTextureRect failed: Texture2D type is unavailable.");
                 }
 
-                batch.Draw(texture2D, new Rectangle(x, y, width, height), CreateColor(r, g, b, a));
+                batch.Draw(texture2D, UiDrawTransform.TransformRectangle(x, y, width, height), CreateColor(r, g, b, a));
                 return true;
             }
             catch (Exception error)
@@ -192,7 +192,7 @@ namespace JueMingZ.UI
 
                 batch.Draw(
                     texture2D,
-                    new Rectangle(ix, iy, iw, ih),
+                    UiDrawTransform.TransformRectangle(ix, iy, iw, ih),
                     new Rectangle(sx, sy, sw, sh),
                     CreateColor(r, g, b, a));
                 return true;
@@ -392,12 +392,12 @@ namespace JueMingZ.UI
 
                 batch.Draw(
                     texture2D,
-                    new Vector2(x, y),
+                    UiDrawTransform.TransformVector(x, y),
                     new Rectangle(sourceX, sourceY, sourceWidth, sourceHeight),
                     CreateColor(r, g, b, a),
                     rotation,
                     new Vector2(originX, originY),
-                    new Vector2(scaleX, scaleY),
+                    new Vector2(UiDrawTransform.TransformScale(scaleX), UiDrawTransform.TransformScale(scaleY)),
                     SpriteEffects.None,
                     0f);
                 return true;
@@ -660,7 +660,7 @@ namespace JueMingZ.UI
 
                 batch.Draw(
                     texture2D,
-                    new Rectangle(ix, iy, iw, ih),
+                    UiDrawTransform.TransformRectangle(ix, iy, iw, ih),
                     new Rectangle(sx, sy, sw, sh),
                     CreateColor(r, g, b, a));
                 return true;

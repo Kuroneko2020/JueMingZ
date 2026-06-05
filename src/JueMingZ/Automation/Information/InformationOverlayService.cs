@@ -163,6 +163,8 @@ namespace JueMingZ.Automation.Information
         private static int _tombstoneTileType = 85;
         private static bool _targetDummyNpcTypeResolved;
         private static int _targetDummyNpcType = 488;
+        private static bool _skeletonMerchantNpcTypeResolved;
+        private static int _skeletonMerchantNpcType = 453;
         private static bool _critterSetResolved;
         private static object _critterSet;
 
@@ -441,7 +443,7 @@ namespace JueMingZ.Automation.Information
                     continue;
                 }
 
-                if (snapshot.TownNpc && !string.Equals(npcMode, "Off", StringComparison.OrdinalIgnoreCase))
+                if (IsNpcNameLabelCandidate(snapshot) && !string.Equals(npcMode, "Off", StringComparison.OrdinalIgnoreCase))
                 {
                     labels.Add(new NpcLabel
                     {
@@ -488,12 +490,7 @@ namespace JueMingZ.Automation.Information
                     continue;
                 }
                 else if (settings.InformationEnemyNameLabelsEnabled &&
-                         !snapshot.TownNpc &&
-                         !snapshot.Friendly &&
-                         !snapshot.Critter &&
-                         snapshot.Life > 0 &&
-                         snapshot.LifeMax > 5 &&
-                         !IsTargetDummy(snapshot.Type))
+                         IsEnemyNameLabelCandidate(snapshot))
                 {
                     var knownSegmentRole = GetKnownSegmentRole(snapshot.Type);
                     if (knownSegmentRole == NpcSegmentRole.Body)
@@ -589,6 +586,21 @@ namespace JueMingZ.Automation.Information
                    label.Hidden == snapshot.Hidden &&
                    label.Critter == snapshot.Critter &&
                    GetNpcLifeEligibilityKey(label.Life, label.LifeMax) == GetNpcLifeEligibilityKey(snapshot.Life, snapshot.LifeMax);
+        }
+
+        private static bool IsNpcNameLabelCandidate(NpcLabelSnapshot snapshot)
+        {
+            return snapshot.TownNpc || IsSkeletonMerchant(snapshot.Type);
+        }
+
+        private static bool IsEnemyNameLabelCandidate(NpcLabelSnapshot snapshot)
+        {
+            return !IsNpcNameLabelCandidate(snapshot) &&
+                   !snapshot.Friendly &&
+                   !snapshot.Critter &&
+                   snapshot.Life > 0 &&
+                   snapshot.LifeMax > 5 &&
+                   !IsTargetDummy(snapshot.Type);
         }
 
         private static int GetNpcLifeEligibilityKey(int life, int lifeMax)
@@ -4482,6 +4494,24 @@ namespace JueMingZ.Automation.Information
             return GetKnownSegmentRole(npcType) != NpcSegmentRole.Body;
         }
 
+        internal static bool IsNpcNameLabelCandidateForTesting(int npcType, bool townNpc)
+        {
+            return IsNpcNameLabelCandidate(new NpcLabelSnapshot { Type = npcType, TownNpc = townNpc });
+        }
+
+        internal static bool IsEnemyNameLabelCandidateForTesting(int npcType, bool friendly, bool critter, int life, int lifeMax)
+        {
+            return IsEnemyNameLabelCandidate(
+                new NpcLabelSnapshot
+                {
+                    Type = npcType,
+                    Friendly = friendly,
+                    Critter = critter,
+                    Life = life,
+                    LifeMax = lifeMax
+                });
+        }
+
         private static NpcSegmentRole GetKnownSegmentRole(int npcType)
         {
             switch (npcType)
@@ -4883,6 +4913,11 @@ namespace JueMingZ.Automation.Information
             return npcType == ReadTargetDummyNpcType();
         }
 
+        private static bool IsSkeletonMerchant(int npcType)
+        {
+            return npcType == ReadSkeletonMerchantNpcType();
+        }
+
         private static bool HasMetalDetector(object player)
         {
             var typedPlayer = player as Player;
@@ -4950,6 +4985,18 @@ namespace JueMingZ.Automation.Information
             _targetDummyNpcType = ReadNpcId("TargetDummy", 488);
             _targetDummyNpcTypeResolved = true;
             return _targetDummyNpcType;
+        }
+
+        private static int ReadSkeletonMerchantNpcType()
+        {
+            if (_skeletonMerchantNpcTypeResolved)
+            {
+                return _skeletonMerchantNpcType;
+            }
+
+            _skeletonMerchantNpcType = ReadNpcId("SkeletonMerchant", 453);
+            _skeletonMerchantNpcTypeResolved = true;
+            return _skeletonMerchantNpcType;
         }
 
         private static bool TryReadStaticInt(Type type, string name, out int value)

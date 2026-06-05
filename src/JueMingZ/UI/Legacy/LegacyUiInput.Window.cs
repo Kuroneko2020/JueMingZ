@@ -50,8 +50,9 @@ namespace JueMingZ.UI.Legacy
                 return false;
             }
 
+            var scale = LegacyMainUiScale.Resolve(raw);
             var coordinate = ResolveLogicalMouse(raw);
-            return IsWindowHit(raw, coordinate.X, coordinate.Y);
+            return IsWindowHit(raw, scale.ToBaseLogicalX(coordinate.X), scale.ToBaseLogicalY(coordinate.Y), scale);
         }
 
         public static void ResetInteractionState()

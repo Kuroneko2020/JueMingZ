@@ -551,10 +551,11 @@ namespace JueMingZ.UI
 
             try
             {
-                var drawX = x;
-                var drawY = y;
+                var drawPosition = UiDrawTransform.TransformVector(x, y);
+                var drawX = drawPosition.X;
+                var drawY = drawPosition.Y;
                 float effectiveScale;
-                var scaleIsSafe = TryResolveEffectiveScale(scale, out effectiveScale);
+                var scaleIsSafe = TryResolveEffectiveScale(UiDrawTransform.TransformScale(scale), out effectiveScale);
                 var batch = spriteBatch as SpriteBatch;
                 if (batch == null)
                 {

@@ -48,7 +48,7 @@ namespace JueMingZ.Runtime
         private static readonly Dictionary<string, long> ServiceSchedulerLastRunTick =
             new Dictionary<string, long>(StringComparer.Ordinal);
 
-        public const string Version = "1.7.449-auto-recovery-item-config";
+        public const string Version = "1.7.451-f5-ui-scale-cap";
 
         public static RuntimeState State { get; private set; } = new RuntimeState();
         public static FeatureRegistry FeatureRegistry { get; private set; }

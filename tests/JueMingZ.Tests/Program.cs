@@ -490,6 +490,7 @@ namespace JueMingZ.Tests
             Run("fishing filter requires sonar buff", ref failed, FishingFilterRequiresSonarBuff);
             Run("enemy segment labels hide middle segments", ref failed, EnemySegmentLabelsHideMiddleSegments);
             Run("known worm segment labels use Terraria NPC roles", ref failed, KnownWormSegmentLabelsUseTerrariaNpcRoles);
+            Run("skeleton merchant counts as information NPC label", ref failed, SkeletonMerchantCountsAsInformationNpcLabel);
             Run("information sign text all mode keeps vanilla line cap", ref failed, InformationSignTextAllModeKeepsVanillaLineCap);
             Run("information sign text line mode respects configured lines", ref failed, InformationSignTextLineModeRespectsConfiguredLines);
             Run("information sign text character mode truncates before wrapping", ref failed, InformationSignTextCharacterModeTruncatesBeforeWrapping);
@@ -550,6 +551,9 @@ namespace JueMingZ.Tests
             Run("legacy UI action update gate skips drag dispatch without commands", ref failed, LegacyUiActionUpdateGateSkipsDragDispatchWithoutCommands);
             Run("legacy UI update prefix skips scroll snapshot when wheel idle", ref failed, LegacyUiUpdatePrefixSkipsScrollSnapshotWhenWheelIdle);
             Run("legacy UI scroll action event coalesces stable wheel diagnostics", ref failed, LegacyUiScrollActionEventCoalescesStableWheelDiagnostics);
+            Run("legacy main UI scale caps high UI scale to default visual height", ref failed, LegacyMainUiScaleCapsHighUiScaleToDefaultVisualHeight);
+            Run("legacy main UI scale keeps sub-default UI scale", ref failed, LegacyMainUiScaleKeepsSubDefaultUiScale);
+            Run("UI draw transform scales rectangles and text scale", ref failed, UiDrawTransformScalesRectanglesAndTextScale);
             Run("diagnostic mouse state reader reuses snapshot within draw frame", ref failed, DiagnosticMouseStateReaderReusesSnapshotWithinDrawFrame);
             Run("diagnostic mouse state reader refreshes on new fast draw frame", ref failed, DiagnosticMouseStateReaderRefreshesOnNewFastDrawFrame);
             Run("diagnostic mouse state reader refreshes when draw frame changes under same update", ref failed, DiagnosticMouseStateReaderRefreshesWhenDrawFrameChangesUnderSameUpdate);

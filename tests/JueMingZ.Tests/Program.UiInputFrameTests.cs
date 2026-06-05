@@ -255,6 +255,69 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void LegacyMainUiScaleCapsHighUiScaleToDefaultVisualHeight()
+        {
+            var scale = LegacyMainUiScale.ResolveForTesting(1.25d, 1536, 864);
+            var visualHeight = LegacyUiMetrics.DefaultHeight * scale.EffectiveScaleY;
+
+            if (Math.Abs(scale.DrawScaleY - 0.8d) > 0.001d ||
+                Math.Abs(scale.EffectiveScaleY - 1d) > 0.001d ||
+                Math.Abs(visualHeight - LegacyUiMetrics.MaxVisualHeight) > 0.001d)
+            {
+                throw new InvalidOperationException("Expected 125% Terraria UI scale to cap the F5 visual height at the default 750px window height.");
+            }
+
+            if (!scale.Capped)
+            {
+                throw new InvalidOperationException("Expected the F5 scale snapshot to report capped=true.");
+            }
+        }
+
+        private static void LegacyMainUiScaleKeepsSubDefaultUiScale()
+        {
+            var scale = LegacyMainUiScale.ResolveForTesting(0.8d, 1536, 864);
+
+            if (Math.Abs(scale.DrawScaleX - 1d) > 0.001d ||
+                Math.Abs(scale.DrawScaleY - 1d) > 0.001d ||
+                Math.Abs(scale.EffectiveScaleY - 0.8d) > 0.001d ||
+                scale.Capped)
+            {
+                throw new InvalidOperationException("Expected sub-100% Terraria UI scale to pass through unchanged for the F5 window.");
+            }
+        }
+
+        private static void UiDrawTransformScalesRectanglesAndTextScale()
+        {
+            int x;
+            int y;
+            int width;
+            int height;
+            UiDrawTransform.TransformRectangleForTesting(10, 20, 100, 50, out x, out y, out width, out height);
+            if (x != 10 || y != 20 || width != 100 || height != 50)
+            {
+                throw new InvalidOperationException("Expected inactive draw transform to leave rectangles unchanged.");
+            }
+
+            using (UiDrawTransform.Begin(0.8f, 0.5f))
+            {
+                UiDrawTransform.TransformRectangleForTesting(10, 20, 100, 50, out x, out y, out width, out height);
+                if (x != 8 || y != 10 || width != 80 || height != 25)
+                {
+                    throw new InvalidOperationException("Expected draw transform to scale rectangle position and size.");
+                }
+
+                if (Math.Abs(UiDrawTransform.TransformScaleForTesting(0.9f) - 0.45f) > 0.001f)
+                {
+                    throw new InvalidOperationException("Expected text scale to use the active draw transform.");
+                }
+            }
+
+            if (UiDrawTransform.ActiveForTesting)
+            {
+                throw new InvalidOperationException("Expected draw transform scope to restore the previous state on dispose.");
+            }
+        }
+
         private static void ResetUiInputFrameTestState()
         {
             UiInputFrameClock.ResetForTesting();

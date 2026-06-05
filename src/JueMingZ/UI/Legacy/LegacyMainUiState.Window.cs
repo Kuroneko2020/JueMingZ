@@ -148,10 +148,27 @@ namespace JueMingZ.UI.Legacy
             int screenWidth;
             int screenHeight;
             ReadScreenSize(out screenWidth, out screenHeight);
+            var scale = LegacyMainUiScale.ResolveForScreen(DiagnosticMouseStateReader.Read(), screenWidth, screenHeight);
             _width = LegacyUiMetrics.DefaultWidth;
             _height = LegacyUiMetrics.DefaultHeight;
-            _x = Clamp(_x, 0, Math.Max(0, screenWidth - _width - 8));
-            _y = Clamp(_y, 0, Math.Max(0, screenHeight - _height - 8));
+            _x = Clamp(_x, 0, CalculateMaxBasePosition(screenWidth, _width, scale == null ? 1d : scale.EffectiveScaleX));
+            _y = Clamp(_y, 0, CalculateMaxBasePosition(screenHeight, _height, scale == null ? 1d : scale.EffectiveScaleY));
+        }
+
+        private static int CalculateMaxBasePosition(int screenSize, int baseSize, double effectiveScale)
+        {
+            if (screenSize <= 0 || baseSize <= 0)
+            {
+                return 0;
+            }
+
+            if (effectiveScale <= 0.01d)
+            {
+                effectiveScale = 1d;
+            }
+
+            var safeSize = Math.Max(0, screenSize - 8);
+            return Math.Max(0, (int)Math.Floor(safeSize / effectiveScale - baseSize));
         }
 
         private static void SaveWindowLocked()

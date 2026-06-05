@@ -12,19 +12,35 @@ namespace JueMingZ.UI.Legacy
         public static LegacyMouseSnapshot ReadMouse()
         {
             var raw = DiagnosticMouseStateReader.Read();
-            return BuildMouseSnapshot(raw, true);
+            return BuildMouseSnapshot(raw, true, LegacyMainUiScale.Resolve(raw));
+        }
+
+        internal static LegacyMouseSnapshot ReadMouse(DiagnosticMouseState raw, LegacyMainUiScaleSnapshot scale)
+        {
+            return BuildMouseSnapshot(raw, true, scale);
         }
 
         private static LegacyMouseSnapshot BuildMouseSnapshot(DiagnosticMouseState raw, bool consumePendingScroll)
+        {
+            return BuildMouseSnapshot(raw, consumePendingScroll, LegacyMainUiScale.Resolve(raw));
+        }
+
+        private static LegacyMouseSnapshot BuildMouseSnapshot(DiagnosticMouseState raw, bool consumePendingScroll, LegacyMainUiScaleSnapshot scale)
         {
             if (raw == null)
             {
                 raw = new DiagnosticMouseState();
             }
 
+            if (scale == null)
+            {
+                scale = LegacyMainUiScale.Resolve(raw);
+            }
+
             var coordinate = ResolveLogicalMouse(raw);
-            var x = coordinate.X;
-            var y = coordinate.Y;
+            var x = scale.ToBaseLogicalX(coordinate.X);
+            var y = scale.ToBaseLogicalY(coordinate.Y);
+            var readMode = AppendLegacyScaleMode(coordinate.Mode, scale);
 
             var inputAvailable = raw.GameInputAvailable;
             var down = inputAvailable && (raw.TerrariaLeftDown || raw.OsLeftDown);
@@ -59,12 +75,12 @@ namespace JueMingZ.UI.Legacy
                 LeftReleased = inputAvailable && !down && _wasLeftDown,
                 ScrollDelta = scrollDelta,
                 ReadAvailable = raw.TerrariaReadAvailable || raw.OsReadAvailable,
-                ReadMode = coordinate.Mode,
-                WindowHit = IsWindowHit(raw, x, y)
+                ReadMode = readMode,
+                WindowHit = IsWindowHit(raw, x, y, scale)
             };
         }
 
-        private static bool IsWindowHit(DiagnosticMouseState raw, int resolvedX, int resolvedY)
+        private static bool IsWindowHit(DiagnosticMouseState raw, int resolvedX, int resolvedY, LegacyMainUiScaleSnapshot scale)
         {
             var window = LegacyMainUiState.WindowRect;
             if (window.Contains(resolvedX, resolvedY))
@@ -77,38 +93,19 @@ namespace JueMingZ.UI.Legacy
                 return false;
             }
 
-            var scaleX = raw.UiScaleX > 0.01d ? raw.UiScaleX : raw.UiScale;
-            var scaleY = raw.UiScaleY > 0.01d ? raw.UiScaleY : raw.UiScale;
-            if (scaleX <= 0.01d)
+            if (scale == null)
             {
-                scaleX = 1d;
+                scale = LegacyMainUiScale.Resolve(raw);
             }
 
-            if (scaleY <= 0.01d)
-            {
-                scaleY = 1d;
-            }
-
-            var scaleActive = raw.UiScaleAvailable &&
-                              (Math.Abs(scaleX - 1d) > 0.01d ||
-                               Math.Abs(scaleY - 1d) > 0.01d ||
-                               Math.Abs(raw.UiTranslateX) > 0.01d ||
-                               Math.Abs(raw.UiTranslateY) > 0.01d);
             if (raw.TerrariaReadAvailable && raw.TerrariaMouseX >= 0 && raw.TerrariaMouseY >= 0)
             {
-                if (scaleActive)
+                if (scale.ContainsScreenPoint(window, raw.TerrariaMouseX, raw.TerrariaMouseY))
                 {
-                    if (ContainsScreenPoint(window, raw.TerrariaMouseX, raw.TerrariaMouseY, scaleX, scaleY, raw.UiTranslateX, raw.UiTranslateY))
-                    {
-                        return true;
-                    }
-
-                    if (window.Contains(ScreenToUiCoordinate(raw.TerrariaMouseX, scaleX, raw.UiTranslateX), ScreenToUiCoordinate(raw.TerrariaMouseY, scaleY, raw.UiTranslateY)))
-                    {
-                        return true;
-                    }
+                    return true;
                 }
-                else if (window.Contains(raw.TerrariaMouseX, raw.TerrariaMouseY))
+
+                if (window.Contains(scale.ScreenToBaseLogicalX(raw.TerrariaMouseX), scale.ScreenToBaseLogicalY(raw.TerrariaMouseY)))
                 {
                     return true;
                 }
@@ -116,37 +113,15 @@ namespace JueMingZ.UI.Legacy
 
             if (raw.OsReadAvailable && raw.OsClientMouseX >= 0 && raw.OsClientMouseY >= 0)
             {
-                if (scaleActive)
+                if (scale.ContainsScreenPoint(window, raw.OsClientMouseX, raw.OsClientMouseY))
                 {
-                    if (ContainsScreenPoint(window, raw.OsClientMouseX, raw.OsClientMouseY, scaleX, scaleY, raw.UiTranslateX, raw.UiTranslateY))
-                    {
-                        return true;
-                    }
-
-                    return window.Contains(ScreenToUiCoordinate(raw.OsClientMouseX, scaleX, raw.UiTranslateX), ScreenToUiCoordinate(raw.OsClientMouseY, scaleY, raw.UiTranslateY));
+                    return true;
                 }
 
-                return window.Contains(raw.OsClientMouseX, raw.OsClientMouseY);
+                return window.Contains(scale.ScreenToBaseLogicalX(raw.OsClientMouseX), scale.ScreenToBaseLogicalY(raw.OsClientMouseY));
             }
 
             return false;
-        }
-
-        private static bool ContainsScreenPoint(LegacyUiRect logicalRect, int screenX, int screenY, double scaleX, double scaleY, double translateX, double translateY)
-        {
-            if (screenX < 0 || screenY < 0)
-            {
-                return false;
-            }
-
-            var left = logicalRect.X * scaleX + translateX;
-            var top = logicalRect.Y * scaleY + translateY;
-            var right = logicalRect.Right * scaleX + translateX;
-            var bottom = logicalRect.Bottom * scaleY + translateY;
-            return screenX >= Math.Min(left, right) &&
-                   screenY >= Math.Min(top, bottom) &&
-                   screenX < Math.Max(left, right) &&
-                   screenY < Math.Max(top, bottom);
         }
 
         private static MouseCoordinate ResolveLogicalMouse(DiagnosticMouseState raw)
@@ -255,6 +230,16 @@ namespace JueMingZ.UI.Legacy
             }
 
             return mode + "/" + source;
+        }
+
+        private static string AppendLegacyScaleMode(string mode, LegacyMainUiScaleSnapshot scale)
+        {
+            if (scale == null || !scale.Capped)
+            {
+                return mode ?? string.Empty;
+            }
+
+            return (mode ?? string.Empty) + "/LegacyScaleCap";
         }
     }
 }

@@ -314,6 +314,32 @@ namespace JueMingZ.Tests
             AssertSegmentLabelRoles("Blood Eel", new[] { 621, 623 }, new[] { 622 });
         }
 
+        private static void SkeletonMerchantCountsAsInformationNpcLabel()
+        {
+            const int skeletonMerchantNpcType = 453;
+            const int ordinaryEnemyNpcType = 3;
+
+            if (!InformationOverlayService.IsNpcNameLabelCandidateForTesting(skeletonMerchantNpcType, false))
+            {
+                throw new InvalidOperationException("Expected Skeleton Merchant to count as an NPC name label candidate.");
+            }
+
+            if (InformationOverlayService.IsEnemyNameLabelCandidateForTesting(skeletonMerchantNpcType, false, false, 250, 250))
+            {
+                throw new InvalidOperationException("Expected Skeleton Merchant to stay out of enemy name labels.");
+            }
+
+            if (InformationOverlayService.IsNpcNameLabelCandidateForTesting(ordinaryEnemyNpcType, false))
+            {
+                throw new InvalidOperationException("Expected ordinary enemies to stay out of NPC name labels.");
+            }
+
+            if (!InformationOverlayService.IsEnemyNameLabelCandidateForTesting(ordinaryEnemyNpcType, false, false, 40, 40))
+            {
+                throw new InvalidOperationException("Expected ordinary enemies to remain eligible for enemy name labels.");
+            }
+        }
+
         private static void AssertSegmentLabelRoles(string name, int[] headOrTailTypes, int[] bodyTypes)
         {
             foreach (var npcType in headOrTailTypes)
@@ -2663,28 +2689,40 @@ namespace JueMingZ.Tests
         {
             LegacyMainUiState.EnsureLoaded();
             var window = LegacyMainUiState.WindowRect;
+            Terraria.Main.screenWidth = 1536;
+            Terraria.Main.screenHeight = 864;
             var raw = new DiagnosticMouseState
             {
                 UiScaleAvailable = true,
                 UiScaleMatrixAvailable = true,
-                UiScale = 1.5d,
-                UiScaleX = 1.5d,
-                UiScaleY = 1.5d,
+                UiScale = 1.25d,
+                UiScaleX = 1.25d,
+                UiScaleY = 1.25d,
                 OsReadAvailable = true,
-                OsClientMouseX = (int)((window.X + 20) * 1.5d),
-                OsClientMouseY = (int)((window.Y + 20) * 1.5d)
+                OsClientMouseX = window.X + 20,
+                OsClientMouseY = window.Y + 20
             };
 
             if (!LegacyUiInput.IsMouseInWindowForDiagnostics(raw))
             {
-                throw new InvalidOperationException("Expected scaled OS coordinates over the visual F5 window to count as captured.");
+                throw new InvalidOperationException("Expected capped 125% OS coordinates over the visual F5 window to count as captured.");
             }
 
-            raw.OsClientMouseX = (int)((window.Right + 50) * 1.5d);
-            raw.OsClientMouseY = (int)((window.Bottom + 50) * 1.5d);
+            raw.OsClientMouseX = (int)((window.X + 20) * 1.25d);
+            raw.OsClientMouseY = (int)((window.Bottom - 10) * 1.25d);
             if (LegacyUiInput.IsMouseInWindowForDiagnostics(raw))
             {
-                throw new InvalidOperationException("Expected scaled OS coordinates outside the visual F5 window not to count as captured.");
+                throw new InvalidOperationException("Expected old uncapped 125% bottom coordinates outside the capped visual F5 window not to count as captured.");
+            }
+
+            raw.UiScale = 0.8d;
+            raw.UiScaleX = 0.8d;
+            raw.UiScaleY = 0.8d;
+            raw.OsClientMouseX = (int)((window.X + 20) * 0.8d);
+            raw.OsClientMouseY = (int)((window.Y + 20) * 0.8d);
+            if (!LegacyUiInput.IsMouseInWindowForDiagnostics(raw))
+            {
+                throw new InvalidOperationException("Expected sub-100% OS coordinates to keep following Terraria UI scale.");
             }
         }
     }

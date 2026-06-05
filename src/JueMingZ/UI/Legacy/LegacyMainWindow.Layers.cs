@@ -48,132 +48,137 @@ namespace JueMingZ.UI.Legacy
                     return true;
                 }
 
-                var mouse = LegacyUiInput.ReadMouse();
-                var window = LegacyMainUiState.WindowRect;
-                var shell = LegacyMainWindowShell.Create(window);
-                LegacyUiInput.HandleWindowFrame(mouse, shell.TitleRect, shell.ResizeRect);
-
-                window = LegacyMainUiState.WindowRect;
-                shell = LegacyMainWindowShell.Create(window);
-                var inWindow = LegacyUiInput.IsMouseInWindow(mouse) || LegacyUiInput.IsActiveInteraction();
-                LegacyUiInput.CaptureIfNeeded(inWindow);
-                var selectedPage = LegacyMainUiState.SelectedPageId;
-                var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
-                var contentRect = shell.ContentRect;
-                var pageLayout = GetCachedPageLayout(selectedPage, window, contentRect, settings, LegacyMainUiState.ScrollOffset);
-                var contentHeight = pageLayout.ContentHeight;
-                var scrollArea = pageLayout.CreateScrollArea(contentRect);
-                LegacyMainUiState.SetScrollOffset(scrollArea.ScrollOffset, scrollArea.MaxScroll);
-
-                if (inWindow && mouse.ScrollDelta != 0)
+                var rawMouse = DiagnosticMouseStateReader.Read();
+                var scale = LegacyMainUiScale.Resolve(rawMouse);
+                var mouse = LegacyUiInput.ReadMouse(rawMouse, scale);
+                using (UiDrawTransform.Begin(scale.DrawScaleXFloat, scale.DrawScaleYFloat))
                 {
-                    var scrollSnapshot = TerrariaUiMouseCompat.ReadScrollSnapshot(mouse.ScrollDelta);
-                    if (string.Equals(selectedPage, "fishing", StringComparison.Ordinal) &&
-                        (FishingFilterUiState.TryConsumePickerScroll(mouse) ||
-                         FishingFilterUiState.TryConsumePresetScroll(mouse) ||
-                         FishingFilterUiState.TryConsumeEntryScroll(mouse)))
+                    var window = LegacyMainUiState.WindowRect;
+                    var shell = LegacyMainWindowShell.Create(window);
+                    LegacyUiInput.HandleWindowFrame(mouse, shell.TitleRect, shell.ResizeRect);
+
+                    window = LegacyMainUiState.WindowRect;
+                    shell = LegacyMainWindowShell.Create(window);
+                    var inWindow = LegacyUiInput.IsMouseInWindow(mouse) || LegacyUiInput.IsActiveInteraction();
+                    LegacyUiInput.CaptureIfNeeded(inWindow);
+                    var selectedPage = LegacyMainUiState.SelectedPageId;
+                    var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
+                    var contentRect = shell.ContentRect;
+                    var pageLayout = GetCachedPageLayout(selectedPage, window, contentRect, settings, LegacyMainUiState.ScrollOffset);
+                    var contentHeight = pageLayout.ContentHeight;
+                    var scrollArea = pageLayout.CreateScrollArea(contentRect);
+                    LegacyMainUiState.SetScrollOffset(scrollArea.ScrollOffset, scrollArea.MaxScroll);
+
+                    if (inWindow && mouse.ScrollDelta != 0)
                     {
-                        LegacyUiInput.CaptureIfNeeded(true);
-                        LegacyHotbarScrollGuard.RestoreLateUiWheelIfNeeded(scrollSnapshot, inWindow, LegacyUiInput.IsActiveInteraction());
-                        LegacyUiInput.SuppressHotbarScroll();
+                        var scrollSnapshot = TerrariaUiMouseCompat.ReadScrollSnapshot(mouse.ScrollDelta);
+                        if (string.Equals(selectedPage, "fishing", StringComparison.Ordinal) &&
+                            (FishingFilterUiState.TryConsumePickerScroll(mouse) ||
+                             FishingFilterUiState.TryConsumePresetScroll(mouse) ||
+                             FishingFilterUiState.TryConsumeEntryScroll(mouse)))
+                        {
+                            LegacyUiInput.CaptureIfNeeded(true);
+                            LegacyHotbarScrollGuard.RestoreLateUiWheelIfNeeded(scrollSnapshot, inWindow, LegacyUiInput.IsActiveInteraction());
+                            LegacyUiInput.SuppressHotbarScroll();
+                        }
+                        else
+                        {
+                            var before = LegacyMainUiState.ScrollOffset;
+                            var scrollDelta = -mouse.ScrollDelta / 3;
+                            if (scrollDelta == 0)
+                            {
+                                scrollDelta = mouse.ScrollDelta > 0 ? -40 : 40;
+                            }
+
+                            LegacyMainUiState.ScrollBy(scrollDelta, scrollArea.MaxScroll);
+                            pageLayout = GetCachedPageLayout(selectedPage, window, contentRect, settings, LegacyMainUiState.ScrollOffset);
+                            contentHeight = pageLayout.ContentHeight;
+                            scrollArea = pageLayout.CreateScrollArea(contentRect);
+                            LegacyUiInput.CaptureIfNeeded(true);
+                            var restored = LegacyHotbarScrollGuard.RestoreLateUiWheelIfNeeded(scrollSnapshot, inWindow, LegacyUiInput.IsActiveInteraction());
+                            var suppressed = LegacyUiInput.SuppressHotbarScroll();
+                            if (before != LegacyMainUiState.ScrollOffset)
+                            {
+                                RecordUiScroll(mouse.ScrollDelta, before, LegacyMainUiState.ScrollOffset, suppressed || restored);
+                            }
+                        }
+                    }
+
+                    LegacyUiInput.HandleScrollbarDrag(mouse, scrollArea);
+                    pageLayout = GetCachedPageLayout(selectedPage, window, contentRect, settings, LegacyMainUiState.ScrollOffset);
+                    contentHeight = pageLayout.ContentHeight;
+                    scrollArea = pageLayout.CreateScrollArea(contentRect);
+                    BeginRetainedFrameModel(selectedPage, window, contentRect, scrollArea, settings, contentHeight);
+                    var elements = PrepareFrameElements();
+                    elementFrameStarted = true;
+                    var frameContext = new LegacyUiContext(spriteBatch, mouse, window, selectedPage, settings, elements);
+                    frameContext.SetContentRect(contentRect);
+                    BeginFrameHoverCache(mouse, selectedPage, window, contentRect, scrollArea, settings);
+
+                    DrawFrame(spriteBatch, window, shell.TitleRect, shell.ResizeRect);
+
+                    DrawTabs(frameContext);
+
+                    LegacyUiTheme.DrawContentPanel(spriteBatch, contentRect);
+
+                    LegacyUiElement hoveredElement = null;
+                    if (string.Equals(selectedPage, "buff", StringComparison.Ordinal))
+                    {
+                        hoveredElement = DrawBuffPage(spriteBatch, scrollArea, mouse, elements);
+                    }
+                    else if (string.Equals(selectedPage, "combat", StringComparison.Ordinal))
+                    {
+                        hoveredElement = DrawCombatPage(spriteBatch, scrollArea, mouse, elements);
+                    }
+                    else if (string.Equals(selectedPage, "misc", StringComparison.Ordinal))
+                    {
+                        hoveredElement = DrawMiscPage(spriteBatch, scrollArea, mouse, elements);
+                    }
+                    else if (string.Equals(selectedPage, "about", StringComparison.Ordinal))
+                    {
+                        hoveredElement = DrawAboutPage(spriteBatch, scrollArea, mouse, elements);
+                    }
+                    else if (string.Equals(selectedPage, "information", StringComparison.Ordinal))
+                    {
+                        hoveredElement = DrawInformationPage(spriteBatch, scrollArea, mouse, elements);
+                    }
+                    else if (string.Equals(selectedPage, "fishing", StringComparison.Ordinal))
+                    {
+                        hoveredElement = DrawFishingPage(spriteBatch, scrollArea, mouse, elements);
+                    }
+                    else if (string.Equals(selectedPage, "movement", StringComparison.Ordinal))
+                    {
+                        hoveredElement = DrawMovementPage(spriteBatch, scrollArea, mouse, elements);
                     }
                     else
                     {
-                        var before = LegacyMainUiState.ScrollOffset;
-                        var scrollDelta = -mouse.ScrollDelta / 3;
-                        if (scrollDelta == 0)
-                        {
-                            scrollDelta = mouse.ScrollDelta > 0 ? -40 : 40;
-                        }
-
-                        LegacyMainUiState.ScrollBy(scrollDelta, scrollArea.MaxScroll);
-                        pageLayout = GetCachedPageLayout(selectedPage, window, contentRect, settings, LegacyMainUiState.ScrollOffset);
-                        contentHeight = pageLayout.ContentHeight;
-                        scrollArea = pageLayout.CreateScrollArea(contentRect);
-                        LegacyUiInput.CaptureIfNeeded(true);
-                        var restored = LegacyHotbarScrollGuard.RestoreLateUiWheelIfNeeded(scrollSnapshot, inWindow, LegacyUiInput.IsActiveInteraction());
-                        var suppressed = LegacyUiInput.SuppressHotbarScroll();
-                        if (before != LegacyMainUiState.ScrollOffset)
-                        {
-                            RecordUiScroll(mouse.ScrollDelta, before, LegacyMainUiState.ScrollOffset, suppressed || restored);
-                        }
+                        hoveredElement = DrawEmptyPage(spriteBatch, scrollArea, selectedPage, mouse);
                     }
-                }
 
-                LegacyUiInput.HandleScrollbarDrag(mouse, scrollArea);
-                pageLayout = GetCachedPageLayout(selectedPage, window, contentRect, settings, LegacyMainUiState.ScrollOffset);
-                contentHeight = pageLayout.ContentHeight;
-                scrollArea = pageLayout.CreateScrollArea(contentRect);
-                BeginRetainedFrameModel(selectedPage, window, contentRect, scrollArea, settings, contentHeight);
-                var elements = PrepareFrameElements();
-                elementFrameStarted = true;
-                var frameContext = new LegacyUiContext(spriteBatch, mouse, window, selectedPage, settings, elements);
-                frameContext.SetContentRect(contentRect);
-                BeginFrameHoverCache(mouse, selectedPage, window, contentRect, scrollArea, settings);
+                    if (!string.Equals(selectedPage, "about", StringComparison.Ordinal) || scrollArea.NeedsScroll)
+                    {
+                        LegacyUiTheme.DrawScrollbar(spriteBatch, scrollArea.ScrollbarTrack, scrollArea.ScrollbarThumb);
+                    }
 
-                DrawFrame(spriteBatch, window, shell.TitleRect, shell.ResizeRect);
+                    if (!string.Equals(selectedPage, "about", StringComparison.Ordinal))
+                    {
+                        DrawFooter(spriteBatch, window);
+                    }
+                    hoveredElement = ResolveFrameHoveredElement(hoveredElement, elements, mouse);
+                    if (hoveredElement != null)
+                    {
+                        DrawTooltip(spriteBatch, hoveredElement, mouse);
+                    }
 
-                DrawTabs(frameContext);
+                    if (inWindow)
+                    {
+                        UiMouseCaptureService.SuppressMouseTextForOperationWindow();
+                    }
 
-                LegacyUiTheme.DrawContentPanel(spriteBatch, contentRect);
-
-                LegacyUiElement hoveredElement = null;
-                if (string.Equals(selectedPage, "buff", StringComparison.Ordinal))
-                {
-                    hoveredElement = DrawBuffPage(spriteBatch, scrollArea, mouse, elements);
+                    HandleClicks(elements, mouse, shell.TitleRect, shell.ResizeRect);
+                    LegacyUiInput.FinishFrame(mouse, inWindow);
+                    FinishRetainedFrameModel(elements);
                 }
-                else if (string.Equals(selectedPage, "combat", StringComparison.Ordinal))
-                {
-                    hoveredElement = DrawCombatPage(spriteBatch, scrollArea, mouse, elements);
-                }
-                else if (string.Equals(selectedPage, "misc", StringComparison.Ordinal))
-                {
-                    hoveredElement = DrawMiscPage(spriteBatch, scrollArea, mouse, elements);
-                }
-                else if (string.Equals(selectedPage, "about", StringComparison.Ordinal))
-                {
-                    hoveredElement = DrawAboutPage(spriteBatch, scrollArea, mouse, elements);
-                }
-                else if (string.Equals(selectedPage, "information", StringComparison.Ordinal))
-                {
-                    hoveredElement = DrawInformationPage(spriteBatch, scrollArea, mouse, elements);
-                }
-                else if (string.Equals(selectedPage, "fishing", StringComparison.Ordinal))
-                {
-                    hoveredElement = DrawFishingPage(spriteBatch, scrollArea, mouse, elements);
-                }
-                else if (string.Equals(selectedPage, "movement", StringComparison.Ordinal))
-                {
-                    hoveredElement = DrawMovementPage(spriteBatch, scrollArea, mouse, elements);
-                }
-                else
-                {
-                    hoveredElement = DrawEmptyPage(spriteBatch, scrollArea, selectedPage, mouse);
-                }
-
-                if (!string.Equals(selectedPage, "about", StringComparison.Ordinal) || scrollArea.NeedsScroll)
-                {
-                    LegacyUiTheme.DrawScrollbar(spriteBatch, scrollArea.ScrollbarTrack, scrollArea.ScrollbarThumb);
-                }
-
-                if (!string.Equals(selectedPage, "about", StringComparison.Ordinal))
-                {
-                    DrawFooter(spriteBatch, window);
-                }
-                hoveredElement = ResolveFrameHoveredElement(hoveredElement, elements, mouse);
-                if (hoveredElement != null)
-                {
-                    DrawTooltip(spriteBatch, hoveredElement, mouse);
-                }
-
-                if (inWindow)
-                {
-                    UiMouseCaptureService.SuppressMouseTextForOperationWindow();
-                }
-
-                HandleClicks(elements, mouse, shell.TitleRect, shell.ResizeRect);
-                LegacyUiInput.FinishFrame(mouse, inWindow);
-                FinishRetainedFrameModel(elements);
             }
             catch (Exception error)
             {

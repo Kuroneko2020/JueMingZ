@@ -4,6 +4,10 @@ namespace JueMingZ.UI.Legacy
     {
         public const int DefaultWidth = 600;
         public const int DefaultHeight = 750;
+        public const int MaxVisualWidth = DefaultWidth;
+        public const int MaxVisualHeight = DefaultHeight;
+        public const int VisualScreenMargin = 24;
+        public const double MinimumEffectiveScale = 0.5d;
         public const int MinWidth = 600;
         public const int MinHeight = 750;
         public static readonly bool AllowResize = false;
