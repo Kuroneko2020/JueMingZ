@@ -60,6 +60,20 @@ namespace JueMingZ.UI.Legacy
             _movementSafeLandingConfigOpen = !_movementSafeLandingConfigOpen;
         }
 
+        public static void ToggleAutoRecoveryItemConfigPopup(string kind)
+        {
+            kind = NormalizeAutoRecoveryItemConfigKind(kind);
+            if (string.IsNullOrEmpty(kind))
+            {
+                _autoRecoveryItemConfigKind = string.Empty;
+                return;
+            }
+
+            _autoRecoveryItemConfigKind = string.Equals(_autoRecoveryItemConfigKind, kind, StringComparison.Ordinal)
+                ? string.Empty
+                : kind;
+        }
+
         public static bool IsDeveloperEasterEggConfirmPending()
         {
             return _developerEasterEggConfirmPending;
@@ -271,6 +285,16 @@ namespace JueMingZ.UI.Legacy
 
             itemTypes.Add(itemType);
             return true;
+        }
+
+        private static string NormalizeAutoRecoveryItemConfigKind(string kind)
+        {
+            if (string.Equals(kind, "heal", StringComparison.OrdinalIgnoreCase))
+            {
+                return "heal";
+            }
+
+            return string.Equals(kind, "mana", StringComparison.OrdinalIgnoreCase) ? "mana" : string.Empty;
         }
     }
 }

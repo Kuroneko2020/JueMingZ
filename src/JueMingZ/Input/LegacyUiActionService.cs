@@ -206,6 +206,18 @@ namespace JueMingZ.Input
                 return;
             }
 
+            if (command.ElementId.StartsWith("auto-recovery-item-config:", StringComparison.Ordinal))
+            {
+                ToggleAutoRecoveryItemConfig(command, command.ElementId.Substring("auto-recovery-item-config:".Length));
+                return;
+            }
+
+            if (command.ElementId.StartsWith("auto-recovery-item-option:", StringComparison.Ordinal))
+            {
+                ToggleAutoRecoveryItemOption(command, command.ElementId.Substring("auto-recovery-item-option:".Length));
+                return;
+            }
+
             if (command.ElementId.StartsWith("auto-buff-mode:", StringComparison.Ordinal))
             {
                 SetAutoBuffEnabled(command, IsOnMode(command.ElementId.Substring("auto-buff-mode:".Length)));

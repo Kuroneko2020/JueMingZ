@@ -26,6 +26,11 @@ namespace JueMingZ.Automation.BuffAndRecovery
 
         public static bool TrySelectHealPotion(string mode, int missingLife, int maxLife, out RecoveryPotionCandidate selected, out string message)
         {
+            return TrySelectHealPotion(mode, missingLife, maxLife, null, out selected, out message);
+        }
+
+        public static bool TrySelectHealPotion(string mode, int missingLife, int maxLife, HashSet<int> blockedItemTypes, out RecoveryPotionCandidate selected, out string message)
+        {
             selected = null;
             message = string.Empty;
             if (missingLife <= 0)
@@ -35,19 +40,43 @@ namespace JueMingZ.Automation.BuffAndRecovery
             }
 
             var candidates = ScanLocalPlayer();
+            return TrySelectHealPotionFromCandidates(mode, missingLife, maxLife, candidates, blockedItemTypes, out selected, out message);
+        }
+
+        internal static bool TrySelectHealPotionFromCandidates(string mode, int missingLife, int maxLife, IList<RecoveryPotionCandidate> candidates, HashSet<int> blockedItemTypes, out RecoveryPotionCandidate selected, out string message)
+        {
+            selected = null;
+            message = string.Empty;
+            if (missingLife <= 0)
+            {
+                message = "LifeNotMissing";
+                return false;
+            }
+
             var healCandidates = new List<RecoveryPotionCandidate>();
-            for (var index = 0; index < candidates.Count; index++)
+            var matchingCount = 0;
+            var blockedCount = 0;
+            for (var index = 0; candidates != null && index < candidates.Count; index++)
             {
                 var candidate = candidates[index];
                 if (candidate != null && candidate.Stack > 0 && candidate.ItemType > 0 && candidate.Potion && candidate.HealLife > 0)
                 {
+                    matchingCount++;
+                    if (IsBlocked(blockedItemTypes, candidate.ItemType))
+                    {
+                        blockedCount++;
+                        continue;
+                    }
+
                     healCandidates.Add(candidate);
                 }
             }
 
             if (healCandidates.Count <= 0)
             {
-                message = "MissingHealPotion";
+                message = matchingCount > 0 && blockedCount == matchingCount
+                    ? "AllHealPotionsDisabledByConfig"
+                    : "MissingHealPotion";
                 return false;
             }
 
@@ -71,14 +100,35 @@ namespace JueMingZ.Automation.BuffAndRecovery
 
         public static bool TrySelectManaPotion(out RecoveryPotionCandidate selected, out string message)
         {
+            return TrySelectManaPotion(null, out selected, out message);
+        }
+
+        public static bool TrySelectManaPotion(HashSet<int> blockedItemTypes, out RecoveryPotionCandidate selected, out string message)
+        {
             selected = null;
             message = string.Empty;
             var candidates = ScanLocalPlayer();
-            for (var index = 0; index < candidates.Count; index++)
+            return TrySelectManaPotionFromCandidates(candidates, blockedItemTypes, out selected, out message);
+        }
+
+        internal static bool TrySelectManaPotionFromCandidates(IList<RecoveryPotionCandidate> candidates, HashSet<int> blockedItemTypes, out RecoveryPotionCandidate selected, out string message)
+        {
+            selected = null;
+            message = string.Empty;
+            var matchingCount = 0;
+            var blockedCount = 0;
+            for (var index = 0; candidates != null && index < candidates.Count; index++)
             {
                 var candidate = candidates[index];
                 if (candidate == null || candidate.Stack <= 0 || candidate.ItemType <= 0 || candidate.HealMana <= 0)
                 {
+                    continue;
+                }
+
+                matchingCount++;
+                if (IsBlocked(blockedItemTypes, candidate.ItemType))
+                {
+                    blockedCount++;
                     continue;
                 }
 
@@ -90,7 +140,11 @@ namespace JueMingZ.Automation.BuffAndRecovery
                 }
             }
 
-            message = selected == null ? "MissingManaPotion" : "SelectedHighestManaPotion";
+            message = selected == null
+                ? matchingCount > 0 && blockedCount == matchingCount
+                    ? "AllManaPotionsDisabledByConfig"
+                    : "MissingManaPotion"
+                : "SelectedHighestManaPotion";
             return selected != null;
         }
 
@@ -223,6 +277,11 @@ namespace JueMingZ.Automation.BuffAndRecovery
         private static int ContainerRank(string sourceContainer)
         {
             return string.Equals(sourceContainer, "Inventory", System.StringComparison.OrdinalIgnoreCase) ? 0 : 1;
+        }
+
+        private static bool IsBlocked(HashSet<int> blockedItemTypes, int itemType)
+        {
+            return itemType > 0 && blockedItemTypes != null && blockedItemTypes.Count > 0 && blockedItemTypes.Contains(itemType);
         }
     }
 }

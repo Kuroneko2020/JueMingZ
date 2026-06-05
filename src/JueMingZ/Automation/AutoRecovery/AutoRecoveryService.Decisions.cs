@@ -68,7 +68,13 @@ namespace JueMingZ.Automation.AutoRecovery
 
             RecoveryPotionCandidate candidate;
             string selectionMessage;
-            if (!RecoveryPotionCatalog.TrySelectHealPotion(settings.AutoHealMode, missingLife, snapshot.Player.LifeMax, out candidate, out selectionMessage))
+            if (!RecoveryPotionCatalog.TrySelectHealPotion(
+                    settings.AutoHealMode,
+                    missingLife,
+                    snapshot.Player.LifeMax,
+                    settings.AutoHealBlockedItemTypes,
+                    out candidate,
+                    out selectionMessage))
             {
                 lock (SyncRoot)
                 {
@@ -178,7 +184,7 @@ namespace JueMingZ.Automation.AutoRecovery
 
             RecoveryPotionCandidate candidate;
             string selectionMessage;
-            if (!RecoveryPotionCatalog.TrySelectManaPotion(out candidate, out selectionMessage))
+            if (!RecoveryPotionCatalog.TrySelectManaPotion(settings.AutoManaBlockedItemTypes, out candidate, out selectionMessage))
             {
                 lock (SyncRoot)
                 {

@@ -74,6 +74,8 @@ namespace JueMingZ.Runtime
             private int _autoHealCooldownTicks;
             private int _autoManaCooldownTicks;
             private int _autoBuffCooldownTicks;
+            private int _autoHealBlockedItemTypesHash;
+            private int _autoManaBlockedItemTypesHash;
             private int _combatAimAssistRadius;
             private bool _combatAimTrackDummyEnabled;
             private bool _combatAimMarkerEnabled;
@@ -181,6 +183,8 @@ namespace JueMingZ.Runtime
                     _autoHealCooldownTicks = settings.AutoHealCooldownTicks,
                     _autoManaCooldownTicks = settings.AutoManaCooldownTicks,
                     _autoBuffCooldownTicks = settings.AutoBuffCooldownTicks,
+                    _autoHealBlockedItemTypesHash = HashInts(settings.AutoHealBlockedItemTypes),
+                    _autoManaBlockedItemTypesHash = HashInts(settings.AutoManaBlockedItemTypes),
                     _combatAimAssistRadius = settings.CombatAimAssistRadius,
                     _combatAimTrackDummyEnabled = settings.CombatAimTrackDummyEnabled,
                     _combatAimMarkerEnabled = settings.CombatAimMarkerEnabled,
@@ -283,6 +287,8 @@ namespace JueMingZ.Runtime
                        _autoHealCooldownTicks == other._autoHealCooldownTicks &&
                        _autoManaCooldownTicks == other._autoManaCooldownTicks &&
                        _autoBuffCooldownTicks == other._autoBuffCooldownTicks &&
+                       _autoHealBlockedItemTypesHash == other._autoHealBlockedItemTypesHash &&
+                       _autoManaBlockedItemTypesHash == other._autoManaBlockedItemTypesHash &&
                        _combatAimAssistRadius == other._combatAimAssistRadius &&
                        _combatAimTrackDummyEnabled == other._combatAimTrackDummyEnabled &&
                        _combatAimMarkerEnabled == other._combatAimMarkerEnabled &&

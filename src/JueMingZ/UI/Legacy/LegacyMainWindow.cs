@@ -47,6 +47,17 @@ namespace JueMingZ.UI.Legacy
         private const int MovementSafeLandingPopupRowGap = 6;
         private const int MovementSafeLandingOptionMinWidth = 96;
         private const int MovementSafeLandingOptionHeight = 32;
+        private const int AutoRecoveryItemPopupMaxWidth = 520;
+        private const int AutoRecoveryItemPopupMinWidth = 360;
+        private const int AutoRecoveryItemPopupMaxHeight = 360;
+        private const int AutoRecoveryItemPopupMinHeight = 168;
+        private const int AutoRecoveryItemPopupHorizontalPadding = 14;
+        private const int AutoRecoveryItemPopupContentStartY = 46;
+        private const int AutoRecoveryItemPopupBottomPadding = 12;
+        private const int AutoRecoveryItemPopupColumnGap = 10;
+        private const int AutoRecoveryItemPopupRowGap = 6;
+        private const int AutoRecoveryItemOptionMinWidth = 132;
+        private const int AutoRecoveryItemOptionHeight = 34;
         private const int FishingFilterPanelHeight = 296;
         private const int FishingFilterSettingsMinWidth = 132;
         private const int FishingFilterSettingsMaxWidth = 144;
@@ -109,6 +120,9 @@ namespace JueMingZ.UI.Legacy
         private static bool _movementSafeLandingConfigOpen;
         private static LegacyUiRect _movementSafeLandingConfigAnchor;
         private static bool _movementSafeLandingConfigAnchorVisible;
+        private static string _autoRecoveryItemConfigKind = string.Empty;
+        private static LegacyUiRect _autoRecoveryItemConfigAnchor;
+        private static bool _autoRecoveryItemConfigAnchorVisible;
         private static bool _developerEasterEggConfirmPending;
         private static bool _worldGenerationDetailsHintAlternate;
         private static bool _quickItemPickerOpen;

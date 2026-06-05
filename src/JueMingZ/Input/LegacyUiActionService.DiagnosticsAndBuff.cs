@@ -450,6 +450,7 @@ namespace JueMingZ.Input
                 return "{}";
             }
 
+            var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
             return "{" +
                    "\"autoHealEnabled\":" + BoolRaw(state.AutoHealEnabled) + "," +
                    "\"autoManaEnabled\":" + BoolRaw(state.AutoManaEnabled) + "," +
@@ -461,6 +462,8 @@ namespace JueMingZ.Input
                    "\"autoHealThresholdPercent\":" + IntRaw(state.AutoHealThresholdPercent) + "," +
                    "\"autoManaThresholdPercent\":" + IntRaw(state.AutoManaThresholdPercent) + "," +
                    "\"autoBuffCooldownTicks\":" + IntRaw(state.AutoBuffCooldownTicks) + "," +
+                   "\"autoHealBlockedItemTypeCount\":" + IntRaw(AutoRecoveryItemFilter.CountBlockedHealItems(settings)) + "," +
+                   "\"autoManaBlockedItemTypeCount\":" + IntRaw(AutoRecoveryItemFilter.CountBlockedManaItems(settings)) + "," +
                    "\"whitelistCount\":" + IntRaw(BuffPotionWhitelistService.Count) +
                    "}";
         }

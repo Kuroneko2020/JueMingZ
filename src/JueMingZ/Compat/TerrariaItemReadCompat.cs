@@ -125,6 +125,11 @@ namespace JueMingZ.Compat
             return item != null && item.consumable;
         }
 
+        public static bool IsPotion(Item item)
+        {
+            return item != null && item.potion;
+        }
+
         public static bool IsAccessory(Item item)
         {
             return item != null && item.accessory;

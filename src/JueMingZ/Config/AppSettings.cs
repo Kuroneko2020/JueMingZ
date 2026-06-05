@@ -91,6 +91,12 @@ namespace JueMingZ.Config
         [DataMember(Order = 28)]
         public string AutoManaMode { get; set; } = "Off";
 
+        [DataMember(Order = 173)]
+        public List<int> AutoHealBlockedItemTypes { get; set; } = new List<int>();
+
+        [DataMember(Order = 174)]
+        public List<int> AutoManaBlockedItemTypes { get; set; } = new List<int>();
+
         [DataMember(Order = 29)]
         public bool AutoNurseEnabled { get; set; }
 
@@ -703,6 +709,8 @@ namespace JueMingZ.Config
                 LegacySelectedPageId = "buff",
                 AutoHealMode = "Off",
                 AutoManaMode = "Off",
+                AutoHealBlockedItemTypes = new List<int>(),
+                AutoManaBlockedItemTypes = new List<int>(),
                 AutoNurseEnabled = false,
                 AutoStationBuffEnabled = false,
                 AutoBuffFollowAddEnabled = false,

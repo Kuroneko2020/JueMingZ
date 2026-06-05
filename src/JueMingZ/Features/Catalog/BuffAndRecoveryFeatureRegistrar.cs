@@ -29,14 +29,16 @@ namespace JueMingZ.Features.Catalog
             Add(registry, FeatureDefinitionBuilder.Create("buff.auto_heal", "自动回血", "掉血后按智能或快速策略使用背包回血药")
                 .Actions(InputActionKind.UseInventoryItem)
                 .GameState(GameStateKind.Player, GameStateKind.Inventory, GameStateKind.Buffs)
+                .Config(FeatureConfigUiKind.ListConfigWindow)
                 .Implemented(true)
-                .Notes("默认关闭，F5 面板开启。Quick 选择回血量最高的可用药；Smart 选择不明显浪费且适配超上限药和诡药的可用药；动作提交 UseInventoryItem 并调用 Terraria 原版恢复物品内部流程。当前按单机/本地辅助可用范围表达，不声明严格多人服务器权威同步已完整验证。"));
+                .Notes("默认关闭，F5 面板开启。Quick 选择回血量最高的可用药；Smart 选择不明显浪费且适配超上限药和诡药的可用药；配置只按 item type 禁用候选物品，不改变原优先级。动作提交 UseInventoryItem 并调用 Terraria 原版恢复物品内部流程。当前按单机/本地辅助可用范围表达，不声明严格多人服务器权威同步已完整验证。"));
 
             Add(registry, FeatureDefinitionBuilder.Create("buff.auto_mana", "自动回蓝", "当前手持耗蓝武器下一次蓝量不足时自动使用背包回蓝药")
                 .Actions(InputActionKind.UseInventoryItem)
                 .GameState(GameStateKind.Player, GameStateKind.Inventory, GameStateKind.Buffs)
+                .Config(FeatureConfigUiKind.ListConfigWindow)
                 .Implemented(true)
-                .Notes("默认关闭，F5 面板开启；当前手持耗蓝武器下一次实际使用会因魔力不足失败时，选择可用回蓝药并提交 UseInventoryItem。当前按单机/本地辅助可用范围表达，不声明严格多人服务器权威同步已完整验证。"));
+                .Notes("默认关闭，F5 面板开启；当前手持耗蓝武器下一次实际使用会因魔力不足失败时，选择可用回蓝药并提交 UseInventoryItem；配置只按 item type 禁用候选物品，不改变原优先级。当前按单机/本地辅助可用范围表达，不声明严格多人服务器权威同步已完整验证。"));
         }
 
         private static void Add(FeatureRegistry registry, FeatureDefinitionBuilder builder)

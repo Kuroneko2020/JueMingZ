@@ -551,6 +551,8 @@ namespace JueMingZ.Config
             settings.AutoManaMode = NormalizeAutoManaMode(settings.AutoManaMode, settings.AutoManaEnabled);
             settings.AutoHealEnabled = !string.Equals(settings.AutoHealMode, "Off", StringComparison.OrdinalIgnoreCase);
             settings.AutoManaEnabled = string.Equals(settings.AutoManaMode, "ManaFlower", StringComparison.OrdinalIgnoreCase);
+            settings.AutoHealBlockedItemTypes = NormalizePositiveItemIds(settings.AutoHealBlockedItemTypes);
+            settings.AutoManaBlockedItemTypes = NormalizePositiveItemIds(settings.AutoManaBlockedItemTypes);
             settings.CombatAimAssistRadius = Clamp(settings.CombatAimAssistRadius, 0, 50);
             settings.AimRangeOrigin = CombatAimModes.NormalizeRangeOrigin(settings.AimRangeOrigin);
             settings.AimTargetPriority = CombatAimModes.NormalizeTargetPriority(settings.AimTargetPriority);
@@ -969,6 +971,25 @@ namespace JueMingZ.Config
                 if (itemId <= 0 ||
                     (itemId >= 71 && itemId <= 74) ||
                     !seen.Add(itemId))
+                {
+                    continue;
+                }
+
+                normalized.Add(itemId);
+            }
+
+            return normalized;
+        }
+
+        private static List<int> NormalizePositiveItemIds(List<int> itemIds)
+        {
+            var source = itemIds ?? new List<int>();
+            var normalized = new List<int>();
+            var seen = new HashSet<int>();
+            for (var index = 0; index < source.Count; index++)
+            {
+                var itemId = source[index];
+                if (itemId <= 0 || !seen.Add(itemId))
                 {
                     continue;
                 }

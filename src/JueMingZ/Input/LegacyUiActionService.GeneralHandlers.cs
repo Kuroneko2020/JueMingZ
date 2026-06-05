@@ -1764,6 +1764,41 @@ namespace JueMingZ.Input
             return ItemSwapFamilyCompat.ResolveItemDisplayName(itemType, itemType.ToString(CultureInfo.InvariantCulture));
         }
 
+        private static string ResolveRecoveryItemDisplayName(string kind, int itemType)
+        {
+            if (itemType <= 0)
+            {
+                return string.Empty;
+            }
+
+            var definitions = string.Equals(kind, "heal", StringComparison.Ordinal)
+                ? RecoveryPotionDefinitionCatalog.GetHealDefinitions()
+                : RecoveryPotionDefinitionCatalog.GetManaDefinitions();
+            if (definitions != null)
+            {
+                for (var index = 0; index < definitions.Length; index++)
+                {
+                    var definition = definitions[index];
+                    if (definition != null && definition.ItemType == itemType && !string.IsNullOrWhiteSpace(definition.ItemName))
+                    {
+                        return definition.ItemName.Trim();
+                    }
+                }
+            }
+
+            return ItemSwapFamilyCompat.ResolveItemDisplayName(itemType, itemType.ToString(CultureInfo.InvariantCulture));
+        }
+
+        private static string NormalizeAutoRecoveryItemKind(string kind)
+        {
+            if (string.Equals(kind, "heal", StringComparison.OrdinalIgnoreCase))
+            {
+                return "heal";
+            }
+
+            return string.Equals(kind, "mana", StringComparison.OrdinalIgnoreCase) ? "mana" : string.Empty;
+        }
+
         private static void ToggleAutoMana(LegacyUiCommand command)
         {
             var before = BuildAutoRecoveryBeforeJson();
@@ -1813,6 +1848,103 @@ namespace JueMingZ.Input
                 before,
                 BuildAutoRecoveryAfterJson(),
                 "{\"submitted\":false,\"autoManaMode\":\"" + EscapeJson(normalized) + "\",\"executionMode\":\"" + (string.Equals(normalized, AutoRecoverySettings.ManaModeManaFlower, StringComparison.OrdinalIgnoreCase) ? "OriginalRecoveryItemUse" : string.Empty) + "\",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                "Button");
+        }
+
+        private static void ToggleAutoRecoveryItemConfig(LegacyUiCommand command, string kind)
+        {
+            kind = NormalizeAutoRecoveryItemKind(kind);
+            var before = BuildAutoRecoveryBeforeJson();
+            if (string.IsNullOrEmpty(kind))
+            {
+                Record(
+                    command,
+                    "Ui.Toggle.AutoRecoveryItemConfig",
+                    "AutoRecovery",
+                    "NotApplicable",
+                    "未知的自动恢复物品配置面板。",
+                    before,
+                    BuildAutoRecoveryAfterJson(),
+                    "{\"submitted\":false,\"implemented\":false,\"kind\":\"" + EscapeJson(kind) + "\",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                    "Button");
+                return;
+            }
+
+            LegacyMainWindow.ToggleAutoRecoveryItemConfigPopup(kind);
+            Record(
+                command,
+                "Ui.Toggle.AutoRecoveryItemConfig",
+                "AutoRecovery",
+                "Succeeded",
+                (string.Equals(kind, "heal", StringComparison.Ordinal) ? "自动回血" : "自动回蓝") + "配置已切换。",
+                before,
+                BuildAutoRecoveryAfterJson(),
+                "{\"submitted\":false,\"implemented\":true,\"kind\":\"" + EscapeJson(kind) + "\",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                "Button");
+        }
+
+        private static void ToggleAutoRecoveryItemOption(LegacyUiCommand command, string payload)
+        {
+            var before = BuildAutoRecoveryBeforeJson();
+            var separator = string.IsNullOrWhiteSpace(payload) ? -1 : payload.IndexOf(':');
+            int itemType;
+            if (separator <= 0 ||
+                separator >= payload.Length - 1 ||
+                !int.TryParse(payload.Substring(separator + 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out itemType) ||
+                itemType <= 0)
+            {
+                Record(
+                    command,
+                    "Ui.Toggle.AutoRecoveryItemOption",
+                    "AutoRecovery",
+                    "NotApplicable",
+                    "自动恢复物品配置项无效。",
+                    before,
+                    BuildAutoRecoveryAfterJson(),
+                    "{\"submitted\":false,\"implemented\":false,\"payload\":\"" + EscapeJson(payload) + "\",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                    "Button");
+                return;
+            }
+
+            var kind = NormalizeAutoRecoveryItemKind(payload.Substring(0, separator));
+            if (string.IsNullOrEmpty(kind))
+            {
+                Record(
+                    command,
+                    "Ui.Toggle.AutoRecoveryItemOption",
+                    "AutoRecovery",
+                    "NotApplicable",
+                    "未知的自动恢复物品类型。",
+                    before,
+                    BuildAutoRecoveryAfterJson(),
+                    "{\"submitted\":false,\"implemented\":false,\"payload\":\"" + EscapeJson(payload) + "\",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                    "Button");
+                return;
+            }
+
+            var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
+            bool enabled;
+            var changed = string.Equals(kind, "heal", StringComparison.Ordinal)
+                ? AutoRecoveryItemFilter.ToggleHealItem(settings, itemType, out enabled)
+                : AutoRecoveryItemFilter.ToggleManaItem(settings, itemType, out enabled);
+            if (changed)
+            {
+                ConfigService.SaveAll();
+            }
+
+            var blockedCount = string.Equals(kind, "heal", StringComparison.Ordinal)
+                ? AutoRecoveryItemFilter.CountBlockedHealItems(settings)
+                : AutoRecoveryItemFilter.CountBlockedManaItems(settings);
+            var itemName = ResolveRecoveryItemDisplayName(kind, itemType);
+            Record(
+                command,
+                "Ui.Toggle.AutoRecoveryItemOption",
+                "AutoRecovery",
+                changed ? "Succeeded" : "NotApplicable",
+                itemName + (enabled ? "已允许自动使用。" : "已禁止自动使用。"),
+                before,
+                BuildAutoRecoveryAfterJson(),
+                "{\"submitted\":false,\"implemented\":true,\"kind\":\"" + EscapeJson(kind) + "\",\"itemType\":" + IntRaw(itemType) + ",\"itemName\":\"" + EscapeJson(itemName) + "\",\"enabled\":" + BoolRaw(enabled) + ",\"blockedCount\":" + IntRaw(blockedCount) + ",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
                 "Button");
         }
 

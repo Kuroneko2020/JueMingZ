@@ -527,6 +527,11 @@ namespace JueMingZ.Tests
             Run("legacy UI page layout cache dirties on scroll size and state", ref failed, LegacyUiPageLayoutCacheDirtiesOnScrollSizeAndState);
             Run("legacy UI page layout cache dirties on font generation", ref failed, LegacyUiPageLayoutCacheDirtiesOnFontGeneration);
             Run("legacy potion grid fits six buttons per default buff pane", ref failed, LegacyPotionGridFitsSixButtonsPerDefaultBuffPane);
+            Run("auto recovery item filter defaults allow all and toggles blocked", ref failed, AutoRecoveryItemFilterDefaultsAllowAllAndTogglesBlocked);
+            Run("recovery potion selection skips blocked heal candidates", ref failed, RecoveryPotionSelectionSkipsBlockedHealCandidates);
+            Run("recovery potion selection skips blocked mana candidates", ref failed, RecoveryPotionSelectionSkipsBlockedManaCandidates);
+            Run("runtime settings snapshot carries recovery item filters", ref failed, RuntimeSettingsSnapshotCarriesRecoveryItemFilters);
+            Run("feature catalog exposes recovery item config windows", ref failed, FeatureCatalogExposesRecoveryItemConfigWindows);
             Run("legacy misc content height includes bottom action rows", ref failed, LegacyMiscContentHeightIncludesBottomActionRows);
             Run("legacy UI hover layout token ignores window and content position", ref failed, LegacyUiHoverLayoutTokenIgnoresWindowAndContentPosition);
             Run("legacy UI hover layout token dirties on page size scroll settings and font", ref failed, LegacyUiHoverLayoutTokenDirtiesOnPageSizeScrollSettingsAndFont);

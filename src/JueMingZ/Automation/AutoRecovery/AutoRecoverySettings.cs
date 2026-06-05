@@ -1,5 +1,6 @@
 using JueMingZ.Config;
 using System;
+using System.Collections.Generic;
 
 namespace JueMingZ.Automation.AutoRecovery
 {
@@ -24,6 +25,8 @@ namespace JueMingZ.Automation.AutoRecovery
         public int AutoHealCooldownTicks { get; set; }
         public int AutoManaCooldownTicks { get; set; }
         public int AutoBuffCooldownTicks { get; set; }
+        public HashSet<int> AutoHealBlockedItemTypes { get; set; }
+        public HashSet<int> AutoManaBlockedItemTypes { get; set; }
 
         public static AutoRecoverySettings FromConfig()
         {
@@ -51,7 +54,9 @@ namespace JueMingZ.Automation.AutoRecovery
                 AutoManaCooldownTicks = settings.AutoManaCooldownTicks <= 0
                     ? AutoManaImmediateCooldownTicks
                     : Math.Min(settings.AutoManaCooldownTicks, AutoManaImmediateCooldownTicks),
-                AutoBuffCooldownTicks = settings.AutoBuffCooldownTicks <= 0 ? 1800 : settings.AutoBuffCooldownTicks
+                AutoBuffCooldownTicks = settings.AutoBuffCooldownTicks <= 0 ? 1800 : settings.AutoBuffCooldownTicks,
+                AutoHealBlockedItemTypes = BuildItemTypeSet(settings.AutoHealBlockedItemTypes),
+                AutoManaBlockedItemTypes = BuildItemTypeSet(settings.AutoManaBlockedItemTypes)
             };
         }
 
@@ -68,6 +73,26 @@ namespace JueMingZ.Automation.AutoRecovery
             }
 
             return value > max ? max : value;
+        }
+
+        private static HashSet<int> BuildItemTypeSet(IList<int> itemTypes)
+        {
+            var set = new HashSet<int>();
+            if (itemTypes == null)
+            {
+                return set;
+            }
+
+            for (var index = 0; index < itemTypes.Count; index++)
+            {
+                var itemType = itemTypes[index];
+                if (itemType > 0)
+                {
+                    set.Add(itemType);
+                }
+            }
+
+            return set;
         }
 
         public static string NormalizeHealMode(string mode, bool legacyEnabled)

@@ -312,7 +312,20 @@ namespace JueMingZ.UI.Legacy
             unchecked
             {
                 var hash = BuildContentHeightSignature(selectedPage, settings);
-                if (string.Equals(selectedPage, "information", StringComparison.Ordinal))
+                if (string.Equals(selectedPage, "buff", StringComparison.Ordinal))
+                {
+                    AddHash(ref hash, settings.AutoHealMode);
+                    AddHash(ref hash, settings.AutoManaMode);
+                    AddHash(ref hash, settings.AutoHealEnabled);
+                    AddHash(ref hash, settings.AutoManaEnabled);
+                    AddHash(ref hash, settings.AutoBuffEnabled);
+                    AddHash(ref hash, settings.AutoNurseEnabled);
+                    AddHash(ref hash, settings.AutoStationBuffEnabled);
+                    AddHash(ref hash, _autoRecoveryItemConfigKind);
+                    AddIntListHash(ref hash, settings.AutoHealBlockedItemTypes);
+                    AddIntListHash(ref hash, settings.AutoManaBlockedItemTypes);
+                }
+                else if (string.Equals(selectedPage, "information", StringComparison.Ordinal))
                 {
                     AddHash(ref hash, settings.InformationEnemyNameLabelsEnabled);
                     AddHash(ref hash, settings.InformationCritterNameLabelsEnabled);
@@ -445,6 +458,20 @@ namespace JueMingZ.UI.Legacy
         private static void AddHash(ref int hash, string value)
         {
             hash = hash * 31 + StringComparer.Ordinal.GetHashCode(value ?? string.Empty);
+        }
+
+        private static void AddIntListHash(ref int hash, IList<int> values)
+        {
+            AddHash(ref hash, values == null ? 0 : values.Count);
+            if (values == null)
+            {
+                return;
+            }
+
+            for (var index = 0; index < values.Count; index++)
+            {
+                AddHash(ref hash, values[index]);
+            }
         }
 
         internal static LegacyUiPageLayoutSnapshot BuildPageLayoutSnapshotForTesting(

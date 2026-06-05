@@ -25,10 +25,11 @@ namespace JueMingZ.UI.Legacy
             var hovered = (LegacyUiElement)null;
             var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
             var y = 0;
+            _autoRecoveryItemConfigAnchorVisible = false;
 
-            hovered = DrawHealModeRow(spriteBatch, area, mouse, elements, y, settings.AutoHealMode) ?? hovered;
+            hovered = DrawHealModeRow(spriteBatch, area, mouse, elements, y, settings) ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
-            hovered = DrawManaModeRow(spriteBatch, area, mouse, elements, y, settings.AutoManaMode) ?? hovered;
+            hovered = DrawManaModeRow(spriteBatch, area, mouse, elements, y, settings) ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "自动护士", settings.AutoNurseEnabled, "auto-nurse-mode:", "靠近可交互护士且需要治疗或清除 Debuff 时尝试自动治疗。") ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
@@ -40,6 +41,7 @@ namespace JueMingZ.UI.Legacy
             DrawSection(spriteBatch, area, y, "自动增益列表");
             y += LegacyUiMetrics.SectionHeaderHeight;
             hovered = DrawDualBuffGrid(spriteBatch, area, mouse, elements, y) ?? hovered;
+            hovered = DrawAutoRecoveryItemConfigPopup(spriteBatch, area, mouse, elements) ?? hovered;
 
             return hovered;
         }
