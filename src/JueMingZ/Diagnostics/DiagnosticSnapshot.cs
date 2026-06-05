@@ -696,6 +696,17 @@ namespace JueMingZ.Diagnostics
         public string CombatPerfectRevolverLastDecision { get; set; }
         public string CombatPerfectRevolverLastSkipReason { get; set; }
         public DateTime? CombatPerfectRevolverLastDecisionUtc { get; set; }
+        public string CombatItemCheckAutoClickerLastDecision { get; set; }
+        public string CombatItemCheckAutoClickerLastReason { get; set; }
+        public DateTime? CombatItemCheckAutoClickerLastDecisionUtc { get; set; }
+        public int CombatItemCheckAutoClickerLastItemType { get; set; }
+        public bool CombatItemCheckAutoClickerVanillaAutoReuseAllAvailable { get; set; }
+        public bool CombatItemCheckAutoClickerVanillaAutoReuseAllWeapons { get; set; }
+        public bool CombatItemCheckAutoClickerScopedPress { get; set; }
+        public bool CombatItemCheckAutoClickerScopedRelease { get; set; }
+        public bool CombatItemCheckAutoClickerRestored { get; set; }
+        public long CombatItemCheckAutoClickerAppliedCount { get; set; }
+        public long CombatItemCheckAutoClickerSkippedCount { get; set; }
         public string CombatMagicStringClickerLastDecision { get; set; }
         public string CombatMagicStringClickerLastSkipReason { get; set; }
         public DateTime? CombatMagicStringClickerLastDecisionUtc { get; set; }
@@ -978,6 +989,8 @@ namespace JueMingZ.Diagnostics
             CombatAutoFacingTargetName = string.Empty;
             CombatPerfectRevolverLastDecision = string.Empty;
             CombatPerfectRevolverLastSkipReason = string.Empty;
+            CombatItemCheckAutoClickerLastDecision = string.Empty;
+            CombatItemCheckAutoClickerLastReason = string.Empty;
             CombatMagicStringClickerLastDecision = string.Empty;
             CombatMagicStringClickerLastSkipReason = string.Empty;
             LastAutoHealResult = string.Empty;

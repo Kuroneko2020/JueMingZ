@@ -703,6 +703,17 @@ namespace JueMingZ.Diagnostics
             Append(builder, "CombatPerfectRevolverLastDecision", snapshot.CombatPerfectRevolverLastDecision, true);
             Append(builder, "CombatPerfectRevolverLastSkipReason", snapshot.CombatPerfectRevolverLastSkipReason, true);
             Append(builder, "CombatPerfectRevolverLastDecisionUtc", FormatDate(snapshot.CombatPerfectRevolverLastDecisionUtc), true);
+            Append(builder, "CombatItemCheckAutoClickerLastDecision", snapshot.CombatItemCheckAutoClickerLastDecision, true);
+            Append(builder, "CombatItemCheckAutoClickerLastReason", snapshot.CombatItemCheckAutoClickerLastReason, true);
+            Append(builder, "CombatItemCheckAutoClickerLastDecisionUtc", FormatDate(snapshot.CombatItemCheckAutoClickerLastDecisionUtc), true);
+            Append(builder, "CombatItemCheckAutoClickerLastItemType", snapshot.CombatItemCheckAutoClickerLastItemType, true);
+            Append(builder, "CombatItemCheckAutoClickerVanillaAutoReuseAllAvailable", snapshot.CombatItemCheckAutoClickerVanillaAutoReuseAllAvailable, true);
+            Append(builder, "CombatItemCheckAutoClickerVanillaAutoReuseAllWeapons", snapshot.CombatItemCheckAutoClickerVanillaAutoReuseAllWeapons, true);
+            Append(builder, "CombatItemCheckAutoClickerScopedPress", snapshot.CombatItemCheckAutoClickerScopedPress, true);
+            Append(builder, "CombatItemCheckAutoClickerScopedRelease", snapshot.CombatItemCheckAutoClickerScopedRelease, true);
+            Append(builder, "CombatItemCheckAutoClickerRestored", snapshot.CombatItemCheckAutoClickerRestored, true);
+            Append(builder, "CombatItemCheckAutoClickerAppliedCount", snapshot.CombatItemCheckAutoClickerAppliedCount, true);
+            Append(builder, "CombatItemCheckAutoClickerSkippedCount", snapshot.CombatItemCheckAutoClickerSkippedCount, true);
             Append(builder, "CombatMagicStringClickerLastDecision", snapshot.CombatMagicStringClickerLastDecision, true);
             Append(builder, "CombatMagicStringClickerLastSkipReason", snapshot.CombatMagicStringClickerLastSkipReason, true);
             Append(builder, "CombatMagicStringClickerLastDecisionUtc", FormatDate(snapshot.CombatMagicStringClickerLastDecisionUtc), true);

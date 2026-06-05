@@ -19,6 +19,7 @@ using JueMingZ.Diagnostics;
 using JueMingZ.Features;
 using JueMingZ.GameState;
 using JueMingZ.GameState.Ui;
+using JueMingZ.Hooks;
 using JueMingZ.Runtime;
 using JueMingZ.UI;
 using JueMingZ.UI.Legacy;
@@ -163,6 +164,253 @@ namespace JueMingZ.Tests
             {
                 throw new InvalidOperationException("Expected auto clicker input probe animation buckets to remain stable.");
             }
+        }
+
+        private static void CombatItemCheckAutoClickerCorePressesReadyItem()
+        {
+            var profile = CreateAutoClickerProfile();
+            var decision = CombatItemCheckAutoClickService.CreateDecision(profile, true, true, false);
+            if (!decision.ApplyTakeover || !decision.PressAttack ||
+                !string.Equals(decision.Reason, "ready", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected ItemCheck auto clicker core to press a ready item.");
+            }
+        }
+
+        private static void CombatItemCheckAutoClickerCoreReleasesCooldownItem()
+        {
+            var profile = CreateAutoClickerProfile();
+            profile.ItemAnimation = 12;
+            profile.ItemTime = 7;
+            var decision = CombatItemCheckAutoClickService.CreateDecision(profile, true, true, false);
+            if (!decision.ApplyTakeover || decision.PressAttack ||
+                !string.Equals(decision.Reason, "cooldown", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected ItemCheck auto clicker core to release during cooldown.");
+            }
+        }
+
+        private static void CombatItemCheckAutoClickerCoreDisabledNoOp()
+        {
+            var profile = CreateAutoClickerProfile();
+            var decision = CombatItemCheckAutoClickService.CreateDecision(profile, false, true, false);
+            if (decision.ApplyTakeover || decision.PressAttack ||
+                !string.Equals(decision.Reason, "disabled", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected disabled ItemCheck auto clicker core to no-op.");
+            }
+        }
+
+        private static void CombatItemCheckAutoClickerFourQuadrants()
+        {
+            var profile = CreateAutoClickerProfile();
+            ExpectAutoClickDecision(profile, false, false, false, false, "disabled", "vanilla off / feature off");
+            ExpectAutoClickDecision(profile, false, true, false, false, "disabled", "vanilla on / feature off");
+            ExpectAutoClickDecision(profile, true, false, true, true, "ready", "vanilla off / feature on");
+            ExpectAutoClickDecision(profile, true, true, true, true, "ready", "vanilla on / feature on补非原版覆盖物品");
+        }
+
+        private static void CombatItemCheckAutoClickerRespectsVanillaAutoReuse()
+        {
+            var autoReuseItem = CreateAutoClickerProfile(3507, 24, true, false, false, 0);
+            ExpectAutoClickDecision(autoReuseItem, true, true, false, false, "itemAutoReuse", "item.autoReuse with vanilla auto reuse on");
+            ExpectAutoClickDecision(autoReuseItem, true, false, true, true, "ready", "item.autoReuse with vanilla auto reuse off");
+
+            var weapon = CreateAutoClickerProfile(1, 10, false, false, false, 0);
+            ExpectAutoClickDecision(weapon, true, true, false, false, "vanillaAutoReuseCovered", "ordinary damage weapon with vanilla auto reuse on");
+            ExpectAutoClickDecision(weapon, true, false, true, true, "ready", "ordinary damage weapon with vanilla auto reuse off");
+        }
+
+        private static void CombatItemCheckAutoClickerSamplesAndHardExcludes()
+        {
+            ExpectAutoClickDecision(CreateAutoClickerProfile(29), true, true, true, true, "ready", "life crystal sample");
+            ExpectAutoClickDecision(CreateAutoClickerProfile(5335), true, true, true, true, "ready", "Rod of Harmony sample");
+
+            var rainbowRod = CreateAutoClickerProfile(495, 74, false, true, true, 0);
+            ExpectAutoClickDecision(rainbowRod, true, true, true, true, "ready", "Rainbow Rod while vanilla channel is already active");
+
+            ExpectAutoClickDecision(CreateAutoClickerProfile(2294, 0, false, false, false, 45), true, false, false, false, "excludedFishingRod", "fishing pole field exclusion");
+            ExpectAutoClickDecision(CreateAutoClickerProfile(2289, 0, false, false, false, 0), true, false, false, false, "excludedFishingRod", "known fishing pole id fallback");
+            ExpectAutoClickDecision(CreateAutoClickerProfile(2269, 15, false, false, false, 0), true, false, false, false, "excludedRevolver", "perfect revolver exclusion");
+
+            if (!CombatItemCheckAutoClickService.IsKnownFishingRodItemTypeForTesting(4442) ||
+                CombatItemCheckAutoClickService.IsKnownFishingRodItemTypeForTesting(1))
+            {
+                throw new InvalidOperationException("Expected auto clicker fishing rod fallback id table to stay scoped.");
+            }
+        }
+
+        private static void CombatItemCheckAutoClickerFailsClosedWhenVanillaSwitchUnavailable()
+        {
+            var profile = CreateAutoClickerProfile();
+            profile.VanillaAutoReuseAllAvailable = false;
+            var decision = CombatItemCheckAutoClickService.CreateDecision(profile, true, true, false);
+            if (decision.ApplyTakeover ||
+                !string.Equals(decision.Reason, "vanillaAutoReuseUnavailable", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected ItemCheck auto clicker to fail closed when vanilla auto reuse state is unavailable.");
+            }
+        }
+
+        private static void CombatItemCheckAutoClickerYieldsToAdjacentScopedUse()
+        {
+            if (!ItemUseHookCallbacks.ShouldAttemptAutoClickerTakeoverForTesting(false, false, false, false, false))
+            {
+                throw new InvalidOperationException("Expected auto clicker to run when no adjacent scoped use is active.");
+            }
+
+            AssertAutoClickerYield(true, false, false, false, false, "bridge pending at start");
+            AssertAutoClickerYield(false, true, false, false, false, "bridge pending now");
+            AssertAutoClickerYield(false, false, true, false, false, "UseItemPulseBridge");
+            AssertAutoClickerYield(false, false, false, true, false, "auto harvest");
+            AssertAutoClickerYield(false, false, false, false, true, "auto capture");
+        }
+
+        private static void CombatItemCheckAutoClickerTakeoverRestoresInputState()
+        {
+            try
+            {
+                var player = new Terraria.Player
+                {
+                    active = true,
+                    controlUseItem = false,
+                    releaseUseItem = false
+                };
+                ResetFakeMainMouse(false, false);
+
+                var decision = CombatItemCheckAutoClickService.CreateDecision(CreateAutoClickerProfile(), true, true, false);
+                if (!decision.ApplyTakeover || !decision.PressAttack)
+                {
+                    throw new InvalidOperationException("Expected ItemCheck auto clicker core to request a fresh click before restore test.");
+                }
+
+                TerrariaInputCompat.ScopedUseItemTakeover takeover;
+                if (!TerrariaInputCompat.TryBeginScopedUseItemClickTakeover(player, decision.PressAttack, "CombatAutoClickerItemCheck", out takeover))
+                {
+                    throw new InvalidOperationException("Expected ItemCheck auto clicker takeover to apply: " + TerrariaInputCompat.LastInputCompatError);
+                }
+
+                if (!player.controlUseItem || !player.releaseUseItem ||
+                    !Terraria.Main.mouseLeft || !Terraria.Main.mouseLeftRelease ||
+                    takeover == null || !takeover.Pressed ||
+                    !string.Equals(takeover.ScopeName, "CombatAutoClickerItemCheck", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected ItemCheck auto clicker takeover to apply a fresh click scope.");
+                }
+
+                if (!TerrariaInputCompat.TryRestoreScopedUseItemTakeover(takeover))
+                {
+                    throw new InvalidOperationException("Expected ItemCheck auto clicker takeover restore to succeed: " + TerrariaInputCompat.LastInputCompatError);
+                }
+
+                if (player.controlUseItem || player.releaseUseItem ||
+                    Terraria.Main.mouseLeft || Terraria.Main.mouseLeftRelease)
+                {
+                    throw new InvalidOperationException("Expected ItemCheck auto clicker takeover to restore player and Main mouse state.");
+                }
+            }
+            finally
+            {
+                ResetFakeMainMouse(false, true);
+            }
+        }
+
+        private static void CombatItemCheckAutoClickerDiagnosticsRecordScopedDecision()
+        {
+            var profile = CreateAutoClickerProfile(29);
+            var decision = CombatItemCheckAutoClickService.CreateDecision(profile, true, true, false);
+            CombatItemCheckAutoClickService.RecordDecisionForTesting(decision, profile);
+
+            var diagnostics = CombatItemCheckAutoClickService.GetDiagnostics();
+            if (!string.Equals(diagnostics.LastDecision, "scopedPress", StringComparison.Ordinal) ||
+                !string.Equals(diagnostics.LastReason, "ready", StringComparison.Ordinal) ||
+                diagnostics.LastItemType != 29 ||
+                !diagnostics.LastVanillaAutoReuseAllAvailable ||
+                diagnostics.LastVanillaAutoReuseAllWeapons ||
+                !diagnostics.LastScopedPress ||
+                diagnostics.LastScopedRelease ||
+                diagnostics.LastRestored)
+            {
+                throw new InvalidOperationException("Expected ItemCheck auto clicker diagnostics to record scoped press decision.");
+            }
+
+            CombatItemCheckAutoClickService.RecordRestoreStatus(true);
+            diagnostics = CombatItemCheckAutoClickService.GetDiagnostics();
+            if (!diagnostics.LastRestored)
+            {
+                throw new InvalidOperationException("Expected ItemCheck auto clicker diagnostics to record restore status.");
+            }
+        }
+
+        private static void ExpectAutoClickDecision(
+            CombatItemCheckAutoClickService.ItemCheckAutoClickProfile profile,
+            bool featureEnabled,
+            bool vanillaAutoReuseAllWeapons,
+            bool expectedApply,
+            bool expectedPress,
+            string expectedReason,
+            string label)
+        {
+            var decision = CombatItemCheckAutoClickService.CreateDecision(profile, featureEnabled, true, vanillaAutoReuseAllWeapons);
+            if (decision.ApplyTakeover != expectedApply ||
+                decision.PressAttack != expectedPress ||
+                !string.Equals(decision.Reason, expectedReason, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "Expected auto clicker decision " + label + " to be " +
+                    expectedApply + "/" + expectedPress + "/" + expectedReason +
+                    ", got " + decision.ApplyTakeover + "/" + decision.PressAttack + "/" + decision.Reason + ".");
+            }
+        }
+
+        private static void AssertAutoClickerYield(
+            bool bridgePendingAtStart,
+            bool bridgePendingNow,
+            bool pulseApplied,
+            bool autoHarvestApplied,
+            bool autoCaptureApplied,
+            string label)
+        {
+            if (ItemUseHookCallbacks.ShouldAttemptAutoClickerTakeoverForTesting(
+                bridgePendingAtStart,
+                bridgePendingNow,
+                pulseApplied,
+                autoHarvestApplied,
+                autoCaptureApplied))
+            {
+                throw new InvalidOperationException("Expected auto clicker to yield to " + label + ".");
+            }
+        }
+
+        private static CombatItemCheckAutoClickService.ItemCheckAutoClickProfile CreateAutoClickerProfile(
+            int itemType = 29,
+            int damage = 0,
+            bool autoReuse = false,
+            bool channel = false,
+            bool playerChannel = false,
+            int fishingPole = 0)
+        {
+            return new CombatItemCheckAutoClickService.ItemCheckAutoClickProfile
+            {
+                Available = true,
+                Eligible = true,
+                SelectedSlot = 0,
+                ItemType = itemType,
+                ItemStack = 1,
+                UseStyle = 4,
+                UseAnimation = 20,
+                UseTime = 20,
+                Damage = damage,
+                AutoReuse = autoReuse,
+                Channel = channel,
+                PlayerChannel = playerChannel,
+                FishingPole = fishingPole,
+                ItemAnimation = 0,
+                ItemTime = 0,
+                ReuseDelay = 0,
+                DelayUseItem = false,
+                VanillaAutoReuseAllAvailable = true
+            };
         }
 
         private static void CombatGoblinExecutionAllowsOnlyTinkererWhenEnabled()

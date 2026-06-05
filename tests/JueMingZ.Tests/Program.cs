@@ -350,6 +350,7 @@ namespace JueMingZ.Tests
             Run("diagnostic snapshot writes auto tax collect state", ref failed, DiagnosticSnapshotWritesAutoTaxCollectState);
             Run("diagnostic snapshot writes auto capture critter state", ref failed, DiagnosticSnapshotWritesAutoCaptureCritterState);
             Run("diagnostic snapshot writes auto harvest state", ref failed, DiagnosticSnapshotWritesAutoHarvestState);
+            Run("diagnostic snapshot writes combat ItemCheck auto clicker state", ref failed, DiagnosticSnapshotWritesCombatItemCheckAutoClickerState);
             Run("diagnostic snapshot writes fishing idle pipeline state", ref failed, DiagnosticSnapshotWritesFishingIdlePipelineState);
             Run("performance hitch recorder detects runtime gaps", ref failed, PerformanceHitchRecorderDetectsRuntimeGaps);
             Run("diagnostic snapshot writes performance hitch state", ref failed, DiagnosticSnapshotWritesPerformanceHitchState);
@@ -379,6 +380,16 @@ namespace JueMingZ.Tests
             Run("combat perfect revolver ItemCheck takeover mirrors helper cadence", ref failed, CombatPerfectRevolverItemCheckTakeoverMirrorsHelperCadence);
             Run("combat perfect revolver schedules only in fire window", ref failed, CombatPerfectRevolverSchedulesOnlyInFireWindow);
             Run("combat auto clicker input probe targets reported items", ref failed, CombatAutoClickerInputProbeTargetsReportedItems);
+            Run("combat ItemCheck auto clicker core presses ready item", ref failed, CombatItemCheckAutoClickerCorePressesReadyItem);
+            Run("combat ItemCheck auto clicker core releases cooldown item", ref failed, CombatItemCheckAutoClickerCoreReleasesCooldownItem);
+            Run("combat ItemCheck auto clicker core disabled no-op", ref failed, CombatItemCheckAutoClickerCoreDisabledNoOp);
+            Run("combat ItemCheck auto clicker four quadrants", ref failed, CombatItemCheckAutoClickerFourQuadrants);
+            Run("combat ItemCheck auto clicker respects vanilla auto reuse", ref failed, CombatItemCheckAutoClickerRespectsVanillaAutoReuse);
+            Run("combat ItemCheck auto clicker samples and hard excludes", ref failed, CombatItemCheckAutoClickerSamplesAndHardExcludes);
+            Run("combat ItemCheck auto clicker fails closed when vanilla switch unavailable", ref failed, CombatItemCheckAutoClickerFailsClosedWhenVanillaSwitchUnavailable);
+            Run("combat ItemCheck auto clicker yields to adjacent scoped use", ref failed, CombatItemCheckAutoClickerYieldsToAdjacentScopedUse);
+            Run("combat ItemCheck auto clicker takeover restores input state", ref failed, CombatItemCheckAutoClickerTakeoverRestoresInputState);
+            Run("combat ItemCheck auto clicker diagnostics record scoped decision", ref failed, CombatItemCheckAutoClickerDiagnosticsRecordScopedDecision);
             Run("combat goblin execution allows only tinkerer when enabled", ref failed, CombatGoblinExecutionAllowsOnlyTinkererWhenEnabled);
             Run("travel menu diagnostics clone keeps scoped hook fields", ref failed, TravelMenuDiagnosticsCloneKeepsScopedHookFields);
             Run("travel menu ItemCheck guard suppresses world use and restores click", ref failed, TravelMenuItemCheckGuardSuppressesWorldUseAndRestoresClick);

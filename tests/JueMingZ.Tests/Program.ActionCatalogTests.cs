@@ -2292,6 +2292,38 @@ namespace JueMingZ.Tests
             AssertContains(json, "\"AutoHarvestPendingReplantCount\": 2");
         }
 
+        private static void DiagnosticSnapshotWritesCombatItemCheckAutoClickerState()
+        {
+            var snapshot = new DiagnosticSnapshot
+            {
+                CombatItemCheckAutoClickerLastDecision = "scopedPress",
+                CombatItemCheckAutoClickerLastReason = "ready",
+                CombatItemCheckAutoClickerLastDecisionUtc = new DateTime(2026, 6, 5, 2, 3, 4, DateTimeKind.Utc),
+                CombatItemCheckAutoClickerLastItemType = 29,
+                CombatItemCheckAutoClickerVanillaAutoReuseAllAvailable = true,
+                CombatItemCheckAutoClickerVanillaAutoReuseAllWeapons = false,
+                CombatItemCheckAutoClickerScopedPress = true,
+                CombatItemCheckAutoClickerScopedRelease = false,
+                CombatItemCheckAutoClickerRestored = true,
+                CombatItemCheckAutoClickerAppliedCount = 3,
+                CombatItemCheckAutoClickerSkippedCount = 5
+            };
+
+            var json = InvokeDiagnosticSnapshotJson(snapshot);
+
+            AssertContains(json, "\"CombatItemCheckAutoClickerLastDecision\": \"scopedPress\"");
+            AssertContains(json, "\"CombatItemCheckAutoClickerLastReason\": \"ready\"");
+            AssertContains(json, "\"CombatItemCheckAutoClickerLastDecisionUtc\": \"2026-06-05T02:03:04.0000000Z\"");
+            AssertContains(json, "\"CombatItemCheckAutoClickerLastItemType\": 29");
+            AssertContains(json, "\"CombatItemCheckAutoClickerVanillaAutoReuseAllAvailable\": true");
+            AssertContains(json, "\"CombatItemCheckAutoClickerVanillaAutoReuseAllWeapons\": false");
+            AssertContains(json, "\"CombatItemCheckAutoClickerScopedPress\": true");
+            AssertContains(json, "\"CombatItemCheckAutoClickerScopedRelease\": false");
+            AssertContains(json, "\"CombatItemCheckAutoClickerRestored\": true");
+            AssertContains(json, "\"CombatItemCheckAutoClickerAppliedCount\": 3");
+            AssertContains(json, "\"CombatItemCheckAutoClickerSkippedCount\": 5");
+        }
+
         private static void DiagnosticSnapshotWritesFishingIdlePipelineState()
         {
             var snapshot = new DiagnosticSnapshot

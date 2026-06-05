@@ -37,17 +37,19 @@ namespace JueMingZ.Diagnostics
             Guid autoHarvestRequestId,
             bool autoCaptureApplied,
             Guid autoCaptureRequestId,
+            bool autoClickerApplied,
             bool perfectRevolverApplied,
             bool flailApplied,
             bool travelMenuGuardApplied,
             bool aimApplied)
         {
             var anyScopedWriter = bridgeApplied ||
-                                  pulseApplied ||
-                                  autoHarvestApplied ||
-                                  autoCaptureApplied ||
-                                  perfectRevolverApplied ||
-                                  flailApplied ||
+                                   pulseApplied ||
+                                   autoHarvestApplied ||
+                                   autoCaptureApplied ||
+                                   autoClickerApplied ||
+                                   perfectRevolverApplied ||
+                                   flailApplied ||
                                   travelMenuGuardApplied;
             var after = Capture(player, "postfix-before-restore", bridgePendingAtStart, before != null && before.Captured);
             if (!ShouldRecord(before, after, anyScopedWriter))
@@ -69,6 +71,7 @@ namespace JueMingZ.Diagnostics
                 autoHarvestRequestId,
                 autoCaptureApplied,
                 autoCaptureRequestId,
+                autoClickerApplied,
                 perfectRevolverApplied,
                 flailApplied,
                 travelMenuGuardApplied,
@@ -413,6 +416,7 @@ namespace JueMingZ.Diagnostics
             Guid autoHarvestRequestId,
             bool autoCaptureApplied,
             Guid autoCaptureRequestId,
+            bool autoClickerApplied,
             bool perfectRevolverApplied,
             bool flailApplied,
             bool travelMenuGuardApplied,
@@ -436,6 +440,7 @@ namespace JueMingZ.Diagnostics
             AppendString(builder, "autoHarvestRequestId", autoHarvestRequestId == Guid.Empty ? string.Empty : autoHarvestRequestId.ToString(), true);
             AppendRaw(builder, "autoCaptureApplied", BoolRaw(autoCaptureApplied), true);
             AppendString(builder, "autoCaptureRequestId", autoCaptureRequestId == Guid.Empty ? string.Empty : autoCaptureRequestId.ToString(), true);
+            AppendRaw(builder, "autoClickerApplied", BoolRaw(autoClickerApplied), true);
             AppendRaw(builder, "perfectRevolverApplied", BoolRaw(perfectRevolverApplied), true);
             AppendRaw(builder, "flailApplied", BoolRaw(flailApplied), true);
             AppendRaw(builder, "travelMenuGuardApplied", BoolRaw(travelMenuGuardApplied), true);

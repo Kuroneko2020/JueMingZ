@@ -48,7 +48,7 @@ namespace JueMingZ.Runtime
         private static readonly Dictionary<string, long> ServiceSchedulerLastRunTick =
             new Dictionary<string, long>(StringComparer.Ordinal);
 
-        public const string Version = "1.7.445-travel-menu-guard-fix";
+        public const string Version = "1.7.446-auto-clicker-itemcheck-delivery";
 
         public static RuntimeState State { get; private set; } = new RuntimeState();
         public static FeatureRegistry FeatureRegistry { get; private set; }
@@ -959,6 +959,7 @@ namespace JueMingZ.Runtime
             var autoTaxCollect = AutoTaxCollectorService.GetDiagnostics();
             var autoFacing = CombatAutoFacingService.GetDiagnostics();
             var perfectRevolver = CombatPerfectRevolverService.GetDiagnostics();
+            var itemCheckAutoClicker = CombatItemCheckAutoClickService.GetDiagnostics();
             var magicStringClicker = CombatMagicStringClickerService.GetDiagnostics();
             var information = InformationOverlayService.GetDiagnostics();
             var fishing = FishingAutomationService.GetDiagnostics();
@@ -1664,6 +1665,17 @@ namespace JueMingZ.Runtime
                 CombatPerfectRevolverLastDecision = perfectRevolver == null ? string.Empty : perfectRevolver.LastDecision,
                 CombatPerfectRevolverLastSkipReason = perfectRevolver == null ? string.Empty : perfectRevolver.LastSkipReason,
                 CombatPerfectRevolverLastDecisionUtc = perfectRevolver == null ? null : perfectRevolver.LastDecisionUtc,
+                CombatItemCheckAutoClickerLastDecision = itemCheckAutoClicker == null ? string.Empty : itemCheckAutoClicker.LastDecision,
+                CombatItemCheckAutoClickerLastReason = itemCheckAutoClicker == null ? string.Empty : itemCheckAutoClicker.LastReason,
+                CombatItemCheckAutoClickerLastDecisionUtc = itemCheckAutoClicker == null ? null : itemCheckAutoClicker.LastDecisionUtc,
+                CombatItemCheckAutoClickerLastItemType = itemCheckAutoClicker == null ? 0 : itemCheckAutoClicker.LastItemType,
+                CombatItemCheckAutoClickerVanillaAutoReuseAllAvailable = itemCheckAutoClicker != null && itemCheckAutoClicker.LastVanillaAutoReuseAllAvailable,
+                CombatItemCheckAutoClickerVanillaAutoReuseAllWeapons = itemCheckAutoClicker != null && itemCheckAutoClicker.LastVanillaAutoReuseAllWeapons,
+                CombatItemCheckAutoClickerScopedPress = itemCheckAutoClicker != null && itemCheckAutoClicker.LastScopedPress,
+                CombatItemCheckAutoClickerScopedRelease = itemCheckAutoClicker != null && itemCheckAutoClicker.LastScopedRelease,
+                CombatItemCheckAutoClickerRestored = itemCheckAutoClicker != null && itemCheckAutoClicker.LastRestored,
+                CombatItemCheckAutoClickerAppliedCount = itemCheckAutoClicker == null ? 0 : itemCheckAutoClicker.AppliedCount,
+                CombatItemCheckAutoClickerSkippedCount = itemCheckAutoClicker == null ? 0 : itemCheckAutoClicker.SkippedCount,
                 CombatMagicStringClickerLastDecision = magicStringClicker == null ? string.Empty : magicStringClicker.LastDecision,
                 CombatMagicStringClickerLastSkipReason = magicStringClicker == null ? string.Empty : magicStringClicker.LastSkipReason,
                 CombatMagicStringClickerLastDecisionUtc = magicStringClicker == null ? null : magicStringClicker.LastDecisionUtc,

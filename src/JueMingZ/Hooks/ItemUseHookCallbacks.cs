@@ -19,6 +19,7 @@ namespace JueMingZ.Hooks
             public bool PulseAllowCombatAim;
             public bool AutoHarvestSustainedUseApplied;
             public bool AutoCaptureCritterSustainedUseApplied;
+            public bool AutoClickerTakeoverApplied;
             public bool PerfectRevolverTakeoverApplied;
             public bool FlailTakeoverApplied;
             public bool TravelMenuItemCheckGuardApplied;
@@ -38,6 +39,7 @@ namespace JueMingZ.Hooks
             public int AutoCaptureCritterSustainedUseRestoreSlot;
             public bool AutoCaptureCritterSustainedUseDirectionCaptured;
             public int AutoCaptureCritterSustainedUseOriginalDirection;
+            public TerrariaInputCompat.ScopedUseItemTakeover AutoClickerTakeover;
             public TerrariaInputCompat.ScopedUseItemTakeover PerfectRevolverTakeover;
             public TerrariaInputCompat.ScopedUseItemTakeover FlailTakeover;
             public TerrariaInputCompat.ScopedUseItemTakeover TravelMenuItemCheckGuard;
@@ -135,6 +137,22 @@ namespace JueMingZ.Hooks
                         return;
                     }
 
+                    if (ShouldAttemptAutoClickerTakeover(
+                            __state.BridgePendingAtStart,
+                            ItemUseBridge.PendingRequestId != Guid.Empty,
+                            __state.PulseApplied,
+                            __state.AutoHarvestSustainedUseApplied,
+                            __state.AutoCaptureCritterSustainedUseApplied) &&
+                        TryApplyAutoClickerTakeover(__instance, ref __state))
+                    {
+                        if (__state.AutoClickerTakeoverApplied && __state.AutoClickerTakeover != null && __state.AutoClickerTakeover.Pressed)
+                        {
+                            TryApplyCombatAim(__instance, ref __state, false);
+                        }
+
+                        return;
+                    }
+
                     if (!__state.PulseApplied || __state.PulseAllowCombatAim)
                     {
                         TryApplyCombatAim(__instance, ref __state, false);
@@ -211,6 +229,11 @@ namespace JueMingZ.Hooks
 
             if (!__state.BridgeApplied)
             {
+                if (__state.AutoClickerTakeoverApplied)
+                {
+                    RestoreAutoClickerTakeover(__state.AutoClickerTakeover);
+                }
+
                 if (__state.PerfectRevolverTakeoverApplied)
                 {
                     RestorePerfectRevolverTakeover(__state.PerfectRevolverTakeover);
@@ -259,6 +282,11 @@ namespace JueMingZ.Hooks
             {
                 try
                 {
+                    if (__state.AutoClickerTakeoverApplied)
+                    {
+                        RestoreAutoClickerTakeover(__state.AutoClickerTakeover);
+                    }
+
                     if (__state.PerfectRevolverTakeoverApplied)
                     {
                         RestorePerfectRevolverTakeover(__state.PerfectRevolverTakeover);
@@ -306,6 +334,21 @@ namespace JueMingZ.Hooks
             }
         }
 
+        internal static bool ShouldAttemptAutoClickerTakeoverForTesting(
+            bool bridgePendingAtStart,
+            bool bridgePendingNow,
+            bool pulseApplied,
+            bool autoHarvestApplied,
+            bool autoCaptureApplied)
+        {
+            return ShouldAttemptAutoClickerTakeover(
+                bridgePendingAtStart,
+                bridgePendingNow,
+                pulseApplied,
+                autoHarvestApplied,
+                autoCaptureApplied);
+        }
+
         private static void RecordInputProbe(object player, ref ItemUseHookState state)
         {
             try
@@ -324,6 +367,7 @@ namespace JueMingZ.Hooks
                     state.AutoHarvestSustainedUseRequestId,
                     state.AutoCaptureCritterSustainedUseApplied,
                     state.AutoCaptureCritterSustainedUseRequestId,
+                    state.AutoClickerTakeoverApplied,
                     state.PerfectRevolverTakeoverApplied,
                     state.FlailTakeoverApplied,
                     state.TravelMenuItemCheckGuardApplied,
@@ -390,6 +434,33 @@ namespace JueMingZ.Hooks
             state.PerfectRevolverTakeoverApplied = true;
             state.PerfectRevolverTakeover = takeover;
             return true;
+        }
+
+        private static bool TryApplyAutoClickerTakeover(object player, ref ItemUseHookState state)
+        {
+            TerrariaInputCompat.ScopedUseItemTakeover takeover;
+            if (!CombatItemCheckAutoClickService.TryBeginItemCheckTakeover(player, out takeover))
+            {
+                return false;
+            }
+
+            state.AutoClickerTakeoverApplied = true;
+            state.AutoClickerTakeover = takeover;
+            return true;
+        }
+
+        private static bool ShouldAttemptAutoClickerTakeover(
+            bool bridgePendingAtStart,
+            bool bridgePendingNow,
+            bool pulseApplied,
+            bool autoHarvestApplied,
+            bool autoCaptureApplied)
+        {
+            return !bridgePendingAtStart &&
+                   !bridgePendingNow &&
+                   !pulseApplied &&
+                   !autoHarvestApplied &&
+                   !autoCaptureApplied;
         }
 
         private static void TryApplyFlailTakeover(object player, ref ItemUseHookState state)
@@ -603,6 +674,25 @@ namespace JueMingZ.Hooks
                     TimeSpan.FromSeconds(10),
                     "ItemUseHookCallbacks",
                     "ItemCheck perfect revolver takeover restore failed; exception swallowed.", restoreError);
+            }
+        }
+
+        private static void RestoreAutoClickerTakeover(TerrariaInputCompat.ScopedUseItemTakeover takeover)
+        {
+            try
+            {
+                var restored = TerrariaInputCompat.TryRestoreScopedUseItemTakeover(takeover);
+                CombatItemCheckAutoClickService.RecordRestoreStatus(restored);
+            }
+            catch (Exception restoreError)
+            {
+                CombatItemCheckAutoClickService.RecordRestoreStatus(false);
+                RuntimeDiagnostics.RecordError("ItemUseHookCallbacks.AutoClickerTakeoverRestore", restoreError);
+                LogThrottle.ErrorThrottled(
+                    "itemcheck-auto-clicker-takeover-restore-failed",
+                    TimeSpan.FromSeconds(10),
+                    "ItemUseHookCallbacks",
+                    "ItemCheck auto clicker takeover restore failed; exception swallowed.", restoreError);
             }
         }
 

@@ -2059,10 +2059,10 @@ namespace JueMingZ.Input
                 changed = settings.CombatAutoClickerEnabled != enabled;
                 settings.CombatAutoClickerEnabled = enabled;
                 scenario = "Ui.Toggle.CombatAutoClicker";
-                implemented = false;
+                implemented = true;
                 message = enabled
-                    ? "自动连点旧路线已清理，新核心尚未接入；当前仅保留配置开关。"
-                    : "自动连点已关闭；旧输入源路线已清理。";
+                    ? "自动连点已开启：ItemCheck 策略会按原版自动复用状态补足合格物品，并排除鱼竿和左轮。"
+                    : "自动连点已关闭；ItemCheck 核心不会接管物品使用。";
             }
             else if (string.Equals(option, "perfectRevolver", StringComparison.Ordinal))
             {
