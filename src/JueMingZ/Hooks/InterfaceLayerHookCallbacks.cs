@@ -14,17 +14,62 @@ namespace JueMingZ.Hooks
     public static class InterfaceLayerHookCallbacks
     {
         private const string LegacyInputGuardLayerName = "JueMing-Z: Legacy Main UI Input Guard";
+        private const string InformationWorldUnderVanillaUiDispatcherLayerName = "JueMing-Z: Information World Under Vanilla UI Dispatcher";
+        private const string InformationStatusPanelUnderVanillaUiDispatcherLayerName = "JueMing-Z: Information Status Panel Under Vanilla UI Dispatcher";
         private const string GameOverlayDispatcherLayerName = "JueMing-Z: Game Overlay Dispatcher";
         private const string UiOverlayDispatcherLayerName = "JueMing-Z: UI Overlay Dispatcher";
         private const string LegacyMouseTextGuardLayerName = "JueMing-Z: Legacy Main UI Mouse Text Guard";
 
         private static readonly object ReflectionCacheSyncRoot = new object();
         private static readonly Dictionary<Type, LayerNameAccessor> LayerNameAccessorCache = new Dictionary<Type, LayerNameAccessor>();
+        private static readonly Func<bool>[] InformationWorldUnderVanillaUiDispatcherDrawers =
+        {
+            InformationWorldOverlay.DrawInformationInterfaceLayer
+        };
+
+        private static readonly Func<bool>[] InformationStatusPanelUnderVanillaUiDispatcherDrawers =
+        {
+            InformationStatusPanelOverlay.DrawInterfaceLayer
+        };
+
+        private static readonly Func<bool>[] GameOverlayDispatcherDrawers =
+        {
+            InformationWorldOverlay.DrawAutoMiningInterfaceLayer,
+            FishingStatusPromptOverlay.DrawInterfaceLayer,
+            FirstWorldLoadPromptOverlay.DrawInterfaceLayer,
+            CombatEquipmentWarningPromptOverlay.DrawInterfaceLayer,
+            CombatAimMarkerOverlay.DrawInterfaceLayer
+        };
+
+        private static readonly Func<bool>[] GameOverlayFallbackDispatcherDrawers =
+        {
+            InformationWorldOverlay.DrawInformationInterfaceLayer,
+            InformationWorldOverlay.DrawAutoMiningInterfaceLayer,
+            FishingStatusPromptOverlay.DrawInterfaceLayer,
+            FirstWorldLoadPromptOverlay.DrawInterfaceLayer,
+            CombatEquipmentWarningPromptOverlay.DrawInterfaceLayer,
+            CombatAimMarkerOverlay.DrawInterfaceLayer
+        };
+
+        private static readonly Func<bool>[] UiOverlayDispatcherDrawers =
+        {
+            LegacyMainWindow.DrawInterfaceLayer
+        };
+
+        private static readonly Func<bool>[] UiOverlayFallbackDispatcherDrawers =
+        {
+            InformationStatusPanelOverlay.DrawInterfaceLayer,
+            LegacyMainWindow.DrawInterfaceLayer
+        };
 
         private static int _firstLegacyInputGuardInsertLogged;
+        private static int _firstInformationWorldUnderVanillaUiDispatcherInsertLogged;
+        private static int _firstInformationStatusPanelUnderVanillaUiDispatcherInsertLogged;
         private static int _firstGameOverlayDispatcherInsertLogged;
         private static int _firstUiOverlayDispatcherInsertLogged;
         private static int _firstLegacyMouseTextGuardInsertLogged;
+        private static int _informationWorldUnderVanillaUiDispatcherActive;
+        private static int _informationStatusPanelUnderVanillaUiDispatcherActive;
 
         private static Type _gameInterfaceLayerType;
         private static Type _legacyLayerType;
@@ -84,6 +129,8 @@ namespace JueMingZ.Hooks
             }
 
             var layerState = BuildLayerSearchState(layers);
+            var informationWorldUnderUiLayerActive = layerState.Contains(InformationWorldUnderVanillaUiDispatcherLayerName);
+            var informationStatusPanelUnderUiLayerActive = layerState.Contains(InformationStatusPanelUnderVanillaUiDispatcherLayerName);
 
             InsertLayerIfMissing(
                 layers,
@@ -94,6 +141,43 @@ namespace JueMingZ.Hooks
                 ref _firstLegacyInputGuardInsertLogged,
                 "Legacy main UI input guard layer inserted.",
                 0);
+
+            var informationUnderUiInsertIndex = layerState.InformationUnderVanillaUiIndex;
+            if (informationUnderUiInsertIndex >= 0)
+            {
+                InsertLayerIfMissing(
+                    layers,
+                    layerState,
+                    InformationWorldUnderVanillaUiDispatcherLayerName,
+                    typeof(InterfaceLayerHookCallbacks).GetMethod("DrawInformationWorldUnderVanillaUiDispatcherLayer", BindingFlags.Public | BindingFlags.Static),
+                    _gameScaleValue,
+                    ref _firstInformationWorldUnderVanillaUiDispatcherInsertLogged,
+                    "Information world under vanilla UI dispatcher interface layer inserted.",
+                    informationUnderUiInsertIndex);
+                informationWorldUnderUiLayerActive = layerState.Contains(InformationWorldUnderVanillaUiDispatcherLayerName);
+
+                InsertLayerIfMissing(
+                    layers,
+                    layerState,
+                    InformationStatusPanelUnderVanillaUiDispatcherLayerName,
+                    typeof(InterfaceLayerHookCallbacks).GetMethod("DrawInformationStatusPanelUnderVanillaUiDispatcherLayer", BindingFlags.Public | BindingFlags.Static),
+                    _uiScaleValue,
+                    ref _firstInformationStatusPanelUnderVanillaUiDispatcherInsertLogged,
+                    "Information status panel under vanilla UI dispatcher interface layer inserted.",
+                    layerState.InformationUnderVanillaUiIndex);
+                informationStatusPanelUnderUiLayerActive = layerState.Contains(InformationStatusPanelUnderVanillaUiDispatcherLayerName);
+            }
+            else
+            {
+                LogThrottle.WarnThrottled(
+                    "interface-layer-information-under-ui-anchor-missing",
+                    TimeSpan.FromSeconds(10),
+                    "InterfaceLayerHookCallbacks",
+                    "Vanilla UI anchor was not found; information under vanilla UI dispatcher layers not inserted.");
+            }
+
+            Interlocked.Exchange(ref _informationWorldUnderVanillaUiDispatcherActive, informationWorldUnderUiLayerActive ? 1 : 0);
+            Interlocked.Exchange(ref _informationStatusPanelUnderVanillaUiDispatcherActive, informationStatusPanelUnderUiLayerActive ? 1 : 0);
 
             InsertLayerIfMissing(
                 layers,
@@ -126,24 +210,60 @@ namespace JueMingZ.Hooks
                 layerState.MouseTextIndex);
         }
 
+        public static bool DrawInformationWorldUnderVanillaUiDispatcherLayer()
+        {
+            return DrawDispatcher(InformationWorldUnderVanillaUiDispatcherDrawers);
+        }
+
+        public static bool DrawInformationStatusPanelUnderVanillaUiDispatcherLayer()
+        {
+            UiInputFrameClock.BeginDrawFrame("InformationStatusPanelUnderVanillaUiDispatcher");
+            return DrawDispatcher(InformationStatusPanelUnderVanillaUiDispatcherDrawers);
+        }
+
         public static bool DrawGameOverlayDispatcherLayer()
         {
             UiInputFrameClock.BeginDrawFrame("GameOverlayDispatcher");
-            var keepDrawing = true;
-            keepDrawing &= InformationWorldOverlay.DrawInterfaceLayer();
-            keepDrawing &= FishingStatusPromptOverlay.DrawInterfaceLayer();
-            keepDrawing &= FirstWorldLoadPromptOverlay.DrawInterfaceLayer();
-            keepDrawing &= CombatEquipmentWarningPromptOverlay.DrawInterfaceLayer();
-            keepDrawing &= CombatAimMarkerOverlay.DrawInterfaceLayer();
-            return keepDrawing;
+            return DrawDispatcher(SelectGameOverlayDispatcherDrawers());
         }
 
         public static bool DrawUiOverlayDispatcherLayer()
         {
             UiInputFrameClock.BeginDrawFrame("UiOverlayDispatcher");
+            return DrawDispatcher(SelectUiOverlayDispatcherDrawers());
+        }
+
+        private static Func<bool>[] SelectGameOverlayDispatcherDrawers()
+        {
+            return Volatile.Read(ref _informationWorldUnderVanillaUiDispatcherActive) == 0
+                ? GameOverlayFallbackDispatcherDrawers
+                : GameOverlayDispatcherDrawers;
+        }
+
+        private static Func<bool>[] SelectUiOverlayDispatcherDrawers()
+        {
+            return Volatile.Read(ref _informationStatusPanelUnderVanillaUiDispatcherActive) == 0
+                ? UiOverlayFallbackDispatcherDrawers
+                : UiOverlayDispatcherDrawers;
+        }
+
+        private static bool DrawDispatcher(Func<bool>[] drawers)
+        {
             var keepDrawing = true;
-            keepDrawing &= InformationStatusPanelOverlay.DrawInterfaceLayer();
-            keepDrawing &= LegacyMainWindow.DrawInterfaceLayer();
+            if (drawers == null)
+            {
+                return keepDrawing;
+            }
+
+            for (var index = 0; index < drawers.Length; index++)
+            {
+                var drawer = drawers[index];
+                if (drawer != null)
+                {
+                    keepDrawing &= drawer();
+                }
+            }
+
             return keepDrawing;
         }
 
@@ -458,6 +578,83 @@ namespace JueMingZ.Hooks
             return state;
         }
 
+        internal static int FindInformationUnderVanillaUiInsertIndexForTesting(IList<string> layerNames)
+        {
+            return BuildLayerSearchStateForTesting(layerNames).InformationUnderVanillaUiIndex;
+        }
+
+        internal static int[] SimulateInformationUnderVanillaUiInsertIndicesForTesting(IList<string> layerNames)
+        {
+            var state = BuildLayerSearchStateForTesting(layerNames);
+            var worldInsertIndex = state.InformationUnderVanillaUiIndex;
+            state.MarkInserted(InformationWorldUnderVanillaUiDispatcherLayerName, worldInsertIndex);
+
+            var statusPanelInsertIndex = state.InformationUnderVanillaUiIndex;
+            state.MarkInserted(InformationStatusPanelUnderVanillaUiDispatcherLayerName, statusPanelInsertIndex);
+
+            return new[] { worldInsertIndex, statusPanelInsertIndex };
+        }
+
+        internal static string[] GetInformationWorldUnderVanillaUiDispatcherRouteNamesForTesting()
+        {
+            return GetDispatcherRouteNamesForTesting(InformationWorldUnderVanillaUiDispatcherDrawers);
+        }
+
+        internal static string[] GetInformationStatusPanelUnderVanillaUiDispatcherRouteNamesForTesting()
+        {
+            return GetDispatcherRouteNamesForTesting(InformationStatusPanelUnderVanillaUiDispatcherDrawers);
+        }
+
+        internal static string[] GetGameOverlayDispatcherRouteNamesForTesting(bool informationWorldUnderVanillaUiDispatcherActive)
+        {
+            return GetDispatcherRouteNamesForTesting(
+                informationWorldUnderVanillaUiDispatcherActive
+                    ? GameOverlayDispatcherDrawers
+                    : GameOverlayFallbackDispatcherDrawers);
+        }
+
+        internal static string[] GetUiOverlayDispatcherRouteNamesForTesting(bool informationStatusPanelUnderVanillaUiDispatcherActive)
+        {
+            return GetDispatcherRouteNamesForTesting(
+                informationStatusPanelUnderVanillaUiDispatcherActive
+                    ? UiOverlayDispatcherDrawers
+                    : UiOverlayFallbackDispatcherDrawers);
+        }
+
+        private static string[] GetDispatcherRouteNamesForTesting(Func<bool>[] drawers)
+        {
+            if (drawers == null)
+            {
+                return new string[0];
+            }
+
+            var routeNames = new string[drawers.Length];
+            for (var index = 0; index < drawers.Length; index++)
+            {
+                var method = drawers[index] == null ? null : drawers[index].Method;
+                var declaringType = method == null ? null : method.DeclaringType;
+                routeNames[index] = (declaringType == null ? string.Empty : declaringType.Name) + "." + (method == null ? string.Empty : method.Name);
+            }
+
+            return routeNames;
+        }
+
+        private static LayerSearchState BuildLayerSearchStateForTesting(IList<string> layerNames)
+        {
+            var state = new LayerSearchState();
+            if (layerNames == null)
+            {
+                return state;
+            }
+
+            for (var index = 0; index < layerNames.Count; index++)
+            {
+                state.ObserveExisting(layerNames[index], index);
+            }
+
+            return state;
+        }
+
         private static LayerNameAccessor GetLayerNameAccessor(Type type)
         {
             lock (ReflectionCacheSyncRoot)
@@ -484,6 +681,35 @@ namespace JueMingZ.Hooks
 
             public int MouseTextIndex { get; private set; } = -1;
 
+            public int MapMinimapIndex { get; private set; } = -1;
+
+            public int ResourceBarsIndex { get; private set; } = -1;
+
+            public int InventoryIndex { get; private set; } = -1;
+
+            public int InformationUnderVanillaUiIndex
+            {
+                get
+                {
+                    if (MapMinimapIndex >= 0)
+                    {
+                        return MapMinimapIndex;
+                    }
+
+                    if (ResourceBarsIndex >= 0)
+                    {
+                        return ResourceBarsIndex;
+                    }
+
+                    if (InventoryIndex >= 0)
+                    {
+                        return InventoryIndex;
+                    }
+
+                    return MouseTextIndex;
+                }
+            }
+
             public bool Contains(string layerName)
             {
                 return _names.Contains(layerName ?? string.Empty);
@@ -498,16 +724,44 @@ namespace JueMingZ.Hooks
                 {
                     MouseTextIndex = index;
                 }
+
+                if (MapMinimapIndex < 0 &&
+                    name.IndexOf("Map / Minimap", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    MapMinimapIndex = index;
+                }
+
+                if (ResourceBarsIndex < 0 &&
+                    name.IndexOf("Resource Bars", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    ResourceBarsIndex = index;
+                }
+
+                if (InventoryIndex < 0 &&
+                    name.IndexOf("Inventory", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    InventoryIndex = index;
+                }
             }
 
             public void MarkInserted(string layerName, int index)
             {
                 var name = layerName ?? string.Empty;
                 _names.Add(name);
-                if (MouseTextIndex >= 0 && index >= 0 && index <= MouseTextIndex)
+                MouseTextIndex = ShiftIndexAfterInsert(MouseTextIndex, index);
+                MapMinimapIndex = ShiftIndexAfterInsert(MapMinimapIndex, index);
+                ResourceBarsIndex = ShiftIndexAfterInsert(ResourceBarsIndex, index);
+                InventoryIndex = ShiftIndexAfterInsert(InventoryIndex, index);
+            }
+
+            private static int ShiftIndexAfterInsert(int currentIndex, int insertIndex)
+            {
+                if (currentIndex >= 0 && insertIndex >= 0 && insertIndex <= currentIndex)
                 {
-                    MouseTextIndex++;
+                    return currentIndex + 1;
                 }
+
+                return currentIndex;
             }
         }
 

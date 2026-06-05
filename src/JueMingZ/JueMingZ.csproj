@@ -7,10 +7,10 @@
     <Platforms>AnyCPU;x86</Platforms>
     <PlatformTarget>x86</PlatformTarget>
     <LangVersion>7.3</LangVersion>
-    <Version>1.7.447</Version>
-    <AssemblyVersion>1.7.447.0</AssemblyVersion>
-    <FileVersion>1.7.447.0</FileVersion>
-    <InformationalVersion>1.7.447-chest-label-default-name-fix</InformationalVersion>
+    <Version>1.7.448</Version>
+    <AssemblyVersion>1.7.448.0</AssemblyVersion>
+    <FileVersion>1.7.448.0</FileVersion>
+    <InformationalVersion>1.7.448-information-under-vanilla-ui</InformationalVersion>
     <Deterministic>true</Deterministic>
     <RestoreConfigFile>$(MSBuildThisFileDirectory)..\..\NuGet.Config</RestoreConfigFile>
     <RestorePackagesPath>$(MSBuildThisFileDirectory)..\..\.nuget\packages</RestorePackagesPath>

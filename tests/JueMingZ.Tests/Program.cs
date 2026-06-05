@@ -501,6 +501,12 @@ namespace JueMingZ.Tests
             Run("information overlay context profiles route status and world record", ref failed, InformationOverlayContextProfilesRouteStatusAndWorldRecord);
             Run("information status line cache tracks context identity", ref failed, InformationStatusLineCacheTracksContextIdentity);
             Run("information status panel layout cache reuses prepared rows", ref failed, InformationStatusPanelLayoutCacheReusesPreparedRows);
+            Run("information under vanilla UI anchor prefers map minimap", ref failed, InformationUnderVanillaUiAnchorPrefersMapMinimap);
+            Run("information under vanilla UI anchor falls back through vanilla UI layers", ref failed, InformationUnderVanillaUiAnchorFallsBackThroughVanillaUiLayers);
+            Run("information under vanilla UI insertion keeps dispatchers before anchor", ref failed, InformationUnderVanillaUiInsertionKeepsDispatchersBeforeAnchor);
+            Run("information under vanilla UI anchor missing is safe", ref failed, InformationUnderVanillaUiAnchorMissingIsSafe);
+            Run("information world overlay routes information under vanilla UI and automining above", ref failed, InformationWorldOverlayRoutesInformationUnderVanillaUiAndAutoMiningAbove);
+            Run("information status panel routes under vanilla UI and legacy main window stays above", ref failed, InformationStatusPanelRoutesUnderVanillaUiAndLegacyMainWindowStaysAbove);
             Run("UI text renderer fast path keeps safe fallbacks", ref failed, UiTextRendererFastPathKeepsSafeFallbacks);
             Run("UI text renderer font signature change clears caches", ref failed, UiTextRendererFontSignatureChangeClearsCaches);
             Run("information tombstone text defaults to red and splits tile type", ref failed, InformationTombstoneTextDefaultsToRedAndSplitsTileType);
