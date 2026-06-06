@@ -121,6 +121,9 @@ namespace JueMingZ.Config
         [DataMember(Order = 36)]
         public bool CombatAutoClickerEnabled { get; set; }
 
+        [DataMember(Order = 175)]
+        public bool CombatFlailComboEnabled { get; set; }
+
         [DataMember(Order = 37)]
         public bool CombatPerfectRevolverEnabled { get; set; }
 
@@ -719,6 +722,7 @@ namespace JueMingZ.Config
                 CombatAimTrackDummyEnabled = false,
                 CombatAimMarkerEnabled = true,
                 CombatAutoClickerEnabled = false,
+                CombatFlailComboEnabled = false,
                 CombatPerfectRevolverEnabled = false,
                 CombatMagicStringClickerEnabled = false,
                 CombatAutoFacingEnabled = false,

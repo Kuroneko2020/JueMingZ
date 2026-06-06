@@ -48,7 +48,7 @@ namespace JueMingZ.Runtime
         private static readonly Dictionary<string, long> ServiceSchedulerLastRunTick =
             new Dictionary<string, long>(StringComparer.Ordinal);
 
-        public const string Version = "1.7.453-enemy-health-label-tight";
+        public const string Version = "1.7.470-performance-diagnostics-governance";
 
         public static RuntimeState State { get; private set; } = new RuntimeState();
         public static FeatureRegistry FeatureRegistry { get; private set; }
@@ -959,7 +959,10 @@ namespace JueMingZ.Runtime
             var autoTaxCollect = AutoTaxCollectorService.GetDiagnostics();
             var autoFacing = CombatAutoFacingService.GetDiagnostics();
             var perfectRevolver = CombatPerfectRevolverService.GetDiagnostics();
+            var flailCombo = CombatFlailComboService.GetDiagnostics();
             var itemCheckAutoClicker = CombatItemCheckAutoClickService.GetDiagnostics();
+            var itemCheckWriter = ItemCheckWriterArbiter.GetLastDecision();
+            var worldAutomationFairness = WorldAutomationFairnessCoordinator.GetSnapshot();
             var magicStringClicker = CombatMagicStringClickerService.GetDiagnostics();
             var information = InformationOverlayService.GetDiagnostics();
             var fishing = FishingAutomationService.GetDiagnostics();
@@ -1071,7 +1074,41 @@ namespace JueMingZ.Runtime
                 ActionQueuePendingChannelSummary = actionSnapshot.ActionQueuePendingChannelSummary,
                 ActionQueuePendingOwnerSummary = actionSnapshot.ActionQueuePendingOwnerSummary,
                 ActionQueueLastAdmissionStatus = actionSnapshot.ActionQueueLastAdmissionStatus,
+                ActionQueueLastAdmissionDecision = actionSnapshot.ActionQueueLastAdmissionDecision,
                 ActionQueueLastAdmissionReason = actionSnapshot.ActionQueueLastAdmissionReason,
+                ActionQueueLastAdmissionKind = actionSnapshot.ActionQueueLastAdmissionKind,
+                ActionQueueLastAdmissionSource = actionSnapshot.ActionQueueLastAdmissionSource,
+                ActionQueueLastAdmissionScenario = actionSnapshot.ActionQueueLastAdmissionScenario,
+                ActionQueueLastAdmissionKey = actionSnapshot.ActionQueueLastAdmissionKey,
+                ActionQueueLastAdmissionRequiredChannels = actionSnapshot.ActionQueueLastAdmissionRequiredChannels,
+                ActionQueueLastAdmissionBlockingChannels = actionSnapshot.ActionQueueLastAdmissionBlockingChannels,
+                ActionQueueLastAdmissionConflictChannels = actionSnapshot.ActionQueueLastAdmissionConflictChannels,
+                ActionQueueLastAdmissionPendingConflictSummary = actionSnapshot.ActionQueueLastAdmissionPendingConflictSummary,
+                ActionQueueLastAdmissionRunningConflictSummary = actionSnapshot.ActionQueueLastAdmissionRunningConflictSummary,
+                ActionQueueLastAdmissionBridgeBusySummary = actionSnapshot.ActionQueueLastAdmissionBridgeBusySummary,
+                ActionQueueLastAdmissionOwnerSummary = actionSnapshot.ActionQueueLastAdmissionOwnerSummary,
+                ActionQueueLastAdmissionSupersededRequestId = actionSnapshot.ActionQueueLastAdmissionSupersededRequestId,
+                ActionQueueLastAdmissionCoalescedRequestId = actionSnapshot.ActionQueueLastAdmissionCoalescedRequestId,
+                ActionQueueSupersededPendingCount = actionSnapshot.ActionQueueSupersededPendingCount,
+                ActionQueueCoalescedPendingCount = actionSnapshot.ActionQueueCoalescedPendingCount,
+                SchedulerLastSelectedRequest = actionSnapshot.SchedulerLastSelectedRequest,
+                SchedulerLastSupersededRequest = actionSnapshot.SchedulerLastSupersededRequest,
+                SchedulerLastFairnessBucket = actionSnapshot.SchedulerLastFairnessBucket,
+                WorldAutomationLastWinner = worldAutomationFairness == null ? string.Empty : worldAutomationFairness.LastWinner,
+                WorldAutomationFairnessDebt = worldAutomationFairness == null ? string.Empty : worldAutomationFairness.FairnessDebt,
+                WorldAutomationFairnessDecisionUtc = worldAutomationFairness == null ? null : worldAutomationFairness.LastDecisionUtc,
+                BackgroundRequestCoalescedCount = actionSnapshot.BackgroundRequestCoalescedCount,
+                ExpiredPendingDroppedCount = actionSnapshot.ExpiredPendingDroppedCount,
+                ActionQueueCleanupLeaseCount = actionSnapshot.ActionQueueCleanupLeaseCount,
+                ActionQueueCleanupLeaseChannels = actionSnapshot.ActionQueueCleanupLeaseChannels,
+                ActionQueueLastCleanupOwner = actionSnapshot.ActionQueueLastCleanupOwner,
+                ActionQueueLastCleanupReason = actionSnapshot.ActionQueueLastCleanupReason,
+                ActionQueueDirectEnqueueCount = actionSnapshot.ActionQueueDirectEnqueueCount,
+                ActionQueueLastDirectEnqueueKind = actionSnapshot.ActionQueueLastDirectEnqueueKind,
+                ActionQueueLastDirectEnqueueSource = actionSnapshot.ActionQueueLastDirectEnqueueSource,
+                ActionQueueLastDirectEnqueueScenario = actionSnapshot.ActionQueueLastDirectEnqueueScenario,
+                ActionQueueLastDirectEnqueueAdmissionKey = actionSnapshot.ActionQueueLastDirectEnqueueAdmissionKey,
+                ActionQueueLastDirectEnqueueRequiredChannels = actionSnapshot.ActionQueueLastDirectEnqueueRequiredChannels,
                 ActionQueueExpiredPendingCount = actionSnapshot.ActionQueueExpiredPendingCount,
                 ActionQueueLastPendingExpiryReason = actionSnapshot.ActionQueueLastPendingExpiryReason,
                 ItemUseBridgeLastStatus = ItemUseBridge.LastStatus,
@@ -1083,6 +1120,12 @@ namespace JueMingZ.Runtime
                 ItemUseBridgeSucceededCount = ItemUseBridge.SucceededCount,
                 ItemUseBridgeAttemptedButUnverifiedCount = ItemUseBridge.AttemptedButUnverifiedCount,
                 ItemUseBridgeFailedCount = ItemUseBridge.FailedCount,
+                ItemCheckWriterOwner = itemCheckWriter == null ? string.Empty : itemCheckWriter.OwnerName,
+                ItemCheckWriterOwnerRequestId = itemCheckWriter == null || itemCheckWriter.OwnerRequestId == Guid.Empty ? string.Empty : itemCheckWriter.OwnerRequestId.ToString(),
+                ItemCheckWriterPhase = itemCheckWriter == null ? string.Empty : itemCheckWriter.Phase,
+                ItemCheckWriterDecisionReason = itemCheckWriter == null ? string.Empty : itemCheckWriter.Reason,
+                ItemCheckWriterBlockedCandidates = itemCheckWriter == null ? string.Empty : itemCheckWriter.BlockedCandidatesSummary,
+                ItemCheckWriterDecisionUtc = itemCheckWriter == null ? null : (DateTime?)itemCheckWriter.DecidedUtc,
                 EnableDiagnosticInputTests = ConfigService.AppSettings.EnableDiagnosticInputTests,
                 DiagnosticInputTestSlot = diagnosticSlot,
                 DiagnosticInputTestSlotDisplay = diagnosticSlot + 1,
@@ -1216,6 +1259,13 @@ namespace JueMingZ.Runtime
                 LastPerformanceHitchSlowestStageMs = RuntimePerformanceDiagnostics.LastPerformanceHitchSlowestStageMs,
                 LastPerformanceHitchSlowestOperationName = RuntimePerformanceDiagnostics.LastPerformanceHitchSlowestOperationName,
                 LastPerformanceHitchSlowestOperationMs = RuntimePerformanceDiagnostics.LastPerformanceHitchSlowestOperationMs,
+                PerformanceOperationEventCount = RuntimePerformanceDiagnostics.PerformanceOperationEventCount,
+                LastPerformanceOperationScenario = RuntimePerformanceDiagnostics.LastPerformanceOperationScenario,
+                LastPerformanceOperationUtc = RuntimePerformanceDiagnostics.LastPerformanceOperationUtc,
+                LastPerformanceOperationElapsedMs = RuntimePerformanceDiagnostics.LastPerformanceOperationElapsedMs,
+                LastPerformanceOperationThresholdMs = RuntimePerformanceDiagnostics.LastPerformanceOperationThresholdMs,
+                LastPerformanceOperationReason = RuntimePerformanceDiagnostics.LastPerformanceOperationReason,
+                LastPerformanceOperationOwnerSummary = RuntimePerformanceDiagnostics.LastPerformanceOperationOwnerSummary,
                 ReflectionCacheReady = TerrariaMemberCache.IsInitialized,
                 ReflectionCacheMissCount = TerrariaMemberCache.CacheMissCount,
                 ReflectionCacheLastMissKey = TerrariaMemberCache.LastMissKey,
@@ -1242,6 +1292,18 @@ namespace JueMingZ.Runtime
                 AutoStackLastDecision = autoStack == null ? string.Empty : autoStack.LastDecision,
                 AutoStackLastInventorySignature = autoStack == null ? string.Empty : autoStack.LastInventorySignature,
                 AutoStackLastPendingItemIds = autoStack == null ? string.Empty : autoStack.LastPendingItemIds,
+                AutoStackLastDetectedItemIds = autoStack == null ? string.Empty : autoStack.LastDetectedItemIds,
+                AutoStackPendingSinceTick = autoStack == null ? 0 : autoStack.PendingSinceTick,
+                AutoStackLastPendingChangeTick = autoStack == null ? -1 : autoStack.LastPendingChangeTick,
+                AutoStackLastPendingClearReason = autoStack == null ? string.Empty : autoStack.LastPendingClearReason,
+                AutoStackPendingTransactionState = autoStack == null ? string.Empty : autoStack.PendingTransactionState,
+                AutoStackPendingRetryCount = autoStack == null ? 0 : autoStack.PendingRetryCount,
+                AutoStackLastSubmitRequestId = autoStack == null ? string.Empty : autoStack.LastSubmitRequestId,
+                AutoStackLastResult = autoStack == null ? string.Empty : autoStack.LastResult,
+                AutoStackLastUnverifiedReason = autoStack == null ? string.Empty : autoStack.LastUnverifiedReason,
+                AutoStackInventoryTransactionSlots = autoStack == null ? string.Empty : autoStack.InventoryTransactionSlots,
+                AutoStackInventoryTransactionBlockingReason = autoStack == null ? string.Empty : autoStack.InventoryTransactionBlockingReason,
+                AutoStackActionResultDeliveryMode = autoStack == null ? string.Empty : autoStack.ActionResultDeliveryMode,
                 AutoStackLastDecisionUtc = autoStack == null ? null : autoStack.LastDecisionUtc,
                 AutoSellLastDecision = autoSell == null ? string.Empty : autoSell.LastDecision,
                 AutoSellLastInventorySignature = autoSell == null ? string.Empty : autoSell.LastInventorySignature,
@@ -1665,6 +1727,24 @@ namespace JueMingZ.Runtime
                 CombatPerfectRevolverLastDecision = perfectRevolver == null ? string.Empty : perfectRevolver.LastDecision,
                 CombatPerfectRevolverLastSkipReason = perfectRevolver == null ? string.Empty : perfectRevolver.LastSkipReason,
                 CombatPerfectRevolverLastDecisionUtc = perfectRevolver == null ? null : perfectRevolver.LastDecisionUtc,
+                CombatFlailComboEnabled = flailCombo != null && flailCombo.Enabled,
+                CombatFlailComboRightHeld = flailCombo != null && flailCombo.RightHeld,
+                CombatFlailComboEligible = flailCombo != null && flailCombo.Eligible,
+                CombatFlailComboLastDecision = flailCombo == null ? string.Empty : flailCombo.LastDecision,
+                CombatFlailComboLastReason = flailCombo == null ? string.Empty : flailCombo.LastReason,
+                CombatFlailComboLastDecisionUtc = flailCombo == null ? null : flailCombo.LastDecisionUtc,
+                CombatFlailComboItemType = flailCombo == null ? 0 : flailCombo.ItemType,
+                CombatFlailComboProjectileType = flailCombo == null ? 0 : flailCombo.ProjectileType,
+                CombatFlailComboProjectileAi0 = flailCombo == null ? 0d : flailCombo.ProjectileAi0,
+                CombatFlailComboHitDetected = flailCombo != null && flailCombo.HitDetected,
+                CombatFlailComboCollisionDetected = flailCombo != null && flailCombo.CollisionDetected,
+                CombatFlailComboVanillaRightClickBlocked = flailCombo != null && flailCombo.VanillaRightClickBlocked,
+                CombatFlailComboUiBlocked = flailCombo != null && flailCombo.UiBlocked,
+                CombatFlailComboScopedPress = flailCombo != null && flailCombo.ScopedPress,
+                CombatFlailComboScopedRelease = flailCombo != null && flailCombo.ScopedRelease,
+                CombatFlailComboRestoreOk = flailCombo == null || flailCombo.RestoreOk,
+                CombatFlailComboAppliedCount = flailCombo == null ? 0 : flailCombo.AppliedCount,
+                CombatFlailComboSkippedCount = flailCombo == null ? 0 : flailCombo.SkippedCount,
                 CombatItemCheckAutoClickerLastDecision = itemCheckAutoClicker == null ? string.Empty : itemCheckAutoClicker.LastDecision,
                 CombatItemCheckAutoClickerLastReason = itemCheckAutoClicker == null ? string.Empty : itemCheckAutoClicker.LastReason,
                 CombatItemCheckAutoClickerLastDecisionUtc = itemCheckAutoClicker == null ? null : itemCheckAutoClicker.LastDecisionUtc,
@@ -1866,6 +1946,7 @@ namespace JueMingZ.Runtime
                 _startupNoopQueued = true;
             }
 
+            // ACTION_QUEUE_DIRECT_ENQUEUE_EXCEPTION: one-shot startup health noop; owner=diagnostics; migrate_after=02 no-op unless startup diagnostics need admission testing.
             ActionQueue.Enqueue(InputActionRequest.CreateDiagnosticNoop(
                 "diagnostics.health_check",
                 "M5 queue startup check"));

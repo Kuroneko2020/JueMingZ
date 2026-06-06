@@ -2196,6 +2196,16 @@ namespace JueMingZ.Input
                     ? "自动连点已开启：ItemCheck 策略会按原版自动复用状态补足合格物品，并排除鱼竿和左轮。"
                     : "自动连点已关闭；ItemCheck 核心不会接管物品使用。";
             }
+            else if (string.Equals(option, "flailCombo", StringComparison.Ordinal))
+            {
+                changed = settings.CombatFlailComboEnabled != enabled;
+                settings.CombatFlailComboEnabled = enabled;
+                scenario = "Ui.Toggle.CombatFlailCombo";
+                implemented = true;
+                message = enabled
+                    ? "链球连击已开启：手持链球长按右键时，会在原版右键无意义的安全场景中用 ItemCheck 节奏触发连击。"
+                    : "链球连击已关闭。";
+            }
             else if (string.Equals(option, "perfectRevolver", StringComparison.Ordinal))
             {
                 changed = settings.CombatPerfectRevolverEnabled != enabled;

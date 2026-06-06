@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using JueMingZ.Actions.Channels;
 using JueMingZ.Actions.Executors;
@@ -12,6 +13,7 @@ namespace JueMingZ.Actions
     public sealed class InputActionQueue
     {
         private const int MaxRecentResults = 12;
+        private static readonly TimeSpan DefaultCleanupLeaseDuration = TimeSpan.FromMilliseconds(250);
         private readonly object _syncRoot = new object();
         private readonly List<InputActionRequest> _pending = new List<InputActionRequest>();
         private readonly List<InputActionResult> _recentResults = new List<InputActionResult>();
@@ -19,11 +21,25 @@ namespace JueMingZ.Actions
         private readonly InputActionChannelArbiter _channelArbiter = new InputActionChannelArbiter();
         private InputActionExecution _running;
         private InputActionChannelLease _runningChannelLease;
+        private InputActionCleanupLease _cleanupLease;
         private InputActionChannelDecision _lastChannelDecision;
         private InputActionAdmissionResult _lastAdmissionResult;
         private int _blockedPendingCount;
         private int _expiredPendingCount;
         private string _lastPendingExpiryReason = string.Empty;
+        private int _supersededPendingCount;
+        private int _coalescedPendingCount;
+        private string _lastSchedulerSelectedRequest = string.Empty;
+        private string _lastSchedulerSupersededRequest = string.Empty;
+        private string _lastSchedulerFairnessBucket = string.Empty;
+        private string _lastCleanupOwner = string.Empty;
+        private string _lastCleanupReason = string.Empty;
+        private int _directEnqueueCount;
+        private string _lastDirectEnqueueKind = string.Empty;
+        private string _lastDirectEnqueueSource = string.Empty;
+        private string _lastDirectEnqueueScenario = string.Empty;
+        private string _lastDirectEnqueueAdmissionKey = string.Empty;
+        private string _lastDirectEnqueueRequiredChannels = string.Empty;
         private InputActionResult _lastResult;
         private long _updateCount;
         private long _lastInputActionUpdateMs;
@@ -36,6 +52,14 @@ namespace JueMingZ.Actions
         internal InputActionQueue(Dictionary<InputActionKind, IInputActionExecutor> executors)
         {
             _executors = executors ?? CreateDefaultExecutors();
+        }
+
+        internal IReadOnlyList<InputActionRequest> GetPendingRequestsForTesting()
+        {
+            lock (_syncRoot)
+            {
+                return new List<InputActionRequest>(_pending);
+            }
         }
 
         public long UpdateCount
@@ -55,6 +79,13 @@ namespace JueMingZ.Actions
 
             lock (_syncRoot)
             {
+                var profile = InputActionChannelResolver.Resolve(request);
+                _directEnqueueCount++;
+                _lastDirectEnqueueKind = request.Kind.ToString();
+                _lastDirectEnqueueSource = request.SourceFeatureId ?? string.Empty;
+                _lastDirectEnqueueScenario = profile.Scenario;
+                _lastDirectEnqueueAdmissionKey = request.AdmissionKey ?? string.Empty;
+                _lastDirectEnqueueRequiredChannels = InputActionChannelFormatter.Format(profile.EffectiveRequiredChannels);
                 _pending.Add(request);
             }
 
@@ -64,27 +95,88 @@ namespace JueMingZ.Actions
 
         public bool TryEnqueue(InputActionRequest request, out InputActionAdmissionResult admission)
         {
+            var operationStart = Stopwatch.GetTimestamp();
             NormalizeRequest(request);
 
+            var accepted = false;
             lock (_syncRoot)
             {
-                ExpirePendingLocked(DateTime.UtcNow);
-                admission = BuildAdmissionLocked(request, DateTime.UtcNow);
+                var now = DateTime.UtcNow;
+                ExpireCleanupLeaseLocked(now);
+                ExpirePendingLocked(now);
+                admission = BuildAdmissionLocked(request, now);
                 _lastAdmissionResult = admission;
-                if (admission == null || !admission.Accepted)
+                if (admission != null && admission.Accepted)
                 {
-                    Logger.Debug(
-                        "InputActionQueue",
-                        "Input action admission denied: " +
-                        (admission == null ? "unknown" : admission.Summary));
-                    return false;
+                    ApplyAcceptedAdmissionLocked(request, admission, now);
+                    accepted = true;
                 }
-
-                _pending.Add(request);
             }
 
-            Logger.Debug("InputActionQueue", "Input action admitted and enqueued: " + request.Kind + " / " + request.Description);
+            RecordAdmissionPerformance(operationStart, request, admission);
+            if (!accepted)
+            {
+                Logger.Debug(
+                    "InputActionQueue",
+                    "Input action admission denied: " +
+                    (admission == null ? "unknown" : admission.Summary));
+                return false;
+            }
+
+            Logger.Debug("InputActionQueue", "Input action admission accepted: " + request.Kind + " / " + request.Description + " / " + admission.Decision);
             return true;
+        }
+
+        private static void RecordAdmissionPerformance(long operationStart, InputActionRequest request, InputActionAdmissionResult admission)
+        {
+            var elapsedMs = PerformanceHitchRecorder.ElapsedMilliseconds(operationStart, Stopwatch.GetTimestamp());
+            if (!PerformanceHitchRecorder.ShouldRecordOperationFast(elapsedMs, PerformanceHitchRecorder.ActionQueueAdmissionThresholdMs))
+            {
+                return;
+            }
+
+            var reason = admission == null
+                ? "unknown"
+                : admission.Decision + ":" + (admission.Reason ?? string.Empty);
+            var ownerSummary = admission == null
+                ? string.Empty
+                : FirstNonEmpty(
+                    admission.OwnerSummary,
+                    admission.RunningConflictSummary,
+                    admission.PendingConflictSummary,
+                    admission.BridgeBusySummary);
+            var metadata = request == null
+                ? string.Empty
+                : "kind=" + request.Kind +
+                  ";source=" + (request.SourceFeatureId ?? string.Empty) +
+                  ";scenario=" + (admission == null ? string.Empty : admission.Scenario) +
+                  ";key=" + (request.AdmissionKey ?? string.Empty);
+
+            PerformanceHitchRecorder.RecordOperationIfNeeded(
+                "Performance.ActionQueue.Admission",
+                elapsedMs,
+                PerformanceHitchRecorder.ActionQueueAdmissionThresholdMs,
+                TrimSummary(reason, 256),
+                TrimSummary(ownerSummary, 512),
+                TrimSummary(metadata, 512));
+        }
+
+        private static string FirstNonEmpty(params string[] values)
+        {
+            if (values == null)
+            {
+                return string.Empty;
+            }
+
+            for (var index = 0; index < values.Length; index++)
+            {
+                if (!string.IsNullOrWhiteSpace(values[index]))
+                {
+                    return values[index];
+                }
+            }
+
+            return string.Empty;
         }
 
         public void Update()
@@ -99,6 +191,7 @@ namespace JueMingZ.Actions
 
             lock (_syncRoot)
             {
+                ExpireCleanupLeaseLocked(DateTime.UtcNow);
                 _updateCount++;
                 ExpirePendingLocked(DateTime.UtcNow);
 
@@ -136,6 +229,7 @@ namespace JueMingZ.Actions
         {
             lock (_syncRoot)
             {
+                ExpireCleanupLeaseLocked(DateTime.UtcNow);
                 var result = TryStartNextActionLocked(null);
                 if (result != null)
                 {
@@ -154,8 +248,25 @@ namespace JueMingZ.Actions
 
             lock (_syncRoot)
             {
-                cancelled += _pending.RemoveAll(request =>
-                    string.Equals(request.SourceFeatureId ?? string.Empty, safeSource, StringComparison.OrdinalIgnoreCase));
+                var now = DateTime.UtcNow;
+                ExpireCleanupLeaseLocked(now);
+                for (var index = _pending.Count - 1; index >= 0; index--)
+                {
+                    var request = _pending[index];
+                    if (request == null ||
+                        !string.Equals(request.SourceFeatureId ?? string.Empty, safeSource, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    _pending.RemoveAt(index);
+                    RecordResultLocked(InputActionResult.FromRequest(
+                        request,
+                        InputActionStatus.Cancelled,
+                        "Pending action cancelled by source: " + safeSource,
+                        request.CreatedUtc));
+                    cancelled++;
+                }
 
                 if (_running != null &&
                     string.Equals(_running.Request.SourceFeatureId ?? string.Empty, safeSource, StringComparison.OrdinalIgnoreCase))
@@ -188,6 +299,8 @@ namespace JueMingZ.Actions
                     _channelArbiter.ReleaseAll("Action queue cleared.");
                     _runningChannelLease = null;
                 }
+
+                _cleanupLease = null;
             }
         }
 
@@ -196,6 +309,12 @@ namespace JueMingZ.Actions
             NormalizeRequest(request);
             lock (_syncRoot)
             {
+                ExpireCleanupLeaseLocked(DateTime.UtcNow);
+                if (TryBuildCleanupBlockedDecisionLocked(request, out decision))
+                {
+                    return false;
+                }
+
                 return _channelArbiter.CanAcquire(request, out decision);
             }
         }
@@ -225,6 +344,12 @@ namespace JueMingZ.Actions
         {
             lock (_syncRoot)
             {
+                ExpireCleanupLeaseLocked(DateTime.UtcNow);
+                if (IsCleanupLeaseBlockingChannelsLocked(channels))
+                {
+                    return true;
+                }
+
                 return _channelArbiter.IsAnyChannelBusy(channels);
             }
         }
@@ -250,6 +375,36 @@ namespace JueMingZ.Actions
             lock (_syncRoot)
             {
                 return InputActionDiagnostics.CopyRecentResults(_recentResults);
+            }
+        }
+
+        public bool TryGetResultByRequestId(Guid requestId, out InputActionResult result)
+        {
+            lock (_syncRoot)
+            {
+                result = null;
+                if (requestId == Guid.Empty)
+                {
+                    return false;
+                }
+
+                if (_lastResult != null && _lastResult.RequestId == requestId)
+                {
+                    result = _lastResult;
+                    return true;
+                }
+
+                for (var index = _recentResults.Count - 1; index >= 0; index--)
+                {
+                    var candidate = _recentResults[index];
+                    if (candidate != null && candidate.RequestId == requestId)
+                    {
+                        result = candidate;
+                        return true;
+                    }
+                }
+
+                return false;
             }
         }
 
@@ -285,7 +440,38 @@ namespace JueMingZ.Actions
                     ActionQueuePendingChannelSummary = BuildPendingChannelSummaryLocked(),
                     ActionQueuePendingOwnerSummary = BuildPendingOwnerSummaryLocked(),
                     ActionQueueLastAdmissionStatus = _lastAdmissionResult == null ? string.Empty : _lastAdmissionResult.Status,
+                    ActionQueueLastAdmissionDecision = _lastAdmissionResult == null ? string.Empty : _lastAdmissionResult.Decision.ToString(),
                     ActionQueueLastAdmissionReason = _lastAdmissionResult == null ? string.Empty : _lastAdmissionResult.Reason,
+                    ActionQueueLastAdmissionKind = _lastAdmissionResult == null ? string.Empty : _lastAdmissionResult.Kind.ToString(),
+                    ActionQueueLastAdmissionSource = _lastAdmissionResult == null ? string.Empty : _lastAdmissionResult.SourceFeatureId ?? string.Empty,
+                    ActionQueueLastAdmissionScenario = _lastAdmissionResult == null ? string.Empty : _lastAdmissionResult.Scenario ?? string.Empty,
+                    ActionQueueLastAdmissionKey = _lastAdmissionResult == null ? string.Empty : _lastAdmissionResult.AdmissionKey ?? string.Empty,
+                    ActionQueueLastAdmissionRequiredChannels = _lastAdmissionResult == null ? InputActionChannelFormatter.Format(InputActionChannel.None) : InputActionChannelFormatter.Format(_lastAdmissionResult.RequiredChannels),
+                    ActionQueueLastAdmissionBlockingChannels = _lastAdmissionResult == null ? InputActionChannelFormatter.Format(InputActionChannel.None) : InputActionChannelFormatter.Format(_lastAdmissionResult.BlockingChannels),
+                    ActionQueueLastAdmissionConflictChannels = _lastAdmissionResult == null ? InputActionChannelFormatter.Format(InputActionChannel.None) : InputActionChannelFormatter.Format(_lastAdmissionResult.ConflictChannels),
+                    ActionQueueLastAdmissionPendingConflictSummary = _lastAdmissionResult == null ? string.Empty : _lastAdmissionResult.PendingConflictSummary ?? string.Empty,
+                    ActionQueueLastAdmissionRunningConflictSummary = _lastAdmissionResult == null ? string.Empty : _lastAdmissionResult.RunningConflictSummary ?? string.Empty,
+                    ActionQueueLastAdmissionBridgeBusySummary = _lastAdmissionResult == null ? string.Empty : _lastAdmissionResult.BridgeBusySummary ?? string.Empty,
+                    ActionQueueLastAdmissionOwnerSummary = _lastAdmissionResult == null ? string.Empty : _lastAdmissionResult.OwnerSummary ?? string.Empty,
+                    ActionQueueLastAdmissionSupersededRequestId = _lastAdmissionResult == null || _lastAdmissionResult.SupersededRequestId == Guid.Empty ? string.Empty : _lastAdmissionResult.SupersededRequestId.ToString(),
+                    ActionQueueLastAdmissionCoalescedRequestId = _lastAdmissionResult == null || _lastAdmissionResult.CoalescedRequestId == Guid.Empty ? string.Empty : _lastAdmissionResult.CoalescedRequestId.ToString(),
+                    ActionQueueSupersededPendingCount = _supersededPendingCount,
+                    ActionQueueCoalescedPendingCount = _coalescedPendingCount,
+                    SchedulerLastSelectedRequest = _lastSchedulerSelectedRequest,
+                    SchedulerLastSupersededRequest = _lastSchedulerSupersededRequest,
+                    SchedulerLastFairnessBucket = _lastSchedulerFairnessBucket,
+                    BackgroundRequestCoalescedCount = _coalescedPendingCount,
+                    ExpiredPendingDroppedCount = _expiredPendingCount,
+                    ActionQueueCleanupLeaseCount = IsCleanupLeaseActiveLocked(DateTime.UtcNow) ? 1 : 0,
+                    ActionQueueCleanupLeaseChannels = IsCleanupLeaseActiveLocked(DateTime.UtcNow) ? InputActionChannelFormatter.Format(_cleanupLease.Channels) : InputActionChannelFormatter.Format(InputActionChannel.None),
+                    ActionQueueLastCleanupOwner = _lastCleanupOwner,
+                    ActionQueueLastCleanupReason = _lastCleanupReason,
+                    ActionQueueDirectEnqueueCount = _directEnqueueCount,
+                    ActionQueueLastDirectEnqueueKind = _lastDirectEnqueueKind,
+                    ActionQueueLastDirectEnqueueSource = _lastDirectEnqueueSource,
+                    ActionQueueLastDirectEnqueueScenario = _lastDirectEnqueueScenario,
+                    ActionQueueLastDirectEnqueueAdmissionKey = _lastDirectEnqueueAdmissionKey,
+                    ActionQueueLastDirectEnqueueRequiredChannels = _lastDirectEnqueueRequiredChannels,
                     ActionQueueExpiredPendingCount = _expiredPendingCount,
                     ActionQueueLastPendingExpiryReason = _lastPendingExpiryReason
                 };
@@ -296,7 +482,12 @@ namespace JueMingZ.Actions
         {
             lock (_syncRoot)
             {
+                ExpireCleanupLeaseLocked(DateTime.UtcNow);
                 var channelState = _channelArbiter.GetFastState();
+                var cleanupChannels = IsCleanupLeaseActiveLocked(DateTime.UtcNow)
+                    ? _cleanupLease.Channels
+                    : InputActionChannel.None;
+                var occupiedChannels = channelState.OccupiedChannels | cleanupChannels;
                 return new InputActionQueueFastState
                 {
                     PendingCount = _pending.Count,
@@ -306,15 +497,17 @@ namespace JueMingZ.Actions
                     RunningActionSource = _running == null ? string.Empty : _running.Request.SourceFeatureId ?? string.Empty,
                     LastInputActionUpdateMs = _lastInputActionUpdateMs,
                     LastResult = _lastResult,
-                    ChannelLeaseCount = channelState.LeaseCount,
-                    HasChannelLease = channelState.HasLease,
-                    OccupiedChannelsValue = channelState.OccupiedChannels,
+                    ChannelLeaseCount = channelState.LeaseCount + (cleanupChannels == InputActionChannel.None ? 0 : 1),
+                    HasChannelLease = channelState.HasLease || cleanupChannels != InputActionChannel.None,
+                    OccupiedChannelsValue = occupiedChannels,
                     RunningLeaseChannelsValue = channelState.RunningLeaseChannels,
                     BridgeBusyChannelsValue = channelState.BridgeBusyChannels,
                     IsBridgeBusy = channelState.IsBridgeBusy,
-                    OccupiedChannelCount = channelState.OccupiedChannelCount,
+                    OccupiedChannelCount = CountKnownChannels(occupiedChannels),
                     RunningLeaseChannelCount = channelState.RunningLeaseChannelCount,
-                    BridgeBusyChannelCount = channelState.BridgeBusyChannelCount
+                    BridgeBusyChannelCount = channelState.BridgeBusyChannelCount,
+                    CleanupLeaseChannelsValue = cleanupChannels,
+                    CleanupLeaseOwner = cleanupChannels == InputActionChannel.None ? string.Empty : _cleanupLease.OwnerSummary
                 };
             }
         }
@@ -335,6 +528,7 @@ namespace JueMingZ.Actions
             }
 
             ExpirePendingLocked(DateTime.UtcNow);
+            ExpireCleanupLeaseLocked(DateTime.UtcNow);
             if (_pending.Count == 0)
             {
                 return null;
@@ -351,6 +545,9 @@ namespace JueMingZ.Actions
             {
                 _lastChannelDecision = selectedDecision;
             }
+
+            _lastSchedulerSelectedRequest = BuildRequestOwnerSummary(request);
+            _lastSchedulerFairnessBucket = InputActionScheduler.ResolveBucketName(request);
 
             InputActionChannelLease lease;
             InputActionChannelDecision acquireDecision;
@@ -418,6 +615,13 @@ namespace JueMingZ.Actions
             {
                 var request = ordered[index];
                 InputActionChannelDecision decision;
+                if (TryBuildCleanupBlockedDecisionLocked(request, out decision))
+                {
+                    blocked++;
+                    lastBlocked = decision;
+                    continue;
+                }
+
                 if (_channelArbiter.CanAcquire(request, out decision))
                 {
                     selectedDecision = decision;
@@ -472,13 +676,76 @@ namespace JueMingZ.Actions
                 return result;
             }
 
-            string duplicateSummary;
-            if (TryFindDuplicatePendingOrRunningLocked(request, out duplicateSummary))
+            InputActionChannelDecision cleanupDecision;
+            if (TryBuildCleanupBlockedDecisionLocked(request, out cleanupDecision))
+            {
+                result.Accepted = false;
+                result.Decision = InputActionAdmissionDecision.DeniedCleanupLease;
+                result.CleanupLeaseBlocked = true;
+                result.BlockingChannels = cleanupDecision.BlockingChannels;
+                result.OwnerSummary = cleanupDecision.OwnerSummary;
+                result.Reason = cleanupDecision.Reason;
+                return result;
+            }
+
+            InputActionRequest duplicateRunning;
+            if (TryFindDuplicateRunningLocked(request, out duplicateRunning))
             {
                 result.Accepted = false;
                 result.Decision = InputActionAdmissionDecision.DeniedDuplicatePendingOrRunning;
                 result.DuplicatePendingOrRunning = true;
-                result.Reason = "duplicatePendingOrRunning:" + duplicateSummary;
+                result.RunningConflictSummary = "running:" + BuildRequestOwnerSummary(duplicateRunning);
+                result.OwnerSummary = result.RunningConflictSummary;
+                result.Reason = "duplicateRunning:" + BuildRequestOwnerSummary(duplicateRunning);
+                return result;
+            }
+
+            InputActionRequest duplicatePending;
+            if (TryFindDuplicatePendingLocked(request, out duplicatePending))
+            {
+                var pendingOwner = "pending:" + BuildRequestOwnerSummary(duplicatePending);
+                result.PendingConflictSummary = string.IsNullOrWhiteSpace(result.PendingConflictSummary)
+                    ? pendingOwner
+                    : result.PendingConflictSummary + "; " + pendingOwner;
+                result.OwnerSummary = pendingOwner;
+
+                if (request.DuplicatePolicy == InputActionDuplicatePolicy.SupersedePending)
+                {
+                    result.Accepted = true;
+                    result.Decision = InputActionAdmissionDecision.SupersededPending;
+                    result.SupersededPending = true;
+                    result.SupersededRequestId = duplicatePending.RequestId;
+                    result.Reason = "supersededPending:" + BuildRequestOwnerSummary(duplicatePending);
+                    return result;
+                }
+
+                if (request.DuplicatePolicy == InputActionDuplicatePolicy.CoalescePending)
+                {
+                    result.Accepted = true;
+                    result.Decision = InputActionAdmissionDecision.CoalescedPending;
+                    result.CoalescedPending = true;
+                    result.CoalescedRequestId = duplicatePending.RequestId;
+                    result.CoalescedCount = GetRequestMetadataInt(duplicatePending, "AdmissionCoalescedCount") + 1;
+                    result.Reason = "coalescedPending:" + BuildRequestOwnerSummary(duplicatePending);
+                    return result;
+                }
+
+                result.Accepted = false;
+                result.Decision = InputActionAdmissionDecision.DeniedDuplicatePendingOrRunning;
+                result.DuplicatePendingOrRunning = true;
+                result.Reason = "duplicatePending:" + BuildRequestOwnerSummary(duplicatePending);
+                return result;
+            }
+
+            InputActionRequest preemptedPending;
+            if (TryFindPreemptableBackgroundPendingLocked(request, profile, out preemptedPending))
+            {
+                result.Accepted = true;
+                result.Decision = InputActionAdmissionDecision.SupersededPending;
+                result.SupersededPending = true;
+                result.SupersededRequestId = preemptedPending.RequestId;
+                result.OwnerSummary = "pending:" + BuildRequestOwnerSummary(preemptedPending);
+                result.Reason = "supersededBackgroundPending:" + BuildRequestOwnerSummary(preemptedPending);
                 return result;
             }
 
@@ -507,12 +774,130 @@ namespace JueMingZ.Actions
                    !string.IsNullOrWhiteSpace(decision.BridgeBusySummary) &&
                    (decision.BlockingChannels & (InputActionChannel.UseItem |
                                                 InputActionChannel.BridgeItemUse |
-                                                InputActionChannel.BridgeUseItemPulse)) != 0;
+                                                 InputActionChannel.BridgeUseItemPulse)) != 0;
         }
 
-        private bool TryFindDuplicatePendingOrRunningLocked(InputActionRequest request, out string summary)
+        private void ApplyAcceptedAdmissionLocked(InputActionRequest request, InputActionAdmissionResult admission, DateTime now)
         {
-            summary = string.Empty;
+            if (request == null || admission == null || !admission.Accepted)
+            {
+                return;
+            }
+
+            if (admission.Decision == InputActionAdmissionDecision.SupersededPending)
+            {
+                var superseded = RemovePendingByIdLocked(admission.SupersededRequestId);
+                if (superseded != null)
+                {
+                    _supersededPendingCount++;
+                    _lastSchedulerSupersededRequest = BuildRequestOwnerSummary(superseded);
+                    var message = "Pending action superseded by newer request. newRequestId=" + request.RequestId;
+                    RecordResultLocked(InputActionResult.FromRequest(
+                        superseded,
+                        InputActionStatus.Cancelled,
+                        message,
+                        superseded.CreatedUtc));
+                }
+
+                _pending.Add(request);
+                return;
+            }
+
+            if (admission.Decision == InputActionAdmissionDecision.CoalescedPending)
+            {
+                var pending = FindPendingByIdLocked(admission.CoalescedRequestId);
+                if (pending == null)
+                {
+                    _pending.Add(request);
+                    return;
+                }
+
+                _coalescedPendingCount++;
+                MergePendingRequestLocked(pending, request, admission.CoalescedCount, now);
+                return;
+            }
+
+            _pending.Add(request);
+        }
+
+        private InputActionRequest FindPendingByIdLocked(Guid requestId)
+        {
+            if (requestId == Guid.Empty)
+            {
+                return null;
+            }
+
+            for (var index = 0; index < _pending.Count; index++)
+            {
+                var pending = _pending[index];
+                if (pending != null && pending.RequestId == requestId)
+                {
+                    return pending;
+                }
+            }
+
+            return null;
+        }
+
+        private InputActionRequest RemovePendingByIdLocked(Guid requestId)
+        {
+            if (requestId == Guid.Empty)
+            {
+                return null;
+            }
+
+            for (var index = 0; index < _pending.Count; index++)
+            {
+                var pending = _pending[index];
+                if (pending == null || pending.RequestId != requestId)
+                {
+                    continue;
+                }
+
+                _pending.RemoveAt(index);
+                return pending;
+            }
+
+            return null;
+        }
+
+        private static void MergePendingRequestLocked(
+            InputActionRequest pending,
+            InputActionRequest incoming,
+            int coalescedCount,
+            DateTime now)
+        {
+            if (pending == null || incoming == null)
+            {
+                return;
+            }
+
+            var requestId = pending.RequestId;
+            pending.Kind = incoming.Kind;
+            pending.Priority = incoming.Priority;
+            pending.DuplicatePolicy = incoming.DuplicatePolicy;
+            pending.SourceFeatureId = incoming.SourceFeatureId ?? string.Empty;
+            pending.Description = incoming.Description ?? string.Empty;
+            pending.CreatedUtc = incoming.CreatedUtc;
+            pending.QueueTimeout = incoming.QueueTimeout;
+            pending.QueueExpiresUtc = incoming.QueueExpiresUtc;
+            pending.AdmissionKey = incoming.AdmissionKey ?? string.Empty;
+            pending.Timeout = incoming.Timeout;
+            pending.IsExclusive = incoming.IsExclusive;
+            pending.RequiredChannels = incoming.RequiredChannels;
+            pending.ConflictChannels = incoming.ConflictChannels;
+            pending.Metadata = incoming.Metadata == null
+                ? new Dictionary<string, string>()
+                : new Dictionary<string, string>(incoming.Metadata, StringComparer.Ordinal);
+            pending.RequestId = requestId;
+            pending.Metadata["AdmissionCoalescedCount"] = coalescedCount.ToString(CultureInfo.InvariantCulture);
+            pending.Metadata["AdmissionLastCoalescedIncomingRequestId"] = incoming.RequestId.ToString();
+            pending.Metadata["AdmissionLastCoalescedUtc"] = now.ToString("O", CultureInfo.InvariantCulture);
+        }
+
+        private bool TryFindDuplicateRunningLocked(InputActionRequest request, out InputActionRequest duplicate)
+        {
+            duplicate = null;
             if (request == null)
             {
                 return false;
@@ -523,8 +908,19 @@ namespace JueMingZ.Actions
                 _running.Request.RequestId != request.RequestId &&
                 IsDuplicateRequest(request, _running.Request))
             {
-                summary = "running:" + BuildRequestOwnerSummary(_running.Request);
+                duplicate = _running.Request;
                 return true;
+            }
+
+            return false;
+        }
+
+        private bool TryFindDuplicatePendingLocked(InputActionRequest request, out InputActionRequest duplicate)
+        {
+            duplicate = null;
+            if (request == null)
+            {
+                return false;
             }
 
             for (var index = 0; index < _pending.Count; index++)
@@ -537,9 +933,45 @@ namespace JueMingZ.Actions
 
                 if (IsDuplicateRequest(request, pending))
                 {
-                    summary = "pending:" + BuildRequestOwnerSummary(pending);
+                    duplicate = pending;
                     return true;
                 }
+            }
+
+            return false;
+        }
+
+        private bool TryFindPreemptableBackgroundPendingLocked(
+            InputActionRequest request,
+            InputActionChannelProfile requestProfile,
+            out InputActionRequest preempted)
+        {
+            preempted = null;
+            if (!InputActionScheduler.IsUserExplicitCommand(request) ||
+                requestProfile == null ||
+                _pending.Count == 0)
+            {
+                return false;
+            }
+
+            for (var index = 0; index < _pending.Count; index++)
+            {
+                var pending = _pending[index];
+                if (pending == null ||
+                    pending.RequestId == request.RequestId ||
+                    !InputActionScheduler.IsBackgroundAutomation(pending))
+                {
+                    continue;
+                }
+
+                var pendingProfile = InputActionChannelResolver.Resolve(pending);
+                if (FindPendingOverlap(requestProfile, pendingProfile) == InputActionChannel.None)
+                {
+                    continue;
+                }
+
+                preempted = pending;
+                return true;
             }
 
             return false;
@@ -624,6 +1056,132 @@ namespace JueMingZ.Actions
             return (required & pendingRequired) |
                    (conflicts & pendingRequired) |
                    (required & pendingConflicts);
+        }
+
+        private bool TryBuildCleanupBlockedDecisionLocked(InputActionRequest request, out InputActionChannelDecision decision)
+        {
+            decision = null;
+            if (!IsCleanupLeaseActiveLocked(DateTime.UtcNow) || request == null)
+            {
+                return false;
+            }
+
+            var profile = InputActionChannelResolver.Resolve(request);
+            var blocking = FindCleanupBlockingChannels(profile);
+            if (blocking == InputActionChannel.None)
+            {
+                return false;
+            }
+
+            decision = new InputActionChannelDecision
+            {
+                RequestId = request.RequestId,
+                Kind = request.Kind,
+                SourceFeatureId = profile.SourceFeatureId,
+                Scenario = profile.Scenario,
+                Allowed = false,
+                RequiredChannels = profile.EffectiveRequiredChannels,
+                ConflictChannels = profile.ConflictChannels,
+                OccupiedChannels = _cleanupLease.Channels,
+                BlockingChannels = blocking,
+                OwnerSummary = _cleanupLease.OwnerSummary,
+                BridgeBusySummary = string.Empty,
+                Reason = "blockedByCleanupLease:" + _cleanupLease.OwnerSummary
+            };
+            return true;
+        }
+
+        private InputActionChannel FindCleanupBlockingChannels(InputActionChannelProfile profile)
+        {
+            if (profile == null || !IsCleanupLeaseActiveLocked(DateTime.UtcNow))
+            {
+                return InputActionChannel.None;
+            }
+
+            var required = profile.EffectiveRequiredChannels;
+            var conflicts = profile.ConflictChannels;
+            var cleanupChannels = _cleanupLease.Channels;
+            if (required == InputActionChannel.None || cleanupChannels == InputActionChannel.None)
+            {
+                return InputActionChannel.None;
+            }
+
+            if ((required & InputActionChannel.GlobalExclusive) != 0 ||
+                (cleanupChannels & InputActionChannel.GlobalExclusive) != 0)
+            {
+                return cleanupChannels;
+            }
+
+            return (required & cleanupChannels) |
+                   (conflicts & cleanupChannels);
+        }
+
+        private bool IsCleanupLeaseBlockingChannelsLocked(InputActionChannel channels)
+        {
+            return channels != InputActionChannel.None &&
+                   IsCleanupLeaseActiveLocked(DateTime.UtcNow) &&
+                   (_cleanupLease.Channels & channels) != 0;
+        }
+
+        private void MaybeCreateCleanupLeaseLocked(InputActionResult result)
+        {
+            if (result == null ||
+                _running == null ||
+                _running.Request == null ||
+                !ShouldCreateCleanupLease(result.Status))
+            {
+                return;
+            }
+
+            var profile = InputActionChannelResolver.Resolve(_running.Request);
+            var channels = profile.EffectiveRequiredChannels;
+            if (channels == InputActionChannel.None)
+            {
+                return;
+            }
+
+            _cleanupLease = new InputActionCleanupLease
+            {
+                RequestId = result.RequestId,
+                Kind = result.Kind,
+                SourceFeatureId = result.SourceFeatureId ?? string.Empty,
+                Scenario = result.Scenario ?? string.Empty,
+                Channels = channels,
+                OwnerSummary = BuildRequestOwnerSummary(_running.Request),
+                Reason = result.Status + ":" + (result.Message ?? string.Empty),
+                ExpiresUtc = DateTime.UtcNow + DefaultCleanupLeaseDuration
+            };
+            _lastCleanupOwner = _cleanupLease.OwnerSummary;
+            _lastCleanupReason = _cleanupLease.Reason;
+        }
+
+        private static bool ShouldCreateCleanupLease(InputActionStatus status)
+        {
+            return status == InputActionStatus.AttemptedButUnverified ||
+                   status == InputActionStatus.Failed ||
+                   status == InputActionStatus.TimedOut;
+        }
+
+        private void ExpireCleanupLeaseLocked(DateTime now)
+        {
+            if (_cleanupLease == null)
+            {
+                return;
+            }
+
+            if (now < _cleanupLease.ExpiresUtc)
+            {
+                return;
+            }
+
+            _lastCleanupOwner = _cleanupLease.OwnerSummary;
+            _lastCleanupReason = "expired:" + _cleanupLease.Reason;
+            _cleanupLease = null;
+        }
+
+        private bool IsCleanupLeaseActiveLocked(DateTime now)
+        {
+            return _cleanupLease != null && now < _cleanupLease.ExpiresUtc;
         }
 
         private void ExpirePendingLocked(DateTime now)
@@ -794,6 +1352,7 @@ namespace JueMingZ.Actions
                 _runningChannelLease = null;
             }
 
+            MaybeCreateCleanupLeaseLocked(result);
             RecordResultLocked(result);
             _running = null;
         }
@@ -902,6 +1461,27 @@ namespace JueMingZ.Actions
             return request.Metadata.TryGetValue(key, out value) ? value ?? string.Empty : string.Empty;
         }
 
+        private static int GetRequestMetadataInt(InputActionRequest request, string key)
+        {
+            var value = GetRequestMetadata(request, key);
+            int parsed;
+            return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out parsed) ? parsed : 0;
+        }
+
+        private static int CountKnownChannels(InputActionChannel channels)
+        {
+            var count = 0;
+            var value = (int)(channels & InputActionChannelFormatter.AllKnown);
+            while (value != 0)
+            {
+                count += value & 1;
+                value >>= 1;
+            }
+
+            var unknown = channels & ~InputActionChannelFormatter.AllKnown;
+            return unknown == InputActionChannel.None ? count : count + 1;
+        }
+
         private static string TrimSummary(string value, int maxLength)
         {
             if (string.IsNullOrEmpty(value) || maxLength <= 0 || value.Length <= maxLength)
@@ -953,6 +1533,26 @@ namespace JueMingZ.Actions
             executors[executor.Kind] = executor;
         }
 
+        private sealed class InputActionCleanupLease
+        {
+            public Guid RequestId { get; set; }
+            public InputActionKind Kind { get; set; }
+            public string SourceFeatureId { get; set; }
+            public string Scenario { get; set; }
+            public InputActionChannel Channels { get; set; }
+            public string OwnerSummary { get; set; }
+            public string Reason { get; set; }
+            public DateTime ExpiresUtc { get; set; }
+
+            public InputActionCleanupLease()
+            {
+                SourceFeatureId = string.Empty;
+                Scenario = string.Empty;
+                OwnerSummary = string.Empty;
+                Reason = string.Empty;
+            }
+        }
+
         private string GetRecentResultLineFromNewest(int newestIndex)
         {
             var index = _recentResults.Count - 1 - newestIndex;
@@ -984,11 +1584,13 @@ namespace JueMingZ.Actions
         public InputActionChannel OccupiedChannelsValue { get; set; }
         public InputActionChannel RunningLeaseChannelsValue { get; set; }
         public InputActionChannel BridgeBusyChannelsValue { get; set; }
+        public InputActionChannel CleanupLeaseChannelsValue { get; set; }
         public bool IsBridgeBusy { get; set; }
         public int OccupiedChannelCount { get; set; }
         public int RunningLeaseChannelCount { get; set; }
         public int BridgeBusyChannelCount { get; set; }
         public string RunningActionSource { get; set; }
+        public string CleanupLeaseOwner { get; set; }
 
         public string RunningActionKind
         {
@@ -1003,6 +1605,11 @@ namespace JueMingZ.Actions
         public string BridgeBusyChannels
         {
             get { return InputActionChannelFormatter.Format(BridgeBusyChannelsValue); }
+        }
+
+        public string CleanupLeaseChannels
+        {
+            get { return InputActionChannelFormatter.Format(CleanupLeaseChannelsValue); }
         }
 
         public string LastActionKind
@@ -1034,6 +1641,8 @@ namespace JueMingZ.Actions
             OccupiedChannelsValue = InputActionChannel.None;
             RunningLeaseChannelsValue = InputActionChannel.None;
             BridgeBusyChannelsValue = InputActionChannel.None;
+            CleanupLeaseChannelsValue = InputActionChannel.None;
+            CleanupLeaseOwner = string.Empty;
         }
     }
 
@@ -1069,7 +1678,38 @@ namespace JueMingZ.Actions
         public string ActionQueuePendingChannelSummary { get; set; }
         public string ActionQueuePendingOwnerSummary { get; set; }
         public string ActionQueueLastAdmissionStatus { get; set; }
+        public string ActionQueueLastAdmissionDecision { get; set; }
         public string ActionQueueLastAdmissionReason { get; set; }
+        public string ActionQueueLastAdmissionKind { get; set; }
+        public string ActionQueueLastAdmissionSource { get; set; }
+        public string ActionQueueLastAdmissionScenario { get; set; }
+        public string ActionQueueLastAdmissionKey { get; set; }
+        public string ActionQueueLastAdmissionRequiredChannels { get; set; }
+        public string ActionQueueLastAdmissionBlockingChannels { get; set; }
+        public string ActionQueueLastAdmissionConflictChannels { get; set; }
+        public string ActionQueueLastAdmissionPendingConflictSummary { get; set; }
+        public string ActionQueueLastAdmissionRunningConflictSummary { get; set; }
+        public string ActionQueueLastAdmissionBridgeBusySummary { get; set; }
+        public string ActionQueueLastAdmissionOwnerSummary { get; set; }
+        public string ActionQueueLastAdmissionSupersededRequestId { get; set; }
+        public string ActionQueueLastAdmissionCoalescedRequestId { get; set; }
+        public int ActionQueueSupersededPendingCount { get; set; }
+        public int ActionQueueCoalescedPendingCount { get; set; }
+        public string SchedulerLastSelectedRequest { get; set; }
+        public string SchedulerLastSupersededRequest { get; set; }
+        public string SchedulerLastFairnessBucket { get; set; }
+        public int BackgroundRequestCoalescedCount { get; set; }
+        public int ExpiredPendingDroppedCount { get; set; }
+        public int ActionQueueCleanupLeaseCount { get; set; }
+        public string ActionQueueCleanupLeaseChannels { get; set; }
+        public string ActionQueueLastCleanupOwner { get; set; }
+        public string ActionQueueLastCleanupReason { get; set; }
+        public int ActionQueueDirectEnqueueCount { get; set; }
+        public string ActionQueueLastDirectEnqueueKind { get; set; }
+        public string ActionQueueLastDirectEnqueueSource { get; set; }
+        public string ActionQueueLastDirectEnqueueScenario { get; set; }
+        public string ActionQueueLastDirectEnqueueAdmissionKey { get; set; }
+        public string ActionQueueLastDirectEnqueueRequiredChannels { get; set; }
         public int ActionQueueExpiredPendingCount { get; set; }
         public string ActionQueueLastPendingExpiryReason { get; set; }
 
@@ -1116,7 +1756,32 @@ namespace JueMingZ.Actions
             ActionQueuePendingChannelSummary = InputActionChannelFormatter.Format(InputActionChannel.None);
             ActionQueuePendingOwnerSummary = string.Empty;
             ActionQueueLastAdmissionStatus = string.Empty;
+            ActionQueueLastAdmissionDecision = string.Empty;
             ActionQueueLastAdmissionReason = string.Empty;
+            ActionQueueLastAdmissionKind = string.Empty;
+            ActionQueueLastAdmissionSource = string.Empty;
+            ActionQueueLastAdmissionScenario = string.Empty;
+            ActionQueueLastAdmissionKey = string.Empty;
+            ActionQueueLastAdmissionRequiredChannels = InputActionChannelFormatter.Format(InputActionChannel.None);
+            ActionQueueLastAdmissionBlockingChannels = InputActionChannelFormatter.Format(InputActionChannel.None);
+            ActionQueueLastAdmissionConflictChannels = InputActionChannelFormatter.Format(InputActionChannel.None);
+            ActionQueueLastAdmissionPendingConflictSummary = string.Empty;
+            ActionQueueLastAdmissionRunningConflictSummary = string.Empty;
+            ActionQueueLastAdmissionBridgeBusySummary = string.Empty;
+            ActionQueueLastAdmissionOwnerSummary = string.Empty;
+            ActionQueueLastAdmissionSupersededRequestId = string.Empty;
+            ActionQueueLastAdmissionCoalescedRequestId = string.Empty;
+            SchedulerLastSelectedRequest = string.Empty;
+            SchedulerLastSupersededRequest = string.Empty;
+            SchedulerLastFairnessBucket = string.Empty;
+            ActionQueueCleanupLeaseChannels = InputActionChannelFormatter.Format(InputActionChannel.None);
+            ActionQueueLastCleanupOwner = string.Empty;
+            ActionQueueLastCleanupReason = string.Empty;
+            ActionQueueLastDirectEnqueueKind = string.Empty;
+            ActionQueueLastDirectEnqueueSource = string.Empty;
+            ActionQueueLastDirectEnqueueScenario = string.Empty;
+            ActionQueueLastDirectEnqueueAdmissionKey = string.Empty;
+            ActionQueueLastDirectEnqueueRequiredChannels = string.Empty;
             ActionQueueLastPendingExpiryReason = string.Empty;
         }
     }

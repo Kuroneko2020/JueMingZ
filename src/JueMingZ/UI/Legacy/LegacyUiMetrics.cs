@@ -13,6 +13,8 @@ namespace JueMingZ.UI.Legacy
         public static readonly bool AllowResize = false;
         public const int OuterPadding = 12;
         public const int TitleHeight = 34;
+        public const int DragRecoverableVisibleWidth = 96;
+        public const int DragRecoverableVisibleHeight = TitleHeight;
         public const int TabBlockYOffset = 4;
         public const int TabButtonHeight = 31;
         public const int TabButtonGap = 4;

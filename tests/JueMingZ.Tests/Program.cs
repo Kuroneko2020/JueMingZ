@@ -31,7 +31,15 @@ namespace Terraria
         public static bool mouseRightRelease;
         public static bool mouseInterface;
         public static bool blockMouse;
+        public static bool SmartInteractShowingGenuine;
+        public static bool SmartInteractShowingFake;
+        public static bool SmartCursorShowing;
+        public static bool SmartCursorWanted_Mouse;
+        public static bool SmartCursorWanted_GamePad;
+        public static int SmartInteractNPC = -1;
+        public static int SmartInteractProj = -1;
         public static bool mouseText;
+        public static object mouseItem;
         public static string hoverItemName;
         public static string hoverItemName2;
         public static object HoverItem;
@@ -87,6 +95,10 @@ namespace Terraria
         public bool releaseUseItem = true;
         public bool channel;
         public bool mouseInterface;
+        public int altFunctionUse;
+        public bool controlUseTile;
+        public bool tileInteractionHappened;
+        public bool tileInteractAttempted;
         public int itemAnimation;
         public int itemTime;
         public int reuseDelay;
@@ -114,6 +126,18 @@ namespace Terraria
         public bool active()
         {
             return activeValue;
+        }
+    }
+}
+
+namespace Terraria.ID
+{
+    internal static class ItemID
+    {
+        internal static class Sets
+        {
+            public static bool[] HasRightFire = new bool[6000];
+            public static bool[] ItemsThatAllowRepeatedRightClick = new bool[6000];
         }
     }
 }
@@ -292,6 +316,9 @@ namespace JueMingZ.Tests
             Run("auto stack allows player inventory open", ref failed, AutoStackAllowsPlayerInventoryOpen);
             Run("auto stack still blocks chest UI", ref failed, AutoStackStillBlocksChestUi);
             Run("auto stack uses short inventory-open settle window", ref failed, AutoStackUsesShortInventoryOpenSettleWindow);
+            Run("auto stack unsafe UI retains pending transaction", ref failed, AutoStackUnsafeUiRetainsPendingTransaction);
+            Run("auto stack successful action result clears pending transaction", ref failed, AutoStackSuccessfulActionResultClearsPendingTransaction);
+            Run("auto stack unverified action result keeps retry pending", ref failed, AutoStackUnverifiedActionResultKeepsRetryPending);
             Run("auto sell default list is conservative fishing junk", ref failed, AutoSellDefaultListIsConservativeFishingJunk);
             Run("auto sell request uses shop metadata", ref failed, AutoSellRequestUsesShopMetadata);
             Run("auto sell allows player inventory open", ref failed, AutoSellAllowsPlayerInventoryOpen);
@@ -345,14 +372,18 @@ namespace JueMingZ.Tests
             Run("auto mining green reach respects pick power", ref failed, AutoMiningGreenReachRespectsPickPower);
             Run("worldgen debug viewer and developer menu are always available", ref failed, WorldGenDebugViewerAndDeveloperMenuAlwaysAvailable);
             Run("diagnostic snapshot writes worldgen debug state", ref failed, DiagnosticSnapshotWritesWorldGenDebugState);
+            Run("diagnostic snapshot writes action queue admission state", ref failed, DiagnosticSnapshotWritesActionQueueAdmissionState);
+            Run("diagnostic snapshot writes ItemCheck writer state", ref failed, DiagnosticSnapshotWritesItemCheckWriterState);
             Run("diagnostic snapshot writes auto stack state", ref failed, DiagnosticSnapshotWritesAutoStackState);
             Run("diagnostic snapshot writes auto deposit coins state", ref failed, DiagnosticSnapshotWritesAutoDepositCoinsState);
             Run("diagnostic snapshot writes auto tax collect state", ref failed, DiagnosticSnapshotWritesAutoTaxCollectState);
             Run("diagnostic snapshot writes auto capture critter state", ref failed, DiagnosticSnapshotWritesAutoCaptureCritterState);
             Run("diagnostic snapshot writes auto harvest state", ref failed, DiagnosticSnapshotWritesAutoHarvestState);
             Run("diagnostic snapshot writes combat ItemCheck auto clicker state", ref failed, DiagnosticSnapshotWritesCombatItemCheckAutoClickerState);
+            Run("diagnostic snapshot writes combat flail combo state", ref failed, DiagnosticSnapshotWritesCombatFlailComboState);
             Run("diagnostic snapshot writes fishing idle pipeline state", ref failed, DiagnosticSnapshotWritesFishingIdlePipelineState);
             Run("performance hitch recorder detects runtime gaps", ref failed, PerformanceHitchRecorderDetectsRuntimeGaps);
+            Run("performance operation recorder uses scenario thresholds", ref failed, PerformanceOperationRecorderUsesScenarioThresholds);
             Run("diagnostic snapshot writes performance hitch state", ref failed, DiagnosticSnapshotWritesPerformanceHitchState);
             Run("feature catalog exposes implemented misc inventory automation", ref failed, FeatureCatalogExposesImplementedMiscInventoryAutomation);
             Run("feature catalog exposes goblin execution", ref failed, FeatureCatalogExposesGoblinExecution);
@@ -387,9 +418,23 @@ namespace JueMingZ.Tests
             Run("combat ItemCheck auto clicker respects vanilla auto reuse", ref failed, CombatItemCheckAutoClickerRespectsVanillaAutoReuse);
             Run("combat ItemCheck auto clicker samples and hard excludes", ref failed, CombatItemCheckAutoClickerSamplesAndHardExcludes);
             Run("combat ItemCheck auto clicker fails closed when vanilla switch unavailable", ref failed, CombatItemCheckAutoClickerFailsClosedWhenVanillaSwitchUnavailable);
+            Run("combat ItemCheck auto clicker reads mouse item slot", ref failed, CombatItemCheckAutoClickerReadsMouseItemSlot);
             Run("combat ItemCheck auto clicker yields to adjacent scoped use", ref failed, CombatItemCheckAutoClickerYieldsToAdjacentScopedUse);
             Run("combat ItemCheck auto clicker takeover restores input state", ref failed, CombatItemCheckAutoClickerTakeoverRestoresInputState);
             Run("combat ItemCheck auto clicker diagnostics record scoped decision", ref failed, CombatItemCheckAutoClickerDiagnosticsRecordScopedDecision);
+            Run("combat flail combo core launches releases and recalls", ref failed, CombatFlailComboCoreLaunchesReleasesAndRecalls);
+            Run("combat flail combo blocks vanilla right click semantics", ref failed, CombatFlailComboBlocksVanillaRightClickSemantics);
+            Run("combat flail combo item set guard fails closed", ref failed, CombatFlailComboItemSetGuardFailsClosed);
+            Run("combat flail combo scoped takeover suppresses and restores right click", ref failed, CombatFlailComboScopedTakeoverSuppressesAndRestoresRightClick);
+            Run("combat flail combo world right click guard allows raw right click intent", ref failed, CombatFlailComboWorldRightClickGuardAllowsRawRightClickIntent);
+            Run("combat flail combo allows plain inventory open", ref failed, CombatFlailComboAllowsPlainInventoryOpen);
+            Run("combat flail combo yields to adjacent scoped use", ref failed, CombatFlailComboYieldsToAdjacentScopedUse);
+            Run("ItemCheck writer arbiter prioritizes bridge over combat writers", ref failed, ItemCheckWriterArbiterPrioritizesBridgeOverCombatWriters);
+            Run("ItemCheck writer arbiter selects single world automation writer", ref failed, ItemCheckWriterArbiterSelectsSingleWorldAutomationWriter);
+            Run("world automation fairness coordinator rotates runtime winners", ref failed, WorldAutomationFairnessCoordinatorRotatesRuntimeWinners);
+            Run("combat flail combo diagnostics record scoped decision", ref failed, CombatFlailComboDiagnosticsRecordScopedDecision);
+            Run("combat flail combo release remembers flail aim tail", ref failed, CombatFlailComboReleaseRemembersFlailAimTail);
+            Run("combat flail combo press aim feeds release tail", ref failed, CombatFlailComboPressAimFeedsReleaseTail);
             Run("combat goblin execution allows only tinkerer when enabled", ref failed, CombatGoblinExecutionAllowsOnlyTinkererWhenEnabled);
             Run("travel menu diagnostics clone keeps scoped hook fields", ref failed, TravelMenuDiagnosticsCloneKeepsScopedHookFields);
             Run("travel menu ItemCheck guard suppresses world use and restores click", ref failed, TravelMenuItemCheckGuardSuppressesWorldUseAndRestoresClick);
@@ -409,17 +454,25 @@ namespace JueMingZ.Tests
             Run("try enqueue accepts normal request", ref failed, TryEnqueueAcceptsNormalRequest);
             Run("try enqueue rejects duplicate pending admission key", ref failed, TryEnqueueRejectsDuplicatePendingAdmissionKey);
             Run("try enqueue rejects duplicate running admission key", ref failed, TryEnqueueRejectsDuplicateRunningAdmissionKey);
+            Run("try enqueue supersedes pending user request", ref failed, TryEnqueueSupersedesPendingUserRequest);
+            Run("try enqueue coalesces pending background request", ref failed, TryEnqueueCoalescesPendingBackgroundRequest);
+            Run("try enqueue user request supersedes background pending", ref failed, TryEnqueueUserRequestSupersedesBackgroundPending);
+            Run("input action queue finds terminal result by request id", ref failed, InputActionQueueFindsTerminalResultByRequestId);
+            Run("cleanup lease blocks same resource admission", ref failed, CleanupLeaseBlocksSameResourceAdmission);
             Run("try enqueue reports item use bridge busy", ref failed, TryEnqueueReportsItemUseBridgeBusy);
             Run("try enqueue bridge busy keeps pending count unchanged", ref failed, TryEnqueueBridgeBusyKeepsPendingCountUnchanged);
+            Run("try enqueue snapshot records denied admission details", ref failed, TryEnqueueSnapshotRecordsDeniedAdmissionDetails);
             Run("try enqueue derives queue expiration", ref failed, TryEnqueueDerivesQueueExpiration);
             Run("try enqueue allows distinct empty-source default keys", ref failed, TryEnqueueAllowsDistinctEmptySourceDefaultKeys);
             Run("legacy enqueue still accepts while channel busy", ref failed, LegacyEnqueueStillAcceptsWhileChannelBusy);
+            Run("legacy enqueue records direct entry diagnostics", ref failed, LegacyEnqueueRecordsDirectEntryDiagnostics);
             Run("pending queue timeout expires before start", ref failed, PendingQueueTimeoutExpiresBeforeStart);
             Run("pending expiration does not cancel executor", ref failed, PendingExpirationDoesNotCancelExecutor);
             Run("pending queue timeout expires while running", ref failed, PendingQueueTimeoutExpiresWhileRunning);
             Run("pending expiration while running does not start or cancel pending executor", ref failed, PendingExpirationWhileRunningDoesNotStartOrCancelPendingExecutor);
             Run("running lease survives pending expiration", ref failed, RunningLeaseSurvivesPendingExpiration);
             Run("scheduler keeps priority then created order", ref failed, SchedulerKeepsPriorityThenCreatedOrder);
+            Run("scheduler prefers user bucket over earlier background", ref failed, SchedulerPrefersUserBucketOverEarlierBackground);
             Run("pending lower priority same channel does not block admission", ref failed, PendingLowerPrioritySameChannelDoesNotBlockAdmission);
             Run("simulated jump request has queue timeout", ref failed, SimulatedJumpRequestHasQueueTimeout);
             Run("continuous dash request has queue timeout", ref failed, ContinuousDashRequestHasQueueTimeout);
@@ -553,8 +606,10 @@ namespace JueMingZ.Tests
             Run("legacy UI action update gate skips drag dispatch without commands", ref failed, LegacyUiActionUpdateGateSkipsDragDispatchWithoutCommands);
             Run("legacy UI update prefix skips scroll snapshot when wheel idle", ref failed, LegacyUiUpdatePrefixSkipsScrollSnapshotWhenWheelIdle);
             Run("legacy UI scroll action event coalesces stable wheel diagnostics", ref failed, LegacyUiScrollActionEventCoalescesStableWheelDiagnostics);
-            Run("legacy main UI scale caps high UI scale to default visual height", ref failed, LegacyMainUiScaleCapsHighUiScaleToDefaultVisualHeight);
+            Run("legacy main UI scale keeps high UI scale when screen fits", ref failed, LegacyMainUiScaleKeepsHighUiScaleWhenScreenFits);
+            Run("legacy main UI scale caps high UI scale only to screen fit", ref failed, LegacyMainUiScaleCapsHighUiScaleOnlyToScreenFit);
             Run("legacy main UI scale keeps sub-default UI scale", ref failed, LegacyMainUiScaleKeepsSubDefaultUiScale);
+            Run("legacy main UI drag bounds keep title recoverable", ref failed, LegacyMainUiDragBoundsKeepTitleRecoverable);
             Run("UI draw transform scales rectangles and text scale", ref failed, UiDrawTransformScalesRectanglesAndTextScale);
             Run("diagnostic mouse state reader reuses snapshot within draw frame", ref failed, DiagnosticMouseStateReaderReusesSnapshotWithinDrawFrame);
             Run("diagnostic mouse state reader refreshes on new fast draw frame", ref failed, DiagnosticMouseStateReaderRefreshesOnNewFastDrawFrame);

@@ -739,7 +739,13 @@ namespace JueMingZ.Automation.Fishing
                             "Fishing auto pull (filter skip timeout)",
                             observation == null ? State.LastProcessedHookIdentity : observation.Identity,
                             false);
-                        queue.Enqueue(forcedPullRequest);
+                        InputActionAdmissionResult forcedAdmission;
+                        if (!queue.TryEnqueue(forcedPullRequest, out forcedAdmission))
+                        {
+                            Record("filterSkipTimeoutAdmissionDenied", forcedAdmission == null ? "unknown" : forcedAdmission.Reason);
+                            return;
+                        }
+
                         State.PullRequestId = forcedPullRequest.RequestId;
                         if (observation != null)
                         {
@@ -831,7 +837,13 @@ namespace JueMingZ.Automation.Fishing
                     "Fishing auto pull",
                     observation.Identity,
                     false);
-                queue.Enqueue(request);
+                InputActionAdmissionResult admission;
+                if (!queue.TryEnqueue(request, out admission))
+                {
+                    Record("skipped", "admissionDenied:" + (admission == null ? "unknown" : admission.Reason));
+                    return;
+                }
+
                 if (ShouldRegisterCaughtItemForAutoStore(settings, candidate))
                 {
                     FishingQuestFishStorageService.RegisterExpectedCaughtItem(request.RequestId, candidate.Id);
@@ -864,7 +876,14 @@ namespace JueMingZ.Automation.Fishing
                 "Fishing auto recast",
                 State.LastProcessedHookIdentity,
                 true);
-            queue.Enqueue(request);
+            InputActionAdmissionResult admission;
+            if (!queue.TryEnqueue(request, out admission))
+            {
+                State.RecastDelayTicks = 1;
+                Record("skipped", "admissionDeniedBeforeRecast:" + (admission == null ? "unknown" : admission.Reason));
+                return;
+            }
+
             State.RecastRequestId = request.RequestId;
             State.CurrentBobberIdentity = -1;
             State.LastProcessedHookIdentity = -1;
@@ -973,7 +992,13 @@ namespace JueMingZ.Automation.Fishing
             }
 
             var request = CreateFilterSkipRequest(temporarySlot, observation, candidate, decision);
-            queue.Enqueue(request);
+            InputActionAdmissionResult admission;
+            if (!queue.TryEnqueue(request, out admission))
+            {
+                BeginFilterSkipNaturalWait(settings, observation, candidate, decision, "admissionDenied:" + (admission == null ? "unknown" : admission.Reason), tick);
+                return;
+            }
+
             State.LastProcessedHookIdentity = observation.Identity;
             State.WaitingForBobberGone = true;
             State.WaitingForBobberGoneStartTick = tick;
@@ -1146,8 +1171,11 @@ namespace JueMingZ.Automation.Fishing
             {
                 Kind = InputActionKind.ItemUse,
                 Priority = InputActionPriority.Normal,
+                DuplicatePolicy = InputActionDuplicatePolicy.CoalescePending,
                 SourceFeatureId = FeatureIds.FishingAutoFish,
                 Description = description,
+                QueueTimeout = TimeSpan.FromMilliseconds(500),
+                AdmissionKey = FeatureIds.FishingAutoFish + "|" + scenario + "|" + bobberIdentity.ToString(CultureInfo.InvariantCulture),
                 Timeout = TimeSpan.FromSeconds(3)
             };
             request.Metadata[ActionMetadataKeys.Scenario] = scenario;
@@ -1221,8 +1249,11 @@ namespace JueMingZ.Automation.Fishing
             {
                 Kind = InputActionKind.SelectHotbarSlot,
                 Priority = InputActionPriority.Normal,
+                DuplicatePolicy = InputActionDuplicatePolicy.CoalescePending,
                 SourceFeatureId = FeatureIds.FishingFilter,
                 Description = "Fishing filter skip",
+                QueueTimeout = TimeSpan.FromMilliseconds(500),
+                AdmissionKey = FeatureIds.FishingFilter + "|skip|" + (observation == null ? "-1" : observation.Identity.ToString(CultureInfo.InvariantCulture)),
                 Timeout = TimeSpan.FromSeconds(4)
             };
             request.Metadata[ActionMetadataKeys.Scenario] = ScenarioNames.FishingFilterSkip;

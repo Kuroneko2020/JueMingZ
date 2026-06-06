@@ -349,9 +349,9 @@ namespace JueMingZ.Tests
             }
 
             var healthScale = InformationOverlayService.ResolveEnemyHealthFontScaleForTesting(0.80f);
-            if (Math.Abs(healthScale - 0.60f) > 0.001f)
+            if (Math.Abs(healthScale - 0.67f) > 0.001f)
             {
-                throw new InvalidOperationException("Expected enemy health label scale to be three quarters of the name scale.");
+                throw new InvalidOperationException("Expected enemy health label scale to be 0.13 below the name scale.");
             }
 
             var clampedHealthScale = InformationOverlayService.ResolveEnemyHealthFontScaleForTesting(0.50f);
@@ -360,10 +360,10 @@ namespace JueMingZ.Tests
                 throw new InvalidOperationException("Expected enemy health label scale to respect the shared minimum font scale.");
             }
 
-            var tightAdvance = InformationWorldLabelRenderer.ResolveTightStackedLineAdvanceForTesting(0.80f, 0.60f);
-            if (Math.Abs(tightAdvance - 10.4f) > 0.001f)
+            var tightAdvance = InformationWorldLabelRenderer.ResolveTightStackedLineAdvanceForTesting(0.80f, 0.67f);
+            if (Math.Abs(tightAdvance - 12.0f) > 0.001f)
             {
-                throw new InvalidOperationException("Expected enemy health label rows to use a tight visual line advance.");
+                throw new InvalidOperationException("Expected enemy health label rows to leave enough tight spacing for the larger health scale.");
             }
         }
 
@@ -2736,6 +2736,7 @@ namespace JueMingZ.Tests
             var window = LegacyMainUiState.WindowRect;
             Terraria.Main.screenWidth = 1536;
             Terraria.Main.screenHeight = 864;
+            var effectiveScale = (864d - LegacyUiMetrics.VisualScreenMargin) / LegacyUiMetrics.DefaultHeight;
             var raw = new DiagnosticMouseState
             {
                 UiScaleAvailable = true,
@@ -2744,13 +2745,13 @@ namespace JueMingZ.Tests
                 UiScaleX = 1.25d,
                 UiScaleY = 1.25d,
                 OsReadAvailable = true,
-                OsClientMouseX = window.X + 20,
-                OsClientMouseY = window.Y + 20
+                OsClientMouseX = (int)Math.Round((window.X + 20) * effectiveScale),
+                OsClientMouseY = (int)Math.Round((window.Y + 20) * effectiveScale)
             };
 
             if (!LegacyUiInput.IsMouseInWindowForDiagnostics(raw))
             {
-                throw new InvalidOperationException("Expected capped 125% OS coordinates over the visual F5 window to count as captured.");
+                throw new InvalidOperationException("Expected screen-fit capped 125% OS coordinates over the visual F5 window to count as captured.");
             }
 
             raw.OsClientMouseX = (int)((window.X + 20) * 1.25d);
@@ -2758,6 +2759,18 @@ namespace JueMingZ.Tests
             if (LegacyUiInput.IsMouseInWindowForDiagnostics(raw))
             {
                 throw new InvalidOperationException("Expected old uncapped 125% bottom coordinates outside the capped visual F5 window not to count as captured.");
+            }
+
+            Terraria.Main.screenWidth = 2560;
+            Terraria.Main.screenHeight = 1440;
+            raw.UiScale = 1.3d;
+            raw.UiScaleX = 1.3d;
+            raw.UiScaleY = 1.3d;
+            raw.OsClientMouseX = (int)Math.Round((window.X + 20) * 1.3d);
+            raw.OsClientMouseY = (int)Math.Round((window.Y + 20) * 1.3d);
+            if (!LegacyUiInput.IsMouseInWindowForDiagnostics(raw))
+            {
+                throw new InvalidOperationException("Expected 2560x1440 at 130% OS coordinates to keep following Terraria UI scale.");
             }
 
             raw.UiScale = 0.8d;

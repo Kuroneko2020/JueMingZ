@@ -255,21 +255,49 @@ namespace JueMingZ.Tests
             }
         }
 
-        private static void LegacyMainUiScaleCapsHighUiScaleToDefaultVisualHeight()
+        private static void LegacyMainUiScaleKeepsHighUiScaleWhenScreenFits()
+        {
+            var scale = LegacyMainUiScale.ResolveForTesting(1.3d, 2560, 1440);
+            var visualHeight = LegacyUiMetrics.DefaultHeight * scale.EffectiveScaleY;
+
+            if (Math.Abs(scale.DrawScaleX - 1d) > 0.001d ||
+                Math.Abs(scale.DrawScaleY - 1d) > 0.001d ||
+                Math.Abs(scale.EffectiveScaleY - 1.3d) > 0.001d ||
+                Math.Abs(visualHeight - 975d) > 0.001d ||
+                scale.Capped)
+            {
+                throw new InvalidOperationException("Expected 2560x1440 at 130% Terraria UI scale to keep the F5 window following UI scale without capping.");
+            }
+        }
+
+        private static void LegacyMainUiScaleCapsHighUiScaleOnlyToScreenFit()
         {
             var scale = LegacyMainUiScale.ResolveForTesting(1.25d, 1536, 864);
             var visualHeight = LegacyUiMetrics.DefaultHeight * scale.EffectiveScaleY;
+            var expectedEffectiveScale = (864d - LegacyUiMetrics.VisualScreenMargin) / LegacyUiMetrics.DefaultHeight;
 
-            if (Math.Abs(scale.DrawScaleY - 0.8d) > 0.001d ||
-                Math.Abs(scale.EffectiveScaleY - 1d) > 0.001d ||
-                Math.Abs(visualHeight - LegacyUiMetrics.MaxVisualHeight) > 0.001d)
+            if (Math.Abs(scale.EffectiveScaleY - expectedEffectiveScale) > 0.001d ||
+                Math.Abs(scale.DrawScaleY - expectedEffectiveScale / 1.25d) > 0.001d ||
+                Math.Abs(visualHeight - (864d - LegacyUiMetrics.VisualScreenMargin)) > 0.001d ||
+                scale.EffectiveScaleY <= 1d)
             {
-                throw new InvalidOperationException("Expected 125% Terraria UI scale to cap the F5 visual height at the default 750px window height.");
+                throw new InvalidOperationException("Expected 1536x864 at 125% Terraria UI scale to cap only to the screen fit limit, not to the default 750px height.");
             }
 
             if (!scale.Capped)
             {
                 throw new InvalidOperationException("Expected the F5 scale snapshot to report capped=true.");
+            }
+
+            scale = LegacyMainUiScale.ResolveForTesting(1.5d, 1280, 720);
+            visualHeight = LegacyUiMetrics.DefaultHeight * scale.EffectiveScaleY;
+            expectedEffectiveScale = (720d - LegacyUiMetrics.VisualScreenMargin) / LegacyUiMetrics.DefaultHeight;
+            if (Math.Abs(scale.EffectiveScaleY - expectedEffectiveScale) > 0.001d ||
+                Math.Abs(scale.DrawScaleY - expectedEffectiveScale / 1.5d) > 0.001d ||
+                Math.Abs(visualHeight - (720d - LegacyUiMetrics.VisualScreenMargin)) > 0.001d ||
+                !scale.Capped)
+            {
+                throw new InvalidOperationException("Expected 1280x720 at 150% Terraria UI scale to shrink the F5 window only enough to fit the screen.");
             }
         }
 
@@ -283,6 +311,43 @@ namespace JueMingZ.Tests
                 scale.Capped)
             {
                 throw new InvalidOperationException("Expected sub-100% Terraria UI scale to pass through unchanged for the F5 window.");
+            }
+        }
+
+        private static void LegacyMainUiDragBoundsKeepTitleRecoverable()
+        {
+            var fullVisibleY = LegacyMainUiState.CalculateMaxBasePositionForTesting(
+                1440,
+                LegacyUiMetrics.DefaultHeight,
+                1.3d);
+            var recoverableY = LegacyMainUiState.CalculateMaxRecoverableBasePositionForTesting(
+                1440,
+                LegacyUiMetrics.DefaultHeight,
+                1.3d,
+                LegacyUiMetrics.DragRecoverableVisibleHeight);
+
+            if (fullVisibleY != 351)
+            {
+                throw new InvalidOperationException("Expected 2560x1440 at 130% full-visible F5 Y range to stay small because the scaled window is tall.");
+            }
+
+            if (recoverableY <= fullVisibleY + 600 || recoverableY != 1067)
+            {
+                throw new InvalidOperationException("Expected drag bounds to keep the title recoverable without locking the whole scaled F5 window into a narrow top band.");
+            }
+
+            var fullVisibleX = LegacyMainUiState.CalculateMaxBasePositionForTesting(
+                2560,
+                LegacyUiMetrics.DefaultWidth,
+                1.3d);
+            var recoverableX = LegacyMainUiState.CalculateMaxRecoverableBasePositionForTesting(
+                2560,
+                LegacyUiMetrics.DefaultWidth,
+                1.3d,
+                LegacyUiMetrics.DragRecoverableVisibleWidth);
+            if (recoverableX <= fullVisibleX || recoverableX != 1867)
+            {
+                throw new InvalidOperationException("Expected drag bounds to allow more horizontal movement while keeping a recoverable strip visible.");
             }
         }
 
@@ -309,6 +374,15 @@ namespace JueMingZ.Tests
                 if (Math.Abs(UiDrawTransform.TransformScaleForTesting(0.9f) - 0.45f) > 0.001f)
                 {
                     throw new InvalidOperationException("Expected text scale to use the active draw transform.");
+                }
+            }
+
+            using (UiDrawTransform.Begin(0.4f, 0.4f))
+            {
+                UiDrawTransform.TransformRectangleForTesting(10, 20, 1, 1, out x, out y, out width, out height);
+                if (width != 1 || height != 1)
+                {
+                    throw new InvalidOperationException("Expected active draw transform to preserve visible one-pixel UI edges.");
                 }
             }
 

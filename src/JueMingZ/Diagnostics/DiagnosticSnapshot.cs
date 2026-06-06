@@ -101,7 +101,41 @@ namespace JueMingZ.Diagnostics
         public string ActionQueuePendingChannelSummary { get; set; }
         public string ActionQueuePendingOwnerSummary { get; set; }
         public string ActionQueueLastAdmissionStatus { get; set; }
+        public string ActionQueueLastAdmissionDecision { get; set; }
         public string ActionQueueLastAdmissionReason { get; set; }
+        public string ActionQueueLastAdmissionKind { get; set; }
+        public string ActionQueueLastAdmissionSource { get; set; }
+        public string ActionQueueLastAdmissionScenario { get; set; }
+        public string ActionQueueLastAdmissionKey { get; set; }
+        public string ActionQueueLastAdmissionRequiredChannels { get; set; }
+        public string ActionQueueLastAdmissionBlockingChannels { get; set; }
+        public string ActionQueueLastAdmissionConflictChannels { get; set; }
+        public string ActionQueueLastAdmissionPendingConflictSummary { get; set; }
+        public string ActionQueueLastAdmissionRunningConflictSummary { get; set; }
+        public string ActionQueueLastAdmissionBridgeBusySummary { get; set; }
+        public string ActionQueueLastAdmissionOwnerSummary { get; set; }
+        public string ActionQueueLastAdmissionSupersededRequestId { get; set; }
+        public string ActionQueueLastAdmissionCoalescedRequestId { get; set; }
+        public int ActionQueueSupersededPendingCount { get; set; }
+        public int ActionQueueCoalescedPendingCount { get; set; }
+        public string SchedulerLastSelectedRequest { get; set; }
+        public string SchedulerLastSupersededRequest { get; set; }
+        public string SchedulerLastFairnessBucket { get; set; }
+        public string WorldAutomationLastWinner { get; set; }
+        public string WorldAutomationFairnessDebt { get; set; }
+        public DateTime? WorldAutomationFairnessDecisionUtc { get; set; }
+        public int BackgroundRequestCoalescedCount { get; set; }
+        public int ExpiredPendingDroppedCount { get; set; }
+        public int ActionQueueCleanupLeaseCount { get; set; }
+        public string ActionQueueCleanupLeaseChannels { get; set; }
+        public string ActionQueueLastCleanupOwner { get; set; }
+        public string ActionQueueLastCleanupReason { get; set; }
+        public int ActionQueueDirectEnqueueCount { get; set; }
+        public string ActionQueueLastDirectEnqueueKind { get; set; }
+        public string ActionQueueLastDirectEnqueueSource { get; set; }
+        public string ActionQueueLastDirectEnqueueScenario { get; set; }
+        public string ActionQueueLastDirectEnqueueAdmissionKey { get; set; }
+        public string ActionQueueLastDirectEnqueueRequiredChannels { get; set; }
         public int ActionQueueExpiredPendingCount { get; set; }
         public string ActionQueueLastPendingExpiryReason { get; set; }
         public string ItemUseBridgeLastStatus { get; set; }
@@ -113,6 +147,12 @@ namespace JueMingZ.Diagnostics
         public int ItemUseBridgeSucceededCount { get; set; }
         public int ItemUseBridgeAttemptedButUnverifiedCount { get; set; }
         public int ItemUseBridgeFailedCount { get; set; }
+        public string ItemCheckWriterOwner { get; set; }
+        public string ItemCheckWriterOwnerRequestId { get; set; }
+        public string ItemCheckWriterPhase { get; set; }
+        public string ItemCheckWriterDecisionReason { get; set; }
+        public string ItemCheckWriterBlockedCandidates { get; set; }
+        public DateTime? ItemCheckWriterDecisionUtc { get; set; }
         public bool EnableDiagnosticInputTests { get; set; }
         public int DiagnosticInputTestSlot { get; set; }
         public int DiagnosticInputTestSlotDisplay { get; set; }
@@ -242,6 +282,13 @@ namespace JueMingZ.Diagnostics
         public double LastPerformanceHitchSlowestStageMs { get; set; }
         public string LastPerformanceHitchSlowestOperationName { get; set; }
         public double LastPerformanceHitchSlowestOperationMs { get; set; }
+        public long PerformanceOperationEventCount { get; set; }
+        public string LastPerformanceOperationScenario { get; set; }
+        public DateTime? LastPerformanceOperationUtc { get; set; }
+        public double LastPerformanceOperationElapsedMs { get; set; }
+        public double LastPerformanceOperationThresholdMs { get; set; }
+        public string LastPerformanceOperationReason { get; set; }
+        public string LastPerformanceOperationOwnerSummary { get; set; }
         public bool ReflectionCacheReady { get; set; }
         public int ReflectionCacheMissCount { get; set; }
         public string ReflectionCacheLastMissKey { get; set; }
@@ -268,6 +315,18 @@ namespace JueMingZ.Diagnostics
         public string AutoStackLastDecision { get; set; }
         public string AutoStackLastInventorySignature { get; set; }
         public string AutoStackLastPendingItemIds { get; set; }
+        public string AutoStackLastDetectedItemIds { get; set; }
+        public long AutoStackPendingSinceTick { get; set; }
+        public long AutoStackLastPendingChangeTick { get; set; }
+        public string AutoStackLastPendingClearReason { get; set; }
+        public string AutoStackPendingTransactionState { get; set; }
+        public int AutoStackPendingRetryCount { get; set; }
+        public string AutoStackLastSubmitRequestId { get; set; }
+        public string AutoStackLastResult { get; set; }
+        public string AutoStackLastUnverifiedReason { get; set; }
+        public string AutoStackInventoryTransactionSlots { get; set; }
+        public string AutoStackInventoryTransactionBlockingReason { get; set; }
+        public string AutoStackActionResultDeliveryMode { get; set; }
         public DateTime? AutoStackLastDecisionUtc { get; set; }
         public string AutoSellLastDecision { get; set; }
         public string AutoSellLastInventorySignature { get; set; }
@@ -696,6 +755,24 @@ namespace JueMingZ.Diagnostics
         public string CombatPerfectRevolverLastDecision { get; set; }
         public string CombatPerfectRevolverLastSkipReason { get; set; }
         public DateTime? CombatPerfectRevolverLastDecisionUtc { get; set; }
+        public bool CombatFlailComboEnabled { get; set; }
+        public bool CombatFlailComboRightHeld { get; set; }
+        public bool CombatFlailComboEligible { get; set; }
+        public string CombatFlailComboLastDecision { get; set; }
+        public string CombatFlailComboLastReason { get; set; }
+        public DateTime? CombatFlailComboLastDecisionUtc { get; set; }
+        public int CombatFlailComboItemType { get; set; }
+        public int CombatFlailComboProjectileType { get; set; }
+        public double CombatFlailComboProjectileAi0 { get; set; }
+        public bool CombatFlailComboHitDetected { get; set; }
+        public bool CombatFlailComboCollisionDetected { get; set; }
+        public bool CombatFlailComboVanillaRightClickBlocked { get; set; }
+        public bool CombatFlailComboUiBlocked { get; set; }
+        public bool CombatFlailComboScopedPress { get; set; }
+        public bool CombatFlailComboScopedRelease { get; set; }
+        public bool CombatFlailComboRestoreOk { get; set; }
+        public long CombatFlailComboAppliedCount { get; set; }
+        public long CombatFlailComboSkippedCount { get; set; }
         public string CombatItemCheckAutoClickerLastDecision { get; set; }
         public string CombatItemCheckAutoClickerLastReason { get; set; }
         public DateTime? CombatItemCheckAutoClickerLastDecisionUtc { get; set; }
@@ -785,12 +862,44 @@ namespace JueMingZ.Diagnostics
             ActionQueuePendingChannelSummary = string.Empty;
             ActionQueuePendingOwnerSummary = string.Empty;
             ActionQueueLastAdmissionStatus = string.Empty;
+            ActionQueueLastAdmissionDecision = string.Empty;
             ActionQueueLastAdmissionReason = string.Empty;
+            ActionQueueLastAdmissionKind = string.Empty;
+            ActionQueueLastAdmissionSource = string.Empty;
+            ActionQueueLastAdmissionScenario = string.Empty;
+            ActionQueueLastAdmissionKey = string.Empty;
+            ActionQueueLastAdmissionRequiredChannels = string.Empty;
+            ActionQueueLastAdmissionBlockingChannels = string.Empty;
+            ActionQueueLastAdmissionConflictChannels = string.Empty;
+            ActionQueueLastAdmissionPendingConflictSummary = string.Empty;
+            ActionQueueLastAdmissionRunningConflictSummary = string.Empty;
+            ActionQueueLastAdmissionBridgeBusySummary = string.Empty;
+            ActionQueueLastAdmissionOwnerSummary = string.Empty;
+            ActionQueueLastAdmissionSupersededRequestId = string.Empty;
+            ActionQueueLastAdmissionCoalescedRequestId = string.Empty;
+            SchedulerLastSelectedRequest = string.Empty;
+            SchedulerLastSupersededRequest = string.Empty;
+            SchedulerLastFairnessBucket = string.Empty;
+            WorldAutomationLastWinner = string.Empty;
+            WorldAutomationFairnessDebt = string.Empty;
+            ActionQueueCleanupLeaseChannels = string.Empty;
+            ActionQueueLastCleanupOwner = string.Empty;
+            ActionQueueLastCleanupReason = string.Empty;
+            ActionQueueLastDirectEnqueueKind = string.Empty;
+            ActionQueueLastDirectEnqueueSource = string.Empty;
+            ActionQueueLastDirectEnqueueScenario = string.Empty;
+            ActionQueueLastDirectEnqueueAdmissionKey = string.Empty;
+            ActionQueueLastDirectEnqueueRequiredChannels = string.Empty;
             ActionQueueLastPendingExpiryReason = string.Empty;
             ItemUseBridgeLastStatus = string.Empty;
             ItemUseBridgeLastMessage = string.Empty;
             ItemUseBridgeLastRequestId = string.Empty;
             ItemUseBridgePendingRequestId = string.Empty;
+            ItemCheckWriterOwner = string.Empty;
+            ItemCheckWriterOwnerRequestId = string.Empty;
+            ItemCheckWriterPhase = string.Empty;
+            ItemCheckWriterDecisionReason = string.Empty;
+            ItemCheckWriterBlockedCandidates = string.Empty;
             LastDiagnosticHotkey = string.Empty;
             LastDiagnosticHotkeyMessage = string.Empty;
             ActionEventsPath = string.Empty;
@@ -842,6 +951,9 @@ namespace JueMingZ.Diagnostics
             LastPerformanceHitchReason = string.Empty;
             LastPerformanceHitchSlowestStageName = string.Empty;
             LastPerformanceHitchSlowestOperationName = string.Empty;
+            LastPerformanceOperationScenario = string.Empty;
+            LastPerformanceOperationReason = string.Empty;
+            LastPerformanceOperationOwnerSummary = string.Empty;
             ReflectionCacheLastMissKey = string.Empty;
             ReflectionCacheLastError = string.Empty;
             PlayerTypeName = string.Empty;
@@ -856,6 +968,16 @@ namespace JueMingZ.Diagnostics
             AutoStackLastDecision = string.Empty;
             AutoStackLastInventorySignature = string.Empty;
             AutoStackLastPendingItemIds = string.Empty;
+            AutoStackLastDetectedItemIds = string.Empty;
+            AutoStackLastPendingChangeTick = -1;
+            AutoStackLastPendingClearReason = string.Empty;
+            AutoStackPendingTransactionState = string.Empty;
+            AutoStackLastSubmitRequestId = string.Empty;
+            AutoStackLastResult = string.Empty;
+            AutoStackLastUnverifiedReason = string.Empty;
+            AutoStackInventoryTransactionSlots = string.Empty;
+            AutoStackInventoryTransactionBlockingReason = string.Empty;
+            AutoStackActionResultDeliveryMode = string.Empty;
             AutoSellLastDecision = string.Empty;
             AutoSellLastInventorySignature = string.Empty;
             AutoSellLastItemIds = string.Empty;
@@ -989,6 +1111,9 @@ namespace JueMingZ.Diagnostics
             CombatAutoFacingTargetName = string.Empty;
             CombatPerfectRevolverLastDecision = string.Empty;
             CombatPerfectRevolverLastSkipReason = string.Empty;
+            CombatFlailComboLastDecision = string.Empty;
+            CombatFlailComboLastReason = string.Empty;
+            CombatFlailComboRestoreOk = true;
             CombatItemCheckAutoClickerLastDecision = string.Empty;
             CombatItemCheckAutoClickerLastReason = string.Empty;
             CombatMagicStringClickerLastDecision = string.Empty;

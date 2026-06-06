@@ -18,6 +18,12 @@ namespace JueMingZ.Features.Catalog
                 .GameState(GameStateKind.Player, GameStateKind.Inventory)
                 .Notes("上一套自动连点 source / policy / input source 路线已按用户实测失败清理。当前接入 ItemCheck scoped takeover 核心、四象限策略、原版自动复用让路、鱼竿 / 左轮硬排除，并让路 ItemUseBridge、UseItemPulseBridge、自动捕捉 / 自动收获等相邻 scoped use；诊断和用户复测口径等待后续计划。"), true);
 
+            Add(registry, FeatureDefinitionBuilder.Create(FeatureIds.CombatFlailCombo, "链球连击", "长按右键触发连击")
+                .Actions(InputActionKind.ItemUse, InputActionKind.RawInput)
+                .GameState(GameStateKind.Player, GameStateKind.Inventory, GameStateKind.CombatTargets)
+                .Priority(18)
+                .Notes("默认关闭。手持 aiStyle 15 且非悠悠球的链球/连枷时，长按右键在 Player.ItemCheck scoped takeover 内制造左键按下/松开节奏；右键 UI、交互 Tile/NPC 和物品自身右键语义全部原版优先并 fail-closed。只读取 projectile 状态，不写 projectile/NPC/Tile/玩家状态；按下 tick 可继续让 combat.auto_aim 应用目标。"), true);
+
             Add(registry, FeatureDefinitionBuilder.Create(FeatureIds.CombatPerfectRevolver, "完美左轮", "最大程度发挥左轮威力")
                 .Actions(InputActionKind.ItemUse, InputActionKind.RawInput)
                 .GameState(GameStateKind.Player, GameStateKind.Inventory)

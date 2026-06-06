@@ -170,11 +170,12 @@ namespace JueMingZ.Config
             SetFeatureEnabledLocked(FeatureIds.WorldAutomationAutoCaptureCritter, settings.WorldAutomationAutoCaptureCritterEnabled);
             SetFeatureEnabledLocked(FeatureIds.WorldAutomationAutoHarvest, settings.WorldAutomationAutoHarvestEnabled);
             SetFeatureEnabledLocked("combat.auto_aim", settings.CombatAimAssistRadius > 0 || settings.CursorAimRadius > 0 || settings.PlayerAimRadius > 0);
-            SetFeatureEnabledLocked("combat.auto_clicker", settings.CombatAutoClickerEnabled);
-            SetFeatureEnabledLocked("combat.perfect_revolver", settings.CombatPerfectRevolverEnabled);
-            SetFeatureEnabledLocked("combat.magic_string_clicker", settings.CombatMagicStringClickerEnabled);
-            SetFeatureEnabledLocked("combat.auto_facing", settings.CombatAutoFacingEnabled);
-            SetFeatureEnabledLocked("combat.equipment_warning", settings.CombatEquipmentWarningEnabled);
+            SetFeatureEnabledLocked(FeatureIds.CombatAutoClicker, settings.CombatAutoClickerEnabled);
+            SetFeatureEnabledLocked(FeatureIds.CombatFlailCombo, settings.CombatFlailComboEnabled);
+            SetFeatureEnabledLocked(FeatureIds.CombatPerfectRevolver, settings.CombatPerfectRevolverEnabled);
+            SetFeatureEnabledLocked(FeatureIds.CombatMagicStringClicker, settings.CombatMagicStringClickerEnabled);
+            SetFeatureEnabledLocked(FeatureIds.CombatAutoFacing, settings.CombatAutoFacingEnabled);
+            SetFeatureEnabledLocked(FeatureIds.CombatEquipmentWarning, settings.CombatEquipmentWarningEnabled);
             SetFeatureEnabledLocked(FeatureIds.CombatGoblinExecution, settings.CombatGoblinExecutionEnabled);
             SetFeatureEnabledLocked("information.enemy_name_labels", settings.InformationEnemyNameLabelsEnabled);
             SetFeatureEnabledLocked("information.critter_name_labels", settings.InformationCritterNameLabelsEnabled);
@@ -240,6 +241,7 @@ namespace JueMingZ.Config
             if (settings.WorldAutomationAutoHarvestEnabled) count++;
             if (settings.CombatAimAssistRadius > 0 || settings.CursorAimRadius > 0 || settings.PlayerAimRadius > 0) count++;
             if (settings.CombatAutoClickerEnabled) count++;
+            if (settings.CombatFlailComboEnabled) count++;
             if (settings.CombatPerfectRevolverEnabled) count++;
             if (settings.CombatMagicStringClickerEnabled) count++;
             if (settings.CombatAutoFacingEnabled) count++;

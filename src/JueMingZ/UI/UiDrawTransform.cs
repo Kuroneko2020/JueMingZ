@@ -66,8 +66,8 @@ namespace JueMingZ.UI
             return new Rectangle(
                 left,
                 top,
-                Math.Max(0, right - left),
-                Math.Max(0, bottom - top));
+                Math.Max(1, right - left),
+                Math.Max(1, bottom - top));
         }
 
         internal static Vector2 TransformVector(float x, float y)

@@ -134,6 +134,23 @@ namespace JueMingZ.UI.Legacy
             }
         }
 
+        internal static void SetWindowForInteraction(int x, int y, int width, int height, bool save)
+        {
+            EnsureLoaded();
+            lock (SyncRoot)
+            {
+                _x = Clamp(x, -4096, 4096);
+                _y = Clamp(y, -4096, 4096);
+                _width = LegacyUiMetrics.DefaultWidth;
+                _height = LegacyUiMetrics.DefaultHeight;
+                ClampToRecoverableScreenLocked();
+                if (save)
+                {
+                    SaveWindowLocked();
+                }
+            }
+        }
+
         public static void SaveWindow()
         {
             EnsureLoaded();
@@ -155,6 +172,34 @@ namespace JueMingZ.UI.Legacy
             _y = Clamp(_y, 0, CalculateMaxBasePosition(screenHeight, _height, scale == null ? 1d : scale.EffectiveScaleY));
         }
 
+        private static void ClampToRecoverableScreenLocked()
+        {
+            int screenWidth;
+            int screenHeight;
+            ReadScreenSize(out screenWidth, out screenHeight);
+            var scale = LegacyMainUiScale.ResolveForScreen(DiagnosticMouseStateReader.Read(), screenWidth, screenHeight);
+            var effectiveScaleX = scale == null ? 1d : scale.EffectiveScaleX;
+            var effectiveScaleY = scale == null ? 1d : scale.EffectiveScaleY;
+            _width = LegacyUiMetrics.DefaultWidth;
+            _height = LegacyUiMetrics.DefaultHeight;
+            _x = Clamp(
+                _x,
+                0,
+                CalculateMaxRecoverableBasePosition(
+                    screenWidth,
+                    _width,
+                    effectiveScaleX,
+                    LegacyUiMetrics.DragRecoverableVisibleWidth));
+            _y = Clamp(
+                _y,
+                0,
+                CalculateMaxRecoverableBasePosition(
+                    screenHeight,
+                    _height,
+                    effectiveScaleY,
+                    LegacyUiMetrics.DragRecoverableVisibleHeight));
+        }
+
         private static int CalculateMaxBasePosition(int screenSize, int baseSize, double effectiveScale)
         {
             if (screenSize <= 0 || baseSize <= 0)
@@ -169,6 +214,33 @@ namespace JueMingZ.UI.Legacy
 
             var safeSize = Math.Max(0, screenSize - 8);
             return Math.Max(0, (int)Math.Floor(safeSize / effectiveScale - baseSize));
+        }
+
+        private static int CalculateMaxRecoverableBasePosition(int screenSize, int baseSize, double effectiveScale, int visibleSize)
+        {
+            if (screenSize <= 0 || baseSize <= 0)
+            {
+                return 0;
+            }
+
+            if (effectiveScale <= 0.01d)
+            {
+                effectiveScale = 1d;
+            }
+
+            var safeSize = Math.Max(0, screenSize - 8);
+            var recoverableVisibleSize = Clamp(visibleSize, 1, Math.Max(1, baseSize));
+            return Math.Max(0, (int)Math.Floor(safeSize / effectiveScale - recoverableVisibleSize));
+        }
+
+        internal static int CalculateMaxBasePositionForTesting(int screenSize, int baseSize, double effectiveScale)
+        {
+            return CalculateMaxBasePosition(screenSize, baseSize, effectiveScale);
+        }
+
+        internal static int CalculateMaxRecoverableBasePositionForTesting(int screenSize, int baseSize, double effectiveScale, int visibleSize)
+        {
+            return CalculateMaxRecoverableBasePosition(screenSize, baseSize, effectiveScale, visibleSize);
         }
 
         private static void SaveWindowLocked()

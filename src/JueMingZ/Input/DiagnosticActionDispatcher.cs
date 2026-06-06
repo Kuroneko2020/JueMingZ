@@ -445,6 +445,7 @@ namespace JueMingZ.Input
                 return;
             }
 
+            // ACTION_QUEUE_DIRECT_ENQUEUE_EXCEPTION: diagnostic button path; owner=diagnostics; migrate_after=02 no-op unless diagnostics admission testing is requested.
             var requestId = queue.Enqueue(request);
             MarkSource(source);
             Logger.Info("DiagnosticActionDispatcher", GetSourceLabel(source) + ": enqueued " + request.Kind + ".");

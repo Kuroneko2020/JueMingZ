@@ -134,15 +134,23 @@ namespace JueMingZ.UI.Legacy
 
         private static double ResolveMaxEffectiveScale(int screenWidth, int screenHeight)
         {
-            var maxScale = 1d;
+            var maxScale = double.PositiveInfinity;
+            var hasScreenBound = false;
             if (screenWidth > 0)
             {
                 maxScale = Math.Min(maxScale, ResolveScreenFitScale(screenWidth, LegacyUiMetrics.MaxVisualWidth));
+                hasScreenBound = true;
             }
 
             if (screenHeight > 0)
             {
                 maxScale = Math.Min(maxScale, ResolveScreenFitScale(screenHeight, LegacyUiMetrics.MaxVisualHeight));
+                hasScreenBound = true;
+            }
+
+            if (!hasScreenBound || double.IsNaN(maxScale) || double.IsInfinity(maxScale))
+            {
+                maxScale = 1d;
             }
 
             return Math.Max(LegacyUiMetrics.MinimumEffectiveScale, maxScale);

@@ -188,15 +188,23 @@ namespace JueMingZ.Automation.Fishing
             {
                 Kind = InputActionKind.Chest,
                 Priority = InputActionPriority.Low,
+                DuplicatePolicy = InputActionDuplicatePolicy.CoalescePending,
                 SourceFeatureId = FeatureIds.FishingAutoStoreQuestFish,
                 Description = "Fishing auto store quest fish",
+                QueueTimeout = TimeSpan.FromSeconds(2),
+                AdmissionKey = FeatureIds.FishingAutoStoreQuestFish + "|quest",
                 Timeout = TimeSpan.FromSeconds(3)
             };
             request.Metadata[ActionMetadataKeys.Scenario] = ScenarioNames.FishingAutoStoreQuestFish;
             request.Metadata[ActionMetadataKeys.SourceKind] = "Automation";
             request.Metadata["QuestFishItemId"] = questFishId.ToString(CultureInfo.InvariantCulture);
             request.Metadata["QuestFishInventorySlots"] = string.Join(",", slots);
-            queue.Enqueue(request);
+            InputActionAdmissionResult admission;
+            if (!queue.TryEnqueue(request, out admission))
+            {
+                RecordStoreDiagnostics(FishingAutoStoreModes.QuestFish, string.Empty, questFishId.ToString(CultureInfo.InvariantCulture), "quest fish storage admission denied: " + (admission == null ? "unknown" : admission.Reason));
+                return;
+            }
 
             lock (SyncRoot)
             {
@@ -267,8 +275,11 @@ namespace JueMingZ.Automation.Fishing
             {
                 Kind = InputActionKind.Chest,
                 Priority = InputActionPriority.Low,
+                DuplicatePolicy = InputActionDuplicatePolicy.CoalescePending,
                 SourceFeatureId = FeatureIds.FishingAutoStoreQuestFish,
                 Description = "Fishing auto store caught items",
+                QueueTimeout = TimeSpan.FromSeconds(2),
+                AdmissionKey = FeatureIds.FishingAutoStoreQuestFish + "|all",
                 Timeout = TimeSpan.FromSeconds(3)
             };
             request.Metadata[ActionMetadataKeys.Scenario] = ScenarioNames.FishingAutoStoreAll;
@@ -279,7 +290,13 @@ namespace JueMingZ.Automation.Fishing
             request.Metadata["InventorySignature"] = signature;
             request.Metadata["MovableSlotCount"] = slotCount.ToString(CultureInfo.InvariantCulture);
             request.Metadata["MovableStackTotal"] = stackTotal.ToString(CultureInfo.InvariantCulture);
-            queue.Enqueue(request);
+            InputActionAdmissionResult admission;
+            if (!queue.TryEnqueue(request, out admission))
+            {
+                RecordLast(caughtItemIds.Count == 0 ? 0 : caughtItemIds[caughtItemIds.Count - 1], slots.Count);
+                RecordStoreDiagnostics(FishingAutoStoreModes.All, signature, pendingIds, "all caught storage admission denied: " + (admission == null ? "unknown" : admission.Reason));
+                return;
+            }
 
             lock (SyncRoot)
             {

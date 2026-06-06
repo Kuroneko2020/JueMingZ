@@ -151,8 +151,11 @@ namespace JueMingZ.Automation.Combat
                 {
                     Kind = InputActionKind.RawInput,
                     Priority = InputActionPriority.Normal,
+                    DuplicatePolicy = InputActionDuplicatePolicy.CoalescePending,
                     SourceFeatureId = FeatureId,
                     Description = "Combat magic string clicker pulses selected yoyo use input",
+                    QueueTimeout = TimeSpan.FromMilliseconds(250),
+                    AdmissionKey = FeatureId + "|selected",
                     Timeout = TimeSpan.FromMinutes(15),
                     IsExclusive = true
                 };
@@ -169,7 +172,13 @@ namespace JueMingZ.Automation.Combat
                 request.Metadata["MagicStringUseTime"] = profile.UseTime.ToString(CultureInfo.InvariantCulture);
                 request.Metadata["MagicStringPulseIntervalTicks"] = PulseIntervalTicks.ToString(CultureInfo.InvariantCulture);
 
-                queue.Enqueue(request);
+                InputActionAdmissionResult admission;
+                if (!queue.TryEnqueue(request, out admission))
+                {
+                    RecordDecision("skipped", "admissionDenied:" + (admission == null ? "unknown" : admission.Reason), tick, false);
+                    return;
+                }
+
                 RecordDecision("submitted", string.Empty, tick, true);
             }
             catch (Exception error)

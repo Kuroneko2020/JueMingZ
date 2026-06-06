@@ -173,7 +173,14 @@ namespace JueMingZ.Automation.NpcServices
                 return;
             }
 
-            queue.Enqueue(BuildQuickReforgeRequest(prefixes, currentAffix));
+            var request = BuildQuickReforgeRequest(prefixes, currentAffix);
+            InputActionAdmissionResult admission;
+            if (!queue.TryEnqueue(request, out admission))
+            {
+                RecordDecision("quick reforge admission denied: " + (admission == null ? "unknown" : admission.Reason), JoinPrefixes(prefixes), string.Empty);
+                return;
+            }
+
             RecordDecision("submitted quick reforge request", JoinPrefixes(prefixes), string.Empty);
         }
 
@@ -184,6 +191,7 @@ namespace JueMingZ.Automation.NpcServices
             {
                 Kind = InputActionKind.Reforge,
                 Priority = InputActionPriority.High,
+                DuplicatePolicy = InputActionDuplicatePolicy.CoalescePending,
                 SourceFeatureId = FeatureIds.NpcAutoReforge,
                 Description = "Quick reforge until target prefix is matched",
                 QueueTimeout = TimeSpan.FromMilliseconds(300),

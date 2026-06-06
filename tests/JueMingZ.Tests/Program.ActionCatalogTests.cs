@@ -376,6 +376,169 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void AutoStackUnsafeUiRetainsPendingTransaction()
+        {
+            AutoStackService.ResetForTesting();
+            try
+            {
+                var settings = AppSettings.CreateDefault();
+                settings.InventoryAutoStackEnabled = true;
+                var runtimeSettings = RuntimeSettingsSnapshot.FromSettings(settings);
+                var queue = new InputActionQueue();
+                var runtime = new RuntimeState { UpdateCount = 0 };
+
+                AutoStackService.Tick(
+                    queue,
+                    BuildAutoStackSnapshot(false, false, 2),
+                    runtime,
+                    runtimeSettings);
+
+                runtime.UpdateCount = 5;
+                AutoStackService.Tick(
+                    queue,
+                    BuildAutoStackSnapshot(false, true, 3),
+                    runtime,
+                    runtimeSettings);
+
+                var diagnostics = AutoStackService.GetDiagnostics();
+                if (diagnostics == null ||
+                    diagnostics.LastDecision.IndexOf("unsafe UI open", StringComparison.OrdinalIgnoreCase) < 0 ||
+                    !string.Equals(diagnostics.LastDetectedItemIds, "12", StringComparison.Ordinal) ||
+                    !string.Equals(diagnostics.LastPendingItemIds, "12", StringComparison.Ordinal) ||
+                    diagnostics.PendingSinceTick != 5 ||
+                    diagnostics.LastPendingChangeTick != 5 ||
+                    !string.Equals(diagnostics.PendingTransactionState, "Detected", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected unsafe UI auto stack detection to retain a pending transaction.");
+                }
+            }
+            finally
+            {
+                AutoStackService.ResetForTesting();
+            }
+        }
+
+        private static void AutoStackSuccessfulActionResultClearsPendingTransaction()
+        {
+            AutoStackService.ResetForTesting();
+            try
+            {
+                var settings = AppSettings.CreateDefault();
+                settings.InventoryAutoStackEnabled = true;
+                var runtimeSettings = RuntimeSettingsSnapshot.FromSettings(settings);
+                var executors = new Dictionary<InputActionKind, IInputActionExecutor>();
+                executors[InputActionKind.Chest] = new TerminalFakeExecutor(InputActionKind.Chest, InputActionStatus.Succeeded, "auto stack moved items");
+                var queue = new InputActionQueue(executors);
+                var runtime = new RuntimeState { UpdateCount = 0 };
+                var snapshot = BuildAutoStackSnapshot(false, false, 2);
+
+                AutoStackService.Tick(queue, snapshot, runtime, runtimeSettings);
+
+                runtime.UpdateCount = 5;
+                snapshot = BuildAutoStackSnapshot(false, false, 3);
+                AutoStackService.Tick(queue, snapshot, runtime, runtimeSettings);
+
+                var submitted = AutoStackService.GetDiagnostics();
+                if (submitted == null ||
+                    string.IsNullOrWhiteSpace(submitted.LastSubmitRequestId) ||
+                    !string.Equals(submitted.LastPendingItemIds, "12", StringComparison.Ordinal) ||
+                    !string.Equals(submitted.PendingTransactionState, "Admitted", StringComparison.Ordinal) ||
+                    queue.GetSnapshot().PendingCount != 1)
+                {
+                    throw new InvalidOperationException("Expected auto stack to submit without clearing pending transaction.");
+                }
+
+                queue.Update(snapshot);
+                runtime.UpdateCount = 10;
+                AutoStackService.Tick(queue, snapshot, runtime, runtimeSettings);
+
+                var completed = AutoStackService.GetDiagnostics();
+                if (completed == null ||
+                    !string.IsNullOrWhiteSpace(completed.LastPendingItemIds) ||
+                    !string.Equals(completed.PendingTransactionState, "VerifiedMoved", StringComparison.Ordinal) ||
+                    completed.LastPendingClearReason.IndexOf("verified", StringComparison.OrdinalIgnoreCase) < 0 ||
+                    completed.LastResult.IndexOf("Succeeded", StringComparison.OrdinalIgnoreCase) < 0 ||
+                    AutoStackService.HasPendingAutomationWork())
+                {
+                    throw new InvalidOperationException("Expected successful auto stack result to clear pending transaction.");
+                }
+            }
+            finally
+            {
+                AutoStackService.ResetForTesting();
+            }
+        }
+
+        private static void AutoStackUnverifiedActionResultKeepsRetryPending()
+        {
+            AutoStackService.ResetForTesting();
+            try
+            {
+                var settings = AppSettings.CreateDefault();
+                settings.InventoryAutoStackEnabled = true;
+                var runtimeSettings = RuntimeSettingsSnapshot.FromSettings(settings);
+                var executors = new Dictionary<InputActionKind, IInputActionExecutor>();
+                executors[InputActionKind.Chest] = new TerminalFakeExecutor(InputActionKind.Chest, InputActionStatus.AttemptedButUnverified, "quick stack invoked but not verified");
+                var queue = new InputActionQueue(executors);
+                var runtime = new RuntimeState { UpdateCount = 0 };
+                var snapshot = BuildAutoStackSnapshot(false, false, 2);
+
+                AutoStackService.Tick(queue, snapshot, runtime, runtimeSettings);
+
+                runtime.UpdateCount = 5;
+                snapshot = BuildAutoStackSnapshot(false, false, 3);
+                AutoStackService.Tick(queue, snapshot, runtime, runtimeSettings);
+                queue.Update(snapshot);
+
+                runtime.UpdateCount = 10;
+                AutoStackService.Tick(queue, snapshot, runtime, runtimeSettings);
+
+                var diagnostics = AutoStackService.GetDiagnostics();
+                if (diagnostics == null ||
+                    !string.Equals(diagnostics.LastPendingItemIds, "12", StringComparison.Ordinal) ||
+                    !string.Equals(diagnostics.PendingTransactionState, "RetryPending", StringComparison.Ordinal) ||
+                    diagnostics.PendingRetryCount != 1 ||
+                    diagnostics.LastUnverifiedReason.IndexOf("not verified", StringComparison.OrdinalIgnoreCase) < 0 ||
+                    diagnostics.LastResult.IndexOf("AttemptedButUnverified", StringComparison.OrdinalIgnoreCase) < 0 ||
+                    !AutoStackService.HasPendingAutomationWork())
+                {
+                    throw new InvalidOperationException("Expected unverified auto stack result to keep a retry-pending transaction.");
+                }
+
+                runtime.UpdateCount = 11;
+                AutoStackService.Tick(queue, snapshot, runtime, runtimeSettings);
+                var waiting = AutoStackService.GetDiagnostics();
+                if (waiting == null || waiting.LastDecision.IndexOf("retry backoff", StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    throw new InvalidOperationException("Expected auto stack retry to respect backoff instead of immediately resubmitting.");
+                }
+            }
+            finally
+            {
+                AutoStackService.ResetForTesting();
+            }
+        }
+
+        private static GameStateSnapshot BuildAutoStackSnapshot(bool playerInventoryOpen, bool chestOpen, int copperOreStack)
+        {
+            var snapshot = new GameStateSnapshot
+            {
+                IsInWorld = true,
+                Player = new PlayerStateSnapshot
+                {
+                    Exists = true,
+                    Active = true
+                }
+            };
+            snapshot.Ui.PlayerInventoryOpen = playerInventoryOpen;
+            snapshot.Ui.ChestOpen = chestOpen;
+            snapshot.Inventory.Items = new List<InventoryItemSnapshot>
+            {
+                BuildInventoryItem(1, 12, "铜矿", copperOreStack, 0, false)
+            };
+            return snapshot;
+        }
+
         private static void AutoSellDefaultListIsConservativeFishingJunk()
         {
             var normalized = AutoSellService.NormalizeAutoSellItemIdsForTesting(null);
@@ -1413,17 +1576,17 @@ namespace JueMingZ.Tests
                 throw new InvalidOperationException("Standard bug net reach should include critters intersecting the vanilla-like swing envelope.");
             }
 
-            if (AutoCaptureCritterService.IsWithinCaptureRangeForTesting(100f, 100f, 154f, 108f, 16, 16, 1))
+            if (!AutoCaptureCritterService.IsWithinCaptureRangeForTesting(100f, 100f, 148f, 108f, 16, 16, 1))
             {
-                throw new InvalidOperationException("Auto capture critter must not swing before the bug net envelope can actually reach the critter.");
+                throw new InvalidOperationException("Standard bug net reach should include critters within the one-tile trigger padding.");
             }
 
-            if (AutoCaptureCritterService.IsWithinCaptureRangeForTesting(100f, 100f, 148f, 108f, 16, 16, 1))
+            if (AutoCaptureCritterService.IsWithinCaptureRangeForTesting(100f, 100f, 170f, 108f, 16, 16, 1))
             {
-                throw new InvalidOperationException("Standard bug net envelope should stay tighter than the previous radial pre-check.");
+                throw new InvalidOperationException("Auto capture critter must not swing beyond the one-tile trigger padding.");
             }
 
-            if (!AutoCaptureCritterService.IsWithinCaptureRangeForTesting(100f, 100f, 148f, 108f, 16, 16, 2))
+            if (!AutoCaptureCritterService.IsWithinCaptureRangeForTesting(100f, 100f, 164f, 108f, 16, 16, 2))
             {
                 throw new InvalidOperationException("Golden bug net reach should extend slightly beyond the standard bug net envelope.");
             }
@@ -2180,6 +2343,108 @@ namespace JueMingZ.Tests
             AssertContains(json, "\"WorldGenDebugLastAttemptUtc\": \"2026-05-25T00:00:00.0000000Z\"");
         }
 
+        private static void DiagnosticSnapshotWritesActionQueueAdmissionState()
+        {
+            var snapshot = new DiagnosticSnapshot
+            {
+                ActionQueueLastAdmissionStatus = "Denied",
+                ActionQueueLastAdmissionDecision = "DeniedBridgeBusy",
+                ActionQueueLastAdmissionReason = "bridgeBusy",
+                ActionQueueLastAdmissionKind = "ItemUse",
+                ActionQueueLastAdmissionSource = "test.source",
+                ActionQueueLastAdmissionScenario = "Test.Scenario",
+                ActionQueueLastAdmissionKey = "test-key",
+                ActionQueueLastAdmissionRequiredChannels = "UseItem|BridgeItemUse",
+                ActionQueueLastAdmissionBlockingChannels = "UseItem",
+                ActionQueueLastAdmissionConflictChannels = "UseItem|InventorySlot",
+                ActionQueueLastAdmissionPendingConflictSummary = "pending:UseItem",
+                ActionQueueLastAdmissionRunningConflictSummary = "running:Chest",
+                ActionQueueLastAdmissionBridgeBusySummary = "ItemUseBridge:request",
+                ActionQueueLastAdmissionOwnerSummary = "owner:UseItem",
+                ActionQueueLastAdmissionSupersededRequestId = "superseded-request",
+                ActionQueueLastAdmissionCoalescedRequestId = "coalesced-request",
+                ActionQueueSupersededPendingCount = 2,
+                ActionQueueCoalescedPendingCount = 4,
+                SchedulerLastSelectedRequest = "UseHotbarItem:inventory.quick_item_hotkeys:quick-hotkey",
+                SchedulerLastSupersededRequest = "RawInput:automation.auto_harvest:automation.auto_harvest.harvest.sustained",
+                SchedulerLastFairnessBucket = "P2:UserExplicitCommand",
+                WorldAutomationLastWinner = "AutoHarvest",
+                WorldAutomationFairnessDebt = "autoCapture=1; autoHarvest=0",
+                WorldAutomationFairnessDecisionUtc = new DateTime(2026, 6, 6, 6, 7, 8, DateTimeKind.Utc),
+                BackgroundRequestCoalescedCount = 4,
+                ExpiredPendingDroppedCount = 5,
+                ActionQueueCleanupLeaseCount = 1,
+                ActionQueueCleanupLeaseChannels = "UseItem|HotbarSelection",
+                ActionQueueLastCleanupOwner = "UseHotbarItem:inventory.quick_item_hotkeys:test-key",
+                ActionQueueLastCleanupReason = "AttemptedButUnverified:restore failed",
+                ActionQueueDirectEnqueueCount = 3,
+                ActionQueueLastDirectEnqueueKind = "Chest",
+                ActionQueueLastDirectEnqueueSource = "inventory.auto_stack",
+                ActionQueueLastDirectEnqueueScenario = ScenarioNames.InventoryAutoStack,
+                ActionQueueLastDirectEnqueueAdmissionKey = FeatureIds.InventoryAutoStack,
+                ActionQueueLastDirectEnqueueRequiredChannels = "InventorySlot|ChestInteraction"
+            };
+
+            var json = InvokeDiagnosticSnapshotJson(snapshot);
+
+            AssertContains(json, "\"ActionQueueLastAdmissionKind\": \"ItemUse\"");
+            AssertContains(json, "\"ActionQueueLastAdmissionDecision\": \"DeniedBridgeBusy\"");
+            AssertContains(json, "\"ActionQueueLastAdmissionSource\": \"test.source\"");
+            AssertContains(json, "\"ActionQueueLastAdmissionScenario\": \"Test.Scenario\"");
+            AssertContains(json, "\"ActionQueueLastAdmissionKey\": \"test-key\"");
+            AssertContains(json, "\"ActionQueueLastAdmissionRequiredChannels\": \"UseItem|BridgeItemUse\"");
+            AssertContains(json, "\"ActionQueueLastAdmissionBlockingChannels\": \"UseItem\"");
+            AssertContains(json, "\"ActionQueueLastAdmissionConflictChannels\": \"UseItem|InventorySlot\"");
+            AssertContains(json, "\"ActionQueueLastAdmissionPendingConflictSummary\": \"pending:UseItem\"");
+            AssertContains(json, "\"ActionQueueLastAdmissionRunningConflictSummary\": \"running:Chest\"");
+            AssertContains(json, "\"ActionQueueLastAdmissionBridgeBusySummary\": \"ItemUseBridge:request\"");
+            AssertContains(json, "\"ActionQueueLastAdmissionOwnerSummary\": \"owner:UseItem\"");
+            AssertContains(json, "\"ActionQueueLastAdmissionSupersededRequestId\": \"superseded-request\"");
+            AssertContains(json, "\"ActionQueueLastAdmissionCoalescedRequestId\": \"coalesced-request\"");
+            AssertContains(json, "\"ActionQueueSupersededPendingCount\": 2");
+            AssertContains(json, "\"ActionQueueCoalescedPendingCount\": 4");
+            AssertContains(json, "\"SchedulerLastSelectedRequest\": \"UseHotbarItem:inventory.quick_item_hotkeys:quick-hotkey\"");
+            AssertContains(json, "\"SchedulerLastSupersededRequest\": \"RawInput:automation.auto_harvest:automation.auto_harvest.harvest.sustained\"");
+            AssertContains(json, "\"SchedulerLastFairnessBucket\": \"P2:UserExplicitCommand\"");
+            AssertContains(json, "\"WorldAutomationLastWinner\": \"AutoHarvest\"");
+            AssertContains(json, "\"WorldAutomationFairnessDebt\": \"autoCapture=1; autoHarvest=0\"");
+            AssertContains(json, "\"WorldAutomationFairnessDecisionUtc\": \"2026-06-06T06:07:08.0000000Z\"");
+            AssertContains(json, "\"BackgroundRequestCoalescedCount\": 4");
+            AssertContains(json, "\"ExpiredPendingDroppedCount\": 5");
+            AssertContains(json, "\"ActionQueueCleanupLeaseCount\": 1");
+            AssertContains(json, "\"ActionQueueCleanupLeaseChannels\": \"UseItem|HotbarSelection\"");
+            AssertContains(json, "\"ActionQueueLastCleanupOwner\": \"UseHotbarItem:inventory.quick_item_hotkeys:test-key\"");
+            AssertContains(json, "\"ActionQueueLastCleanupReason\": \"AttemptedButUnverified:restore failed\"");
+            AssertContains(json, "\"ActionQueueDirectEnqueueCount\": 3");
+            AssertContains(json, "\"ActionQueueLastDirectEnqueueKind\": \"Chest\"");
+            AssertContains(json, "\"ActionQueueLastDirectEnqueueSource\": \"inventory.auto_stack\"");
+            AssertContains(json, "\"ActionQueueLastDirectEnqueueScenario\": \"Inventory.AutoStack\"");
+            AssertContains(json, "\"ActionQueueLastDirectEnqueueAdmissionKey\": \"inventory.auto_stack\"");
+            AssertContains(json, "\"ActionQueueLastDirectEnqueueRequiredChannels\": \"InventorySlot|ChestInteraction\"");
+        }
+
+        private static void DiagnosticSnapshotWritesItemCheckWriterState()
+        {
+            var snapshot = new DiagnosticSnapshot
+            {
+                ItemCheckWriterOwner = "ItemUseBridge",
+                ItemCheckWriterOwnerRequestId = "writer-request",
+                ItemCheckWriterPhase = "press",
+                ItemCheckWriterDecisionReason = "bridgePendingAtStart",
+                ItemCheckWriterBlockedCandidates = "CombatPerfectRevolver:blockedByItemUseBridge",
+                ItemCheckWriterDecisionUtc = new DateTime(2026, 6, 6, 5, 6, 7, DateTimeKind.Utc)
+            };
+
+            var json = InvokeDiagnosticSnapshotJson(snapshot);
+
+            AssertContains(json, "\"ItemCheckWriterOwner\": \"ItemUseBridge\"");
+            AssertContains(json, "\"ItemCheckWriterOwnerRequestId\": \"writer-request\"");
+            AssertContains(json, "\"ItemCheckWriterPhase\": \"press\"");
+            AssertContains(json, "\"ItemCheckWriterDecisionReason\": \"bridgePendingAtStart\"");
+            AssertContains(json, "\"ItemCheckWriterBlockedCandidates\": \"CombatPerfectRevolver:blockedByItemUseBridge\"");
+            AssertContains(json, "\"ItemCheckWriterDecisionUtc\": \"2026-06-06T05:06:07.0000000Z\"");
+        }
+
         private static void DiagnosticSnapshotWritesAutoStackState()
         {
             var snapshot = new DiagnosticSnapshot
@@ -2187,7 +2452,19 @@ namespace JueMingZ.Tests
                 AutoStackLastDecision = "waiting for inventory-open auto stack settle",
                 AutoStackLastDecisionUtc = new DateTime(2026, 5, 26, 2, 3, 4, DateTimeKind.Utc),
                 AutoStackLastInventorySignature = "3:12x2",
-                AutoStackLastPendingItemIds = "12"
+                AutoStackLastPendingItemIds = "12",
+                AutoStackLastDetectedItemIds = "12,99",
+                AutoStackPendingSinceTick = 120,
+                AutoStackLastPendingChangeTick = 124,
+                AutoStackLastPendingClearReason = "submitted auto stack request",
+                AutoStackPendingTransactionState = "RetryPending",
+                AutoStackPendingRetryCount = 1,
+                AutoStackLastSubmitRequestId = "request-456",
+                AutoStackLastResult = "AttemptedButUnverified:AttemptedButUnverified:quick stack invoked",
+                AutoStackLastUnverifiedReason = "quick stack invoked",
+                AutoStackInventoryTransactionSlots = "3,11",
+                AutoStackInventoryTransactionBlockingReason = "quick stack invoked",
+                AutoStackActionResultDeliveryMode = "RequestIdLookup"
             };
 
             var json = InvokeDiagnosticSnapshotJson(snapshot);
@@ -2196,6 +2473,18 @@ namespace JueMingZ.Tests
             AssertContains(json, "\"AutoStackLastDecisionUtc\": \"2026-05-26T02:03:04.0000000Z\"");
             AssertContains(json, "\"AutoStackLastInventorySignature\": \"3:12x2\"");
             AssertContains(json, "\"AutoStackLastPendingItemIds\": \"12\"");
+            AssertContains(json, "\"AutoStackLastDetectedItemIds\": \"12,99\"");
+            AssertContains(json, "\"AutoStackPendingSinceTick\": 120");
+            AssertContains(json, "\"AutoStackLastPendingChangeTick\": 124");
+            AssertContains(json, "\"AutoStackLastPendingClearReason\": \"submitted auto stack request\"");
+            AssertContains(json, "\"AutoStackPendingTransactionState\": \"RetryPending\"");
+            AssertContains(json, "\"AutoStackPendingRetryCount\": 1");
+            AssertContains(json, "\"AutoStackLastSubmitRequestId\": \"request-456\"");
+            AssertContains(json, "\"AutoStackLastResult\": \"AttemptedButUnverified:AttemptedButUnverified:quick stack invoked\"");
+            AssertContains(json, "\"AutoStackLastUnverifiedReason\": \"quick stack invoked\"");
+            AssertContains(json, "\"AutoStackInventoryTransactionSlots\": \"3,11\"");
+            AssertContains(json, "\"AutoStackInventoryTransactionBlockingReason\": \"quick stack invoked\"");
+            AssertContains(json, "\"AutoStackActionResultDeliveryMode\": \"RequestIdLookup\"");
         }
 
         private static void DiagnosticSnapshotWritesAutoDepositCoinsState()
@@ -2324,6 +2613,48 @@ namespace JueMingZ.Tests
             AssertContains(json, "\"CombatItemCheckAutoClickerSkippedCount\": 5");
         }
 
+        private static void DiagnosticSnapshotWritesCombatFlailComboState()
+        {
+            var snapshot = new DiagnosticSnapshot
+            {
+                CombatFlailComboEnabled = true,
+                CombatFlailComboRightHeld = true,
+                CombatFlailComboEligible = true,
+                CombatFlailComboLastDecision = "scopedRelease",
+                CombatFlailComboLastReason = "recallRelease",
+                CombatFlailComboLastDecisionUtc = new DateTime(2026, 6, 5, 3, 4, 5, DateTimeKind.Utc),
+                CombatFlailComboItemType = 5526,
+                CombatFlailComboProjectileType = 1058,
+                CombatFlailComboProjectileAi0 = 1d,
+                CombatFlailComboHitDetected = true,
+                CombatFlailComboCollisionDetected = false,
+                CombatFlailComboVanillaRightClickBlocked = false,
+                CombatFlailComboUiBlocked = false,
+                CombatFlailComboScopedPress = false,
+                CombatFlailComboScopedRelease = true,
+                CombatFlailComboRestoreOk = true,
+                CombatFlailComboAppliedCount = 4,
+                CombatFlailComboSkippedCount = 7
+            };
+
+            var json = InvokeDiagnosticSnapshotJson(snapshot);
+
+            AssertContains(json, "\"CombatFlailComboEnabled\": true");
+            AssertContains(json, "\"CombatFlailComboRightHeld\": true");
+            AssertContains(json, "\"CombatFlailComboEligible\": true");
+            AssertContains(json, "\"CombatFlailComboLastDecision\": \"scopedRelease\"");
+            AssertContains(json, "\"CombatFlailComboLastReason\": \"recallRelease\"");
+            AssertContains(json, "\"CombatFlailComboLastDecisionUtc\": \"2026-06-05T03:04:05.0000000Z\"");
+            AssertContains(json, "\"CombatFlailComboItemType\": 5526");
+            AssertContains(json, "\"CombatFlailComboProjectileType\": 1058");
+            AssertContains(json, "\"CombatFlailComboProjectileAi0\": 1");
+            AssertContains(json, "\"CombatFlailComboHitDetected\": true");
+            AssertContains(json, "\"CombatFlailComboScopedRelease\": true");
+            AssertContains(json, "\"CombatFlailComboRestoreOk\": true");
+            AssertContains(json, "\"CombatFlailComboAppliedCount\": 4");
+            AssertContains(json, "\"CombatFlailComboSkippedCount\": 7");
+        }
+
         private static void DiagnosticSnapshotWritesFishingIdlePipelineState()
         {
             var snapshot = new DiagnosticSnapshot
@@ -2440,6 +2771,47 @@ namespace JueMingZ.Tests
 
             AssertContains(reason, "runtimeUpdate");
             AssertContains(reason, "informationDraw");
+        }
+
+        private static void PerformanceOperationRecorderUsesScenarioThresholds()
+        {
+            if (PerformanceHitchRecorder.ShouldRecordOperationFast(
+                PerformanceHitchRecorder.ActionQueueAdmissionThresholdMs - 0.001d,
+                PerformanceHitchRecorder.ActionQueueAdmissionThresholdMs))
+            {
+                throw new InvalidOperationException("Below-threshold action queue admission must not produce an operation event.");
+            }
+
+            if (!PerformanceHitchRecorder.ShouldRecordOperationFast(
+                PerformanceHitchRecorder.ItemCheckWriterResolveThresholdMs,
+                PerformanceHitchRecorder.ItemCheckWriterResolveThresholdMs))
+            {
+                throw new InvalidOperationException("ItemCheck writer resolve threshold must produce an operation event.");
+            }
+
+            RuntimePerformanceDiagnostics.ResetForTesting();
+            RuntimePerformanceDiagnostics.RecordOperation(
+                new PerformanceOperationSample
+                {
+                    UtcNow = new DateTime(2026, 6, 6, 8, 9, 10, DateTimeKind.Utc),
+                    Scenario = "Performance.InventoryTransaction.Verify",
+                    ElapsedMs = 12.5d,
+                    ThresholdMs = PerformanceHitchRecorder.InventoryTransactionVerifyThresholdMs,
+                    Reason = "result:AttemptedButUnverified",
+                    OwnerSummary = "nearby container unavailable"
+                },
+                "diagnostics/performance-events-test.jsonl");
+
+            if (RuntimePerformanceDiagnostics.PerformanceOperationEventCount != 1 ||
+                !string.Equals(RuntimePerformanceDiagnostics.LastPerformanceOperationScenario, "Performance.InventoryTransaction.Verify", StringComparison.Ordinal) ||
+                Math.Abs(RuntimePerformanceDiagnostics.LastPerformanceOperationElapsedMs - 12.5d) > 0.001d ||
+                !string.Equals(RuntimePerformanceDiagnostics.LastPerformanceOperationReason, "result:AttemptedButUnverified", StringComparison.Ordinal) ||
+                !string.Equals(RuntimePerformanceDiagnostics.LastPerformanceOperationOwnerSummary, "nearby container unavailable", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Runtime performance diagnostics must retain the latest slow operation summary.");
+            }
+
+            RuntimePerformanceDiagnostics.ResetForTesting();
         }
 
         private static void GameStateReadOptionsMapCoinAutomationToCoinsProfile()
@@ -3045,7 +3417,14 @@ namespace JueMingZ.Tests
                 LastPerformanceHitchInputActionUpdateMs = 0.5d,
                 LastPerformanceHitchInformationDrawMs = 3.25d,
                 LastPerformanceHitchSlowestStageName = "game-state-read",
-                LastPerformanceHitchSlowestStageMs = 11.75d
+                LastPerformanceHitchSlowestStageMs = 11.75d,
+                PerformanceOperationEventCount = 2,
+                LastPerformanceOperationScenario = "Performance.ItemCheckWriter.Resolve",
+                LastPerformanceOperationUtc = new DateTime(2026, 6, 6, 8, 9, 10, DateTimeKind.Utc),
+                LastPerformanceOperationElapsedMs = 10.5d,
+                LastPerformanceOperationThresholdMs = 10d,
+                LastPerformanceOperationReason = "worldAutomationFairness:autoHarvest",
+                LastPerformanceOperationOwnerSummary = "AutoHarvestSustainedUse"
             };
 
             var json = InvokeDiagnosticSnapshotJson(snapshot);
@@ -3117,6 +3496,13 @@ namespace JueMingZ.Tests
             AssertContains(json, "\"LastPerformanceHitchReason\": \"updateGap+gameStateRead\"");
             AssertContains(json, "\"LastPerformanceHitchUpdateGapMs\": 91.125");
             AssertContains(json, "\"LastPerformanceHitchSlowestStageName\": \"game-state-read\"");
+            AssertContains(json, "\"PerformanceOperationEventCount\": 2");
+            AssertContains(json, "\"LastPerformanceOperationScenario\": \"Performance.ItemCheckWriter.Resolve\"");
+            AssertContains(json, "\"LastPerformanceOperationUtc\": \"2026-06-06T08:09:10.0000000Z\"");
+            AssertContains(json, "\"LastPerformanceOperationElapsedMs\": 10.5");
+            AssertContains(json, "\"LastPerformanceOperationThresholdMs\": 10");
+            AssertContains(json, "\"LastPerformanceOperationReason\": \"worldAutomationFairness:autoHarvest\"");
+            AssertContains(json, "\"LastPerformanceOperationOwnerSummary\": \"AutoHarvestSustainedUse\"");
         }
 
         private static void AssertPlannedFeatureHidden(FeatureRegistry registry, string featureId)

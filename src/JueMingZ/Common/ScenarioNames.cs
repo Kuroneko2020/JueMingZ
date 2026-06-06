@@ -5,6 +5,7 @@ namespace JueMingZ.Common
         public const string CombatAutoFacing = "Combat.AutoFacing";
         public const string CombatAutoClicker = "Combat.AutoClicker";
         public const string CombatAutoClickerItemCheckInputProbe = "Combat.AutoClicker.ItemCheckInputProbe";
+        public const string CombatFlailCombo = "Combat.FlailCombo";
         public const string CombatPerfectRevolver = "Combat.PerfectRevolver";
         public const string CombatMagicStringClicker = "Combat.MagicStringClicker";
         public const string FishingAutoFishPull = "Fishing.AutoFish.Pull";

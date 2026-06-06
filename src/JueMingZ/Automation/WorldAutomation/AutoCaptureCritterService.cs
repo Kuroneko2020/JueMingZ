@@ -43,6 +43,7 @@ namespace JueMingZ.Automation.WorldAutomation
         private const int PlayerWidthPixels = 20;
         private const int DefaultCritterWidthPixels = 16;
         private const int DefaultCritterHeightPixels = 16;
+        private const int CaptureReachPaddingPixels = 16;
         private const float SustainedTargetMaxDistancePixels = 192f;
         private static readonly object SyncRoot = new object();
         private static long _lastScanTick = -CheckIntervalTicks;
@@ -293,6 +294,7 @@ namespace JueMingZ.Automation.WorldAutomation
 
             if (string.Equals(mode, AutoCaptureCritterModes.Off, StringComparison.Ordinal))
             {
+                RecordFairnessUnavailable(tick, "disabled");
                 ClearTracking("disabled");
                 return;
             }
@@ -309,12 +311,14 @@ namespace JueMingZ.Automation.WorldAutomation
 
             if (queue == null)
             {
+                RecordFairnessUnavailable(tick, "queue unavailable");
                 RecordDecision("queue unavailable", null, null);
                 return;
             }
 
             if (!CanRun(gameState))
             {
+                RecordFairnessUnavailable(tick, "player unavailable");
                 ClearTracking("player unavailable");
                 return;
             }
@@ -322,6 +326,7 @@ namespace JueMingZ.Automation.WorldAutomation
             var blockedReason = GetExecutionBlockedReason(gameState);
             if (!string.IsNullOrEmpty(blockedReason))
             {
+                RecordFairnessUnavailable(tick, blockedReason);
                 AutoCaptureCritterSustainedUseBridge.ClearDesiredTarget(blockedReason);
                 RecordDecision(blockedReason, null, null);
                 return;
@@ -331,6 +336,7 @@ namespace JueMingZ.Automation.WorldAutomation
             string bugNetMessage;
             if (!TryFindBestBugNet(gameState, mode, out bugNet, out bugNetMessage))
             {
+                RecordFairnessUnavailable(tick, bugNetMessage);
                 AutoCaptureCritterSustainedUseBridge.ClearDesiredTarget(bugNetMessage);
                 RecordDecision(bugNetMessage, null, null);
                 return;
@@ -343,6 +349,7 @@ namespace JueMingZ.Automation.WorldAutomation
             {
                 if (!TryFindActiveSustainedTarget(gameState, bugNet, out target, out targetMessage))
                 {
+                    RecordFairnessUnavailable(tick, targetMessage);
                     AutoCaptureCritterSustainedUseBridge.ClearDesiredTarget(targetMessage);
                     RecordDecision(targetMessage, bugNet, null);
                     return;
@@ -350,17 +357,30 @@ namespace JueMingZ.Automation.WorldAutomation
             }
             else if (!TryFindCaptureTarget(gameState, bugNet, out target, out targetMessage))
             {
+                RecordFairnessUnavailable(tick, targetMessage);
                 AutoCaptureCritterSustainedUseBridge.ClearDesiredTarget(targetMessage);
                 RecordDecision(targetMessage, bugNet, null);
                 return;
             }
 
-            AutoCaptureCritterSustainedUseBridge.SetDesiredTarget(BuildSustainedUseTarget(bugNet, target, gameState.Player, tick, mode));
             if (!captureInFlight && tick - _lastUseTick < UseCooldownTicks)
             {
+                AutoCaptureCritterSustainedUseBridge.SetDesiredTarget(BuildSustainedUseTarget(bugNet, target, gameState.Player, tick, mode));
                 RecordDecision("cooldown", bugNet, target);
                 return;
             }
+
+            if (WorldAutomationFairnessCoordinator.ShouldDeferRuntimeSubmission(
+                    WorldAutomationFairnessKind.AutoCaptureCritter,
+                    tick,
+                    captureInFlight))
+            {
+                AutoCaptureCritterSustainedUseBridge.ClearDesiredTarget("fairness deferred to auto harvest");
+                RecordDecision("fairness deferred to auto harvest", bugNet, target);
+                return;
+            }
+
+            AutoCaptureCritterSustainedUseBridge.SetDesiredTarget(BuildSustainedUseTarget(bugNet, target, gameState.Player, tick, mode));
 
             var fishingProtection = captureInFlight ? null : TryCreateFishingProtection();
             if (!EnsureSustainedCaptureRequest(queue, bugNet, target, fishingProtection, tick, mode))
@@ -371,6 +391,14 @@ namespace JueMingZ.Automation.WorldAutomation
             }
 
             RecordDecision(captureInFlight ? "sustained capture target refreshed" : "submitted sustained capture request", bugNet, target);
+        }
+
+        private static void RecordFairnessUnavailable(long tick, string reason)
+        {
+            WorldAutomationFairnessCoordinator.RecordCandidateUnavailable(
+                WorldAutomationFairnessKind.AutoCaptureCritter,
+                tick,
+                reason ?? string.Empty);
         }
 
         private static bool TryFindBestBugNet(GameStateSnapshot gameState, string mode, out BugNetCandidate bugNet, out string message)
@@ -1142,7 +1170,7 @@ namespace JueMingZ.Automation.WorldAutomation
             var playerCenterX = player.PositionX + PlayerWidthPixels * 0.5f;
             var direction = critter.CenterX >= playerCenterX ? 1 : -1;
             var critterRect = CreateCritterRect(critter);
-            var reachRect = BuildBugNetReachEnvelope(player.PositionX, player.PositionY, direction, profile);
+            var reachRect = InflateRect(BuildBugNetReachEnvelope(player.PositionX, player.PositionY, direction, profile), CaptureReachPaddingPixels);
             return RectIntersects(reachRect, critterRect);
         }
 
@@ -1280,6 +1308,16 @@ namespace JueMingZ.Automation.WorldAutomation
             var maxX = Math.Max(left.Right, right.Right);
             var maxY = Math.Max(left.Bottom, right.Bottom);
             return new IntRect(minX, minY, maxX - minX, maxY - minY);
+        }
+
+        private static IntRect InflateRect(IntRect rect, int padding)
+        {
+            if (padding <= 0)
+            {
+                return rect;
+            }
+
+            return new IntRect(rect.X - padding, rect.Y - padding, rect.Width + padding * 2, rect.Height + padding * 2);
         }
 
         private static bool RectIntersects(IntRect left, IntRect right)

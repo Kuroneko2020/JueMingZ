@@ -278,7 +278,13 @@ namespace JueMingZ.Automation.Movement
                         analysis,
                         "Movement safe landing uses a vanilla control input",
                         InputActionPriority.High);
-                    queue.Enqueue(activeRequest);
+                    InputActionAdmissionResult activeAdmission;
+                    if (!queue.TryEnqueue(activeRequest, out activeAdmission))
+                    {
+                        RecordDecision(true, "skipped", "admissionDenied:" + (activeAdmission == null ? "unknown" : activeAdmission.Reason), tick, queueSnapshot, analysis, false, MovementSafeLandingOptionCatalog.BuildConfigSummary(settings), string.Empty);
+                        return;
+                    }
+
                     TrackSafeLandingMountActivationRequest(activeRequest.RequestId, analysis.SelectedActionType);
                     TrackSafeLandingGravityActivationRequest(activeRequest.RequestId, analysis.SelectedActionType, analysis.GravityDirection);
                     MarkCooldown(tick, selection.SelectedEvaluation);
@@ -347,7 +353,13 @@ namespace JueMingZ.Automation.Movement
                         analysis,
                         "Movement safe landing uses vanilla quick grapple input",
                         InputActionPriority.High);
-                    queue.Enqueue(grappleRequest);
+                    InputActionAdmissionResult grappleAdmission;
+                    if (!queue.TryEnqueue(grappleRequest, out grappleAdmission))
+                    {
+                        RecordDecision(true, "skipped", "admissionDenied:" + (grappleAdmission == null ? "unknown" : grappleAdmission.Reason), tick, queueSnapshot, analysis, false, MovementSafeLandingOptionCatalog.BuildConfigSummary(settings), string.Empty);
+                        return;
+                    }
+
                     MarkCooldown(tick, selection.SelectedEvaluation);
                     MarkDescentRescueSubmitted(tick, analysis, selection.SelectedEvaluation);
                     RecordDecision(true, "submitted", string.Empty, tick, queueSnapshot, analysis, true, MovementSafeLandingOptionCatalog.BuildConfigSummary(settings), string.Empty);
@@ -388,7 +400,13 @@ namespace JueMingZ.Automation.Movement
                     var teleportRodRequest = MovementSafeLandingRequestBuilder.BuildTeleportRodRequest(
                         selection.SelectedPlan,
                         analysis);
-                    queue.Enqueue(teleportRodRequest);
+                    InputActionAdmissionResult teleportAdmission;
+                    if (!queue.TryEnqueue(teleportRodRequest, out teleportAdmission))
+                    {
+                        RecordDecision(true, "skipped", "admissionDenied:" + (teleportAdmission == null ? "unknown" : teleportAdmission.Reason), tick, queueSnapshot, analysis, false, MovementSafeLandingOptionCatalog.BuildConfigSummary(settings), string.Empty);
+                        return;
+                    }
+
                     MarkCooldown(tick, selection.SelectedEvaluation);
                     MarkDescentRescueSubmitted(tick, analysis, selection.SelectedEvaluation);
                     RecordDecision(true, "submitted", string.Empty, tick, queueSnapshot, analysis, true, MovementSafeLandingOptionCatalog.BuildConfigSummary(settings), string.Empty);
@@ -676,7 +694,14 @@ namespace JueMingZ.Automation.Movement
                 targetDirection,
                 "Movement safe landing restores gravity direction after Gravity Globe rescue");
 
-            queue.Enqueue(request);
+            InputActionAdmissionResult admission;
+            if (!queue.TryEnqueue(request, out admission))
+            {
+                RecordGravityRestoreState("restoreWaiting", "admissionDenied:" + (admission == null ? "unknown" : admission.Reason));
+                RecordDecision(true, "gravityRestorePending", "admissionDenied:" + (admission == null ? "unknown" : admission.Reason), tick, queueSnapshot, null, false, MovementSafeLandingOptionCatalog.BuildConfigSummary(settings), string.Empty);
+                return true;
+            }
+
             lock (SyncRoot)
             {
                 _safeLandingGravityRestoreRequestId = request.RequestId;
@@ -811,7 +836,13 @@ namespace JueMingZ.Automation.Movement
                 1f,
                 "Movement safe landing cancels flying mount after landing");
 
-            queue.Enqueue(request);
+            InputActionAdmissionResult admission;
+            if (!queue.TryEnqueue(request, out admission))
+            {
+                RecordDecision(true, "mountCancelPending", "admissionDenied:" + (admission == null ? "unknown" : admission.Reason), tick, queueSnapshot, null, false, MovementSafeLandingOptionCatalog.BuildConfigSummary(settings), string.Empty);
+                return true;
+            }
+
             lock (SyncRoot)
             {
                 _safeLandingMountCancelRequestId = request.RequestId;
@@ -1059,7 +1090,13 @@ namespace JueMingZ.Automation.Movement
                 records.Count,
                 activationSource);
 
-            queue.Enqueue(request);
+            InputActionAdmissionResult admission;
+            if (!queue.TryEnqueue(request, out admission))
+            {
+                RecordDecision(true, "temporaryEquipmentActive", "admissionDenied:" + (admission == null ? "unknown" : admission.Reason), tick, queueSnapshot, analysis, false, MovementSafeLandingOptionCatalog.BuildConfigSummary(settings), activationExtra);
+                return true;
+            }
+
             TrackSafeLandingGravityActivationRequest(request.RequestId, selectedActionType, analysis.GravityDirection);
             lock (SyncRoot)
             {
@@ -1104,8 +1141,14 @@ namespace JueMingZ.Automation.Movement
 
             var request = MovementSafeLandingRequestBuilder.BuildTemporaryEquipmentApplyRequest(plan, analysis);
 
+            InputActionAdmissionResult admission;
+            if (!queue.TryEnqueue(request, out admission))
+            {
+                RecordDecision(true, "skipped", "temporaryEquipmentApplyAdmissionDenied:" + (admission == null ? "unknown" : admission.Reason), tick, queueSnapshot, analysis, false, MovementSafeLandingOptionCatalog.BuildConfigSummary(settings), planMessage);
+                return;
+            }
+
             MovementSafeLandingEquipmentCompat.RegisterApplyPlan(request.RequestId, plan);
-            queue.Enqueue(request);
             lock (SyncRoot)
             {
                 _temporaryEquipmentApplyRequestId = request.RequestId;
@@ -1147,8 +1190,14 @@ namespace JueMingZ.Automation.Movement
             }
 
             var request = MovementSafeLandingRequestBuilder.BuildTemporaryEquipmentRestoreRequest(records, reason);
+            InputActionAdmissionResult admission;
+            if (!queue.TryEnqueue(request, out admission))
+            {
+                RecordTemporaryEquipmentState("restoreSkipped", "admissionDenied:" + (admission == null ? "unknown" : admission.Reason));
+                return;
+            }
+
             MovementSafeLandingEquipmentCompat.RegisterRestoreRequest(request.RequestId, records, reason);
-            queue.Enqueue(request);
             lock (SyncRoot)
             {
                 _temporaryEquipmentRestoreRequestId = request.RequestId;

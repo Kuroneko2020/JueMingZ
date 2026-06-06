@@ -19,11 +19,14 @@ namespace JueMingZ.Automation.Combat
         private const int StuckRecoveryTicks = 8;
         private const int ReleaseAimWindowTicks = 3;
         private const int CachedReleaseAimMaxAgeTicks = 120;
+        private const int FlailComboPressAimMaxAgeTicks = 20;
         private const float StationaryVelocityEpsilon = 0.001f;
         private static readonly object SyncRoot = new object();
         private static readonly int[] LastLocalNpcImmunity = new int[ImmunityCacheLength];
         private static CombatAimFlailDiagnostics _lastDiagnostics = CombatAimFlailDiagnostics.Empty();
         private static FlailCachedReleaseAim _cachedReleaseAim;
+        private static CombatAimItemCheckDecision _flailComboPressAimDecision;
+        private static long _flailComboPressAimTick;
         private static long _cooldownUntilTick;
         private static bool _physicalUseItemHeldLastTick;
         private static int _releaseAimTicksRemaining;
@@ -404,17 +407,128 @@ namespace JueMingZ.Automation.Combat
             return true;
         }
 
-        private static bool IsItemCheckReleaseDecision(CombatAimItemCheckDecision decision)
+        internal static bool TryRememberExistingItemCheckReleaseTail(CombatAimItemCheckDecision decision, string takeoverScope)
         {
-            if (decision == null || decision.WeaponProfile == null)
+            if (!IsItemCheckReleaseDecision(decision))
             {
                 return false;
             }
 
-            var projectileAiStyle = decision.BallisticSolution == null ? 0 : decision.BallisticSolution.ProjectileAiStyle;
+            return TryRememberReleaseTailFromDecision(decision, takeoverScope, "existingItemCheckRelease", false);
+        }
+
+        internal static bool TryRememberFlailComboPressAim(CombatAimItemCheckDecision decision)
+        {
+            if (!IsFlailTailSourceDecision(decision))
+            {
+                return false;
+            }
+
+            long tick;
+            TerrariaInputCompat.TryReadGameUpdateCount(out tick);
+            lock (SyncRoot)
+            {
+                _flailComboPressAimDecision = decision;
+                _flailComboPressAimTick = tick;
+            }
+
+            return true;
+        }
+
+        internal static bool TryRememberFlailComboPressReleaseTail(string takeoverScope)
+        {
+            CombatAimItemCheckDecision decision;
+            if (!TryGetRecentFlailComboPressAim(out decision))
+            {
+                return false;
+            }
+
+            return TryRememberReleaseTailFromDecision(decision, takeoverScope, "flailComboPressAim", true);
+        }
+
+        private static bool TryRememberReleaseTailFromDecision(
+            CombatAimItemCheckDecision decision,
+            string takeoverScope,
+            string blockedReason,
+            bool markCachedReleaseAim)
+        {
+            if (!IsFlailTailSourceDecision(decision))
+            {
+                return false;
+            }
+
+            var diagnostics = GetDecisionDiagnostics(decision);
+            if (diagnostics == null || !diagnostics.Eligible)
+            {
+                return false;
+            }
+
+            diagnostics.Active = true;
+            diagnostics.State = FlailControlStates.ReleaseToTarget;
+            diagnostics.AttackPulse = false;
+            diagnostics.AttackRelease = true;
+            diagnostics.AttackSuppressed = true;
+            diagnostics.AttackRestored = false;
+            diagnostics.InputMode = "controlledUseItemRelease";
+            diagnostics.InputPhase = FlailControlStates.ReleaseToTarget;
+            diagnostics.TakeoverScope = string.IsNullOrWhiteSpace(takeoverScope) ? "ItemCheck" : takeoverScope;
+            diagnostics.BlockedReason = string.IsNullOrWhiteSpace(blockedReason) ? "releaseTail" : blockedReason;
+            diagnostics.PhysicalUseItemHeld = false;
+            diagnostics.PhysicalReleasePending = true;
+            diagnostics.CachedReleaseAim = diagnostics.CachedReleaseAim ||
+                                           markCachedReleaseAim ||
+                                           string.Equals(decision.ReleaseHoldValidationReason, "cachedFlailReleaseAim", StringComparison.Ordinal);
+            if (diagnostics.CachedReleaseAim && string.IsNullOrWhiteSpace(diagnostics.CachedReleaseAimReason))
+            {
+                diagnostics.CachedReleaseAimReason = markCachedReleaseAim ? "flailComboPressAim" : "usedForExistingRelease";
+            }
+
+            Publish(diagnostics);
+            return CombatAimPersistentCursorService.RememberFlailReleaseTail(decision);
+        }
+
+        private static bool TryGetRecentFlailComboPressAim(out CombatAimItemCheckDecision decision)
+        {
+            decision = null;
+            long tick;
+            TerrariaInputCompat.TryReadGameUpdateCount(out tick);
+
+            lock (SyncRoot)
+            {
+                if (_flailComboPressAimDecision == null)
+                {
+                    return false;
+                }
+
+                if (tick > 0 &&
+                    _flailComboPressAimTick > 0 &&
+                    tick - _flailComboPressAimTick > FlailComboPressAimMaxAgeTicks)
+                {
+                    _flailComboPressAimDecision = null;
+                    _flailComboPressAimTick = 0;
+                    return false;
+                }
+
+                decision = _flailComboPressAimDecision;
+                return true;
+            }
+        }
+
+        private static bool IsFlailTailSourceDecision(CombatAimItemCheckDecision decision)
+        {
+            if (decision == null || decision.WeaponProfile == null || decision.BallisticSolution == null)
+            {
+                return false;
+            }
+
             var isYoyo = CombatAimYoyoCompat.IsYoyoProjectileType(decision.WeaponProfile.Shoot);
-            var eligibility = CombatAimFlailPolicy.Evaluate(decision.WeaponProfile, projectileAiStyle, isYoyo);
-            if (!eligibility.Eligible)
+            var eligibility = CombatAimFlailPolicy.Evaluate(decision.WeaponProfile, decision.BallisticSolution.ProjectileAiStyle, isYoyo);
+            return eligibility.Eligible;
+        }
+
+        private static bool IsItemCheckReleaseDecision(CombatAimItemCheckDecision decision)
+        {
+            if (!IsFlailTailSourceDecision(decision))
             {
                 return false;
             }
@@ -1580,6 +1694,15 @@ namespace JueMingZ.Automation.Combat
             }
         }
 
+        private static void ClearFlailComboPressAim()
+        {
+            lock (SyncRoot)
+            {
+                _flailComboPressAimDecision = null;
+                _flailComboPressAimTick = 0;
+            }
+        }
+
         private static void ResetProjectileTracking()
         {
             var hadTracking =
@@ -1915,6 +2038,7 @@ namespace JueMingZ.Automation.Combat
         internal static void ResetForTesting()
         {
             ResetControlState();
+            ClearFlailComboPressAim();
             Publish(CombatAimFlailDiagnostics.Empty());
         }
     }

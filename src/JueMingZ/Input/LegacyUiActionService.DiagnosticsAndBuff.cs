@@ -240,6 +240,7 @@ namespace JueMingZ.Input
                    "\"combatAimTrackDummyEnabled\":" + BoolRaw(settings.CombatAimTrackDummyEnabled) + "," +
                    "\"combatAimMarkerEnabled\":" + BoolRaw(settings.CombatAimMarkerEnabled) + "," +
                    "\"combatAutoClickerEnabled\":" + BoolRaw(settings.CombatAutoClickerEnabled) + "," +
+                   "\"combatFlailComboEnabled\":" + BoolRaw(settings.CombatFlailComboEnabled) + "," +
                    "\"combatPerfectRevolverEnabled\":" + BoolRaw(settings.CombatPerfectRevolverEnabled) + "," +
                    "\"combatMagicStringClickerEnabled\":" + BoolRaw(settings.CombatMagicStringClickerEnabled) + "," +
                    "\"combatAutoFacingEnabled\":" + BoolRaw(settings.CombatAutoFacingEnabled) + "," +

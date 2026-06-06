@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Text;
@@ -64,6 +65,29 @@ namespace JueMingZ.Diagnostics
         }
     }
 
+    public sealed class PerformanceOperationSample
+    {
+        public DateTime UtcNow { get; set; }
+        public string TestRunId { get; set; }
+        public string RuntimeVersion { get; set; }
+        public string Scenario { get; set; }
+        public double ElapsedMs { get; set; }
+        public double ThresholdMs { get; set; }
+        public string Reason { get; set; }
+        public string OwnerSummary { get; set; }
+        public string Metadata { get; set; }
+
+        public PerformanceOperationSample()
+        {
+            TestRunId = string.Empty;
+            RuntimeVersion = string.Empty;
+            Scenario = string.Empty;
+            Reason = string.Empty;
+            OwnerSummary = string.Empty;
+            Metadata = string.Empty;
+        }
+    }
+
     public static class PerformanceHitchRecorder
     {
         public const double UpdateStartGapThresholdMs = 50d;
@@ -72,6 +96,9 @@ namespace JueMingZ.Diagnostics
         public const double ActionQueueUpdateThresholdMs = 10d;
         public const double InputActionUpdateThresholdMs = 10d;
         public const double InformationDrawThresholdMs = 10d;
+        public const double ActionQueueAdmissionThresholdMs = ActionQueueUpdateThresholdMs;
+        public const double ItemCheckWriterResolveThresholdMs = InputActionUpdateThresholdMs;
+        public const double InventoryTransactionVerifyThresholdMs = ActionQueueUpdateThresholdMs;
         public const double SevereUpdateStartGapThresholdMs = 125d;
         public const double SevereRuntimeUpdateThresholdMs = 50d;
 
@@ -121,6 +148,24 @@ namespace JueMingZ.Diagnostics
                    actionQueueUpdateMs >= ActionQueueUpdateThresholdMs ||
                    inputActionUpdateMs >= InputActionUpdateThresholdMs ||
                    informationLastDrawElapsedMs >= InformationDrawThresholdMs;
+        }
+
+        public static bool ShouldRecordOperationFast(double elapsedMs, double thresholdMs)
+        {
+            return thresholdMs > 0d &&
+                   !double.IsNaN(elapsedMs) &&
+                   !double.IsInfinity(elapsedMs) &&
+                   elapsedMs >= thresholdMs;
+        }
+
+        public static double ElapsedMilliseconds(long startTimestamp, long endTimestamp)
+        {
+            if (endTimestamp <= startTimestamp)
+            {
+                return 0d;
+            }
+
+            return (endTimestamp - startTimestamp) * 1000d / Stopwatch.Frequency;
         }
 
         public static string BuildReason(PerformanceHitchSample sample)
@@ -203,6 +248,57 @@ namespace JueMingZ.Diagnostics
             RecordIfNeeded(sampleFactory == null ? null : sampleFactory());
         }
 
+        public static void RecordOperationIfNeeded(
+            string scenario,
+            double elapsedMs,
+            double thresholdMs,
+            string reason,
+            string ownerSummary,
+            string metadata)
+        {
+            if (!ShouldRecordOperationFast(elapsedMs, thresholdMs))
+            {
+                return;
+            }
+
+            var sample = new PerformanceOperationSample
+            {
+                UtcNow = DateTime.UtcNow,
+                Scenario = scenario ?? string.Empty,
+                ElapsedMs = elapsedMs,
+                ThresholdMs = thresholdMs,
+                Reason = reason ?? string.Empty,
+                OwnerSummary = ownerSummary ?? string.Empty,
+                Metadata = metadata ?? string.Empty
+            };
+
+            if (string.IsNullOrWhiteSpace(sample.Scenario))
+            {
+                sample.Scenario = "Performance.Operation";
+            }
+
+            if (!ReserveOperationRecordSlot(sample))
+            {
+                return;
+            }
+
+            var path = PerformanceEventsPath;
+            RuntimePerformanceDiagnostics.RecordOperation(sample, path);
+
+            try
+            {
+                EnqueueWrite(path, BuildOperationEventJson(sample));
+            }
+            catch (Exception error)
+            {
+                if (DateTime.UtcNow - _lastWriteFailureUtc > TimeSpan.FromSeconds(30))
+                {
+                    _lastWriteFailureUtc = DateTime.UtcNow;
+                    Logger.Warn("PerformanceHitchRecorder", "Performance operation event write failed: " + error.Message);
+                }
+            }
+        }
+
         private static bool ReserveRecordSlot(PerformanceHitchSample sample)
         {
             var severe =
@@ -217,6 +313,26 @@ namespace JueMingZ.Diagnostics
                 }
 
                 _lastRecordUtc = sample.UtcNow;
+                return true;
+            }
+        }
+
+        private static bool ReserveOperationRecordSlot(PerformanceOperationSample sample)
+        {
+            var severe = sample != null &&
+                         sample.ElapsedMs >= Math.Max(sample.ThresholdMs * 2d, sample.ThresholdMs + 10d);
+
+            lock (SyncRoot)
+            {
+                var now = sample == null || sample.UtcNow == default(DateTime)
+                    ? DateTime.UtcNow
+                    : sample.UtcNow;
+                if (!severe && now - _lastRecordUtc < MinRecordInterval)
+                {
+                    return false;
+                }
+
+                _lastRecordUtc = now;
                 return true;
             }
         }
@@ -338,6 +454,23 @@ namespace JueMingZ.Diagnostics
             AppendRaw(builder, "state", BuildStateJson(sample), true);
             AppendRaw(builder, "features", BuildFeaturesJson(sample), true);
             AppendRaw(builder, "actionQueue", BuildActionQueueJson(sample), false);
+            builder.Append("}");
+            return builder.ToString();
+        }
+
+        private static string BuildOperationEventJson(PerformanceOperationSample sample)
+        {
+            var builder = new StringBuilder();
+            builder.Append("{");
+            AppendString(builder, "time", sample.UtcNow.ToString("o", CultureInfo.InvariantCulture), true);
+            AppendString(builder, "testRunId", sample.TestRunId, true);
+            AppendString(builder, "scenario", sample.Scenario, true);
+            AppendString(builder, "runtimeVersion", sample.RuntimeVersion, true);
+            AppendRaw(builder, "elapsedMs", DoubleRaw(sample.ElapsedMs), true);
+            AppendRaw(builder, "thresholdMs", DoubleRaw(sample.ThresholdMs), true);
+            AppendString(builder, "reason", sample.Reason, true);
+            AppendString(builder, "ownerSummary", TrimForEvent(sample.OwnerSummary, 512), true);
+            AppendString(builder, "metadata", TrimForEvent(sample.Metadata, 512), false);
             builder.Append("}");
             return builder.ToString();
         }
@@ -485,6 +618,16 @@ namespace JueMingZ.Diagnostics
                 .Replace("\"", "\\\"")
                 .Replace("\r", "\\r")
                 .Replace("\n", "\\n");
+        }
+
+        private static string TrimForEvent(string value, int maxLength)
+        {
+            if (string.IsNullOrEmpty(value) || maxLength <= 0 || value.Length <= maxLength)
+            {
+                return value ?? string.Empty;
+            }
+
+            return value.Substring(0, maxLength) + "...";
         }
 
         private struct PendingPerformanceEventWrite

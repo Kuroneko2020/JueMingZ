@@ -13,6 +13,7 @@ namespace JueMingZ.Compat
     {
         private const BindingFlags InstanceMemberFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
         private const int VkLeftButton = 0x01;
+        private const int VkRightButton = 0x02;
         private static string _lastError = string.Empty;
         private static bool _playerInputMouseResolved;
         private static Type _playerInputType;
@@ -88,6 +89,10 @@ namespace JueMingZ.Compat
             public bool MainMouseLeft { get; internal set; }
             public bool MainMouseLeftReleaseCaptured { get; internal set; }
             public bool MainMouseLeftRelease { get; internal set; }
+            public bool MainMouseRightCaptured { get; internal set; }
+            public bool MainMouseRight { get; internal set; }
+            public bool MainMouseRightReleaseCaptured { get; internal set; }
+            public bool MainMouseRightRelease { get; internal set; }
             public bool SuppressedPhysicalInput { get; internal set; }
 
             public void Dispose()
@@ -152,6 +157,37 @@ namespace JueMingZ.Compat
         {
             var ok = TerrariaPlayerSelectionCompat.TryGetSelectedItem(player, out selectedItem);
             return ok ? ClearSelectionError() : SelectionFail(TerrariaPlayerSelectionCompat.LastError);
+        }
+
+        public static bool TryGetMouseItem(out object mouseItem)
+        {
+            mouseItem = null;
+            var mainType = TerrariaRuntimeTypes.MainType ?? FindType("Terraria.Main");
+            if (mainType == null)
+            {
+                return Fail("Cannot read Main.mouseItem: Terraria.Main unavailable.");
+            }
+
+            mouseItem = GetStatic(mainType, "mouseItem");
+            if (mouseItem == null)
+            {
+                return Fail("Cannot read Main.mouseItem.");
+            }
+
+            return ClearInputError();
+        }
+
+        public static bool TryReadMouseItemPresent(out bool present)
+        {
+            present = false;
+            object mouseItem;
+            if (!TryGetMouseItem(out mouseItem))
+            {
+                return false;
+            }
+
+            present = IsItemPresent(mouseItem);
+            return ClearInputError();
         }
 
         public static bool TrySetSelectedItem(object player, int slot)
@@ -299,15 +335,20 @@ namespace JueMingZ.Compat
 
         public static bool TryBeginScopedUseItemTakeover(object player, bool pressed, string scopeName, out ScopedUseItemTakeover takeover)
         {
-            return TryBeginScopedUseItemTakeover(player, pressed, scopeName, true, out takeover);
+            return TryBeginScopedUseItemTakeover(player, pressed, scopeName, true, false, out takeover);
         }
 
         public static bool TryBeginScopedUseItemClickTakeover(object player, bool pressed, string scopeName, out ScopedUseItemTakeover takeover)
         {
-            return TryBeginScopedUseItemTakeover(player, pressed, scopeName, false, out takeover);
+            return TryBeginScopedUseItemTakeover(player, pressed, scopeName, false, false, out takeover);
         }
 
-        private static bool TryBeginScopedUseItemTakeover(object player, bool pressed, string scopeName, bool applyChannel, out ScopedUseItemTakeover takeover)
+        public static bool TryBeginScopedUseItemClickTakeoverSuppressingRightClick(object player, bool pressed, string scopeName, out ScopedUseItemTakeover takeover)
+        {
+            return TryBeginScopedUseItemTakeover(player, pressed, scopeName, false, true, out takeover);
+        }
+
+        private static bool TryBeginScopedUseItemTakeover(object player, bool pressed, string scopeName, bool applyChannel, bool suppressRightClick, out ScopedUseItemTakeover takeover)
         {
             takeover = null;
             if (player == null)
@@ -349,13 +390,27 @@ namespace JueMingZ.Compat
                     state.MainMouseLeftReleaseCaptured = true;
                     state.MainMouseLeftRelease = value;
                 }
+
+                if (suppressRightClick && TryGetStaticBool(mainType, "mouseRight", out value))
+                {
+                    state.MainMouseRightCaptured = true;
+                    state.MainMouseRight = value;
+                }
+
+                if (suppressRightClick && TryGetStaticBool(mainType, "mouseRightRelease", out value))
+                {
+                    state.MainMouseRightReleaseCaptured = true;
+                    state.MainMouseRightRelease = value;
+                }
             }
 
             state.Captured = state.PlayerControlUseItemCaptured ||
                              state.PlayerReleaseUseItemCaptured ||
                              state.PlayerChannelCaptured ||
                              state.MainMouseLeftCaptured ||
-                             state.MainMouseLeftReleaseCaptured;
+                             state.MainMouseLeftReleaseCaptured ||
+                             state.MainMouseRightCaptured ||
+                             state.MainMouseRightReleaseCaptured;
             state.SuppressedPhysicalInput = !pressed &&
                                             ((state.PlayerControlUseItemCaptured && state.PlayerControlUseItem) ||
                                              (state.MainMouseLeftCaptured && state.MainMouseLeft));
@@ -365,7 +420,7 @@ namespace JueMingZ.Compat
                 return Fail("Cannot begin scoped use item takeover: player use item fields unavailable.");
             }
 
-            if (!ApplyUseItemTakeoverFields(player, pressed, applyChannel))
+            if (!ApplyUseItemTakeoverFields(player, pressed, applyChannel, suppressRightClick))
             {
                 TryRestoreScopedUseItemTakeover(state);
                 return Fail("Cannot begin scoped use item takeover: " + LastInputCompatError);
@@ -410,6 +465,16 @@ namespace JueMingZ.Compat
                 if (takeover.MainMouseLeftReleaseCaptured)
                 {
                     ok &= TrySetStaticIfExists(mainType, "mouseLeftRelease", takeover.MainMouseLeftRelease);
+                }
+
+                if (takeover.MainMouseRightCaptured)
+                {
+                    ok &= TrySetStaticIfExists(mainType, "mouseRight", takeover.MainMouseRight);
+                }
+
+                if (takeover.MainMouseRightReleaseCaptured)
+                {
+                    ok &= TrySetStaticIfExists(mainType, "mouseRightRelease", takeover.MainMouseRightRelease);
                 }
             }
 
@@ -1374,6 +1439,39 @@ namespace JueMingZ.Compat
             }
         }
 
+        public static bool TryReadPhysicalMouseRightHeld(out bool held)
+        {
+            held = IsRightButtonDownFallback();
+            try
+            {
+                bool mainMouseRight;
+                if (TryGetStaticBool(TerrariaRuntimeTypes.MainType, "mouseRight", out mainMouseRight))
+                {
+                    held = held || mainMouseRight;
+                }
+
+                var playerInputType = FindType("Terraria.GameInput.PlayerInput");
+                if (playerInputType == null)
+                {
+                    return ClearInputError();
+                }
+
+                var triggers = GetStatic(playerInputType, "Triggers");
+                var current = triggers == null ? null : GetMember(triggers, "Current");
+                bool mouseRight;
+                if (current != null && TryGetBool(current, "MouseRight", out mouseRight))
+                {
+                    held = held || mouseRight;
+                }
+
+                return ClearInputError();
+            }
+            catch (Exception error)
+            {
+                return Fail("Cannot read physical mouse right state: " + error.Message);
+            }
+        }
+
         public static bool TrySuppressHeldUseItemForPerfectRevolver(object player)
         {
             var ok = SuppressHeldUseItemForQueuedCombat(player);
@@ -1478,6 +1576,40 @@ namespace JueMingZ.Compat
             if (context.MouseCapturedByUi)
             {
                 reason = context.MouseCaptureReason;
+                return true;
+            }
+
+            reason = string.Empty;
+            return false;
+        }
+
+        public static bool IsWorldRightClickInteractionActive(object player, out string reason)
+        {
+            var mainType = TerrariaRuntimeTypes.MainType ?? FindType("Terraria.Main");
+            if (mainType == null)
+            {
+                reason = "mainTypeUnavailable";
+                return true;
+            }
+
+            bool value;
+            if (TryGetStaticBool(mainType, "SmartInteractShowingGenuine", out value) && value)
+            {
+                reason = "smartInteractGenuine";
+                return true;
+            }
+
+            int target;
+            if ((TryGetStaticInt(mainType, "SmartInteractNPC", out target) && target != -1) ||
+                (TryGetStaticInt(mainType, "SmartInteractProj", out target) && target != -1))
+            {
+                reason = "smartInteractTarget";
+                return true;
+            }
+
+            if (TryGetBool(player, "tileInteractionHappened", out value) && value)
+            {
+                reason = "tileInteractionHappened";
                 return true;
             }
 
@@ -2994,6 +3126,11 @@ namespace JueMingZ.Compat
 
         private static bool ApplyUseItemTakeoverFields(object player, bool pressed, bool applyChannel)
         {
+            return ApplyUseItemTakeoverFields(player, pressed, applyChannel, false);
+        }
+
+        private static bool ApplyUseItemTakeoverFields(object player, bool pressed, bool applyChannel, bool suppressRightClick)
+        {
             // Controlled input write: combat takeover must override both Player and Main mouse use state for this tick/scope.
             var ok = SetMember(player, "controlUseItem", pressed);
             ok &= SetMember(player, "releaseUseItem", true);
@@ -3007,6 +3144,11 @@ namespace JueMingZ.Compat
             {
                 TrySetStaticIfExists(mainType, "mouseLeft", pressed);
                 TrySetStaticIfExists(mainType, "mouseLeftRelease", true);
+                if (suppressRightClick)
+                {
+                    TrySetStaticIfExists(mainType, "mouseRight", false);
+                    TrySetStaticIfExists(mainType, "mouseRightRelease", false);
+                }
             }
 
             return ok;
@@ -3095,6 +3237,23 @@ namespace JueMingZ.Compat
             try
             {
                 return (GetAsyncKeyState(VkLeftButton) & 0x8000) != 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool IsRightButtonDownFallback()
+        {
+            if (!TerrariaMainCompat.AllowsInputProcessing)
+            {
+                return false;
+            }
+
+            try
+            {
+                return (GetAsyncKeyState(VkRightButton) & 0x8000) != 0;
             }
             catch
             {
@@ -3237,6 +3396,27 @@ namespace JueMingZ.Compat
                 Fail(error.Message);
                 return false;
             }
+        }
+
+        private static bool IsItemPresent(object item)
+        {
+            if (item == null)
+            {
+                return false;
+            }
+
+            bool isAir;
+            if (TryGetBool(item, "IsAir", out isAir))
+            {
+                return !isAir;
+            }
+
+            int type;
+            int stack;
+            return TryGetInt(item, "type", out type) &&
+                   TryGetInt(item, "stack", out stack) &&
+                   type > 0 &&
+                   stack > 0;
         }
 
         private static bool TryReadVector2(object vector, out float x, out float y)

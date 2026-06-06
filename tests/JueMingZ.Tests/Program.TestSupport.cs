@@ -519,6 +519,10 @@ namespace JueMingZ.Tests
             public bool releaseUseItem;
             public bool channel;
             public bool mouseInterface;
+            public int altFunctionUse;
+            public bool controlUseTile;
+            public bool tileInteractionHappened;
+            public bool tileInteractAttempted;
             public int itemAnimation;
             public int itemTime;
             public int reuseDelay;
@@ -758,6 +762,40 @@ namespace JueMingZ.Tests
             public InputActionExecutionStepResult Cancel(InputActionExecution execution, string reason)
             {
                 return InputActionExecutionStepResult.Complete(InputActionStatus.Cancelled, reason ?? "fake cancelled");
+            }
+        }
+
+        private sealed class TerminalFakeExecutor : IInputActionExecutor
+        {
+            private readonly InputActionKind _kind;
+            private readonly InputActionStatus _status;
+            private readonly string _message;
+
+            public TerminalFakeExecutor(InputActionKind kind, InputActionStatus status, string message)
+            {
+                _kind = kind;
+                _status = status;
+                _message = message ?? string.Empty;
+            }
+
+            public InputActionKind Kind
+            {
+                get { return _kind; }
+            }
+
+            public InputActionExecutionStepResult Start(InputActionExecution execution, GameStateSnapshot snapshot)
+            {
+                return InputActionExecutionStepResult.Complete(_status, _message);
+            }
+
+            public InputActionExecutionStepResult Update(InputActionExecution execution, GameStateSnapshot snapshot)
+            {
+                return InputActionExecutionStepResult.Complete(_status, _message);
+            }
+
+            public InputActionExecutionStepResult Cancel(InputActionExecution execution, string reason)
+            {
+                return InputActionExecutionStepResult.Complete(InputActionStatus.Cancelled, reason ?? "terminal fake cancelled");
             }
         }
 

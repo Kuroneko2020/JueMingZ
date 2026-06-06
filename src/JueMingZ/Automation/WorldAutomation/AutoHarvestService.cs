@@ -172,6 +172,7 @@ namespace JueMingZ.Automation.WorldAutomation
 
             if (!settingsSnapshot.WorldAutomationAutoHarvestEnabled)
             {
+                RecordFairnessUnavailable(tick, "disabled");
                 AutoHarvestSustainedUseBridge.ClearDesiredTarget("auto harvest disabled");
                 ClearTracking("disabled");
                 return;
@@ -186,6 +187,7 @@ namespace JueMingZ.Automation.WorldAutomation
 
             if (queue == null)
             {
+                RecordFairnessUnavailable(tick, "queue unavailable");
                 AutoHarvestSustainedUseBridge.ClearDesiredTarget("auto harvest queue unavailable");
                 RecordDecision("queue unavailable", null, null, string.Empty);
                 return;
@@ -193,6 +195,7 @@ namespace JueMingZ.Automation.WorldAutomation
 
             if (!CanRun(gameState))
             {
+                RecordFairnessUnavailable(tick, "player unavailable");
                 AutoHarvestSustainedUseBridge.ClearDesiredTarget("auto harvest player unavailable");
                 ClearTracking("player unavailable");
                 return;
@@ -201,6 +204,7 @@ namespace JueMingZ.Automation.WorldAutomation
             var blockedReason = GetExecutionBlockedReason(gameState);
             if (!string.IsNullOrEmpty(blockedReason))
             {
+                RecordFairnessUnavailable(tick, blockedReason);
                 AutoHarvestSustainedUseBridge.ClearDesiredTarget(blockedReason);
                 RecordDecision(blockedReason, null, null, string.Empty);
                 return;
@@ -210,6 +214,7 @@ namespace JueMingZ.Automation.WorldAutomation
             string toolMessage;
             if (!TryFindRegrowthTool(gameState, out tool, out toolMessage))
             {
+                RecordFairnessUnavailable(tick, toolMessage);
                 AutoHarvestSustainedUseBridge.ClearDesiredTarget(toolMessage);
                 RecordDecision(toolMessage, null, null, string.Empty);
                 return;
@@ -253,6 +258,18 @@ namespace JueMingZ.Automation.WorldAutomation
             AutoHarvestHerbTarget target;
             if (TryFindHarvestTarget(tiles, maxTilesX, maxTilesY, player, tool, out target, out message))
             {
+                var queueSnapshot = queue.GetFastState();
+                var activeContinuation = IsRunningAutoHarvestSustainedUse(queueSnapshot);
+                if (WorldAutomationFairnessCoordinator.ShouldDeferRuntimeSubmission(
+                        WorldAutomationFairnessKind.AutoHarvest,
+                        tick,
+                        activeContinuation))
+                {
+                    AutoHarvestSustainedUseBridge.ClearDesiredTarget("fairness deferred to auto capture");
+                    RecordDecision("fairness deferred to auto capture", tool, target, "Harvest");
+                    return;
+                }
+
                 var desiredTarget = BuildSustainedUseTarget(tool, target, player, tick);
                 AutoHarvestSustainedUseBridge.SetDesiredTarget(desiredTarget);
                 if (!EnsureSustainedHarvestRequest(queue, tool, target))
@@ -267,6 +284,7 @@ namespace JueMingZ.Automation.WorldAutomation
                 return;
             }
 
+            RecordFairnessUnavailable(tick, message);
             AutoHarvestSustainedUseBridge.ClearDesiredTarget(message);
             if (tick - _lastUseTick < UseCooldownTicks)
             {
@@ -286,6 +304,14 @@ namespace JueMingZ.Automation.WorldAutomation
             }
 
             RecordDecision(message, tool, null, string.Empty);
+        }
+
+        private static void RecordFairnessUnavailable(long tick, string reason)
+        {
+            WorldAutomationFairnessCoordinator.RecordCandidateUnavailable(
+                WorldAutomationFairnessKind.AutoHarvest,
+                tick,
+                reason ?? string.Empty);
         }
 
         private static bool TrySubmitPendingReplant(InputActionQueue queue, GameStateSnapshot gameState, object tiles, object player, AutoHarvestToolCandidate tool, long tick)

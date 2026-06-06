@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using JueMingZ.Actions;
 using JueMingZ.Common;
@@ -17,6 +18,18 @@ namespace JueMingZ.Automation.InventoryAndItems
         public string LastDecision { get; set; }
         public string LastInventorySignature { get; set; }
         public string LastPendingItemIds { get; set; }
+        public string LastDetectedItemIds { get; set; }
+        public long PendingSinceTick { get; set; }
+        public long LastPendingChangeTick { get; set; }
+        public string LastPendingClearReason { get; set; }
+        public string PendingTransactionState { get; set; }
+        public int PendingRetryCount { get; set; }
+        public string LastSubmitRequestId { get; set; }
+        public string LastResult { get; set; }
+        public string LastUnverifiedReason { get; set; }
+        public string InventoryTransactionSlots { get; set; }
+        public string InventoryTransactionBlockingReason { get; set; }
+        public string ActionResultDeliveryMode { get; set; }
         public DateTime? LastDecisionUtc { get; set; }
 
         public AutoStackServiceDiagnostics()
@@ -24,6 +37,16 @@ namespace JueMingZ.Automation.InventoryAndItems
             LastDecision = string.Empty;
             LastInventorySignature = string.Empty;
             LastPendingItemIds = string.Empty;
+            LastDetectedItemIds = string.Empty;
+            LastPendingClearReason = string.Empty;
+            PendingTransactionState = string.Empty;
+            LastSubmitRequestId = string.Empty;
+            LastResult = string.Empty;
+            LastUnverifiedReason = string.Empty;
+            InventoryTransactionSlots = string.Empty;
+            InventoryTransactionBlockingReason = string.Empty;
+            ActionResultDeliveryMode = string.Empty;
+            LastPendingChangeTick = -1;
         }
     }
 
@@ -32,6 +55,11 @@ namespace JueMingZ.Automation.InventoryAndItems
         private const long CheckIntervalTicks = 5;
         private const long PendingSettleTicks = 120;
         private const long InventoryOpenExecutionSettleTicks = 3;
+        private const long SubmittedResultWaitTicks = 120;
+        private const long RetryBackoffTicks = 60;
+        private const long NoNearbyContainerRetryTicks = 180;
+        private const long PendingNotApplicableTtlTicks = 600;
+        private const int MaxRetryCount = 3;
         private static readonly object SyncRoot = new object();
         private static readonly Dictionary<int, int> LastStackTotals = new Dictionary<int, int>();
         private static readonly List<int> PendingItemIds = new List<int>();
@@ -42,7 +70,36 @@ namespace JueMingZ.Automation.InventoryAndItems
         private static string _lastDecision = string.Empty;
         private static string _lastInventorySignature = string.Empty;
         private static string _lastPendingItemIds = string.Empty;
+        private static string _lastDetectedItemIds = string.Empty;
+        private static string _lastPendingClearReason = string.Empty;
+        private static AutoStackTransactionState _pendingTransactionState = AutoStackTransactionState.None;
+        private static int _pendingRetryCount;
+        private static Guid _activeSubmitRequestId = Guid.Empty;
+        private static string _lastSubmitRequestId = string.Empty;
+        private static string _lastResult = string.Empty;
+        private static string _lastUnverifiedReason = string.Empty;
+        private static string _inventoryTransactionSlots = string.Empty;
+        private static string _inventoryTransactionBlockingReason = string.Empty;
+        private static string _actionResultDeliveryMode = string.Empty;
+        private static long _lastSubmitTick = -1;
+        private static long _nextRetryTick = -1;
         private static DateTime? _lastDecisionUtc;
+
+        private enum AutoStackTransactionState
+        {
+            None,
+            Detected,
+            PendingSettle,
+            ReadyToSubmit,
+            Admitted,
+            WaitingForResult,
+            VerifiedMoved,
+            AttemptedButUnverified,
+            RetryPending,
+            NotApplicable,
+            Failed,
+            Expired
+        }
 
         public static void Tick(InputActionQueue queue, GameStateSnapshot gameState, RuntimeState runtimeState)
         {
@@ -106,7 +163,15 @@ namespace JueMingZ.Automation.InventoryAndItems
 
         internal static bool HasPendingAutomationWork()
         {
-            return HasPendingItemIds();
+            lock (SyncRoot)
+            {
+                return PendingItemIds.Count > 0 || _activeSubmitRequestId != Guid.Empty;
+            }
+        }
+
+        internal static void ResetForTesting()
+        {
+            ClearTracking("reset");
         }
 
         public static AutoStackServiceDiagnostics GetDiagnostics()
@@ -118,6 +183,18 @@ namespace JueMingZ.Automation.InventoryAndItems
                     LastDecision = _lastDecision,
                     LastInventorySignature = _lastInventorySignature,
                     LastPendingItemIds = _lastPendingItemIds,
+                    LastDetectedItemIds = _lastDetectedItemIds,
+                    PendingSinceTick = _pendingSinceTick,
+                    LastPendingChangeTick = _lastPendingChangeTick,
+                    LastPendingClearReason = _lastPendingClearReason,
+                    PendingTransactionState = _pendingTransactionState.ToString(),
+                    PendingRetryCount = _pendingRetryCount,
+                    LastSubmitRequestId = _lastSubmitRequestId,
+                    LastResult = _lastResult,
+                    LastUnverifiedReason = _lastUnverifiedReason,
+                    InventoryTransactionSlots = _inventoryTransactionSlots,
+                    InventoryTransactionBlockingReason = _inventoryTransactionBlockingReason,
+                    ActionResultDeliveryMode = _actionResultDeliveryMode,
                     LastDecisionUtc = _lastDecisionUtc
                 };
             }
@@ -163,31 +240,40 @@ namespace JueMingZ.Automation.InventoryAndItems
                     return;
                 }
 
-                if (IsUnsafeUiOpenForAutoStack(gameState))
+                var added = UpdateBaselineAndDetectIncreases(current, eligibleItemTypes);
+                if (added.Count > 0)
                 {
-                    UpdateBaselineAndDetectIncreases(current, eligibleItemTypes);
+                    AddPendingItemIds(added, tick);
+                }
+
+                var unsafeUiOpen = IsUnsafeUiOpenForAutoStack(gameState);
+                if (unsafeUiOpen)
+                {
                     RecordDecision(
-                        "unsafe UI open",
+                        added.Count > 0
+                            ? "unsafe UI open; detected picked item stack increase and retained pending transaction"
+                            : "unsafe UI open",
                         string.Empty,
-                        JoinInts(GetPendingItemIds()));
+                        JoinInts(GetPendingItemIds()),
+                        JoinInts(added));
+                    return;
                 }
                 else
                 {
-                    var added = UpdateBaselineAndDetectIncreases(current, eligibleItemTypes);
-                    if (added.Count > 0)
-                    {
-                        AddPendingItemIds(added, tick);
-                    }
-
                     if (added.Count > 0 && IsPlayerInventoryOpen(gameState))
                     {
-                        RecordDecision("detected picked item stack increase while inventory open", string.Empty, JoinInts(GetPendingItemIds()));
+                        RecordDecision("detected picked item stack increase while inventory open", string.Empty, JoinInts(GetPendingItemIds()), JoinInts(added));
                     }
                     else if (added.Count > 0)
                     {
-                        RecordDecision("detected picked item stack increase", string.Empty, JoinInts(GetPendingItemIds()));
+                        RecordDecision("detected picked item stack increase", string.Empty, JoinInts(GetPendingItemIds()), JoinInts(added));
                     }
                 }
+            }
+
+            if (TryHandleSubmittedActionResult(queue, tick))
+            {
+                return;
             }
 
             if (!HasPendingItemIds())
@@ -198,12 +284,14 @@ namespace JueMingZ.Automation.InventoryAndItems
             string blockReason;
             if (TryGetExecutionBlockedReason(gameState, tick, out blockReason))
             {
+                SetTransactionBlockingReason(blockReason);
                 RecordDecision(blockReason, string.Empty, JoinInts(GetPendingItemIds()));
                 return;
             }
 
             if (IsQueueBusy(queue))
             {
+                SetTransactionBlockingReason("queue busy");
                 RecordDecision("queue busy", string.Empty, JoinInts(GetPendingItemIds()));
                 return;
             }
@@ -219,19 +307,34 @@ namespace JueMingZ.Automation.InventoryAndItems
             {
                 if (ShouldKeepPending(tick))
                 {
+                    SetTransactionState(AutoStackTransactionState.PendingSettle);
                     RecordDecision("waiting for picked item to settle into inventory", string.Empty, JoinInts(pendingIds));
                     return;
                 }
 
-                ClearPendingItemIds();
+                ClearPendingItemIds("picked item no longer present", AutoStackTransactionState.NotApplicable);
                 RecordDecision("picked item no longer present", string.Empty, JoinInts(pendingIds));
                 return;
             }
 
+            SetTransactionState(AutoStackTransactionState.ReadyToSubmit);
             var request = BuildAutoStackRequest(pendingIds, slots, signature, slotCount, stackTotal);
-            queue.Enqueue(request);
-            ClearPendingItemIds();
-            RecordDecision("submitted auto stack request", signature, JoinInts(pendingIds));
+            InputActionAdmissionResult admission;
+            if (!queue.TryEnqueue(request, out admission))
+            {
+                SetTransactionBlockingReason(admission == null ? "admission denied: unknown" : "admission denied: " + admission.Reason);
+                RecordDecision("auto stack admission denied: " + (admission == null ? "unknown" : admission.Reason), signature, JoinInts(pendingIds));
+                return;
+            }
+
+            var submittedRequestId = ResolveSubmittedRequestId(request, admission);
+            MarkSubmitted(submittedRequestId, slots, tick);
+            RecordDecision(
+                admission.Decision == InputActionAdmissionDecision.CoalescedPending
+                    ? "coalesced auto stack request"
+                    : "submitted auto stack request",
+                signature,
+                JoinInts(pendingIds));
         }
 
         private static InputActionRequest BuildAutoStackRequest(IReadOnlyList<int> itemIds, IReadOnlyList<int> slots, string signature, int slotCount, int stackTotal)
@@ -240,8 +343,10 @@ namespace JueMingZ.Automation.InventoryAndItems
             {
                 Kind = InputActionKind.Chest,
                 Priority = InputActionPriority.Low,
+                DuplicatePolicy = InputActionDuplicatePolicy.CoalescePending,
                 SourceFeatureId = FeatureIds.InventoryAutoStack,
                 Description = "Auto stack picked up items",
+                QueueTimeout = TimeSpan.FromSeconds(2),
                 Timeout = TimeSpan.FromSeconds(3),
                 AdmissionKey = FeatureIds.InventoryAutoStack
             };
@@ -254,6 +359,293 @@ namespace JueMingZ.Automation.InventoryAndItems
             request.Metadata["MovableStackTotal"] = stackTotal.ToString(CultureInfo.InvariantCulture);
             request.Metadata["AllowPlayerInventoryOpen"] = "true";
             return request;
+        }
+
+        private static bool TryHandleSubmittedActionResult(InputActionQueue queue, long tick)
+        {
+            Guid activeRequestId;
+            long submittedTick;
+            long nextRetryTick;
+            lock (SyncRoot)
+            {
+                activeRequestId = _activeSubmitRequestId;
+                submittedTick = _lastSubmitTick;
+                nextRetryTick = _nextRetryTick;
+            }
+
+            if (activeRequestId != Guid.Empty)
+            {
+                var operationStart = Stopwatch.GetTimestamp();
+                var performanceReason = string.Empty;
+                InputActionResult result;
+                if (queue != null && queue.TryGetResultByRequestId(activeRequestId, out result))
+                {
+                    HandleSubmittedActionResult(result, tick);
+                    performanceReason = result == null ? "resultMissing" : "result:" + result.Status;
+                    RecordInventoryTransactionVerifyPerformance(operationStart, activeRequestId, performanceReason);
+                    return true;
+                }
+
+                if (submittedTick < 0 || tick - submittedTick <= SubmittedResultWaitTicks)
+                {
+                    SetTransactionState(AutoStackTransactionState.WaitingForResult);
+                    RecordDecision("waiting for auto stack action result", string.Empty, JoinInts(GetPendingItemIds()));
+                    RecordInventoryTransactionVerifyPerformance(operationStart, activeRequestId, "waitingForResult");
+                    return true;
+                }
+
+                RegisterRetry(
+                    tick,
+                    "auto stack action result unavailable for request " + activeRequestId,
+                    AutoStackTransactionState.Failed,
+                    RetryBackoffTicks);
+                RecordInventoryTransactionVerifyPerformance(operationStart, activeRequestId, "resultUnavailable");
+                return true;
+            }
+
+            if (nextRetryTick >= 0 && tick < nextRetryTick)
+            {
+                SetTransactionState(AutoStackTransactionState.RetryPending);
+                RecordDecision("waiting for auto stack retry backoff", string.Empty, JoinInts(GetPendingItemIds()));
+                return true;
+            }
+
+            return false;
+        }
+
+        private static void RecordInventoryTransactionVerifyPerformance(long operationStart, Guid requestId, string reason)
+        {
+            var elapsedMs = PerformanceHitchRecorder.ElapsedMilliseconds(operationStart, Stopwatch.GetTimestamp());
+            if (!PerformanceHitchRecorder.ShouldRecordOperationFast(elapsedMs, PerformanceHitchRecorder.InventoryTransactionVerifyThresholdMs))
+            {
+                return;
+            }
+
+            string state;
+            string slots;
+            string blockingReason;
+            int pendingCount;
+            int retryCount;
+            lock (SyncRoot)
+            {
+                state = _pendingTransactionState.ToString();
+                slots = _inventoryTransactionSlots;
+                blockingReason = _inventoryTransactionBlockingReason;
+                pendingCount = PendingItemIds.Count;
+                retryCount = _pendingRetryCount;
+            }
+
+            var metadata =
+                "requestId=" + (requestId == Guid.Empty ? string.Empty : requestId.ToString()) +
+                ";state=" + state +
+                ";pendingCount=" + pendingCount.ToString(CultureInfo.InvariantCulture) +
+                ";retry=" + retryCount.ToString(CultureInfo.InvariantCulture) +
+                ";slots=" + slots;
+
+            PerformanceHitchRecorder.RecordOperationIfNeeded(
+                "Performance.InventoryTransaction.Verify",
+                elapsedMs,
+                PerformanceHitchRecorder.InventoryTransactionVerifyThresholdMs,
+                TrimSummary(reason ?? string.Empty, 256),
+                TrimSummary(blockingReason, 512),
+                TrimSummary(metadata, 512));
+        }
+
+        private static void HandleSubmittedActionResult(InputActionResult result, long tick)
+        {
+            RecordSubmittedResult(result);
+            if (result == null)
+            {
+                RegisterRetry(tick, "auto stack result missing", AutoStackTransactionState.Failed, RetryBackoffTicks);
+                return;
+            }
+
+            if (result.Status == InputActionStatus.Succeeded)
+            {
+                if (HasPendingChangedAfterLastSubmit())
+                {
+                    lock (SyncRoot)
+                    {
+                        _pendingTransactionState = AutoStackTransactionState.Detected;
+                        _pendingRetryCount = 0;
+                        _lastSubmitTick = -1;
+                        _nextRetryTick = -1;
+                    }
+
+                    RecordDecision("verified previous auto stack request; newer pending transaction remains", string.Empty, JoinInts(GetPendingItemIds()));
+                    return;
+                }
+
+                ClearPendingItemIds("verified auto stack request succeeded", AutoStackTransactionState.VerifiedMoved);
+                RecordDecision("verified auto stack request succeeded", string.Empty, string.Empty);
+                return;
+            }
+
+            if (result.Status == InputActionStatus.NotApplicable)
+            {
+                var message = string.IsNullOrWhiteSpace(result.Message) ? "not applicable" : result.Message;
+                var retryTicks = LooksLikeNoNearbyContainers(message)
+                    ? NoNearbyContainerRetryTicks
+                    : RetryBackoffTicks;
+                RegisterRetry(tick, message, AutoStackTransactionState.NotApplicable, retryTicks);
+                return;
+            }
+
+            if (result.Status == InputActionStatus.AttemptedButUnverified)
+            {
+                RegisterRetry(tick, string.IsNullOrWhiteSpace(result.Message) ? "attempted but unverified" : result.Message, AutoStackTransactionState.AttemptedButUnverified, RetryBackoffTicks);
+                return;
+            }
+
+            if (result.Status == InputActionStatus.BlockedByUi ||
+                result.Status == InputActionStatus.Failed ||
+                result.Status == InputActionStatus.TimedOut ||
+                result.Status == InputActionStatus.Cancelled)
+            {
+                RegisterRetry(tick, string.IsNullOrWhiteSpace(result.Message) ? result.Status.ToString() : result.Message, AutoStackTransactionState.Failed, RetryBackoffTicks);
+                return;
+            }
+
+            RegisterRetry(tick, result.Status + ": " + (result.Message ?? string.Empty), AutoStackTransactionState.Failed, RetryBackoffTicks);
+        }
+
+        private static void RegisterRetry(long tick, string reason, AutoStackTransactionState sourceState, long retryDelayTicks)
+        {
+            var pendingIds = GetPendingItemIds();
+            if (pendingIds.Count == 0)
+            {
+                ClearPendingItemIds("auto stack result arrived after pending cleared: " + reason, sourceState);
+                RecordDecision("auto stack result ignored after pending cleared: " + reason, string.Empty, string.Empty);
+                return;
+            }
+
+            bool stop;
+            int retryCount;
+            lock (SyncRoot)
+            {
+                _activeSubmitRequestId = Guid.Empty;
+                _lastSubmitTick = -1;
+                _lastUnverifiedReason = reason ?? string.Empty;
+                _inventoryTransactionBlockingReason = reason ?? string.Empty;
+                if (_pendingSinceTick <= 0)
+                {
+                    _pendingSinceTick = tick;
+                }
+
+                var age = tick >= _pendingSinceTick ? tick - _pendingSinceTick : 0;
+                stop = _pendingRetryCount >= MaxRetryCount ||
+                       age > PendingNotApplicableTtlTicks;
+                if (!stop)
+                {
+                    _pendingRetryCount++;
+                    _nextRetryTick = tick + Math.Max(1, retryDelayTicks);
+                    _pendingTransactionState = AutoStackTransactionState.RetryPending;
+                }
+                else
+                {
+                    _nextRetryTick = -1;
+                    _pendingTransactionState = sourceState == AutoStackTransactionState.NotApplicable
+                        ? AutoStackTransactionState.Expired
+                        : AutoStackTransactionState.Failed;
+                }
+
+                retryCount = _pendingRetryCount;
+            }
+
+            if (stop)
+            {
+                ClearPendingItemIds("auto stack stopped after retry limit: " + reason, AutoStackTransactionState.Expired);
+                RecordDecision("auto stack stopped after retry limit: " + reason, string.Empty, JoinInts(pendingIds));
+                return;
+            }
+
+            RecordDecision("auto stack retry pending: " + reason + " retry=" + retryCount.ToString(CultureInfo.InvariantCulture), string.Empty, JoinInts(pendingIds));
+        }
+
+        private static Guid ResolveSubmittedRequestId(InputActionRequest request, InputActionAdmissionResult admission)
+        {
+            if (admission != null &&
+                admission.Decision == InputActionAdmissionDecision.CoalescedPending &&
+                admission.CoalescedRequestId != Guid.Empty)
+            {
+                return admission.CoalescedRequestId;
+            }
+
+            return request == null ? Guid.Empty : request.RequestId;
+        }
+
+        private static void MarkSubmitted(Guid requestId, IReadOnlyList<int> slots, long tick)
+        {
+            lock (SyncRoot)
+            {
+                _activeSubmitRequestId = requestId;
+                _lastSubmitRequestId = requestId == Guid.Empty ? string.Empty : requestId.ToString();
+                _lastSubmitTick = tick;
+                _nextRetryTick = -1;
+                _pendingTransactionState = AutoStackTransactionState.Admitted;
+                _inventoryTransactionSlots = JoinInts(slots);
+                _inventoryTransactionBlockingReason = string.Empty;
+                _actionResultDeliveryMode = "RequestIdLookup";
+            }
+        }
+
+        private static void RecordSubmittedResult(InputActionResult result)
+        {
+            if (result == null)
+            {
+                return;
+            }
+
+            lock (SyncRoot)
+            {
+                _activeSubmitRequestId = Guid.Empty;
+                _actionResultDeliveryMode = "RequestIdLookup";
+                _lastResult = result.Status + ":" + (result.ResultCode ?? string.Empty) + ":" + TrimSummary(result.Message, 160);
+                if (result.Status == InputActionStatus.AttemptedButUnverified ||
+                    result.Status == InputActionStatus.NotApplicable ||
+                    result.Status == InputActionStatus.BlockedByUi ||
+                    result.Status == InputActionStatus.Failed ||
+                    result.Status == InputActionStatus.TimedOut ||
+                    result.Status == InputActionStatus.Cancelled)
+                {
+                    _lastUnverifiedReason = result.Message ?? string.Empty;
+                    _inventoryTransactionBlockingReason = result.Message ?? string.Empty;
+                }
+            }
+        }
+
+        private static bool HasPendingChangedAfterLastSubmit()
+        {
+            lock (SyncRoot)
+            {
+                return _lastSubmitTick >= 0 &&
+                       _lastPendingChangeTick > _lastSubmitTick &&
+                       PendingItemIds.Count > 0;
+            }
+        }
+
+        private static void SetTransactionState(AutoStackTransactionState state)
+        {
+            lock (SyncRoot)
+            {
+                _pendingTransactionState = state;
+            }
+        }
+
+        private static void SetTransactionBlockingReason(string reason)
+        {
+            lock (SyncRoot)
+            {
+                _inventoryTransactionBlockingReason = reason ?? string.Empty;
+            }
+        }
+
+        private static bool LooksLikeNoNearbyContainers(string message)
+        {
+            return !string.IsNullOrWhiteSpace(message) &&
+                   (message.IndexOf("nearby", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    message.IndexOf("container", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    message.IndexOf("chest", StringComparison.OrdinalIgnoreCase) >= 0);
         }
 
         private static bool TryReadInventoryStackTotals(GameStateSnapshot gameState, out Dictionary<int, int> totals, out HashSet<int> eligibleItemTypes, out string message)
@@ -478,6 +870,12 @@ namespace JueMingZ.Automation.InventoryAndItems
                 if (hasValidItemId && PendingItemIds.Count > 0)
                 {
                     _lastPendingChangeTick = tick;
+                    _lastPendingClearReason = string.Empty;
+                    if (_activeSubmitRequestId == Guid.Empty)
+                    {
+                        _pendingTransactionState = AutoStackTransactionState.Detected;
+                        _inventoryTransactionBlockingReason = string.Empty;
+                    }
                 }
             }
         }
@@ -498,13 +896,30 @@ namespace JueMingZ.Automation.InventoryAndItems
             }
         }
 
-        private static void ClearPendingItemIds()
+        private static void ClearPendingItemIds(string reason)
+        {
+            ClearPendingItemIds(reason, AutoStackTransactionState.None);
+        }
+
+        private static void ClearPendingItemIds(string reason, AutoStackTransactionState finalState)
         {
             lock (SyncRoot)
             {
                 PendingItemIds.Clear();
                 _pendingSinceTick = 0;
                 _lastPendingChangeTick = -1;
+                _lastPendingClearReason = reason ?? string.Empty;
+                _pendingTransactionState = finalState;
+                if (finalState == AutoStackTransactionState.None ||
+                    finalState == AutoStackTransactionState.VerifiedMoved ||
+                    finalState == AutoStackTransactionState.NotApplicable)
+                {
+                    _pendingRetryCount = 0;
+                }
+                _activeSubmitRequestId = Guid.Empty;
+                _lastSubmitTick = -1;
+                _nextRetryTick = -1;
+                _inventoryTransactionSlots = string.Empty;
             }
         }
 
@@ -555,6 +970,19 @@ namespace JueMingZ.Automation.InventoryAndItems
                 _lastDecision = decision ?? string.Empty;
                 _lastInventorySignature = string.Empty;
                 _lastPendingItemIds = string.Empty;
+                _lastDetectedItemIds = string.Empty;
+                _lastPendingClearReason = decision ?? string.Empty;
+                _pendingTransactionState = AutoStackTransactionState.None;
+                _pendingRetryCount = 0;
+                _activeSubmitRequestId = Guid.Empty;
+                _lastSubmitRequestId = string.Empty;
+                _lastResult = string.Empty;
+                _lastUnverifiedReason = string.Empty;
+                _inventoryTransactionSlots = string.Empty;
+                _inventoryTransactionBlockingReason = string.Empty;
+                _actionResultDeliveryMode = string.Empty;
+                _lastSubmitTick = -1;
+                _nextRetryTick = -1;
                 _lastDecisionUtc = DateTime.UtcNow;
             }
         }
@@ -653,11 +1081,17 @@ namespace JueMingZ.Automation.InventoryAndItems
 
         private static void RecordDecision(string decision, string inventorySignature, string pendingItemIds)
         {
+            RecordDecision(decision, inventorySignature, pendingItemIds, string.Empty);
+        }
+
+        private static void RecordDecision(string decision, string inventorySignature, string pendingItemIds, string detectedItemIds)
+        {
             lock (SyncRoot)
             {
                 _lastDecision = decision ?? string.Empty;
                 _lastInventorySignature = inventorySignature ?? string.Empty;
                 _lastPendingItemIds = pendingItemIds ?? string.Empty;
+                _lastDetectedItemIds = detectedItemIds ?? string.Empty;
                 _lastDecisionUtc = DateTime.UtcNow;
             }
         }
@@ -696,6 +1130,16 @@ namespace JueMingZ.Automation.InventoryAndItems
             }
 
             return result;
+        }
+
+        private static string TrimSummary(string value, int maxLength)
+        {
+            if (string.IsNullOrEmpty(value) || maxLength <= 0 || value.Length <= maxLength)
+            {
+                return value ?? string.Empty;
+            }
+
+            return value.Substring(0, maxLength) + "...";
         }
     }
 }

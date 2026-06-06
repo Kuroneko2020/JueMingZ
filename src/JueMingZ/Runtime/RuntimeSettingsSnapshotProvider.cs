@@ -80,6 +80,7 @@ namespace JueMingZ.Runtime
             private bool _combatAimTrackDummyEnabled;
             private bool _combatAimMarkerEnabled;
             private bool _combatAutoClickerEnabled;
+            private bool _combatFlailComboEnabled;
             private bool _combatPerfectRevolverEnabled;
             private bool _combatMagicStringClickerEnabled;
             private bool _combatAutoFacingEnabled;
@@ -189,6 +190,7 @@ namespace JueMingZ.Runtime
                     _combatAimTrackDummyEnabled = settings.CombatAimTrackDummyEnabled,
                     _combatAimMarkerEnabled = settings.CombatAimMarkerEnabled,
                     _combatAutoClickerEnabled = settings.CombatAutoClickerEnabled,
+                    _combatFlailComboEnabled = settings.CombatFlailComboEnabled,
                     _combatPerfectRevolverEnabled = settings.CombatPerfectRevolverEnabled,
                     _combatMagicStringClickerEnabled = settings.CombatMagicStringClickerEnabled,
                     _combatAutoFacingEnabled = settings.CombatAutoFacingEnabled,
@@ -293,6 +295,7 @@ namespace JueMingZ.Runtime
                        _combatAimTrackDummyEnabled == other._combatAimTrackDummyEnabled &&
                        _combatAimMarkerEnabled == other._combatAimMarkerEnabled &&
                        _combatAutoClickerEnabled == other._combatAutoClickerEnabled &&
+                       _combatFlailComboEnabled == other._combatFlailComboEnabled &&
                        _combatPerfectRevolverEnabled == other._combatPerfectRevolverEnabled &&
                        _combatMagicStringClickerEnabled == other._combatMagicStringClickerEnabled &&
                        _combatAutoFacingEnabled == other._combatAutoFacingEnabled &&

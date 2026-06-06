@@ -22,8 +22,11 @@ namespace JueMingZ.Automation.AutoRecovery
             {
                 Kind = decision.ActionKind,
                 Priority = InputActionPriority.Low,
+                DuplicatePolicy = InputActionDuplicatePolicy.CoalescePending,
                 SourceFeatureId = decision.FeatureId,
                 Description = BuildDecisionDescription(decision),
+                QueueTimeout = TimeSpan.FromMilliseconds(350),
+                AdmissionKey = BuildDecisionAdmissionKey(decision),
                 Timeout = TimeSpan.FromSeconds(3)
             };
 
@@ -127,7 +130,14 @@ namespace JueMingZ.Automation.AutoRecovery
                 request.Metadata["BuffTime"] = decision.BuffTime.ToString(CultureInfo.InvariantCulture);
             }
 
-            var requestId = queue.Enqueue(request);
+            InputActionAdmissionResult admission;
+            if (!queue.TryEnqueue(request, out admission))
+            {
+                RecordAdmissionDenied(decision, tick, admission == null ? "unknown" : admission.Reason);
+                return Guid.Empty;
+            }
+
+            var requestId = request.RequestId;
             lock (SyncRoot)
             {
                 if (decision.ActionKind == InputActionKind.BuffPotionDirectUse && decision.ItemType > 0)
@@ -184,6 +194,51 @@ namespace JueMingZ.Automation.AutoRecovery
             }
 
             return requestId;
+        }
+
+        private static string BuildDecisionAdmissionKey(AutoRecoveryDecision decision)
+        {
+            if (decision == null)
+            {
+                return "auto_recovery|unknown";
+            }
+
+            return (decision.FeatureId ?? string.Empty) +
+                   "|" + decision.ActionKind +
+                   "|" + (decision.Mode ?? string.Empty);
+        }
+
+        private static void RecordAdmissionDenied(AutoRecoveryDecision decision, long tick, string reason)
+        {
+            var message = "Admission denied: " + (reason ?? string.Empty) + ".";
+            lock (SyncRoot)
+            {
+                if (decision != null && string.Equals(decision.Mode, "AutoHeal", StringComparison.OrdinalIgnoreCase))
+                {
+                    State.LastAutoHealTick = tick;
+                    State.LastAutoHealResult = message;
+                }
+                else if (decision != null && string.Equals(decision.Mode, "AutoMana", StringComparison.OrdinalIgnoreCase))
+                {
+                    State.LastAutoManaTick = tick;
+                    State.LastAutoManaResult = message;
+                }
+                else if (decision != null && string.Equals(decision.Mode, "AutoBuff", StringComparison.OrdinalIgnoreCase))
+                {
+                    State.LastAutoBuffTick = tick;
+                    State.LastAutoBuffResult = message;
+                }
+                else if (decision != null && string.Equals(decision.Mode, "AutoNurse", StringComparison.OrdinalIgnoreCase))
+                {
+                    State.LastAutoNurseTick = tick;
+                    State.LastAutoNurseResult = message;
+                }
+                else if (decision != null && string.Equals(decision.Mode, "AutoStationBuff", StringComparison.OrdinalIgnoreCase))
+                {
+                    State.LastAutoStationBuffTick = tick;
+                    State.LastAutoStationBuffResult = message;
+                }
+            }
         }
 
         private static string BuildDecisionDescription(AutoRecoveryDecision decision)

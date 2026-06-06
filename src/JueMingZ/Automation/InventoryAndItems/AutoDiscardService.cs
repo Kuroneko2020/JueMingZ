@@ -185,7 +185,13 @@ namespace JueMingZ.Automation.InventoryAndItems
             }
 
             var request = BuildAutoDiscardRequest(candidates, signature);
-            queue.Enqueue(request);
+            InputActionAdmissionResult admission;
+            if (!queue.TryEnqueue(request, out admission))
+            {
+                RecordDecision("auto discard admission denied: " + (admission == null ? "unknown" : admission.Reason), signature, JoinInts(itemIds));
+                return;
+            }
+
             RecordDecision("submitted auto discard request", signature, JoinInts(itemIds));
         }
 
@@ -198,8 +204,10 @@ namespace JueMingZ.Automation.InventoryAndItems
             {
                 Kind = InputActionKind.TrashSlot,
                 Priority = InputActionPriority.Low,
+                DuplicatePolicy = InputActionDuplicatePolicy.CoalescePending,
                 SourceFeatureId = FeatureIds.InventoryAutoDiscard,
                 Description = "Auto discard listed items",
+                QueueTimeout = TimeSpan.FromSeconds(2),
                 Timeout = TimeSpan.FromSeconds(3),
                 AdmissionKey = FeatureIds.InventoryAutoDiscard
             };

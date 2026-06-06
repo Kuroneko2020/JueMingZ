@@ -15,10 +15,12 @@ namespace JueMingZ.Automation.Movement
             {
                 Kind = InputActionKind.Jump,
                 Priority = priority,
+                DuplicatePolicy = InputActionDuplicatePolicy.CoalescePending,
                 SourceFeatureId = FeatureIds.MovementSafeLanding,
                 Description = description ?? "Movement safe landing uses a vanilla control input",
                 Timeout = plan == null || plan.Timeout == TimeSpan.Zero ? TimeSpan.FromMilliseconds(450) : plan.Timeout,
-                QueueTimeout = plan == null ? TimeSpan.Zero : plan.QueueTimeout,
+                QueueTimeout = plan == null || plan.QueueTimeout == TimeSpan.Zero ? TimeSpan.FromMilliseconds(250) : plan.QueueTimeout,
+                AdmissionKey = BuildAdmissionKey(analysis, plan, "jump"),
                 IsExclusive = true
             };
             MovementSafeLandingMetadataBuilder.AddBaseMetadata(request.Metadata, analysis, plan);
@@ -32,9 +34,12 @@ namespace JueMingZ.Automation.Movement
             {
                 Kind = InputActionKind.Jump,
                 Priority = InputActionPriority.Normal,
+                DuplicatePolicy = InputActionDuplicatePolicy.CoalescePending,
                 SourceFeatureId = FeatureIds.MovementSafeLanding,
                 Description = description ?? "Movement safe landing recovery input",
                 Timeout = TimeSpan.FromMilliseconds(450),
+                QueueTimeout = TimeSpan.FromMilliseconds(500),
+                AdmissionKey = FeatureIds.MovementSafeLanding + "|recovery|" + (actionType ?? string.Empty) + "|" + (capabilitySummary ?? string.Empty),
                 IsExclusive = true
             };
             MovementSafeLandingMetadataBuilder.EnsurePreservedKeys(request.Metadata);
@@ -57,9 +62,12 @@ namespace JueMingZ.Automation.Movement
             {
                 Kind = InputActionKind.InventorySlot,
                 Priority = InputActionPriority.High,
+                DuplicatePolicy = InputActionDuplicatePolicy.CoalescePending,
                 SourceFeatureId = FeatureIds.MovementSafeLanding,
                 Description = "Movement safe landing temporary equipment",
                 Timeout = TimeSpan.FromMilliseconds(650),
+                QueueTimeout = TimeSpan.FromMilliseconds(300),
+                AdmissionKey = BuildAdmissionKey(analysis, PlanFromEquipment(plan), "temporaryEquipmentApply"),
                 IsExclusive = true
             };
             MovementSafeLandingMetadataBuilder.AddBaseMetadata(request.Metadata, analysis, PlanFromEquipment(plan));
@@ -79,10 +87,12 @@ namespace JueMingZ.Automation.Movement
             {
                 Kind = InputActionKind.UseHotbarItem,
                 Priority = plan == null ? InputActionPriority.High : plan.RequestPriority,
+                DuplicatePolicy = InputActionDuplicatePolicy.CoalescePending,
                 SourceFeatureId = FeatureIds.MovementSafeLanding,
                 Description = "Movement safe landing uses teleport rod toward the projected landing tile",
                 Timeout = plan == null || plan.Timeout == TimeSpan.Zero ? TimeSpan.FromMilliseconds(650) : plan.Timeout,
-                QueueTimeout = plan == null ? TimeSpan.Zero : plan.QueueTimeout,
+                QueueTimeout = plan == null || plan.QueueTimeout == TimeSpan.Zero ? TimeSpan.FromMilliseconds(250) : plan.QueueTimeout,
+                AdmissionKey = BuildAdmissionKey(analysis, plan, "teleportRod"),
                 IsExclusive = true
             };
 
@@ -130,9 +140,12 @@ namespace JueMingZ.Automation.Movement
             {
                 Kind = InputActionKind.InventorySlot,
                 Priority = InputActionPriority.Normal,
+                DuplicatePolicy = InputActionDuplicatePolicy.CoalescePending,
                 SourceFeatureId = FeatureIds.MovementSafeLanding,
                 Description = "Movement safe landing restore temporary equipment",
                 Timeout = TimeSpan.FromSeconds(3),
+                QueueTimeout = TimeSpan.FromSeconds(2),
+                AdmissionKey = FeatureIds.MovementSafeLanding + "|temporaryEquipmentRestore",
                 IsExclusive = true
             };
             MovementSafeLandingMetadataBuilder.EnsurePreservedKeys(request.Metadata);
@@ -185,6 +198,15 @@ namespace JueMingZ.Automation.Movement
                 RequiresTemporaryEquipment = true,
                 RequiresRestore = true
             };
+        }
+
+        private static string BuildAdmissionKey(MovementSafeLandingAnalysis analysis, MovementSafeLandingRescuePlan plan, string suffix)
+        {
+            return FeatureIds.MovementSafeLanding +
+                   "|" + (suffix ?? string.Empty) +
+                   "|" + (plan == null ? string.Empty : plan.StrategyId ?? string.Empty) +
+                   "|" + (plan == null ? string.Empty : plan.ActionType ?? string.Empty) +
+                   "|" + (analysis == null ? string.Empty : analysis.SelectedPriority.ToString(CultureInfo.InvariantCulture));
         }
 
         private static int ResolveTeleportRodUseSlot(MovementSafeLandingAnalysis analysis)

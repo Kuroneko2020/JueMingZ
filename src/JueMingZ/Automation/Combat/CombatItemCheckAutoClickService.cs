@@ -10,6 +10,7 @@ namespace JueMingZ.Automation.Combat
     {
         private const string ScopeName = "CombatAutoClickerItemCheck";
         private const int LifeCrystalItemType = 29;
+        private const int MouseItemSlot = 58;
         private const int RainbowRodItemType = 495;
         private const int RevolverItemType = 2269;
         private const int RodOfHarmonyItemType = 5335;
@@ -127,6 +128,11 @@ namespace JueMingZ.Automation.Combat
             }
         }
 
+        public static void RecordExternalSkip(string reason)
+        {
+            RecordDecision(ItemCheckAutoClickDecision.NoOp(string.IsNullOrWhiteSpace(reason) ? "externalScopedUse" : reason), null);
+        }
+
         public static ItemCheckAutoClickDecision CreateDecision(
             ItemCheckAutoClickProfile profile,
             bool featureEnabled,
@@ -180,6 +186,11 @@ namespace JueMingZ.Automation.Combat
                    !profile.DelayUseItem;
         }
 
+        internal static bool TryReadProfileForTesting(object player, out ItemCheckAutoClickProfile profile, out string reason)
+        {
+            return TryReadProfile(player, out profile, out reason);
+        }
+
         internal static bool IsSeedItemTypeForTesting(int itemType)
         {
             return IsSeedItemType(itemType);
@@ -218,7 +229,7 @@ namespace JueMingZ.Automation.Combat
             }
 
             profile.SelectedSlot = selectedSlot;
-            if (selectedSlot < 0 || selectedSlot > 9)
+            if (selectedSlot < 0 || (selectedSlot > 9 && selectedSlot != MouseItemSlot))
             {
                 profile.Available = false;
                 profile.Reason = "selectedSlotNotHotbar";
@@ -226,18 +237,32 @@ namespace JueMingZ.Automation.Combat
                 return true;
             }
 
-            var inventory = GameStateReflection.AsList(GameStateReflection.GetMember(player, "inventory"));
-            if (inventory == null || selectedSlot >= inventory.Count)
+            object item;
+            if (selectedSlot == MouseItemSlot)
             {
-                reason = "inventoryUnavailable";
-                return false;
+                if (!TerrariaInputCompat.TryGetMouseItem(out item))
+                {
+                    reason = "mouseItemUnavailable:" + TerrariaInputCompat.LastInputCompatError;
+                    return false;
+                }
+                profile.UsesMouseItem = true;
+            }
+            else
+            {
+                var inventory = GameStateReflection.AsList(GameStateReflection.GetMember(player, "inventory"));
+                if (inventory == null || selectedSlot >= inventory.Count)
+                {
+                    reason = "inventoryUnavailable";
+                    return false;
+                }
+
+                item = inventory[selectedSlot];
             }
 
-            var item = inventory[selectedSlot];
             if (item == null)
             {
                 profile.Available = false;
-                profile.Reason = "selectedItemUnavailable";
+                profile.Reason = selectedSlot == MouseItemSlot ? "mouseItemUnavailable" : "selectedItemUnavailable";
                 reason = profile.Reason;
                 return true;
             }
@@ -507,6 +532,7 @@ namespace JueMingZ.Automation.Combat
             public bool Eligible { get; set; }
             public string Reason { get; set; }
             public int SelectedSlot { get; set; }
+            public bool UsesMouseItem { get; set; }
             public int ItemType { get; set; }
             public int ItemStack { get; set; }
             public int UseStyle { get; set; }

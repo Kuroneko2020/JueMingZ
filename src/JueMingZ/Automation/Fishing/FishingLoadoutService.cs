@@ -112,7 +112,12 @@ namespace JueMingZ.Automation.Fishing
                 best.LoadoutIndex,
                 current,
                 "bestScore:" + best.Score.ToString(CultureInfo.InvariantCulture));
-            queue.Enqueue(request);
+            InputActionAdmissionResult admission;
+            if (!queue.TryEnqueue(request, out admission))
+            {
+                return;
+            }
+
             lock (SyncRoot)
             {
                 _switchRequestId = request.RequestId;
@@ -172,7 +177,12 @@ namespace JueMingZ.Automation.Fishing
                 original,
                 current,
                 reason ?? "sessionExit");
-            queue.Enqueue(request);
+            InputActionAdmissionResult admission;
+            if (!queue.TryEnqueue(request, out admission))
+            {
+                return;
+            }
+
             lock (SyncRoot)
             {
                 _restoreRequestId = request.RequestId;
@@ -278,8 +288,11 @@ namespace JueMingZ.Automation.Fishing
             {
                 Kind = InputActionKind.InventorySlot,
                 Priority = InputActionPriority.Normal,
+                DuplicatePolicy = InputActionDuplicatePolicy.CoalescePending,
                 SourceFeatureId = FeatureIds.FishingAutoLoadout,
                 Description = scenario,
+                QueueTimeout = TimeSpan.FromSeconds(2),
+                AdmissionKey = FeatureIds.FishingAutoLoadout + "|" + scenario,
                 Timeout = TimeSpan.FromSeconds(3)
             };
             request.Metadata[ActionMetadataKeys.Scenario] = scenario;

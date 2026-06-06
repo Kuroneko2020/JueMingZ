@@ -159,8 +159,14 @@ namespace JueMingZ.Automation.NpcServices
             }
 
             var request = BuildAutoTaxCollectRequest(target);
-            var requestId = queue.Enqueue(request);
-            RecordDecision("submitted auto tax collect request", target, requestId.ToString());
+            InputActionAdmissionResult admission;
+            if (!queue.TryEnqueue(request, out admission))
+            {
+                RecordDecision("auto tax collect admission denied: " + (admission == null ? "unknown" : admission.Reason), target, string.Empty);
+                return;
+            }
+
+            RecordDecision("submitted auto tax collect request", target, request.RequestId.ToString());
         }
 
         private static InputActionRequest BuildAutoTaxCollectRequest(TaxCollectorTarget target)
@@ -170,6 +176,7 @@ namespace JueMingZ.Automation.NpcServices
             {
                 Kind = InputActionKind.NpcInteract,
                 Priority = InputActionPriority.Low,
+                DuplicatePolicy = InputActionDuplicatePolicy.CoalescePending,
                 SourceFeatureId = FeatureIds.NpcAutoTaxCollect,
                 Description = "Auto collect tax collector money",
                 QueueTimeout = TimeSpan.FromMilliseconds(500),

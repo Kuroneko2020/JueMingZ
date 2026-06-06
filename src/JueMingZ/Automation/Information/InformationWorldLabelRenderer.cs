@@ -9,7 +9,7 @@ namespace JueMingZ.Automation.Information
         private const float LabelScale = 0.70f;
         private const float ScreenCullPadding = 80f;
         private const int MaxMeasureCacheEntries = 384;
-        private const float TightStackedLineAdvanceBasePixels = 13f;
+        private const float TightStackedLineAdvanceBasePixels = 15f;
         private const float TightStackedLineAdvanceMinPixels = 6f;
         private readonly Dictionary<string, InformationLabelMeasure> _measureCache = new Dictionary<string, InformationLabelMeasure>(StringComparer.Ordinal);
         private readonly Queue<string> _measureOrder = new Queue<string>();

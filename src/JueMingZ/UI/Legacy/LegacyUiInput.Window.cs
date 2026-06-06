@@ -98,12 +98,12 @@ namespace JueMingZ.UI.Legacy
 
                 if (mouse.LeftDown && string.Equals(_activeMode, "drag", StringComparison.Ordinal))
                 {
-                    LegacyMainUiState.SetWindow(mouse.X - _dragOffsetX, mouse.Y - _dragOffsetY, LegacyMainUiState.Width, LegacyMainUiState.Height, false);
+                    LegacyMainUiState.SetWindowForInteraction(mouse.X - _dragOffsetX, mouse.Y - _dragOffsetY, LegacyMainUiState.Width, LegacyMainUiState.Height, false);
                 }
 
                 if (LegacyUiMetrics.AllowResize && mouse.LeftDown && string.Equals(_activeMode, "resize", StringComparison.Ordinal))
                 {
-                    LegacyMainUiState.SetWindow(
+                    LegacyMainUiState.SetWindowForInteraction(
                         _resizeStartX,
                         _resizeStartY,
                         _resizeStartWidth + (mouse.X - _resizeStartMouseX),

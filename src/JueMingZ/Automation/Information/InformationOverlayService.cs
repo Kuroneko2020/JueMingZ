@@ -58,7 +58,7 @@ namespace JueMingZ.Automation.Information
         private const ulong SignScanIntervalTicks = 60;
         private const ulong StatusRefreshTicks = 30;
         private const ulong FishingBobberObserverFreshTicks = 2;
-        private const float EnemyHealthFontScaleMultiplier = 0.75f;
+        private const float EnemyHealthFontScaleDelta = 0.13f;
         private const string ChestLabelsModeAlways = "Always";
         private const string ChestLabelsModeOpened = "Opened";
         private const string ChestLabelsModeOff = "Off";
@@ -742,7 +742,7 @@ namespace JueMingZ.Automation.Information
                 nameFontScale = 0.70f;
             }
 
-            var value = Math.Round(nameFontScale * EnemyHealthFontScaleMultiplier, 2);
+            var value = Math.Round(nameFontScale - EnemyHealthFontScaleDelta, 2);
             if (value < InformationStyleHelper.MinFontScale)
             {
                 value = InformationStyleHelper.MinFontScale;

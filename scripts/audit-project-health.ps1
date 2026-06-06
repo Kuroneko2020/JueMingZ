@@ -1,4 +1,4 @@
-param(
+﻿param(
     [switch]$IncludeSourcePackageZip
 )
 
@@ -269,7 +269,7 @@ function Test-GitSourceBoundary {
         @{ Path = "docs/CURRENT_STATUS.md"; Description = "legacy docs backflow guard sample" },
         @{ Path = "$localDocsRootName/sample.md"; Description = "local Chinese documentation" },
         @{ Path = "references/TerrariaDecompiled-1.4.5.6/Player.cs"; Description = "decompiled Terraria references" },
-        @{ Path = "references/TerrariaReferenceNotes/README.md"; Description = "local curated reference notes" },
+        @{ Path = "文档/AI经验笔记/Terraria原版参考笔记/README.md"; Description = "local Terraria API experience notes" },
         @{ Path = "external/TerrariaRefs/Terraria.exe"; Description = "local compile-only Terraria references" },
         @{ Path = ".codex-tmp/smoke/sample.txt"; Description = "Codex temp output" },
         @{ Path = "_codex_log_inspect_20260506/sample.txt"; Description = "local log inspection output" },

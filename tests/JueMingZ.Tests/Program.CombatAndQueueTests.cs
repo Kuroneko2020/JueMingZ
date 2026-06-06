@@ -256,6 +256,64 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void CombatItemCheckAutoClickerReadsMouseItemSlot()
+        {
+            var restoreRuntimeTypes = PushFakeTerrariaMainType();
+            var previousMouseItem = Terraria.Main.mouseItem;
+            var previousAutoReuseAll = Terraria.Main.SettingsEnabled_AutoReuseAllItems;
+            try
+            {
+                Terraria.Main.SettingsEnabled_AutoReuseAllItems = false;
+                Terraria.Main.mouseItem = new FakeItem
+                {
+                    type = 5335,
+                    stack = 1,
+                    useStyle = 4,
+                    useAnimation = 20,
+                    useTime = 20,
+                    Name = "Rod of Harmony"
+                };
+
+                var player = new FakePlayer
+                {
+                    selectedItem = 58,
+                    active = true
+                };
+
+                CombatItemCheckAutoClickService.ItemCheckAutoClickProfile profile;
+                string reason;
+                if (!CombatItemCheckAutoClickService.TryReadProfileForTesting(player, out profile, out reason))
+                {
+                    throw new InvalidOperationException("Expected ItemCheck auto clicker to read Main.mouseItem: " + reason);
+                }
+
+                if (profile == null ||
+                    !profile.Available ||
+                    !profile.Eligible ||
+                    !profile.UsesMouseItem ||
+                    profile.SelectedSlot != 58 ||
+                    profile.ItemType != 5335)
+                {
+                    throw new InvalidOperationException("Expected mouse item slot 58 profile, got slot=" +
+                                                        (profile == null ? -1 : profile.SelectedSlot) +
+                                                        " itemType=" + (profile == null ? 0 : profile.ItemType) +
+                                                        " reason=" + (profile == null ? string.Empty : profile.Reason));
+                }
+
+                var decision = CombatItemCheckAutoClickService.CreateDecision(profile, true, true, profile.VanillaAutoReuseAllWeapons);
+                if (!decision.ApplyTakeover || !decision.PressAttack)
+                {
+                    throw new InvalidOperationException("Expected mouse-held item profile to request a fresh click, got " + decision.Reason + ".");
+                }
+            }
+            finally
+            {
+                Terraria.Main.mouseItem = previousMouseItem;
+                Terraria.Main.SettingsEnabled_AutoReuseAllItems = previousAutoReuseAll;
+                restoreRuntimeTypes();
+            }
+        }
+
         private static void CombatItemCheckAutoClickerYieldsToAdjacentScopedUse()
         {
             if (!ItemUseHookCallbacks.ShouldAttemptAutoClickerTakeoverForTesting(false, false, false, false, false))
@@ -346,6 +404,600 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void CombatFlailComboCoreLaunchesReleasesAndRecalls()
+        {
+            var profile = CreateFlailComboProfile();
+            var none = CombatFlailRuntimeFrame.None();
+
+            AssertFlailComboDecision(
+                CombatFlailComboService.CreateDecision(profile, none, true, true, false, FlailComboStates.Idle),
+                true,
+                true,
+                FlailComboStates.LaunchPress,
+                "launchReady");
+
+            AssertFlailComboDecision(
+                CombatFlailComboService.CreateDecision(profile, none, true, true, false, FlailComboStates.LaunchPress),
+                true,
+                false,
+                FlailComboStates.LaunchRelease,
+                "launchRelease");
+
+            AssertFlailComboDecision(
+                CombatFlailComboService.CreateDecision(profile, none, true, true, true, FlailComboStates.LaunchRelease),
+                false,
+                false,
+                FlailComboStates.Cooldown,
+                "cooldown");
+
+            var flying = CombatFlailRuntimeFrame.ForTesting(true, 10, 1058, 20, 1f, 4f, 0f, false, false, 0);
+            AssertFlailComboDecision(
+                CombatFlailComboService.CreateDecision(profile, flying, true, true, false, FlailComboStates.InFlight),
+                false,
+                false,
+                FlailComboStates.InFlight,
+                "inFlight");
+
+            var hit = CombatFlailRuntimeFrame.ForTesting(true, 10, 1058, 20, 1f, 4f, 0f, true, false, 0);
+            AssertFlailComboDecision(
+                CombatFlailComboService.CreateDecision(profile, hit, true, true, false, FlailComboStates.InFlight),
+                true,
+                true,
+                FlailComboStates.RecallPress,
+                "hitDetected");
+
+            AssertFlailComboDecision(
+                CombatFlailComboService.CreateDecision(profile, hit, true, true, false, FlailComboStates.RecallPress),
+                true,
+                false,
+                FlailComboStates.RecallRelease,
+                "recallRelease");
+        }
+
+        private static void CombatFlailComboBlocksVanillaRightClickSemantics()
+        {
+            var profile = CreateFlailComboProfile();
+            profile.VanillaRightClickBlocked = true;
+            profile.VanillaRightClickReason = "itemHasRightFire";
+
+            AssertFlailComboDecision(
+                CombatFlailComboService.CreateDecision(profile, CombatFlailRuntimeFrame.None(), true, true, false, FlailComboStates.Idle),
+                false,
+                false,
+                FlailComboStates.Disabled,
+                "itemHasRightFire");
+        }
+
+        private static void CombatFlailComboItemSetGuardFailsClosed()
+        {
+            try
+            {
+                CombatFlailComboService.ResetForTesting();
+                Terraria.ID.ItemID.Sets.HasRightFire[5526] = true;
+                string reason;
+                if (!CombatFlailRuntime.HasVanillaRightClickSemantics(5526, new FakePlayer(), out reason) ||
+                    !string.Equals(reason, "itemHasRightFire", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected HasRightFire item set to block flail combo right-click takeover.");
+                }
+
+                Terraria.ID.ItemID.Sets.HasRightFire[5526] = false;
+                Terraria.ID.ItemID.Sets.ItemsThatAllowRepeatedRightClick[5526] = true;
+                CombatFlailRuntime.ResetItemSetCacheForTesting();
+                if (!CombatFlailRuntime.HasVanillaRightClickSemantics(5526, new FakePlayer(), out reason) ||
+                    !string.Equals(reason, "itemAllowsRepeatedRightClick", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected repeated right-click item set to block flail combo right-click takeover.");
+                }
+            }
+            finally
+            {
+                Terraria.ID.ItemID.Sets.HasRightFire[5526] = false;
+                Terraria.ID.ItemID.Sets.ItemsThatAllowRepeatedRightClick[5526] = false;
+                CombatFlailRuntime.ResetItemSetCacheForTesting();
+            }
+        }
+
+        private static void CombatFlailComboScopedTakeoverSuppressesAndRestoresRightClick()
+        {
+            var player = new Terraria.Player
+            {
+                active = true,
+                controlUseItem = false,
+                releaseUseItem = false
+            };
+
+            ResetFakeMainMouse(false, false);
+            Terraria.Main.mouseRight = true;
+            Terraria.Main.mouseRightRelease = true;
+
+            TerrariaInputCompat.ScopedUseItemTakeover takeover;
+            if (!TerrariaInputCompat.TryBeginScopedUseItemClickTakeoverSuppressingRightClick(player, true, "CombatFlailComboItemCheck", out takeover))
+            {
+                throw new InvalidOperationException("Expected flail combo scoped takeover to apply: " + TerrariaInputCompat.LastInputCompatError);
+            }
+
+            if (!player.controlUseItem || !player.releaseUseItem ||
+                !Terraria.Main.mouseLeft || !Terraria.Main.mouseLeftRelease ||
+                Terraria.Main.mouseRight || Terraria.Main.mouseRightRelease ||
+                takeover == null || !takeover.Pressed ||
+                !takeover.MainMouseRightCaptured || !takeover.MainMouseRightReleaseCaptured)
+            {
+                throw new InvalidOperationException("Expected flail combo takeover to press left and suppress right within scope.");
+            }
+
+            if (!TerrariaInputCompat.TryRestoreScopedUseItemTakeover(takeover))
+            {
+                throw new InvalidOperationException("Expected flail combo scoped takeover restore to succeed: " + TerrariaInputCompat.LastInputCompatError);
+            }
+
+            if (player.controlUseItem || player.releaseUseItem ||
+                Terraria.Main.mouseLeft || Terraria.Main.mouseLeftRelease ||
+                !Terraria.Main.mouseRight || !Terraria.Main.mouseRightRelease)
+            {
+                throw new InvalidOperationException("Expected flail combo scoped takeover to restore left and right mouse state.");
+            }
+        }
+
+        private static void CombatFlailComboWorldRightClickGuardAllowsRawRightClickIntent()
+        {
+            var player = new FakePlayer();
+            var restoreMainType = PushFakeTerrariaMainType();
+            string reason;
+
+            try
+            {
+                Terraria.Main.SmartCursorWanted_Mouse = true;
+                Terraria.Main.SmartCursorShowing = true;
+                Terraria.Main.SmartInteractShowingFake = true;
+                if (TerrariaInputCompat.IsWorldRightClickInteractionActive(player, out reason))
+                {
+                    throw new InvalidOperationException("Expected smart cursor/fake interact hints to be allowed, got " + reason + ".");
+                }
+
+                Terraria.Main.SmartInteractShowingGenuine = true;
+                if (!TerrariaInputCompat.IsWorldRightClickInteractionActive(player, out reason) ||
+                    !string.Equals(reason, "smartInteractGenuine", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected genuine smart interact to block world right click takeover.");
+                }
+
+                Terraria.Main.SmartInteractShowingGenuine = false;
+                Terraria.Main.SmartInteractNPC = 12;
+                if (!TerrariaInputCompat.IsWorldRightClickInteractionActive(player, out reason) ||
+                    !string.Equals(reason, "smartInteractTarget", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected smart interact target to block world right click takeover.");
+                }
+
+                Terraria.Main.SmartInteractNPC = -1;
+                player.controlUseTile = true;
+                player.tileInteractAttempted = true;
+                if (TerrariaInputCompat.IsWorldRightClickInteractionActive(player, out reason))
+                {
+                    throw new InvalidOperationException("Expected raw right click intent to be allowed, got " + reason + ".");
+                }
+
+                player.tileInteractionHappened = true;
+                if (!TerrariaInputCompat.IsWorldRightClickInteractionActive(player, out reason) ||
+                    !string.Equals(reason, "tileInteractionHappened", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected completed tile interaction to block world right click takeover.");
+                }
+            }
+            finally
+            {
+                Terraria.Main.SmartInteractShowingGenuine = false;
+                Terraria.Main.SmartInteractShowingFake = false;
+                Terraria.Main.SmartCursorShowing = false;
+                Terraria.Main.SmartCursorWanted_Mouse = false;
+                Terraria.Main.SmartCursorWanted_GamePad = false;
+                Terraria.Main.SmartInteractNPC = -1;
+                Terraria.Main.SmartInteractProj = -1;
+                player.controlUseTile = false;
+                player.tileInteractionHappened = false;
+                player.tileInteractAttempted = false;
+                restoreMainType();
+            }
+        }
+
+        private static void CombatFlailComboAllowsPlainInventoryOpen()
+        {
+            var restoreRuntimeTypes = PushFakeTerrariaMainType();
+            var previousInventoryOpen = Terraria.Main.playerInventory;
+            var previousMainMouseInterface = Terraria.Main.mouseInterface;
+            var previousBlockMouse = Terraria.Main.blockMouse;
+            var previousGameMenu = Terraria.Main.gameMenu;
+            var previousChatMode = Terraria.Main.chatMode;
+            var previousDrawingPlayerChat = Terraria.Main.drawingPlayerChat;
+            var previousNpcChatText = Terraria.Main.npcChatText;
+            try
+            {
+                Terraria.Main.playerInventory = true;
+                Terraria.Main.mouseInterface = false;
+                Terraria.Main.blockMouse = false;
+                Terraria.Main.gameMenu = false;
+                Terraria.Main.chatMode = false;
+                Terraria.Main.drawingPlayerChat = false;
+                Terraria.Main.npcChatText = string.Empty;
+
+                var player = new FakePlayer
+                {
+                    active = true,
+                    mouseInterface = false
+                };
+
+                string reason;
+                if (CombatFlailComboService.IsUiBlockedForTesting(player, out reason))
+                {
+                    throw new InvalidOperationException("Plain open inventory should not block flail combo, got " + reason + ".");
+                }
+
+                Terraria.Main.mouseInterface = true;
+                if (!CombatFlailComboService.IsUiBlockedForTesting(player, out reason) ||
+                    !string.Equals(reason, "uiBlocked:mainMouseInterface", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Mouse-captured inventory UI should still block flail combo, got " + reason + ".");
+                }
+            }
+            finally
+            {
+                Terraria.Main.playerInventory = previousInventoryOpen;
+                Terraria.Main.mouseInterface = previousMainMouseInterface;
+                Terraria.Main.blockMouse = previousBlockMouse;
+                Terraria.Main.gameMenu = previousGameMenu;
+                Terraria.Main.chatMode = previousChatMode;
+                Terraria.Main.drawingPlayerChat = previousDrawingPlayerChat;
+                Terraria.Main.npcChatText = previousNpcChatText;
+                restoreRuntimeTypes();
+            }
+        }
+
+        private static void CombatFlailComboYieldsToAdjacentScopedUse()
+        {
+            if (!ItemUseHookCallbacks.ShouldAttemptFlailComboTakeoverForTesting(false, false, false, false, false))
+            {
+                throw new InvalidOperationException("Expected flail combo to run when no adjacent scoped use is active.");
+            }
+
+            AssertFlailComboYield(true, false, false, false, false, "bridge pending at start");
+            AssertFlailComboYield(false, true, false, false, false, "bridge pending now");
+            AssertFlailComboYield(false, false, true, false, false, "UseItemPulseBridge");
+            AssertFlailComboYield(false, false, false, true, false, "auto harvest");
+            AssertFlailComboYield(false, false, false, false, true, "auto capture");
+        }
+
+        private static void ItemCheckWriterArbiterPrioritizesBridgeOverCombatWriters()
+        {
+            var pending = ItemUseBridge.PendingRequestId;
+            if (pending != Guid.Empty)
+            {
+                ItemUseBridge.Cancel(pending, "test cleanup before bridge priority arbiter test");
+            }
+
+            var bridgeRequestId = Guid.NewGuid();
+            string bridgeMessage;
+            if (!ItemUseBridge.TryEnqueueUseSelectedItem(
+                bridgeRequestId,
+                "test.bridge_writer",
+                0,
+                1,
+                1,
+                "Test Item",
+                TimeSpan.FromSeconds(30),
+                0,
+                InputActionKind.ItemUse,
+                "Test.ItemCheckWriter.Bridge",
+                string.Empty,
+                "Automation",
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                out bridgeMessage))
+            {
+                throw new InvalidOperationException("Failed to seed ItemUseBridge pending request: " + bridgeMessage);
+            }
+
+            try
+            {
+                var decision = ItemCheckWriterArbiter.ResolveOwner(new ItemCheckWriterArbiterContext
+                {
+                    BridgePendingAtStart = true,
+                    BridgePendingNow = true,
+                    UseItemPulseActive = true,
+                    AutoCaptureCritterActive = true,
+                    AutoHarvestActive = true
+                });
+
+                if (decision.Owner != ItemCheckWriterKind.ItemUseBridge ||
+                    decision.OwnerRequestId != bridgeRequestId ||
+                    !string.Equals(decision.Reason, "bridgePendingAtStart", StringComparison.Ordinal) ||
+                    decision.BlockedCandidatesSummary.IndexOf("CombatPerfectRevolver:blockedByItemUseBridge", StringComparison.Ordinal) < 0)
+                {
+                    throw new InvalidOperationException("Expected ItemUseBridge to own ItemCheck writer while bridge is pending.");
+                }
+
+                if (ItemUseHookCallbacks.ShouldAttemptAutoClickerTakeoverForTesting(true, true, false, false, false) ||
+                    ItemUseHookCallbacks.ShouldAttemptFlailComboTakeoverForTesting(true, true, false, false, false))
+                {
+                    throw new InvalidOperationException("Combat writers must yield while ItemUseBridge is pending.");
+                }
+            }
+            finally
+            {
+                ItemUseBridge.Cancel(bridgeRequestId, "test cleanup after bridge priority arbiter test");
+            }
+        }
+
+        private static void ItemCheckWriterArbiterSelectsSingleWorldAutomationWriter()
+        {
+            WorldAutomationFairnessCoordinator.ResetForTesting();
+            var pending = ItemUseBridge.PendingRequestId;
+            if (pending != Guid.Empty)
+            {
+                ItemUseBridge.Cancel(pending, "test cleanup before world automation arbiter test");
+            }
+
+            var both = ItemCheckWriterArbiter.ResolveOwner(new ItemCheckWriterArbiterContext
+            {
+                AutoCaptureCritterActive = true,
+                AutoHarvestActive = true
+            });
+
+            if (both.Owner != ItemCheckWriterKind.AutoCaptureCritterSustainedUse ||
+                both.BlockedCandidatesSummary.IndexOf("AutoHarvestSustainedUse:notOwner", StringComparison.Ordinal) < 0)
+            {
+                throw new InvalidOperationException("Expected one world automation owner with the other writer blocked.");
+            }
+
+            var rotated = ItemCheckWriterArbiter.ResolveOwner(new ItemCheckWriterArbiterContext
+            {
+                AutoCaptureCritterActive = true,
+                AutoHarvestActive = true
+            });
+
+            if (rotated.Owner != ItemCheckWriterKind.AutoHarvestSustainedUse ||
+                rotated.BlockedCandidatesSummary.IndexOf("AutoCaptureCritterSustainedUse:notOwner", StringComparison.Ordinal) < 0)
+            {
+                throw new InvalidOperationException("Expected world automation writer fairness to rotate to auto harvest.");
+            }
+
+            var harvestOnly = ItemCheckWriterArbiter.ResolveOwner(new ItemCheckWriterArbiterContext
+            {
+                AutoHarvestActive = true
+            });
+
+            if (harvestOnly.Owner != ItemCheckWriterKind.AutoHarvestSustainedUse)
+            {
+                throw new InvalidOperationException("Expected auto harvest to own ItemCheck writer when it is the only active sustained session.");
+            }
+
+            if (ItemUseHookCallbacks.ShouldAttemptAutoClickerTakeoverForTesting(false, false, false, true, true) ||
+                ItemUseHookCallbacks.ShouldAttemptFlailComboTakeoverForTesting(false, false, false, true, true))
+            {
+                throw new InvalidOperationException("Combat writers must yield while sustained world automation owns ItemCheck.");
+            }
+        }
+
+        private static void WorldAutomationFairnessCoordinatorRotatesRuntimeWinners()
+        {
+            WorldAutomationFairnessCoordinator.ResetForTesting();
+            if (WorldAutomationFairnessCoordinator.ShouldDeferRuntimeSubmission(
+                    WorldAutomationFairnessKind.AutoCaptureCritter,
+                    10,
+                    false))
+            {
+                throw new InvalidOperationException("First capture candidate should receive the initial short world automation grant.");
+            }
+
+            if (!WorldAutomationFairnessCoordinator.ShouldDeferRuntimeSubmission(
+                    WorldAutomationFairnessKind.AutoHarvest,
+                    10,
+                    false))
+            {
+                throw new InvalidOperationException("Runtime grant within one tick should make the non-winner defer.");
+            }
+
+            if (!WorldAutomationFairnessCoordinator.ShouldDeferRuntimeSubmission(
+                    WorldAutomationFairnessKind.AutoCaptureCritter,
+                    11,
+                    false))
+            {
+                throw new InvalidOperationException("Capture should defer on the next conflict after it won the previous one.");
+            }
+
+            if (WorldAutomationFairnessCoordinator.ShouldDeferRuntimeSubmission(
+                    WorldAutomationFairnessKind.AutoHarvest,
+                    11,
+                    false))
+            {
+                throw new InvalidOperationException("Harvest should receive the next fairness grant after capture won.");
+            }
+
+            var snapshot = WorldAutomationFairnessCoordinator.GetSnapshot();
+            if (!string.Equals(snapshot.LastWinner, "AutoHarvest", StringComparison.Ordinal) ||
+                snapshot.LastFairnessBucket.IndexOf("worldAutomationFairnessGranted", StringComparison.Ordinal) < 0 ||
+                snapshot.FairnessDebt.IndexOf("autoCapture=", StringComparison.Ordinal) < 0)
+            {
+                throw new InvalidOperationException("Expected runtime fairness diagnostics to record harvest winner and debt.");
+            }
+        }
+
+        private static void CombatFlailComboDiagnosticsRecordScopedDecision()
+        {
+            var profile = CreateFlailComboProfile();
+            var frame = CombatFlailRuntimeFrame.ForTesting(true, 10, 1058, 20, 1f, 4f, 0f, true, false, 0);
+            var decision = CombatFlailComboService.CreateDecision(profile, frame, true, true, false, FlailComboStates.InFlight);
+            CombatFlailComboService.RecordDecisionForTesting(decision, profile, frame);
+
+            var diagnostics = CombatFlailComboService.GetDiagnostics();
+            if (!string.Equals(diagnostics.LastDecision, "scopedPress", StringComparison.Ordinal) ||
+                !string.Equals(diagnostics.LastReason, "hitDetected", StringComparison.Ordinal) ||
+                diagnostics.ItemType != 5526 ||
+                diagnostics.ProjectileType != 1058 ||
+                !diagnostics.HitDetected ||
+                !diagnostics.ScopedPress ||
+                diagnostics.ScopedRelease ||
+                diagnostics.RestoreOk)
+            {
+                throw new InvalidOperationException("Expected flail combo diagnostics to record scoped press decision.");
+            }
+
+            CombatFlailComboService.RecordRestoreStatus(true);
+            diagnostics = CombatFlailComboService.GetDiagnostics();
+            if (!diagnostics.RestoreOk)
+            {
+                throw new InvalidOperationException("Expected flail combo diagnostics to record restore status.");
+            }
+
+            CombatItemCheckAutoClickService.RecordExternalSkip("flailComboTakeover");
+            var autoClicker = CombatItemCheckAutoClickService.GetDiagnostics();
+            if (!string.Equals(autoClicker.LastDecision, "noOp", StringComparison.Ordinal) ||
+                !string.Equals(autoClicker.LastReason, "flailComboTakeover", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected auto clicker diagnostics to record flail combo external skip.");
+            }
+        }
+
+        private static void CombatFlailComboReleaseRemembersFlailAimTail()
+        {
+            CombatAimFlailControlService.ResetForTesting();
+            Terraria.Main.GameUpdateCount = 900;
+            ResetFakeMainMouse(false, true);
+            var player = new FakePlayer
+            {
+                whoAmI = 7,
+                controlUseItem = false,
+                releaseUseItem = true,
+                channel = false
+            };
+            var decision = BuildFlailItemCheckDecision(player);
+            decision.UseItemHeld = false;
+            decision.UseItemReleased = true;
+            decision.WasUseItemHeldLastTick = true;
+            decision.ReleasedThisTick = true;
+            decision.ReleaseDetected = true;
+            decision.ReleaseHoldPending = true;
+            decision.ReleaseHoldActive = true;
+            decision.ReleaseHoldState = ReleaseHoldStates.ReleasedPending;
+            decision.ReleaseHoldValidationReason = "targetDummyAllowed:strictRecomputed";
+
+            if (!CombatAimFlailControlService.TryRememberExistingItemCheckReleaseTail(decision, "FlailComboItemCheck"))
+            {
+                throw new InvalidOperationException("Expected flail combo release to remember ProjectileAI aim tail without a second input takeover.");
+            }
+
+            if (player.controlUseItem || !player.releaseUseItem || player.channel ||
+                Terraria.Main.mouseLeft || !Terraria.Main.mouseLeftRelease)
+            {
+                throw new InvalidOperationException("Expected flail combo release tail memory to leave input state unchanged.");
+            }
+
+            var diagnostics = CombatAimFlailControlService.GetDecisionDiagnostics(decision);
+            if (diagnostics == null ||
+                !diagnostics.Active ||
+                !diagnostics.AttackRelease ||
+                !diagnostics.AttackSuppressed ||
+                !diagnostics.PhysicalReleasePending ||
+                !string.Equals(diagnostics.State, FlailControlStates.ReleaseToTarget, StringComparison.Ordinal) ||
+                !string.Equals(diagnostics.TakeoverScope, "FlailComboItemCheck", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected flail combo release tail diagnostics to mark existing release scope.");
+            }
+
+            var method = typeof(CombatAimPersistentCursorService).GetMethod("TryGetFlailReleaseTailDecision", BindingFlags.Static | BindingFlags.NonPublic);
+            if (method == null)
+            {
+                throw new InvalidOperationException("TryGetFlailReleaseTailDecision reflection failed.");
+            }
+
+            var args = new object[] { 900L, null, null };
+            var tailAvailable = (bool)method.Invoke(null, args);
+            var tail = args[2] as CombatAimItemCheckDecision;
+            if (!tailAvailable || tail == null ||
+                !string.Equals(tail.PersistentCursorReason, "flailAiStyle15Release", StringComparison.Ordinal) ||
+                Math.Abs(tail.AimWorldX - decision.AimWorldX) > 0.001f ||
+                Math.Abs(tail.AimWorldY - decision.AimWorldY) > 0.001f)
+            {
+                throw new InvalidOperationException("Expected flail combo release to arm flail Projectile.AI scoped aim.");
+            }
+        }
+
+        private static void CombatFlailComboPressAimFeedsReleaseTail()
+        {
+            CombatAimFlailControlService.ResetForTesting();
+            Terraria.Main.GameUpdateCount = 1200;
+            ResetFakeMainMouse(false, true);
+            var player = new FakePlayer
+            {
+                whoAmI = 7,
+                controlUseItem = false,
+                releaseUseItem = true,
+                channel = false
+            };
+
+            var pressDecision = BuildFlailItemCheckDecision(player);
+            pressDecision.UseItemHeld = true;
+            pressDecision.UseItemReleased = true;
+            pressDecision.WasUseItemHeldLastTick = false;
+            pressDecision.ReleasedThisTick = false;
+            pressDecision.ReleaseDetected = false;
+            pressDecision.ReleaseHoldPending = true;
+            pressDecision.ReleaseHoldActive = false;
+            pressDecision.ReleaseHoldState = ReleaseHoldStates.ArmedWhileHeld;
+
+            if (!CombatAimFlailControlService.TryRememberFlailComboPressAim(pressDecision))
+            {
+                throw new InvalidOperationException("Expected flail combo press aim to be cached for the following virtual release.");
+            }
+
+            Terraria.Main.GameUpdateCount = 1201;
+            if (!CombatAimFlailControlService.TryRememberFlailComboPressReleaseTail("FlailComboItemCheck"))
+            {
+                throw new InvalidOperationException("Expected flail combo virtual release to arm tail from the press aim cache.");
+            }
+
+            if (player.controlUseItem || !player.releaseUseItem || player.channel ||
+                Terraria.Main.mouseLeft || !Terraria.Main.mouseLeftRelease)
+            {
+                throw new InvalidOperationException("Expected flail combo press-cache release tail memory to leave input state unchanged.");
+            }
+
+            var diagnostics = CombatAimFlailControlService.GetDecisionDiagnostics(pressDecision);
+            if (diagnostics == null ||
+                !diagnostics.Active ||
+                !diagnostics.AttackRelease ||
+                !diagnostics.AttackSuppressed ||
+                !diagnostics.CachedReleaseAim ||
+                !diagnostics.PhysicalReleasePending ||
+                !string.Equals(diagnostics.State, FlailControlStates.ReleaseToTarget, StringComparison.Ordinal) ||
+                !string.Equals(diagnostics.TakeoverScope, "FlailComboItemCheck", StringComparison.Ordinal) ||
+                !string.Equals(diagnostics.BlockedReason, "flailComboPressAim", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected flail combo press-cache diagnostics to mark a virtual release tail.");
+            }
+
+            var method = typeof(CombatAimPersistentCursorService).GetMethod("TryGetFlailReleaseTailDecision", BindingFlags.Static | BindingFlags.NonPublic);
+            if (method == null)
+            {
+                throw new InvalidOperationException("TryGetFlailReleaseTailDecision reflection failed.");
+            }
+
+            var args = new object[] { 1201L, null, null };
+            var tailAvailable = (bool)method.Invoke(null, args);
+            var tail = args[2] as CombatAimItemCheckDecision;
+            if (!tailAvailable || tail == null ||
+                !string.Equals(tail.PersistentCursorReason, "flailAiStyle15Release", StringComparison.Ordinal) ||
+                !tail.ReleaseDetected ||
+                !tail.ReleasedThisTick ||
+                !tail.WasUseItemHeldLastTick ||
+                Math.Abs(tail.AimWorldX - pressDecision.AimWorldX) > 0.001f ||
+                Math.Abs(tail.AimWorldY - pressDecision.AimWorldY) > 0.001f)
+            {
+                throw new InvalidOperationException("Expected flail combo press aim cache to feed the Projectile.AI release tail.");
+            }
+        }
+
         private static void ExpectAutoClickDecision(
             CombatItemCheckAutoClickService.ItemCheckAutoClickProfile profile,
             bool featureEnabled,
@@ -383,6 +1035,59 @@ namespace JueMingZ.Tests
                 autoCaptureApplied))
             {
                 throw new InvalidOperationException("Expected auto clicker to yield to " + label + ".");
+            }
+        }
+
+        private static void AssertFlailComboYield(
+            bool bridgePendingAtStart,
+            bool bridgePendingNow,
+            bool pulseApplied,
+            bool autoHarvestApplied,
+            bool autoCaptureApplied,
+            string label)
+        {
+            if (ItemUseHookCallbacks.ShouldAttemptFlailComboTakeoverForTesting(
+                bridgePendingAtStart,
+                bridgePendingNow,
+                pulseApplied,
+                autoHarvestApplied,
+                autoCaptureApplied))
+            {
+                throw new InvalidOperationException("Expected flail combo to yield to " + label + ".");
+            }
+        }
+
+        private static CombatFlailComboProfile CreateFlailComboProfile()
+        {
+            return new CombatFlailComboProfile
+            {
+                Available = true,
+                Eligible = true,
+                Reason = "eligible:flailAiStyle15",
+                ItemType = 5526,
+                ItemName = "Flairon",
+                Shoot = 1058,
+                ProjectileAiStyle = 15,
+                ItemReady = true
+            };
+        }
+
+        private static void AssertFlailComboDecision(
+            CombatFlailComboDecision decision,
+            bool expectedApply,
+            bool expectedPress,
+            string expectedState,
+            string expectedReason)
+        {
+            if (decision == null ||
+                decision.ApplyTakeover != expectedApply ||
+                decision.PressAttack != expectedPress ||
+                !string.Equals(decision.State, expectedState, StringComparison.Ordinal) ||
+                !string.Equals(decision.Reason, expectedReason, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "Expected flail combo decision " + expectedApply + "/" + expectedPress + "/" + expectedState + "/" + expectedReason +
+                    ", got " + (decision == null ? "<null>" : decision.ApplyTakeover + "/" + decision.PressAttack + "/" + decision.State + "/" + decision.Reason) + ".");
             }
         }
 
@@ -510,7 +1215,9 @@ namespace JueMingZ.Tests
             {
                 Kind = InputActionKind.MouseTarget,
                 SourceFeatureId = "test.try_enqueue",
-                Description = "normal admission"
+                Description = "normal admission",
+                AdmissionKey = "try-enqueue-normal",
+                Metadata = { { ActionMetadataKeys.Scenario, "Test.TryEnqueue.Normal" } }
             }, out admission))
             {
                 throw new InvalidOperationException("Expected TryEnqueue to accept a normal request: " + (admission == null ? "null" : admission.Reason));
@@ -518,7 +1225,12 @@ namespace JueMingZ.Tests
 
             var snapshot = queue.GetSnapshot();
             if (snapshot.PendingCount != 1 ||
-                !string.Equals(snapshot.ActionQueueLastAdmissionStatus, "Accepted", StringComparison.Ordinal))
+                !string.Equals(snapshot.ActionQueueLastAdmissionStatus, "Accepted", StringComparison.Ordinal) ||
+                !string.Equals(snapshot.ActionQueueLastAdmissionKind, "MouseTarget", StringComparison.Ordinal) ||
+                !string.Equals(snapshot.ActionQueueLastAdmissionSource, "test.try_enqueue", StringComparison.Ordinal) ||
+                !string.Equals(snapshot.ActionQueueLastAdmissionScenario, "Test.TryEnqueue.Normal", StringComparison.Ordinal) ||
+                !string.Equals(snapshot.ActionQueueLastAdmissionKey, "try-enqueue-normal", StringComparison.Ordinal) ||
+                string.IsNullOrWhiteSpace(snapshot.ActionQueueLastAdmissionRequiredChannels))
             {
                 throw new InvalidOperationException("Expected accepted admission to appear in snapshot.");
             }
@@ -595,6 +1307,247 @@ namespace JueMingZ.Tests
             if (admission == null || admission.Decision != InputActionAdmissionDecision.DeniedDuplicatePendingOrRunning)
             {
                 throw new InvalidOperationException("Unexpected duplicate running admission result.");
+            }
+        }
+
+        private static void TryEnqueueSupersedesPendingUserRequest()
+        {
+            var queue = new InputActionQueue();
+            var first = new InputActionRequest
+            {
+                Kind = InputActionKind.UseHotbarItem,
+                DuplicatePolicy = InputActionDuplicatePolicy.SupersedePending,
+                SourceFeatureId = FeatureIds.InventoryQuickItemHotkeys,
+                AdmissionKey = "quick-hotkey|F1|1",
+                Metadata = { { ActionMetadataKeys.Scenario, "Hotkey.QuickItemHotkeys" } }
+            };
+            var second = new InputActionRequest
+            {
+                Kind = InputActionKind.UseHotbarItem,
+                DuplicatePolicy = InputActionDuplicatePolicy.SupersedePending,
+                SourceFeatureId = FeatureIds.InventoryQuickItemHotkeys,
+                AdmissionKey = "quick-hotkey|F1|1",
+                Metadata = { { ActionMetadataKeys.Scenario, "Hotkey.QuickItemHotkeys" } }
+            };
+
+            InputActionAdmissionResult admission;
+            if (!queue.TryEnqueue(first, out admission))
+            {
+                throw new InvalidOperationException("Expected first user request to be accepted.");
+            }
+
+            if (!queue.TryEnqueue(second, out admission))
+            {
+                throw new InvalidOperationException("Expected second user request to supersede pending request: " + (admission == null ? "null" : admission.Reason));
+            }
+
+            var snapshot = queue.GetSnapshot();
+            if (admission == null ||
+                admission.Decision != InputActionAdmissionDecision.SupersededPending ||
+                admission.SupersededRequestId != first.RequestId ||
+                snapshot.PendingCount != 1 ||
+                snapshot.LastResult == null ||
+                snapshot.LastResult.RequestId != first.RequestId ||
+                snapshot.LastResult.Status != InputActionStatus.Cancelled ||
+                snapshot.ActionQueueSupersededPendingCount != 1 ||
+                !string.Equals(snapshot.ActionQueueLastAdmissionStatus, "Superseded", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected superseded pending request to record terminal result and snapshot state.");
+            }
+        }
+
+        private static void TryEnqueueCoalescesPendingBackgroundRequest()
+        {
+            var queue = new InputActionQueue();
+            var first = new InputActionRequest
+            {
+                Kind = InputActionKind.Chest,
+                DuplicatePolicy = InputActionDuplicatePolicy.CoalescePending,
+                SourceFeatureId = FeatureIds.InventoryAutoStack,
+                AdmissionKey = FeatureIds.InventoryAutoStack,
+                QueueTimeout = TimeSpan.FromSeconds(2),
+                Metadata =
+                {
+                    { ActionMetadataKeys.Scenario, ScenarioNames.InventoryAutoStack },
+                    { "InventorySignature", "old" }
+                }
+            };
+            var second = new InputActionRequest
+            {
+                Kind = InputActionKind.Chest,
+                DuplicatePolicy = InputActionDuplicatePolicy.CoalescePending,
+                SourceFeatureId = FeatureIds.InventoryAutoStack,
+                AdmissionKey = FeatureIds.InventoryAutoStack,
+                QueueTimeout = TimeSpan.FromSeconds(2),
+                Metadata =
+                {
+                    { ActionMetadataKeys.Scenario, ScenarioNames.InventoryAutoStack },
+                    { "InventorySignature", "new" }
+                }
+            };
+
+            InputActionAdmissionResult admission;
+            if (!queue.TryEnqueue(first, out admission))
+            {
+                throw new InvalidOperationException("Expected first background request to be accepted.");
+            }
+
+            if (!queue.TryEnqueue(second, out admission))
+            {
+                throw new InvalidOperationException("Expected second background request to coalesce pending request: " + (admission == null ? "null" : admission.Reason));
+            }
+
+            var pending = queue.GetPendingRequestsForTesting();
+            if (admission == null ||
+                admission.Decision != InputActionAdmissionDecision.CoalescedPending ||
+                admission.CoalescedRequestId != first.RequestId ||
+                queue.GetSnapshot().PendingCount != 1 ||
+                pending.Count != 1 ||
+                pending[0].RequestId != first.RequestId ||
+                !string.Equals(pending[0].Metadata["InventorySignature"], "new", StringComparison.Ordinal) ||
+                !string.Equals(pending[0].Metadata["AdmissionCoalescedCount"], "1", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected coalesced pending request to keep one updated pending request.");
+            }
+        }
+
+        private static void TryEnqueueUserRequestSupersedesBackgroundPending()
+        {
+            var queue = new InputActionQueue();
+            var background = new InputActionRequest
+            {
+                Kind = InputActionKind.RawInput,
+                Priority = InputActionPriority.Low,
+                SourceFeatureId = FeatureIds.WorldAutomationAutoHarvest,
+                AdmissionKey = FeatureIds.WorldAutomationAutoHarvest + ".harvest.sustained",
+                QueueTimeout = TimeSpan.FromMilliseconds(250),
+                Metadata =
+                {
+                    { ActionMetadataKeys.Scenario, ScenarioNames.WorldAutomationAutoHarvest },
+                    { ActionMetadataKeys.RawInputMode, "AutoHarvestSustainedUse" },
+                    { ActionMetadataKeys.SourceKind, "Automation" }
+                }
+            };
+            var user = new InputActionRequest
+            {
+                Kind = InputActionKind.UseHotbarItem,
+                Priority = InputActionPriority.Normal,
+                SourceFeatureId = FeatureIds.InventoryQuickItemHotkeys,
+                AdmissionKey = "quick-hotkey|F2|1326",
+                QueueTimeout = TimeSpan.FromMilliseconds(400),
+                Metadata =
+                {
+                    { ActionMetadataKeys.Scenario, "Hotkey.QuickItemHotkeys" },
+                    { ActionMetadataKeys.SourceKind, "Hotkey" },
+                    { ActionMetadataKeys.TargetSlot, "1" }
+                }
+            };
+
+            InputActionAdmissionResult admission;
+            if (!queue.TryEnqueue(background, out admission))
+            {
+                throw new InvalidOperationException("Expected background pending request to be accepted.");
+            }
+
+            if (!queue.TryEnqueue(user, out admission))
+            {
+                throw new InvalidOperationException("Expected user request to supersede background pending: " + (admission == null ? "null" : admission.Reason));
+            }
+
+            var pending = queue.GetPendingRequestsForTesting();
+            var snapshot = queue.GetSnapshot();
+            if (admission == null ||
+                admission.Decision != InputActionAdmissionDecision.SupersededPending ||
+                admission.SupersededRequestId != background.RequestId ||
+                pending.Count != 1 ||
+                pending[0].RequestId != user.RequestId ||
+                snapshot.LastResult == null ||
+                snapshot.LastResult.RequestId != background.RequestId ||
+                snapshot.ActionQueueSupersededPendingCount != 1 ||
+                snapshot.SchedulerLastSupersededRequest.IndexOf(FeatureIds.WorldAutomationAutoHarvest, StringComparison.Ordinal) < 0)
+            {
+                throw new InvalidOperationException("Expected user command to cancel conflicting background pending request with diagnostics.");
+            }
+        }
+
+        private static void InputActionQueueFindsTerminalResultByRequestId()
+        {
+            var executors = new Dictionary<InputActionKind, IInputActionExecutor>();
+            executors[InputActionKind.Chest] = new TerminalFakeExecutor(
+                InputActionKind.Chest,
+                InputActionStatus.AttemptedButUnverified,
+                "quick stack invoked but not verified");
+            var queue = new InputActionQueue(executors);
+            var request = new InputActionRequest
+            {
+                Kind = InputActionKind.Chest,
+                SourceFeatureId = FeatureIds.InventoryAutoStack,
+                AdmissionKey = FeatureIds.InventoryAutoStack,
+                Metadata = { { ActionMetadataKeys.Scenario, ScenarioNames.InventoryAutoStack } }
+            };
+
+            InputActionAdmissionResult admission;
+            if (!queue.TryEnqueue(request, out admission))
+            {
+                throw new InvalidOperationException("Expected request to be accepted.");
+            }
+
+            queue.Update(null);
+
+            InputActionResult result;
+            if (!queue.TryGetResultByRequestId(request.RequestId, out result) ||
+                result == null ||
+                result.RequestId != request.RequestId ||
+                result.Status != InputActionStatus.AttemptedButUnverified ||
+                result.Message.IndexOf("not verified", StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                throw new InvalidOperationException("Expected queue to return terminal result by request id.");
+            }
+        }
+
+        private static void CleanupLeaseBlocksSameResourceAdmission()
+        {
+            var executors = new Dictionary<InputActionKind, IInputActionExecutor>();
+            executors[InputActionKind.MouseTarget] = new TerminalFakeExecutor(
+                InputActionKind.MouseTarget,
+                InputActionStatus.AttemptedButUnverified,
+                "restore unverified");
+            var queue = new InputActionQueue(executors);
+            InputActionAdmissionResult admission;
+            if (!queue.TryEnqueue(new InputActionRequest
+            {
+                Kind = InputActionKind.MouseTarget,
+                SourceFeatureId = "test.cleanup.seed",
+                AdmissionKey = "cleanup-seed"
+            }, out admission))
+            {
+                throw new InvalidOperationException("Expected cleanup seed request to be accepted.");
+            }
+
+            queue.Update(null);
+            if (!queue.IsAnyChannelBusy(InputActionChannel.MouseTarget))
+            {
+                throw new InvalidOperationException("Expected attempted-but-unverified result to hold cleanup lease.");
+            }
+
+            if (queue.TryEnqueue(new InputActionRequest
+            {
+                Kind = InputActionKind.MouseTarget,
+                SourceFeatureId = "test.cleanup.next",
+                AdmissionKey = "cleanup-next"
+            }, out admission))
+            {
+                throw new InvalidOperationException("Expected cleanup lease to block same-resource admission.");
+            }
+
+            var snapshot = queue.GetSnapshot();
+            if (admission == null ||
+                admission.Decision != InputActionAdmissionDecision.DeniedCleanupLease ||
+                snapshot.ActionQueueCleanupLeaseCount != 1 ||
+                string.IsNullOrWhiteSpace(snapshot.ActionQueueLastCleanupOwner) ||
+                !string.Equals(snapshot.ActionQueueLastAdmissionDecision, "DeniedCleanupLease", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected cleanup lease denial to be visible in admission snapshot.");
             }
         }
 
@@ -702,6 +1655,66 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void TryEnqueueSnapshotRecordsDeniedAdmissionDetails()
+        {
+            var bridgeRequestId = Guid.NewGuid();
+            string bridgeMessage;
+            if (!ItemUseBridge.TryEnqueueUseSelectedItem(
+                bridgeRequestId,
+                "test.bridge_denied_snapshot",
+                0,
+                1,
+                1,
+                "Test Item",
+                TimeSpan.FromSeconds(30),
+                0,
+                InputActionKind.ItemUse,
+                "Test.BridgeDeniedSnapshot",
+                string.Empty,
+                "Automation",
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                out bridgeMessage))
+            {
+                throw new InvalidOperationException("Failed to seed ItemUseBridge pending request: " + bridgeMessage);
+            }
+
+            try
+            {
+                var queue = new InputActionQueue();
+                InputActionAdmissionResult admission;
+                if (queue.TryEnqueue(new InputActionRequest
+                {
+                    Kind = InputActionKind.ItemUse,
+                    SourceFeatureId = "test.denied_snapshot",
+                    Description = "denied snapshot",
+                    AdmissionKey = "denied-snapshot",
+                    Metadata = { { ActionMetadataKeys.Scenario, "Test.TryEnqueue.DeniedSnapshot" } }
+                }, out admission))
+                {
+                    throw new InvalidOperationException("Expected ItemUse request to be rejected while bridge is busy.");
+                }
+
+                var snapshot = queue.GetSnapshot();
+                if (snapshot.PendingCount != 0 ||
+                    !string.Equals(snapshot.ActionQueueLastAdmissionStatus, "Denied", StringComparison.Ordinal) ||
+                    !string.Equals(snapshot.ActionQueueLastAdmissionKind, "ItemUse", StringComparison.Ordinal) ||
+                    !string.Equals(snapshot.ActionQueueLastAdmissionSource, "test.denied_snapshot", StringComparison.Ordinal) ||
+                    !string.Equals(snapshot.ActionQueueLastAdmissionScenario, "Test.TryEnqueue.DeniedSnapshot", StringComparison.Ordinal) ||
+                    !string.Equals(snapshot.ActionQueueLastAdmissionKey, "denied-snapshot", StringComparison.Ordinal) ||
+                    string.IsNullOrWhiteSpace(snapshot.ActionQueueLastAdmissionBlockingChannels) ||
+                    string.IsNullOrWhiteSpace(snapshot.ActionQueueLastAdmissionBridgeBusySummary))
+                {
+                    throw new InvalidOperationException("Expected denied admission details to remain visible in snapshot.");
+                }
+            }
+            finally
+            {
+                ItemUseBridge.Cancel(bridgeRequestId, "test cleanup");
+            }
+        }
+
         private static void TryEnqueueDerivesQueueExpiration()
         {
             var created = DateTime.UtcNow;
@@ -777,6 +1790,29 @@ namespace JueMingZ.Tests
             if (legacyId == Guid.Empty || snapshot.PendingCount != 1)
             {
                 throw new InvalidOperationException("Expected legacy Enqueue to keep accepting pending requests.");
+            }
+        }
+
+        private static void LegacyEnqueueRecordsDirectEntryDiagnostics()
+        {
+            var queue = new InputActionQueue();
+            queue.Enqueue(new InputActionRequest
+            {
+                Kind = InputActionKind.Chest,
+                SourceFeatureId = "test.legacy.direct",
+                AdmissionKey = "legacy-direct",
+                Metadata = { { ActionMetadataKeys.Scenario, ScenarioNames.InventoryAutoStack } }
+            });
+
+            var snapshot = queue.GetSnapshot();
+            if (snapshot.ActionQueueDirectEnqueueCount != 1 ||
+                !string.Equals(snapshot.ActionQueueLastDirectEnqueueKind, "Chest", StringComparison.Ordinal) ||
+                !string.Equals(snapshot.ActionQueueLastDirectEnqueueSource, "test.legacy.direct", StringComparison.Ordinal) ||
+                !string.Equals(snapshot.ActionQueueLastDirectEnqueueScenario, ScenarioNames.InventoryAutoStack, StringComparison.Ordinal) ||
+                !string.Equals(snapshot.ActionQueueLastDirectEnqueueAdmissionKey, "legacy-direct", StringComparison.Ordinal) ||
+                string.IsNullOrWhiteSpace(snapshot.ActionQueueLastDirectEnqueueRequiredChannels))
+            {
+                throw new InvalidOperationException("Expected legacy Enqueue diagnostics to record the latest direct entry.");
             }
         }
 
@@ -951,6 +1987,41 @@ namespace JueMingZ.Tests
             if (!object.ReferenceEquals(selected, earlyHigh))
             {
                 throw new InvalidOperationException("Expected scheduler to pick highest priority, then earliest CreatedUtc.");
+            }
+        }
+
+        private static void SchedulerPrefersUserBucketOverEarlierBackground()
+        {
+            var earlyBackground = new InputActionRequest
+            {
+                Kind = InputActionKind.RawInput,
+                Priority = InputActionPriority.Normal,
+                SourceFeatureId = FeatureIds.WorldAutomationAutoHarvest,
+                CreatedUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                Metadata =
+                {
+                    { ActionMetadataKeys.SourceKind, "Automation" },
+                    { ActionMetadataKeys.Scenario, ScenarioNames.WorldAutomationAutoHarvest }
+                }
+            };
+            var laterUser = new InputActionRequest
+            {
+                Kind = InputActionKind.UseHotbarItem,
+                Priority = InputActionPriority.Normal,
+                SourceFeatureId = FeatureIds.InventoryQuickItemHotkeys,
+                CreatedUtc = new DateTime(2026, 1, 1, 0, 0, 1, DateTimeKind.Utc),
+                Metadata =
+                {
+                    { ActionMetadataKeys.SourceKind, "Hotkey" },
+                    { ActionMetadataKeys.Scenario, "Hotkey.QuickItemHotkeys" }
+                }
+            };
+
+            var selected = InputActionScheduler.SelectNext(new[] { earlyBackground, laterUser });
+            if (!object.ReferenceEquals(selected, laterUser) ||
+                !string.Equals(InputActionScheduler.ResolveBucketName(laterUser), "P2:UserExplicitCommand", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected scheduler bucket ordering to prefer explicit user commands over earlier background automation at the same priority.");
             }
         }
 
@@ -2584,6 +3655,8 @@ namespace JueMingZ.Tests
         {
             Terraria.Main.mouseLeft = left;
             Terraria.Main.mouseLeftRelease = leftRelease;
+            Terraria.Main.mouseRight = false;
+            Terraria.Main.mouseRightRelease = true;
             Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft = left;
             Terraria.GameInput.PlayerInput.Triggers.Current.MouseRight = false;
             Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft = false;

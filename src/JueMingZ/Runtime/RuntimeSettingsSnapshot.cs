@@ -58,6 +58,7 @@ namespace JueMingZ.Runtime
                 CombatAimTrackDummyEnabled = settings.CombatAimTrackDummyEnabled,
                 CombatAimMarkerEnabled = settings.CombatAimMarkerEnabled,
                 CombatAutoClickerEnabled = settings.CombatAutoClickerEnabled,
+                CombatFlailComboEnabled = settings.CombatFlailComboEnabled,
                 CombatPerfectRevolverEnabled = settings.CombatPerfectRevolverEnabled,
                 CombatMagicStringClickerEnabled = settings.CombatMagicStringClickerEnabled,
                 CombatAutoFacingEnabled = settings.CombatAutoFacingEnabled,
@@ -166,6 +167,7 @@ namespace JueMingZ.Runtime
         public bool CombatAimTrackDummyEnabled { get; private set; }
         public bool CombatAimMarkerEnabled { get; private set; }
         public bool CombatAutoClickerEnabled { get; private set; }
+        public bool CombatFlailComboEnabled { get; private set; }
         public bool CombatPerfectRevolverEnabled { get; private set; }
         public bool CombatMagicStringClickerEnabled { get; private set; }
         public bool CombatAutoFacingEnabled { get; private set; }

@@ -289,8 +289,11 @@ namespace JueMingZ.Automation.Fishing
             {
                 Kind = InputActionKind.InventorySlot,
                 Priority = InputActionPriority.Normal,
+                DuplicatePolicy = InputActionDuplicatePolicy.CoalescePending,
                 SourceFeatureId = FeatureIds.FishingAutoEquipment,
                 Description = "Fishing auto equipment apply",
+                QueueTimeout = TimeSpan.FromSeconds(2),
+                AdmissionKey = FeatureIds.FishingAutoEquipment + "|apply",
                 Timeout = TimeSpan.FromSeconds(3)
             };
             request.Metadata[ActionMetadataKeys.Scenario] = ScenarioNames.FishingAutoEquipmentApply;
@@ -298,8 +301,14 @@ namespace JueMingZ.Automation.Fishing
             request.Metadata["OriginalSelectedItemIndex"] = plan.Session.OriginalSelectedItemIndex.ToString(CultureInfo.InvariantCulture);
             request.Metadata["OriginalLoadoutIndex"] = plan.Session.OriginalLoadoutIndex.ToString(CultureInfo.InvariantCulture);
             request.Metadata["PlannedMoveCount"] = plan.Moves.Count.ToString(CultureInfo.InvariantCulture);
+            InputActionAdmissionResult admission;
+            if (!queue.TryEnqueue(request, out admission))
+            {
+                Record("skipped", "applyAdmissionDenied:" + (admission == null ? "unknown" : admission.Reason));
+                return;
+            }
+
             FishingAutoEquipmentCompat.RegisterApplyPlan(request.RequestId, plan);
-            queue.Enqueue(request);
             lock (SyncRoot)
             {
                 _applyRequestId = request.RequestId;
@@ -360,8 +369,11 @@ namespace JueMingZ.Automation.Fishing
             {
                 Kind = InputActionKind.InventorySlot,
                 Priority = InputActionPriority.Normal,
+                DuplicatePolicy = InputActionDuplicatePolicy.CoalescePending,
                 SourceFeatureId = FeatureIds.FishingAutoEquipment,
                 Description = "Fishing auto equipment restore",
+                QueueTimeout = TimeSpan.FromSeconds(2),
+                AdmissionKey = FeatureIds.FishingAutoEquipment + "|restore",
                 Timeout = TimeSpan.FromSeconds(3)
             };
             request.Metadata[ActionMetadataKeys.Scenario] = ScenarioNames.FishingAutoEquipmentRestore;
@@ -370,8 +382,14 @@ namespace JueMingZ.Automation.Fishing
             request.Metadata["OriginalLoadoutIndex"] = session.OriginalLoadoutIndex.ToString(CultureInfo.InvariantCulture);
             request.Metadata["PendingRestoreCount"] = records.Count.ToString(CultureInfo.InvariantCulture);
             request.Metadata["Reason"] = reason ?? string.Empty;
+            InputActionAdmissionResult admission;
+            if (!queue.TryEnqueue(request, out admission))
+            {
+                Record("skipped", "restoreAdmissionDenied:" + (admission == null ? "unknown" : admission.Reason));
+                return;
+            }
+
             FishingAutoEquipmentCompat.RegisterRestoreRequest(request.RequestId, session, records, reason);
-            queue.Enqueue(request);
             lock (SyncRoot)
             {
                 _restoreRequestId = request.RequestId;

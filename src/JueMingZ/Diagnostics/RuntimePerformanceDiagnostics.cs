@@ -47,6 +47,13 @@ namespace JueMingZ.Diagnostics
         public static double LastPerformanceHitchSlowestStageMs { get; private set; }
         public static string LastPerformanceHitchSlowestOperationName { get; private set; }
         public static double LastPerformanceHitchSlowestOperationMs { get; private set; }
+        public static long PerformanceOperationEventCount { get; private set; }
+        public static string LastPerformanceOperationScenario { get; private set; }
+        public static System.DateTime? LastPerformanceOperationUtc { get; private set; }
+        public static double LastPerformanceOperationElapsedMs { get; private set; }
+        public static double LastPerformanceOperationThresholdMs { get; private set; }
+        public static string LastPerformanceOperationReason { get; private set; }
+        public static string LastPerformanceOperationOwnerSummary { get; private set; }
 
         public static void Record(
             double runtimeUpdateMs,
@@ -135,6 +142,26 @@ namespace JueMingZ.Diagnostics
             }
         }
 
+        public static void RecordOperation(PerformanceOperationSample sample, string performanceEventsPath)
+        {
+            if (sample == null)
+            {
+                return;
+            }
+
+            lock (SyncRoot)
+            {
+                PerformanceOperationEventCount++;
+                PerformanceEventsPath = performanceEventsPath ?? string.Empty;
+                LastPerformanceOperationScenario = sample.Scenario ?? string.Empty;
+                LastPerformanceOperationUtc = sample.UtcNow;
+                LastPerformanceOperationElapsedMs = sample.ElapsedMs;
+                LastPerformanceOperationThresholdMs = sample.ThresholdMs;
+                LastPerformanceOperationReason = sample.Reason ?? string.Empty;
+                LastPerformanceOperationOwnerSummary = sample.OwnerSummary ?? string.Empty;
+            }
+        }
+
         internal static void ResetForTesting()
         {
             lock (SyncRoot)
@@ -165,6 +192,13 @@ namespace JueMingZ.Diagnostics
                 LastPerformanceHitchSlowestStageMs = 0d;
                 LastPerformanceHitchSlowestOperationName = string.Empty;
                 LastPerformanceHitchSlowestOperationMs = 0d;
+                PerformanceOperationEventCount = 0;
+                LastPerformanceOperationScenario = string.Empty;
+                LastPerformanceOperationUtc = null;
+                LastPerformanceOperationElapsedMs = 0d;
+                LastPerformanceOperationThresholdMs = 0d;
+                LastPerformanceOperationReason = string.Empty;
+                LastPerformanceOperationOwnerSummary = string.Empty;
                 ClearRecentWindow();
             }
         }

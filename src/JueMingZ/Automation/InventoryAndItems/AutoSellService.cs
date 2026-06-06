@@ -203,7 +203,13 @@ namespace JueMingZ.Automation.InventoryAndItems
             }
 
             var request = BuildAutoSellRequest(target, candidates, signature);
-            queue.Enqueue(request);
+            InputActionAdmissionResult admission;
+            if (!queue.TryEnqueue(request, out admission))
+            {
+                RecordDecision("auto sell admission denied: " + (admission == null ? "unknown" : admission.Reason), signature, JoinInts(itemIds));
+                return;
+            }
+
             RecordDecision("submitted auto sell request", signature, JoinInts(itemIds));
         }
 
@@ -218,8 +224,10 @@ namespace JueMingZ.Automation.InventoryAndItems
             {
                 Kind = InputActionKind.Shop,
                 Priority = InputActionPriority.Low,
+                DuplicatePolicy = InputActionDuplicatePolicy.CoalescePending,
                 SourceFeatureId = FeatureIds.InventoryAutoSell,
                 Description = "Auto sell listed items",
+                QueueTimeout = TimeSpan.FromSeconds(2),
                 Timeout = TimeSpan.FromSeconds(3),
                 AdmissionKey = FeatureIds.InventoryAutoSell
             };

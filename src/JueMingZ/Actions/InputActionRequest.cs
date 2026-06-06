@@ -4,11 +4,19 @@ using JueMingZ.Actions.Channels;
 
 namespace JueMingZ.Actions
 {
+    public enum InputActionDuplicatePolicy
+    {
+        Deny,
+        SupersedePending,
+        CoalescePending
+    }
+
     public sealed class InputActionRequest
     {
         public Guid RequestId { get; set; }
         public InputActionKind Kind { get; set; }
         public InputActionPriority Priority { get; set; }
+        public InputActionDuplicatePolicy DuplicatePolicy { get; set; }
         public string SourceFeatureId { get; set; }
         public string Description { get; set; }
         public DateTime CreatedUtc { get; set; }
@@ -29,6 +37,7 @@ namespace JueMingZ.Actions
             RequestId = Guid.NewGuid();
             Kind = InputActionKind.None;
             Priority = InputActionPriority.Normal;
+            DuplicatePolicy = InputActionDuplicatePolicy.Deny;
             SourceFeatureId = string.Empty;
             Description = string.Empty;
             CreatedUtc = DateTime.UtcNow;

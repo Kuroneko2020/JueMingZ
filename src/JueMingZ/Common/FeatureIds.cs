@@ -4,6 +4,7 @@ namespace JueMingZ.Common
     {
         public const string CombatAutoAim = "combat.auto_aim";
         public const string CombatAutoClicker = "combat.auto_clicker";
+        public const string CombatFlailCombo = "combat.flail_combo";
         public const string CombatPerfectRevolver = "combat.perfect_revolver";
         public const string CombatMagicStringClicker = "combat.magic_string_clicker";
         public const string CombatAutoFacing = "combat.auto_facing";

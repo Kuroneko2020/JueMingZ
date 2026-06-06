@@ -6,9 +6,12 @@ namespace JueMingZ.Actions
     public enum InputActionAdmissionDecision
     {
         Accepted,
+        SupersededPending,
+        CoalescedPending,
         DeniedDuplicatePendingOrRunning,
         DeniedRunningChannelConflict,
         DeniedBridgeBusy,
+        DeniedCleanupLease,
         DeniedExpiredBeforeEnqueue,
         DeniedInvalidRequest
     }
@@ -36,8 +39,15 @@ namespace JueMingZ.Actions
         public string PendingConflictSummary { get; set; }
         public string RunningConflictSummary { get; set; }
         public string BridgeBusySummary { get; set; }
+        public string OwnerSummary { get; set; }
+        public Guid SupersededRequestId { get; set; }
+        public Guid CoalescedRequestId { get; set; }
+        public int CoalescedCount { get; set; }
         public bool DuplicatePendingOrRunning { get; set; }
         public bool ExpiredBeforeEnqueue { get; set; }
+        public bool SupersededPending { get; set; }
+        public bool CoalescedPending { get; set; }
+        public bool CleanupLeaseBlocked { get; set; }
 
         public InputActionAdmissionResult()
         {
@@ -48,11 +58,30 @@ namespace JueMingZ.Actions
             PendingConflictSummary = string.Empty;
             RunningConflictSummary = string.Empty;
             BridgeBusySummary = string.Empty;
+            OwnerSummary = string.Empty;
         }
 
         public string Status
         {
-            get { return Accepted ? "Accepted" : "Denied"; }
+            get
+            {
+                if (!Accepted)
+                {
+                    return "Denied";
+                }
+
+                if (Decision == InputActionAdmissionDecision.SupersededPending)
+                {
+                    return "Superseded";
+                }
+
+                if (Decision == InputActionAdmissionDecision.CoalescedPending)
+                {
+                    return "Coalesced";
+                }
+
+                return "Accepted";
+            }
         }
 
         public string Summary

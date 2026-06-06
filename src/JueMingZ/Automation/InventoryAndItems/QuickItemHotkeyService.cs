@@ -130,13 +130,22 @@ namespace JueMingZ.Automation.InventoryAndItems
             }
 
             var request = BuildUseRequest(slot, itemType, itemName, requestedItemType, binding.DisplayName, chord.Display);
-            queue.Enqueue(request);
+            InputActionAdmissionResult admission;
+            if (!queue.TryEnqueue(request, out admission))
+            {
+                DiagnosticActionRecorder.RecordHotkeyEvent(
+                    chord.Display,
+                    "Hotkey.QuickItemHotkeys",
+                DiagnosticResultCode.Failed,
+                    "Quick item hotkey request was not admitted: " + (admission == null ? "unknown" : admission.Reason));
+                return false;
+            }
 
             DiagnosticActionRecorder.RecordHotkeyEvent(
                 chord.Display,
                 "Hotkey.QuickItemHotkeys",
                 DiagnosticResultCode.Queued,
-                "Quick item hotkey queued UseHotbarItem for slot " + (slot + 1).ToString(CultureInfo.InvariantCulture) + ".");
+                "Quick item hotkey " + admission.Status.ToLowerInvariant() + " UseHotbarItem for slot " + (slot + 1).ToString(CultureInfo.InvariantCulture) + ".");
             return true;
         }
 
@@ -147,8 +156,11 @@ namespace JueMingZ.Automation.InventoryAndItems
             {
                 Kind = InputActionKind.UseHotbarItem,
                 Priority = InputActionPriority.Normal,
+                DuplicatePolicy = InputActionDuplicatePolicy.SupersedePending,
                 SourceFeatureId = FeatureIds.InventoryQuickItemHotkeys,
                 Description = "Quick item hotkey use",
+                QueueTimeout = TimeSpan.FromMilliseconds(400),
+                AdmissionKey = FeatureIds.InventoryQuickItemHotkeys + "|" + (sourceHotkey ?? string.Empty) + "|" + requestedItemType.ToString(CultureInfo.InvariantCulture),
                 Timeout = TimeSpan.FromSeconds(5)
             };
             request.Metadata["Slot"] = slotText;

@@ -20,6 +20,7 @@ namespace JueMingZ.Hooks
             public bool AutoHarvestSustainedUseApplied;
             public bool AutoCaptureCritterSustainedUseApplied;
             public bool AutoClickerTakeoverApplied;
+            public bool FlailComboTakeoverApplied;
             public bool PerfectRevolverTakeoverApplied;
             public bool FlailTakeoverApplied;
             public bool TravelMenuItemCheckGuardApplied;
@@ -40,6 +41,7 @@ namespace JueMingZ.Hooks
             public bool AutoCaptureCritterSustainedUseDirectionCaptured;
             public int AutoCaptureCritterSustainedUseOriginalDirection;
             public TerrariaInputCompat.ScopedUseItemTakeover AutoClickerTakeover;
+            public TerrariaInputCompat.ScopedUseItemTakeover FlailComboTakeover;
             public TerrariaInputCompat.ScopedUseItemTakeover PerfectRevolverTakeover;
             public TerrariaInputCompat.ScopedUseItemTakeover FlailTakeover;
             public TerrariaInputCompat.ScopedUseItemTakeover TravelMenuItemCheckGuard;
@@ -47,6 +49,7 @@ namespace JueMingZ.Hooks
             public CombatAimItemCheckDecision AimDecision;
             public AutoBuffFollowItemUseObservation FollowUseObservation;
             public ItemCheckInputProbeFrame InputProbeBefore;
+            public ItemCheckWriterDecision WriterDecision;
         }
 
         private static void Prefix(object __instance, ref ItemUseHookState __state)
@@ -73,16 +76,6 @@ namespace JueMingZ.Hooks
                 TerrariaInputCompat.TryApplyAutoFacingDirectionOverrideForItemCheck(__instance, out autoFacingApplied, out autoFacingMessage);
                 CombatAutoFacingService.TryApplyManualMovementFacingForItemCheck(__instance, out autoFacingApplied, out autoFacingMessage);
 
-                if (TryApplyPerfectRevolverTakeover(__instance, ref __state))
-                {
-                    if (__state.PerfectRevolverTakeoverApplied && __state.PerfectRevolverTakeover != null && __state.PerfectRevolverTakeover.Pressed)
-                    {
-                        TryApplyCombatAim(__instance, ref __state, false);
-                    }
-
-                    return;
-                }
-
                 var bridgePendingAtStart = __state.BridgePendingAtStart;
                 if (!bridgePendingAtStart)
                 {
@@ -92,48 +85,61 @@ namespace JueMingZ.Hooks
                 ItemUseBridgeContext context;
                 if (!ItemUseBridge.TryBeginFromItemCheck(__instance, out context))
                 {
-                    if (bridgePendingAtStart || ItemUseBridge.PendingRequestId != Guid.Empty)
+                    __state.WriterDecision = ItemCheckWriterArbiter.ResolveOwner(BuildItemCheckWriterContext(bridgePendingAtStart));
+                    if (TryApplyArbitratedActiveWriter(__instance, ref __state, __state.WriterDecision))
                     {
                         return;
                     }
 
-                    AutoHarvestSustainedUseApplyResult autoHarvestUse;
-                    AutoCaptureCritterSustainedUseApplyResult autoCaptureUse;
-                    if (AutoCaptureCritterSustainedUseBridge.TryApplyItemCheckUse(__instance, out autoCaptureUse) && autoCaptureUse != null)
+                    if (__state.WriterDecision != null &&
+                        __state.WriterDecision.Owner != ItemCheckWriterKind.None)
                     {
-                        __state.FollowUseObservation = null;
-                        __state.AutoCaptureCritterSustainedUseApplied = true;
-                        __state.AutoCaptureCritterSustainedUseRequestId = autoCaptureUse.RequestId;
-                        __state.AutoCaptureCritterSustainedUseRestoreState = autoCaptureUse.RestoreState;
-                        __state.AutoCaptureCritterSustainedUseMouseRestoreState = autoCaptureUse.MouseRestoreState;
-                        __state.AutoCaptureCritterSustainedUseRestoreSlot = autoCaptureUse.RestoreSelectedSlot;
-                        __state.AutoCaptureCritterSustainedUseDirectionCaptured = autoCaptureUse.DirectionCaptured;
-                        __state.AutoCaptureCritterSustainedUseOriginalDirection = autoCaptureUse.OriginalDirection;
+                        CombatItemCheckAutoClickService.RecordExternalSkip(__state.WriterDecision.Reason);
                         return;
                     }
 
-                    if (AutoHarvestSustainedUseBridge.TryApplyItemCheckUse(__instance, out autoHarvestUse) && autoHarvestUse != null)
+                    if (TryApplyPerfectRevolverTakeover(__instance, ref __state))
                     {
-                        __state.FollowUseObservation = null;
-                        __state.AutoHarvestSustainedUseApplied = true;
-                        __state.AutoHarvestSustainedUseRequestId = autoHarvestUse.RequestId;
-                        __state.AutoHarvestSustainedUseRestoreState = autoHarvestUse.RestoreState;
-                        __state.AutoHarvestSustainedUseMouseRestoreState = autoHarvestUse.MouseRestoreState;
+                        ItemCheckWriterArbiter.RecordApplied(
+                            ItemCheckWriterKind.CombatPerfectRevolver,
+                            Guid.Empty,
+                            __state.PerfectRevolverTakeover != null && __state.PerfectRevolverTakeover.Pressed ? "press" : "release",
+                            "perfectRevolverTakeover");
+                        if (__state.PerfectRevolverTakeoverApplied && __state.PerfectRevolverTakeover != null && __state.PerfectRevolverTakeover.Pressed)
+                        {
+                            TryApplyCombatAim(__instance, ref __state, false);
+                        }
+
                         return;
                     }
 
-                    UseItemPulseApplyResult pulse;
-                    if (UseItemPulseBridge.TryApplyItemCheckPulse(__instance, out pulse) && pulse != null)
+                    if (ShouldAttemptFlailComboTakeover(
+                            __state.BridgePendingAtStart,
+                            ItemUseBridge.PendingRequestId != Guid.Empty,
+                            __state.PulseApplied,
+                            __state.AutoHarvestSustainedUseApplied,
+                            __state.AutoCaptureCritterSustainedUseApplied) &&
+                        TryApplyFlailComboTakeover(__instance, ref __state))
                     {
-                        __state.PulseApplied = true;
-                        __state.PulseRequestId = pulse.RequestId;
-                        __state.PulsePressed = pulse.Pressed;
-                        __state.PulseAllowCombatAim = pulse.AllowCombatAim;
-                        __state.PulseRestoreState = pulse.RestoreState;
-                    }
+                        ItemCheckWriterArbiter.RecordApplied(
+                            ItemCheckWriterKind.CombatFlailCombo,
+                            Guid.Empty,
+                            __state.FlailComboTakeover != null && __state.FlailComboTakeover.Pressed ? "press" : "release",
+                            "flailComboTakeover");
+                        CombatItemCheckAutoClickService.RecordExternalSkip("flailComboTakeover");
+                        if (__state.FlailComboTakeoverApplied && __state.FlailComboTakeover != null)
+                        {
+                            TryApplyCombatAim(__instance, ref __state, false);
+                            if (__state.FlailComboTakeover.Pressed)
+                            {
+                                TryRememberFlailComboPressAim(ref __state);
+                            }
+                            else
+                            {
+                                TryRememberFlailComboReleaseTail(ref __state);
+                            }
+                        }
 
-                    if (__state.PulseApplied && !__state.PulsePressed)
-                    {
                         return;
                     }
 
@@ -145,6 +151,11 @@ namespace JueMingZ.Hooks
                             __state.AutoCaptureCritterSustainedUseApplied) &&
                         TryApplyAutoClickerTakeover(__instance, ref __state))
                     {
+                        ItemCheckWriterArbiter.RecordApplied(
+                            ItemCheckWriterKind.CombatItemCheckAutoClicker,
+                            Guid.Empty,
+                            __state.AutoClickerTakeover != null && __state.AutoClickerTakeover.Pressed ? "press" : "release",
+                            "autoClickerTakeover");
                         if (__state.AutoClickerTakeoverApplied && __state.AutoClickerTakeover != null && __state.AutoClickerTakeover.Pressed)
                         {
                             TryApplyCombatAim(__instance, ref __state, false);
@@ -157,7 +168,22 @@ namespace JueMingZ.Hooks
                     {
                         TryApplyCombatAim(__instance, ref __state, false);
                         TryApplyFlailCachedReleaseAim(__instance, ref __state);
-                        TryApplyFlailTakeover(__instance, ref __state);
+                        if (TryApplyFlailTakeover(__instance, ref __state))
+                        {
+                            ItemCheckWriterArbiter.RecordApplied(
+                                ItemCheckWriterKind.CombatFlailRelease,
+                                Guid.Empty,
+                                "release",
+                                "flailReleaseTakeover");
+                        }
+                        else if (__state.AimApplied)
+                        {
+                            ItemCheckWriterArbiter.RecordApplied(
+                                ItemCheckWriterKind.CombatAim,
+                                Guid.Empty,
+                                "aimOnly",
+                                "combatAimOnly");
+                        }
                     }
 
                     return;
@@ -198,6 +224,11 @@ namespace JueMingZ.Hooks
                 __state.RestoreState = restoreState;
                 __state.BridgeMouseRestoreState = mouseRestoreState;
                 __state.Context = context;
+                ItemCheckWriterArbiter.RecordApplied(
+                    ItemCheckWriterKind.ItemUseBridge,
+                    context.RequestId,
+                    "press",
+                    "itemUseBridgeApplied");
 
                 if (context.AllowCombatAim)
                 {
@@ -229,6 +260,11 @@ namespace JueMingZ.Hooks
 
             if (!__state.BridgeApplied)
             {
+                if (__state.FlailComboTakeoverApplied)
+                {
+                    RestoreFlailComboTakeover(__state.FlailComboTakeover);
+                }
+
                 if (__state.AutoClickerTakeoverApplied)
                 {
                     RestoreAutoClickerTakeover(__state.AutoClickerTakeover);
@@ -285,6 +321,11 @@ namespace JueMingZ.Hooks
                     if (__state.AutoClickerTakeoverApplied)
                     {
                         RestoreAutoClickerTakeover(__state.AutoClickerTakeover);
+                    }
+
+                    if (__state.FlailComboTakeoverApplied)
+                    {
+                        RestoreFlailComboTakeover(__state.FlailComboTakeover);
                     }
 
                     if (__state.PerfectRevolverTakeoverApplied)
@@ -349,6 +390,21 @@ namespace JueMingZ.Hooks
                 autoCaptureApplied);
         }
 
+        internal static bool ShouldAttemptFlailComboTakeoverForTesting(
+            bool bridgePendingAtStart,
+            bool bridgePendingNow,
+            bool pulseApplied,
+            bool autoHarvestApplied,
+            bool autoCaptureApplied)
+        {
+            return ShouldAttemptFlailComboTakeover(
+                bridgePendingAtStart,
+                bridgePendingNow,
+                pulseApplied,
+                autoHarvestApplied,
+                autoCaptureApplied);
+        }
+
         private static void RecordInputProbe(object player, ref ItemUseHookState state)
         {
             try
@@ -395,6 +451,11 @@ namespace JueMingZ.Hooks
 
             state.TravelMenuItemCheckGuardApplied = true;
             state.TravelMenuItemCheckGuard = takeover;
+            ItemCheckWriterArbiter.RecordApplied(
+                ItemCheckWriterKind.TravelMenuGuard,
+                Guid.Empty,
+                "guard",
+                string.IsNullOrWhiteSpace(message) ? "travelMenuGuard" : message);
             return true;
         }
 
@@ -449,6 +510,19 @@ namespace JueMingZ.Hooks
             return true;
         }
 
+        private static bool TryApplyFlailComboTakeover(object player, ref ItemUseHookState state)
+        {
+            TerrariaInputCompat.ScopedUseItemTakeover takeover;
+            if (!CombatFlailComboService.TryBeginItemCheckTakeover(player, out takeover))
+            {
+                return false;
+            }
+
+            state.FlailComboTakeoverApplied = true;
+            state.FlailComboTakeover = takeover;
+            return true;
+        }
+
         private static bool ShouldAttemptAutoClickerTakeover(
             bool bridgePendingAtStart,
             bool bridgePendingNow,
@@ -456,18 +530,46 @@ namespace JueMingZ.Hooks
             bool autoHarvestApplied,
             bool autoCaptureApplied)
         {
-            return !bridgePendingAtStart &&
-                   !bridgePendingNow &&
-                   !pulseApplied &&
-                   !autoHarvestApplied &&
-                   !autoCaptureApplied;
+            ItemCheckWriterDecision decision;
+            return !ItemCheckWriterArbiter.IsBlockedByActiveOwner(
+                ItemCheckWriterKind.CombatItemCheckAutoClicker,
+                new ItemCheckWriterArbiterContext
+                {
+                    BridgePendingAtStart = bridgePendingAtStart,
+                    BridgePendingNow = bridgePendingNow,
+                    UseItemPulseActive = pulseApplied,
+                    AutoHarvestActive = autoHarvestApplied,
+                    AutoCaptureCritterActive = autoCaptureApplied
+                },
+                out decision);
         }
 
-        private static void TryApplyFlailTakeover(object player, ref ItemUseHookState state)
+        private static bool ShouldAttemptFlailComboTakeover(
+            bool bridgePendingAtStart,
+            bool bridgePendingNow,
+            bool pulseApplied,
+            bool autoHarvestApplied,
+            bool autoCaptureApplied)
+        {
+            ItemCheckWriterDecision decision;
+            return !ItemCheckWriterArbiter.IsBlockedByActiveOwner(
+                ItemCheckWriterKind.CombatFlailCombo,
+                new ItemCheckWriterArbiterContext
+                {
+                    BridgePendingAtStart = bridgePendingAtStart,
+                    BridgePendingNow = bridgePendingNow,
+                    UseItemPulseActive = pulseApplied,
+                    AutoHarvestActive = autoHarvestApplied,
+                    AutoCaptureCritterActive = autoCaptureApplied
+                },
+                out decision);
+        }
+
+        private static bool TryApplyFlailTakeover(object player, ref ItemUseHookState state)
         {
             if (!state.AimApplied || state.AimDecision == null || state.FlailTakeoverApplied)
             {
-                return;
+                return false;
             }
 
             TerrariaInputCompat.ScopedUseItemTakeover takeover;
@@ -475,7 +577,116 @@ namespace JueMingZ.Hooks
             {
                 state.FlailTakeoverApplied = true;
                 state.FlailTakeover = takeover;
+                return true;
             }
+
+            return false;
+        }
+
+        private static ItemCheckWriterArbiterContext BuildItemCheckWriterContext(bool bridgePendingAtStart)
+        {
+            return new ItemCheckWriterArbiterContext
+            {
+                BridgePendingAtStart = bridgePendingAtStart,
+                BridgePendingNow = ItemUseBridge.PendingRequestId != Guid.Empty,
+                UseItemPulseActive = UseItemPulseBridge.HasActivePulse,
+                AutoCaptureCritterActive = AutoCaptureCritterSustainedUseBridge.HasActiveUse,
+                AutoHarvestActive = AutoHarvestSustainedUseBridge.HasActiveUse
+            };
+        }
+
+        private static bool TryApplyArbitratedActiveWriter(
+            object player,
+            ref ItemUseHookState state,
+            ItemCheckWriterDecision decision)
+        {
+            if (decision == null || decision.Owner == ItemCheckWriterKind.None)
+            {
+                return false;
+            }
+
+            if (decision.Owner == ItemCheckWriterKind.ItemUseBridge)
+            {
+                CombatItemCheckAutoClickService.RecordExternalSkip(decision.Reason);
+                return true;
+            }
+
+            if (decision.Owner == ItemCheckWriterKind.AutoCaptureCritterSustainedUse)
+            {
+                AutoCaptureCritterSustainedUseApplyResult autoCaptureUse;
+                if (AutoCaptureCritterSustainedUseBridge.TryApplyItemCheckUse(player, out autoCaptureUse) && autoCaptureUse != null)
+                {
+                    state.FollowUseObservation = null;
+                    state.AutoCaptureCritterSustainedUseApplied = true;
+                    state.AutoCaptureCritterSustainedUseRequestId = autoCaptureUse.RequestId;
+                    state.AutoCaptureCritterSustainedUseRestoreState = autoCaptureUse.RestoreState;
+                    state.AutoCaptureCritterSustainedUseMouseRestoreState = autoCaptureUse.MouseRestoreState;
+                    state.AutoCaptureCritterSustainedUseRestoreSlot = autoCaptureUse.RestoreSelectedSlot;
+                    state.AutoCaptureCritterSustainedUseDirectionCaptured = autoCaptureUse.DirectionCaptured;
+                    state.AutoCaptureCritterSustainedUseOriginalDirection = autoCaptureUse.OriginalDirection;
+                    ItemCheckWriterArbiter.RecordApplied(
+                        ItemCheckWriterKind.AutoCaptureCritterSustainedUse,
+                        autoCaptureUse.RequestId,
+                        "sustainedUse",
+                        decision.Reason,
+                        decision.BlockedCandidatesSummary);
+                }
+
+                CombatItemCheckAutoClickService.RecordExternalSkip(decision.Reason);
+                return true;
+            }
+
+            if (decision.Owner == ItemCheckWriterKind.AutoHarvestSustainedUse)
+            {
+                AutoHarvestSustainedUseApplyResult autoHarvestUse;
+                if (AutoHarvestSustainedUseBridge.TryApplyItemCheckUse(player, out autoHarvestUse) && autoHarvestUse != null)
+                {
+                    state.FollowUseObservation = null;
+                    state.AutoHarvestSustainedUseApplied = true;
+                    state.AutoHarvestSustainedUseRequestId = autoHarvestUse.RequestId;
+                    state.AutoHarvestSustainedUseRestoreState = autoHarvestUse.RestoreState;
+                    state.AutoHarvestSustainedUseMouseRestoreState = autoHarvestUse.MouseRestoreState;
+                    ItemCheckWriterArbiter.RecordApplied(
+                        ItemCheckWriterKind.AutoHarvestSustainedUse,
+                        autoHarvestUse.RequestId,
+                        "sustainedUse",
+                        decision.Reason,
+                        decision.BlockedCandidatesSummary);
+                }
+
+                CombatItemCheckAutoClickService.RecordExternalSkip(decision.Reason);
+                return true;
+            }
+
+            if (decision.Owner == ItemCheckWriterKind.UseItemPulseBridge)
+            {
+                UseItemPulseApplyResult pulse;
+                if (UseItemPulseBridge.TryApplyItemCheckPulse(player, out pulse) && pulse != null)
+                {
+                    state.PulseApplied = true;
+                    state.PulseRequestId = pulse.RequestId;
+                    state.PulsePressed = pulse.Pressed;
+                    state.PulseAllowCombatAim = pulse.AllowCombatAim;
+                    state.PulseRestoreState = pulse.RestoreState;
+                    ItemCheckWriterArbiter.RecordApplied(
+                        ItemCheckWriterKind.UseItemPulseBridge,
+                        pulse.RequestId,
+                        pulse.Pressed ? "press" : "release",
+                        decision.Reason,
+                        decision.BlockedCandidatesSummary);
+
+                    if (pulse.Pressed && pulse.AllowCombatAim)
+                    {
+                        TryApplyCombatAim(player, ref state, false);
+                        TryApplyFlailCachedReleaseAim(player, ref state);
+                        TryApplyFlailTakeover(player, ref state);
+                    }
+                }
+
+                return true;
+            }
+
+            return false;
         }
 
         private static void TryApplyCombatAim(object player, ref ItemUseHookState state, bool allowItemUseBridgePending)
@@ -503,6 +714,37 @@ namespace JueMingZ.Hooks
             }
 
             TryApplyCombatAimDecision(ref state, decision);
+        }
+
+        private static void TryRememberFlailComboReleaseTail(ref ItemUseHookState state)
+        {
+            if (state.FlailComboTakeover == null ||
+                state.FlailComboTakeover.Pressed)
+            {
+                return;
+            }
+
+            if (state.AimApplied &&
+                state.AimDecision != null &&
+                CombatAimFlailControlService.TryRememberExistingItemCheckReleaseTail(state.AimDecision, "FlailComboItemCheck"))
+            {
+                return;
+            }
+
+            CombatAimFlailControlService.TryRememberFlailComboPressReleaseTail("FlailComboItemCheck");
+        }
+
+        private static void TryRememberFlailComboPressAim(ref ItemUseHookState state)
+        {
+            if (state.FlailComboTakeover == null ||
+                !state.FlailComboTakeover.Pressed ||
+                !state.AimApplied ||
+                state.AimDecision == null)
+            {
+                return;
+            }
+
+            CombatAimFlailControlService.TryRememberFlailComboPressAim(state.AimDecision);
         }
 
         private static void TryApplyCombatAimDecision(ref ItemUseHookState state, CombatAimItemCheckDecision decision)
@@ -693,6 +935,25 @@ namespace JueMingZ.Hooks
                     TimeSpan.FromSeconds(10),
                     "ItemUseHookCallbacks",
                     "ItemCheck auto clicker takeover restore failed; exception swallowed.", restoreError);
+            }
+        }
+
+        private static void RestoreFlailComboTakeover(TerrariaInputCompat.ScopedUseItemTakeover takeover)
+        {
+            try
+            {
+                var restored = TerrariaInputCompat.TryRestoreScopedUseItemTakeover(takeover);
+                CombatFlailComboService.RecordRestoreStatus(restored);
+            }
+            catch (Exception restoreError)
+            {
+                CombatFlailComboService.RecordRestoreStatus(false);
+                RuntimeDiagnostics.RecordError("ItemUseHookCallbacks.FlailComboTakeoverRestore", restoreError);
+                LogThrottle.ErrorThrottled(
+                    "itemcheck-flail-combo-takeover-restore-failed",
+                    TimeSpan.FromSeconds(10),
+                    "ItemUseHookCallbacks",
+                    "ItemCheck flail combo takeover restore failed; exception swallowed.", restoreError);
             }
         }
 

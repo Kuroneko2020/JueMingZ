@@ -242,6 +242,12 @@ namespace JueMingZ.Input
                 return;
             }
 
+            if (command.ElementId.StartsWith("combat-flail-combo-mode:", StringComparison.Ordinal))
+            {
+                SetCombatFeatureEnabled(command, "flailCombo", IsOnMode(command.ElementId.Substring("combat-flail-combo-mode:".Length)));
+                return;
+            }
+
             if (command.ElementId.StartsWith("combat-perfect-revolver-mode:", StringComparison.Ordinal))
             {
                 SetCombatFeatureEnabled(command, "perfectRevolver", IsOnMode(command.ElementId.Substring("combat-perfect-revolver-mode:".Length)));

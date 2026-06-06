@@ -202,7 +202,13 @@ namespace JueMingZ.Automation.InventoryAndItems
             }
 
             var request = BuildAutoDepositCoinsRequest(coinItemIds, slots, signature, slotCount, stackTotal);
-            queue.Enqueue(request);
+            InputActionAdmissionResult admission;
+            if (!queue.TryEnqueue(request, out admission))
+            {
+                RecordDecision("auto deposit coins admission denied: " + (admission == null ? "unknown" : admission.Reason), signature, JoinInts(coinItemIds));
+                return;
+            }
+
             MarkSubmittedSignature(signature, tick);
             RecordDecision("submitted auto deposit coins request", signature, JoinInts(coinItemIds));
         }
@@ -218,8 +224,10 @@ namespace JueMingZ.Automation.InventoryAndItems
             {
                 Kind = InputActionKind.Chest,
                 Priority = InputActionPriority.Low,
+                DuplicatePolicy = InputActionDuplicatePolicy.CoalescePending,
                 SourceFeatureId = FeatureIds.InventoryAutoDepositCoins,
                 Description = "Auto deposit coins",
+                QueueTimeout = TimeSpan.FromSeconds(2),
                 Timeout = TimeSpan.FromSeconds(3),
                 AdmissionKey = FeatureIds.InventoryAutoDepositCoins
             };
