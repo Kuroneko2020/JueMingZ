@@ -8,6 +8,8 @@ namespace JueMingZ.Actions
 {
     public static class UseItemPulseBridge
     {
+        // RawInput pulse ownership lives here; this is not a general input override.
+        // Each pulse must be visible to channels and restored by the ItemCheck scope.
         private static readonly object SyncRoot = new object();
         private static PulseState _active;
         private static UseItemPulseBridgeSnapshot _lastSnapshot = UseItemPulseBridgeSnapshot.None;
@@ -214,6 +216,8 @@ namespace JueMingZ.Actions
                 return false;
             }
 
+            // The actual press/release mutation is scoped to Player.ItemCheck; return
+            // the captured state so the hook can restore it after the pulse.
             if (DateTime.UtcNow - state.CreatedUtc > state.Timeout)
             {
                 Complete(state.RequestId, InputActionStatus.TimedOut, DiagnosticResultCode.TimedOut, "Use item pulse timed out before ItemCheck.");

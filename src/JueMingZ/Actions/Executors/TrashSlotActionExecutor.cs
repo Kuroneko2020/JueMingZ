@@ -34,6 +34,8 @@ namespace JueMingZ.Actions.Executors
             }
 
             AutoDiscardResult result;
+        // Auto discard uses Terraria's trash-slot path for listed slots only;
+        // this executor must not erase items or edit inventory stacks directly.
             var discarded = AutoDiscardCompat.TryMoveInventorySlotsToTrash(itemIds, slots, out result);
             if (discarded && result != null && result.DiscardedStackTotal > 0)
             {

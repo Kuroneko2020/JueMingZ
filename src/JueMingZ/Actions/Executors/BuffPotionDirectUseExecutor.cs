@@ -10,6 +10,8 @@ namespace JueMingZ.Actions.Executors
 {
     public sealed class BuffPotionDirectUseExecutor : InputActionExecutorBase
     {
+        // DirectLocalBuffPotion is a controlled local fallback. Business layers must
+        // not duplicate AddBuff or item-stack consumption outside this executor/Compat.
         public override InputActionKind Kind { get { return InputActionKind.BuffPotionDirectUse; } }
 
         public override InputActionExecutionStepResult Start(InputActionExecution execution, GameStateSnapshot snapshot)
@@ -137,6 +139,8 @@ namespace JueMingZ.Actions.Executors
 
             bool addBuffInvoked;
             string addBuffMessage;
+            // Confirm AddBuff before consuming the item; an invoked but unverified buff
+            // remains AttemptedButUnverified and must not spend stack.
             if (!PlayerBuffCompat.TryAddBuff(player, buffType, buffTime, out addBuffInvoked, out addBuffMessage))
             {
                 return Finish(
@@ -246,6 +250,8 @@ namespace JueMingZ.Actions.Executors
             int netMode;
             string networkMode;
             bool multiplayerClient;
+            // Local application in multiplayer is unverified unless the sync helper can
+            // prove the supported network path.
             InventoryMutationCompat.ReadNetworkState(out netMode, out networkMode, out multiplayerClient);
             bool syncAttempted;
             string syncMethod;

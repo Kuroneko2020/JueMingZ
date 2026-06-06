@@ -9,6 +9,8 @@ namespace JueMingZ.Actions.Executors
 {
     public sealed class UseInventoryItemActionExecutor : InputActionExecutorBase
     {
+        // This executor is restricted to recovery item use. It is not a generic
+        // inventory picker, and stack changes must stay inside recovery/Inventory Compat.
         public override InputActionKind Kind { get { return InputActionKind.UseInventoryItem; } }
 
         public override InputActionExecutionStepResult Start(InputActionExecution execution, GameStateSnapshot snapshot)
@@ -116,6 +118,8 @@ namespace JueMingZ.Actions.Executors
                 var fallbackUseSoundPlayed = ItemUseSoundCompat.TryPlayUseSound(player, item, out fallbackUseSoundInvoked, out fallbackUseSoundMessage);
 
                 string fallbackConsumeMessage;
+                // Fallback consumption is tied to verified recovery metadata; do not
+                // reuse this as a general inventory stack editor.
                 var fallbackItemConsumed = InventoryMutationCompat.TryConsumeOneItem(player, sourceContainer, sourceSlot, itemType, out stackBefore, out stackAfter, out fallbackConsumeMessage);
                 if (!fallbackItemConsumed)
                 {
@@ -170,6 +174,8 @@ namespace JueMingZ.Actions.Executors
             if (canConsumeRead && canConsume)
             {
                 string consumeMessage;
+                // Consumption follows the same recovery-only contract as the use path;
+                // callers must not treat this executor as a broad mutation API.
                 itemConsumed = InventoryMutationCompat.TryConsumeOneItem(player, sourceContainer, sourceSlot, itemType, out stackBefore, out stackAfter, out consumeMessage);
                 if (!itemConsumed)
                 {

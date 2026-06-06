@@ -359,6 +359,8 @@ namespace JueMingZ.Compat
                 return false;
             }
 
+            // Cache GetFishingConditions per Player type; unavailable reflection
+            // must let bait reads fall back or skip instead of guessing state.
             var playerType = player.GetType();
             MethodInfo method;
             lock (BaitSyncRoot)
@@ -412,6 +414,8 @@ namespace JueMingZ.Compat
         {
             lock (BaitSyncRoot)
             {
+                // Resolve ItemID.TruffleWorm once; the fallback is a stable
+                // compatibility constant, not a per-frame reflection probe.
                 if (_truffleWormItemTypeResolved)
                 {
                     return _truffleWormItemType;

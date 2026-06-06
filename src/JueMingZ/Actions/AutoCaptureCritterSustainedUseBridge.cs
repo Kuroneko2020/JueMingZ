@@ -7,6 +7,8 @@ namespace JueMingZ.Actions
 {
     public static class AutoCaptureCritterSustainedUseBridge
     {
+        // Services may refresh the target, but this bridge owns the scoped ItemCheck
+        // input write and the restore state for the active request.
         private const int TargetStaleMilliseconds = 300;
         private static readonly object SyncRoot = new object();
         private static AutoCaptureCritterSustainedUseState _active;
@@ -252,6 +254,8 @@ namespace JueMingZ.Actions
                 return false;
             }
 
+            // Apply only inside ItemCheck after capturing use input and mouse target;
+            // the caller must restore the returned states after the hook finishes.
             if (player == null || !TerrariaInputCompat.TryIsLocalPlayer(player))
             {
                 return false;
@@ -385,6 +389,8 @@ namespace JueMingZ.Actions
                 _desiredTarget = null;
             }
 
+            // Completing releases the active request id before the queue records its
+            // terminal result, so later admission sees the bridge as free.
             RestoreOriginalSelectionAndDirection(snapshot);
             Logger.Info("AutoCaptureCritterSustainedUseBridge", "Auto capture critter sustained use finished: " + status + " / " + snapshot.Message);
             return snapshot;

@@ -61,6 +61,8 @@ namespace JueMingZ.Compat
             return TryReadBuffTime(player, buffType, out buffTime) && buffTime > 0;
         }
 
+        // Controlled AddBuff fallback: business services must not call
+        // Player.AddBuff directly, and missing reflection must fail closed.
         public static bool TryAddBuff(object player, int buffType, int buffTime, out bool methodInvoked, out string message)
         {
             methodInvoked = false;
@@ -139,6 +141,8 @@ namespace JueMingZ.Compat
             return count;
         }
 
+        // Resolve once and cache the compatible AddBuff overload; unresolved
+        // means this fallback is unavailable, not that callers may guess.
         private static MethodInfo ResolveAddBuff(Type playerType)
         {
             if (_addBuffResolved)

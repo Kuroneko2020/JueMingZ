@@ -3174,6 +3174,8 @@ namespace JueMingZ.Tests
 
         private static void SafeLandingRequestBuilderPreservesOldMetadataKeys()
         {
+            // SafeLanding metadata keys are action-event diagnostics contracts;
+            // passing this test is local coverage, not real-world rescue proof.
             var analysis = AnalysisNearGround();
             analysis.HasAirJump = true;
             var selection = MovementSafeLandingStrategyCatalog.Evaluate(MovementSafeLandingStrategyContext.FromAnalysis(AppSettings.CreateDefault(), analysis));
@@ -3231,6 +3233,8 @@ namespace JueMingZ.Tests
 
         private static void SafeLandingRecoveryKeepsItemWhenRestoreTargetChanged()
         {
+            // Restore deferral protects user-moved items; never weaken it into
+            // a successful restore just because the rescue item is still known.
             var player = new FakePlayer();
             var rescue = new FakeItem { type = 158, stack = 1, prefix = 0, Name = "Lucky Horseshoe" };
             var userItem = new FakeItem { type = 946, stack = 1, prefix = 0, Name = "Umbrella" };

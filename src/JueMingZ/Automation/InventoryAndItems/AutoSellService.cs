@@ -152,6 +152,8 @@ namespace JueMingZ.Automation.InventoryAndItems
                 return;
             }
 
+            // AutoStack pending transactions own newly picked item evidence; selling
+            // must wait so it does not move the same slots or destroy the anchor.
             if (AutoStackService.HasPendingAutomationWork())
             {
                 RecordDecision("waiting for auto stack", string.Empty, string.Empty);

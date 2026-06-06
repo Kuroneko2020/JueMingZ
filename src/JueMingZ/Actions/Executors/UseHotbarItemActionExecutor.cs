@@ -221,6 +221,8 @@ namespace JueMingZ.Actions.Executors
             SetState(execution, "SlotSwitchBefore", originalSlot);
             SetState(execution, "SlotSwitchTarget", targetSlot);
 
+            // A selection request is not enough; wait until Terraria reports the
+            // target slot before the bridge is allowed to use the item.
             bool selectedImmediately;
             if (!TerrariaInputCompat.TryRequestInventorySlotSelection(player, targetSlot, out selectedImmediately))
             {
@@ -402,6 +404,8 @@ namespace JueMingZ.Actions.Executors
                 ClickSourceAtClick = GetState(execution, "ClickSourceAtClick", string.Empty)
             };
 
+            // Actual item-use input is delegated to ItemUseBridge/ItemCheck after
+            // slot verification. This executor must not synthesize a separate click.
             string message;
             if (!ItemUseBridge.TryEnqueueUseSelectedItem(
                 execution.Request.RequestId,
@@ -897,6 +901,8 @@ namespace JueMingZ.Actions.Executors
             var observableChange = GetStateBool(execution, "BridgeObservableChange", false);
             var bridgeStatus = GetState(execution, "BridgeStatus", string.Empty);
             var bridgeSucceeded = string.Equals(bridgeStatus, ItemUseBridgeStatus.Succeeded.ToString(), StringComparison.OrdinalIgnoreCase);
+            // Using the target item without restoring the original slot is not a clean
+            // success; downgrade so callers keep the recovery evidence.
             if (status == InputActionStatus.Succeeded && !restoreSucceeded)
             {
                 status = InputActionStatus.AttemptedButUnverified;

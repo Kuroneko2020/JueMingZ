@@ -50,6 +50,8 @@ namespace JueMingZ.Automation.Combat
 
     public static class CombatAimProjectileCursorCompat
     {
+        // Projectile cursor matching is read-only ownership evidence for scoped
+        // cursor tails; it never edits projectile ai, velocity, position, or net state.
         private static readonly ConditionalWeakTable<CombatAimItemCheckDecision, CombatAimProjectileCursorMetadata> DecisionMetadata =
             new ConditionalWeakTable<CombatAimItemCheckDecision, CombatAimProjectileCursorMetadata>();
 

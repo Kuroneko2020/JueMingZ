@@ -68,6 +68,8 @@ namespace JueMingZ.Actions
                 return right.Priority.CompareTo(left.Priority);
             }
 
+            // Same-priority bucket order is a fairness contract, not cosmetic sorting:
+            // explicit user commands and recovery work must not trail background automation.
             var bucketCompare = CompareSchedulerBucket(left, right);
             if (bucketCompare != 0)
             {

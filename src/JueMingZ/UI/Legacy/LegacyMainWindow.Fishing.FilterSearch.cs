@@ -109,6 +109,8 @@ namespace JueMingZ.UI.Legacy
             try
             {
                 bool truncated;
+                // Global search is a filter-preset index, not a current-water
+                // query; keep it detached from bobber and auto-fish state.
                 var candidates = InformationFishingCatchResolver.ResolveGlobalFishableItemCandidates(
                     context,
                     searchText,

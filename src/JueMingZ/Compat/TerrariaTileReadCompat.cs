@@ -6,6 +6,8 @@ namespace JueMingZ.Compat
     {
         public const int TileSize = 16;
 
+        // Tile reads are fail-closed snapshots; callers should skip automation
+        // when a tile cannot be proven instead of synthesizing active terrain.
         public static bool TryGetTile(int tileX, int tileY, out Tile tile)
         {
             return TerrariaMainCompat.TryGetTile(tileX, tileY, out tile);

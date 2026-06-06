@@ -80,6 +80,8 @@ namespace JueMingZ.Automation.Combat
         public static bool TryBeginProjectileAi(object projectile, out ActiveOverride active)
         {
             active = null;
+            // ProjectileAI scopes may override cursor for the active projectile
+            // only; projectile state remains vanilla-owned.
             var hook = PersistentHook;
             if (!string.Equals(hook, PersistentCursorHooks.ProjectileAI, StringComparison.OrdinalIgnoreCase) &&
                 !string.Equals(hook, PersistentCursorHooks.AI099, StringComparison.OrdinalIgnoreCase))
@@ -346,12 +348,16 @@ namespace JueMingZ.Automation.Combat
 
             lock (SyncRoot)
             {
+                // Only one ProjectileAI cursor scope may be active at a time.
+                // Failure to prove ownership keeps the path closed.
                 if (_projectileAiScopedActive)
                 {
                     return false;
                 }
             }
 
+            // Flail release tail must match the local owner's active flail
+            // projectile before any cursor override is allowed.
             var projectileMatch = CombatAimProjectileCursorCompat.MatchFlailProjectile(
                 projectile,
                 player,
@@ -1247,6 +1253,7 @@ namespace JueMingZ.Automation.Combat
 
             lock (SyncRoot)
             {
+                // A scoped cursor tail is exclusive for the current hook frame.
                 if (_projectileAiScopedActive)
                 {
                     return false;
@@ -1489,6 +1496,8 @@ namespace JueMingZ.Automation.Combat
                 }
             }
 
+            // Restore mouse target before recording success; scoped cursor
+            // application is not complete until cleanup is verified.
             var restored = TerrariaInputCompat.TryRestoreMouseTargetState(active.RestoreState);
             CombatAimItemCheckService.RecordItemCheckAim(
                 active.Decision,

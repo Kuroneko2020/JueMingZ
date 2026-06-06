@@ -96,6 +96,8 @@ namespace JueMingZ.Automation.Combat
                     return false;
                 }
 
+                // This is the new Player.ItemCheck scoped fresh-click path. Do
+                // not route it back through the removed input-source policy.
                 if (!TerrariaInputCompat.TryBeginScopedUseItemClickTakeover(player, decision.PressAttack, ScopeName, out takeover))
                 {
                     RecordReadFailure("takeover:" + TerrariaInputCompat.LastInputCompatError);
@@ -240,6 +242,8 @@ namespace JueMingZ.Automation.Combat
             object item;
             if (selectedSlot == MouseItemSlot)
             {
+                // selectedItem == 58 is Terraria's mouse-item slot. Read it for
+                // profiling only; do not write inventory selection here.
                 if (!TerrariaInputCompat.TryGetMouseItem(out item))
                 {
                     reason = "mouseItemUnavailable:" + TerrariaInputCompat.LastInputCompatError;
@@ -342,6 +346,8 @@ namespace JueMingZ.Automation.Combat
                 return false;
             }
 
+            // Fishing rods and vanilla revolver are hard exclusions even when
+            // the auto clicker feature is enabled.
             if (IsFishingRod(profile))
             {
                 reason = "excludedFishingRod";
@@ -377,6 +383,8 @@ namespace JueMingZ.Automation.Combat
                 return true;
             }
 
+            // Terraria global auto-reuse owns weapons it already covers; this
+            // feature stands down instead of double-clicking them.
             if (profile.Damage > 0 && (!profile.Channel || !profile.PlayerChannel))
             {
                 reason = "vanillaAutoReuseCovered";

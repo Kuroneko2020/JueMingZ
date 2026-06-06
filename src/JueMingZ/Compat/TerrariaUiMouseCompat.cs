@@ -110,6 +110,8 @@ namespace JueMingZ.Compat
             }
         }
 
+        // UI capture may mark Terraria mouse flags only to prevent click-through;
+        // it must not execute world, inventory, or item actions.
         public static bool TryMarkUiMouseCapture()
         {
             try

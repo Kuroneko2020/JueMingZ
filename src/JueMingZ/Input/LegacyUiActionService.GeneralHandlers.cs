@@ -26,6 +26,8 @@ namespace JueMingZ.Input
 {
     public static partial class LegacyUiActionService
     {
+        // UI handlers may update settings, clear service state, or submit commands;
+        // inventory, NPC, tile, and input mutations still belong to ActionQueue/Compat.
         private static void ToggleAutoHeal(LegacyUiCommand command)
         {
             var before = BuildAutoRecoveryBeforeJson();

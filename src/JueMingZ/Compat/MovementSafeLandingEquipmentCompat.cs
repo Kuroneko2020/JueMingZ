@@ -51,6 +51,8 @@ namespace JueMingZ.Compat
             public string Reason;
         }
 
+        // Build plans from verifiable inventory/equipment snapshots only;
+        // unreadable containers must skip rescue rather than guess slots.
         public static bool TryBuildTemporaryEquipmentPlan(
             object player,
             AppSettings settings,
@@ -282,6 +284,8 @@ namespace JueMingZ.Compat
             }
         }
 
+        // Apply consumes a registered plan exactly once and verifies source and
+        // target signatures before writing any temporary equipment swap.
         public static bool TryApplyRegisteredPlan(Guid requestId, out MovementSafeLandingEquipmentActionResult result)
         {
             result = null;
@@ -319,6 +323,8 @@ namespace JueMingZ.Compat
             return result.AppliedMoveCount > 0;
         }
 
+        // Restore records are the recovery anchor; blocked restores keep the
+        // records pending instead of claiming success.
         public static bool TryRestoreRegisteredRecords(Guid requestId, out MovementSafeLandingEquipmentActionResult result)
         {
             result = null;
@@ -1235,6 +1241,8 @@ namespace JueMingZ.Compat
             MovementSafeLandingCapabilitySnapshot snapshot,
             JumpInputProfile profile)
         {
+            // Verification reasons describe observed capability after apply,
+            // not proof that a guessed equipment write succeeded.
             var category = plan == null ? string.Empty : plan.EquipmentCategory ?? string.Empty;
             if (string.Equals(category, "rocket_boots", StringComparison.OrdinalIgnoreCase))
             {
@@ -1532,6 +1540,8 @@ namespace JueMingZ.Compat
             return _refreshDoubleJumpsMethod;
         }
 
+        // Restore only from recorded signatures; user-changed slots are left
+        // alone and unresolved writes stay pending for the caller.
         private static MovementSafeLandingEquipmentActionResult RestoreRecords(object player, RestoreRequest request)
         {
             var result = BuildResult("restoreAttempted", string.Empty, "Safe landing temporary equipment restore attempted.");

@@ -4,6 +4,8 @@ namespace JueMingZ.Compat
 {
     internal static class TerrariaItemReadCompat
     {
+        // Read-only item adapter; neutral fallbacks support snapshot skips, not
+        // proof that an item exists or should be mutated.
         public static bool IsActive(Item item)
         {
             return item != null && item.type > 0 && item.stack > 0;

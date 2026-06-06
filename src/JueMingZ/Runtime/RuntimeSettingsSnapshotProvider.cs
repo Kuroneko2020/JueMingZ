@@ -32,6 +32,8 @@ namespace JueMingZ.Runtime
                 legacySelectedPageId,
                 legacyMiscUiNeedsInventory);
 
+            // Normalize once per signature so high-frequency services can read
+            // stable flags without rebuilding defaults or full settings each tick.
             lock (SyncRoot)
             {
                 if (_current == null ||

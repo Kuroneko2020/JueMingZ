@@ -50,6 +50,8 @@ namespace JueMingZ.Actions
 
             lock (SyncRoot)
             {
+                // Runtime submission and ItemCheck writer choice share this state.
+                // Splitting them would let one automation win at the other layer.
                 RecordCandidateLocked(kind, tick);
                 if (activeSessionContinuation)
                 {
@@ -109,6 +111,8 @@ namespace JueMingZ.Actions
             {
                 if (autoCaptureActive && autoHarvestActive)
                 {
+                    // Simultaneous world automation writers must not fall back to
+                    // service or hook order; use the same debt as runtime grants.
                     var winner = ChooseWinnerLocked(true);
                     _lastFairnessBucket = "P5:itemCheckWriterFairness:" + FormatKind(winner);
                     _lastDecisionUtc = DateTime.UtcNow;

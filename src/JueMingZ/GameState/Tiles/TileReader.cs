@@ -9,6 +9,8 @@ namespace JueMingZ.GameState.Tiles
         public static TileSnapshot Read(Type mainType, PlayerStateSnapshot player)
         {
             var snapshot = new TileSnapshot { SampleRadius = 1 };
+            // Tile snapshots are read-only and intentionally tiny; unavailable
+            // tiles make upper automation yield instead of guessing map state.
             if (mainType == null || player == null || !player.Exists)
             {
                 return snapshot;

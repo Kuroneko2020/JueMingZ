@@ -30,6 +30,8 @@ namespace JueMingZ.Automation.Information
             var key = whoAmI.ToString(CultureInfo.InvariantCulture) + ":" +
                       npcType.ToString(CultureInfo.InvariantCulture) + ":Name";
             NameCacheEntry cached;
+            // Name reads are label-only and tick-cached; missing fields fall back
+            // to type names instead of probing every draw frame.
             if (NameCache.TryGetValue(key, out cached) && gameUpdateCount < cached.RefreshAfterTick)
             {
                 return cached.Value;
@@ -57,6 +59,8 @@ namespace JueMingZ.Automation.Information
 
             var value = string.Empty;
             object raw;
+            // Missing Lang lookup fails to the numeric id for display; it must
+            // not be treated as unavailable NPC state.
             var langType = InformationReflection.FindType("Terraria.Lang") ??
                            InformationReflection.FindType("Terraria.Localization.Lang");
             if (InformationReflection.TryInvokeStatic(langType, "GetNPCNameValue", new object[] { npcType }, out raw))

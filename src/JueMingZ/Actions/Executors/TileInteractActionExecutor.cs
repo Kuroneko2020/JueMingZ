@@ -64,6 +64,8 @@ namespace JueMingZ.Actions.Executors
                 SetState(execution, "TileInteractionOverrideArmed", "true");
             }
 
+            // controlUseTile is right-click intent, not proof Terraria accepted the
+            // interaction. Verification must come from observed station buff state.
             if (!TerrariaInputCompat.TrySetMouseWorldPosition(primaryPoint.Item1 * 16f + 8f, primaryPoint.Item2 * 16f + 8f) ||
                 !TerrariaInputCompat.TrySetUseTile(player, true))
             {
@@ -247,6 +249,8 @@ namespace JueMingZ.Actions.Executors
                 CapturedMouseStates.Remove(execution.Request.RequestId);
             }
 
+            // Mouse target and tile overrides must be cleaned before status is reported;
+            // an unverified tile click cannot leave a held world target behind.
             CleanupInteraction(execution, player, mouseState);
 
             var active = AreExpectedStationBuffsActive(execution, player);

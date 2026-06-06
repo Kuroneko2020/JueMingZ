@@ -8,6 +8,8 @@ namespace JueMingZ.GameState.World
         public static WorldStateSnapshot Read(Type mainType, bool isInWorld)
         {
             var snapshot = new WorldStateSnapshot { WorldAvailable = isInWorld };
+            // World summary is read-only display/context data; read failures keep
+            // the snapshot sparse instead of inventing world identity.
             if (mainType == null)
             {
                 return snapshot;

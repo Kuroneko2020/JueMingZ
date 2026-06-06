@@ -27,6 +27,8 @@ namespace JueMingZ.Actions.Executors
         public override InputActionExecutionStepResult Start(InputActionExecution execution, GameStateSnapshot snapshot)
         {
             var mode = GetMetadataString(execution, "RawInputMode", string.Empty);
+            // RawInput modes are allowlisted here; unknown modes stay NotImplemented and
+            // the resolver keeps them globally exclusive.
             if (string.Equals(mode, ModeAutoFacing, StringComparison.OrdinalIgnoreCase))
             {
                 return StartAutoFacing(execution, snapshot);
@@ -72,6 +74,8 @@ namespace JueMingZ.Actions.Executors
             var requireUseItemHeld = string.Equals(GetMetadataString(execution, "RequireUseItemHeld", string.Empty), "true", StringComparison.OrdinalIgnoreCase);
 
             string message;
+            // Magic string uses UseItemPulseBridge so pulse ownership is visible to
+            // channels and ItemCheck writer arbitration.
             if (!UseItemPulseBridge.TryBegin(
                 execution.Request.RequestId,
                 execution.Request.SourceFeatureId,
@@ -161,6 +165,8 @@ namespace JueMingZ.Actions.Executors
             }
 
             string message;
+            // World automation starts bridge ownership only; ItemCheck applies and
+            // restores the scoped input override.
             if (!AutoHarvestSustainedUseBridge.TryBegin(
                 execution.Request.RequestId,
                 execution.Request.SourceFeatureId,
@@ -277,6 +283,8 @@ namespace JueMingZ.Actions.Executors
             }
 
             string message;
+            // Capture mode may preselect a bug net, but the sustained bridge still owns
+            // the scoped ItemCheck input and restore contract.
             if (!AutoCaptureCritterSustainedUseBridge.TryBegin(
                 execution.Request.RequestId,
                 execution.Request.SourceFeatureId,
@@ -464,6 +472,8 @@ namespace JueMingZ.Actions.Executors
                 {
                     defaultReason = "Auto capture critter sustained use cancelled.";
                     AutoCaptureCritterSustainedUseBridge.Cancel(execution.Request.RequestId, reason ?? defaultReason);
+                    // Cancel must release bridge ownership and restore any preselected
+                    // bug net slot before the queue records the terminal cancellation.
                     TryRestoreAutoCaptureOriginalSelection(execution);
                 }
                 else

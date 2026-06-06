@@ -33,6 +33,8 @@ namespace JueMingZ.Actions.Executors
             var targetSlot = HasMetadata(execution, ActionMetadataKeys.TargetSlot)
                 ? GetMetadataInt(execution, ActionMetadataKeys.TargetSlot, selectedSlot)
                 : selectedSlot;
+            // Slot 58 is Terraria's mouse item slot. This executor may profile it,
+            // but the actual use still has to go through ItemUseBridge.
             if (!TerrariaInputCompat.IsSupportedItemUseSlot(targetSlot))
             {
                 return InputActionExecutionStepResult.Complete(InputActionStatus.Failed, "UseSelectedItem 当前只支持快捷栏物品和鼠标浮动物品；selected=" + selectedSlot + ", target=" + targetSlot);
@@ -212,6 +214,8 @@ namespace JueMingZ.Actions.Executors
                 : null;
 
             string message;
+            // Bridge submission is the mutation boundary; selection/options are prepared
+            // here, while Player.ItemCheck owns the real use input.
             if (!ItemUseBridge.TryEnqueueUseSelectedItem(
                 execution.Request.RequestId,
                 execution.Request.SourceFeatureId,

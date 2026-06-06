@@ -77,6 +77,8 @@ namespace JueMingZ.Actions.Executors
 
             long gameTick;
             TerrariaInputCompat.TryReadGameUpdateCount(out gameTick);
+            // Continuous dash must stay inside the dash hook or Compat pulse path;
+            // this executor never edits velocity or position directly.
             if (TerrariaDashCompat.DashMovementHookInstalled)
             {
                 string message;

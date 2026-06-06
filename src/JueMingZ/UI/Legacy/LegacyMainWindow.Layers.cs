@@ -48,6 +48,9 @@ namespace JueMingZ.UI.Legacy
                     return true;
                 }
 
+                // This layer draws inside Terraria's interface SpriteBatch phase.
+                // Input capture may suppress world clicks, but drawing must not
+                // reorder vanilla UI or execute gameplay actions directly.
                 var rawMouse = DiagnosticMouseStateReader.Read();
                 var scale = LegacyMainUiScale.Resolve(rawMouse);
                 var mouse = LegacyUiInput.ReadMouse(rawMouse, scale);
@@ -213,6 +216,8 @@ namespace JueMingZ.UI.Legacy
 
                 if (!LegacyMainUiState.HideIfMainMenu("LegacyMainUi.InputGuard"))
                 {
+                    // Guard layers only claim mouse ownership for the visible F5
+                    // window; they do not run button commands or mutate game state.
                     LegacyUiInput.CaptureCurrentMouseForWindow("LegacyMainUi.InputGuard");
                 }
             }

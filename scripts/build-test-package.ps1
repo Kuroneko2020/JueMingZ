@@ -72,6 +72,8 @@ foreach ($name in $compileOnlyDependencyNames) {
     }
 }
 
+# Test package cleanup is limited to the repo package folder; compile-only
+# game assemblies must never be shipped alongside the injected runtime.
 if ((Test-Path $packageDir) -and (Test-IsInsideDirectory -Parent $repoRoot -Child $packageDir)) {
     try {
         Remove-Item -LiteralPath $packageDir -Recurse -Force -ErrorAction Stop

@@ -29,6 +29,8 @@ namespace JueMingZ.GameState
             LastInventoryProfile = options.InventoryProfile;
             LastNpcProfile = options.NpcProfile;
             LastTileProfile = options.TileProfile;
+            // GameStateReader only builds snapshots for services to inspect.
+            // Unavailable reads surface as Unknown/Unavailable, not guessed state.
 
             if (!lateBootstrapCompleted)
             {
@@ -80,6 +82,8 @@ namespace JueMingZ.GameState
                     Player = playerSnapshot,
                     Inventory = inventorySnapshot,
                     ActiveBuffs = buffs,
+                    // Profiles bound read cost; adding fields here must not
+                    // force high-frequency callers into wider scans.
                     Npcs = options.NpcProfile != NpcReadProfile.None ? NpcReader.Read(options.NpcProfile) : new NpcSummarySnapshot(),
                     Tiles = options.TileProfile != TileReadProfile.None ? TileReader.Read(mainType, playerSnapshot) : new TileSnapshot(),
                     World = options.IncludeWorldSummary ? WorldStateReader.Read(mainType, isInWorld) : new WorldStateSnapshot(),

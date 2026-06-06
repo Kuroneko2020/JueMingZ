@@ -2087,6 +2087,8 @@ namespace JueMingZ.Tests
 
         private static void CombatAimDiagnosticsMetadataKeepsStableFieldNames()
         {
+            // These JSON field names are consumed by runtime snapshots, action
+            // events, and user-return diagnostics; rename only with doc updates.
             var decision = BuildCombatAimDiagnosticDecision();
             var json = BuildCombatAimDecisionJson(decision, true, true);
 
@@ -4898,6 +4900,8 @@ namespace JueMingZ.Tests
 
         private static void InputActionQueueReleasesChannelAfterTerminalStart()
         {
+            // Channel-release tests guard cleanup regressions, not player-facing
+            // feature success. Keep leases and terminal results observable.
             var queue = new InputActionQueue();
             queue.Enqueue(new InputActionRequest
             {

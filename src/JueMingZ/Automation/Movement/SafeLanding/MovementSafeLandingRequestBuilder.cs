@@ -9,6 +9,8 @@ namespace JueMingZ.Automation.Movement
 {
     internal static class MovementSafeLandingRequestBuilder
     {
+        // These builders describe ActionQueue work only. SafeLanding rescue and
+        // restore must stay inside controlled input/equipment executors.
         public static InputActionRequest BuildJumpRequest(MovementSafeLandingRescuePlan plan, MovementSafeLandingAnalysis analysis, string description, InputActionPriority priority)
         {
             var request = new InputActionRequest
@@ -136,6 +138,8 @@ namespace JueMingZ.Automation.Movement
         public static InputActionRequest BuildTemporaryEquipmentRestoreRequest(IList<MovementSafeLandingEquipmentMoveRecord> records, string reason)
         {
             var first = records == null || records.Count == 0 ? null : records[0];
+            // Restore uses recorded move signatures; request submission alone does
+            // not clear pending equipment records.
             var request = new InputActionRequest
             {
                 Kind = InputActionKind.InventorySlot,

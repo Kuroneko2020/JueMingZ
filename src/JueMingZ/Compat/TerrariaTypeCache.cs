@@ -16,6 +16,8 @@ namespace JueMingZ.Compat
             }
 
             var cleanName = StripAssemblyName(fullName);
+            // Type discovery is centralized here; callers must treat null as a
+            // fail-closed signal instead of guessing Terraria state.
             Type cached;
             lock (SyncRoot)
             {
@@ -82,6 +84,8 @@ namespace JueMingZ.Compat
                 }
             }
 
+            // Unresolved type means this Terraria build cannot prove the
+            // requested API path. Automation must let callers fail closed.
             return null;
         }
 

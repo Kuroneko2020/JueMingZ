@@ -37,6 +37,8 @@ namespace JueMingZ.Actions.Executors
             }
 
             AutoSellResult result;
+            // Auto sell must use the original shop path and listed slots only;
+            // the executor must not edit inventory stacks or NPC shop state directly.
             var sold = AutoSellCompat.TryOpenShopAndSell(npcIndex, shopIndex, itemIds, slots, out result);
             if (sold && result != null && result.SoldStackTotal > 0)
             {

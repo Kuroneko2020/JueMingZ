@@ -240,6 +240,8 @@ namespace JueMingZ.Automation.InventoryAndItems
                     return;
                 }
 
+                // Stack increases are transaction anchors. A later baseline refresh
+                // must not erase them while UI, queue, or verification is unsafe.
                 var added = UpdateBaselineAndDetectIncreases(current, eligibleItemTypes);
                 if (added.Count > 0)
                 {
@@ -317,6 +319,8 @@ namespace JueMingZ.Automation.InventoryAndItems
                 return;
             }
 
+            // Queue admission starts QuickStack, but it is not proof that items
+            // moved. Keep the pending transaction until terminal verification.
             SetTransactionState(AutoStackTransactionState.ReadyToSubmit);
             var request = BuildAutoStackRequest(pendingIds, slots, signature, slotCount, stackTotal);
             InputActionAdmissionResult admission;
@@ -462,6 +466,8 @@ namespace JueMingZ.Automation.InventoryAndItems
 
             if (result.Status == InputActionStatus.Succeeded)
             {
+                // A succeeded result only clears the submitted snapshot. Newer
+                // detected items stay pending so their recovery anchor survives.
                 if (HasPendingChangedAfterLastSubmit())
                 {
                     lock (SyncRoot)
@@ -537,6 +543,8 @@ namespace JueMingZ.Automation.InventoryAndItems
                        age > PendingNotApplicableTtlTicks;
                 if (!stop)
                 {
+                    // Unverified, blocked, or unavailable QuickStack attempts wait
+                    // with backoff instead of refreshing the baseline as success.
                     _pendingRetryCount++;
                     _nextRetryTick = tick + Math.Max(1, retryDelayTicks);
                     _pendingTransactionState = AutoStackTransactionState.RetryPending;
@@ -905,6 +913,8 @@ namespace JueMingZ.Automation.InventoryAndItems
         {
             lock (SyncRoot)
             {
+                // Only final transaction states may clear the recovery anchor.
+                // Submit-time cleanup would hide picked items that still need retry.
                 PendingItemIds.Clear();
                 _pendingSinceTick = 0;
                 _lastPendingChangeTick = -1;
@@ -938,6 +948,8 @@ namespace JueMingZ.Automation.InventoryAndItems
                     return true;
                 }
 
+                // A just-picked item may need a short settle window before its
+                // inventory slots are readable; keep pending instead of dropping it.
                 return tick >= _pendingSinceTick &&
                        tick - _pendingSinceTick <= PendingSettleTicks;
             }

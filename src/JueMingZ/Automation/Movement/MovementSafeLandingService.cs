@@ -14,6 +14,9 @@ namespace JueMingZ.Automation.Movement
 {
     public static class MovementSafeLandingService
     {
+        // SafeLanding may analyze danger and enqueue vanilla rescue or restore
+        // actions; it must not write position, velocity, fall state, life, buffs,
+        // tiles, or network state directly.
         private const int RescueCooldownTicks = 45;
         private const int ActiveRescueCooldownTicks = 4;
         private const int TeleportRodRescueCooldownTicks = 12;
@@ -200,6 +203,8 @@ namespace JueMingZ.Automation.Movement
                     return;
                 }
 
+                // Temporary equipment records are restore debt, not a completed
+                // rescue. Drain them before considering a new SafeLanding action.
                 if (HasTemporaryEquipmentRecordsOrInflight())
                 {
                     HandleTemporaryEquipmentRestore(queue, tick, queueSnapshot, player, inputFrame, settings);
@@ -861,6 +866,8 @@ namespace JueMingZ.Automation.Movement
             MovementInputFrameCache.MovementInputFrame inputFrame,
             AppSettings settings)
         {
+            // Apply, activate, and restore are one state machine. Do not submit a
+            // new rescue while any leg still owns recorded equipment state.
             if (HasTemporaryEquipmentApplyInflight() || HasTemporaryEquipmentActivationInflight() || HasTemporaryEquipmentRestoreInflight())
             {
                 var waitingReason = HasTemporaryEquipmentRestoreInflight()
@@ -2023,6 +2030,8 @@ namespace JueMingZ.Automation.Movement
         {
             lock (SyncRoot)
             {
+                // Restore completion may still return pending records; keep them as
+                // debt so blocked or failed restores cannot masquerade as success.
                 TemporaryEquipmentRecords.Clear();
                 if (result != null && result.Records != null)
                 {
@@ -2388,6 +2397,8 @@ namespace JueMingZ.Automation.Movement
             var restoreReason = result == null ? string.Empty : result.ResultCode ?? string.Empty;
             if (actionApplied)
             {
+                // A queued gravity flip is only accepted when the observed gravity
+                // direction returns to the recorded original direction.
                 float originalDirection;
                 lock (SyncRoot)
                 {

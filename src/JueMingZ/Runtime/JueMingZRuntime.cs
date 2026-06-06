@@ -199,6 +199,8 @@ namespace JueMingZ.Runtime
 
         private static void RunTargetingAndUiActions(RuntimeTickContext context)
         {
+            // Keep the focus gate ahead of targeting and UI services; inactive
+            // input frames must not pay for weapon profiles or target scans.
             if (!IsGameInputAvailable(context.GameState))
             {
                 return;
@@ -247,6 +249,8 @@ namespace JueMingZ.Runtime
 
         private static void DispatchAutomationRequests(RuntimeTickContext context)
         {
+            // The dispatch gate and per-service cadence are the idle-path budget;
+            // do not move service scans ahead of ShouldRunService checks.
             if (!ShouldDispatchAutomation(context.GameState))
             {
                 return;
@@ -931,6 +935,8 @@ namespace JueMingZ.Runtime
 
         public static DiagnosticSnapshot GetDiagnosticSnapshot()
         {
+            // Snapshot publishing reads cached module summaries. Adding fields
+            // here must not submit actions, append events, or start new scans.
             var featureInfo = FeatureManager == null ? FeatureManagerDiagnosticInfo.Empty : FeatureManager.GetDiagnosticInfo();
             var actionSnapshot = ActionQueue == null ? InputActionQueueSnapshot.Empty : ActionQueue.GetSnapshot();
             var gameState = GameStateReader.LastSnapshot ?? GameStateSnapshot.Unknown("Not read yet.");

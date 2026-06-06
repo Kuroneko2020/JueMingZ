@@ -12,6 +12,8 @@ namespace JueMingZ.Diagnostics
         {
             var builder = new StringBuilder();
             builder.AppendLine("{");
+            // Runtime-snapshot field names are a user-return contract. This
+            // writer serializes prepared values only and must not trigger reads.
             Append(builder, "Loaded", snapshot.Loaded, true);
             Append(builder, "Version", snapshot.Version, true);
             Append(builder, "RuntimeVersion", string.IsNullOrWhiteSpace(snapshot.RuntimeVersion) ? snapshot.Version : snapshot.RuntimeVersion, true);

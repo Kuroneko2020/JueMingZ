@@ -1343,6 +1343,8 @@ namespace JueMingZ.Tests
 
         private static void InformationFishingCatchEarlyCacheHitSkipsHeavyCounters()
         {
+            // This is a performance regression guard: cache hits must not read
+            // water or FishingConditions just to refresh display diagnostics.
             InformationFishingCatchResolver.ResetCatchCacheForTesting();
             var candidates = new List<FishingCatchCandidate>
             {

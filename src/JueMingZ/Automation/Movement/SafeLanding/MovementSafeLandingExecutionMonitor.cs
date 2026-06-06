@@ -11,6 +11,8 @@ namespace JueMingZ.Automation.Movement
                 return string.Empty;
             }
 
+            // This is diagnostic text only; callers must interpret status and
+            // verification separately before clearing rescue or restore state.
             return "requestId=" + result.RequestId +
                    ",kind=" + result.Kind +
                    ",status=" + result.Status +

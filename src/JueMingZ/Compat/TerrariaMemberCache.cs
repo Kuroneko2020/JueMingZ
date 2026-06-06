@@ -64,6 +64,8 @@ namespace JueMingZ.Compat
             }
         }
 
+        // Cache successful lookups and misses; false is a fail-closed signal,
+        // not permission for callers to invent a compatible member shape.
         public static bool TryGetField(Type type, string name, bool isStatic, out FieldInfo field)
         {
             field = null;

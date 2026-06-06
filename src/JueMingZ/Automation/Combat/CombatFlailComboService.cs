@@ -87,6 +87,8 @@ namespace JueMingZ.Automation.Combat
                 }
 
                 string uiReason;
+                // Inventory-open alone is not a blocker; real UI capture,
+                // chest/chat/travel, and vanilla right-click semantics are.
                 if (IsUiBlocked(player, out uiReason))
                 {
                     ResetComboState();
@@ -171,6 +173,8 @@ namespace JueMingZ.Automation.Combat
                     return false;
                 }
 
+                // Right-click combo creates one scoped press/release rhythm. It
+                // must not layer another input takeover on top of ItemCheck.
                 if (!TerrariaInputCompat.TryBeginScopedUseItemClickTakeoverSuppressingRightClick(player, decision.PressAttack, ScopeName, out takeover))
                 {
                     var failed = CombatFlailComboDecision.NoOp(decision.State, "takeover:" + TerrariaInputCompat.LastInputCompatError, false);
@@ -389,6 +393,8 @@ namespace JueMingZ.Automation.Combat
         private static bool IsUiBlocked(object player, out string reason)
         {
             var ui = TerrariaInputCompat.ReadUiInputContext(player);
+            // Do not add PlayerInventoryOpen here by itself; mouse UI capture
+            // and concrete vanilla interaction states are the blockers.
             if (ui.MainTypeUnavailable)
             {
                 reason = "mainTypeUnavailable";

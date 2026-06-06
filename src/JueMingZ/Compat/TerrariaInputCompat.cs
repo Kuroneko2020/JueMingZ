@@ -65,6 +65,8 @@ namespace JueMingZ.Compat
 
         public sealed class ScopedUseItemTakeover : IDisposable
         {
+            // Scoped takeover is the combat-facing contract for temporary
+            // controlUseItem/Main mouse writes; callers must restore or dispose.
             private bool _disposed;
 
             internal ScopedUseItemTakeover(object player, bool pressed, string scopeName)
@@ -168,6 +170,8 @@ namespace JueMingZ.Compat
                 return Fail("Cannot read Main.mouseItem: Terraria.Main unavailable.");
             }
 
+            // Main.mouseItem is a read-only profile source for selectedItem 58;
+            // actual use still belongs to scoped ItemCheck takeover paths.
             mouseItem = GetStatic(mainType, "mouseItem");
             if (mouseItem == null)
             {
@@ -357,6 +361,8 @@ namespace JueMingZ.Compat
             }
 
             var state = new ScopedUseItemTakeover(player, pressed, scopeName);
+            // Capture before writing so failed or completed takeover can fail
+            // closed back to vanilla input state.
             bool value;
             if (TryGetBool(player, "controlUseItem", out value))
             {
@@ -478,6 +484,8 @@ namespace JueMingZ.Compat
                 }
             }
 
+            // Restore every captured Player/Main field; partial restore reports
+            // failure instead of pretending the scoped click succeeded.
             return ok ? ClearInputError() : Fail("Cannot restore scoped use item takeover.");
         }
 
@@ -2032,6 +2040,8 @@ namespace JueMingZ.Compat
                     }
                 }
 
+                // Smart cursor and tile-use fields are intent state, not proof
+                // that Terraria accepted a tile interaction.
                 CaptureSmartInteractionState(state);
                 CaptureTileInteractionInputState(player, state);
                 state.Captured = true;
@@ -2192,7 +2202,8 @@ namespace JueMingZ.Compat
                 return Fail(message);
             }
 
-            // Controlled input write: these fields are Terraria's one-click tile interaction gate.
+            // Controlled input write: these fields express right-click tile
+            // intent only; they are not confirmation of a vanilla interaction.
             var ok = SetMember(player, "controlUseTile", true);
             ok &= SetMember(player, "releaseUseTile", true);
             ok &= SetMember(player, "tileInteractAttempted", true);
@@ -2265,6 +2276,8 @@ namespace JueMingZ.Compat
                 return false;
             }
 
+            // The override is scoped to this queued tile action and must leave
+            // mouse, smart cursor, and tile intent state restorable.
             if (!TryCaptureMouseTargetState(player, out restoreState))
             {
                 message = "Tile interaction mouse override capture failed: " + LastInputCompatError;
@@ -3739,6 +3752,8 @@ namespace JueMingZ.Compat
                 return;
             }
 
+            // Restore captured tile intent exactly; leaving these primed can
+            // leak a queued tile action into later vanilla input.
             SetMember(player, "controlUseTile", state.ControlUseTile);
             SetMember(player, "releaseUseTile", state.ReleaseUseTile);
             SetMember(player, "tileInteractAttempted", state.TileInteractAttempted);

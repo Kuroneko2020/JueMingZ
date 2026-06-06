@@ -51,6 +51,8 @@ namespace JueMingZ.Actions.Executors
                 return StartKeepFavorited(execution, snapshot, startedUtc);
             }
 
+            // InventorySlot is a controlled ActionQueue executor, not a generic
+            // inventory mutation API. Slot changes must stay inside scenario Compat.
             if (!string.Equals(scenario, ScenarioNames.FishingAutoLoadoutSwitch, StringComparison.Ordinal) &&
                 !string.Equals(scenario, ScenarioNames.FishingAutoLoadoutRestore, StringComparison.Ordinal))
             {

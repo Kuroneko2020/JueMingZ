@@ -75,6 +75,8 @@ namespace JueMingZ.Actions.Executors
 
         private InputActionExecutionStepResult RequestTargetSelection(InputActionExecution execution, object player, int slot)
         {
+            // Hotbar selection is asynchronous Terraria input state. Request first,
+            // then verify the reported selected slot before use or restore.
             if (ShouldPreferImmediateSelection(execution) &&
                 TerrariaInputCompat.TryForceInventorySlotSelection(player, slot))
             {

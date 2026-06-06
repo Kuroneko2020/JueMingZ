@@ -91,6 +91,8 @@ namespace JueMingZ.Diagnostics
             string slowestOperationName,
             double slowestOperationElapsedMs)
         {
+            // Normal ticks only update in-memory counters here; performance event
+            // writes stay behind PerformanceHitchRecorder threshold checks.
             lock (SyncRoot)
             {
                 RuntimeUpdateCount++;
@@ -118,6 +120,8 @@ namespace JueMingZ.Diagnostics
 
         public static void RecordHitch(PerformanceHitchSample sample, string reason, string performanceEventsPath)
         {
+            // Called only after hitch threshold and throttle checks. Do not use
+            // this path as a per-tick diagnostic append point.
             if (sample == null)
             {
                 return;
@@ -144,6 +148,8 @@ namespace JueMingZ.Diagnostics
 
         public static void RecordOperation(PerformanceOperationSample sample, string performanceEventsPath)
         {
+            // Operation samples share the slow-path contract; callers must fast
+            // check thresholds before building owner summaries or metadata.
             if (sample == null)
             {
                 return;

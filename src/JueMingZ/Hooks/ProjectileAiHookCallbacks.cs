@@ -16,6 +16,8 @@ namespace JueMingZ.Hooks
             __state = new ProjectileAiHookState();
             try
             {
+                // ProjectileAI may only receive a scoped cursor override here.
+                // The service must not edit projectile state or network fields.
                 CombatAimPersistentCursorService.ActiveOverride active;
                 if (CombatAimPersistentCursorService.TryBeginProjectileAi(__instance, out active))
                 {
@@ -37,6 +39,8 @@ namespace JueMingZ.Hooks
         {
             try
             {
+                // Restore the cursor in the paired postfix for this hook frame;
+                // scoped cursor state must not leak into later ProjectileAI calls.
                 CombatAimPersistentCursorService.EndProjectileAi(__state.ActiveOverride);
             }
             catch (Exception error)

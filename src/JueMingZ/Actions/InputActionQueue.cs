@@ -12,6 +12,8 @@ namespace JueMingZ.Actions
 {
     public sealed class InputActionQueue
     {
+        // The queue owns admission, ordering, cleanup leases, and terminal receipts.
+        // Actual input or inventory mutation must stay inside executors and Compat.
         private const int MaxRecentResults = 12;
         private static readonly TimeSpan DefaultCleanupLeaseDuration = TimeSpan.FromMilliseconds(250);
         private readonly object _syncRoot = new object();
@@ -95,6 +97,8 @@ namespace JueMingZ.Actions
 
         public bool TryEnqueue(InputActionRequest request, out InputActionAdmissionResult admission)
         {
+            // TryEnqueue is the admission contract for new triggers, not a raw list add.
+            // It may reject, supersede, or coalesce before the request becomes pending.
             var operationStart = Stopwatch.GetTimestamp();
             NormalizeRequest(request);
 
@@ -394,6 +398,8 @@ namespace JueMingZ.Actions
                     return true;
                 }
 
+                // Terminal result lookup is a recovery receipt path, not just a
+                // diagnostics convenience for the snapshot writer.
                 for (var index = _recentResults.Count - 1; index >= 0; index--)
                 {
                     var candidate = _recentResults[index];
@@ -522,6 +528,8 @@ namespace JueMingZ.Actions
 
         private InputActionResult TryStartNextActionLocked(GameStateSnapshot snapshot)
         {
+            // Priority and bucket sorting only choose the next pending request; active
+            // running actions are not preempted here.
             if (_running != null)
             {
                 return null;
@@ -679,6 +687,8 @@ namespace JueMingZ.Actions
             InputActionChannelDecision cleanupDecision;
             if (TryBuildCleanupBlockedDecisionLocked(request, out cleanupDecision))
             {
+                // Cleanup leases protect post-action restore windows; later requests that
+                // share those channels must wait instead of racing the executor cleanup.
                 result.Accepted = false;
                 result.Decision = InputActionAdmissionDecision.DeniedCleanupLease;
                 result.CleanupLeaseBlocked = true;
@@ -703,6 +713,8 @@ namespace JueMingZ.Actions
             InputActionRequest duplicatePending;
             if (TryFindDuplicatePendingLocked(request, out duplicatePending))
             {
+                // Duplicate policies only rewrite not-yet-started work. A running owner
+                // must finish, timeout, or be cancelled through its executor cleanup path.
                 var pendingOwner = "pending:" + BuildRequestOwnerSummary(duplicatePending);
                 result.PendingConflictSummary = string.IsNullOrWhiteSpace(result.PendingConflictSummary)
                     ? pendingOwner
@@ -740,6 +752,8 @@ namespace JueMingZ.Actions
             InputActionRequest preemptedPending;
             if (TryFindPreemptableBackgroundPendingLocked(request, profile, out preemptedPending))
             {
+                // User commands may supersede conflicting background pending requests only
+                // before they start; this branch must never preempt the active running action.
                 result.Accepted = true;
                 result.Decision = InputActionAdmissionDecision.SupersededPending;
                 result.SupersededPending = true;
@@ -883,6 +897,8 @@ namespace JueMingZ.Actions
             pending.QueueExpiresUtc = incoming.QueueExpiresUtc;
             pending.AdmissionKey = incoming.AdmissionKey ?? string.Empty;
             pending.Timeout = incoming.Timeout;
+            // IsExclusive is legacy metadata; channels and bridge ownership decide whether
+            // a request conflicts with other work.
             pending.IsExclusive = incoming.IsExclusive;
             pending.RequiredChannels = incoming.RequiredChannels;
             pending.ConflictChannels = incoming.ConflictChannels;
@@ -1352,6 +1368,8 @@ namespace JueMingZ.Actions
                 _runningChannelLease = null;
             }
 
+            // Failed or unverified terminal states keep a short channel lease before
+            // recording the receipt, so resource recovery is visible to later admission.
             MaybeCreateCleanupLeaseLocked(result);
             RecordResultLocked(result);
             _running = null;
@@ -1366,6 +1384,8 @@ namespace JueMingZ.Actions
 
             _lastResult = result;
             _recentResults.Add(result);
+            // Recent terminal results are transaction receipts for callers such as
+            // AutoStack; keep this as state, not just as diagnostic logging.
             while (_recentResults.Count > MaxRecentResults)
             {
                 _recentResults.RemoveAt(0);

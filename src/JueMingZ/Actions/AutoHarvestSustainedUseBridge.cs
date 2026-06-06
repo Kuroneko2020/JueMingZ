@@ -7,6 +7,8 @@ namespace JueMingZ.Actions
 {
     public static class AutoHarvestSustainedUseBridge
     {
+        // Services may refresh the target, but this bridge owns the scoped ItemCheck
+        // input write and the restore state for the active request.
         private const int TargetStaleMilliseconds = 250;
         private static readonly object SyncRoot = new object();
         private static AutoHarvestSustainedUseState _active;
@@ -202,6 +204,8 @@ namespace JueMingZ.Actions
                 return false;
             }
 
+            // Apply only inside ItemCheck after capturing use input and mouse target;
+            // the caller must restore the returned states after the hook finishes.
             if (player == null || !TerrariaInputCompat.TryIsLocalPlayer(player))
             {
                 return false;
@@ -315,6 +319,8 @@ namespace JueMingZ.Actions
                 _active.Finished = true;
                 _active.FinishedUtc = DateTime.UtcNow;
                 _lastSnapshot = BuildSnapshotLocked(_active);
+                // Completing releases the active request id before the queue records its
+                // terminal result, so later admission sees the bridge as free.
                 _active = null;
                 Logger.Info("AutoHarvestSustainedUseBridge", "Auto harvest sustained use finished: " + status + " / " + _lastSnapshot.Message);
                 return _lastSnapshot;

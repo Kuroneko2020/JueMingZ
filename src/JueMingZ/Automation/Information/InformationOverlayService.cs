@@ -174,6 +174,8 @@ namespace JueMingZ.Automation.Information
         {
             lock (SyncRoot)
             {
+                // Snapshot consumers read existing counters only; diagnostics
+                // must not refresh labels, scan tiles, or rebuild layouts.
                 return new InformationOverlayDiagnostics
                 {
                     EnabledSummary = Diagnostics.EnabledSummary,
@@ -262,6 +264,8 @@ namespace JueMingZ.Automation.Information
                     return;
                 }
 
+                // Use one read-only context for this overlay pass. New scanners
+                // must not submit actions or duplicate context construction here.
                 ImportLegacyKnownChests(context, settings);
                 RecordOpenChest(context, settings);
                 npcLabels = DrawNpcLabels(spriteBatch, context, settings);
@@ -307,6 +311,8 @@ namespace JueMingZ.Automation.Information
                     return;
                 }
 
+                // Status lines are a read-only model bridge; fishing catch lines
+                // must not enqueue filter, auto-fish, or inventory actions.
                 var lines = GetStatusLines(context, settings);
                 statusLines = InformationStatusPanelService.DrawPanel(spriteBatch, context, lines);
             }
@@ -435,6 +441,8 @@ namespace JueMingZ.Automation.Information
                     ? BuildNpcSegmentInfos(typedNpcs, count)
                     : BuildNpcSegmentInfos(reflectedNpcs, count)
                 : null;
+            // NPC, critter, and enemy buckets are mutually exclusive. Skeleton
+            // merchant stays with NPC labels instead of being swallowed by enemy labels.
             for (var index = 0; index < count && labels.Count < MaxNpcLabelsPerFrame; index++)
             {
                 var npc = typedNpcs != null ? (object)typedNpcs[index] : InformationReflection.GetIndexedValue(reflectedNpcs, index);
@@ -687,6 +695,8 @@ namespace JueMingZ.Automation.Information
 
         private static bool TryReadNpcHealthByIndex(NPC[] typedNpcs, object reflectedNpcs, int count, int index, out int life, out int lifeMax)
         {
+            // Segment health reads are label text only; failed reads keep the
+            // snapshot's own life instead of inventing a group total.
             life = 0;
             lifeMax = 0;
             if (index < 0 || index >= count)
@@ -3070,6 +3080,8 @@ namespace JueMingZ.Automation.Information
 
         private static string ResolveChestTileDisplayName(Type mainType, int tileType, int tileStyle)
         {
+            // Container style indexes address Lang chest/dresser arrays, not
+            // MapHelper lookup options. Keep default chest names on this path.
             if (IsDresserTileType(tileType))
             {
                 return ResolveDresserTileDisplayName(tileStyle);
@@ -3452,6 +3464,8 @@ namespace JueMingZ.Automation.Information
             lock (SyncRoot)
             {
                 var signature = BuildTileHighlightScanSignature(context, settings);
+                // Signature plus scan interval gate the cache; do not replace
+                // this with unconditional per-frame tile scans.
                 if (!ShouldRefreshTileHighlights(context, signature.Hash))
                 {
                     return CachedTileHighlights;
@@ -3496,6 +3510,8 @@ namespace JueMingZ.Automation.Information
 
         private static TileHighlightScanSignature BuildTileHighlightScanSignature(InformationWorldContext context, AppSettings settings)
         {
+            // The signature scopes visible-range scans; range, player chunk, and
+            // enabled-mask inputs are part of the Tile highlight contract.
             var bounds = BuildTileHighlightScanBounds(context);
             var enabledMask = BuildTileHighlightEnabledMask(settings);
             unchecked
@@ -3607,6 +3623,8 @@ namespace JueMingZ.Automation.Information
 
         private static void ScanTileHighlights(InformationWorldContext context, AppSettings settings, TileHighlightScanBounds bounds, TileHighlightColors colors, IList<TileHighlight> results)
         {
+            // Tile highlighting only reads the bounded visible range and builds
+            // draw models; it must not edit tiles or expand scan cadence.
             var tiles = InformationReflection.GetStaticMember(context.MainType, "tile");
             if (tiles == null)
             {
@@ -3784,6 +3802,8 @@ namespace JueMingZ.Automation.Information
 
         private static void RecordOpenChest(InformationWorldContext context, AppSettings settings)
         {
+            // Opened-chest records are per player/world behavior state; recording
+            // must not inspect or mutate chest contents.
             int chestIndex;
             var typedPlayer = context == null ? null : context.LocalPlayer as Player;
             if (typedPlayer != null)
@@ -5436,6 +5456,8 @@ namespace JueMingZ.Automation.Information
         {
             try
             {
+                // The status panel calls the read-only resolver only; auto-fish
+                // and filter actions remain outside the Information overlay.
                 return InformationFishingCatchResolver.ResolveCatchCandidates(context, bobberX, bobberY, bobberIdentity, filterSignature, out message);
             }
             catch (Exception error)
@@ -5672,6 +5694,8 @@ namespace JueMingZ.Automation.Information
 
         private static SignTextLayout GetOrBuildSignTextLayout(string text, int textHash, string mode, int maxLines, int maxCharacters, float scale)
         {
+            // Sign and tombstone layouts are cached by text, mode, scale, and
+            // font generation; drawing must not rebuild layout every frame.
             if (string.IsNullOrWhiteSpace(text))
             {
                 return null;
@@ -5828,6 +5852,8 @@ namespace JueMingZ.Automation.Information
 
         private static bool WrapSignText(string text, int maxLines, float scale, IList<string> lines)
         {
+            // Wrap to the vanilla display width budget so structural splits do
+            // not change visible sign or tombstone text.
             var source = text ?? string.Empty;
             var paragraphs = source.Split('\n');
             var truncated = false;

@@ -10,6 +10,8 @@ namespace JueMingZ.Actions.Channels
             var profile = new InputActionChannelProfile();
             if (request == null)
             {
+                // Unknown requests fail closed; absence of metadata must not become
+                // permission to share input channels.
                 profile.RequiredChannels = InputActionChannel.GlobalExclusive;
                 profile.ConflictChannels = InputActionChannelFormatter.AllKnown;
                 profile.GlobalExclusive = true;
@@ -116,6 +118,8 @@ namespace JueMingZ.Actions.Channels
                 case InputActionKind.None:
                 case InputActionKind.Movement:
                 default:
+                    // Unknown action kinds fail closed to GlobalExclusive; adding a
+                    // narrower channel requires an explicit resolver branch.
                     return InputActionChannel.GlobalExclusive;
             }
         }
@@ -238,6 +242,8 @@ namespace JueMingZ.Actions.Channels
 
         private static InputActionChannel ResolveItemUseChannels(InputActionRequest request)
         {
+            // Item-use requests include BridgeItemUse so ItemUseBridge participates in
+            // channel ownership before Player.ItemCheck consumes the request.
             var channels = InputActionChannel.UseItem | InputActionChannel.BridgeItemUse;
             if (HasMouseTarget(request) || IsTrue(GetMetadata(request, "AllowCombatAim")))
             {
@@ -326,6 +332,8 @@ namespace JueMingZ.Actions.Channels
                        InputActionChannel.RawInput;
             }
 
+            // Unrecognized RawInput remains globally exclusive. Narrow channels are only
+            // granted to allowlisted modes with known restore semantics.
             return InputActionChannel.GlobalExclusive | InputActionChannel.RawInput;
         }
 

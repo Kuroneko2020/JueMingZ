@@ -1321,6 +1321,8 @@ namespace JueMingZ.Input
             try
             {
                 string message;
+                // "Add current" reads current-water candidates only; it must
+                // not pull rods, swap hotbar slots, or reuse auto-fish actions.
                 var candidates = InformationFishingCatchResolver.ResolveCatchCandidates(context, bobber.CenterX, bobber.CenterY, out message);
                 if (candidates != null)
                 {

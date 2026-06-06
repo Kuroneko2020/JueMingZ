@@ -28,6 +28,8 @@ namespace JueMingZ.Actions.Executors
             }
 
             QuickReforgeResult result;
+            // Reforge must run through the vanilla NPC reforge path; matching a
+            // target prefix never permits direct item prefix or inventory edits.
             var invoked = ReforgeCompat.TryQuickReforgeOnce(targetPrefixes, out result);
             if (invoked && result != null && result.ReforgeInvoked && result.MatchedTargetPrefix)
             {

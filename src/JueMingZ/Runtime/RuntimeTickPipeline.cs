@@ -26,6 +26,8 @@ namespace JueMingZ.Runtime
                 {
                     if (context != null)
                     {
+                        // Stage timings feed snapshot counters only; normal
+                        // ticks must not emit per-stage performance events.
                         context.RecordStageTiming(
                             stage.Name,
                             RuntimeTickContext.GetElapsedMilliseconds(stageStart, Stopwatch.GetTimestamp()));

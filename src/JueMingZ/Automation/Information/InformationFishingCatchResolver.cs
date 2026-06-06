@@ -112,6 +112,8 @@ namespace JueMingZ.Automation.Information
         {
             message = string.Empty;
             var candidates = new List<FishingCatchCandidate>();
+            // This resolver is display-only. Status panels and filter pickers may
+            // read candidates, but must not submit fishing actions or move items.
             if (context == null || context.LocalPlayer == null || context.MainType == null)
             {
                 message = "环境不可用";
@@ -143,6 +145,8 @@ namespace JueMingZ.Automation.Information
                 out earlyBaitItemType,
                 out earlyQuestFish);
             FishingCatchCacheEntry earlyCached;
+            // Early cache hits must return before water scans, FishingConditions
+            // reads, rule enumeration, and display string building.
             if (TryGetEarlyCatchCache(earlyKey, out earlyCached))
             {
                 message = earlyCached.Message;
@@ -152,6 +156,8 @@ namespace JueMingZ.Automation.Information
             var water = ScanFishingWater(context, tileX, tileY);
             if (water.TotalTiles < MinimumWaterTilesForFishingRules)
             {
+                // Keep water shortage as its own player-visible reason; it is
+                // not the same state as unavailable rules or empty candidates.
                 message = "水体不足";
                 StoreEarlyCatchCache(earlyKey, candidates, message);
                 return candidates;
@@ -315,6 +321,8 @@ namespace JueMingZ.Automation.Information
             out bool truncated,
             out string message)
         {
+            // Global search feeds the filter UI index only; it is not proof that
+            // the current bobber can catch the item.
             truncated = false;
             message = string.Empty;
             var candidates = new List<FishingCatchCandidate>();
@@ -638,6 +646,8 @@ namespace JueMingZ.Automation.Information
             int baitItemType,
             int questFish)
         {
+            // The early key is the guard before heavy reads; changing fields here
+            // changes when scans and FishingConditions calls are skipped.
             var builder = new StringBuilder(512);
             AppendKeyPart(builder, "world", context == null ? string.Empty : context.WorldKey);
             AppendKeyPart(builder, "bobber", bobberIdentity.ToString(CultureInfo.InvariantCulture));
@@ -897,6 +907,8 @@ namespace JueMingZ.Automation.Information
 
         private static bool TryGetFishDropRules(InformationWorldContext context, out IList rules)
         {
+            // FishDropRules are display-only candidates; unavailable DB/rule
+            // reflection returns no list instead of inventing catches.
             rules = null;
             var fishDropDb = InformationReflection.GetStaticMember(context.MainType, "FishDropsDB");
             if (fishDropDb == null)
@@ -1121,6 +1133,8 @@ namespace JueMingZ.Automation.Information
 
         private static FishingWaterScan ScanFishingWater(InformationWorldContext context, int tileX, int tileY)
         {
+            // Scan only the current bobber water pocket. Do not widen this into a
+            // per-frame world scan during resolver or overlay refactors.
             Interlocked.Increment(ref _waterScanCount);
             var result = new FishingWaterScan();
             result.Chums = 0;
@@ -1249,6 +1263,8 @@ namespace JueMingZ.Automation.Information
 
         private static List<int> BuildHeightLevels(InformationWorldContext context, int tileY)
         {
+            // Height roll order participates in candidate ordering; keep it
+            // deterministic and allocation-light.
             var result = new List<int>();
             var worldSurface = ReadStaticDouble(context.MainType, "worldSurface", 1200d);
             var rockLayer = ReadStaticDouble(context.MainType, "rockLayer", worldSurface + 200d);
@@ -1414,6 +1430,8 @@ namespace JueMingZ.Automation.Information
 
         private static bool RuleMeetsConditions(object rule, object fishingContext)
         {
+            // Missing MeetsConditions reflection fails closed; guessed filters
+            // would show catches that Terraria has not proven possible.
             try
             {
                 MethodInfo method;
@@ -1723,6 +1741,8 @@ namespace JueMingZ.Automation.Information
             bool hasItemIdSearch,
             int searchItemId)
         {
+            // Keep ID, display-name, and internal-name matching distinct; the UI
+            // truncation message depends on this cheap predicate staying cheap.
             if (hasItemIdSearch && itemId == searchItemId)
             {
                 return true;
@@ -1802,6 +1822,8 @@ namespace JueMingZ.Automation.Information
 
         private static object InvokeInstance(object instance, string methodName, object[] args)
         {
+            // Optional vanilla calls enrich display only; unavailable reflection
+            // returns null and must not trigger fishing actions.
             if (instance == null || string.IsNullOrWhiteSpace(methodName))
             {
                 return null;

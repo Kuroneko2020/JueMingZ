@@ -260,6 +260,8 @@ namespace JueMingZ.Automation.WorldAutomation
             {
                 var queueSnapshot = queue.GetFastState();
                 var activeContinuation = IsRunningAutoHarvestSustainedUse(queueSnapshot);
+                // Runtime submission fairness matches ItemCheck writer fairness;
+                // replacing this with service order can starve auto capture.
                 if (WorldAutomationFairnessCoordinator.ShouldDeferRuntimeSubmission(
                         WorldAutomationFairnessKind.AutoHarvest,
                         tick,
@@ -565,6 +567,8 @@ namespace JueMingZ.Automation.WorldAutomation
         {
             tool = tool ?? new AutoHarvestToolCandidate();
             target = target ?? new AutoHarvestHerbTarget();
+            // Harvest sustained use is a queued bridge action. This service must not
+            // write item input, selected slots, tiles, or plant state directly.
             var request = new InputActionRequest
             {
                 Kind = InputActionKind.RawInput,

@@ -6,6 +6,8 @@ namespace JueMingZ.Actions.Channels
 {
     public sealed class InputActionChannelArbiter
     {
+        // Channel ownership gates admission and start boundaries; the queue still owns
+        // the single running action contract.
         private readonly Dictionary<Guid, InputActionChannelLease> _leases = new Dictionary<Guid, InputActionChannelLease>();
 
         public bool CanAcquire(InputActionRequest request, out InputActionChannelDecision decision)
@@ -235,6 +237,8 @@ namespace JueMingZ.Actions.Channels
         private static InputActionChannel GetBridgeBusyChannels()
         {
             var channels = InputActionChannel.None;
+            // Bridge request ids are live owners even without a running channel lease.
+            // They must block competing item-use writers until the bridge releases them.
             if (ItemUseBridge.PendingRequestId != Guid.Empty)
             {
                 channels |= InputActionChannel.UseItem | InputActionChannel.BridgeItemUse;

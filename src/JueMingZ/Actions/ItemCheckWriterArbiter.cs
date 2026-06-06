@@ -91,6 +91,8 @@ namespace JueMingZ.Actions
 
             ItemCheckWriterDecision decision;
             var bridgeRequestId = ItemUseBridge.PendingRequestId;
+            // ItemUseBridge owns the first ItemCheck writer slot; combat scoped
+            // writers must wait instead of overwriting a bridge use.
             if (context.BridgePendingAtStart || context.BridgePendingNow || bridgeRequestId != Guid.Empty)
             {
                 decision = BuildDecision(
@@ -103,6 +105,8 @@ namespace JueMingZ.Actions
                 return decision;
             }
 
+            // Auto capture and harvest share fairness state here. Do not let
+            // branch order pick a permanent winner when both are active.
             if (context.AutoCaptureCritterActive && context.AutoHarvestActive)
             {
                 var winner = WorldAutomationFairnessCoordinator.ResolveItemCheckWriterOwner(true, true);
@@ -154,6 +158,8 @@ namespace JueMingZ.Actions
                 return decision;
             }
 
+            // UseItemPulse is also an active writer owner for this frame; later
+            // combat writers may only observe the block, not double-write.
             if (context.UseItemPulseActive)
             {
                 decision = BuildDecision(
@@ -267,6 +273,8 @@ namespace JueMingZ.Actions
 
         private static string BuildBlockedCandidates(ItemCheckWriterKind owner)
         {
+            // This summary is diagnostic evidence for skipped candidates. It is
+            // not permission for any later writer to bypass ResolveOwnerCore.
             switch (owner)
             {
                 case ItemCheckWriterKind.ItemUseBridge:

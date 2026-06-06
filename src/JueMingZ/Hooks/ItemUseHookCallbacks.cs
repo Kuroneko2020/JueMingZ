@@ -85,6 +85,8 @@ namespace JueMingZ.Hooks
                 ItemUseBridgeContext context;
                 if (!ItemUseBridge.TryBeginFromItemCheck(__instance, out context))
                 {
+                    // Prefix selects the only active scoped ItemCheck writer for
+                    // this frame; every applied takeover must be restored below.
                     __state.WriterDecision = ItemCheckWriterArbiter.ResolveOwner(BuildItemCheckWriterContext(bridgePendingAtStart));
                     if (TryApplyArbitratedActiveWriter(__instance, ref __state, __state.WriterDecision))
                     {
@@ -98,6 +100,8 @@ namespace JueMingZ.Hooks
                         return;
                     }
 
+                    // Combat writers are fallbacks. Bridge, world automation,
+                    // and pulse owners must finish or restore before they run.
                     if (TryApplyPerfectRevolverTakeover(__instance, ref __state))
                     {
                         ItemCheckWriterArbiter.RecordApplied(
@@ -260,6 +264,8 @@ namespace JueMingZ.Hooks
 
             if (!__state.BridgeApplied)
             {
+                // The paired postfix is the restore contract for hook-side
+                // scoped writes; do not move these restores out of this phase.
                 if (__state.FlailComboTakeoverApplied)
                 {
                     RestoreFlailComboTakeover(__state.FlailComboTakeover);
@@ -351,6 +357,8 @@ namespace JueMingZ.Hooks
                         "ItemCheck input restore failed; exception swallowed.", restoreError);
                 }
 
+                // Notify the bridge only after input and slot restore has run;
+                // terminal results must not race ahead of cleanup.
                 ItemUseBridge.NotifyItemCheckFinished(__instance, __state.RequestId);
 
                 if (__state.AimApplied)

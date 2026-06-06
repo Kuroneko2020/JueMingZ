@@ -3,6 +3,8 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
 
+# Keep dotnet caches in ignored repo-local folders so release builds do
+# not leak machine-specific artifacts into the clean source boundary.
 if (-not $env:DOTNET_CLI_HOME) {
     $env:DOTNET_CLI_HOME = Join-Path $repoRoot ".dotnet_home"
 }

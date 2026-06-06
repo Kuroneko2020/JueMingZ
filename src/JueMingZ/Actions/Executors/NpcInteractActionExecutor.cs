@@ -32,6 +32,8 @@ namespace JueMingZ.Actions.Executors
         {
             var npcIndex = GetMetadataInt(execution, "NpcIndex", -1);
             NurseHealResult result;
+            // NPC actions must use the vanilla dialog/service compat flow; this executor
+            // must not edit NPC service results or player stats directly.
             var changed = NurseServiceCompat.TryOpenAndHeal(npcIndex, out result);
             if (changed)
             {
@@ -51,6 +53,8 @@ namespace JueMingZ.Actions.Executors
         {
             var npcIndex = GetMetadataInt(execution, "NpcIndex", -1);
             TaxCollectResult result;
+            // Tax collection follows the same NPC service boundary; collected value is
+            // verified from the vanilla service result, not by editing NPC state.
             var changed = TaxCollectorServiceCompat.TryOpenAndCollect(npcIndex, out result);
             if (changed)
             {

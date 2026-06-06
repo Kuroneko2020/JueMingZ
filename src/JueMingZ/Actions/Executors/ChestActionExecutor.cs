@@ -61,6 +61,8 @@ namespace JueMingZ.Actions.Executors
                 }
 
                 QuestFishStorageResult allResult;
+                // Chest transfers stay on selective QuickStack/bank compat paths.
+                // Invocation alone is not success; inventory decrease verifies movement.
                 var allOk = autoDepositCoinsMode
                     ? AutoDepositCoinsCompat.TryMoveCoinsToNearbyBanks(player, itemIds, selectiveSlots, out allResult)
                     : autoStackMode
@@ -93,6 +95,8 @@ namespace JueMingZ.Actions.Executors
             }
 
             QuestFishStorageResult result;
+            // Quest fish storage uses the same selective chest path and must not edit
+            // inventory or chest stacks directly.
             var ok = QuestFishStorageCompat.TrySelectiveQuickStackQuestFish(player, questFishId, slots, out result);
             if (!ok)
             {

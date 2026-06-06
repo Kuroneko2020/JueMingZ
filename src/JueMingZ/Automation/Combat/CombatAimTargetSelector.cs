@@ -87,6 +87,8 @@ namespace JueMingZ.Automation.Combat
                 selection.SkipReason = readResult.SkipReason ?? string.Empty;
             }
 
+            // Disabled or unavailable frames stop before scoring samples and
+            // line-of-sight work; selection diagnostics should stay cheap.
             if (!selection.Enabled || radiusTiles <= 0)
             {
                 selection.ResultCode = "Disabled";

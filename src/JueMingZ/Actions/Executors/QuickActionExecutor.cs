@@ -104,6 +104,8 @@ namespace JueMingZ.Actions.Executors
 
             try
             {
+                // QuickHeal/QuickMana/QuickBuff stay on Terraria's vanilla Player
+                // methods; success still requires an observable state change.
                 _method.Invoke(player, new object[0]);
                 SetState(execution, "OriginalQuickMethodInvoked", "true");
             }

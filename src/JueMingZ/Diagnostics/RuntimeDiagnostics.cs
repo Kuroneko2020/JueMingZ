@@ -15,6 +15,8 @@ namespace JueMingZ.Diagnostics
 
         public static void RecordUpdate(long updateCount, bool lateBootstrapCompleted, string lastActionResult)
         {
+            // Keep runtime heartbeat state in memory only; snapshot JSON is
+            // published later by the throttled diagnostics stage.
             lock (SyncRoot)
             {
                 LastUpdateUtc = DateTime.UtcNow;

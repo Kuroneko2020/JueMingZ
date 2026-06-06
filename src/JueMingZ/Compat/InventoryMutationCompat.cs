@@ -170,6 +170,8 @@ namespace JueMingZ.Compat
             return true;
         }
 
+        // Controlled inventory mutation for local fallback use only; callers
+        // must verify item identity and stack before decrementing.
         public static bool TryConsumeOneItem(object player, string sourceContainer, int sourceSlot, int expectedItemType, out int stackBefore, out int stackAfter, out string message)
         {
             stackBefore = 0;

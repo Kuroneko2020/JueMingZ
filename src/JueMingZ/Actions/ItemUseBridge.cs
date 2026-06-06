@@ -8,6 +8,8 @@ namespace JueMingZ.Actions
 {
     public static class ItemUseBridge
     {
+        // This bridge turns a queue-owned item-use request into one controlled
+        // Player.ItemCheck consumption. PendingRequestId is channel and writer ownership.
         private static readonly object SyncRoot = new object();
         private static PendingUseRequest _pending;
         private static ItemUseBridgeResult _lastResult = ItemUseBridgeResult.None;
@@ -207,6 +209,8 @@ namespace JueMingZ.Actions
                 return false;
             }
 
+            // Player.ItemCheck is the consumption window. Validate slot, item, and
+            // input state here before hooks receive a context that can write input.
             if (DateTime.UtcNow - pending.CreatedUtc > pending.Timeout)
             {
                 Complete(pending.RequestId, ItemUseBridgeStatus.Expired, "ItemUseBridge request expired before Player.ItemCheck consumed it.");
@@ -570,6 +574,8 @@ namespace JueMingZ.Actions
             pending.LastMessage = message ?? string.Empty;
             pending.Finished = true;
             pending.AfterState = afterState;
+            // If delayUseItem was only nudged while waiting, restore it before releasing
+            // bridge ownership so the next request does not inherit a synthetic release.
             RestoreDelayUseItemReleaseIfNeeded(pending);
             _lastMessage = pending.LastMessage;
             _lastResult = new ItemUseBridgeResult

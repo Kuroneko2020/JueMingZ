@@ -228,6 +228,8 @@ function Test-GitSourceBoundary {
         return
     }
 
+# GitHub must stay as clean source only; AGENTS, local docs, references,
+# generated packages, logs, and caches remain local collaboration material.
     $requiredIgnoreSnippets = @(
         "**/bin/",
         "**/obj/",

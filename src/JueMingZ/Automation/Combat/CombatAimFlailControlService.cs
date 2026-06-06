@@ -100,6 +100,8 @@ namespace JueMingZ.Automation.Combat
                 var physicalReleasePending = UpdatePhysicalUseItemReleaseState(physicalHeld);
                 diagnostics.PhysicalUseItemHeld = physicalHeld;
                 diagnostics.PhysicalReleasePending = physicalReleasePending;
+                // Keep this idle gate before profile reads, ballistic solve, and
+                // projectile scans; inactive frames must stay cheap.
                 if (!physicalHeld && !physicalReleasePending && !_releaseInFlight)
                 {
                     ResetControlState();
@@ -388,6 +390,8 @@ namespace JueMingZ.Automation.Combat
             }
 
             var pressed = diagnostics.AttackPulse;
+            // ItemCheck takeover emits one scoped press/release and relies on
+            // the hook postfix to restore captured input.
             if (!TerrariaInputCompat.TryBeginScopedUseItemTakeover(player, pressed, "ItemCheck", out takeover))
             {
                 diagnostics.BlockedReason = "itemCheckTakeoverFailed:" + TerrariaInputCompat.LastInputCompatError;
@@ -401,6 +405,8 @@ namespace JueMingZ.Automation.Combat
             Publish(diagnostics);
             if (!pressed)
             {
+                // Release tails pass cursor aim to ProjectileAI only; they do
+                // not mutate projectile ai, velocity, position, or network state.
                 CombatAimPersistentCursorService.RememberFlailReleaseTail(decision);
             }
 
@@ -428,6 +434,8 @@ namespace JueMingZ.Automation.Combat
             TerrariaInputCompat.TryReadGameUpdateCount(out tick);
             lock (SyncRoot)
             {
+                // Combo press aim is a short-lived fallback for a later virtual
+                // release tail, not a second input takeover.
                 _flailComboPressAimDecision = decision;
                 _flailComboPressAimTick = tick;
             }
@@ -443,6 +451,8 @@ namespace JueMingZ.Automation.Combat
                 return false;
             }
 
+            // Use the remembered press aim only when no fresh release decision
+            // exists for the combo release frame.
             return TryRememberReleaseTailFromDecision(decision, takeoverScope, "flailComboPressAim", true);
         }
 
@@ -561,6 +571,8 @@ namespace JueMingZ.Automation.Combat
             diagnostics.InputPhase = string.IsNullOrWhiteSpace(diagnostics.InputPhase) ? diagnostics.State : diagnostics.InputPhase;
             diagnostics.InputMode = string.IsNullOrWhiteSpace(diagnostics.InputMode) ? "projectileAiScopedCursor" : diagnostics.InputMode;
             diagnostics.TakeoverScope = "ProjectileAI";
+            // ProjectileAI scope is diagnostic and cursor-only; flail projectile
+            // fields remain vanilla-owned.
             diagnostics.AttackRelease = true;
             diagnostics.AttackSuppressed = true;
             diagnostics.PhysicalUseItemHeld = false;
@@ -739,6 +751,8 @@ namespace JueMingZ.Automation.Combat
         {
             if (physicalHeld)
             {
+                // Left-click flails must keep vanilla spin-hold while the
+                // physical button is held; only release-pending states steer.
                 if (projectile == null || !projectile.Active || projectile.WhoAmI < 0 || projectile.Type <= 0)
                 {
                     return itemReady
@@ -873,6 +887,8 @@ namespace JueMingZ.Automation.Combat
                 return false;
             }
 
+            // Cached release aim is bounded by item, shoot type, and age; do
+            // not turn it into an unbounded target memory.
             if (cached.ItemType != profile.ItemType || cached.Shoot != profile.Shoot)
             {
                 return false;
@@ -1447,6 +1463,8 @@ namespace JueMingZ.Automation.Combat
                 return false;
             }
 
+            // TileCollision is reflection-backed; if it cannot be proven, leave
+            // collision false so aiming never reacts to guessed terrain.
             try
             {
                 var parameters = method.GetParameters();
@@ -1504,6 +1522,8 @@ namespace JueMingZ.Automation.Combat
 
         private static MethodInfo ResolveTileCollisionMethod()
         {
+            // Resolve once; repeated method scans on the ProjectileAI path are
+            // forbidden because this code can run every frame.
             if (_tileCollisionResolved)
             {
                 return _tileCollisionMethod;

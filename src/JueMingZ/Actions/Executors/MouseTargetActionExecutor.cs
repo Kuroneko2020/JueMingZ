@@ -25,6 +25,8 @@ namespace JueMingZ.Actions.Executors
             {
                 var worldX = GetMetadataFloat(execution, "WorldX", 0f);
                 var worldY = GetMetadataFloat(execution, "WorldY", 0f);
+                // MouseTarget may position Terraria's cursor for an owning action,
+                // but it must not perform the click or item/tile interaction itself.
                 if (!TerrariaInputCompat.TrySetMouseWorldPosition(worldX, worldY))
                 {
                     return InputActionExecutionStepResult.Complete(InputActionStatus.Failed, TerrariaInputCompat.LastInputCompatError);
@@ -38,6 +40,8 @@ namespace JueMingZ.Actions.Executors
                 return InputActionExecutionStepResult.Complete(InputActionStatus.Failed, "MouseTarget requires ScreenX/ScreenY or WorldX/WorldY metadata.");
             }
 
+            // Screen-position requests follow the same boundary: set only the cursor
+            // target, leaving use/click semantics to the queued executor that owns them.
             if (!TerrariaInputCompat.TrySetMouseScreenPosition(screenX, screenY))
             {
                 return InputActionExecutionStepResult.Complete(InputActionStatus.Failed, TerrariaInputCompat.LastInputCompatError);

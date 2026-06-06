@@ -28,6 +28,8 @@ namespace JueMingZ.Actions.Executors
                 return Finish(execution, startedUtc, InputActionStatus.BlockedByUi, DiagnosticResultCode.BlockedByUi, "Player rename blocked by menu, chat, or NPC chat.", null, requestedName, mode);
             }
 
+            // Player rename is a narrow single-player Compat path for fishing quest
+            // state refresh; do not bypass the multiplayer guard from UI/runtime code.
             if (snapshot.NetMode != 0 && !allowMultiplayer)
             {
                 var blocked = new PlayerRenameResult

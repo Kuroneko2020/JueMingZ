@@ -823,6 +823,8 @@ namespace JueMingZ.Automation.Fishing
             FishingFilterDecision decision;
             var shouldKeep = EvaluateFishingFilter(settings, snapshot, observation, out candidate, out decision);
 
+            // Auto fishing owns decisions only. Pulls, recasts, and filter skips
+            // must remain ActionQueue requests instead of direct bobber/slot edits.
             if (shouldKeep)
             {
                 RecordFishingFilterRun(settings, candidate, decision, "filterKeepPull", decision == null ? string.Empty : decision.Reason);
@@ -964,6 +966,8 @@ namespace JueMingZ.Automation.Fishing
                 return;
             }
 
+            // Filter skip protects the existing session pole: temporary slot changes
+            // wait for bobber disappearance or restore instead of overwriting selectedItem.
             string unsafeReason;
             if (IsUnsafeForFilterSkip(snapshot, out unsafeReason))
             {

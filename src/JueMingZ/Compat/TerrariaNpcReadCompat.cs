@@ -5,6 +5,8 @@ namespace JueMingZ.Compat
 {
     internal static class TerrariaNpcReadCompat
     {
+        // Read-only NPC adapter; null or unavailable data must stay neutral and
+        // must never repair or mutate vanilla NPC state.
         public static bool IsActive(NPC npc)
         {
             return npc != null && npc.active;

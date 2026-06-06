@@ -58,6 +58,8 @@ finally {
     $verifyMemory.Dispose()
 }
 
+# The compressed payload is embedded in JueMingZ.dll, so verify by
+# round-tripping bytes before writing the generated dependency blob.
 $sha256 = [System.Security.Cryptography.SHA256]::Create()
 try {
     $sourceHash = [System.BitConverter]::ToString($sha256.ComputeHash($sourceBytes))

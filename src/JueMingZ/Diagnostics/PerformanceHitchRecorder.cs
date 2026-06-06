@@ -192,6 +192,8 @@ namespace JueMingZ.Diagnostics
                 return;
             }
 
+            // performance-events is an over-threshold stream only; normal runtime
+            // frames must not enqueue JSON writes just to refresh diagnostics.
             var reason = BuildReason(sample);
             if (string.IsNullOrWhiteSpace(reason))
             {
@@ -256,6 +258,8 @@ namespace JueMingZ.Diagnostics
             string ownerSummary,
             string metadata)
         {
+            // Slow operation samples share the same threshold and throttle contract
+            // as hitch samples, so admission/verification hot paths stay quiet.
             if (!ShouldRecordOperationFast(elapsedMs, thresholdMs))
             {
                 return;

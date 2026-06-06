@@ -145,6 +145,8 @@ namespace JueMingZ.Automation.InventoryAndItems
                 return;
             }
 
+            // AutoStack pending transactions own newly picked item evidence; coin
+            // deposit must wait so it does not move slots ahead of verification.
             if (AutoStackService.HasPendingAutomationWork())
             {
                 RecordDecision("waiting for auto stack", string.Empty, string.Empty);

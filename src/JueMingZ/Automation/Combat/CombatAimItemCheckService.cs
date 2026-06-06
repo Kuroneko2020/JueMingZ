@@ -44,6 +44,8 @@ namespace JueMingZ.Automation.Combat
 
         internal static bool TryCreatePersistentCursorTailAimDecision(object player, out CombatAimItemCheckDecision decision)
         {
+            // Tail decisions only move cursor for scoped ProjectileAI/MainUpdate
+            // windows; they must not submit item-use actions.
             return TryCreateAimDecisionCore(player, CombatAimApplyModes.PersistentCursor, false, true, out decision);
         }
 
@@ -207,6 +209,8 @@ namespace JueMingZ.Automation.Combat
                 }
 
 
+                // Keep target reads and ballistic preparation behind idle, UI,
+                // and item gates; skipped ItemCheck frames must not build JSON.
                 var readResult = CombatAimTargetReader.Read(decision.TrackDummy);
                 CombatAimTargetHistoryService.Enrich(readResult == null ? null : readResult.Candidates);
                 object localPlayer = player;
@@ -650,6 +654,8 @@ namespace JueMingZ.Automation.Combat
                 return false;
             }
 
+            // Release-hold steers the eventual release aim; held-button
+            // behavior stays with vanilla or the scoped takeover owner.
             decision.Selection.RangeCenterWorldX = decision.RangeCenterWorldX;
             decision.Selection.RangeCenterWorldY = decision.RangeCenterWorldY;
             decision.Selection.AimRangeOrigin = decision.AimRangeOrigin;
@@ -791,6 +797,8 @@ namespace JueMingZ.Automation.Combat
             bool mouseOverrideApplied,
             bool restored)
         {
+            // Adjacent flail and persistent-cursor diagnostics depend on these
+            // field names; keep JSON construction out of idle paths.
             var persistentEligibility = CombatAimPersistentCursorPolicy.Evaluate(
                 decision == null ? null : decision.WeaponProfile,
                 decision != null && string.Equals(decision.PersistentCursorReason, "yoyo", StringComparison.Ordinal),

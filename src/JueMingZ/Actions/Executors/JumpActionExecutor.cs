@@ -264,6 +264,8 @@ namespace JueMingZ.Actions.Executors
             JumpInputProfile before = null;
             JumpInputProfile after = null;
 
+            // SafeLanding rescue owns only a scoped input pulse. It must not edit
+            // velocity, position, fallStart, noFallDmg, or ability state directly.
             SetState(execution, "JumpMode", ModeSafeLandingTakeover);
             SetState(execution, "SafeLandingStrategy", strategy);
             SetState(execution, "SafeLandingActionType", actionType);

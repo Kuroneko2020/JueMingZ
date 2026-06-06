@@ -182,6 +182,8 @@ Set-Location $repoRoot
 $packageDir = Join-Path $repoRoot "JueMingZ-SourcePackage"
 $zipPath = Join-Path $repoRoot "JueMingZ-SourcePackage.zip"
 
+# Source package cleanup must stay inside the repo root; local docs,
+# references, and generated packages are not public source payload.
 Remove-DirectoryInsideRoot -Root $repoRoot -Path $packageDir
 if (Test-Path -LiteralPath $zipPath) {
     Remove-Item -LiteralPath $zipPath -Force

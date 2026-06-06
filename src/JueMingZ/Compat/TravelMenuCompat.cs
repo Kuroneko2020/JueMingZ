@@ -115,6 +115,8 @@ namespace JueMingZ.Compat
             return true;
         }
 
+        // Native CreativeUI scope only observes Terraria's already-open Journey
+        // menu; it must not apply JueMingZ travel-state fallback writes.
         public static bool TryBeginNativeJourneyCreativeUiScope(string scope, out TravelMenuScopedJourneyState state, out string message)
         {
             state = new TravelMenuScopedJourneyState
@@ -309,6 +311,8 @@ namespace JueMingZ.Compat
             return false;
         }
 
+        // JueMingZ travel scope temporarily writes Journey state and therefore
+        // must retain enough original context for fail-closed restore.
         public static bool TryBeginScopedJourneyState(TravelMenuContext original, string scope, out TravelMenuScopedJourneyState state, out string message)
         {
             state = new TravelMenuScopedJourneyState

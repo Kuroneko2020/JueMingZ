@@ -118,6 +118,8 @@ function Invoke-AuditSearch {
     return Invoke-PowerShellSearch -Pattern $Pattern -SourceRoot $SourceRoot
 }
 
+# Audit allowlists encode project mutation boundaries; widening them
+# requires the same review as moving real input/data writes in source.
 function Test-IsAllowedControlledInputPath {
     param(
         [Parameter(Mandatory = $true)]

@@ -633,6 +633,8 @@ namespace JueMingZ.Automation.WorldAutomation
             bugNet = bugNet ?? new BugNetCandidate();
             target = target ?? new NpcSnapshot();
             mode = AutoCaptureCritterModes.Normalize(mode);
+            // The service only enqueues a sustained-use bridge request; scoped
+            // ItemCheck input writes and restore belong to Actions/Compat.
             var request = new InputActionRequest
             {
                 Kind = InputActionKind.RawInput,
@@ -1170,6 +1172,8 @@ namespace JueMingZ.Automation.WorldAutomation
             var playerCenterX = player.PositionX + PlayerWidthPixels * 0.5f;
             var direction = critter.CenterX >= playerCenterX ? 1 : -1;
             var critterRect = CreateCritterRect(critter);
+            // Net variants keep their own vanilla reach envelope; padding is only
+            // detection tolerance and must not change executor range or cadence.
             var reachRect = InflateRect(BuildBugNetReachEnvelope(player.PositionX, player.PositionY, direction, profile), CaptureReachPaddingPixels);
             return RectIntersects(reachRect, critterRect);
         }

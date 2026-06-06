@@ -28,6 +28,8 @@ namespace JueMingZ.GameState.Npcs
         public static NpcSummarySnapshot Read(NpcReadProfile profile)
         {
             var summary = new NpcSummarySnapshot();
+            // Reader profiles bound NPC scan cost; unavailable collections
+            // produce empty snapshots rather than fake NPC state.
             if (profile == NpcReadProfile.None)
             {
                 return summary;
@@ -94,6 +96,8 @@ namespace JueMingZ.GameState.Npcs
                         var catchItem = TerrariaNpcReadCompat.CatchItem(npc);
                         if (catchItem > 0)
                         {
+                            // Catchable critter snapshots are read-only targeting
+                            // inputs; capture actions still go through ActionQueue.
                             if (!includeCounts)
                             {
                                 townNpc = TerrariaNpcReadCompat.IsTownNpc(npc);
