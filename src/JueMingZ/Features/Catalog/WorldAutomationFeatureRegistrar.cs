@@ -7,6 +7,7 @@ namespace JueMingZ.Features.Catalog
     {
         public static void Register(FeatureRegistry registry)
         {
+            // CodeDomain remains WorldAutomation while UserCategory.Misc preserves the existing player-facing page.
             registry.Register(FeatureDefinitionBuilder.Create(FeatureIds.WorldAutomationAutoMining, "自动挖矿", "手持镐子对准矿物点击快捷键，或手动挖下第一个矿物后自动采集矿脉。")
                 .Domain(FeatureCodeDomain.WorldAutomation)
                 .Category(FeatureUserCategory.Misc)

@@ -11,6 +11,8 @@ namespace JueMingZ.Hooks
 {
     public static class PlayerInputScrollHookInstaller
     {
+        // Scroll interception is UI/input timing sensitive. Install only verified
+        // PlayerInput targets so hotbar and F5 scroll handling keep vanilla priority.
         private const string HarmonyId = "JueMingZ.PlayerInputScroll.0026";
         private static int _installed;
         private static int _installing;

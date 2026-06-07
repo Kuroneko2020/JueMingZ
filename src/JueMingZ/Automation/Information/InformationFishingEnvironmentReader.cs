@@ -2,6 +2,7 @@ using System;
 
 namespace JueMingZ.Automation.Information
 {
+    // Environment reads build display snapshots only; they must not correct player, bait, or world fishing state.
     internal static class InformationFishingEnvironmentReader
     {
         public static FishingEnvironmentSnapshot ReadEarlyEnvironmentSnapshot(InformationWorldContext context)

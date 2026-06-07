@@ -11,6 +11,7 @@ using JueMingZ.Runtime;
 
 namespace JueMingZ.Automation.Combat
 {
+    // Equipment warnings read loadout state only; suggestions here must not swap items or enqueue combat actions.
     internal static class CombatEquipmentWarningService
     {
         private const string PromptText = "当前装备非战斗饰品";

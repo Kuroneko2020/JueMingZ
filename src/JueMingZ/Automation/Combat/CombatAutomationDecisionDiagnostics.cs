@@ -3,6 +3,7 @@ using JueMingZ.GameState.Ui;
 
 namespace JueMingZ.Automation.Combat
 {
+    // UI skip reasons are gating contracts; input intent is not treated as safe ownership by itself.
     public static class CombatAutomationDecisionDiagnostics
     {
         public static string BuildUiSkipReason(TerrariaUiInputContext ui)

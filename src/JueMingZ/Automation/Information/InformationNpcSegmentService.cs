@@ -6,6 +6,7 @@ using Terraria;
 
 namespace JueMingZ.Automation.Information
 {
+    // Segment grouping affects labels only; NPC life, ownership, and identity stay vanilla-owned.
     internal static class InformationNpcSegmentService
     {
         internal static bool ShouldDrawEnemySegmentLabel(int groupSize, int neighborCount)

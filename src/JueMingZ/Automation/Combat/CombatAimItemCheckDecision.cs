@@ -2,6 +2,7 @@ using JueMingZ.Compat;
 
 namespace JueMingZ.Automation.Combat
 {
+    // Decisions describe one scoped ItemCheck cursor/input intent; executors and Compat still own real input writes.
     public sealed class CombatAimItemCheckDecision
     {
         public bool Enabled { get; set; }

@@ -10,6 +10,8 @@ namespace JueMingZ.Hooks
 {
     public static class MovementSafeLandingPlayerUpdateHookInstaller
     {
+        // Safe-landing installation is a guarded Player.Update prefix. Missing
+        // runtime types keep rescue pulses inactive rather than guessing player fields.
         private const string HarmonyId = "JueMingZ.MovementSafeLanding.PlayerUpdate.001";
         private static int _installed;
         private static int _installing;

@@ -401,6 +401,8 @@ namespace JueMingZ.Tests
                     runtimeSettings);
 
                 var diagnostics = AutoStackService.GetDiagnostics();
+                // Regression guard: unsafe UI must keep the pending transaction;
+                // refreshing the baseline here would silently lose new stackable items.
                 if (diagnostics == null ||
                     diagnostics.LastDecision.IndexOf("unsafe UI open", StringComparison.OrdinalIgnoreCase) < 0 ||
                     !string.Equals(diagnostics.LastDetectedItemIds, "12", StringComparison.Ordinal) ||
@@ -439,6 +441,8 @@ namespace JueMingZ.Tests
                 AutoStackService.Tick(queue, snapshot, runtime, runtimeSettings);
 
                 var submitted = AutoStackService.GetDiagnostics();
+                // Admission is not proof of movement; only the ActionQueue terminal
+                // result is allowed to clear pending auto-stack work.
                 if (submitted == null ||
                     string.IsNullOrWhiteSpace(submitted.LastSubmitRequestId) ||
                     !string.Equals(submitted.LastPendingItemIds, "12", StringComparison.Ordinal) ||
@@ -494,6 +498,8 @@ namespace JueMingZ.Tests
                 AutoStackService.Tick(queue, snapshot, runtime, runtimeSettings);
 
                 var diagnostics = AutoStackService.GetDiagnostics();
+                // Regression guard: QuickStack can run without verified movement,
+                // so AttemptedButUnverified must remain retry-pending.
                 if (diagnostics == null ||
                     !string.Equals(diagnostics.LastPendingItemIds, "12", StringComparison.Ordinal) ||
                     !string.Equals(diagnostics.PendingTransactionState, "RetryPending", StringComparison.Ordinal) ||
@@ -790,6 +796,8 @@ namespace JueMingZ.Tests
         {
             QuickBagOpenService.ClearState("test reset");
             QuickBagOpenService.BeginCleanupYieldForTesting(100, true);
+            // Regression guard: cleanup yield protects adjacent inventory automation
+            // without turning quick bag open into a long global blocker.
             if (!QuickBagOpenService.IsCleanupYieldActiveForTesting(100) ||
                 !QuickBagOpenService.IsCleanupYieldActiveForTesting(124))
             {
@@ -1737,6 +1745,8 @@ namespace JueMingZ.Tests
                 Status = InputActionStatus.AttemptedButUnverified
             });
 
+            // Restore sessions survive unverified terminal results so slot cleanup
+            // can retry instead of stranding the fishing loadout in a partial state.
             if (!FishingLoadoutService.IsSessionActiveForTesting())
             {
                 throw new InvalidOperationException("AttemptedButUnverified restore must keep fishing loadout session active for retry.");
@@ -2410,6 +2420,8 @@ namespace JueMingZ.Tests
 
             var json = InvokeDiagnosticSnapshotJson(snapshot);
 
+            // Diagnostic field names are external troubleshooting contracts; keep
+            // every ActionQueue admission, cleanup, and direct-enqueue key serialized.
             AssertContains(json, "\"ActionQueueLastAdmissionKind\": \"ItemUse\"");
             AssertContains(json, "\"ActionQueueLastAdmissionDecision\": \"DeniedBridgeBusy\"");
             AssertContains(json, "\"ActionQueueLastAdmissionSource\": \"test.source\"");
@@ -2492,6 +2504,8 @@ namespace JueMingZ.Tests
 
             var json = InvokeDiagnosticSnapshotJson(snapshot);
 
+            // AutoStack transaction fields are used to distinguish pending,
+            // verified, and unverified QuickStack outcomes in user reports.
             AssertContains(json, "\"AutoStackLastDecision\": \"waiting for inventory-open auto stack settle\"");
             AssertContains(json, "\"AutoStackLastDecisionUtc\": \"2026-05-26T02:03:04.0000000Z\"");
             AssertContains(json, "\"AutoStackLastInventorySignature\": \"3:12x2\"");

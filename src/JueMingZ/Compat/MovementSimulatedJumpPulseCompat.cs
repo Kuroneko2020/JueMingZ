@@ -5,6 +5,8 @@ namespace JueMingZ.Compat
 {
     public static class MovementSimulatedJumpPulseCompat
     {
+        // Jump pulses are applied only from Player.Update hook phases so input
+        // writes follow vanilla ordering and can be restored.
         private static readonly object SyncRoot = new object();
         private static SimulatedJumpPulseState _queuedPulse;
 

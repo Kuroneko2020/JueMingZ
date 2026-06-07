@@ -11,6 +11,7 @@ using JueMingZ.Runtime;
 
 namespace JueMingZ.Automation.InventoryAndItems
 {
+    // Keep-favorited detects policy drift from snapshots and queues a slot action; it must not flip inventory flags directly.
     public sealed class KeepFavoritedDiagnostics
     {
         public string LastDecision { get; set; }

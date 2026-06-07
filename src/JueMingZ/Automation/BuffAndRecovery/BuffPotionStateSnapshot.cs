@@ -1,5 +1,6 @@
 namespace JueMingZ.Automation.BuffAndRecovery
 {
+    // This snapshot reports scan state only; request admission and executor results own the real buff-use state machine.
     public sealed class BuffPotionStateSnapshot
     {
         public int CandidateCount { get; set; }

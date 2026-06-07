@@ -6,6 +6,8 @@ namespace JueMingZ.Compat
 {
     public static class DebugCommandsCompat
     {
+        // Debug command access is diagnostic-only; unresolved ChatManager
+        // members fail closed instead of simulating chat commands.
         private const BindingFlags StaticFieldFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
         private static readonly object SyncRoot = new object();
         private static string _lastStatus = "notAttempted";

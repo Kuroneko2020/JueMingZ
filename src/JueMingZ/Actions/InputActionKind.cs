@@ -2,6 +2,8 @@ namespace JueMingZ.Actions
 {
     public enum InputActionKind
     {
+        // New kinds need an executor and an explicit channel resolver branch.
+        // Falling through is intentionally treated as unknown/high-risk work.
         None,
         DiagnosticNoop,
         ItemUse,

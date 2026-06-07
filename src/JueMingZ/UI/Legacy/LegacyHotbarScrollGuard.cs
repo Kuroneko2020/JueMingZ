@@ -7,6 +7,8 @@ namespace JueMingZ.UI.Legacy
 {
     public static class LegacyHotbarScrollGuard
     {
+        // This guard restores only hotbar slot drift caused by UI wheel input leaking
+        // to Terraria; it is not a general selection action executor.
         private const int VerificationFrames = 3;
         private static readonly object SyncRoot = new object();
         private static bool _active;

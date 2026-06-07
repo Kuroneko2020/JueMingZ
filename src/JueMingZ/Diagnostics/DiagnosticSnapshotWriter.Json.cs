@@ -8,6 +8,7 @@ namespace JueMingZ.Diagnostics
 {
     public static partial class DiagnosticSnapshotWriter
     {
+        // JSON serialization preserves field names used in user diagnostics and stays append-free.
         private static string ToJson(DiagnosticSnapshot snapshot)
         {
             var builder = new StringBuilder();

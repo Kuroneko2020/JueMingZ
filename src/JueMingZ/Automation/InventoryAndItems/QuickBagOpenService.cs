@@ -11,6 +11,7 @@ using JueMingZ.Runtime;
 
 namespace JueMingZ.Automation.InventoryAndItems
 {
+    // Quick bag open resolves the requested bag slot, then lets ActionQueue own mouse target and item-use input.
     public sealed class QuickBagOpenDiagnostics
     {
         public string LastDecision { get; set; }

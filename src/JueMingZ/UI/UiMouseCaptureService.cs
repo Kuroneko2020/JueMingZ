@@ -15,6 +15,8 @@ namespace JueMingZ.UI
 
         public static bool CaptureForOperationWindow()
         {
+            // Capture marks vanilla UI ownership for this frame; it is not permission
+            // to execute a gameplay action.
             if (!TerrariaMainCompat.AllowsInputProcessing)
             {
                 InvalidateCache();

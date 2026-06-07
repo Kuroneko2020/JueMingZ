@@ -6,6 +6,7 @@ using JueMingZ.Runtime;
 
 namespace JueMingZ.Automation.Combat
 {
+    // Track only proven local active flails; uncertain ownership resets caches instead of steering another projectile.
     internal sealed class CombatAimFlailProjectileTracker
     {
         private const int ImmunityCacheLength = 256;

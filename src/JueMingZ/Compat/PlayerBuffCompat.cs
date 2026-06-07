@@ -6,6 +6,8 @@ namespace JueMingZ.Compat
 {
     public static class PlayerBuffCompat
     {
+        // Buff writes are restricted to controlled fallback methods; most
+        // helpers here are read-only availability checks.
         private static MethodInfo _addBuffMethod;
         private static bool _addBuffResolved;
 

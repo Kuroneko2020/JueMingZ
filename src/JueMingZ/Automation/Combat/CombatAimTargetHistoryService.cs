@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 namespace JueMingZ.Automation.Combat
 {
+    // Target history enriches scoring only; stale or missing history must not force a target lock or an attack.
     public static class CombatAimTargetHistoryService
     {
         private const long StaleTicks = 180;

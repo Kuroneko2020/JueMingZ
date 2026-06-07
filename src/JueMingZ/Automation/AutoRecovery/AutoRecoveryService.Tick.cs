@@ -14,6 +14,7 @@ using JueMingZ.Runtime;
 
 namespace JueMingZ.Automation.AutoRecovery
 {
+    // Keep runtime, UI, and queue gates before candidate selection; blocked frames should not scan or enqueue recovery actions.
     public static partial class AutoRecoveryService
     {
         public static void Tick(InputActionQueue queue, GameStateSnapshot snapshot, RuntimeState runtimeState)

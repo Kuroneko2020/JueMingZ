@@ -147,6 +147,8 @@ namespace JueMingZ.UI
 
         public static DiagnosticsOverlayModel FromSnapshot(DiagnosticSnapshot snapshot)
         {
+            // Snapshot mapping is display-only; missing fields become labels instead
+            // of feeding gameplay decisions back into services.
             if (snapshot == null)
             {
                 return new DiagnosticsOverlayModel();

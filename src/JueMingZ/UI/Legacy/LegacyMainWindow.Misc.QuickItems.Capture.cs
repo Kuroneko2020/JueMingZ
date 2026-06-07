@@ -14,6 +14,8 @@ namespace JueMingZ.UI.Legacy
     {
         private static void UpdateQuickItemHotkeyCapture(List<QuickItemHotkeyBinding> bindings)
         {
+            // Hotkey capture writes configuration only while the game window is focused;
+            // it must not synthesize the captured key as gameplay input.
             if (!_quickItemHotkeyCaptureActive ||
                 _quickItemHotkeyCaptureBindingIndex < 0 ||
                 bindings == null ||

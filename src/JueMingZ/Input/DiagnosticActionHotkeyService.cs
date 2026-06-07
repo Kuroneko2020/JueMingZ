@@ -36,6 +36,8 @@ namespace JueMingZ.Input
 
         public static void Update(InputActionQueue queue, GameStateSnapshot snapshot)
         {
+            // Fallback diagnostics hotkeys stay gated by overlay visibility, text focus,
+            // foreground process, and debounce before they dispatch any command.
             if (queue == null)
             {
                 return;

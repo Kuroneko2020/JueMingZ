@@ -2,6 +2,7 @@ using System.Globalization;
 
 namespace JueMingZ.Automation.Fishing.Filtering
 {
+    // Candidates are filter/display identities, not proof that a catch item was moved or stored.
     internal sealed class FishingCatchCandidate
     {
         public string Kind { get; set; }

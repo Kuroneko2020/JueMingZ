@@ -67,6 +67,8 @@ function Test-IsRuntimeArtifactPath {
         [string]$Path
     )
 
+    # Source-package filtering mirrors the GitHub clean-source boundary:
+    # local docs, references, generated packages, and caches stay out.
     $relative = Get-RelativePath -Root $Root -Path $Path
     $normalized = $relative.Replace('/', '\')
     $segments = $normalized -split '\\'
@@ -204,9 +206,13 @@ foreach ($fileName in @('README.md', 'JueMingZ.sln', 'NuGet.Config', '.gitignore
 
 $thirdPartySource = Join-Path $repoRoot "external\ThirdParty"
 $thirdPartyDestination = Join-Path $packageDir "external\ThirdParty"
+# 0Harmony.dll is a committed build input for clean source; test packages
+# still embed it instead of shipping it beside JueMingZ.dll.
 Copy-FileIfExists -Source (Join-Path $thirdPartySource "0Harmony.dll") -Destination (Join-Path $thirdPartyDestination "0Harmony.dll")
 Copy-FileIfExists -Source (Join-Path $thirdPartySource "README.md") -Destination (Join-Path $thirdPartyDestination "README.md")
 
+# Legacy docs remains a backflow guard only; neither old docs nor local
+# Chinese docs may enter exported source.
 $forbiddenRelativePaths = @(
     'JueMingZ-TestPackage',
     'JueMingZ-TestPackage.zip',

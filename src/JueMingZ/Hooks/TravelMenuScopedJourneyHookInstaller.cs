@@ -12,6 +12,8 @@ namespace JueMingZ.Hooks
 {
     public static class TravelMenuScopedJourneyHookInstaller
     {
+        // This installer may patch multiple known Journey scopes, but each target
+        // must resolve individually and duplicate signatures are patched once.
         private const string HarmonyId = "JueMingZ.TravelMenuScopedJourney.001";
         private static int _installed;
         private static int _installing;

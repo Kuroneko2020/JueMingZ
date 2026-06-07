@@ -11,6 +11,8 @@ namespace JueMingZ.Hooks
 {
     public static class TravelMenuSaveGuardHookInstaller
     {
+        // Player and world save hooks are installed together for one scoped guard.
+        // If either target is missing, skip so save ordering remains vanilla.
         private const string HarmonyId = "JueMingZ.TravelMenuSaveGuard.001";
         private static int _installed;
         private static int _installing;

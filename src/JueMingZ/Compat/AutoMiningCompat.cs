@@ -8,6 +8,8 @@ namespace JueMingZ.Compat
 {
     internal static class AutoMiningCompat
     {
+        // Mining helpers prove cursor/tile facts for automation gates only;
+        // unproven terrain must make callers yield.
         public const int TileSize = 16;
         private const int VanillaPlayerWidth = 20;
         private const int VanillaPlayerHeight = 42;

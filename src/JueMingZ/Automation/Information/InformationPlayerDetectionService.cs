@@ -3,6 +3,7 @@ using Terraria;
 
 namespace JueMingZ.Automation.Information
 {
+    // Player detection reads accessory-like state for labels only; unreadable fields leave the detector inactive.
     internal static class InformationPlayerDetectionService
     {
         internal static bool HasMetalDetector(object player)

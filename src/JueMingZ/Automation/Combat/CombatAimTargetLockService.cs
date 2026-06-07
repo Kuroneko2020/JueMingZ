@@ -1,5 +1,6 @@
 namespace JueMingZ.Automation.Combat
 {
+    // Manual target locks are selector hints; every frame still rechecks eligibility, range, and line of sight.
     public static class CombatAimTargetLockService
     {
         private const int HoldTicksAfterDisqualified = 18;

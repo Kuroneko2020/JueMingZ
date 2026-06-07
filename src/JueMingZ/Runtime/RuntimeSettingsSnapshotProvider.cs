@@ -6,6 +6,7 @@ using JueMingZ.UI.Legacy;
 
 namespace JueMingZ.Runtime
 {
+    // Caches normalized settings by signature; unchanged config should be a cheap snapshot read.
     internal static class RuntimeSettingsSnapshotProvider
     {
         private static readonly object SyncRoot = new object();

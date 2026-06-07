@@ -6,6 +6,8 @@ namespace JueMingZ.Compat
 {
     internal static class AutoHarvestCompat
     {
+        // Herb reads describe vanilla tile state only; harvest or replant
+        // mutations belong to queued Actions.
         public const int StaffOfRegrowthItemType = 213;
         public const int AxeOfRegrowthItemType = 5295;
         public const int ClayPotTileType = 78;

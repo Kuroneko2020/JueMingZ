@@ -6,6 +6,7 @@ using JueMingZ.Config;
 
 namespace JueMingZ.Automation.Movement
 {
+    // Strategy selection ranks rescue plans only; execution, activation, and restore stay in queued actions.
     internal static class MovementSafeLandingStrategyCatalog
     {
         public const string Version = "safe_landing_strategy_framework_phase1";

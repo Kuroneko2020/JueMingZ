@@ -99,6 +99,8 @@ if ((Test-Path $packageDir) -and (Test-IsInsideDirectory -Parent $repoRoot -Chil
 
 New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
 
+# Keep the first-level test package narrow: JueMingZ.dll, config,
+# VERSION, and README only. Harmony is embedded in the DLL.
 $jmzDll = Join-Path $outputDir "JueMingZ.dll"
 if (-not (Test-Path $jmzDll)) {
     Write-Error "JueMingZ.dll was not found: $jmzDll"
@@ -135,6 +137,8 @@ if (-not (Test-Path $readmeTemplate)) {
     Write-Error "README testing template was not found: $readmeTemplate"
 }
 
+# Generate the user-facing README from the local template without copying
+# the local docs tree into the package.
 $readmeOutputPath = Join-Path $packageDir $readmeFileName
 $utf8Bom = New-Object System.Text.UTF8Encoding($true)
 $templateText = [System.IO.File]::ReadAllText($readmeTemplate, [System.Text.Encoding]::UTF8)

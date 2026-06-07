@@ -5,6 +5,8 @@ namespace JueMingZ.Actions
 {
     public enum InputActionAdmissionDecision
     {
+        // Admission decisions are caller-visible receipts. Denied or coalesced
+        // work must not be re-enqueued by guessing around channel ownership.
         Accepted,
         SupersededPending,
         CoalescedPending,
@@ -18,6 +20,8 @@ namespace JueMingZ.Actions
 
     public sealed class InputActionAdmissionResult
     {
+        // This result is part of the ActionQueue contract, not just logging.
+        // Automation relies on it to keep pending work instead of silently dropping it.
         public static readonly InputActionAdmissionResult Empty = new InputActionAdmissionResult
         {
             Accepted = false,

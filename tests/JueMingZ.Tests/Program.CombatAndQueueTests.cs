@@ -258,6 +258,8 @@ namespace JueMingZ.Tests
 
         private static void CombatItemCheckAutoClickerReadsMouseItemSlot()
         {
+            // Regression guard: inventory-open auto-click must read Main.mouseItem
+            // when selectedItem is Terraria's mouse-slot sentinel.
             var restoreRuntimeTypes = PushFakeTerrariaMainType();
             var previousMouseItem = Terraria.Main.mouseItem;
             var previousAutoReuseAll = Terraria.Main.SettingsEnabled_AutoReuseAllItems;
@@ -332,6 +334,8 @@ namespace JueMingZ.Tests
         {
             try
             {
+                // Scoped ItemCheck clicks must restore both Player and Main mouse
+                // state after the synthetic fresh click.
                 var player = new Terraria.Player
                 {
                     active = true,
@@ -456,6 +460,8 @@ namespace JueMingZ.Tests
 
         private static void CombatFlailComboBlocksVanillaRightClickSemantics()
         {
+            // Regression guard: right-click flail takeover must yield to vanilla
+            // item right-click semantics instead of stealing those interactions.
             var profile = CreateFlailComboProfile();
             profile.VanillaRightClickBlocked = true;
             profile.VanillaRightClickReason = "itemHasRightFire";
@@ -500,6 +506,8 @@ namespace JueMingZ.Tests
 
         private static void CombatFlailComboScopedTakeoverSuppressesAndRestoresRightClick()
         {
+            // Right-click suppression is scoped takeover state; restore must put
+            // both left and right mouse inputs back exactly.
             var player = new Terraria.Player
             {
                 active = true,
@@ -541,6 +549,8 @@ namespace JueMingZ.Tests
 
         private static void CombatFlailComboWorldRightClickGuardAllowsRawRightClickIntent()
         {
+            // Raw right-click intent and fake smart-cursor hints are not confirmed
+            // world interactions; only genuine targets may block takeover.
             var player = new FakePlayer();
             var restoreMainType = PushFakeTerrariaMainType();
             string reason;
@@ -603,6 +613,8 @@ namespace JueMingZ.Tests
 
         private static void CombatFlailComboAllowsPlainInventoryOpen()
         {
+            // Regression guard: opening inventory alone is not UI capture; actual
+            // mouse ownership still blocks flail combo as before.
             var restoreRuntimeTypes = PushFakeTerrariaMainType();
             var previousInventoryOpen = Terraria.Main.playerInventory;
             var previousMainMouseInterface = Terraria.Main.mouseInterface;

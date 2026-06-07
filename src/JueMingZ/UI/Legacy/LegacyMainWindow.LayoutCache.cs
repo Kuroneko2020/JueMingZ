@@ -134,6 +134,8 @@ namespace JueMingZ.UI.Legacy
             AppSettings settings,
             int requestedScrollOffset)
         {
+            // Layout signatures include scroll, settings, and font generation so retained
+            // frames are reused only when hit-test geometry still matches draw geometry.
             selectedPage = selectedPage ?? string.Empty;
             settings = settings ?? AppSettings.CreateDefault();
 

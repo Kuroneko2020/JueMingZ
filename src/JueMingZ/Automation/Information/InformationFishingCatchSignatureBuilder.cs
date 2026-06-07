@@ -6,6 +6,7 @@ using System.Text;
 
 namespace JueMingZ.Automation.Information
 {
+    // Signature builders choose cache identity only; keep fields stable so display reads do not churn scans.
     internal static class InformationFishingCatchSignatureBuilder
     {
         private const int TileSize = 16;

@@ -26,6 +26,8 @@ namespace JueMingZ.UI.Legacy
 
         public static void EnqueueClick(LegacyUiElement element, LegacyMouseSnapshot mouse, bool captured)
         {
+            // Captured UI clicks are buffered as commands; the bounded queue prevents
+            // stale UI input from growing across frames.
             if (element == null || mouse == null || !element.Enabled)
             {
                 return;

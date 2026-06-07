@@ -6,6 +6,8 @@ namespace JueMingZ.Compat
 {
     public static class InventoryMutationCompat
     {
+        // This is the narrow inventory mutation boundary; readers may inspect
+        // fields, but stack writes must verify item identity first.
         public static bool TryGetItem(object player, string sourceContainer, int sourceSlot, out object item, out string message)
         {
             item = null;

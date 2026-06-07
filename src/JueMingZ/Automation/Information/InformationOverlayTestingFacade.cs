@@ -3,6 +3,7 @@ using JueMingZ.Config;
 
 namespace JueMingZ.Automation.Information
 {
+    // The testing facade forwards helper calls only; production overlay ownership stays in the split services.
     internal static class InformationOverlayTestingFacade
     {
         internal static float CalculateSignTextLineX(float signCenterX, int lineWidth, int screenWidth)

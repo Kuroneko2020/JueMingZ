@@ -12,6 +12,8 @@ namespace JueMingZ.Compat
 {
     public static class MovementSafeLandingCompat
     {
+        // Safe-landing reads and queued pulses must never repair fall state
+        // directly; rescue remains input/equipment based.
         private const BindingFlags StaticFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
         private const BindingFlags InstanceFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
         private const float MinimumDangerFallingSpeed = 6.25f;

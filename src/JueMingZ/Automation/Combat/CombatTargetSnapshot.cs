@@ -1,5 +1,6 @@
 namespace JueMingZ.Automation.Combat
 {
+    // Target snapshots are scoring evidence only; action paths must revalidate live state before steering input.
     public sealed class CombatTargetSnapshot
     {
         public int WhoAmI { get; set; }

@@ -3,6 +3,7 @@ using JueMingZ.Config;
 
 namespace JueMingZ.Automation.Information
 {
+    // Testing wrappers expose read-only helpers without reintroducing scanners into production hot paths.
     public static partial class InformationOverlayService
     {
         internal static float CalculateSignTextLineXForTesting(float signCenterX, int lineWidth, int screenWidth)

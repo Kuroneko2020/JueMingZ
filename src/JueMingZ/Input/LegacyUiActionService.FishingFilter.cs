@@ -359,6 +359,8 @@ namespace JueMingZ.Input
 
         private static void StartFishingFilterGlobalSearch(LegacyUiCommand command)
         {
+            // Global search opens an editor picker only; it must not scan current water
+            // or trigger auto-fishing actions.
             var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
             FishingFilterUiState.EnsureModeSignature(settings);
             var before = BuildFishingUiStateJson();
@@ -1370,6 +1372,8 @@ namespace JueMingZ.Input
 
         private static bool IsBobberInLiquid(InformationWorldContext context, float worldX, float worldY)
         {
+            // Missing tile context fails closed so uncertain water state cannot become
+            // an allowed current-catch picker list.
             if (context == null || context.MainType == null)
             {
                 return false;

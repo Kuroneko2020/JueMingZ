@@ -12,6 +12,8 @@ namespace JueMingZ.Compat
 {
     internal static class MovementSafeLandingEquipmentCompat
     {
+        // Temporary equipment plans are reversible mutations; every apply record
+        // must be restorable or the rescue path should skip.
         private const BindingFlags StaticFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
         private const int LegEquipmentSlot = 2;
         private const int FirstAccessorySlot = 3;

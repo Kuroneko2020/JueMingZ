@@ -59,6 +59,7 @@ namespace JueMingZ.Bootstrap
                 Logger.Info("LateBootstrap", "Late game mode: " + GameMode.GetDescriptionLateOnly());
                 Logger.Info("LateBootstrap", "Installing runtime update hook...");
 
+                // Late bootstrap owns hook installation after Main is alive; failed hooks must remain diagnostic, not fatal.
                 var hookResult = HookInstaller.InstallUpdateHook();
                 Logger.Info("LateBootstrap", "Runtime hook handoff result: " + hookResult.Message);
 
@@ -233,6 +234,7 @@ namespace JueMingZ.Bootstrap
                 JueMingZRuntime.MarkLateBootstrapCompleted();
                 Logger.Info("LateBootstrap", "runtime handoff success.");
 
+                // Completion is published only after the runtime and UI hook handoff, so services do not read early state.
                 lock (SyncRoot)
                 {
                     _completed = true;

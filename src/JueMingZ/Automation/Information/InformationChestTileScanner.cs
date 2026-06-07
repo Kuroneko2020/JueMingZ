@@ -7,6 +7,7 @@ using Terraria;
 
 namespace JueMingZ.Automation.Information
 {
+    // Chest scans stay bounded to visible label work; unreadable tiles fail closed instead of mutating or widening scans.
     internal static class InformationChestTileScanner
     {
         internal const int TileSize = 16;

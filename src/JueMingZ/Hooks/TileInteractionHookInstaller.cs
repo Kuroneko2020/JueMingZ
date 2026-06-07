@@ -11,6 +11,8 @@ namespace JueMingZ.Hooks
 {
     public static class TileInteractionHookInstaller
     {
+        // Tile interaction installation is bound to the known vanilla hook target.
+        // Missing reflection must skip rather than writing tile or buff state directly.
         private const string HarmonyId = "JueMingZ.TileInteractions.0036";
         private static int _installed;
         private static int _installing;

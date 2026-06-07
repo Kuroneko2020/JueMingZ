@@ -5,6 +5,8 @@ namespace JueMingZ.Actions
 {
     public sealed class ItemUseBridgeContext
     {
+        // Context is the handoff into Player.ItemCheck. Preparing a slot or
+        // target here still does not permit services to synthesize their own click.
         public Guid RequestId { get; set; }
         public string SourceFeatureId { get; set; }
         public int TargetSlot { get; set; }

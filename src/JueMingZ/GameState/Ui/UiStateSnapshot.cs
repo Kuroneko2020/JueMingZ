@@ -2,6 +2,8 @@ namespace JueMingZ.GameState.Ui
 {
     public sealed class UiStateSnapshot
     {
+        // Mouse/UI capture flags describe ownership only; clearing vanilla
+        // mouse capture flags belongs to Compat UI capture code.
         public UiStateSnapshot()
         {
             GameInputAvailable = true;

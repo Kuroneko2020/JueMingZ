@@ -6,6 +6,8 @@ namespace JueMingZ.Actions.Channels
 {
     public static class InputActionChannelFormatter
     {
+        // Keep diagnostic formatting in the same order as arbitration so unknown
+        // channel bits are visible instead of silently disappearing from evidence.
         public static readonly InputActionChannel AllKnown =
             InputActionChannel.GlobalExclusive |
             InputActionChannel.MouseTarget |

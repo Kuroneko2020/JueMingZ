@@ -8,6 +8,8 @@ namespace JueMingZ.Compat
 {
     internal static class KeepFavoritedCompat
     {
+        // Favorite restoration depends on tracked signatures; never set
+        // favorited on a slot whose item identity no longer matches.
         private const int MaxTrackedCount = 512;
         private const long ExpireTicks = 36000;
         private const string InventoryContainer = "Inventory";

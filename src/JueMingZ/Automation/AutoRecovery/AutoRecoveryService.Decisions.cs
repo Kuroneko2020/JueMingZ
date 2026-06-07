@@ -14,6 +14,7 @@ using JueMingZ.Runtime;
 
 namespace JueMingZ.Automation.AutoRecovery
 {
+    // Decision builders preserve cooldown and UI gates; finding a candidate is not permission to mutate player state.
     public static partial class AutoRecoveryService
     {
         private static AutoRecoveryDecision CreateAutoBuffDecision(AutoRecoverySettings settings, GameStateSnapshot snapshot, BuffPotionCandidate candidate, string triggerReason, bool immediate, string immediateTriggerReason)

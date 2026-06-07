@@ -9,6 +9,8 @@ namespace JueMingZ.Compat
 {
     public static class TerrariaUiMouseCompat
     {
+        // UI mouse helpers may mark capture flags to stop click-through;
+        // gameplay actions remain outside this layer.
         private const int VkLeftButton = 0x01;
         private static bool _mainMouseResolved;
         private static FieldInfo _mouseXField;

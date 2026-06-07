@@ -6,6 +6,8 @@ namespace JueMingZ.Hooks
 {
     internal static class QuickBagOpenItemSlotHookCallbacks
     {
+        // ItemSlot.RightClick prefix only recognizes the vanilla UI gesture for
+        // quick bag opening; inventory mutation remains in the service/compat path.
         private static void Prefix(object[] __args)
         {
             try

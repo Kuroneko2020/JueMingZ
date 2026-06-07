@@ -10,6 +10,8 @@ namespace JueMingZ.Hooks
 {
     public static class InterfaceLayerHookInstaller
     {
+        // Interface layer installation depends on reflected UI list structure.
+        // Missing targets are logged and skipped so draw hooks do not destabilize menus.
         private const string HarmonyId = "JueMingZ.InterfaceLayer.M2_1";
         private static int _installed;
         private static int _installing;

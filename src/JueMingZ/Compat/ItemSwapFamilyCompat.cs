@@ -9,6 +9,8 @@ namespace JueMingZ.Compat
 {
     internal static class ItemSwapFamilyCompat
     {
+        // Form swaps are item-type mutations in Compat only; callers must
+        // compare before/after identity rather than treating families as aliases.
         private static readonly int[][] SwapFamilies =
         {
             new[] { 2611, 5526 }, // Flairoon / Flairon

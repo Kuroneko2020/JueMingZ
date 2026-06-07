@@ -4,6 +4,7 @@ using JueMingZ.Automation.WorldAutomation;
 
 namespace JueMingZ.Config
 {
+    // Persisted settings keep legacy serialized names; runtime code consumes normalized snapshots instead.
     [DataContract]
     public sealed class AppSettings
     {

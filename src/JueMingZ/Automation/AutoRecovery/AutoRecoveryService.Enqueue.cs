@@ -14,6 +14,7 @@ using JueMingZ.Runtime;
 
 namespace JueMingZ.Automation.AutoRecovery
 {
+    // Enqueue is AutoRecovery's mutation boundary; terminal queue results, not request creation, drive cooldown evidence.
     public static partial class AutoRecoveryService
     {
         private static Guid EnqueueDecision(InputActionQueue queue, AutoRecoveryDecision decision, long tick)

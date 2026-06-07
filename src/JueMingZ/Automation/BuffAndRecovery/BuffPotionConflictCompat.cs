@@ -5,6 +5,7 @@ using JueMingZ.Compat;
 
 namespace JueMingZ.Automation.BuffAndRecovery
 {
+    // Conflict reflection is advisory; missing Terraria buff tables leave the group unsupported rather than guessed.
     internal static class BuffPotionConflictCompat
     {
         public static string FindConflictGroup(int buffType, HashSet<int> activeBuffs, out bool supported)

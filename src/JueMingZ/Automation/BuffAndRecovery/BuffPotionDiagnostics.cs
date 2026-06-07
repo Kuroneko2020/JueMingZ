@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 namespace JueMingZ.Automation.BuffAndRecovery
 {
+    // Diagnostics mirror scan outcomes and whitelist state; they must not trigger a new scan or mutate buff settings.
     public static class BuffPotionDiagnostics
     {
         private static readonly object SyncRoot = new object();

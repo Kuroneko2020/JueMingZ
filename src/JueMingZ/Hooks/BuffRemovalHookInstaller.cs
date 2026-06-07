@@ -10,6 +10,8 @@ namespace JueMingZ.Hooks
 {
     public static class BuffRemovalHookInstaller
     {
+        // DelBuff signatures vary across Terraria builds, so installation is
+        // fail-closed: no verified target means no hook, not a broader patch.
         private const string HarmonyId = "JueMingZ.BuffRemoval.0041";
         private static int _installed;
         private static int _installing;

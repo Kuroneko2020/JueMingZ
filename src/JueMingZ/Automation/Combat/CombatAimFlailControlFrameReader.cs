@@ -3,6 +3,7 @@ using JueMingZ.Config;
 
 namespace JueMingZ.Automation.Combat
 {
+    // Frame reads sample settings, player, input, and UI gates only; blocked frames stop before any takeover.
     public static partial class CombatAimFlailControlService
     {
         private static bool TryReadFlailRuntimeReady(out string blockedReason)

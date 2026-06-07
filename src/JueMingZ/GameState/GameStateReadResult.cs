@@ -2,6 +2,8 @@ namespace JueMingZ.GameState
 {
     public sealed class GameStateReadResult
     {
+        // Unavailable/failed results carry sparse snapshots so callers can
+        // yield instead of guessing Terraria state.
         public GameStateReadStatus Status { get; set; }
         public GameStateSnapshot Snapshot { get; set; }
         public string Message { get; set; }

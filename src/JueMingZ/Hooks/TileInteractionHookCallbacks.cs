@@ -6,6 +6,8 @@ namespace JueMingZ.Hooks
 {
     internal static class TileInteractionHookCallbacks
     {
+        // Tile interaction hooks carry mouse target intent through vanilla use.
+        // The use-tile flag is only intent until Terraria accepts the interaction.
         private struct TileInteractionHookState
         {
             public bool Applied;

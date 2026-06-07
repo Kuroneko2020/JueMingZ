@@ -11,6 +11,7 @@ using JueMingZ.Runtime;
 
 namespace JueMingZ.Automation.InventoryAndItems
 {
+    // Extractinator automation may choose an item and enqueue work only; slot writes stay inside the controlled executor path.
     public sealed class AutoExtractinatorDiagnostics
     {
         public string LastDecision { get; set; }

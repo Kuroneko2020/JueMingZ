@@ -7,6 +7,8 @@ namespace JueMingZ.Hooks
 {
     internal static class TravelMenuScopedJourneyHookCallbacks
     {
+        // Scoped journey prefixes/postfixes only bracket vanilla travel-menu calls;
+        // every BeginScopedJourney must be ended with the captured state.
         private static void ScopedJourneyPrefix(MethodBase __originalMethod, ref TravelMenuScopedJourneyState __state)
         {
             try

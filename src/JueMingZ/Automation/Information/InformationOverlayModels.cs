@@ -2,6 +2,7 @@ using System;
 
 namespace JueMingZ.Automation.Information
 {
+    // Overlay models are cache and draw data; they must not become chest, tile, NPC, or fishing state owners.
     internal struct ChestScanCandidate
     {
         public int ChestX;

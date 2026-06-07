@@ -11,6 +11,8 @@ namespace JueMingZ.Hooks
 {
     public static class ScrollHotbarHookInstaller
     {
+        // Hotbar scroll suppression is a narrow input hook. Missing PlayerInput
+        // targets must leave vanilla scrolling untouched instead of blocking globally.
         private const string HarmonyId = "JueMingZ.ScrollHotbar.0024";
         private static int _installed;
         private static int _installing;

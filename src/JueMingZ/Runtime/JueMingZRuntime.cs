@@ -125,6 +125,7 @@ namespace JueMingZ.Runtime
 
         private static RuntimeTickPipeline CreateTickPipeline()
         {
+            // Stage order is the runtime contract: read state, gate focus, dispatch services, then publish diagnostics.
             return new RuntimeTickPipeline(
                 new RuntimeTickStage("runtime-state", UpdateRuntimeState),
                 new RuntimeTickStage("ui-text-resource-monitor", UpdateUiTextResources),
@@ -646,6 +647,7 @@ namespace JueMingZ.Runtime
 
         private static GameStateReadOptions BuildGameStateReadOptions(RuntimeSettingsSnapshot settingsSnapshot, bool diagnosticSnapshotDue)
         {
+            // Read profiles are the runtime cost budget; full reads stay behind feature and snapshot gates.
             var settings = settingsSnapshot ?? RuntimeSettingsSnapshotProvider.GetCurrent();
             var sourceSettings = settings.SourceSettings ?? AppSettings.CreateDefault();
             if (diagnosticSnapshotDue)

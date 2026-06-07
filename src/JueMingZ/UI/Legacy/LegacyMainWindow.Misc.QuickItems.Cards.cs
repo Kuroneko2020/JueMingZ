@@ -13,6 +13,8 @@ namespace JueMingZ.UI.Legacy
     {
         private static LegacyUiElement DrawQuickItemBindingCard(object spriteBatch, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, LegacyUiRect clip, QuickItemHotkeyBinding binding, int index, LegacyUiRect card)
         {
+            // Quick-item cards display configuration choices and capture intent; real
+            // item use stays in hotkey/runtime services.
             LegacyUiTheme.DrawRowClipped(spriteBatch, card, clip);
             var captureSelected = _quickItemHotkeyCaptureActive && _quickItemHotkeyCaptureBindingIndex == index;
             var hotkeyText = captureSelected

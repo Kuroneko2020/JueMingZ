@@ -5,6 +5,8 @@ namespace JueMingZ.Compat
 {
     public static class RecoveryItemUseCompat
     {
+        // Recovery item use invokes vanilla ItemCheck helpers only after
+        // reflection resolves; missing methods fail closed.
         private static bool _resolved;
         private static MethodInfo _tryStartUseMethod;
         private static MethodInfo _applyPotionDelayMethod;

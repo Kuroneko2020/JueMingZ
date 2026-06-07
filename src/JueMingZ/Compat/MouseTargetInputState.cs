@@ -2,6 +2,8 @@ namespace JueMingZ.Compat
 {
     public sealed class MouseTargetInputState
     {
+        // Captured flags are restore contracts for mouse/tile input, including
+        // controlUseTile intent versus confirmed interaction.
         public bool Captured { get; set; }
         public int MouseX { get; set; }
         public int MouseY { get; set; }

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 
 namespace JueMingZ.Automation.WorldAutomation
 {
+    // Mining models describe targets and overlays only; Tile mutation and pick use must stay in Actions/Compat.
     internal struct AutoMiningTilePoint
     {
         public int X;

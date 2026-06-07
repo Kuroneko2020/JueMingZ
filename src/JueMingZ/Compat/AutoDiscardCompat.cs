@@ -44,6 +44,8 @@ namespace JueMingZ.Compat
 
     public static class AutoDiscardCompat
     {
+        // Trash movement stays on Terraria ItemSlot paths with before/after
+        // verification; callers must not clear item stacks directly.
         private const int InventorySlotCount = 58;
         private const int InventoryItemSlotContext = 0;
         private const int TrashCursorOverride = 6;
@@ -319,6 +321,8 @@ namespace JueMingZ.Compat
             var previousMouseLeftRelease = ReadStaticBool(mainType, "mouseLeftRelease", false);
             var previousMouseRight = ReadStaticBool(mainType, "mouseRight", false);
             var previousMouseRightRelease = ReadStaticBool(mainType, "mouseRightRelease", false);
+            // Trash uses a transient ItemSlot click with cursor override; always
+            // restore Main input flags before reporting the result.
             try
             {
                 SetStatic(mainType, "cursorOverride", TrashCursorOverride);

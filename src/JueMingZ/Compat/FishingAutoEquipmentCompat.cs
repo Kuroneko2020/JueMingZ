@@ -10,6 +10,8 @@ namespace JueMingZ.Compat
 {
     internal static class FishingAutoEquipmentCompat
     {
+        // Equipment plans record every move for restore verification; failed
+        // reads or stale signatures must skip rather than reshuffle gear.
         private sealed class SourceCandidate
         {
             public FishingEquipmentContainerKind Kind;
@@ -704,6 +706,8 @@ namespace JueMingZ.Compat
                 RestoreRequests.Remove(requestId);
             }
 
+            // Restore is as important as apply: stale loadout or mouse item
+            // state keeps records pending instead of forcing gear back.
             object player;
             if (!TerrariaInputCompat.TryGetLocalPlayer(out player) || player == null)
             {

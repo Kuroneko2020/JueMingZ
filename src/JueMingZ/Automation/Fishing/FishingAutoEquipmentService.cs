@@ -8,6 +8,7 @@ using JueMingZ.GameState;
 
 namespace JueMingZ.Automation.Fishing
 {
+    // Auto equipment owns apply/restore intent; slot mutation and verification stay in queued inventory actions.
     internal static class FishingAutoEquipmentService
     {
         private static readonly object SyncRoot = new object();

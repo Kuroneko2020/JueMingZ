@@ -19,6 +19,8 @@ namespace JueMingZ.UI.Legacy
         {
             get
             {
+                // Wake Runtime dispatch only for pending commands or active UI ownership
+                // so idle frames stay off the command path.
                 return PendingCommandCount > 0 ||
                        HasActiveInteraction ||
                        HasScrollNeed ||

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 namespace JueMingZ.Diagnostics
 {
+    // Runtime snapshot is a user-return contract; keep this DTO passive and populated from cached summaries.
     public sealed class DiagnosticSnapshot
     {
         public bool Loaded { get; set; }

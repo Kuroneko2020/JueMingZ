@@ -39,6 +39,8 @@ try {
     }
 
     $packageDir = Join-Path $repoRoot "JueMingZ-TestPackage"
+    # Copy only first-level package artifacts; missing optional legacy files
+    # are skipped instead of being recreated by the installer.
     $filesToCopy = @(
         "Terraria.exe.config",
         "JueMingZ.dll",

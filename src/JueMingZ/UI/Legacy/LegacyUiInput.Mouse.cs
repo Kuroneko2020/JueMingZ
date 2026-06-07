@@ -126,6 +126,8 @@ namespace JueMingZ.UI.Legacy
 
         private static MouseCoordinate ResolveLogicalMouse(DiagnosticMouseState raw)
         {
+            // Reconcile Terraria and OS coordinates under UI scale so hit tests match
+            // the scaled F5 window instead of the raw screen cursor.
             var scaleX = raw.UiScaleX > 0.01d ? raw.UiScaleX : raw.UiScale;
             var scaleY = raw.UiScaleY > 0.01d ? raw.UiScaleY : raw.UiScale;
             if (scaleX <= 0.01d)

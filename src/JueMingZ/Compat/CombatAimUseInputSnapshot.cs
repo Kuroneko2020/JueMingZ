@@ -2,6 +2,8 @@ namespace JueMingZ.Compat
 {
     public sealed class CombatAimUseInputSnapshot
     {
+        // This snapshot distinguishes held/released intent from confirmed
+        // ItemCheck takeover; it must not be used to write input by itself.
         public bool Available { get; set; }
         public bool UseItemHeld { get; set; }
         public bool UseItemReleased { get; set; }

@@ -214,6 +214,8 @@ namespace JueMingZ.Tests
 
         private static void SafeLandingCheapPrecheckFailsOpenWhenVelocityUnavailable()
         {
+            // Regression guard: missing cheap-precheck fields fail open to full
+            // analysis, not to "safe" or a hard failure.
             var player = new FakeSafeLandingCheapPrecheckPlayerWithoutVelocity();
 
             MovementSafeLandingAnalysis analysis;
@@ -3069,6 +3071,8 @@ namespace JueMingZ.Tests
             MovementSafeLandingService.ResetDescentRescueGuardForTesting();
             try
             {
+                // Suppress duplicate rescues within one descent, but clear the
+                // guard as soon as danger ends so the next fall can act.
                 var analysis = AnalysisNearGround();
                 analysis.HasInventoryGrapple = true;
                 MovementSafeLandingService.MarkDescentRescueSubmittedForTesting(
@@ -3138,6 +3142,8 @@ namespace JueMingZ.Tests
 
         private static void SafeLandingTeleportRodRequestStaleWhenLandingChanges()
         {
+            // Pending teleport-rod rescues must revalidate the landing snapshot;
+            // replaying stale coordinates can move the player to the wrong place.
             var metadata = SafeLandingTeleportRodMetadata(100f, 200f, 104f, 184f, 90f, 120f);
             var current = AnalysisNearGround();
             current.PositionX = 420f;

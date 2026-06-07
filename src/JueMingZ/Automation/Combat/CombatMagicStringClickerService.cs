@@ -10,6 +10,7 @@ using JueMingZ.Runtime;
 
 namespace JueMingZ.Automation.Combat
 {
+    // Magic-string clicks stay scoped to eligible ItemCheck frames and must not revive broad auto-click input policy.
     public static class CombatMagicStringClickerService
     {
         private const string FeatureId = FeatureIds.CombatMagicStringClicker;

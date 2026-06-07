@@ -106,6 +106,8 @@ namespace JueMingZ.UI.Legacy
             int screenWidth,
             int screenHeight)
         {
+            // Cap only the F5 draw/input scale to fit the screen; do not rewrite
+            // Terraria's global UI scale.
             uiScaleX = NormalizeScale(uiScaleX);
             uiScaleY = NormalizeScale(uiScaleY);
 

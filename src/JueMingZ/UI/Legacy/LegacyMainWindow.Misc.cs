@@ -114,6 +114,8 @@ namespace JueMingZ.UI.Legacy
 
         private static LegacyUiElement DrawSingleMiscActionRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, string label, string buttonLabel, string buttonValue, string elementPrefix, int textR, int textG, int textB)
         {
+            // Misc rows register hit-test elements only; clicks are translated to
+            // LegacyUiCommand after the frame.
             var row = new LegacyUiRect(area.Viewport.X, area.ToScreenY(contentY), area.Viewport.Width, LegacyUiMetrics.RowHeight);
             if (!area.IsVisible(row))
             {

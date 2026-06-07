@@ -9,6 +9,7 @@ namespace JueMingZ.Features
         public string DisplayName { get; set; }
         public string Description { get; set; }
         public string DetailedNotes { get; set; }
+        // CodeDomain is implementation ownership; UserCategory is the F5 page and may intentionally differ.
         public FeatureCodeDomain CodeDomain { get; set; }
         public FeatureUserCategory UserCategory { get; set; }
         public FeatureMultiplayerSupport MultiplayerSupport { get; set; }

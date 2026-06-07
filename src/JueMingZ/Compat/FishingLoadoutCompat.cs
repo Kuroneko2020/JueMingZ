@@ -8,6 +8,8 @@ namespace JueMingZ.Compat
 {
     internal static class FishingLoadoutCompat
     {
+        // Loadout reflection is advisory until verified; switching must confirm
+        // the target index before callers assume success.
         public static bool TryGetCurrentLoadoutIndex(object player, out int index)
         {
             index = -1;

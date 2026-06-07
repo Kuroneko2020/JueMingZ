@@ -8,6 +8,7 @@ using JueMingZ.Runtime;
 
 namespace JueMingZ.Automation.Combat
 {
+    // Auto aim may update cursor and diagnostics; it must not become an automatic attack source.
     public static class CombatAutoAimService
     {
         private const long LogIntervalTicks = 300;

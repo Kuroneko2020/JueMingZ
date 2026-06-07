@@ -8,6 +8,8 @@ namespace JueMingZ.Compat
 {
     internal static class AutoDepositCoinsCompat
     {
+        // Coin deposit may invoke vanilla ChestUI or the guarded piggy-bank
+        // seed fallback; callers must verify results instead of editing stacks.
         private static readonly object ResolveSync = new object();
         private static bool _nearbyBanksResolved;
         private static MethodInfo _getBanksInRangeMethod;
@@ -447,6 +449,8 @@ namespace JueMingZ.Compat
                 return false;
             }
 
+            // Direct seed is this Compat fallback's whole mutation boundary;
+            // roll back the cloned bank slot if the source stack cannot clear.
             int sourceSlot;
             object sourceItem;
             if (!TryFindSeedCoinSource(inventory, itemIds, inventorySlots, out sourceSlot, out sourceItem))

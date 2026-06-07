@@ -6,6 +6,7 @@ using JueMingZ.Runtime;
 
 namespace JueMingZ.Automation.Movement
 {
+    // Movement frames cache one update's read-only input facts so movement services do not re-read hot paths repeatedly.
     internal static class MovementInputFrameCache
     {
         private const int FeatureMaskSimulatedJump = 1;

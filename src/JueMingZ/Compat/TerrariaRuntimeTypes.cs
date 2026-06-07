@@ -6,6 +6,8 @@ namespace JueMingZ.Compat
 {
     public static class TerrariaRuntimeTypes
     {
+        // Runtime type discovery is late-bootstrap only; unresolved types must
+        // make callers fail closed rather than search every frame.
         private static readonly object SyncRoot = new object();
         private static Type _mainType;
         private static Type _playerType;

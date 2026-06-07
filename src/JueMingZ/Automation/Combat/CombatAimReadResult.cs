@@ -2,6 +2,7 @@ using System.Collections.Generic;
 
 namespace JueMingZ.Automation.Combat
 {
+    // Read results carry targeting evidence and skip reasons only; they do not imply an item-use action was accepted.
     public sealed class CombatAimReadResult
     {
         public bool CanSearch { get; set; }

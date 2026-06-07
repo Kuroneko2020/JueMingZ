@@ -6,6 +6,8 @@ namespace JueMingZ.GameState
 {
     internal static class GameStateReflection
     {
+        // Reflection reads return neutral failures only; readers must surface
+        // Unavailable/Unknown snapshots instead of manufacturing state.
         public static object GetStaticMember(Type type, string name)
         {
             if (type == null || string.IsNullOrWhiteSpace(name))

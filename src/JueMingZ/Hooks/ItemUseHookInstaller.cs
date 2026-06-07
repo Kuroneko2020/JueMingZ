@@ -10,6 +10,8 @@ namespace JueMingZ.Hooks
 {
     public static class ItemUseHookInstaller
     {
+        // The ItemCheck hook is the controlled input-write bridge. If the target
+        // method or callbacks cannot be resolved, item-use automation stays inactive.
         private const string HarmonyId = "JueMingZ.ItemCheck.M6_0";
         private static int _installed;
         private static int _installing;

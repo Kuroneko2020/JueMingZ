@@ -7,6 +7,7 @@ using JueMingZ.Config;
 
 namespace JueMingZ.Automation.Movement
 {
+    // Grapple strategy computes a target only; grapple input and mouse targeting stay in the generated request.
     internal sealed class GrappleStrategy : IMovementSafeLandingStrategy
     {
         private const float GrappleInputDelayTicks = 2f;

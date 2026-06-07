@@ -12,6 +12,7 @@ using Terraria;
 
 namespace JueMingZ.Automation.Combat
 {
+    // Auto-facing chooses direction from snapshots and queues work; direct direction writes belong to action executors.
     public static class CombatAutoFacingService
     {
         private const string FeatureId = FeatureIds.CombatAutoFacing;

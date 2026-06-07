@@ -14,9 +14,9 @@ using JueMingZ.Runtime;
 
 namespace JueMingZ.Automation.AutoRecovery
 {
+    // AutoRecovery coordinates snapshot decisions only; partial helpers cross mutation boundaries through EnqueueDecision.
     public static partial class AutoRecoveryService
     {
-        // Shared state and public snapshot entrypoint for the partial AutoRecoveryService implementation.
         public const long ForceDueTick = -1000000;
         private const string AutoHealFeatureId = "buff.auto_heal";
         private const string AutoManaFeatureId = "buff.auto_mana";

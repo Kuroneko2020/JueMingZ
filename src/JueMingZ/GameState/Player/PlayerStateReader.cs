@@ -7,6 +7,8 @@ namespace JueMingZ.GameState.Player
 {
     public static class PlayerStateReader
     {
+        // PlayerStateReader mirrors vanilla fields for decisions only; movement
+        // or recovery services must enqueue controlled actions to change them.
         public static PlayerStateSnapshot Read(TerrariaPlayer player)
         {
             var snapshot = new PlayerStateSnapshot();

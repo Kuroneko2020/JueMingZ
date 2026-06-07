@@ -11,6 +11,7 @@ using JueMingZ.Runtime;
 
 namespace JueMingZ.Automation.NpcServices
 {
+    // Quick reforge requests use the controlled NPC interaction path; prefix selection here is only a snapshot decision.
     public sealed class QuickReforgeServiceDiagnostics
     {
         public string LastDecision { get; set; }

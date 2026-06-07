@@ -229,6 +229,7 @@ namespace JueMingZ.Diagnostics
 
         private static bool ShouldRecord(ItemCheckInputProbeFrame before, ItemCheckInputProbeFrame after, bool anyScopedWriter)
         {
+            // Probe events are throttled observations; ItemCheck sampling must not become a per-frame action log.
             var itemType = ResolveItemType(before, after);
             var interesting = anyScopedWriter || IsProbeItem(itemType) || IsSuspiciousFreshClick(before) || IsSuspiciousFreshClick(after);
             if (!interesting)

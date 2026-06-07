@@ -106,6 +106,8 @@ namespace JueMingZ.UI.Legacy
 
         private static void HandleClicks(List<LegacyUiElement> elements, LegacyMouseSnapshot mouse, LegacyUiRect titleRect, LegacyUiRect resizeRect)
         {
+            // Click handling stops at LegacyUiCommand enqueue so Draw never invokes
+            // feature services directly.
             if (elements == null || mouse == null || !mouse.LeftPressed ||
                 (LegacyUiInput.IsActiveInteraction() && !LegacyTextInput.IsAnyFocused))
             {
@@ -202,6 +204,8 @@ namespace JueMingZ.UI.Legacy
 
         private static LegacyUiTooltipModel BuildTooltipModel(LegacyUiElement element, string pageId, AppSettings settings)
         {
+            // Tooltip layout is cached by visible content, settings, and font generation
+            // so retained frames do not reuse stale text geometry.
             if (element == null ||
                 (element.Candidate == null &&
                  element.WhitelistEntry == null &&

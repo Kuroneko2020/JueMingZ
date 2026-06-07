@@ -141,6 +141,7 @@ namespace JueMingZ.Diagnostics
             string buttonId = "",
             string buttonLabel = "")
         {
+            // Action events describe lifecycle edges only; callers must not record every Running tick.
             try
             {
                 var line = BuildEventJson(
@@ -179,6 +180,7 @@ namespace JueMingZ.Diagnostics
                 return;
             }
 
+            // Keep disk IO off gameplay paths and bound the queue if diagnostics briefly outpace writes.
             lock (WriteQueueSyncRoot)
             {
                 if (PendingWrites.Count >= MaxPendingWrites)

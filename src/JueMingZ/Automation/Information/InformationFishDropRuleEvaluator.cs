@@ -6,6 +6,7 @@ using System.Reflection;
 
 namespace JueMingZ.Automation.Information
 {
+    // Fish-drop rule reflection is display-only; missing rule members make candidates unavailable rather than invented.
     internal static class InformationFishDropRuleEvaluator
     {
         public const int MaxCatchItems = 96;

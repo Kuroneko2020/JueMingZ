@@ -5,6 +5,7 @@ using Terraria;
 
 namespace JueMingZ.Automation.Combat
 {
+    // Player context reads fail closed; missing local-player fields must not be replaced with synthetic aim centers.
     public static class CombatAimPlayerContext
     {
         public static bool TryReadLocalPlayerCenter(out object player, out float x, out float y)

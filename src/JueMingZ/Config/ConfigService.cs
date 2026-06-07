@@ -34,6 +34,7 @@ namespace JueMingZ.Config
 
         public static void Initialize()
         {
+            // Load and migrate all config files under one lock; hot paths read RuntimeSettingsSnapshot instead.
             lock (SyncRoot)
             {
                 try
@@ -522,6 +523,7 @@ namespace JueMingZ.Config
 
         private static void MigrateAppSettings(AppSettings settings)
         {
+            // Migrations normalize legacy aliases once at load/save rather than every runtime tick.
             if (settings.ConfigVersion <= 0)
             {
                 settings.ConfigVersion = 1;

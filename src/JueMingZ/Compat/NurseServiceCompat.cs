@@ -36,6 +36,8 @@ namespace JueMingZ.Compat
 
     public static class NurseServiceCompat
     {
+        // Nurse healing goes through vanilla chat/button handlers and verifies
+        // effects; callers must not set life or buff arrays directly.
         private const int NurseNpcType = 18;
 
         public static bool NeedsNurse(object player)

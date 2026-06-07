@@ -2,6 +2,7 @@ using System;
 
 namespace JueMingZ.Automation.Movement
 {
+    // SafeLanding diagnostics report rescue state only; they must not imply player position or fall-state mutation.
     public sealed class MovementSafeLandingDiagnosticInfo
     {
         public bool Enabled { get; set; }

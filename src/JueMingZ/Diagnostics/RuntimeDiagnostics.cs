@@ -2,6 +2,7 @@ using System;
 
 namespace JueMingZ.Diagnostics
 {
+    // Lightweight runtime heartbeat stays in memory; throttled snapshot publication happens elsewhere.
     public static class RuntimeDiagnostics
     {
         private static readonly object SyncRoot = new object();

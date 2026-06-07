@@ -10,6 +10,8 @@ namespace JueMingZ.Hooks
 {
     public static class AutoMiningPickTileHookInstaller
     {
+        // Install only the exact Player.PickTile shape we can verify. Missing
+        // Harmony, Terraria types, or callback methods must skip instead of guessing.
         private const string HarmonyId = "JueMingZ.AutoMining.PickTile.0001";
         private static int _installed;
         private static int _installing;

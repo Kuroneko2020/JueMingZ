@@ -24,6 +24,7 @@ namespace JueMingZ.Diagnostics
 
         public static bool ShouldWriteNow()
         {
+            // runtime-snapshot.json is a low-frequency overwrite, not an append log or per-tick event stream.
             lock (SyncRoot)
             {
                 return DateTime.UtcNow - _lastWriteUtc >= TimeSpan.FromSeconds(5);

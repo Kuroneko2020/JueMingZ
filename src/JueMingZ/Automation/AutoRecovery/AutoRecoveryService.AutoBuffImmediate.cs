@@ -14,6 +14,7 @@ using JueMingZ.Runtime;
 
 namespace JueMingZ.Automation.AutoRecovery
 {
+    // Immediate auto-buff observes recent manual use from snapshots, then still queues controlled buff-potion work.
     public static partial class AutoRecoveryService
     {
         private static void DetectImmediateAutoBuffTriggers(AutoRecoverySettings settings, GameStateSnapshot snapshot, long tick)

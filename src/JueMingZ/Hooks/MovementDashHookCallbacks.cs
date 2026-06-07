@@ -6,6 +6,8 @@ namespace JueMingZ.Hooks
 {
     internal static class MovementDashHookCallbacks
     {
+        // Dash pulses live only around vanilla DashMovement. The paired postfix
+        // must reset the compat state before later movement code observes it.
         private struct DashMovementHookState
         {
             public DashPulseApplyResult Pulse;

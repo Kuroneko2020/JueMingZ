@@ -9,6 +9,7 @@ using JueMingZ.GameState;
 
 namespace JueMingZ.Automation.Combat
 {
+    // Ballistic solving is pure aim math; unavailable player, weapon, or target data returns no solution.
     public static class CombatAimBallisticSolver
     {
         private const int MainInventoryEndExclusive = 54;

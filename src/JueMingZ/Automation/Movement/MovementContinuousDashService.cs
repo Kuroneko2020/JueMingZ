@@ -12,6 +12,7 @@ using JueMingZ.UI.Legacy;
 
 namespace JueMingZ.Automation.Movement
 {
+    // Continuous dash reads intent and queues direction/dash work; it must not write player velocity or control flags here.
     public static class MovementContinuousDashService
     {
         private const string FeatureId = FeatureIds.MovementContinuousDash;

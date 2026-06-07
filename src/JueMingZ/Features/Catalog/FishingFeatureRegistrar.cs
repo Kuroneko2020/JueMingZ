@@ -51,6 +51,7 @@ namespace JueMingZ.Features.Catalog
 
         private static void Add(FeatureRegistry registry, FeatureDefinitionBuilder builder, bool implemented, FeatureMultiplayerSupport multiplayerSupport)
         {
+            // Fishing registrations stay declarative; filtering and equipment actions are still queued at runtime.
             registry.Register(builder
                 .Domain(FeatureCodeDomain.Fishing)
                 .Category(FeatureUserCategory.Fishing)

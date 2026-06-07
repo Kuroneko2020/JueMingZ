@@ -6,6 +6,8 @@ namespace JueMingZ.Hooks
 {
     internal static class ProjectileAiHookCallbacks
     {
+        // ProjectileAI hooks may lend cursor context to combat services for one
+        // projectile frame only; projectile data and network state stay untouched.
         private struct ProjectileAiHookState
         {
             public CombatAimPersistentCursorService.ActiveOverride ActiveOverride;

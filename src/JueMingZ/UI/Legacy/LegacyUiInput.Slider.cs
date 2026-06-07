@@ -43,6 +43,8 @@ namespace JueMingZ.UI.Legacy
 
         public static void BeginOrUpdateSlider(LegacyMouseSnapshot mouse, LegacyUiElement sliderElement)
         {
+            // Slider drags keep a local preview value and emit one command on release,
+            // avoiding per-frame settings writes.
             if (mouse == null || sliderElement == null)
             {
                 return;

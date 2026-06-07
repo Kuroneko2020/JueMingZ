@@ -6,6 +6,7 @@ using JueMingZ.Compat;
 
 namespace JueMingZ.Automation.Fishing
 {
+    // Equipment scoring is read-only; unknown item or player facts make the profile unsupported rather than guessed.
     internal sealed class FishingEquipmentProfile
     {
         public int ItemType { get; set; }

@@ -117,6 +117,8 @@ namespace JueMingZ.Input
             string verificationJson,
             string sourceKind)
         {
+            // Legacy UI records settings/list edits only; real buff or item use still
+            // has to travel through an InputActionRequest.
             RecordSource(command, sourceKind);
             DiagnosticActionRecorder.RecordCustomEvent(
                 Guid.Empty,

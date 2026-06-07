@@ -10,6 +10,8 @@ namespace JueMingZ.Compat
 {
     public static class TravelMenuCompat
     {
+        // TravelMenu state writes are limited to scoped Journey menu guards;
+        // native CreativeUI observation must not arm travel fallbacks.
         public const int JourneyGameMode = 3;
         public const byte JourneyPlayerDifficulty = 3;
 

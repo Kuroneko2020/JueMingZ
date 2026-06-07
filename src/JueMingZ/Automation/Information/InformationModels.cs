@@ -2,6 +2,7 @@ using System;
 
 namespace JueMingZ.Automation.Information
 {
+    // Information models carry overlay context and diagnostics only; action submission lives outside this domain.
     public struct InformationColor
     {
         public int R;

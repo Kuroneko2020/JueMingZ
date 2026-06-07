@@ -9,6 +9,7 @@ using JueMingZ.GameState;
 
 namespace JueMingZ.Automation.Fishing
 {
+    // Quest fish storage waits for caught-item evidence and queues inventory work; it never edits item stacks directly.
     internal static class FishingQuestFishStorageService
     {
         private const long AllModeInventorySettleTicks = 120;

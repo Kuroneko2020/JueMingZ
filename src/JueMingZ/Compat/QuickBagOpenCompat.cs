@@ -7,6 +7,8 @@ namespace JueMingZ.Compat
 {
     internal static class QuickBagOpenCompat
     {
+        // Bag opening is a hook-scoped right-click pulse; inventory state and
+        // pending actions must be safe before invoking ItemSlot.
         private const int InventoryItemSlotContext = 0;
         private const int MaxInventorySlot = 50;
         private const int VkShift = 0x10;
@@ -525,6 +527,8 @@ namespace JueMingZ.Compat
             var previousMouseLeftRelease = ReadStaticBool(mainType, "mouseLeftRelease", false);
             var previousMouseRight = ReadStaticBool(mainType, "mouseRight", false);
             var previousMouseRightRelease = ReadStaticBool(mainType, "mouseRightRelease", false);
+            // Rapid bag open borrows vanilla right-click state for one ItemSlot
+            // invocation; the hook must restore both left/right flags.
             try
             {
                 SetStatic(mainType, "mouseLeft", false);

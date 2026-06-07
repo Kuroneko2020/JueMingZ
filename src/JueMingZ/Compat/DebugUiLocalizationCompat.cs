@@ -8,6 +8,8 @@ namespace JueMingZ.Compat
 {
     public static class DebugUiLocalizationCompat
     {
+        // Debug UI localization may rewrite reflected UI text only; unresolved
+        // members leave vanilla UI untouched.
         private const BindingFlags InstanceFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
         private const BindingFlags StaticFlags = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
 

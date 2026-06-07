@@ -5,6 +5,7 @@ using JueMingZ.Actions.Channels;
 
 namespace JueMingZ.Automation.Movement
 {
+    // Equipped active abilities are recommendations until queued; this strategy must not fire mounts, hooks, or items.
     internal sealed class EquippedActiveAbilityStrategy : IMovementSafeLandingStrategy
     {
         public IEnumerable<MovementSafeLandingStrategyEvaluation> Evaluate(MovementSafeLandingStrategyContext context)

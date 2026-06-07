@@ -6,6 +6,8 @@ namespace JueMingZ.Compat
 {
     public static class TerrariaTextInputCompat
     {
+        // Native text input capture must be explicitly released; unresolved APIs
+        // leave IME handling unavailable rather than guessed.
         private const BindingFlags StaticFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
         private static readonly object SyncRoot = new object();
         private static bool _resolvedGetInputText;

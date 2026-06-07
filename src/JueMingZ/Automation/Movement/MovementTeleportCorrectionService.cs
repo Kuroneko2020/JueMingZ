@@ -12,6 +12,7 @@ using JueMingZ.UI.Legacy;
 
 namespace JueMingZ.Automation.Movement
 {
+    // Teleport correction may stage a controlled mouse target only when restore state is known; otherwise it fails closed.
     public static class MovementTeleportCorrectionService
     {
         private static readonly object DiagnosticsSyncRoot = new object();

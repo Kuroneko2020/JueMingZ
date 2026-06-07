@@ -10,6 +10,8 @@ namespace JueMingZ.Compat
 {
     internal static class AutoExtractinatorCompat
     {
+        // Extractinator use is driven through vanilla ItemSlot right-click;
+        // missing mode or method data fails closed instead of consuming items.
         private const int InventoryItemSlotContext = 0;
         public const int ExtractinatorTileType = 219;
         public const int ChlorophyteExtractinatorTileType = 642;
@@ -641,6 +643,8 @@ namespace JueMingZ.Compat
             var previousMouseLeftRelease = ReadStaticBool(mainType, "mouseLeftRelease", false);
             var previousMouseRight = ReadStaticBool(mainType, "mouseRight", false);
             var previousMouseRightRelease = ReadStaticBool(mainType, "mouseRightRelease", false);
+            // ItemSlot.RightClick needs a temporary vanilla right-click pulse;
+            // always restore Main mouse flags even when reflection throws.
             try
             {
                 SetStatic(mainType, "mouseLeft", false);

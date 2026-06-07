@@ -19,6 +19,7 @@ namespace JueMingZ.Bootstrap
 
         public static void Start()
         {
+            // Early bootstrap wires config and registries only; Terraria Main state is still unsafe to read here.
             lock (SyncRoot)
             {
                 if (_started)

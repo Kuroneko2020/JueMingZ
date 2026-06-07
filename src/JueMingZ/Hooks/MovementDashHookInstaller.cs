@@ -10,6 +10,8 @@ namespace JueMingZ.Hooks
 {
     public static class MovementDashHookInstaller
     {
+        // Dash hook resolution is signature-bound. Without the expected method,
+        // continuous dash remains disabled instead of writing movement state directly.
         private const string HarmonyId = "JueMingZ.MovementDash.001";
         private static int _installed;
         private static int _installing;

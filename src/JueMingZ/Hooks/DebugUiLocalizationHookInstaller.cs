@@ -9,6 +9,8 @@ namespace JueMingZ.Hooks
 {
     public static class DebugUiLocalizationHookInstaller
     {
+        // These hooks target optional debug UI types. If any required type or
+        // method is absent, localization is skipped rather than patched by name only.
         private const string HarmonyId = "JueMingZ.DebugUiLocalization.0297";
         private static int _installed;
         private static int _installing;

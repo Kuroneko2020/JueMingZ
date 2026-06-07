@@ -27,6 +27,8 @@ try {
     $managerType = "JueMingZ.Bootstrap.JueMingZAppDomainManager"
     $configPath = Join-Path $TerrariaDir "Terraria.exe.config"
 
+    # Only remove configs that name the JueMingZ AppDomainManager; unrelated
+    # Terraria.exe.config files belong to the user.
     if (Test-Path $configPath) {
         $configText = Get-Content -Raw -Path $configPath
         if ($configText -notlike "*$managerType*") {
@@ -56,6 +58,8 @@ try {
         Write-Host "Terraria.exe.config was not found."
     }
 
+    # Flat install artifacts live at the Terraria root; this loop must not
+    # recurse into user folders or generated package directories.
     foreach ($fileName in @("JueMingZ.dll", "0Harmony.dll")) {
         $path = Join-Path $TerrariaDir $fileName
         if (Test-Path $path) {
@@ -66,6 +70,8 @@ try {
 
     $installDir = Join-Path $TerrariaDir "JueMingZDev"
     if ($RemoveFiles) {
+        # Recursive cleanup is limited to the old dev folder under the supplied
+        # TerrariaDir, preserving the rest of the game directory.
         if ((Test-Path $installDir) -and (Test-IsInsideDirectory -Parent $TerrariaDir -Child $installDir)) {
             Remove-Item -LiteralPath $installDir -Recurse -Force
             Write-Host "Removed old install directory: $installDir"

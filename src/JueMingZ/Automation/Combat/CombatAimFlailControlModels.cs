@@ -4,6 +4,7 @@ using JueMingZ.Config;
 
 namespace JueMingZ.Automation.Combat
 {
+    // Flail model values are state and diagnostics contracts; keep release/takeover names stable for snapshots.
     public static partial class CombatAimFlailControlService
     {
         internal sealed class FlailProjectileSnapshot

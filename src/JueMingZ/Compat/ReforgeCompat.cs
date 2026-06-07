@@ -30,6 +30,8 @@ namespace JueMingZ.Compat
 
     public static class ReforgeCompat
     {
+        // Reforge automation stays inside the vanilla reforge menu and verifies
+        // prefix changes; callers must not edit item prefixes.
         private static readonly object SyncRoot = new object();
         private static MethodInfo _reforgeItemMethod;
 

@@ -14,6 +14,7 @@ namespace JueMingZ.Runtime
 
         public void Run(RuntimeTickContext context)
         {
+            // Execute stages in declaration order; timing collection must not alter stage semantics.
             for (var index = 0; index < _stages.Length; index++)
             {
                 var stage = _stages[index];

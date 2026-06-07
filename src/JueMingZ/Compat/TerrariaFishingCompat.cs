@@ -9,6 +9,8 @@ namespace JueMingZ.Compat
 {
     internal static class TerrariaFishingCompat
     {
+        // Fishing condition reads are cached observations for decisions; missing
+        // members must not trigger rod or inventory actions.
         private const int FallbackTruffleWormItemType = 2673;
         private static readonly object BaitSyncRoot = new object();
         private static Type _getFishingConditionsPlayerType;

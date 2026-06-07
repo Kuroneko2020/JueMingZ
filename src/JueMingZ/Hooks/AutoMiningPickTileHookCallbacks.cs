@@ -7,6 +7,8 @@ namespace JueMingZ.Hooks
 {
     internal static class AutoMiningPickTileHookCallbacks
     {
+        // PickTile is an observation boundary for auto mining. Prefix snapshots
+        // the vanilla attempt; postfix must record outcome, not force tile changes.
         private struct PickTileHookState
         {
             public bool Track;

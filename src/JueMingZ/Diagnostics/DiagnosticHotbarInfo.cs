@@ -41,6 +41,7 @@ namespace JueMingZ.Diagnostics
     {
         public static DiagnosticHotbarSlotInfo FromSnapshot(GameStateSnapshot snapshot, int slot)
         {
+            // Suitability hints are read-only diagnostics; this path must not select slots or use items.
             InventoryItemSnapshot item = null;
             if (snapshot != null && snapshot.Inventory != null && snapshot.Inventory.Items != null)
             {

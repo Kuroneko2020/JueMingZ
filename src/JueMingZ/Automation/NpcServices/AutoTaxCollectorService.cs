@@ -9,6 +9,7 @@ using JueMingZ.Runtime;
 
 namespace JueMingZ.Automation.NpcServices
 {
+    // Auto tax collection selects a valid target and queues the vanilla NPC service path; it never edits NPC state or coins.
     public sealed class AutoTaxCollectorServiceDiagnostics
     {
         public string LastDecision { get; set; }

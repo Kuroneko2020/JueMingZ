@@ -1,5 +1,6 @@
 namespace JueMingZ.Common
 {
+    // Feature ids are config keys and diagnostic identifiers; renames require explicit migration aliases.
     public static class FeatureIds
     {
         public const string CombatAutoAim = "combat.auto_aim";

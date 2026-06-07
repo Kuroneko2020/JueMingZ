@@ -5,6 +5,8 @@ namespace JueMingZ.Compat
 {
     internal static class CombatGoblinExecutionCompat
     {
+        // Hook readiness and feature settings both gate this NPC rule; default
+        // false keeps hook failure from changing combat behavior.
         internal const int GoblinTinkererNpcType = 107;
         internal const int BoundGoblinNpcType = 105;
 

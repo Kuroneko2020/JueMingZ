@@ -11,6 +11,8 @@ namespace JueMingZ.Hooks
 {
     internal static class GoblinExecutionHookCallbacks
     {
+        // Transpilers only reopen the vanilla friendly-NPC gates for the accepted
+        // execution rule; they must not edit NPC state, player state, or damage data.
         private static readonly MethodInfo ShouldAllowMethod =
             typeof(CombatGoblinExecutionCompat).GetMethod(
                 "ShouldAllowGoblinExecution",

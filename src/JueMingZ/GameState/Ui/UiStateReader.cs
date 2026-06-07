@@ -7,6 +7,8 @@ namespace JueMingZ.GameState.Ui
 {
     public static class UiStateReader
     {
+        // UI state is advisory input-ownership data; unknown capture should
+        // block actions instead of clearing Terraria UI flags here.
         public static UiStateSnapshot Read(TerrariaPlayer player, bool isInMainMenu)
         {
             var snapshot = new UiStateSnapshot { IsInMainMenu = isInMainMenu };

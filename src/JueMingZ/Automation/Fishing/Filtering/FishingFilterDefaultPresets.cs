@@ -6,6 +6,7 @@ using JueMingZ.Diagnostics;
 
 namespace JueMingZ.Automation.Fishing.Filtering
 {
+    // Presets seed filter policy only; they must not be treated as confirmed vanilla catch outcomes.
     internal static class FishingFilterDefaultPresets
     {
         public const string LowFishingPowerJunkName = "低渔力垃圾";

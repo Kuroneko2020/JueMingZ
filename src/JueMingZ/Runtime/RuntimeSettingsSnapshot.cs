@@ -23,6 +23,7 @@ namespace JueMingZ.Runtime
             string legacySelectedPageId,
             bool legacyMiscUiNeedsInventorySnapshot)
         {
+            // Build the normalized runtime view once so services avoid rereading AppSettings and defaults.
             settings = settings ?? AppSettings.CreateDefault();
             var autoRecovery = AutoRecoverySettings.FromSettings(settings);
             var autoMiningMode = AutoMiningModes.Normalize(settings.WorldAutomationAutoMiningMode);

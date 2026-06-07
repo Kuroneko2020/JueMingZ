@@ -8,6 +8,7 @@ using JueMingZ.GameState;
 
 namespace JueMingZ.Automation.Combat
 {
+    // Yoyo detection stands down on uncertainty so yoyo and flail takeover semantics cannot be merged accidentally.
     public static class CombatAimYoyoCompat
     {
         private static readonly object SyncRoot = new object();

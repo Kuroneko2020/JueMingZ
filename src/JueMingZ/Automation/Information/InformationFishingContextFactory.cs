@@ -4,6 +4,7 @@ using System.Reflection;
 
 namespace JueMingZ.Automation.Information
 {
+    // Fishing context reflection is cached and fail-closed; unknown Terraria types make rules unavailable.
     internal static class InformationFishingContextFactory
     {
         private static Type _attemptType;

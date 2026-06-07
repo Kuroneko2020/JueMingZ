@@ -84,6 +84,7 @@ namespace JueMingZ.Automation.Combat
                 return Result(CombatAimWeaponFamilies.Unsupported, unsupportedReason, projectileAiStyle, specialRuleKind);
             }
 
+            // Keep specialized projectile families ahead of the generic fallback; flails, yoyos, spears, and beams need distinct aim paths.
             if (IsYoyo(profile, projectileAiStyle, yoyoDetected))
             {
                 var reason = string.IsNullOrWhiteSpace(yoyoReason)

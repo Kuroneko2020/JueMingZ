@@ -30,6 +30,8 @@ namespace JueMingZ.UI
 
     public static class UiTextRenderer
     {
+        // Centralized text drawing keeps measurement, clipping, and font cache
+        // invalidation consistent across UI surfaces.
         private const string CalibrationText = "国测田Agjy0123456789";
         private const float SingleLineVisualHeight = 16f;
         private const float SingleLineVerticalLift = -2f;

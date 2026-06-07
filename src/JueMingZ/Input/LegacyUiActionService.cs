@@ -69,6 +69,8 @@ namespace JueMingZ.Input
 
         public static void Update(InputActionQueue queue, GameStateSnapshot snapshot)
         {
+            // Runtime action phase drains LegacyUiInput commands; the draw layer only
+            // captures hit tests and queues commands.
             try
             {
                 var gate = LegacyUiInput.GetActionUpdateGateSnapshot();

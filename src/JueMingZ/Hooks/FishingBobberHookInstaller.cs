@@ -10,6 +10,8 @@ namespace JueMingZ.Hooks
 {
     public static class FishingBobberHookInstaller
     {
+        // Projectile.AI is a hot path; install only the verified callback and
+        // keep missing reflection as a skipped hook, not a runtime scan loop.
         private const string HarmonyId = "JueMingZ.FishingBobber.0063";
         private static int _installed;
         private static int _installing;

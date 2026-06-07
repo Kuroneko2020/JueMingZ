@@ -11,6 +11,7 @@ namespace JueMingZ.Config
         [DataMember(Order = 2)]
         public int Id { get; set; }
 
+        // Exact matching uses Kind and Id; this display snapshot is only a UI hint.
         [DataMember(Order = 3)]
         public string DisplayNameSnapshot { get; set; }
 

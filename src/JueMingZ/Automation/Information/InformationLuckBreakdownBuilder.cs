@@ -4,6 +4,7 @@ using System.Globalization;
 
 namespace JueMingZ.Automation.Information
 {
+    // Luck breakdown lines are read-only display; unavailable contributors are omitted rather than fabricated.
     internal static class InformationLuckBreakdownBuilder
     {
         private const double ContributionEpsilon = 0.0005d;

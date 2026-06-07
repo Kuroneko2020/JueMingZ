@@ -4,6 +4,7 @@ using JueMingZ.GameState;
 
 namespace JueMingZ.Runtime
 {
+    // Carries per-tick timings and cached reads; properties must stay passive to keep diagnostics cheap.
     internal sealed class RuntimeTickContext
     {
         private readonly long _runtimeStartTimestamp;

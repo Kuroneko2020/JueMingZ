@@ -14,6 +14,7 @@ using JueMingZ.Runtime;
 
 namespace JueMingZ.Automation.AutoRecovery
 {
+    // Recovery JSON is diagnostic metadata for one decision; keep it bounded and snapshot-derived.
     public static partial class AutoRecoveryService
     {
         private static string BuildBuffTypesJson(IReadOnlyList<BuffSnapshot> buffs)

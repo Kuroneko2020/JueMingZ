@@ -19,6 +19,7 @@ namespace JueMingZ.Diagnostics
 
         public static void WriteOnce(FeatureRegistry registry)
         {
+            // feature-catalog.json is a one-shot registry artifact; changing runtime state belongs in snapshots.
             if (registry == null)
             {
                 return;
@@ -81,6 +82,7 @@ namespace JueMingZ.Diagnostics
 
         private static List<FeatureDefinition> FilterPublicDefinitions(IReadOnlyList<FeatureDefinition> definitions)
         {
+            // Only public CodeDomain entries leave the process; internal platform definitions stay diagnostic-only.
             var result = new List<FeatureDefinition>();
             if (definitions == null)
             {

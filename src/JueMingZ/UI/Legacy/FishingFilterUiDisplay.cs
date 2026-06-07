@@ -14,6 +14,8 @@ namespace JueMingZ.UI.Legacy
 
         public static string ResolveDisplayName(string kind, int id, string snapshot)
         {
+            // UI names are best-effort display text; reflection failure falls back to
+            // the captured snapshot or id without changing filter state.
             if (id <= 0)
             {
                 return string.IsNullOrWhiteSpace(snapshot) ? string.Empty : snapshot.Trim();

@@ -13,6 +13,8 @@ namespace JueMingZ.Hooks
 {
     public static class InterfaceLayerHookCallbacks
     {
+        // Interface-layer injection may add draw dispatchers only. It must preserve
+        // Terraria SpriteBatch phase and leave input or game-state mutation elsewhere.
         private const string LegacyInputGuardLayerName = "JueMing-Z: Legacy Main UI Input Guard";
         private const string InformationWorldUnderVanillaUiDispatcherLayerName = "JueMing-Z: Information World Under Vanilla UI Dispatcher";
         private const string InformationStatusPanelUnderVanillaUiDispatcherLayerName = "JueMing-Z: Information Status Panel Under Vanilla UI Dispatcher";

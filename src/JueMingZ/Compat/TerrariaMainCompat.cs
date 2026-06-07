@@ -9,6 +9,8 @@ namespace JueMingZ.Compat
 {
     internal static class TerrariaMainCompat
     {
+        // Main wrappers expose read-mostly vanilla state; UI/input capture
+        // writes stay in the dedicated Compat helpers.
         private static bool? _allowsInputProcessingOverrideForTesting;
 
         internal static void SetAllowsInputProcessingOverrideForTesting(bool? value)

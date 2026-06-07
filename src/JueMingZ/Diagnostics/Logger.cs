@@ -9,6 +9,7 @@ using System.Threading;
 
 namespace JueMingZ.Diagnostics
 {
+    // Logging uses a bounded async queue; gameplay paths must not depend on synchronous disk writes.
     public static class Logger
     {
         private const long MaxLogBytes = 5L * 1024L * 1024L;

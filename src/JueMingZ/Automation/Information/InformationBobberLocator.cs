@@ -5,6 +5,7 @@ using JueMingZ.Automation.Fishing;
 
 namespace JueMingZ.Automation.Information
 {
+    // Bobber lookup is read-only and bounded to local fishing evidence; failure must not pull, recast, or scan wider state.
     internal static class InformationBobberLocator
     {
         private const ulong ObserverFreshTicks = 2;

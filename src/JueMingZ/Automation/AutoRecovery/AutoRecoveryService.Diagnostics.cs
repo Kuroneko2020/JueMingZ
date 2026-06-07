@@ -14,6 +14,7 @@ using JueMingZ.Runtime;
 
 namespace JueMingZ.Automation.AutoRecovery
 {
+    // Blocked diagnostics describe why no action was attempted; they must not refresh inventories or change cooldowns.
     public static partial class AutoRecoveryService
     {
         private static void RecordBlockedIfNeeded(AutoRecoveryDecision decision, long tick)

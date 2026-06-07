@@ -45,6 +45,8 @@ namespace JueMingZ.Compat
 
     public static class TaxCollectorServiceCompat
     {
+        // Tax collection uses vanilla NPC chat/service flow and verifies tax
+        // money; callers must not edit player.taxMoney.
         public const int TaxCollectorNpcType = 441;
 
         private static readonly object SyncRoot = new object();

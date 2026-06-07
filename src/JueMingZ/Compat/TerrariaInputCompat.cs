@@ -11,6 +11,8 @@ namespace JueMingZ.Compat
 {
     public static class TerrariaInputCompat
     {
+        // This is the controlled input-write Compat boundary; scoped captures
+        // must restore every Terraria/Main flag they touch.
         private const BindingFlags InstanceMemberFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
         private const int VkLeftButton = 0x01;
         private const int VkRightButton = 0x02;

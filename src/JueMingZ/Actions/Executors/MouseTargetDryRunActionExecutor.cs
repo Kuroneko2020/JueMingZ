@@ -7,6 +7,8 @@ namespace JueMingZ.Actions.Executors
 {
     public sealed class MouseTargetDryRunActionExecutor : InputActionExecutorBase
     {
+        // Dry-run may capture and restore mouse target state, but it must never
+        // click, use an item, or treat changed world state as success.
         public override InputActionKind Kind { get { return InputActionKind.MouseTargetDryRun; } }
 
         public override InputActionExecutionStepResult Start(InputActionExecution execution, GameStateSnapshot snapshot)

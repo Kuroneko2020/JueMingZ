@@ -6,6 +6,7 @@ using JueMingZ.Records;
 
 namespace JueMingZ.Automation.Information
 {
+    // Chest labels read names and cache draw models only; chest contents and open state remain untouched.
     internal static class InformationChestLabelService
     {
         internal const int MaxLabelsPerFrame = 240;

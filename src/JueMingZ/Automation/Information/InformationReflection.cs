@@ -7,6 +7,7 @@ using JueMingZ.Compat;
 
 namespace JueMingZ.Automation.Information
 {
+    // Shared reflection caches are read-only helpers; missing members return null/false instead of guessing game state.
     internal static class InformationReflection
     {
         private static readonly object CacheSyncRoot = new object();

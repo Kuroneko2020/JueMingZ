@@ -80,6 +80,8 @@ namespace JueMingZ.UI.Legacy
 
         public static void HandleWindowFrame(LegacyMouseSnapshot mouse, LegacyUiRect titleRect, LegacyUiRect resizeRect)
         {
+            // Window drag/resize updates UI state and persists only on release; mouse
+            // capture handles click-through separately.
             if (mouse == null)
             {
                 return;

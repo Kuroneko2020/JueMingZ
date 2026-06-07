@@ -2,6 +2,7 @@ using System;
 
 namespace JueMingZ.Automation.Fishing
 {
+    // Fishing diagnostics mirror hook/session state and must not pull bobbers, swap rods, or refresh inventories.
     public static class FishingAutomationDiagnostics
     {
         private static readonly object SyncRoot = new object();

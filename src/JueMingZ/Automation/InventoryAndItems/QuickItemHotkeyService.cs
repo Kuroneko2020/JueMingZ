@@ -15,6 +15,7 @@ using JueMingZ.UI.Legacy;
 
 namespace JueMingZ.Automation.InventoryAndItems
 {
+    // Hotkeys are explicit user commands, but they still enqueue item use instead of writing selectedItem or input flags here.
     public static class QuickItemHotkeyService
     {
         private const int VkShift = 0x10;

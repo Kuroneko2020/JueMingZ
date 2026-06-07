@@ -90,6 +90,7 @@ namespace JueMingZ.Diagnostics
 
     public static class PerformanceHitchRecorder
     {
+        // Thresholds gate the only performance-events append stream; normal frames update counters in memory.
         public const double UpdateStartGapThresholdMs = 50d;
         public const double RuntimeUpdateThresholdMs = 25d;
         public const double GameStateReadThresholdMs = 10d;

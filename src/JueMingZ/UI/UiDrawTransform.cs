@@ -12,6 +12,8 @@ namespace JueMingZ.UI
 
         public static IDisposable Begin(float scaleX, float scaleY)
         {
+            // Transform scopes must be nested and disposed so retained UI scaling cannot
+            // leak into unrelated overlay draws.
             var previous = _current;
             var safeScaleX = NormalizeScale(scaleX);
             var safeScaleY = NormalizeScale(scaleY);

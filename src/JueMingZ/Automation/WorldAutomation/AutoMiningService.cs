@@ -11,6 +11,7 @@ using JueMingZ.Runtime;
 
 namespace JueMingZ.Automation.WorldAutomation
 {
+    // Auto mining resolves reachable targets and queues use-tile work; it must not write input flags or Tile state directly.
     public static class AutoMiningService
     {
         private const int ScanRadiusTiles = 80;

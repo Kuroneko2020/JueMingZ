@@ -10,6 +10,8 @@ namespace JueMingZ.Hooks
 {
     internal static class ItemUseHookCallbacks
     {
+        // Player.ItemCheck is the only frame where scoped item-use writers may
+        // mutate input; every prefix takeover must be paired with postfix restore.
         private struct ItemUseHookState
         {
             public bool BridgeApplied;

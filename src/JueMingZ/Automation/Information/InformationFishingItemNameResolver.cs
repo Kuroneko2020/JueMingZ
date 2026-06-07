@@ -6,6 +6,7 @@ using JueMingZ.Automation.Fishing.Filtering;
 
 namespace JueMingZ.Automation.Information
 {
+    // Item-name fallbacks are display text only; missing names must not create items or mark rules invalid.
     internal static class InformationFishingItemNameResolver
     {
         private static bool _crateSetsInitialized;

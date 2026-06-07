@@ -8,6 +8,8 @@ namespace JueMingZ.Compat
 {
     public static class TerrariaTeleportRodCompat
     {
+        // Teleport corrections only adjust temporary mouse targets; restore
+        // captured mouse/tile state on every failure path.
         private const int RodOfDiscordItemId = 1326;
         private const int RodOfHarmonyItemId = 5335;
         private const int TempleWallId = 87;

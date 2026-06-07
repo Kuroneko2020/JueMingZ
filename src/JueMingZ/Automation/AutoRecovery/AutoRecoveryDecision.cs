@@ -4,6 +4,7 @@ using System.Collections.Generic;
 
 namespace JueMingZ.Automation.AutoRecovery
 {
+    // Decisions are intent snapshots; only queued executors may turn them into healing, buff, NPC, or tile mutations.
     public sealed class AutoRecoveryDecision
     {
         public string Mode { get; set; }

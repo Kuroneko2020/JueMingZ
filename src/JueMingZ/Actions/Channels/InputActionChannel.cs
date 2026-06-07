@@ -5,6 +5,8 @@ namespace JueMingZ.Actions.Channels
     [Flags]
     public enum InputActionChannel
     {
+        // Channels describe exclusive ownership, not permission to run in parallel.
+        // Unknown or missing mappings must fall back to GlobalExclusive.
         None = 0,
         GlobalExclusive = 1 << 0,
         MouseTarget = 1 << 1,

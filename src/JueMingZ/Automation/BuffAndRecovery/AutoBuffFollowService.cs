@@ -8,6 +8,7 @@ using JueMingZ.Diagnostics;
 
 namespace JueMingZ.Automation.BuffAndRecovery
 {
+    // Follow-up reads infer vanilla item-use effects only; unknown buff fields fail closed instead of fabricating triggers.
     public static class AutoBuffFollowService
     {
         public static bool TryCaptureManualItemUse(object player, out AutoBuffFollowItemUseObservation observation)

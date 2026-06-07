@@ -6,6 +6,8 @@ namespace JueMingZ.Hooks
 {
     internal static class TravelMenuSaveGuardHookCallbacks
     {
+        // Save guards mark travel-menu save windows only. They must not change
+        // player/world save payloads or suppress vanilla save execution.
         private static void PlayerSavePrefix(object[] __args, ref TravelMenuSaveGuardState __state)
         {
             try

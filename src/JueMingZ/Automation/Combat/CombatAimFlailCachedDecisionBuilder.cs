@@ -6,6 +6,7 @@ using JueMingZ.Diagnostics;
 
 namespace JueMingZ.Automation.Combat
 {
+    // Cached release decisions reuse a bounded release aim; do not run fresh target selection on this path.
     public static partial class CombatAimFlailControlService
     {
         internal static bool TryCreateCachedReleaseDecision(object player, out CombatAimItemCheckDecision decision)

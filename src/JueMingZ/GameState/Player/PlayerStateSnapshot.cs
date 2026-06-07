@@ -2,6 +2,8 @@ namespace JueMingZ.GameState.Player
 {
     public sealed class PlayerStateSnapshot
     {
+        // Player snapshots separate observation from mutation; services must
+        // not write life, mana, velocity, selection, or position from here.
         public bool Exists { get; set; }
         public bool Active { get; set; }
         public bool Dead { get; set; }

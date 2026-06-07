@@ -7,6 +7,8 @@ namespace JueMingZ.Hooks
 {
     internal static class TeleportRodHookCallbacks
     {
+        // The prefix may adjust mouse target before vanilla teleport logic, and
+        // the postfix must always restore that target after vanilla runs.
         private struct TeleportRodHookState
         {
             public bool Applied;

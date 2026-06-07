@@ -67,6 +67,8 @@ namespace JueMingZ.Compat
 
     public static class AutoSellCompat
     {
+        // Shop selling opens vanilla shop state and verifies stack deltas;
+        // business services must not remove items directly.
         public static readonly int[] DefaultAutoSellItemIds = { 2337, 2338, 2339 };
 
         private static readonly Dictionary<int, int> ShopIndexByNpcType = new Dictionary<int, int>
@@ -376,6 +378,8 @@ namespace JueMingZ.Compat
             }
             finally
             {
+                // Shop state is restored unless success intentionally leaves the
+                // vanilla shop visible; failures must not leak talkNPC/NPCShop.
                 if (leaveShopOpen)
                 {
                     result.ShopRestored = false;
@@ -431,6 +435,8 @@ namespace JueMingZ.Compat
             try
             {
                 addItemToShop.Invoke(shopChest, new[] { item });
+                // After the vanilla sell path accepts the item, clear only this
+                // verified source item; callers must not bulk-edit inventory.
                 if (!TryTurnToAir(item))
                 {
                     return false;

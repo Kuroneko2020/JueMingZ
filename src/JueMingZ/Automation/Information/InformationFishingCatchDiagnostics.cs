@@ -2,6 +2,7 @@ using System.Threading;
 
 namespace JueMingZ.Automation.Information
 {
+    // Fish-catch diagnostics expose existing counters only; readers must not refresh water, rules, or item names.
     internal struct InformationFishingCatchDiagnosticsSnapshot
     {
         public long EarlyCacheHitCount;

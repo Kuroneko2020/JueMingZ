@@ -12,6 +12,8 @@ namespace JueMingZ.UI
 
         public static void UpdatePrefixGuard()
         {
+            // Capture marks UI ownership to prevent click-through; it does not grant
+            // permission to execute a gameplay action.
             if (!DiagnosticsOverlay.Visible)
             {
                 return;
@@ -88,6 +90,8 @@ namespace JueMingZ.UI
 
         private static void EnqueueCommand(DiagnosticButtonHitTestResult hit, DiagnosticMouseState mouse, string clickSource, bool captured)
         {
+            // Draw-layer clicks become bounded diagnostic commands; execution is
+            // drained later by DiagnosticButtonActionService.
             var button = hit == null ? null : hit.Button;
             if (button == null)
             {

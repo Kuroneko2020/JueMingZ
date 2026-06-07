@@ -7,6 +7,8 @@ namespace JueMingZ.Hooks
 {
     internal static class MovementSafeLandingPlayerUpdateHookCallbacks
     {
+        // Player.Update prefix can apply queued jump pulses only. It must not edit
+        // velocity, position, fallStart, noFallDmg, or ability state directly.
         private static void Prefix(object __instance)
         {
             try

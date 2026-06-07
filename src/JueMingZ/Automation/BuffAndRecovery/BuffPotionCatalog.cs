@@ -8,6 +8,7 @@ using JueMingZ.Diagnostics;
 
 namespace JueMingZ.Automation.BuffAndRecovery
 {
+    // Catalog scans read candidate inventory and active buffs only; actual AddBuff and stack changes belong to Actions/Compat.
     public static class BuffPotionCatalog
     {
         private static readonly object LangSyncRoot = new object();

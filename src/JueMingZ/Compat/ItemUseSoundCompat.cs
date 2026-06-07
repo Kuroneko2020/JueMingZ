@@ -5,6 +5,8 @@ namespace JueMingZ.Compat
 {
     public static class ItemUseSoundCompat
     {
+        // Use sounds are best-effort feedback after item use; missing SoundEngine
+        // reflection must not block or imply item-use success.
         private static MethodInfo _playSoundMethod;
         private static ConstructorInfo _vector2Constructor;
 

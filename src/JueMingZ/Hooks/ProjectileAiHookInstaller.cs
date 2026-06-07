@@ -10,6 +10,8 @@ namespace JueMingZ.Hooks
 {
     public static class ProjectileAiHookInstaller
     {
+        // Projectile.AI is a shared hot path. Hook installation must be exact and
+        // fail closed so cursor scope support never becomes a broad projectile patch.
         private const string HarmonyId = "JueMingZ.ProjectileAI.0054";
         private static int _installed;
         private static int _installing;

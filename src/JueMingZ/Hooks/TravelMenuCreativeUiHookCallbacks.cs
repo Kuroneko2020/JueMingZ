@@ -7,6 +7,8 @@ namespace JueMingZ.Hooks
 {
     internal static class TravelMenuCreativeUiHookCallbacks
     {
+        // CreativeUI scopes are temporary travel-menu guards. Overrides must fall
+        // back to vanilla whenever the service says the scoped menu is inactive.
         private static void CreativeUiUpdatePrefix(ref TravelMenuScopedJourneyState __state)
         {
             try

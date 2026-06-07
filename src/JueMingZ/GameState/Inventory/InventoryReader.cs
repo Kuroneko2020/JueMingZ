@@ -13,6 +13,8 @@ namespace JueMingZ.GameState.Inventory
         private const int SnapshotArmorSlots = 20;
         private const int SnapshotMiscEquipSlots = 5;
 
+        // Profiles bound snapshot cost; this reader copies item facts without
+        // fixing stacks, favorites, or selected item state.
         public static InventorySnapshot Read(TerrariaPlayer player)
         {
             return Read(player, InventoryReadProfile.Full);

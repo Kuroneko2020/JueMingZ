@@ -6,6 +6,7 @@ using JueMingZ.Runtime;
 
 namespace JueMingZ.Automation.Information
 {
+    // First-world prompts are UI state only; progress reads must not trigger scans, world edits, or automation actions.
     internal static class FirstWorldLoadPromptService
     {
         private const string PromptText = "按f5打开配置窗口";

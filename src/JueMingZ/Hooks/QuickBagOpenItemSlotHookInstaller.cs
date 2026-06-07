@@ -10,6 +10,8 @@ namespace JueMingZ.Hooks
 {
     public static class QuickBagOpenItemSlotHookInstaller
     {
+        // ItemSlot reflection must match the right-click helper exactly. If the
+        // signature changes, skip so inventory UI behavior stays vanilla.
         private const string HarmonyId = "JueMingZ.QuickBagOpen.ItemSlotRightClick.0001";
         private static int _installed;
         private static int _installing;

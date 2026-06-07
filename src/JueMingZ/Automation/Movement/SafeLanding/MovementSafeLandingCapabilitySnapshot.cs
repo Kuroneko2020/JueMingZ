@@ -3,6 +3,7 @@ using JueMingZ.Compat;
 
 namespace JueMingZ.Automation.Movement
 {
+    // Capability snapshots describe available rescue options; they do not execute or verify a rescue by themselves.
     internal sealed class MovementSafeLandingCapabilitySnapshot
     {
         public bool HasAirJump { get; set; }

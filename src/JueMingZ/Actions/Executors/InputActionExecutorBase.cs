@@ -5,6 +5,8 @@ namespace JueMingZ.Actions.Executors
 {
     public abstract class InputActionExecutorBase : IInputActionExecutor
     {
+        // Shared gates are intentionally conservative. A derived executor may
+        // narrow a scenario, but it must not turn blocked UI into a direct write.
         public abstract InputActionKind Kind { get; }
 
         public abstract InputActionExecutionStepResult Start(InputActionExecution execution, GameStateSnapshot snapshot);

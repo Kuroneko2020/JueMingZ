@@ -11,6 +11,8 @@ namespace JueMingZ.Hooks
 {
     public static class TravelMenuCreativeUiHookInstaller
     {
+        // Travel menu hooks patch several optional CreativeUI members. Missing
+        // members disable only their scoped override, not unrelated UI behavior.
         private const string HarmonyId = "JueMingZ.TravelMenuCreativeUi.001";
         private static int _installed;
         private static int _installing;

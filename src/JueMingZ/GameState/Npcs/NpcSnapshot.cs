@@ -2,6 +2,8 @@ namespace JueMingZ.GameState.Npcs
 {
     public sealed class NpcSnapshot
     {
+        // NPC snapshots support targeting and labels only; they must not be
+        // used as permission to repair or edit live NPC state.
         public int WhoAmI { get; set; }
         public int Type { get; set; }
         public string Name { get; set; }

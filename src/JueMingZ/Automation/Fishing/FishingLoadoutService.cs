@@ -7,6 +7,7 @@ using JueMingZ.GameState;
 
 namespace JueMingZ.Automation.Fishing
 {
+    // Loadout apply and restore are one state machine; queue results decide when recorded restore debt can clear.
     internal static class FishingLoadoutService
     {
         private const long LoadoutRetryIntervalTicks = 60;

@@ -4,6 +4,7 @@ using JueMingZ.Automation.Fishing.Filtering;
 
 namespace JueMingZ.Automation.Information
 {
+    // Cache keys encode read-only fishing facts; changing them changes when expensive resolver scans are skipped.
     internal struct FishingCatchQueryKey : IEquatable<FishingCatchQueryKey>
     {
         public string Signature { get; private set; }

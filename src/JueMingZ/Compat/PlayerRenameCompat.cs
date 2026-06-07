@@ -30,6 +30,8 @@ namespace JueMingZ.Compat
 
     public static class PlayerRenameCompat
     {
+        // Rename writes are single-player scoped unless explicitly allowed, and
+        // the final name must be reread before reporting success.
         private const int MaxPlayerNameLength = 20;
         private const BindingFlags InstanceFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
 

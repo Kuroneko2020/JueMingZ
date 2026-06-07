@@ -7,6 +7,7 @@ using JueMingZ.UI;
 
 namespace JueMingZ.Automation.WorldAutomation
 {
+    // Auto-mining overlay draws cached target state only; drawing must not select tiles or enqueue mining work.
     public static class AutoMiningOverlayService
     {
         public static void DrawWorldOverlay(object spriteBatch)

@@ -1,5 +1,6 @@
 namespace JueMingZ.Automation.Combat
 {
+    // Target selection is aim evidence, not action admission; use-item paths must revalidate the current frame.
     public sealed class CombatAimTargetSelection
     {
         public bool Enabled { get; set; }

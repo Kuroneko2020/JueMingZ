@@ -4,6 +4,8 @@ namespace JueMingZ.Actions.Executors
 {
     public sealed class NotImplementedActionExecutor : InputActionExecutorBase
     {
+        // Unimplemented action kinds fail closed as terminal results; they must
+        // not be interpreted as generic RawInput or best-effort executor slots.
         private readonly InputActionKind _kind;
 
         public NotImplementedActionExecutor(InputActionKind kind)

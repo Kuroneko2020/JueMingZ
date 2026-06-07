@@ -7,6 +7,8 @@ namespace JueMingZ.Hooks
 {
     internal static class FishingBobberHookCallbacks
     {
+        // Bobber AI postfix is read-only telemetry. Automation may consume the
+        // observation later, but this hook must not reel, switch rods, or enqueue.
         private static void Postfix(object __instance)
         {
             try

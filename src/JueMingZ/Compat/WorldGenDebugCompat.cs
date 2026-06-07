@@ -6,6 +6,8 @@ namespace JueMingZ.Compat
 {
     public static class WorldGenDebugCompat
     {
+        // Debug command enabling is opt-in and reflected once; unresolved fields
+        // leave vanilla debug settings unchanged.
         private const BindingFlags StaticFieldFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
         private static readonly object SyncRoot = new object();
         private static bool _attempted;

@@ -5,6 +5,8 @@ namespace JueMingZ.Actions
 {
     public sealed class ItemUseBridgeResult
     {
+        // Terminal bridge results are transaction evidence for executors. Attempted
+        // but unverified use must stay distinguishable from clean success.
         public static readonly ItemUseBridgeResult None = new ItemUseBridgeResult();
 
         public Guid RequestId { get; set; }

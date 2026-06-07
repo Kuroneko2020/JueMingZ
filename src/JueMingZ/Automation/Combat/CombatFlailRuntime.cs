@@ -9,6 +9,7 @@ using JueMingZ.Runtime;
 
 namespace JueMingZ.Automation.Combat
 {
+    // Runtime reads centralize flail profile and eligibility checks; controller paths fail closed when any fact is missing.
     internal static class CombatFlailRuntime
     {
         private const int ImmunityCacheLength = 256;

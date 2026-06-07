@@ -2,6 +2,7 @@ using System.Collections.Generic;
 
 namespace JueMingZ.Automation.Movement
 {
+    // Equipment models are restore debt and verification evidence, not proof that a rescue already succeeded.
     internal enum MovementSafeLandingEquipmentContainerKind
     {
         Unknown = 0,

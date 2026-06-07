@@ -10,6 +10,8 @@ namespace JueMingZ.Input
     {
         public static void Update(InputActionQueue queue, GameStateSnapshot snapshot)
         {
+            // Runtime drains commands produced by draw-layer hit tests here, keeping
+            // diagnostic button execution out of the draw path.
             try
             {
                 DiagnosticButtonCommand command;

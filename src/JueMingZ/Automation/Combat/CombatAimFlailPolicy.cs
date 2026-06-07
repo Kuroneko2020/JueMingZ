@@ -1,5 +1,6 @@
 namespace JueMingZ.Automation.Combat
 {
+    // Eligibility isolates true flail control; yoyo and normal channel behavior must stay with their vanilla paths.
     public sealed class CombatAimFlailEligibility
     {
         public bool Eligible { get; private set; }

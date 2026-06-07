@@ -4,6 +4,8 @@ namespace JueMingZ.GameState.Inventory
 {
     public sealed class InventorySnapshot
     {
+        // Inventory snapshots are read-only mirrors; mutation belongs to
+        // ActionQueue executors and Compat helpers with verification.
         public int NonEmptyCount { get; set; }
         public int SelectedItemSlot { get; set; }
         public InventoryItemSnapshot SelectedItem { get; set; }

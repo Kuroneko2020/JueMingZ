@@ -8,6 +8,8 @@ namespace JueMingZ.Compat
 {
     public static class TerrariaPlayerSelectionCompat
     {
+        // Selected-item changes prefer vanilla selection APIs and require
+        // verification before callers treat slot ownership as changed.
         private const BindingFlags InstanceFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
         private static readonly object SyncRoot = new object();
 
@@ -361,6 +363,8 @@ namespace JueMingZ.Compat
                 _selectedItemWritableProperty = FindSelectedItemIntProperty(type, requireWritable: true);
             }
 
+            // Direct selectedItem writes are the last fallback and remain
+            // unusable unless later verification observes the requested slot.
             SelectedItemSelectorReady = _changeItemMethod != null ||
                                         _changeItemField != null ||
                                         _selectedItemStateSelectMethod != null ||

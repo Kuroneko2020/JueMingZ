@@ -47,6 +47,8 @@ namespace JueMingZ.Compat
 
     public static class StationBuffCompat
     {
+        // Station buff scanning is read-only and cached; applying furniture
+        // buffs still goes through queued tile interaction.
         private const int ScanCacheTtlTicks = 30;
         private const BindingFlags InstanceFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
         private static readonly object DiagnosticsSyncRoot = new object();

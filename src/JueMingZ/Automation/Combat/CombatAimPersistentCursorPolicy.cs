@@ -180,6 +180,7 @@ namespace JueMingZ.Automation.Combat
                 return CombatAimPersistentCursorEligibility.NotEligible("notEligible:noProjectile", false);
             }
 
+            // Persistent cursor ownership is narrower than auto-aim support; only known scoped projectile families may own it outside direct input frames.
             if (string.Equals(yoyoReason, "flailAiStyle15Release", StringComparison.Ordinal) ||
                 string.Equals(yoyoReason, "flailProjectileAiScoped", StringComparison.Ordinal))
             {

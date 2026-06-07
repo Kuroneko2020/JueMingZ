@@ -71,6 +71,8 @@ namespace JueMingZ.UI
 
         public static bool DrawInterfaceLayer()
         {
+            // Diagnostic overlay draws inside Terraria's active interface SpriteBatch;
+            // button hits are queued for the runtime action phase.
             DiagnosticsOverlayModel model;
             bool visible;
             long drawCallCount;

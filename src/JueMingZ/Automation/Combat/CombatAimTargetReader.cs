@@ -12,6 +12,7 @@ using Terraria.ID;
 
 namespace JueMingZ.Automation.Combat
 {
+    // Target reads build snapshots only; inactive, unreadable, or unsafe entities are skipped rather than patched.
     public static class CombatAimTargetReader
     {
         private const int FallbackTargetDummyType = 488;

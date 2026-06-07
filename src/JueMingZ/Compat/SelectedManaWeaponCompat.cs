@@ -29,6 +29,8 @@ namespace JueMingZ.Compat
 
     public static class SelectedManaWeaponCompat
     {
+        // Mana checks read the selected item only; fallback cost comparison
+        // must not spend mana or trigger item use.
         private const BindingFlags InstanceFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
         private static bool _checkManaResolved;
         private static MethodInfo _checkManaItemAmountPayBlockMethod;

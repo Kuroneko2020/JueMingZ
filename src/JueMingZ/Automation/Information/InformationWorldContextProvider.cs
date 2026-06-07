@@ -6,6 +6,7 @@ using JueMingZ.Records;
 
 namespace JueMingZ.Automation.Information
 {
+    // Context construction centralizes read-only world facts; unavailable UI/world state skips the pass.
     internal enum InformationWorldContextProfile
     {
         Status = 0,

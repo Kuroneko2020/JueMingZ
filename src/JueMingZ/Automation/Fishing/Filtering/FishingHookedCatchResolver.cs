@@ -5,6 +5,7 @@ using JueMingZ.Compat;
 
 namespace JueMingZ.Automation.Fishing.Filtering
 {
+    // Hooked-catch reads are bobber evidence only; unresolved data stays unknown instead of driving fishing actions.
     internal static class FishingHookedCatchResolver
     {
         private static bool _crateSetsInitialized;

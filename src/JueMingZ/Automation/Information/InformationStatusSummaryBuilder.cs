@@ -8,6 +8,7 @@ using Terraria;
 
 namespace JueMingZ.Automation.Information
 {
+    // Status summaries read the current context only; failed world/player facts become omitted lines, not actions.
     internal static class InformationStatusSummaryBuilder
     {
         private static readonly EnabledSummaryDescriptor[] EnabledSummaryDescriptors =

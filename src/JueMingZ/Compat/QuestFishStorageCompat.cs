@@ -31,6 +31,8 @@ namespace JueMingZ.Compat
 
     internal static class QuestFishStorageCompat
     {
+        // Selective quick-stack builds a vanilla context and verifies inventory
+        // deltas; failed reflection keeps fish in inventory.
         public static bool TryGetCurrentAnglerQuestFishId(out int itemId, out string message)
         {
             itemId = -1;
@@ -582,6 +584,8 @@ namespace JueMingZ.Compat
                 return false;
             }
 
+            // The reflected QuickStack context owns the source item list; if its
+            // shape cannot be proven, leave inventory untouched.
             if (!TrySetItemsArray(context, sourceItems) ||
                 !TrySetIntMember(context, "numItems", sourceItems.Count) &&
                 !TrySetIntMember(context, "itemCount", sourceItems.Count) &&

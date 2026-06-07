@@ -1,5 +1,6 @@
 namespace JueMingZ.Common
 {
+    // Scenario names are action/performance event contracts; keep new event literals centralized here.
     public static class ScenarioNames
     {
         public const string CombatAutoFacing = "Combat.AutoFacing";

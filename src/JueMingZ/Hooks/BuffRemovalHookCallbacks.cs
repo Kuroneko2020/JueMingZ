@@ -6,6 +6,8 @@ namespace JueMingZ.Hooks
 {
     internal static class BuffRemovalHookCallbacks
     {
+        // This prefix observes a vanilla buff removal request before Terraria
+        // mutates buffs; follow logic must not add or remove buffs from the hook.
         private static void Prefix(object __instance, object[] __args, System.Reflection.MethodBase __originalMethod)
         {
             try

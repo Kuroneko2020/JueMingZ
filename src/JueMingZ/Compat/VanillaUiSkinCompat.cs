@@ -11,6 +11,8 @@ namespace JueMingZ.Compat
 {
     public static class VanillaUiSkinCompat
     {
+        // Vanilla texture lookup is best-effort skinning; missing assets switch
+        // to fallback drawing without blocking UI.
         private static readonly object SyncRoot = new object();
         private static readonly Dictionary<int, object> InventoryBackTextures = new Dictionary<int, object>();
         private static readonly Dictionary<int, ItemTextureCacheEntry> ItemTextureCache = new Dictionary<int, ItemTextureCacheEntry>();

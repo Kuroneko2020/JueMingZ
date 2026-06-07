@@ -5,6 +5,8 @@ namespace JueMingZ.Compat
 {
     internal static class TerrariaPlayerReadCompat
     {
+        // Typed player reads expose neutral fallbacks for snapshots only; direct
+        // writes to life, mana, selection, or movement remain forbidden here.
         private static readonly Item[] EmptyItems = new Item[0];
         private static readonly int[] EmptyBuffs = new int[0];
 

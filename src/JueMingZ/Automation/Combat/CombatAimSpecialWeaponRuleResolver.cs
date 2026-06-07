@@ -6,6 +6,7 @@ using JueMingZ.GameState;
 
 namespace JueMingZ.Automation.Combat
 {
+    // Special rules narrow or deny aim behavior; unknown weapon facts must not promote a weapon into takeover eligibility.
     public sealed class CombatAimSpecialWeaponRule
     {
         public string Kind { get; private set; }

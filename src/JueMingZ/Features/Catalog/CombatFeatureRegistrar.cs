@@ -61,6 +61,7 @@ namespace JueMingZ.Features.Catalog
 
         private static void Add(FeatureRegistry registry, FeatureDefinitionBuilder builder, bool implemented)
         {
+            // Registrar metadata only describes capabilities; runtime behavior still belongs to services and actions.
             registry.Register(builder
                 .Domain(FeatureCodeDomain.Combat)
                 .Category(FeatureUserCategory.Combat)

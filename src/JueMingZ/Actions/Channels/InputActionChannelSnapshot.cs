@@ -2,6 +2,8 @@ namespace JueMingZ.Actions.Channels
 {
     public sealed class InputActionChannelSnapshot
     {
+        // Snapshot fields are evidence for admission blocks. Bridge owners must
+        // remain visible even when no executor has a normal running lease.
         public static readonly InputActionChannelSnapshot Empty = new InputActionChannelSnapshot();
 
         public int LeaseCount { get; set; }
@@ -26,6 +28,8 @@ namespace JueMingZ.Actions.Channels
 
     public sealed class InputActionChannelFastState
     {
+        // This fast state is a read-only hot-path view; it must not become a
+        // second source of channel ownership decisions.
         public static readonly InputActionChannelFastState Empty = new InputActionChannelFastState();
 
         public int LeaseCount { get; set; }

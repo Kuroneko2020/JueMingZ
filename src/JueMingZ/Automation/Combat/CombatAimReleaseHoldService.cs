@@ -6,6 +6,7 @@ using JueMingZ.Runtime;
 
 namespace JueMingZ.Automation.Combat
 {
+    // Release-hold state remembers button windows only; ItemCheck takeover remains the boundary for controlled release input.
     public static class CombatAimReleaseHoldService
     {
         private const int DefaultPendingTicks = 8;

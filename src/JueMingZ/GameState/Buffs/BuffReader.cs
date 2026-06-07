@@ -8,6 +8,8 @@ namespace JueMingZ.GameState.Buffs
 {
     public static class BuffReader
     {
+        // Buff snapshots are read-only inputs for recovery gates; applying or
+        // removing buffs stays in Action/Compat mutation paths.
         public static IReadOnlyList<BuffSnapshot> Read(TerrariaPlayer player)
         {
             var buffs = new List<BuffSnapshot>();

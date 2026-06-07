@@ -11,6 +11,8 @@ namespace JueMingZ.Hooks
 {
     public static class GoblinExecutionHookInstaller
     {
+        // Both IL anchors must be proven before the feature is marked hook-ready.
+        // Partial or failed installation leaves the compat path disabled.
         private const string HarmonyId = "JueMingZ.GoblinExecution.0001";
         private static int _installed;
         private static int _installing;

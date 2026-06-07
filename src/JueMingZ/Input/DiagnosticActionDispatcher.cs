@@ -11,6 +11,8 @@ namespace JueMingZ.Input
 {
     public static class DiagnosticActionDispatcher
     {
+        // Diagnostic UI/hotkeys either update local diagnostics/config or enqueue requests;
+        // they must not execute Terraria input or state mutations directly.
         public static void ToggleDiagnosticInput(DiagnosticActionSource source)
         {
             ConfigService.AppSettings.EnableDiagnosticInputTests = !ConfigService.AppSettings.EnableDiagnosticInputTests;

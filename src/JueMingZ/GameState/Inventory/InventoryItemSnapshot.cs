@@ -2,6 +2,8 @@ namespace JueMingZ.GameState.Inventory
 {
     public sealed class InventoryItemSnapshot
     {
+        // Item snapshots preserve observable inventory facts; they are not
+        // handles for stack, prefix, or favorite mutation.
         public int SlotIndex { get; set; }
         public int Type { get; set; }
         public int Stack { get; set; }

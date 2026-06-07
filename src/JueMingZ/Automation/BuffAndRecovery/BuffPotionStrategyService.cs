@@ -5,6 +5,7 @@ using JueMingZ.GameState;
 
 namespace JueMingZ.Automation.BuffAndRecovery
 {
+    // Strategy selection builds ActionQueue requests only; buff application and item consumption stay in DirectLocalBuffPotion.
     public static class BuffPotionStrategyService
     {
         public static bool TryCreateAutoBuffRequest(GameStateSnapshot snapshot, long tick, int cooldownTicks, out InputActionRequest request, out string message)

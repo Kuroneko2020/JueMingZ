@@ -23,6 +23,8 @@ namespace JueMingZ.Tests
 
         private static void LegacyUiActionUpdateGateRunsPendingCommandsWhenHidden()
         {
+            // Hidden F5 frames may skip idle work, but queued UI commands still
+            // need one dispatch tick so button actions are not stranded.
             ResetLegacyUiActionGateTestState(false);
             EnqueueUnknownLegacyUiCommandForTesting();
 
@@ -39,6 +41,8 @@ namespace JueMingZ.Tests
 
         private static void LegacyUiActionUpdateGateSkipsDragDispatchWithoutCommands()
         {
+            // Drag frames keep interaction ownership fresh without dispatching a
+            // stale command when no UI action was queued.
             ResetLegacyUiActionGateTestState(true);
             LegacyUiInput.HandleWindowFrame(
                 new LegacyMouseSnapshot

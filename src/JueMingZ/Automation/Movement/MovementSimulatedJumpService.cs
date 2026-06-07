@@ -12,6 +12,7 @@ using JueMingZ.UI.Legacy;
 
 namespace JueMingZ.Automation.Movement
 {
+    // Simulated jump submits a controlled jump request only; raw jump flags and restore stay inside the executor.
     public static class MovementSimulatedJumpService
     {
         private const string FeatureId = FeatureIds.MovementSimulatedMultiJump;

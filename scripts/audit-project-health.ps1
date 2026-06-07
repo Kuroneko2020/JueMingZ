@@ -450,6 +450,8 @@ function Test-TestPackage {
         [Parameter(Mandatory = $true)][string]$RepoRoot,
         [Parameter(Mandatory = $true)][string]$RuntimeVersion
     )
+    # Audit the user-facing package payload only; absence before packaging is
+    # allowed, but stale templates or extra runtime DLLs are failures afterward.
     $packageDir = Join-Path $RepoRoot "JueMingZ-TestPackage"
     if (-not (Test-Path -LiteralPath $packageDir)) {
         Write-WarnHealth "JueMingZ-TestPackage is absent; root absence is allowed before packaging."
@@ -502,6 +504,8 @@ function Test-TestPackage {
     $isWindows = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
         [System.Runtime.InteropServices.OSPlatform]::Windows)
 
+    # The Chinese README filename is a Windows-facing delivery contract; non-
+    # Windows encoded names require Windows validation before becoming fatal.
     if ($hasChineseReadme) {
         Write-Pass "Test package contains Chinese README file."
     }

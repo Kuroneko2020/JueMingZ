@@ -15,6 +15,8 @@ namespace JueMingZ.UI
 
         public static bool TryEnterInterfaceDraw(string owner, bool requireVanillaResources, out object spriteBatch)
         {
+            // Interface overlays must draw inside Terraria's active SpriteBatch; starting
+            // our own Begin here would corrupt vanilla draw state.
             var safeOwner = string.IsNullOrWhiteSpace(owner) ? "UnknownUiLayer" : owner;
             spriteBatch = UiTextRenderer.GetSpriteBatch();
             if (spriteBatch == null)

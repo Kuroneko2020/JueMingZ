@@ -11,6 +11,8 @@ namespace JueMingZ.Hooks
 {
     public static class TeleportRodHookInstaller
     {
+        // Teleport correction depends on the verified rod use path. Without that
+        // target, movement safety must not fall back to editing player position.
         private const string HarmonyId = "JueMingZ.TeleportRodCorrection.001";
         private static int _installed;
         private static int _installing;

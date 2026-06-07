@@ -6,6 +6,8 @@ namespace JueMingZ.Hooks
 {
     internal static class DebugUiLocalizationHookCallbacks
     {
+        // Debug UI callbacks may localize reflected UI objects in place, but any
+        // missing shape falls back to vanilla so world generation UI stays usable.
         private static void WorldGenDebugUpdatePostfix(object __instance)
         {
             try

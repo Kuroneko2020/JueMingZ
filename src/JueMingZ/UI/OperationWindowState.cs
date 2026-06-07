@@ -65,6 +65,8 @@ namespace JueMingZ.UI
 
         public static OperationWindowInteraction UpdateMouse(DiagnosticMouseState mouse)
         {
+            // Drag/resize changes are clamped and saved on release; capture state here
+            // only protects UI interaction, not gameplay execution.
             EnsureLoaded();
             var result = new OperationWindowInteraction();
             if (mouse == null)

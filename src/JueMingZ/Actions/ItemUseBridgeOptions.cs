@@ -2,6 +2,8 @@ namespace JueMingZ.Actions
 {
     public sealed class ItemUseBridgeOptions
     {
+        // Options record the verified setup and restore contract for one bridge
+        // use; downstream code must not infer broader inventory mutation rights.
         public int SelectedSlotAtUseStart { get; set; }
         public bool SlotSwitchAttempted { get; set; }
         public bool SlotSwitchSucceeded { get; set; }

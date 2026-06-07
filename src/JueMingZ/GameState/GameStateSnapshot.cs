@@ -12,6 +12,8 @@ namespace JueMingZ.GameState
 {
     public sealed class GameStateSnapshot
     {
+        // Snapshot DTOs are observations from GameStateReader; services may
+        // read them but must not treat them as writable vanilla state.
         public DateTime CapturedUtc { get; set; }
         public bool TerrariaDetected { get; set; }
         public bool IsInMainMenu { get; set; }

@@ -2,6 +2,7 @@ using System;
 
 namespace JueMingZ.Diagnostics
 {
+    // Records hook outcomes only; installers own reflection and side effects so snapshots can read this safely.
     public static class HookDiagnostics
     {
         private static readonly object SyncRoot = new object();

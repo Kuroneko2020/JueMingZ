@@ -7,6 +7,7 @@ using Terraria;
 
 namespace JueMingZ.Automation.Information
 {
+    // Sign and tombstone labels are bounded read models; scanning must not edit tiles or sign text.
     internal static class InformationSignTextLabelService
     {
         internal const int MaxSignLabelsPerFrame = 40;

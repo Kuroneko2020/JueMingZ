@@ -3,6 +3,7 @@ using JueMingZ.Compat;
 
 namespace JueMingZ.Automation.WorldAutomation
 {
+    // Harvest models carry tool, target, and replant evidence; tile and item writes remain queued action work.
     internal sealed class AutoHarvestToolCandidate
     {
         public int Slot;

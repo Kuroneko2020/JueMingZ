@@ -10,6 +10,7 @@ using Terraria;
 
 namespace JueMingZ.Automation.Combat
 {
+    // Weapon profile reads fail closed when item or player fields are unavailable; do not guess a safer weapon family.
     public sealed class CombatAimWeaponProfile
     {
         private const int FallbackCoinGunItemType = 905;

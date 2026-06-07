@@ -7,6 +7,7 @@ using System.Reflection;
 
 namespace JueMingZ.Automation.Information
 {
+    // Tile access is a fail-closed read adapter for overlays; it must never write Tile or Wall state.
     internal static class InformationTileAccess
     {
         private const BindingFlags InstanceFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;

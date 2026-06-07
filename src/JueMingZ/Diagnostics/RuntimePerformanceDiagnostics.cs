@@ -1,5 +1,6 @@
 namespace JueMingZ.Diagnostics
 {
+    // Rolling performance counters stay in memory; event files are written only after hitch thresholds pass.
     public static class RuntimePerformanceDiagnostics
     {
         private static readonly object SyncRoot = new object();

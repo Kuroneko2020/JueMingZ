@@ -10,6 +10,8 @@ namespace JueMingZ.Compat
 {
     public static class TerrariaDashCompat
     {
+        // Dash pulses are controlled input writes; reflection failures cancel
+        // the pulse rather than modifying movement state directly.
         private const BindingFlags InstanceMemberFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
         private const BindingFlags StaticMemberFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
         private static readonly object SyncRoot = new object();

@@ -14,6 +14,7 @@ using JueMingZ.Runtime;
 
 namespace JueMingZ.Automation.AutoRecovery
 {
+    // Signatures are hot-path gates; use stable snapshot facts so idle ticks avoid repeated inventory and buff scans.
     public static partial class AutoRecoveryService
     {
         private static string BuildInventorySignature(GameStateSnapshot snapshot)
