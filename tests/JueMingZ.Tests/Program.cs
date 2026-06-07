@@ -46,6 +46,10 @@ namespace Terraria
         public static object hoverItem;
         public static object[,] tile;
         public static object[] projectile = new object[0];
+        public static object FishDropsDB;
+        public static int[] anglerQuestItemNetIDs = new int[0];
+        public static int anglerQuest;
+        public static bool anglerQuestFinished;
         public static bool[] tileSolid = new bool[1000];
         public static bool[] tileSolidTop = new bool[1000];
         public static int mouseX;
@@ -128,16 +132,101 @@ namespace Terraria
             return activeValue;
         }
     }
+
+    internal static class Lang
+    {
+        public static readonly Dictionary<int, string> ItemNames = new Dictionary<int, string>();
+
+        public static string GetItemNameValue(int itemId)
+        {
+            string name;
+            return ItemNames.TryGetValue(itemId, out name) ? name : itemId.ToString(CultureInfo.InvariantCulture);
+        }
+    }
+}
+
+namespace Terraria.DataStructures
+{
+    public sealed class FishingAttempt
+    {
+        public object playerFishingConditions;
+        public int X;
+        public int Y;
+        public int bobberType;
+        public bool common;
+        public bool uncommon;
+        public bool rare;
+        public bool veryrare;
+        public bool legendary;
+        public bool crate;
+        public bool junk;
+        public bool inLava;
+        public bool inHoney;
+        public int waterTilesCount;
+        public int waterNeededToFish;
+        public float waterQuality;
+        public int chumsInWater;
+        public int fishingLevel;
+        public bool CanFishInLava;
+        public float atmo;
+        public int questFish;
+        public int heightLevel;
+        public int rolledItemDrop;
+        public int rolledEnemySpawn;
+    }
+}
+
+namespace Terraria.GameContent.FishDropRules
+{
+    public sealed class FishingContext
+    {
+        public object Player;
+        public object Fisher;
+        public bool RolledCorruption;
+        public bool RolledCrimson;
+        public bool RolledJungle;
+        public bool RolledSnow;
+        public bool RolledDesert;
+        public bool RolledInfectedDesert;
+        public bool RolledRemixOcean;
+    }
 }
 
 namespace Terraria.ID
 {
     internal static class ItemID
     {
+        internal static TestItemIdSearch Search = new TestItemIdSearch();
+
         internal static class Sets
         {
             public static bool[] HasRightFire = new bool[6000];
             public static bool[] ItemsThatAllowRepeatedRightClick = new bool[6000];
+            public static bool[] IsFishingCrate = new bool[6000];
+            public static bool[] IsFishingCrateHardmode = new bool[6000];
+            public static bool[] CanFishInLava = new bool[6000];
+            public static bool[] IsLavaBait = new bool[6000];
+        }
+    }
+
+    internal sealed class TestItemIdSearch
+    {
+        private readonly Dictionary<int, string> _names = new Dictionary<int, string>();
+
+        public string GetName(int itemId)
+        {
+            string name;
+            return _names.TryGetValue(itemId, out name) ? name : string.Empty;
+        }
+
+        public void SetName(int itemId, string name)
+        {
+            _names[itemId] = name ?? string.Empty;
+        }
+
+        public void Clear()
+        {
+            _names.Clear();
         }
     }
 }
@@ -556,6 +645,7 @@ namespace JueMingZ.Tests
             Run("information world context cache scopes status profile", ref failed, InformationWorldContextCacheScopesStatusProfile);
             Run("information overlay context profiles route status and world record", ref failed, InformationOverlayContextProfilesRouteStatusAndWorldRecord);
             Run("information status line cache tracks context identity", ref failed, InformationStatusLineCacheTracksContextIdentity);
+            Run("information fishing status line builder keeps display rows", ref failed, InformationFishingStatusLineBuilderKeepsDisplayRows);
             Run("information status panel layout cache reuses prepared rows", ref failed, InformationStatusPanelLayoutCacheReusesPreparedRows);
             Run("information under vanilla UI anchor prefers map minimap", ref failed, InformationUnderVanillaUiAnchorPrefersMapMinimap);
             Run("information under vanilla UI anchor falls back through vanilla UI layers", ref failed, InformationUnderVanillaUiAnchorFallsBackThroughVanillaUiLayers);
@@ -575,9 +665,32 @@ namespace JueMingZ.Tests
             Run("auto station buff requests active buff snapshot", ref failed, AutoStationBuffRequestsActiveBuffSnapshot);
             Run("information tile highlight cache signature tracks bounds settings and world", ref failed, InformationTileHighlightCacheSignatureTracksBoundsSettingsAndWorld);
             Run("information tile highlight cache keeps safety refresh", ref failed, InformationTileHighlightCacheKeepsSafetyRefresh);
+            Run("information tile highlight scanner groups adjacent enabled tiles", ref failed, InformationTileHighlightScannerGroupsAdjacentEnabledTiles);
             Run("information fishing catch query key tracks environment", ref failed, InformationFishingCatchQueryKeyTracksEnvironment);
+            Run("information fishing catch query key tracks full baseline fields", ref failed, InformationFishingCatchQueryKeyTracksFullBaselineFields);
             Run("information fishing catch early key tracks environment", ref failed, InformationFishingCatchEarlyKeyTracksEnvironment);
             Run("information fishing catch early cache hit skips heavy counters", ref failed, InformationFishingCatchEarlyCacheHitSkipsHeavyCounters);
+            Run("information fishing catch caches keep configured limits", ref failed, InformationFishingCatchCachesKeepConfiguredLimits);
+            Run("information fishing catch query cache hit backfills early cache", ref failed, InformationFishingCatchQueryCacheHitBackfillsEarlyCache);
+            Run("information fishing catch reset clears caches and counters", ref failed, InformationFishingCatchResetClearsCachesAndCounters);
+            Run("information fishing water penalty keeps source formula", ref failed, InformationFishingWaterPenaltyKeepsSourceFormula);
+            Run("information fishing liquid kind keeps priority", ref failed, InformationFishingLiquidKindKeepsPriority);
+            Run("information fishing lava capability reads environment", ref failed, InformationFishingLavaCapabilityReadsEnvironment);
+            Run("information fishing water scan increments once per scan", ref failed, InformationFishingWaterScanIncrementsOncePerScan);
+            Run("information fishing condition height rolls keep order", ref failed, InformationFishingConditionHeightRollsKeepOrder);
+            Run("information fishing condition corruption rolls keep order", ref failed, InformationFishingConditionCorruptionRollsKeepOrder);
+            Run("information fishing condition boolean rolls keep order", ref failed, InformationFishingConditionBooleanRollsKeepOrder);
+            Run("information fishing condition enumeration keeps order and stops", ref failed, InformationFishingConditionEnumerationKeepsOrderAndStops);
+            Run("information fishing condition junk disabled stays false", ref failed, InformationFishingConditionJunkDisabledStaysFalse);
+            Run("information fishing context factory maps attempt spec", ref failed, InformationFishingContextFactoryMapsAttemptSpec);
+            Run("information fish rule evaluator keeps order and deduplicates", ref failed, InformationFishRuleEvaluatorKeepsOrderAndDeduplicates);
+            Run("information fish rule evaluator respects max catch items", ref failed, InformationFishRuleEvaluatorRespectsMaxCatchItems);
+            Run("information fish rule evaluator caches meets conditions lookup", ref failed, InformationFishRuleEvaluatorCachesMeetsConditionsLookup);
+            Run("information fishing global empty query keeps heavy counters idle", ref failed, InformationFishingGlobalEmptyQueryKeepsHeavyCountersIdle);
+            Run("information fishing search helpers keep stable semantics", ref failed, InformationFishingSearchHelpersKeepStableSemantics);
+            Run("information fishing item name resolver keeps cache boundaries", ref failed, InformationFishingItemNameResolverKeepsCacheBoundaries);
+            Run("information fishing global search keeps result semantics", ref failed, InformationFishingGlobalSearchKeepsResultSemantics);
+            Run("information fishing diagnostics snapshot keeps stable field mapping", ref failed, InformationFishingDiagnosticsSnapshotKeepsStableFieldMapping);
             Run("information fishing bobber fresh inactive skips projectile fallback", ref failed, InformationFishingBobberFreshInactiveSkipsProjectileFallback);
             Run("legacy UI page layout cache ignores window position", ref failed, LegacyUiPageLayoutCacheIgnoresWindowPosition);
             Run("legacy UI page layout cache dirties on scroll size and state", ref failed, LegacyUiPageLayoutCacheDirtiesOnScrollSizeAndState);
@@ -618,6 +731,7 @@ namespace JueMingZ.Tests
             Run("UI mouse capture service rewrites capture and suppress on next draw frame", ref failed, UiMouseCaptureServiceRewritesCaptureAndSuppressOnNextDrawFrame);
             Run("combat performance caches stable metadata only", ref failed, CombatPerformanceCachesStableMetadataOnly);
             Run("runtime performance diagnostics records slowest operation", ref failed, RuntimePerformanceDiagnosticsRecordsSlowestOperation);
+            Run("information overlay diagnostics writer preserves section counts", ref failed, InformationOverlayDiagnosticsWriterPreservesSectionCounts);
             Run("information NPC label snapshot reuses movement only", ref failed, InformationNpcLabelSnapshotReusesMovementOnly);
             Run("information chest labels cache signature changes with mode and player-world records", ref failed, InformationChestLabelsCacheSignatureChangesWithModeAndKnownKeys);
             Run("information chest always dirty cache tracks movement world and style", ref failed, InformationChestAlwaysDirtyCacheTracksMovementWorldAndStyle);
