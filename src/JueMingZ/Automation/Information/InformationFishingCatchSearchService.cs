@@ -21,7 +21,7 @@ namespace JueMingZ.Automation.Information
             var searchText = string.IsNullOrWhiteSpace(request.Query) ? string.Empty : request.Query.Trim();
             if (searchText.Length <= 0)
             {
-                message = "请输入名称或 ID 搜索全游戏可钓物品";
+                message = "请输入名称或 ID 搜索全游戏可钓鱼获";
                 return candidates;
             }
 
@@ -53,7 +53,7 @@ namespace JueMingZ.Automation.Information
 
             if (itemIds.Count <= 0)
             {
-                message = "暂无全局可钓物品索引";
+                message = "暂无全局可钓鱼获索引";
                 return candidates;
             }
 
@@ -77,6 +77,7 @@ namespace JueMingZ.Automation.Information
                 candidates.Add(InformationFishingItemNameResolver.CreateGlobalSearchCandidate(itemId, displayName, questFishIds));
             }
 
+            InformationFishingEnemyCandidateResolver.AddMatchingFishableEnemyCandidates(candidates, searchText, hasItemIdSearch, searchItemId);
             candidates.Sort(InformationFishingItemNameResolver.CompareCandidates);
             if (request.MaxResults > 0 && candidates.Count > request.MaxResults)
             {
@@ -86,7 +87,7 @@ namespace JueMingZ.Automation.Information
 
             if (candidates.Count <= 0)
             {
-                message = "无匹配物品";
+                message = "无匹配鱼获";
             }
             else if (truncated)
             {

@@ -136,11 +136,18 @@ namespace Terraria
     internal static class Lang
     {
         public static readonly Dictionary<int, string> ItemNames = new Dictionary<int, string>();
+        public static readonly Dictionary<int, string> NpcNames = new Dictionary<int, string>();
 
         public static string GetItemNameValue(int itemId)
         {
             string name;
             return ItemNames.TryGetValue(itemId, out name) ? name : itemId.ToString(CultureInfo.InvariantCulture);
+        }
+
+        public static string GetNPCNameValue(int npcId)
+        {
+            string name;
+            return NpcNames.TryGetValue(npcId, out name) ? name : npcId.ToString(CultureInfo.InvariantCulture);
         }
     }
 }
@@ -209,6 +216,18 @@ namespace Terraria.ID
         }
     }
 
+    internal static class NPCID
+    {
+        public const short ZombieMerman = 586;
+        public const short EyeballFlyingFish = 587;
+        public const short BloodNautilus = 618;
+        public const short GoblinShark = 620;
+        public const short BloodEelHead = 621;
+        public const short TownSlimeRed = 682;
+
+        internal static TestNpcIdSearch Search = new TestNpcIdSearch();
+    }
+
     internal sealed class TestItemIdSearch
     {
         private readonly Dictionary<int, string> _names = new Dictionary<int, string>();
@@ -222,6 +241,27 @@ namespace Terraria.ID
         public void SetName(int itemId, string name)
         {
             _names[itemId] = name ?? string.Empty;
+        }
+
+        public void Clear()
+        {
+            _names.Clear();
+        }
+    }
+
+    internal sealed class TestNpcIdSearch
+    {
+        private readonly Dictionary<int, string> _names = new Dictionary<int, string>();
+
+        public string GetName(int npcId)
+        {
+            string name;
+            return _names.TryGetValue(npcId, out name) ? name : string.Empty;
+        }
+
+        public void SetName(int npcId, string name)
+        {
+            _names[npcId] = name ?? string.Empty;
         }
 
         public void Clear()
@@ -520,6 +560,7 @@ namespace JueMingZ.Tests
             Run("combat flail combo yields to adjacent scoped use", ref failed, CombatFlailComboYieldsToAdjacentScopedUse);
             Run("ItemCheck writer arbiter prioritizes bridge over combat writers", ref failed, ItemCheckWriterArbiterPrioritizesBridgeOverCombatWriters);
             Run("ItemCheck writer arbiter selects single world automation writer", ref failed, ItemCheckWriterArbiterSelectsSingleWorldAutomationWriter);
+            Run("combat aim flail release yields to active ItemCheck writer", ref failed, CombatAimFlailReleaseYieldsToActiveItemCheckWriter);
             Run("world automation fairness coordinator rotates runtime winners", ref failed, WorldAutomationFairnessCoordinatorRotatesRuntimeWinners);
             Run("combat flail combo diagnostics record scoped decision", ref failed, CombatFlailComboDiagnosticsRecordScopedDecision);
             Run("combat flail combo release remembers flail aim tail", ref failed, CombatFlailComboReleaseRemembersFlailAimTail);
@@ -567,6 +608,8 @@ namespace JueMingZ.Tests
             Run("continuous dash request has queue timeout", ref failed, ContinuousDashRequestHasQueueTimeout);
             Run("auto facing request has queue timeout", ref failed, AutoFacingRequestHasQueueTimeout);
             Run("combat aim diagnostics metadata keeps stable field names", ref failed, CombatAimDiagnosticsMetadataKeepsStableFieldNames);
+            Run("flail diagnostics publisher keeps metadata field names", ref failed, FlailDiagnosticsPublisherKeepsMetadataFieldNames);
+            Run("flail diagnostics publisher suppresses duplicate inactive snapshots", ref failed, FlailDiagnosticsPublisherSuppressesDuplicateInactiveSnapshots);
             Run("combat aim weapon family resolver classifies requested families", ref failed, CombatAimWeaponFamilyResolverClassifiesRequestedFamilies);
             Run("combat aim weapon family diagnostics emits metadata fields", ref failed, CombatAimWeaponFamilyDiagnosticsEmitsMetadataFields);
             Run("combat aim skip reasons normalize to stable strings", ref failed, CombatAimSkipReasonsNormalizeToStableStrings);
@@ -580,13 +623,24 @@ namespace JueMingZ.Tests
             Run("projectile cursor match accepts only local flail release projectile", ref failed, ProjectileCursorMatchAcceptsOnlyLocalFlailReleaseProjectile);
             Run("combat aim scoped cursor diagnostics keeps ownership fields", ref failed, CombatAimScopedCursorDiagnosticsKeepsOwnershipFields);
             Run("flail policy only accepts non-yoyo channel aiStyle 15", ref failed, FlailPolicyOnlyAcceptsNonYoyoChannelAiStyle15);
+            Run("flail update disabled stops before local player read", ref failed, FlailUpdateDisabledStopsBeforeLocalPlayerRead);
+            Run("flail update UI blocked stops before weapon profile", ref failed, FlailUpdateUiBlockedStopsBeforeWeaponProfile);
+            Run("flail update idle stops before weapon profile", ref failed, FlailUpdateIdleStopsBeforeWeaponProfile);
             Run("flail control preserves hold spin and releases on physical release", ref failed, FlailControlPreservesHoldSpinAndReleasesOnPhysicalRelease);
+            Run("flail release state machine keeps stable reasons", ref failed, FlailReleaseStateMachineKeepsStableReasons);
             Run("flail ItemCheck takeover skips hold spin", ref failed, FlailItemCheckTakeoverSkipsHoldSpin);
             Run("flail ReleaseHold ItemCheck takeover arms projectile tail before runtime update", ref failed, FlailReleaseHoldItemCheckTakeoverArmsProjectileTailBeforeRuntimeUpdate);
             Run("flail ItemCheck takeover applies physical release scope", ref failed, FlailItemCheckTakeoverAppliesPhysicalReleaseScope);
             Run("flail stuck projectile retries release after physical release", ref failed, FlailStuckProjectileRetriesReleaseAfterPhysicalRelease);
+            Run("flail projectile tracker accepts only local active friendly flail", ref failed, FlailProjectileTrackerAcceptsOnlyLocalActiveFriendlyFlail);
+            Run("flail projectile tracker keeps non expected fallback", ref failed, FlailProjectileTrackerKeepsNonExpectedFallback);
+            Run("flail hit cache resets on projectile identity change", ref failed, FlailHitCacheResetsOnProjectileIdentityChange);
+            Run("flail stuck tracking reaches recovery tick", ref failed, FlailStuckTrackingReachesRecoveryTick);
+            Run("flail TileCollision detector fails closed and caches MethodInfo", ref failed, FlailTileCollisionDetectorFailsClosedAndCachesMethodInfo);
             Run("flail cached release aims after target selection loss", ref failed, FlailCachedReleaseAimsAfterTargetSelectionLoss);
+            Run("flail cached release aim respects age and profile bounds", ref failed, FlailCachedReleaseAimRespectsAgeAndProfileBounds);
             Run("flail release cursor tail keeps ProjectileAI scoped aim", ref failed, FlailReleaseCursorTailKeepsProjectileAiScopedAim);
+            Run("flail combo press aim expires after tail window", ref failed, FlailComboPressAimExpiresAfterTailWindow);
             Run("flail cached release rejects yoyo and normal channel", ref failed, FlailCachedReleaseRejectsYoyoAndNormalChannel);
             Run("special projectile rules distinguish weapon and ammo projectiles", ref failed, SpecialProjectileRulesDistinguishWeaponAndAmmoProjectiles);
             Run("special dual projectile rejects Vortex ammo bullet scoped cursor", ref failed, SpecialDualProjectileRejectsVortexAmmoBulletScopedCursor);
@@ -616,8 +670,11 @@ namespace JueMingZ.Tests
             Run("fishing fallback scan gate skips fresh inactive observer", ref failed, FishingFallbackScanGateSkipsFreshInactiveObserver);
             Run("fishing fallback scan gate keeps old fallback for sensitive stages", ref failed, FishingFallbackScanGateKeepsOldFallbackForSensitiveStages);
             Run("fishing session waits for bobber liquid", ref failed, FishingSessionWaitsForBobberLiquid);
+            Run("fishing session damage exit compares life drop", ref failed, FishingSessionDamageExitComparesLifeDrop);
+            Run("fishing filter special rules respect opposite list overrides", ref failed, FishingFilterSpecialRulesRespectOppositeListOverrides);
             Run("fishing filter skip holds selection until bobber gone", ref failed, FishingFilterSkipHoldsSelectionUntilBobberGone);
             Run("fishing filter natural wait does not force timeout pull", ref failed, FishingFilterNaturalWaitDoesNotForceTimeoutPull);
+            Run("fishing filter natural wait clears after bite expires", ref failed, FishingFilterNaturalWaitClearsAfterBiteExpires);
             Run("fishing filter cut rod skip keeps timeout protection", ref failed, FishingFilterCutRodSkipKeepsTimeoutProtection);
             Run("fishing auto equipment water skips lava hook and covered parts", ref failed, FishingAutoEquipmentWaterSkipsLavaHookAndCoveredParts);
             Run("fishing auto equipment lava prefers lavaproof bag over hook", ref failed, FishingAutoEquipmentLavaPrefersLavaproofBagOverHook);

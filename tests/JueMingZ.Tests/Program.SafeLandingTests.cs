@@ -993,6 +993,7 @@ namespace JueMingZ.Tests
             try
             {
                 TravelMenuCompat.ResetCreativeUiReleasePulseState();
+                TravelMenuCompat.SetCreativeUiMouseButtonDownFallbackOverrideForTests(_ => false);
                 SetFakeMouseOverTravelMenuToggle();
                 ResetFakeMainMouse(true, false);
                 Terraria.Main.mouseRight = false;

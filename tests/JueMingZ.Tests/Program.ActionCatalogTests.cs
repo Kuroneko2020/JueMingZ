@@ -1635,6 +1635,29 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void FishingFilterNaturalWaitClearsAfterBiteExpires()
+        {
+            if (!FishingAutomationService.ShouldClearNaturalFilterSkipWaitForTesting(true, true, 42, 42, 0f))
+            {
+                throw new InvalidOperationException("Natural filter skip wait must clear when the same bobber is no longer hooked.");
+            }
+
+            if (FishingAutomationService.ShouldClearNaturalFilterSkipWaitForTesting(true, true, 42, 42, -1f))
+            {
+                throw new InvalidOperationException("Natural filter skip wait must keep waiting while the same bobber is still hooked.");
+            }
+
+            if (FishingAutomationService.ShouldClearNaturalFilterSkipWaitForTesting(true, false, 42, 42, 0f))
+            {
+                throw new InvalidOperationException("Cut-rod skip wait must still wait for bobber disappearance or restore.");
+            }
+
+            if (FishingAutomationService.ShouldClearNaturalFilterSkipWaitForTesting(true, true, 42, 43, 0f))
+            {
+                throw new InvalidOperationException("Natural filter skip wait must not clear from another bobber.");
+            }
+        }
+
         private static void FishingFilterCutRodSkipKeepsTimeoutProtection()
         {
             if (FishingAutomationService.ShouldForcePullFilterSkipTimeoutForTesting(true, false, 100, 189))

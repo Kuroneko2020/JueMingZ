@@ -45,7 +45,7 @@ namespace JueMingZ.UI.Legacy
             }
             else
             {
-                hovered = DrawFishingFilterActionButton(spriteBatch, area, mouse, elements, globalSearchAnchor, "fishing-filter-exact-picker:open-global", "+", globalSelected, true, disabled ? "过滤未启用时不会添加条目。" : "输入名称或 ID，搜索全游戏可钓物品。") ?? hovered;
+                hovered = DrawFishingFilterActionButton(spriteBatch, area, mouse, elements, globalSearchAnchor, "fishing-filter-exact-picker:open-global", "+", globalSelected, true, disabled ? "过滤未启用时不会添加条目。" : "输入名称或 ID，搜索全游戏可钓鱼获。") ?? hovered;
             }
 
             hovered = DrawFishingFilterActionButton(spriteBatch, area, mouse, elements, clearRect, "fishing-filter-list:clear", "清空", false, !disabled, null) ?? hovered;
@@ -82,9 +82,9 @@ namespace JueMingZ.UI.Legacy
             UiTextRenderer.DrawTextClipped(spriteBatch, text, rect.X + 8, rect.Y + 7, rect.Width - 16, 18, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 238, 226, 255, 0.62f);
             var message = LegacyTextInput.DiagnosticMessage;
             var tooltip = string.IsNullOrWhiteSpace(message)
-                ? "输入当前显示名、内部英文名或 #ID，搜索全游戏可钓物品。"
+                ? "输入当前显示名、内部英文名或 #ID，搜索全游戏可钓鱼获。"
                 : message;
-            AddFrameElement(elements, FishingFilterUiState.GlobalSearchInputId, "全局可钓物品搜索", "blocker", hit.Width > 0 && hit.Height > 0 ? hit : rect, tooltipLines: new[] { tooltip });
+            AddFrameElement(elements, FishingFilterUiState.GlobalSearchInputId, "全局可钓鱼获搜索", "blocker", hit.Width > 0 && hit.Height > 0 ? hit : rect, tooltipLines: new[] { tooltip });
         }
 
         private static List<FishingCatchCandidate> ResolveGlobalFishingSearchCandidates(string query, out string message)
@@ -94,7 +94,7 @@ namespace JueMingZ.UI.Legacy
             var searchText = string.IsNullOrWhiteSpace(query) ? string.Empty : query.Trim();
             if (searchText.Length <= 0)
             {
-                message = "请输入名称或 ID 搜索全游戏可钓物品";
+                message = "请输入名称或 ID 搜索全游戏可钓鱼获";
                 return result;
             }
 
@@ -128,27 +128,27 @@ namespace JueMingZ.UI.Legacy
                         }
 
                         var kind = FishingFilterUiState.NormalizeKind(candidate.Kind);
-                        if (!string.Equals(kind, FishingCatchKinds.Item, StringComparison.OrdinalIgnoreCase))
+                        if (string.IsNullOrWhiteSpace(kind))
                         {
                             continue;
                         }
 
                         result.Add(new FishingCatchCandidate
                         {
-                            Kind = FishingCatchKinds.Item,
+                            Kind = kind,
                             Id = candidate.Id,
                             DisplayName = candidate.DisplayName,
                             DisplayNameSnapshot = candidate.DisplayNameSnapshot,
                             IsCrate = candidate.IsCrate,
                             IsQuestFish = candidate.IsQuestFish,
-                            IsEnemy = false
+                            IsEnemy = candidate.IsEnemy
                         });
                     }
                 }
 
                 if (result.Count <= 0)
                 {
-                    message = FirstNonEmpty(message, "无匹配物品");
+                    message = FirstNonEmpty(message, "无匹配鱼获");
                 }
                 else if (truncated)
                 {
@@ -157,7 +157,7 @@ namespace JueMingZ.UI.Legacy
             }
             catch
             {
-                message = "全局可钓物品搜索失败";
+                message = "全局可钓鱼获搜索失败";
             }
 
             return result;

@@ -10,6 +10,7 @@ namespace JueMingZ.Automation.Fishing
         public int SessionPoleItemType { get; set; }
         public int CurrentBobberIdentity { get; set; }
         public int LastProcessedHookIdentity { get; set; }
+        public int LastObservedPlayerLife { get; set; }
         public long LastBobberSeenTick { get; set; }
         public float CastWorldX { get; set; }
         public float CastWorldY { get; set; }
@@ -55,6 +56,7 @@ namespace JueMingZ.Automation.Fishing
             SessionPoleItemType = 0;
             CurrentBobberIdentity = -1;
             LastProcessedHookIdentity = -1;
+            LastObservedPlayerLife = 0;
             LastBobberSeenTick = 0;
             CastWorldX = 0f;
             CastWorldY = 0f;

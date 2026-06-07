@@ -27,12 +27,22 @@ namespace JueMingZ.Automation.Fishing.Filtering
                 return Keep("unknownCatchKeep", string.Empty, matchMode, filterMode);
             }
 
-            var special = DecideSpecialRule(settings, candidate, matchMode, filterMode);
+            var special = DecideSpecialRule(settings, candidate, candidateKind, matchMode, filterMode);
             if (special != null)
             {
                 return special;
             }
 
+            return DecideList(settings, candidate, candidateKind, filterMode, matchMode);
+        }
+
+        private static FishingFilterDecision DecideList(
+            AppSettings settings,
+            FishingCatchCandidate candidate,
+            string candidateKind,
+            string filterMode,
+            string matchMode)
+        {
             if (string.Equals(matchMode, FishingFilterMatchModes.Keyword, StringComparison.OrdinalIgnoreCase))
             {
                 return DecideKeyword(settings, candidate, filterMode, matchMode);
@@ -44,12 +54,13 @@ namespace JueMingZ.Automation.Fishing.Filtering
         private static FishingFilterDecision DecideSpecialRule(
             AppSettings settings,
             FishingCatchCandidate candidate,
+            string candidateKind,
             string matchMode,
             string filterMode)
         {
             if (candidate.IsCrate)
             {
-                var decision = DecideSpecialRule("crate", settings.FishingFilterCrateRule, matchMode, filterMode);
+                var decision = DecideSpecialRule("crate", settings.FishingFilterCrateRule, settings, candidate, candidateKind, matchMode, filterMode);
                 if (decision != null)
                 {
                     return decision;
@@ -58,7 +69,7 @@ namespace JueMingZ.Automation.Fishing.Filtering
 
             if (candidate.IsQuestFish)
             {
-                var decision = DecideSpecialRule("questFish", settings.FishingFilterQuestFishRule, matchMode, filterMode);
+                var decision = DecideSpecialRule("questFish", settings.FishingFilterQuestFishRule, settings, candidate, candidateKind, matchMode, filterMode);
                 if (decision != null)
                 {
                     return decision;
@@ -67,7 +78,7 @@ namespace JueMingZ.Automation.Fishing.Filtering
 
             if (candidate.IsEnemy)
             {
-                var decision = DecideSpecialRule("enemy", settings.FishingFilterEnemyRule, matchMode, filterMode);
+                var decision = DecideSpecialRule("enemy", settings.FishingFilterEnemyRule, settings, candidate, candidateKind, matchMode, filterMode);
                 if (decision != null)
                 {
                     return decision;
@@ -77,17 +88,46 @@ namespace JueMingZ.Automation.Fishing.Filtering
             return null;
         }
 
-        private static FishingFilterDecision DecideSpecialRule(string ruleName, string ruleValue, string matchMode, string filterMode)
+        private static FishingFilterDecision DecideSpecialRule(
+            string ruleName,
+            string ruleValue,
+            AppSettings settings,
+            FishingCatchCandidate candidate,
+            string candidateKind,
+            string matchMode,
+            string filterMode)
         {
             var normalized = FishingFilterSpecialRuleModes.Normalize(ruleValue);
             var matchedRule = ruleName + ":" + normalized;
+            if (string.Equals(normalized, FishingFilterSpecialRuleModes.Follow, StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            var listDecision = DecideList(settings, candidate, candidateKind, filterMode, matchMode);
+            // Special rules set the category default, while the active list can
+            // still reverse one named catch in the opposite direction.
             if (string.Equals(normalized, FishingFilterSpecialRuleModes.Allow, StringComparison.OrdinalIgnoreCase))
             {
+                if (string.Equals(filterMode, FishingFilterModes.DenyList, StringComparison.OrdinalIgnoreCase) &&
+                    listDecision != null &&
+                    !listDecision.ShouldKeep)
+                {
+                    return listDecision;
+                }
+
                 return Keep(ruleName + "Allow", matchedRule, matchMode, filterMode);
             }
 
             if (string.Equals(normalized, FishingFilterSpecialRuleModes.Deny, StringComparison.OrdinalIgnoreCase))
             {
+                if (!string.Equals(filterMode, FishingFilterModes.DenyList, StringComparison.OrdinalIgnoreCase) &&
+                    listDecision != null &&
+                    listDecision.ShouldKeep)
+                {
+                    return listDecision;
+                }
+
                 return Skip(ruleName + "Deny", matchedRule, matchMode, filterMode);
             }
 

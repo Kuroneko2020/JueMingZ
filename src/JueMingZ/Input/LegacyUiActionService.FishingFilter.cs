@@ -403,13 +403,13 @@ namespace JueMingZ.Input
                 settings,
                 new List<FishingCatchCandidate>(),
                 string.Empty,
-                "请输入名称或 ID 搜索全游戏可钓物品");
+                "请输入名称或 ID 搜索全游戏可钓鱼获");
             Record(
                 command,
                 "Ui.FishingFilter.ExactPicker.GlobalSearch.Start",
                 "UI",
                 "Succeeded",
-                "已开始全局搜索可钓物品。",
+                "已开始全局搜索可钓鱼获。",
                 before,
                 BuildFishingUiStateJson(),
                 "{\"submitted\":false,\"featureId\":\"fishing.filter\",\"filterMode\":\"" + EscapeJson(filterMode) + "\",\"matchMode\":\"" + EscapeJson(matchMode) + "\",\"globalSearchInputActive\":true,\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
@@ -1353,6 +1353,7 @@ namespace JueMingZ.Input
                     }
                 }
 
+                InformationFishingEnemyCandidateResolver.AddFishableEnemyCandidates(result);
                 if (result.Count <= 0)
                 {
                     reason = FirstNonEmpty(message, "暂无可解析鱼获");

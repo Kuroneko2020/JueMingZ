@@ -602,9 +602,16 @@ namespace JueMingZ.Tests
             public int type;
             public int aiStyle;
             public int owner;
+            public int identity;
             public bool active;
             public bool friendly;
             public bool hostile;
+            public int width = 16;
+            public int height = 18;
+            public float[] ai = new float[] { 0f };
+            public Vector2 position = new Vector2();
+            public Vector2 velocity = new Vector2();
+            public int[] localNPCImmunity = new int[256];
         }
 
         private sealed class FakeItem
@@ -667,6 +674,31 @@ namespace JueMingZ.Tests
         {
             public float X;
             public float Y;
+        }
+
+        private sealed class Vector2
+        {
+            public float X;
+            public float Y;
+        }
+
+        private static class FakeMissingTileCollisionType
+        {
+            private static Vector2 NotTileCollision(Vector2 position, Vector2 velocity, int width, int height)
+            {
+                return velocity;
+            }
+        }
+
+        private static class FakeTileCollisionType
+        {
+            public static int CallCount;
+
+            private static Vector2 TileCollision(Vector2 position, Vector2 velocity, int width, int height, bool fallThrough, bool fall2, int gravDir)
+            {
+                CallCount++;
+                return new Vector2 { X = velocity.X - 1f, Y = velocity.Y };
+            }
         }
 
         private sealed class FakeTile

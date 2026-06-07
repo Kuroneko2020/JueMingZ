@@ -72,6 +72,74 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void FishingFilterSpecialRulesRespectOppositeListOverrides()
+        {
+            var pearlwoodCrate = FishingFilterCandidate(701, "Pearlwood Crate", true, false, false);
+            var ironCrate = FishingFilterCandidate(702, "Iron Crate", true, false, false);
+            var settings = AppSettings.CreateDefault();
+            settings.FishingFilterMode = FishingFilterModes.DenyList;
+            settings.FishingFilterMatchMode = FishingFilterMatchModes.Exact;
+            settings.FishingFilterCrateRule = FishingFilterSpecialRuleModes.Allow;
+            settings.FishingFilterDenyExactEntries.Add(new FishingFilterExactEntry { Kind = FishingCatchKinds.Item, Id = 701 });
+            AssertFishingFilterDecision(false, FishingFilterDecisionService.Decide(settings, pearlwoodCrate), "allow crate must still skip a specifically denied crate");
+            AssertFishingFilterDecision(true, FishingFilterDecisionService.Decide(settings, ironCrate), "allow crate must keep crates missing from the blacklist");
+
+            settings = AppSettings.CreateDefault();
+            settings.FishingFilterMode = FishingFilterModes.AllowList;
+            settings.FishingFilterMatchMode = FishingFilterMatchModes.Exact;
+            settings.FishingFilterCrateRule = FishingFilterSpecialRuleModes.Deny;
+            settings.FishingFilterAllowExactEntries.Add(new FishingFilterExactEntry { Kind = FishingCatchKinds.Item, Id = 701 });
+            AssertFishingFilterDecision(true, FishingFilterDecisionService.Decide(settings, pearlwoodCrate), "deny crate must still keep a specifically allowed crate");
+            AssertFishingFilterDecision(false, FishingFilterDecisionService.Decide(settings, ironCrate), "deny crate must skip crates missing from the whitelist");
+
+            var goblinShark = FishingFilterCandidate(620, "Goblin Shark", false, false, true);
+            var zombieMerman = FishingFilterCandidate(586, "Zombie Merman", false, false, true);
+            settings = AppSettings.CreateDefault();
+            settings.FishingFilterMode = FishingFilterModes.DenyList;
+            settings.FishingFilterMatchMode = FishingFilterMatchModes.Keyword;
+            settings.FishingFilterEnemyRule = FishingFilterSpecialRuleModes.Allow;
+            settings.FishingFilterDenyKeywords.Add("Shark");
+            AssertFishingFilterDecision(false, FishingFilterDecisionService.Decide(settings, goblinShark), "allow enemy must still obey a blacklist keyword match");
+            AssertFishingFilterDecision(true, FishingFilterDecisionService.Decide(settings, zombieMerman), "allow enemy must keep enemy catches missing from blacklist keywords");
+        }
+
+        private static void FishingSessionDamageExitComparesLifeDrop()
+        {
+            if (!FishingAutomationService.ShouldEndSessionForPlayerDamageForTesting(400, 399))
+            {
+                throw new InvalidOperationException("Expected fishing session to end when player life drops.");
+            }
+
+            if (FishingAutomationService.ShouldEndSessionForPlayerDamageForTesting(400, 400) ||
+                FishingAutomationService.ShouldEndSessionForPlayerDamageForTesting(400, 420) ||
+                FishingAutomationService.ShouldEndSessionForPlayerDamageForTesting(0, 399))
+            {
+                throw new InvalidOperationException("Expected fishing damage exit to ignore stable life, healing, and unseeded baselines.");
+            }
+        }
+
+        private static FishingCatchCandidate FishingFilterCandidate(int id, string name, bool crate, bool questFish, bool enemy)
+        {
+            return new FishingCatchCandidate
+            {
+                Kind = enemy ? FishingCatchKinds.NPC : FishingCatchKinds.Item,
+                Id = id,
+                DisplayName = name,
+                DisplayNameSnapshot = name,
+                IsCrate = crate,
+                IsQuestFish = questFish,
+                IsEnemy = enemy
+            };
+        }
+
+        private static void AssertFishingFilterDecision(bool expectedKeep, FishingFilterDecision decision, string label)
+        {
+            if (decision == null || decision.ShouldKeep != expectedKeep)
+            {
+                throw new InvalidOperationException("Unexpected fishing filter decision: " + label + ".");
+            }
+        }
+
         private static void FishingAutoEquipmentWaterSkipsLavaHookAndCoveredParts()
         {
             var player = CreateFishingEquipmentPlayer();
@@ -2104,7 +2172,7 @@ namespace JueMingZ.Tests
                 var candidates = InformationFishingCatchResolver.ResolveGlobalFishableItemCandidates(null, "   ", 10, out truncated, out message);
                 if (candidates.Count != 0 ||
                     truncated ||
-                    !string.Equals(message, "请输入名称或 ID 搜索全游戏可钓物品", StringComparison.Ordinal))
+                    !string.Equals(message, "请输入名称或 ID 搜索全游戏可钓鱼获", StringComparison.Ordinal))
                 {
                     throw new InvalidOperationException("Expected empty global fishing search query to return the stable prompt without candidates.");
                 }
@@ -2237,6 +2305,9 @@ namespace JueMingZ.Tests
                 candidates = InformationFishingCatchResolver.ResolveGlobalFishableItemCandidates(context, "hardmodeinternal", 10, out truncated, out message);
                 AssertSingleGlobalFishingCandidate(candidates, 703, "Hardmode Crate Fish", true, false, "hardmode crate result");
 
+                candidates = InformationFishingCatchResolver.ResolveGlobalFishableItemCandidates(context, "zombiemerman", 10, out truncated, out message);
+                AssertSingleGlobalFishingEnemyCandidate(candidates, Terraria.ID.NPCID.ZombieMerman, "global fishable enemy result");
+
                 candidates = InformationFishingCatchResolver.ResolveGlobalFishableItemCandidates(null, "fish", 10, out truncated, out message);
                 if (candidates.Count != 0 ||
                     truncated ||
@@ -2261,7 +2332,7 @@ namespace JueMingZ.Tests
                 candidates = InformationFishingCatchResolver.ResolveGlobalFishableItemCandidates(context, "does-not-exist", 10, out truncated, out message);
                 if (candidates.Count != 0 ||
                     truncated ||
-                    !string.Equals(message, "无匹配物品", StringComparison.Ordinal))
+                    !string.Equals(message, "无匹配鱼获", StringComparison.Ordinal))
                 {
                     throw new InvalidOperationException("Expected global fishing search to keep the no-match message.");
                 }
@@ -2292,6 +2363,27 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void AssertSingleGlobalFishingEnemyCandidate(
+            IList<FishingCatchCandidate> candidates,
+            int expectedId,
+            string label)
+        {
+            if (candidates == null || candidates.Count != 1)
+            {
+                throw new InvalidOperationException("Expected one " + label + ".");
+            }
+
+            var candidate = candidates[0];
+            if (candidate.Id != expectedId ||
+                !string.Equals(candidate.Kind, FishingCatchKinds.NPC, StringComparison.OrdinalIgnoreCase) ||
+                !candidate.IsEnemy ||
+                candidate.IsCrate ||
+                candidate.IsQuestFish)
+            {
+                throw new InvalidOperationException("Unexpected " + label + ".");
+            }
+        }
+
         private static void WithGlobalFishingSearchFixture(Action<InformationWorldContext> test)
         {
             var oldRules = Terraria.Main.FishDropsDB;
@@ -2303,8 +2395,11 @@ namespace JueMingZ.Tests
                 InformationFishDropRuleEvaluator.ResetReflectionCacheForTesting();
                 InformationFishingCatchResolver.ResetFishingItemNameResolverForTesting();
                 InformationFishingCatchResolver.ResetCatchCacheForTesting();
+                InformationFishingEnemyCandidateResolver.ResetForTesting();
                 Terraria.Lang.ItemNames.Clear();
+                Terraria.Lang.NpcNames.Clear();
                 Terraria.ID.ItemID.Search.Clear();
+                Terraria.ID.NPCID.Search.Clear();
                 Array.Clear(Terraria.ID.ItemID.Sets.IsFishingCrate, 0, Terraria.ID.ItemID.Sets.IsFishingCrate.Length);
                 Array.Clear(Terraria.ID.ItemID.Sets.IsFishingCrateHardmode, 0, Terraria.ID.ItemID.Sets.IsFishingCrateHardmode.Length);
 
@@ -2321,11 +2416,23 @@ namespace JueMingZ.Tests
                 Terraria.Lang.ItemNames[702] = "Quest Fish";
                 Terraria.Lang.ItemNames[703] = "Hardmode Crate Fish";
                 Terraria.Lang.ItemNames[704] = "Quest Bonus Fish";
+                Terraria.Lang.NpcNames[Terraria.ID.NPCID.ZombieMerman] = "Zombie Merman";
+                Terraria.Lang.NpcNames[Terraria.ID.NPCID.EyeballFlyingFish] = "Eyeball Flying Fish";
+                Terraria.Lang.NpcNames[Terraria.ID.NPCID.GoblinShark] = "Goblin Shark";
+                Terraria.Lang.NpcNames[Terraria.ID.NPCID.BloodEelHead] = "Blood Eel";
+                Terraria.Lang.NpcNames[Terraria.ID.NPCID.BloodNautilus] = "Dreadnautilus";
+                Terraria.Lang.NpcNames[Terraria.ID.NPCID.TownSlimeRed] = "Surly Slime";
                 Terraria.ID.ItemID.Search.SetName(700, "BassInternalFish");
                 Terraria.ID.ItemID.Search.SetName(701, "CrateInternalFish");
                 Terraria.ID.ItemID.Search.SetName(702, "QuestInternalFish");
                 Terraria.ID.ItemID.Search.SetName(703, "HardmodeInternalFish");
                 Terraria.ID.ItemID.Search.SetName(704, "QuestBonusInternalFish");
+                Terraria.ID.NPCID.Search.SetName(Terraria.ID.NPCID.ZombieMerman, "ZombieMerman");
+                Terraria.ID.NPCID.Search.SetName(Terraria.ID.NPCID.EyeballFlyingFish, "EyeballFlyingFish");
+                Terraria.ID.NPCID.Search.SetName(Terraria.ID.NPCID.GoblinShark, "GoblinShark");
+                Terraria.ID.NPCID.Search.SetName(Terraria.ID.NPCID.BloodEelHead, "BloodEelHead");
+                Terraria.ID.NPCID.Search.SetName(Terraria.ID.NPCID.BloodNautilus, "BloodNautilus");
+                Terraria.ID.NPCID.Search.SetName(Terraria.ID.NPCID.TownSlimeRed, "TownSlimeRed");
                 Terraria.ID.ItemID.Sets.IsFishingCrate[701] = true;
                 Terraria.ID.ItemID.Sets.IsFishingCrateHardmode[703] = true;
 
@@ -2341,12 +2448,15 @@ namespace JueMingZ.Tests
                 Terraria.Main.anglerQuest = oldQuestIndex;
                 Terraria.Main.anglerQuestFinished = oldQuestFinished;
                 Terraria.Lang.ItemNames.Clear();
+                Terraria.Lang.NpcNames.Clear();
                 Terraria.ID.ItemID.Search.Clear();
+                Terraria.ID.NPCID.Search.Clear();
                 Array.Clear(Terraria.ID.ItemID.Sets.IsFishingCrate, 0, Terraria.ID.ItemID.Sets.IsFishingCrate.Length);
                 Array.Clear(Terraria.ID.ItemID.Sets.IsFishingCrateHardmode, 0, Terraria.ID.ItemID.Sets.IsFishingCrateHardmode.Length);
                 InformationFishDropRuleEvaluator.ResetReflectionCacheForTesting();
                 InformationFishingCatchResolver.ResetFishingItemNameResolverForTesting();
                 InformationFishingCatchResolver.ResetCatchCacheForTesting();
+                InformationFishingEnemyCandidateResolver.ResetForTesting();
             }
         }
 

@@ -44,7 +44,7 @@ namespace JueMingZ.UI.Legacy
             {
                 FishingFilterUiState.SetPickerViewport(body, body.Height);
                 var emptyTitle = globalSearch
-                    ? (string.IsNullOrWhiteSpace(FishingFilterUiState.GlobalSearchQuery) ? "输入名称或 ID" : "无匹配物品")
+                    ? (string.IsNullOrWhiteSpace(FishingFilterUiState.GlobalSearchQuery) ? "输入名称或 ID" : "无匹配鱼获")
                     : "未获取鱼获列表";
                 UiTextRenderer.DrawTextClipped(spriteBatch, emptyTitle, body.X + 4, body.Y + 7, body.Width - 8, 20, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 226, 218, 194, 245, 0.70f);
                 UiTextRenderer.DrawTextClipped(spriteBatch, FirstNonEmpty(FishingFilterUiState.PickerMessage, "暂无可解析鱼获"), body.X + 4, body.Y + 31, body.Width - 8, 24, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 196, 208, 226, 230, 0.62f);

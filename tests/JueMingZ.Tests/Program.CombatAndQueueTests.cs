@@ -779,6 +779,43 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void CombatAimFlailReleaseYieldsToActiveItemCheckWriter()
+        {
+            AssertCombatAimWritersBlockedByActiveOwner(
+                new ItemCheckWriterArbiterContext { BridgePendingAtStart = true },
+                ItemCheckWriterKind.ItemUseBridge,
+                "bridge pending at start");
+            AssertCombatAimWritersBlockedByActiveOwner(
+                new ItemCheckWriterArbiterContext { AutoHarvestActive = true },
+                ItemCheckWriterKind.AutoHarvestSustainedUse,
+                "auto harvest active");
+            AssertCombatAimWritersBlockedByActiveOwner(
+                new ItemCheckWriterArbiterContext { UseItemPulseActive = true },
+                ItemCheckWriterKind.UseItemPulseBridge,
+                "UseItemPulseBridge active");
+        }
+
+        private static void AssertCombatAimWritersBlockedByActiveOwner(
+            ItemCheckWriterArbiterContext context,
+            ItemCheckWriterKind expectedOwner,
+            string label)
+        {
+            ItemCheckWriterDecision decision;
+            if (!ItemCheckWriterArbiter.IsBlockedByActiveOwner(ItemCheckWriterKind.CombatFlailRelease, context, out decision) ||
+                decision == null ||
+                decision.Owner != expectedOwner)
+            {
+                throw new InvalidOperationException("Expected flail release ItemCheck writer to yield to " + label + ".");
+            }
+
+            if (!ItemCheckWriterArbiter.IsBlockedByActiveOwner(ItemCheckWriterKind.CombatAim, context, out decision) ||
+                decision == null ||
+                decision.Owner != expectedOwner)
+            {
+                throw new InvalidOperationException("Expected combat aim ItemCheck writer to yield to " + label + ".");
+            }
+        }
+
         private static void WorldAutomationFairnessCoordinatorRotatesRuntimeWinners()
         {
             WorldAutomationFairnessCoordinator.ResetForTesting();
@@ -995,6 +1032,61 @@ namespace JueMingZ.Tests
                 Math.Abs(tail.AimWorldY - pressDecision.AimWorldY) > 0.001f)
             {
                 throw new InvalidOperationException("Expected flail combo press aim cache to feed the Projectile.AI release tail.");
+            }
+        }
+
+        private static void FlailComboPressAimExpiresAfterTailWindow()
+        {
+            var restoreRuntimeTypes = PushFakeTerrariaMainType();
+            try
+            {
+                CombatAimFlailControlService.ResetForTesting();
+                Terraria.Main.GameUpdateCount = 2200;
+                ResetFakeMainMouse(false, true);
+                var player = new FakePlayer
+                {
+                    whoAmI = 7,
+                    controlUseItem = false,
+                    releaseUseItem = true,
+                    channel = false
+                };
+
+                var pressDecision = BuildFlailItemCheckDecision(player);
+                pressDecision.UseItemHeld = true;
+                pressDecision.UseItemReleased = true;
+                pressDecision.WasUseItemHeldLastTick = false;
+                pressDecision.ReleasedThisTick = false;
+                pressDecision.ReleaseDetected = false;
+                pressDecision.ReleaseHoldPending = true;
+                pressDecision.ReleaseHoldActive = false;
+                pressDecision.ReleaseHoldState = ReleaseHoldStates.ArmedWhileHeld;
+
+                if (!CombatAimFlailControlService.TryRememberFlailComboPressAim(pressDecision))
+                {
+                    throw new InvalidOperationException("Expected flail combo press aim to be cached for tail age testing.");
+                }
+
+                Terraria.Main.GameUpdateCount = 2220;
+                if (!CombatAimFlailControlService.TryRememberFlailComboPressReleaseTail("FlailComboItemCheck"))
+                {
+                    throw new InvalidOperationException("Expected flail combo press aim to remain available at 20 ticks.");
+                }
+
+                if (player.controlUseItem || !player.releaseUseItem || player.channel ||
+                    Terraria.Main.mouseLeft || !Terraria.Main.mouseLeftRelease)
+                {
+                    throw new InvalidOperationException("Expected 20 tick combo press tail memory to leave input state unchanged.");
+                }
+
+                Terraria.Main.GameUpdateCount = 2221;
+                if (CombatAimFlailControlService.TryRememberFlailComboPressReleaseTail("FlailComboItemCheck"))
+                {
+                    throw new InvalidOperationException("Expected flail combo press aim to expire after 20 ticks.");
+                }
+            }
+            finally
+            {
+                restoreRuntimeTypes();
             }
         }
 
@@ -2182,6 +2274,141 @@ namespace JueMingZ.Tests
             AssertContains(json, "\"specialWeaponUsesAmmoShoot\"");
         }
 
+        private static void FlailDiagnosticsPublisherKeepsMetadataFieldNames()
+        {
+            var diagnostics = new CombatAimFlailDiagnostics
+            {
+                ItemType = 1058,
+                ItemName = "The Meatball",
+                Eligible = true,
+                Reason = "eligible:flailAiStyle15",
+                Active = true,
+                State = FlailControlStates.ReleaseToTarget,
+                ProjectileWhoAmI = 9,
+                ProjectileType = 1058,
+                ProjectileAiStyle = 15,
+                ProjectileAi0 = 1f,
+                ProjectileVelocityX = 3.5f,
+                ProjectileVelocityY = -2.25f,
+                ProjectileIdentity = 42,
+                HitDetected = true,
+                CollisionDetected = true,
+                LocalNpcImmunityChanged = true,
+                TileCollisionDetected = true,
+                AttackPulse = false,
+                AttackRelease = true,
+                AttackSuppressed = true,
+                AttackRestored = false,
+                BlockedReason = "physicalRelease",
+                InputMode = "controlledUseItemRelease",
+                InputPhase = FlailControlStates.ReleaseToTarget,
+                TakeoverScope = "ItemCheck",
+                StuckRecovery = "none",
+                ReleaseSuppressedPhysicalInput = true,
+                PhysicalUseItemHeld = false,
+                PhysicalReleasePending = true,
+                PulseReason = string.Empty,
+                CachedReleaseAim = true,
+                CachedReleaseAimAgeTicks = 3,
+                CachedReleaseAimReason = "available"
+            };
+
+            var json = CombatAimFlailControlService.BuildFlailDiagnosticsJsonForTesting(diagnostics);
+
+            AssertContains(json, "\"flailControlEligible\"");
+            AssertContains(json, "\"flailControlReason\"");
+            AssertContains(json, "\"flailControlActive\"");
+            AssertContains(json, "\"flailControlState\"");
+            AssertContains(json, "\"flailInputMode\"");
+            AssertContains(json, "\"flailInputPhase\"");
+            AssertContains(json, "\"flailTakeoverScope\"");
+            AssertContains(json, "\"flailPhysicalUseItemHeld\"");
+            AssertContains(json, "\"flailPhysicalReleasePending\"");
+            AssertContains(json, "\"flailProjectileWhoAmI\"");
+            AssertContains(json, "\"flailProjectileType\"");
+            AssertContains(json, "\"flailProjectileAiStyle\"");
+            AssertContains(json, "\"flailProjectileAi0\"");
+            AssertContains(json, "\"flailProjectileVelocity\"");
+            AssertContains(json, "\"flailProjectileIdentity\"");
+            AssertContains(json, "\"flailHitDetected\"");
+            AssertContains(json, "\"flailCollisionDetected\"");
+            AssertContains(json, "\"flailLocalNpcImmunityChanged\"");
+            AssertContains(json, "\"flailTileCollisionDetected\"");
+            AssertContains(json, "\"flailAttackPulse\"");
+            AssertContains(json, "\"flailAttackRelease\"");
+            AssertContains(json, "\"flailAttackSuppressed\"");
+            AssertContains(json, "\"flailAttackRestored\"");
+            AssertContains(json, "\"flailPulseReason\"");
+            AssertContains(json, "\"flailStuckRecovery\"");
+            AssertContains(json, "\"flailCachedReleaseAim\"");
+            AssertContains(json, "\"flailCachedReleaseAimAgeTicks\"");
+            AssertContains(json, "\"flailCachedReleaseAimReason\"");
+            AssertContains(json, "\"flailReleaseSuppressedPhysicalInput\"");
+            AssertContains(json, "\"flailControlBlockedReason\"");
+        }
+
+        private static void FlailDiagnosticsPublisherSuppressesDuplicateInactiveSnapshots()
+        {
+            CombatAimFlailControlService.ResetForTesting();
+            CombatAimFlailControlService.SetLastDiagnosticsForTesting(new CombatAimFlailDiagnostics
+            {
+                ItemType = 0,
+                ItemName = "first-inactive",
+                Eligible = false,
+                Reason = "notEvaluated",
+                Active = false,
+                State = FlailControlStates.Idle,
+                BlockedReason = "noActiveFlailUse",
+                InputMode = "observe",
+                TakeoverScope = "none",
+                StuckRecovery = "none"
+            });
+
+            CombatAimFlailControlService.SetLastDiagnosticsForTesting(new CombatAimFlailDiagnostics
+            {
+                ItemType = 0,
+                ItemName = "duplicate-should-not-replace",
+                Eligible = false,
+                Reason = "notEvaluated",
+                Active = false,
+                State = FlailControlStates.Idle,
+                BlockedReason = "noActiveFlailUse",
+                InputMode = "observe",
+                TakeoverScope = "none",
+                StuckRecovery = "none"
+            });
+
+            var last = CombatAimFlailControlService.GetDecisionDiagnostics(null);
+            if (last == null ||
+                !string.Equals(last.ItemName, "first-inactive", StringComparison.Ordinal) ||
+                !string.Equals(last.BlockedReason, "noActiveFlailUse", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected duplicate inactive flail diagnostics to keep the previous snapshot.");
+            }
+
+            CombatAimFlailControlService.SetLastDiagnosticsForTesting(new CombatAimFlailDiagnostics
+            {
+                ItemType = 0,
+                ItemName = "changed-reason",
+                Eligible = false,
+                Reason = "notEvaluated",
+                Active = false,
+                State = FlailControlStates.Disabled,
+                BlockedReason = "gameMenu",
+                InputMode = "observe",
+                TakeoverScope = "none",
+                StuckRecovery = "none"
+            });
+
+            last = CombatAimFlailControlService.GetDecisionDiagnostics(null);
+            if (last == null ||
+                !string.Equals(last.ItemName, "changed-reason", StringComparison.Ordinal) ||
+                !string.Equals(last.BlockedReason, "gameMenu", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected changed inactive flail diagnostics to replace the last snapshot.");
+            }
+        }
+
         private static void CombatAimWeaponFamilyResolverClassifiesRequestedFamilies()
         {
             AssertWeaponFamily(
@@ -3004,6 +3231,70 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void FlailUpdateDisabledStopsBeforeLocalPlayerRead()
+        {
+            CombatAimFlailControlService.ResetForTesting();
+            var restore = PushFlailUpdateTestState(0, null);
+            try
+            {
+                CombatAimFlailControlService.Update();
+                AssertFlailLastDiagnostics(FlailControlStates.Disabled, "autoAimDisabled");
+            }
+            finally
+            {
+                restore();
+            }
+        }
+
+        private static void FlailUpdateUiBlockedStopsBeforeWeaponProfile()
+        {
+            CombatAimFlailControlService.ResetForTesting();
+            var player = new Terraria.Player
+            {
+                whoAmI = 0,
+                selectedItem = 0,
+                active = true,
+                controlUseItem = true,
+                releaseUseItem = false,
+                channel = true
+            };
+            var restore = PushFlailUpdateTestState(30, player);
+            try
+            {
+                Terraria.Main.gameMenu = true;
+                CombatAimFlailControlService.Update();
+                AssertFlailLastDiagnostics(FlailControlStates.Disabled, "gameMenu");
+            }
+            finally
+            {
+                restore();
+            }
+        }
+
+        private static void FlailUpdateIdleStopsBeforeWeaponProfile()
+        {
+            CombatAimFlailControlService.ResetForTesting();
+            var player = new Terraria.Player
+            {
+                whoAmI = 0,
+                selectedItem = 0,
+                active = true,
+                controlUseItem = false,
+                releaseUseItem = true,
+                channel = false
+            };
+            var restore = PushFlailUpdateTestState(30, player);
+            try
+            {
+                CombatAimFlailControlService.Update();
+                AssertFlailLastDiagnostics(FlailControlStates.Idle, "noActiveFlailUse");
+            }
+            finally
+            {
+                restore();
+            }
+        }
+
         private static void FlailControlPreservesHoldSpinAndReleasesOnPhysicalRelease()
         {
             var noProjectileHeld = CombatAimFlailControlService.DecideForTesting(
@@ -3065,6 +3356,146 @@ namespace JueMingZ.Tests
                 false,
                 true);
             AssertFlailDecision(flying, FlailControlStates.ProjectileFlying, false, false, false, "projectileFlying");
+        }
+
+        private static void FlailReleaseStateMachineKeepsStableReasons()
+        {
+            var noProjectile = CombatAimFlailProjectileFrame.None();
+            var stationary = CombatAimFlailProjectileFrame.ForTesting(true, 10, 1058, 42, 0f, 0f, 0f);
+            var moving = CombatAimFlailProjectileFrame.ForTesting(true, 10, 1058, 42, 1f, 6f, 0f);
+            var returning = CombatAimFlailProjectileFrame.ForTesting(true, 10, 1058, 42, 4f, 0f, 0f);
+
+            AssertFlailDecision(
+                DecideFlailStateMachine(noProjectile, true, false, false, false, false, true, false, false),
+                FlailControlStates.SpinHold,
+                false,
+                false,
+                false,
+                "spinHoldNoProjectile");
+            AssertFlailDecision(
+                DecideFlailStateMachine(noProjectile, false, false, false, false, false, true, false, false),
+                FlailControlStates.ReadyToLaunch,
+                false,
+                false,
+                false,
+                "itemUseCooldown");
+            AssertFlailDecision(
+                DecideFlailStateMachine(returning, true, false, false, false, false, true, false, false),
+                FlailControlStates.ProjectileActive,
+                false,
+                false,
+                false,
+                "spinHoldReturnState");
+            AssertFlailDecision(
+                DecideFlailStateMachine(stationary, true, false, false, false, false, true, false, false),
+                FlailControlStates.SpinHold,
+                false,
+                false,
+                false,
+                "spinHold");
+            AssertFlailDecision(
+                DecideFlailStateMachine(moving, true, false, false, false, false, true, false, false),
+                FlailControlStates.ProjectileFlying,
+                false,
+                false,
+                false,
+                "physicalHoldProjectileMoving");
+            AssertFlailDecision(
+                DecideFlailStateMachine(noProjectile, true, true, false, false, false, false, true, true),
+                FlailControlStates.ReleaseToTarget,
+                false,
+                true,
+                true,
+                "physicalRelease");
+            AssertFlailDecision(
+                DecideFlailStateMachine(noProjectile, true, true, false, false, false, false, false, false),
+                FlailControlStates.Cooldown,
+                false,
+                false,
+                false,
+                "pulseCooldown");
+            AssertFlailDecision(
+                DecideFlailStateMachine(noProjectile, true, false, false, false, false, false, false, false),
+                FlailControlStates.Idle,
+                false,
+                false,
+                false,
+                "notUsingItem");
+            AssertFlailDecision(
+                DecideFlailStateMachine(returning, true, false, false, false, false, false, false, true),
+                FlailControlStates.ProjectileActive,
+                false,
+                false,
+                false,
+                "flailReturnState");
+            AssertFlailDecision(
+                DecideFlailStateMachine(stationary, true, false, false, false, true, false, false, true),
+                FlailControlStates.StuckRecoveryRelease,
+                false,
+                true,
+                true,
+                "stuckRecoveryRelease:ai0ZeroVelocity");
+            AssertFlailDecision(
+                DecideFlailStateMachine(moving, true, false, true, false, false, false, false, true),
+                FlailControlStates.ProjectileActive,
+                false,
+                false,
+                false,
+                "hitDetected");
+            AssertFlailDecision(
+                DecideFlailStateMachine(moving, true, false, false, true, false, false, false, true),
+                FlailControlStates.ProjectileActive,
+                false,
+                false,
+                false,
+                "collisionDetected");
+            AssertFlailDecision(
+                DecideFlailStateMachine(moving, true, false, false, false, false, false, false, true),
+                FlailControlStates.ProjectileFlying,
+                false,
+                false,
+                false,
+                "projectileFlying");
+            AssertFlailDecision(
+                DecideFlailStateMachine(stationary, true, false, false, false, false, false, false, true),
+                FlailControlStates.WaitHitOrCollision,
+                false,
+                false,
+                false,
+                "waitReturnAfterRelease");
+            AssertFlailDecision(
+                DecideFlailStateMachine(stationary, true, false, false, false, false, false, false, false),
+                FlailControlStates.WaitHitOrCollision,
+                false,
+                false,
+                false,
+                "waitSpinRelease");
+        }
+
+        private static CombatAimFlailControlDecision DecideFlailStateMachine(
+            CombatAimFlailProjectileFrame projectile,
+            bool itemReady,
+            bool inCooldown,
+            bool hitDetected,
+            bool collisionDetected,
+            bool stuckRecovery,
+            bool physicalHeld,
+            bool physicalReleasePending,
+            bool releaseInFlight)
+        {
+            var context = new CombatAimFlailDecisionContext
+            {
+                Projectile = projectile,
+                ItemReady = itemReady,
+                InCooldown = inCooldown,
+                HitDetected = hitDetected,
+                CollisionDetected = collisionDetected,
+                StuckRecovery = stuckRecovery,
+                PhysicalHeld = physicalHeld,
+                PhysicalReleasePending = physicalReleasePending,
+                ReleaseInFlight = releaseInFlight
+            };
+            return CombatAimFlailReleaseStateMachine.Decide(in context);
         }
 
         private static void FlailItemCheckTakeoverSkipsHoldSpin()
@@ -3259,6 +3690,264 @@ namespace JueMingZ.Tests
             AssertFlailDecision(stuck, FlailControlStates.StuckRecoveryRelease, false, true, true, "stuckRecoveryRelease:ai0ZeroVelocity");
         }
 
+        private static void FlailProjectileTrackerAcceptsOnlyLocalActiveFriendlyFlail()
+        {
+            var restoreRuntimeTypes = PushFakeTerrariaMainType();
+            var oldProjectiles = Terraria.Main.projectile;
+            var oldMyPlayer = Terraria.Main.myPlayer;
+            try
+            {
+                Terraria.Main.myPlayer = 7;
+                Terraria.Main.projectile = new object[]
+                {
+                    BuildFakeFlailProjectile(1, 1058, 11, 9, true, true, false),
+                    BuildFakeFlailProjectile(2, 1058, 12, 7, false, true, false),
+                    BuildFakeFlailProjectile(3, 1058, 13, 7, true, false, false),
+                    BuildFakeFlailProjectile(4, 1058, 14, 7, true, true, true),
+                    new FakeProjectile { whoAmI = 5, type = 1058, identity = 15, owner = 7, active = true, friendly = true, aiStyle = 14 },
+                    BuildFakeFlailProjectile(6, 1058, 16, 7, true, true, false)
+                };
+
+                var tracker = new CombatAimFlailProjectileTracker();
+                CombatAimFlailControlService.FlailProjectileSnapshot snapshot;
+                if (!tracker.TryFindActiveFlailProjectile(new FakePlayer { whoAmI = 7 }, 1058, out snapshot) ||
+                    snapshot == null ||
+                    snapshot.WhoAmI != 6 ||
+                    snapshot.Owner != 7 ||
+                    snapshot.Type != 1058 ||
+                    snapshot.AiStyle != 15 ||
+                    !snapshot.Active ||
+                    !snapshot.Friendly ||
+                    snapshot.Hostile)
+                {
+                    throw new InvalidOperationException("Expected tracker to accept only the local active friendly non-hostile aiStyle 15 flail projectile.");
+                }
+            }
+            finally
+            {
+                Terraria.Main.projectile = oldProjectiles;
+                Terraria.Main.myPlayer = oldMyPlayer;
+                restoreRuntimeTypes();
+            }
+        }
+
+        private static void FlailProjectileTrackerKeepsNonExpectedFallback()
+        {
+            var restoreRuntimeTypes = PushFakeTerrariaMainType();
+            var oldProjectiles = Terraria.Main.projectile;
+            var oldMyPlayer = Terraria.Main.myPlayer;
+            try
+            {
+                Terraria.Main.myPlayer = 7;
+                Terraria.Main.projectile = new object[]
+                {
+                    BuildFakeFlailProjectile(10, 1057, 20, 7, true, true, false),
+                    BuildFakeFlailProjectile(11, 1059, 21, 7, true, true, false)
+                };
+
+                var tracker = new CombatAimFlailProjectileTracker();
+                CombatAimFlailControlService.FlailProjectileSnapshot snapshot;
+                if (!tracker.TryFindActiveFlailProjectile(new FakePlayer { whoAmI = 7 }, 1058, out snapshot) ||
+                    snapshot == null ||
+                    snapshot.WhoAmI != 10 ||
+                    snapshot.Type != 1057)
+                {
+                    throw new InvalidOperationException("Expected tracker to keep the first eligible flail fallback when expected projectile type is absent.");
+                }
+            }
+            finally
+            {
+                Terraria.Main.projectile = oldProjectiles;
+                Terraria.Main.myPlayer = oldMyPlayer;
+                restoreRuntimeTypes();
+            }
+        }
+
+        private static void FlailHitCacheResetsOnProjectileIdentityChange()
+        {
+            var tracker = new CombatAimFlailProjectileTracker();
+            var cacheField = typeof(CombatAimFlailProjectileTracker).GetField("_lastLocalNpcImmunity", BindingFlags.Instance | BindingFlags.NonPublic);
+            var cache = cacheField == null ? null : cacheField.GetValue(tracker) as int[];
+            if (cache == null || cache.Length != 256)
+            {
+                throw new InvalidOperationException("Expected flail local NPC immunity cache length to remain 256.");
+            }
+
+            var snapshot = BuildFlailSnapshot(20, 1058, 30, 0f, 0f, 0f, new object[] { 0, 0, 0 });
+            if (tracker.UpdateHitCache(snapshot))
+            {
+                throw new InvalidOperationException("Expected initial zero immunity baseline to report no hit.");
+            }
+
+            snapshot.LocalNpcImmunity = new object[] { 0, 2, 5 };
+            if (!tracker.UpdateHitCache(snapshot))
+            {
+                throw new InvalidOperationException("Expected increased local NPC immunity to report a hit.");
+            }
+
+            if (tracker.UpdateHitCache(snapshot))
+            {
+                throw new InvalidOperationException("Expected unchanged local NPC immunity to report no new hit.");
+            }
+
+            snapshot.LocalNpcImmunity = new object[] { 0 };
+            if (tracker.UpdateHitCache(snapshot))
+            {
+                throw new InvalidOperationException("Expected shorter local NPC immunity cache update to clear old slots without reporting a hit.");
+            }
+
+            snapshot.LocalNpcImmunity = new object[] { 0, 0, 5 };
+            if (!tracker.UpdateHitCache(snapshot))
+            {
+                throw new InvalidOperationException("Expected cleared old cache slots to detect a later immunity increase.");
+            }
+
+            snapshot.Identity = 31;
+            snapshot.LocalNpcImmunity = new object[] { 0, 0, 0 };
+            if (tracker.UpdateHitCache(snapshot))
+            {
+                throw new InvalidOperationException("Expected projectile identity change to reset hit cache before new zero baseline.");
+            }
+
+            snapshot.LocalNpcImmunity = new object[] { 0, 1, 0 };
+            if (!tracker.UpdateHitCache(snapshot))
+            {
+                throw new InvalidOperationException("Expected new projectile immunity increase to be detected after identity reset.");
+            }
+        }
+
+        private static void FlailStuckTrackingReachesRecoveryTick()
+        {
+            var tracker = new CombatAimFlailProjectileTracker();
+            var snapshot = BuildFlailSnapshot(30, 1058, 40, 0f, 0f, 0f, new object[] { 0 });
+            tracker.UpdateHitCache(snapshot);
+
+            var ticks = 0;
+            for (var index = 0; index < 8; index++)
+            {
+                ticks = tracker.UpdateStuckTracking(snapshot);
+            }
+
+            if (ticks != 8)
+            {
+                throw new InvalidOperationException("Expected stationary ai0=0 flail projectile to reach 8 stuck ticks.");
+            }
+
+            snapshot.VelocityX = 0.01f;
+            snapshot.Velocity = new Vector2 { X = 0.01f, Y = 0f };
+            if (tracker.UpdateStuckTracking(snapshot) != 0)
+            {
+                throw new InvalidOperationException("Expected moving flail projectile to reset stuck ticks.");
+            }
+        }
+
+        private static void FlailTileCollisionDetectorFailsClosedAndCachesMethodInfo()
+        {
+            var snapshot = BuildFlailSnapshot(40, 1058, 50, 1f, 4f, 0f, new object[] { 0 });
+            snapshot.Position = new Vector2 { X = 10f, Y = 12f };
+            snapshot.Velocity = new Vector2 { X = 4f, Y = 0f };
+            snapshot.Width = 16;
+            snapshot.Height = 18;
+
+            var missingResolveCount = 0;
+            var missingDetector = new CombatAimFlailCollisionDetector(delegate
+            {
+                missingResolveCount++;
+                return typeof(FakeMissingTileCollisionType);
+            });
+            if (missingDetector.DetectTileCollision(snapshot) ||
+                missingDetector.DetectTileCollision(snapshot) ||
+                missingResolveCount != 1)
+            {
+                throw new InvalidOperationException("Expected missing TileCollision method to fail closed and resolve only once.");
+            }
+
+            var validResolveCount = 0;
+            FakeTileCollisionType.CallCount = 0;
+            var validDetector = new CombatAimFlailCollisionDetector(delegate
+            {
+                validResolveCount++;
+                return typeof(FakeTileCollisionType);
+            });
+            if (!validDetector.DetectTileCollision(snapshot) ||
+                !validDetector.DetectTileCollision(snapshot) ||
+                validResolveCount != 1 ||
+                FakeTileCollisionType.CallCount != 2)
+            {
+                throw new InvalidOperationException("Expected TileCollision detector to cache MethodInfo while invoking the cached method per check.");
+            }
+
+            var earlyResolveCount = 0;
+            var earlyDetector = new CombatAimFlailCollisionDetector(delegate
+            {
+                earlyResolveCount++;
+                return typeof(FakeTileCollisionType);
+            });
+            snapshot.Ai0 = 0f;
+            if (earlyDetector.DetectTileCollision(snapshot) || earlyResolveCount != 0)
+            {
+                throw new InvalidOperationException("Expected non-release ai0 state to skip TileCollision resolution.");
+            }
+        }
+
+        private static FakeProjectile BuildFakeFlailProjectile(
+            int whoAmI,
+            int type,
+            int identity,
+            int owner,
+            bool active,
+            bool friendly,
+            bool hostile)
+        {
+            return new FakeProjectile
+            {
+                whoAmI = whoAmI,
+                type = type,
+                identity = identity,
+                owner = owner,
+                active = active,
+                friendly = friendly,
+                hostile = hostile,
+                aiStyle = 15,
+                ai = new float[] { 1f },
+                position = new Vector2 { X = 0f, Y = 0f },
+                velocity = new Vector2 { X = 4f, Y = 0f },
+                width = 16,
+                height = 18,
+                localNPCImmunity = new int[256]
+            };
+        }
+
+        private static CombatAimFlailControlService.FlailProjectileSnapshot BuildFlailSnapshot(
+            int whoAmI,
+            int type,
+            int identity,
+            float ai0,
+            float velocityX,
+            float velocityY,
+            object localNpcImmunity)
+        {
+            return new CombatAimFlailControlService.FlailProjectileSnapshot
+            {
+                WhoAmI = whoAmI,
+                Type = type,
+                AiStyle = 15,
+                Owner = 7,
+                Identity = identity,
+                Active = true,
+                Friendly = true,
+                Hostile = false,
+                Width = 16,
+                Height = 18,
+                Ai0 = ai0,
+                VelocityX = velocityX,
+                VelocityY = velocityY,
+                Position = new Vector2 { X = 0f, Y = 0f },
+                Velocity = new Vector2 { X = velocityX, Y = velocityY },
+                LocalNpcImmunity = localNpcImmunity as System.Collections.IList
+            };
+        }
+
         private static void FlailCachedReleaseAimsAfterTargetSelectionLoss()
         {
             CombatAimFlailControlService.ResetForTesting();
@@ -3298,9 +3987,14 @@ namespace JueMingZ.Tests
                 Math.Abs(cached.AimWorldY - recorded.AimWorldY) > 0.001f ||
                 !cached.ReleaseDetected ||
                 !cached.ReleasedThisTick ||
-                !cached.WasUseItemHeldLastTick)
+                !cached.WasUseItemHeldLastTick ||
+                !string.Equals(cached.ReleaseHoldValidationReason, "cachedFlailReleaseAim", StringComparison.Ordinal) ||
+                cached.Selection == null ||
+                !cached.Selection.SelectionCacheHit ||
+                !string.Equals(cached.Selection.SelectionCacheKey, "flailCachedReleaseAim", StringComparison.Ordinal) ||
+                !string.Equals(cached.Selection.SelectionPurpose, "FlailRelease", StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("Cached flail release decision did not preserve the recorded target and release edge.");
+                throw new InvalidOperationException("Cached flail release decision did not preserve recorded target, release edge, and cache metadata.");
             }
 
             TerrariaInputCompat.ScopedUseItemTakeover takeover;
@@ -3319,6 +4013,122 @@ namespace JueMingZ.Tests
             }
 
             TerrariaInputCompat.TryRestoreScopedUseItemTakeover(takeover);
+        }
+
+        private static void FlailCachedReleaseAimRespectsAgeAndProfileBounds()
+        {
+            AssertCachedReleaseAge(0, true, "0 tick");
+            AssertCachedReleaseAge(120, true, "120 tick");
+            AssertCachedReleaseAge(121, false, "121 tick");
+            AssertCachedReleaseFutureTickRejected();
+            AssertCachedReleaseProfileChangeRejected(CreateFlailLikeItem(5527, 1058, "Different Flail Type"), "item type");
+            AssertCachedReleaseProfileChangeRejected(CreateFlailLikeItem(5526, 1059, "Different Flail Shoot"), "shoot");
+        }
+
+        private static void AssertCachedReleaseAge(int age, bool expected, string label)
+        {
+            CombatAimItemCheckDecision cached;
+            var releaseTick = 2000L;
+            var actual = TryCreateCachedReleaseDecisionForTesting(
+                releaseTick - 1,
+                releaseTick,
+                releaseTick - age,
+                null,
+                out cached);
+            if (actual != expected)
+            {
+                var failureDiagnostics = CombatAimFlailControlService.GetDecisionDiagnostics(null);
+                throw new InvalidOperationException(
+                    "Expected cached flail release age " + label + " availability to be " + expected +
+                    ". LastInputError=" + TerrariaInputCompat.LastInputCompatError +
+                    ", lastState=" + (failureDiagnostics == null ? "<null>" : failureDiagnostics.State) +
+                    ", lastCachedReason=" + (failureDiagnostics == null ? "<null>" : failureDiagnostics.CachedReleaseAimReason) + ".");
+            }
+
+            if (!actual)
+            {
+                return;
+            }
+
+            var diagnostics = CombatAimFlailControlService.GetDecisionDiagnostics(cached);
+            if (diagnostics == null ||
+                !diagnostics.CachedReleaseAim ||
+                diagnostics.CachedReleaseAimAgeTicks != age ||
+                !string.Equals(diagnostics.CachedReleaseAimReason, "usedForPhysicalRelease", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "Expected cached flail release age diagnostics to preserve age " + label +
+                    ", got cached=" + (diagnostics != null && diagnostics.CachedReleaseAim) +
+                    ", age=" + (diagnostics == null ? -1 : diagnostics.CachedReleaseAimAgeTicks) +
+                    ", reason=" + (diagnostics == null ? "<null>" : diagnostics.CachedReleaseAimReason) + ".");
+            }
+        }
+
+        private static void AssertCachedReleaseFutureTickRejected()
+        {
+            CombatAimItemCheckDecision cached;
+            if (TryCreateCachedReleaseDecisionForTesting(2099, 2100, 2101, null, out cached))
+            {
+                throw new InvalidOperationException("Expected cached flail release to reject future cache tick.");
+            }
+        }
+
+        private static void AssertCachedReleaseProfileChangeRejected(FakeItem replacement, string label)
+        {
+            CombatAimItemCheckDecision cached;
+            if (TryCreateCachedReleaseDecisionForTesting(2199, 2200, 2199, replacement, out cached))
+            {
+                throw new InvalidOperationException("Expected cached flail release to reject " + label + " change.");
+            }
+        }
+
+        private static bool TryCreateCachedReleaseDecisionForTesting(
+            long heldTick,
+            long releaseTick,
+            long recordedTick,
+            FakeItem replacementItem,
+            out CombatAimItemCheckDecision cached)
+        {
+            CombatAimFlailControlService.ResetForTesting();
+            Terraria.Main.screenPosition.X = 0f;
+            Terraria.Main.screenPosition.Y = 0f;
+            Terraria.Main.GameUpdateCount = heldTick;
+            ResetFakeCombatUiUnblocked();
+            ResetFakeMainMouse(true, false);
+
+            var player = new FakePlayer
+            {
+                controlUseItem = true,
+                releaseUseItem = false,
+                channel = true
+            };
+            var recorded = BuildFlailItemCheckDecision(player);
+            CombatAimFlailControlService.SetCachedReleaseAimForTesting(recorded, heldTick);
+
+            CombatAimItemCheckDecision ignored;
+            CombatAimFlailControlService.TryCreateCachedReleaseDecision(player, out ignored);
+            CombatAimFlailControlService.SetCachedReleaseAimForTesting(recorded, recordedTick);
+
+            if (replacementItem != null)
+            {
+                player.inventory[0] = replacementItem;
+            }
+
+            Terraria.Main.GameUpdateCount = releaseTick;
+            ResetFakeCombatUiUnblocked();
+            ResetFakeMainMouse(false, true);
+            player.controlUseItem = false;
+            player.releaseUseItem = true;
+            player.channel = false;
+            var restoreRuntimeTypes = PushFakeTerrariaMainType();
+            try
+            {
+                return CombatAimFlailControlService.TryCreateCachedReleaseDecision(player, out cached);
+            }
+            finally
+            {
+                restoreRuntimeTypes();
+            }
         }
 
         private static void FlailReleaseCursorTailKeepsProjectileAiScopedAim()
@@ -3400,7 +4210,18 @@ namespace JueMingZ.Tests
                 player,
                 tail.WeaponProfile,
                 tail.BallisticSolution);
+            player.controlUseItem = true;
+            player.releaseUseItem = false;
+            player.channel = true;
+            Terraria.Main.mouseLeft = true;
+            Terraria.Main.mouseLeftRelease = false;
             CombatAimFlailControlService.MarkProjectileAiScopedTakeover(tail, match);
+            if (!player.controlUseItem || player.releaseUseItem || !player.channel ||
+                !Terraria.Main.mouseLeft || Terraria.Main.mouseLeftRelease)
+            {
+                throw new InvalidOperationException("ProjectileAI scoped diagnostics must not mutate use-item input state.");
+            }
+
             CombatAimProjectileCursorCompat.AttachDecisionMetadata(tail, match, true, true, true);
             var json = BuildCombatAimDecisionJson(tail, true, true);
             AssertContains(json, "\"weaponFamily\":\"FlailAiStyle15\"");
@@ -3474,20 +4295,25 @@ namespace JueMingZ.Tests
             }
         }
 
-        private static CombatAimItemCheckDecision BuildFlailItemCheckDecision(FakePlayer player)
+        private static FakeItem CreateFlailLikeItem(int itemType, int shoot, string name)
         {
-            var item = new FakeItem
+            return new FakeItem
             {
-                type = 5526,
+                type = itemType,
                 stack = 1,
-                Name = "Flairon",
+                Name = name,
                 damage = 66,
-                shoot = 1058,
+                shoot = shoot,
                 shootSpeed = 12f,
                 melee = true,
                 channel = true,
                 useStyle = 5
             };
+        }
+
+        private static CombatAimItemCheckDecision BuildFlailItemCheckDecision(FakePlayer player)
+        {
+            var item = CreateFlailLikeItem(5526, 1058, "Flairon");
             player.inventory[0] = item;
             player.selectedItem = 0;
 
@@ -3665,6 +4491,79 @@ namespace JueMingZ.Tests
             Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseRight = false;
         }
 
+        private static void ResetFakeCombatUiUnblocked()
+        {
+            Terraria.Main.mouseInterface = false;
+            Terraria.Main.blockMouse = false;
+            Terraria.Main.gameMenu = false;
+            Terraria.Main.chatMode = false;
+            Terraria.Main.drawingPlayerChat = false;
+            Terraria.Main.npcChatText = string.Empty;
+            Terraria.Main.playerInventory = false;
+        }
+
+        private static Action PushFlailUpdateTestState(int cursorAimRadius, Terraria.Player player)
+        {
+            var restoreRuntimeTypes = PushFakeTerrariaMainType();
+            var restoreLocalPlayer = CaptureFakeLocalPlayerState();
+            var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
+            var previousCursorAimRadius = settings.CursorAimRadius;
+            var previousMouseLeft = Terraria.Main.mouseLeft;
+            var previousMouseLeftRelease = Terraria.Main.mouseLeftRelease;
+            var previousMouseRight = Terraria.Main.mouseRight;
+            var previousMouseRightRelease = Terraria.Main.mouseRightRelease;
+            var previousMouseInterface = Terraria.Main.mouseInterface;
+            var previousBlockMouse = Terraria.Main.blockMouse;
+            var previousGameMenu = Terraria.Main.gameMenu;
+            var previousChatMode = Terraria.Main.chatMode;
+            var previousDrawingPlayerChat = Terraria.Main.drawingPlayerChat;
+            var previousNpcChatText = Terraria.Main.npcChatText;
+            var previousPlayerInventory = Terraria.Main.playerInventory;
+            var previousProjectiles = Terraria.Main.projectile;
+            var previousGameUpdateCount = Terraria.Main.GameUpdateCount;
+            var previousCurrentMouseLeft = Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft;
+            var previousCurrentMouseRight = Terraria.GameInput.PlayerInput.Triggers.Current.MouseRight;
+            var previousJustPressedMouseLeft = Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft;
+            var previousJustPressedMouseRight = Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseRight;
+
+            settings.CursorAimRadius = cursorAimRadius;
+            Terraria.Main.GameUpdateCount = 9000;
+            Terraria.Main.mouseInterface = false;
+            Terraria.Main.blockMouse = false;
+            Terraria.Main.gameMenu = false;
+            Terraria.Main.chatMode = false;
+            Terraria.Main.drawingPlayerChat = false;
+            Terraria.Main.npcChatText = string.Empty;
+            Terraria.Main.playerInventory = false;
+            Terraria.Main.projectile = new object[0];
+            ResetFakeMainMouse(false, true);
+            ResetFakeLocalPlayer(player);
+
+            return () =>
+            {
+                settings.CursorAimRadius = previousCursorAimRadius;
+                Terraria.Main.mouseLeft = previousMouseLeft;
+                Terraria.Main.mouseLeftRelease = previousMouseLeftRelease;
+                Terraria.Main.mouseRight = previousMouseRight;
+                Terraria.Main.mouseRightRelease = previousMouseRightRelease;
+                Terraria.Main.mouseInterface = previousMouseInterface;
+                Terraria.Main.blockMouse = previousBlockMouse;
+                Terraria.Main.gameMenu = previousGameMenu;
+                Terraria.Main.chatMode = previousChatMode;
+                Terraria.Main.drawingPlayerChat = previousDrawingPlayerChat;
+                Terraria.Main.npcChatText = previousNpcChatText;
+                Terraria.Main.playerInventory = previousPlayerInventory;
+                Terraria.Main.projectile = previousProjectiles;
+                Terraria.Main.GameUpdateCount = previousGameUpdateCount;
+                Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft = previousCurrentMouseLeft;
+                Terraria.GameInput.PlayerInput.Triggers.Current.MouseRight = previousCurrentMouseRight;
+                Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft = previousJustPressedMouseLeft;
+                Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseRight = previousJustPressedMouseRight;
+                restoreLocalPlayer();
+                restoreRuntimeTypes();
+            };
+        }
+
         private static void ResetFakeLocalPlayer(Terraria.Player player)
         {
             Terraria.Main.LocalPlayer = player;
@@ -3672,6 +4571,21 @@ namespace JueMingZ.Tests
             if (player != null && player.whoAmI >= 0 && player.whoAmI < Terraria.Main.player.Length)
             {
                 Terraria.Main.player[player.whoAmI] = player;
+            }
+        }
+
+        private static void AssertFlailLastDiagnostics(string state, string blockedReason)
+        {
+            var diagnostics = CombatAimFlailControlService.GetDecisionDiagnostics(null);
+            if (diagnostics == null ||
+                !string.Equals(diagnostics.State, state, StringComparison.Ordinal) ||
+                !string.Equals(diagnostics.BlockedReason, blockedReason, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "Expected flail diagnostics state=" + state +
+                    " blockedReason=" + blockedReason +
+                    ", got state=" + (diagnostics == null ? "<null>" : diagnostics.State) +
+                    " blockedReason=" + (diagnostics == null ? "<null>" : diagnostics.BlockedReason) + ".");
             }
         }
 

@@ -227,6 +227,14 @@ namespace JueMingZ.Automation.Fishing
                 }
 
                 UpdateSessionFromObservation(queue, snapshot, observation, hasObservation, tick);
+                if (TryEndSessionForPlayerDamage(queue, snapshot, tick))
+                {
+                    FishingAutoEquipmentService.Tick(queue, snapshot, autoEquipmentEnabled, false, FishingLiquidKind.Unknown, tick, "playerDamaged");
+                    FishingLoadoutService.Tick(queue, snapshot, autoLoadoutEnabled, false, tick, truffleWormBaitActive ? "currentBaitTruffleWorm" : null);
+                    PublishDiagnostics();
+                    return;
+                }
+
                 var hasFishingEquipmentBobber = State.SessionActive &&
                                                 hasObservation &&
                                                 observation != null &&
@@ -538,7 +546,7 @@ namespace JueMingZ.Automation.Fishing
                     return;
                 }
 
-                StartSession(poleSlot, poleItemType, observation, tick, truffleWormSession);
+                StartSession(snapshot, poleSlot, poleItemType, observation, tick, truffleWormSession);
                 return;
             }
 
@@ -589,7 +597,7 @@ namespace JueMingZ.Automation.Fishing
             return false;
         }
 
-        private static void StartSession(int poleSlot, int poleItemType, FishingBobberObservation observation, long tick, bool truffleWormSession)
+        private static void StartSession(GameStateSnapshot snapshot, int poleSlot, int poleItemType, FishingBobberObservation observation, long tick, bool truffleWormSession)
         {
             State.SessionActive = true;
             State.SessionStartedWithTruffleWorm = truffleWormSession;
@@ -597,6 +605,7 @@ namespace JueMingZ.Automation.Fishing
             State.SessionPoleItemType = poleItemType;
             State.CurrentBobberIdentity = observation.Identity;
             State.LastProcessedHookIdentity = -1;
+            State.LastObservedPlayerLife = ReadPlayerLife(snapshot);
             State.LastBobberSeenTick = tick;
             State.LastBobberWorldX = observation.CenterX;
             State.LastBobberWorldY = observation.CenterY;
@@ -633,6 +642,40 @@ namespace JueMingZ.Automation.Fishing
             FishingStatusPromptService.ShowStart(tick, truffleWormSession);
         }
 
+        private static bool TryEndSessionForPlayerDamage(InputActionQueue queue, GameStateSnapshot snapshot, long tick)
+        {
+            if (!State.SessionActive)
+            {
+                return false;
+            }
+
+            var currentLife = ReadPlayerLife(snapshot);
+            // Damage exits before auto-pull/recast so knockback cannot leave a
+            // background fishing session active after the player is interrupted.
+            if (ShouldEndSessionForPlayerDamage(State.LastObservedPlayerLife, currentLife))
+            {
+                EndSession(queue, snapshot, tick, "playerDamaged");
+                return true;
+            }
+
+            if (currentLife > 0)
+            {
+                State.LastObservedPlayerLife = currentLife;
+            }
+
+            return false;
+        }
+
+        private static int ReadPlayerLife(GameStateSnapshot snapshot)
+        {
+            return snapshot == null || snapshot.Player == null ? 0 : snapshot.Player.Life;
+        }
+
+        private static bool ShouldEndSessionForPlayerDamage(int previousLife, int currentLife)
+        {
+            return previousLife > 0 && currentLife >= 0 && currentLife < previousLife;
+        }
+
         internal static bool ShouldStartSessionFromObservation(FishingBobberObservation observation, bool truffleWormBait)
         {
             if (observation == null || !observation.Active || !observation.Bobber)
@@ -647,6 +690,11 @@ namespace JueMingZ.Automation.Fishing
 
             return truffleWormBait &&
                    (!observation.LiquidStateKnown || observation.Ai1 < 0f);
+        }
+
+        internal static bool ShouldEndSessionForPlayerDamageForTesting(int previousLife, int currentLife)
+        {
+            return ShouldEndSessionForPlayerDamage(previousLife, currentLife);
         }
 
         private static void EndSession(InputActionQueue queue, GameStateSnapshot snapshot, long tick, string reason)
@@ -692,6 +740,17 @@ namespace JueMingZ.Automation.Fishing
 
             if (State.WaitingForBobberGone)
             {
+                if (ShouldClearNaturalFilterSkipWait(
+                    State.FilterSkipWaitingForBobberGone,
+                    State.FilterSkipNaturalWaitForBobberGone,
+                    State.LastProcessedHookIdentity,
+                    observation,
+                    scanned))
+                {
+                    ClearNaturalFilterSkipWait();
+                    return;
+                }
+
                 if (IsBobberGone(State.LastProcessedHookIdentity, scanned, scanAvailable, tick))
                 {
                     State.WaitingForBobberGone = false;
@@ -966,7 +1025,7 @@ namespace JueMingZ.Automation.Fishing
                 return;
             }
 
-            // Filter skip protects the existing session pole: temporary slot changes
+            // Cut-rod skip protects the existing session pole: temporary slot changes
             // wait for bobber disappearance or restore instead of overwriting selectedItem.
             string unsafeReason;
             if (IsUnsafeForFilterSkip(snapshot, out unsafeReason))
@@ -1015,6 +1074,24 @@ namespace JueMingZ.Automation.Fishing
             State.FilterSkipRestoreFailureReason = string.Empty;
             RecordFishingFilterRun(settings, candidate, decision, "submittedFilterSkip", decision == null ? string.Empty : decision.Reason);
             Record("submittedFilterSkip", string.Empty);
+        }
+
+        private static void ClearNaturalFilterSkipWait()
+        {
+            State.WaitingForBobberGone = false;
+            State.WaitingForBobberGoneStartTick = 0;
+            State.FilterSkipWaitingForBobberGone = false;
+            State.FilterSkipNaturalWaitForBobberGone = false;
+            State.FilterSkipInProgress = false;
+            State.FilterSkipRequestId = Guid.Empty;
+            State.FilterSkipTemporarySlot = -1;
+            State.FilterSkipLastResult = string.Empty;
+            State.FilterSkipRestoreFailureReason = string.Empty;
+            State.LastProcessedHookIdentity = -1;
+            State.FishingFilterDecision = "filterSkipNaturalHookCleared";
+            State.FishingFilterDecisionReason = string.Empty;
+            State.FishingFilterDryRun = false;
+            Record("filterSkipNaturalHookCleared", string.Empty);
         }
 
         private static void BeginFilterSkipNaturalWait(
@@ -1442,6 +1519,74 @@ namespace JueMingZ.Automation.Fishing
             }
 
             return false;
+        }
+
+        internal static bool ShouldClearNaturalFilterSkipWaitForTesting(
+            bool waitingForBobberGone,
+            bool naturalWaitForBobberGone,
+            int processedIdentity,
+            int observationIdentity,
+            float observationAi1)
+        {
+            var observation = observationIdentity < 0
+                ? null
+                : new FishingBobberObservation
+                {
+                    Identity = observationIdentity,
+                    Active = true,
+                    Bobber = true,
+                    Ai1 = observationAi1
+                };
+            return ShouldClearNaturalFilterSkipWait(
+                waitingForBobberGone,
+                naturalWaitForBobberGone,
+                processedIdentity,
+                observation,
+                null);
+        }
+
+        private static bool ShouldClearNaturalFilterSkipWait(
+            bool waitingForBobberGone,
+            bool naturalWaitForBobberGone,
+            int processedIdentity,
+            FishingBobberObservation observation,
+            IReadOnlyList<FishingBobberObservation> scanned)
+        {
+            if (!waitingForBobberGone || !naturalWaitForBobberGone || processedIdentity < 0)
+            {
+                return false;
+            }
+
+            if (IsUnhookedObservationForIdentity(observation, processedIdentity))
+            {
+                return true;
+            }
+
+            if (scanned != null)
+            {
+                for (var index = 0; index < scanned.Count; index++)
+                {
+                    if (IsUnhookedObservationForIdentity(scanned[index], processedIdentity))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            FishingBobberObservation cachedObservation;
+            return FishingBobberObserver.TryGetByIdentity(processedIdentity, out cachedObservation) &&
+                   IsUnhookedObservationForIdentity(cachedObservation, processedIdentity);
+        }
+
+        private static bool IsUnhookedObservationForIdentity(FishingBobberObservation observation, int identity)
+        {
+            return observation != null &&
+                   observation.Active &&
+                   observation.Bobber &&
+                   observation.Identity == identity &&
+                   observation.Ai1 >= 0f;
         }
 
         private static bool IsBobberGone(int identity, IReadOnlyList<FishingBobberObservation> scanned, bool scanAvailable, long tick)
