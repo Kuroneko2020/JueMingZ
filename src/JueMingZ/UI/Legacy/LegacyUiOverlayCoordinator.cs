@@ -11,6 +11,8 @@ namespace JueMingZ.UI.Legacy
         Modal = 1
     }
 
+    // F5 popup/modal surfaces are registered requests instead of inline page
+    // draws so draw order, hit-test, scroll, and cache invalidation share one owner.
     internal sealed class LegacyUiOverlayRequest
     {
         public string Id { get; set; }
@@ -72,6 +74,8 @@ namespace JueMingZ.UI.Legacy
                 return false;
             }
 
+            // OwnerPageId prevents stale requests from a previous page from
+            // retaining hover/click ownership after a tab switch.
             var owner = string.IsNullOrWhiteSpace(request.OwnerPageId) ? _activePageId : request.OwnerPageId;
             if (!string.IsNullOrWhiteSpace(owner) &&
                 !string.IsNullOrWhiteSpace(_activePageId) &&

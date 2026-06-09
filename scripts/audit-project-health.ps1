@@ -1003,6 +1003,103 @@ function Test-InformationFishingFallbackCleanup {
     }
 }
 
+function Test-LegacyUiOverlayGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $legacyRoot = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy"
+    if (-not (Test-Path -LiteralPath $legacyRoot)) {
+        Write-FailHealth "Legacy UI source directory missing."
+        return
+    }
+
+    $expectedPopupPanelUses = @{
+        "LegacyMainWindow.Misc.cs" = 1
+        "LegacyMainWindow.Movement.cs" = 1
+        "LegacyMainWindow.Rows.Recovery.cs" = 1
+    }
+    $expectedAddUiBlockerUses = @{
+        "LegacyMainWindow.Fishing.FilterExact.cs" = 1
+        "LegacyMainWindow.Fishing.FilterPresets.cs" = 1
+        "LegacyMainWindow.Shared.cs" = 1
+    }
+
+    $popupCounts = @{}
+    $blockerCounts = @{}
+    foreach ($file in Get-ChildItem -LiteralPath $legacyRoot -Recurse -Filter "*.cs" -File) {
+        $relative = $file.FullName.Substring($legacyRoot.Length + 1).Replace('\', '/')
+        $text = Read-TextIfExists -Path $file.FullName
+        if ($null -eq $text) {
+            continue
+        }
+
+        $popupCount = [System.Text.RegularExpressions.Regex]::Matches($text, 'new\s+LegacyPopupPanelControl\b').Count
+        if ($popupCount -gt 0) {
+            $popupCounts[$relative] = $popupCount
+        }
+
+        $blockerCount = [System.Text.RegularExpressions.Regex]::Matches($text, '\bAddUiBlocker\s*\(').Count
+        if ($blockerCount -gt 0) {
+            $blockerCounts[$relative] = $blockerCount
+        }
+    }
+
+    $unexpectedPopupUses = @()
+    foreach ($path in $popupCounts.Keys) {
+        if (-not $expectedPopupPanelUses.ContainsKey($path) -or
+            $popupCounts[$path] -ne $expectedPopupPanelUses[$path]) {
+            $unexpectedPopupUses += "$path=$($popupCounts[$path])"
+        }
+    }
+
+    foreach ($path in $expectedPopupPanelUses.Keys) {
+        if (-not $popupCounts.ContainsKey($path) -or
+            $popupCounts[$path] -ne $expectedPopupPanelUses[$path]) {
+            $unexpectedPopupUses += "$path=$($popupCounts[$path]) expected=$($expectedPopupPanelUses[$path])"
+        }
+    }
+
+    if ($unexpectedPopupUses.Count -gt 0) {
+        Write-FailHealth "Legacy UI popup panel usage changed outside the F5 overlay allowlist: $($unexpectedPopupUses -join ', ')"
+    }
+    else {
+        Write-Pass "Legacy UI popup panel usage stays inside the overlay allowlist."
+    }
+
+    $unexpectedBlockerUses = @()
+    foreach ($path in $blockerCounts.Keys) {
+        if (-not $expectedAddUiBlockerUses.ContainsKey($path) -or
+            $blockerCounts[$path] -ne $expectedAddUiBlockerUses[$path]) {
+            $unexpectedBlockerUses += "$path=$($blockerCounts[$path])"
+        }
+    }
+
+    foreach ($path in $expectedAddUiBlockerUses.Keys) {
+        if (-not $blockerCounts.ContainsKey($path) -or
+            $blockerCounts[$path] -ne $expectedAddUiBlockerUses[$path]) {
+            $unexpectedBlockerUses += "$path=$($blockerCounts[$path]) expected=$($expectedAddUiBlockerUses[$path])"
+        }
+    }
+
+    if ($unexpectedBlockerUses.Count -gt 0) {
+        Write-FailHealth "Legacy UI AddUiBlocker usage changed outside the F5 overlay allowlist: $($unexpectedBlockerUses -join ', ')"
+    }
+    else {
+        Write-Pass "Legacy UI AddUiBlocker usage stays inside the overlay allowlist."
+    }
+
+    $coordinatorPath = Join-Path $legacyRoot "LegacyUiOverlayCoordinator.cs"
+    $coordinator = Read-TextIfExists -Path $coordinatorPath
+    if ($null -ne $coordinator -and
+        $coordinator.Contains("LastStackSignature") -and
+        $coordinator.Contains("ShouldBlockMainScroll") -and
+        $coordinator.Contains("HasActiveModalAt")) {
+        Write-Pass "Legacy UI overlay coordinator still owns stack signature, scroll blocking, and modal hit-test helpers."
+    }
+    else {
+        Write-FailHealth "Legacy UI overlay coordinator is missing expected overlay ownership helpers."
+    }
+}
+
 function Test-IterationLogNumbers {
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
     $updatesDir = ConvertFrom-CodePoints @(0x66f4, 0x65b0, 0x8bb0, 0x5f55)
@@ -1073,6 +1170,7 @@ else {
     Test-TestPackage -RepoRoot $repoRoot -RuntimeVersion "Unknown" -AllowReadme:$AllowTestPackageReadme
 }
 Test-InformationFishingFallbackCleanup -RepoRoot $repoRoot
+Test-LegacyUiOverlayGovernance -RepoRoot $repoRoot
 Test-IterationLogNumbers -RepoRoot $repoRoot
 
 if ($script:FailCount -gt 0) {

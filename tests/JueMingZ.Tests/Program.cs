@@ -832,6 +832,7 @@ namespace JueMingZ.Tests
             Run("legacy UI tooltip cache reuses stable hover model", ref failed, LegacyUiTooltipCacheReusesStableHoverModel);
             Run("legacy UI tooltip cache dirties on content change", ref failed, LegacyUiTooltipCacheDirtiesOnContentChange);
             Run("legacy UI overlay coordinator draws after page content", ref failed, LegacyUiOverlayCoordinatorDrawsAfterPageContent);
+            Run("legacy UI overlay request rejects invalid contract", ref failed, LegacyUiOverlayRequestRejectsInvalidContract);
             Run("legacy UI overlay modal blocker stops lower hover and click", ref failed, LegacyUiOverlayModalBlockerStopsLowerHoverAndClick);
             Run("legacy UI overlay child controls beat modal blocker", ref failed, LegacyUiOverlayChildControlsBeatModalBlocker);
             Run("legacy UI overlay modal blocks main scroll", ref failed, LegacyUiOverlayModalBlocksMainScroll);

@@ -215,6 +215,8 @@ namespace JueMingZ.Compat
             return TrySuppressPendingMouseTextForUi();
         }
 
+        // Use only from F5/UI capture boundaries. This clears late vanilla hover
+        // caches; it is not a general switch for disabling world interaction.
         public static bool TrySuppressPendingMouseTextForUi()
         {
             try

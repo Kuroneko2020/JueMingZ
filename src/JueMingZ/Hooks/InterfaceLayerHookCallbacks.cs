@@ -201,6 +201,9 @@ namespace JueMingZ.Hooks
                 "UI overlay dispatcher interface layer inserted.",
                 -1);
 
+            // This guard is intentionally late: vanilla Mouse Over has already
+            // populated pending MouseText/NPC hover caches, but final UI text is
+            // still ahead of us.
             InsertLayerIfMissing(
                 layers,
                 layerState,

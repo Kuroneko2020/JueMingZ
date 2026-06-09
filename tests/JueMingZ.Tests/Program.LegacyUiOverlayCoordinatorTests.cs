@@ -54,6 +54,65 @@ namespace JueMingZ.Tests
             coordinator.ResetForTesting();
         }
 
+        private static void LegacyUiOverlayRequestRejectsInvalidContract()
+        {
+            var coordinator = LegacyUiOverlayCoordinator.Current;
+            coordinator.ResetForTesting();
+            coordinator.BeginFrame("misc");
+
+            if (coordinator.Register(null))
+            {
+                throw new InvalidOperationException("Expected null overlay requests to be rejected.");
+            }
+
+            if (coordinator.Register(new LegacyUiOverlayRequest
+            {
+                OwnerPageId = "misc",
+                Bounds = new LegacyUiRect(10, 10, 80, 40),
+                Kind = LegacyUiOverlayKind.Modal
+            }))
+            {
+                throw new InvalidOperationException("Expected overlay requests without a stable id to be rejected.");
+            }
+
+            if (coordinator.Register(new LegacyUiOverlayRequest
+            {
+                Id = "zero-bounds",
+                OwnerPageId = "misc",
+                Bounds = new LegacyUiRect(10, 10, 0, 40),
+                Kind = LegacyUiOverlayKind.Modal
+            }))
+            {
+                throw new InvalidOperationException("Expected overlay requests without visible bounds to be rejected.");
+            }
+
+            if (coordinator.Register(new LegacyUiOverlayRequest
+            {
+                Id = "stale-page",
+                OwnerPageId = "fishing",
+                Bounds = new LegacyUiRect(10, 10, 80, 40),
+                Kind = LegacyUiOverlayKind.Modal
+            }))
+            {
+                throw new InvalidOperationException("Expected overlay requests from inactive pages to be rejected.");
+            }
+
+            if (!coordinator.Register(new LegacyUiOverlayRequest
+            {
+                Id = "valid-modal",
+                OwnerPageId = "misc",
+                Bounds = new LegacyUiRect(10, 10, 80, 40),
+                Kind = LegacyUiOverlayKind.Modal,
+                CacheSignature = 42
+            }))
+            {
+                throw new InvalidOperationException("Expected a stable active-page overlay request to be accepted.");
+            }
+
+            coordinator.EndFrame();
+            coordinator.ResetForTesting();
+        }
+
         private static void LegacyUiOverlayModalBlockerStopsLowerHoverAndClick()
         {
             var coordinator = LegacyUiOverlayCoordinator.Current;
