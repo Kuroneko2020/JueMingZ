@@ -272,8 +272,7 @@ namespace JueMingZ.UI.Legacy
                 if (presetHeight > 0)
                 {
                     var presetRect = BuildFishingFilterFloatingRect(area, rect, presetListAnchor, presetHeight);
-                    DrawFishingFilterFloatingConnector(spriteBatch, area, presetRect, presetListAnchor);
-                    hovered = DrawFishingFilterPresetList(spriteBatch, area, mouse, elements, presetRect, settings, filterMode, FishingFilterMatchModes.Exact) ?? hovered;
+                    RegisterFishingFilterPresetListOverlay(area, presetRect, presetListAnchor, settings, filterMode, FishingFilterMatchModes.Exact);
                 }
             }
             else
@@ -290,8 +289,7 @@ namespace JueMingZ.UI.Legacy
                 if (pickerHeight > 0)
                 {
                     var pickerRect = BuildFishingFilterFloatingRect(area, rect, pickerAnchor, pickerHeight);
-                    DrawFishingFilterFloatingConnector(spriteBatch, area, pickerRect, pickerAnchor);
-                    hovered = DrawFishingFilterExactPicker(spriteBatch, area, mouse, elements, pickerRect) ?? hovered;
+                    RegisterFishingFilterExactPickerOverlay(area, pickerRect, pickerAnchor);
                 }
             }
             else

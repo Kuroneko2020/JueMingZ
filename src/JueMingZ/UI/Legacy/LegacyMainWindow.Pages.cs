@@ -41,7 +41,7 @@ namespace JueMingZ.UI.Legacy
             DrawSection(spriteBatch, area, y, "自动增益列表");
             y += LegacyUiMetrics.SectionHeaderHeight;
             hovered = DrawDualBuffGrid(spriteBatch, area, mouse, elements, y) ?? hovered;
-            hovered = DrawAutoRecoveryItemConfigPopup(spriteBatch, area, mouse, elements) ?? hovered;
+            RegisterAutoRecoveryItemConfigPopupOverlay(area, settings);
 
             return hovered;
         }

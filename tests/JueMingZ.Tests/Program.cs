@@ -837,6 +837,11 @@ namespace JueMingZ.Tests
             Run("legacy UI overlay stack dirties hover token and retained frame", ref failed, LegacyUiOverlayStackDirtiesHoverTokenAndRetainedFrame);
             Run("legacy auto capture config overlay blocks lower hover and click", ref failed, LegacyAutoCaptureConfigOverlayBlocksLowerHoverAndClick);
             Run("legacy auto capture config overlay checkbox stays clickable", ref failed, LegacyAutoCaptureConfigOverlayCheckboxStaysClickable);
+            Run("legacy information style overlay blocks lower hover and keeps button clickable", ref failed, LegacyInformationStyleOverlayBlocksLowerHoverAndKeepsButtonClickable);
+            Run("legacy auto recovery config overlay blocks lower hover and keeps close clickable", ref failed, LegacyAutoRecoveryConfigOverlayBlocksLowerHoverAndKeepsCloseClickable);
+            Run("legacy movement safe landing overlay blocks lower hover and keeps option clickable", ref failed, LegacyMovementSafeLandingOverlayBlocksLowerHoverAndKeepsOptionClickable);
+            Run("legacy fishing picker overlay blocks lower hover and keeps nested scroll", ref failed, LegacyFishingPickerOverlayBlocksLowerHoverAndKeepsNestedScroll);
+            Run("legacy fishing preset overlay blocks lower hover and keeps rows clickable", ref failed, LegacyFishingPresetOverlayBlocksLowerHoverAndKeepsRowsClickable);
             Run("legacy UI action update gate skips idle frames", ref failed, LegacyUiActionUpdateGateSkipsIdleFrames);
             Run("legacy UI action update gate runs pending commands when hidden", ref failed, LegacyUiActionUpdateGateRunsPendingCommandsWhenHidden);
             Run("legacy UI action update gate skips drag dispatch without commands", ref failed, LegacyUiActionUpdateGateSkipsDragDispatchWithoutCommands);

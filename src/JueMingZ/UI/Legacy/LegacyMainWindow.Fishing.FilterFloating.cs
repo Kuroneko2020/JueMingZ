@@ -52,5 +52,133 @@ namespace JueMingZ.UI.Legacy
         {
             UiPrimitiveRenderer.DrawRectBorderClipped(spriteBatch, rect.X, rect.Y, rect.Width, rect.Height, 1, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, FishingFilterLinkR, FishingFilterLinkG, FishingFilterLinkB, FishingFilterLinkA);
         }
+
+        private static bool RegisterFishingFilterExactPickerOverlay(LegacyScrollArea area, LegacyUiRect picker, LegacyUiRect anchor)
+        {
+            if (area == null || picker.Width <= 0 || picker.Height <= 0)
+            {
+                FishingFilterUiState.ClearPickerViewport();
+                return false;
+            }
+
+            return LegacyUiOverlayCoordinator.Current.Register(new LegacyUiOverlayRequest
+            {
+                Id = "fishing-filter-exact-picker",
+                OwnerPageId = "fishing",
+                Bounds = picker,
+                Kind = LegacyUiOverlayKind.Popup,
+                ZIndex = 30,
+                CacheSignature = BuildFishingFilterPickerOverlayCacheSignature(),
+                State = new FishingFilterOverlayDrawState
+                {
+                    Area = area,
+                    Anchor = anchor
+                },
+                Draw = DrawFishingFilterExactPickerOverlay
+            });
+        }
+
+        private static bool RegisterFishingFilterPresetListOverlay(LegacyScrollArea area, LegacyUiRect rect, LegacyUiRect anchor, AppSettings settings, string filterMode, string matchMode)
+        {
+            if (area == null || rect.Width <= 0 || rect.Height <= 0)
+            {
+                FishingFilterUiState.ClearPresetViewport();
+                return false;
+            }
+
+            return LegacyUiOverlayCoordinator.Current.Register(new LegacyUiOverlayRequest
+            {
+                Id = "fishing-filter-preset-list",
+                OwnerPageId = "fishing",
+                Bounds = rect,
+                Kind = LegacyUiOverlayKind.Popup,
+                ZIndex = 20,
+                CacheSignature = BuildFishingFilterPresetOverlayCacheSignature(settings, filterMode, matchMode),
+                State = new FishingFilterOverlayDrawState
+                {
+                    Area = area,
+                    Anchor = anchor,
+                    Settings = settings,
+                    FilterMode = filterMode,
+                    MatchMode = matchMode
+                },
+                Draw = DrawFishingFilterPresetListOverlay
+            });
+        }
+
+        private static void DrawFishingFilterExactPickerOverlay(LegacyUiContext context, LegacyUiOverlayRequest request)
+        {
+            var state = request == null ? null : request.State as FishingFilterOverlayDrawState;
+            var elements = context == null ? null : context.Elements as List<LegacyUiElement>;
+            if (context == null || state == null || state.Area == null || elements == null)
+            {
+                return;
+            }
+
+            DrawFishingFilterFloatingConnector(context.SpriteBatch, state.Area, request.Bounds, state.Anchor);
+            DrawFishingFilterExactPicker(context.SpriteBatch, state.Area, context.Mouse, elements, request.Bounds);
+        }
+
+        private static void DrawFishingFilterPresetListOverlay(LegacyUiContext context, LegacyUiOverlayRequest request)
+        {
+            var state = request == null ? null : request.State as FishingFilterOverlayDrawState;
+            var elements = context == null ? null : context.Elements as List<LegacyUiElement>;
+            if (context == null || state == null || state.Area == null || elements == null)
+            {
+                return;
+            }
+
+            DrawFishingFilterFloatingConnector(context.SpriteBatch, state.Area, request.Bounds, state.Anchor);
+            DrawFishingFilterPresetList(
+                context.SpriteBatch,
+                state.Area,
+                context.Mouse,
+                elements,
+                request.Bounds,
+                state.Settings ?? context.Settings ?? AppSettings.CreateDefault(),
+                state.FilterMode,
+                state.MatchMode);
+        }
+
+        private static int BuildFishingFilterPickerOverlayCacheSignature()
+        {
+            unchecked
+            {
+                var hash = 17;
+                hash = hash * 31 + FishingFilterUiState.PickerCandidateCount;
+                hash = hash * 31 + FishingFilterUiState.PickerSelectedCount;
+                hash = hash * 31 + FishingFilterUiState.PickerScrollOffset;
+                hash = hash * 31 + StringComparer.Ordinal.GetHashCode(FishingFilterUiState.PickerSource ?? string.Empty);
+                hash = hash * 31 + StringComparer.Ordinal.GetHashCode(FishingFilterUiState.GlobalSearchQuery ?? string.Empty);
+                hash = hash * 31 + StringComparer.Ordinal.GetHashCode(FishingFilterUiState.PickerMessage ?? string.Empty);
+                return hash;
+            }
+        }
+
+        private static int BuildFishingFilterPresetOverlayCacheSignature(AppSettings settings, string filterMode, string matchMode)
+        {
+            unchecked
+            {
+                settings = settings ?? AppSettings.CreateDefault();
+                var hash = 17;
+                hash = hash * 31 + settings.ConfigVersion;
+                hash = hash * 31 + StringComparer.Ordinal.GetHashCode(FishingFilterModes.Normalize(filterMode) ?? string.Empty);
+                hash = hash * 31 + StringComparer.Ordinal.GetHashCode(FishingFilterMatchModes.Normalize(matchMode) ?? string.Empty);
+                hash = hash * 31 + Count(settings.FishingFilterPresets);
+                hash = hash * 31 + FishingFilterUiState.PresetScrollOffset;
+                hash = hash * 31 + StringComparer.Ordinal.GetHashCode(FishingFilterUiState.PresetSaveNotice ?? string.Empty);
+                return hash;
+            }
+        }
+
+        internal static bool RegisterFishingFilterExactPickerOverlayForTesting(LegacyScrollArea area, LegacyUiRect picker, LegacyUiRect anchor)
+        {
+            return RegisterFishingFilterExactPickerOverlay(area, picker, anchor);
+        }
+
+        internal static bool RegisterFishingFilterPresetListOverlayForTesting(LegacyScrollArea area, LegacyUiRect rect, LegacyUiRect anchor, AppSettings settings, string filterMode, string matchMode)
+        {
+            return RegisterFishingFilterPresetListOverlay(area, rect, anchor, settings, filterMode, matchMode);
+        }
     }
 }

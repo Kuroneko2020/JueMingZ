@@ -34,7 +34,7 @@ namespace JueMingZ.UI.Legacy
             hovered = DrawMovementToggleRow(spriteBatch, area, mouse, elements, y, "传送修正", "movement.teleport_correction", settings.MovementTeleportCorrectionEnabled, "点击进方块时，自动修正到附近可传送空位。") ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawMovementSafeLandingRow(spriteBatch, area, mouse, elements, y, settings.MovementSafeLandingEnabled) ?? hovered;
-            hovered = DrawMovementSafeLandingConfigPopup(spriteBatch, area, mouse, elements) ?? hovered;
+            RegisterMovementSafeLandingConfigPopupOverlay(area, settings);
 
             return hovered;
         }
@@ -103,9 +103,54 @@ namespace JueMingZ.UI.Legacy
             return hovered;
         }
 
+        private static bool RegisterMovementSafeLandingConfigPopupOverlay(LegacyScrollArea area, AppSettings settings)
+        {
+            if (!_movementSafeLandingConfigOpen || !_movementSafeLandingConfigAnchorVisible || area == null)
+            {
+                return false;
+            }
+
+            var options = MovementSafeLandingOptionCatalog.Options;
+            int columns;
+            int optionWidth;
+            int columnGap;
+            int rowGap;
+            var popup = CalculateMovementSafeLandingPopupRect(
+                area.Viewport,
+                _movementSafeLandingConfigAnchor,
+                options == null ? 0 : options.Length,
+                out columns,
+                out optionWidth,
+                out columnGap,
+                out rowGap);
+            return LegacyUiOverlayCoordinator.Current.Register(new LegacyUiOverlayRequest
+            {
+                Id = "movement-safe-landing-config-popup",
+                OwnerPageId = "movement",
+                Bounds = popup,
+                Kind = LegacyUiOverlayKind.Modal,
+                ZIndex = 20,
+                CacheSignature = BuildMovementSafeLandingPopupCacheSignature(settings, options),
+                State = area,
+                Draw = DrawMovementSafeLandingConfigPopupOverlay
+            });
+        }
+
+        private static void DrawMovementSafeLandingConfigPopupOverlay(LegacyUiContext context, LegacyUiOverlayRequest request)
+        {
+            var area = request == null ? null : request.State as LegacyScrollArea;
+            var elements = context == null ? null : context.Elements as List<LegacyUiElement>;
+            if (context == null || area == null || elements == null)
+            {
+                return;
+            }
+
+            DrawMovementSafeLandingConfigPopup(context.SpriteBatch, area, context.Mouse, elements);
+        }
+
         private static LegacyUiElement DrawMovementSafeLandingConfigPopup(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements)
         {
-            if (!_movementSafeLandingConfigOpen || !_movementSafeLandingConfigAnchorVisible)
+            if (!_movementSafeLandingConfigOpen || !_movementSafeLandingConfigAnchorVisible || area == null)
             {
                 return null;
             }
@@ -153,6 +198,28 @@ namespace JueMingZ.UI.Legacy
             }
 
             return hovered;
+        }
+
+        private static int BuildMovementSafeLandingPopupCacheSignature(AppSettings settings, MovementSafeLandingOptionDefinition[] options)
+        {
+            unchecked
+            {
+                settings = settings ?? AppSettings.CreateDefault();
+                var hash = 17;
+                hash = hash * 31 + settings.ConfigVersion;
+                hash = hash * 31 + (options == null ? 0 : options.Length);
+                if (options != null)
+                {
+                    for (var index = 0; index < options.Length; index++)
+                    {
+                        var option = options[index];
+                        hash = hash * 31 + StringComparer.Ordinal.GetHashCode(option == null ? string.Empty : option.Id ?? string.Empty);
+                        hash = hash * 31 + (option != null && MovementSafeLandingOptionCatalog.GetEnabled(settings, option.Id) ? 1 : 0);
+                    }
+                }
+
+                return hash;
+            }
         }
 
         private static LegacyUiElement DrawMovementSafeLandingSmallButton(object spriteBatch, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, LegacyUiRect rect, string id, string label, string tooltip)
@@ -242,6 +309,21 @@ namespace JueMingZ.UI.Legacy
 
             y = ClampInt(y, viewport.Y + 6, Math.Max(viewport.Y + 6, viewport.Bottom - height - 6));
             return new LegacyUiRect(x, y, width, height);
+        }
+
+        internal static bool RegisterMovementSafeLandingConfigPopupOverlayForTesting(LegacyScrollArea area, LegacyUiRect anchor)
+        {
+            _movementSafeLandingConfigOpen = true;
+            _movementSafeLandingConfigAnchor = anchor;
+            _movementSafeLandingConfigAnchorVisible = true;
+            return RegisterMovementSafeLandingConfigPopupOverlay(area, AppSettings.CreateDefault());
+        }
+
+        internal static void ResetMovementSafeLandingConfigPopupForTesting()
+        {
+            _movementSafeLandingConfigOpen = false;
+            _movementSafeLandingConfigAnchor = new LegacyUiRect();
+            _movementSafeLandingConfigAnchorVisible = false;
         }
 
         private static LegacyUiElement DrawMovementToggleRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, string label, string featureId, bool enabled, string tooltip)

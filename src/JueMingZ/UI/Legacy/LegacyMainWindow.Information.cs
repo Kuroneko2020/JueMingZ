@@ -79,7 +79,7 @@ namespace JueMingZ.UI.Legacy
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawInformationToggleRow(spriteBatch, area, mouse, elements, y, "渔夫任务", "information.angler_quest", settings.InformationAnglerQuestEnabled, "显示当天渔夫任务，需要渔夫", InformationStyleHelper.AnglerQuestFeatureId) ?? hovered;
 
-            hovered = DrawInformationStylePopup(spriteBatch, area, mouse, elements) ?? hovered;
+            RegisterInformationStylePopupOverlay(area, settings);
 
             return hovered;
         }
@@ -299,10 +299,44 @@ namespace JueMingZ.UI.Legacy
             return hovered ? element : null;
         }
 
+        private static bool RegisterInformationStylePopupOverlay(LegacyScrollArea area, AppSettings settings)
+        {
+            var featureId = _informationStylePopupFeatureId;
+            if (!InformationStyleHelper.IsConfigurable(featureId) || !_informationStylePopupAnchorVisible || area == null)
+            {
+                return false;
+            }
+
+            var popup = CalculateInformationStylePopupRect(area.Viewport, _informationStylePopupAnchor);
+            return LegacyUiOverlayCoordinator.Current.Register(new LegacyUiOverlayRequest
+            {
+                Id = "information-style-popup",
+                OwnerPageId = "information",
+                Bounds = popup,
+                Kind = LegacyUiOverlayKind.Modal,
+                ZIndex = 20,
+                CacheSignature = BuildInformationStylePopupCacheSignature(settings, featureId),
+                State = area,
+                Draw = DrawInformationStylePopupOverlay
+            });
+        }
+
+        private static void DrawInformationStylePopupOverlay(LegacyUiContext context, LegacyUiOverlayRequest request)
+        {
+            var area = request == null ? null : request.State as LegacyScrollArea;
+            var elements = context == null ? null : context.Elements as List<LegacyUiElement>;
+            if (context == null || area == null || elements == null)
+            {
+                return;
+            }
+
+            DrawInformationStylePopup(context.SpriteBatch, area, context.Mouse, elements);
+        }
+
         private static LegacyUiElement DrawInformationStylePopup(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements)
         {
             var featureId = _informationStylePopupFeatureId;
-            if (!InformationStyleHelper.IsConfigurable(featureId) || !_informationStylePopupAnchorVisible)
+            if (!InformationStyleHelper.IsConfigurable(featureId) || !_informationStylePopupAnchorVisible || area == null)
             {
                 return null;
             }
@@ -377,6 +411,21 @@ namespace JueMingZ.UI.Legacy
             return hovered;
         }
 
+        private static int BuildInformationStylePopupCacheSignature(AppSettings settings, string featureId)
+        {
+            unchecked
+            {
+                settings = settings ?? AppSettings.CreateDefault();
+                var hash = 17;
+                hash = hash * 31 + StringComparer.Ordinal.GetHashCode(featureId ?? string.Empty);
+                hash = hash * 31 + settings.ConfigVersion;
+                hash = hash * 31 + StringComparer.Ordinal.GetHashCode(InformationStyleHelper.GetColorHex(settings, featureId) ?? string.Empty);
+                hash = hash * 31 + (int)Math.Round(InformationStyleHelper.GetFontScale(settings, featureId) * 1000d);
+                hash = hash * 31 + (LegacyHexColorInput.IsFocused("information-style-html:" + featureId) ? 1 : 0);
+                return hash;
+            }
+        }
+
         private static LegacyUiRect CalculateInformationStylePopupRect(LegacyUiRect viewport, LegacyUiRect anchor)
         {
             var x = ClampInt(anchor.X, viewport.X + 6, viewport.Right - InformationStylePopupWidth - 6);
@@ -388,6 +437,22 @@ namespace JueMingZ.UI.Legacy
 
             y = ClampInt(y, viewport.Y + 6, viewport.Bottom - InformationStylePopupHeight - 6);
             return new LegacyUiRect(x, y, InformationStylePopupWidth, InformationStylePopupHeight);
+        }
+
+        internal static bool RegisterInformationStylePopupOverlayForTesting(LegacyScrollArea area, LegacyUiRect anchor, string featureId)
+        {
+            _informationStylePopupFeatureId = featureId;
+            _informationStylePopupAnchor = anchor;
+            _informationStylePopupAnchorVisible = true;
+            return RegisterInformationStylePopupOverlay(area, AppSettings.CreateDefault());
+        }
+
+        internal static void ResetInformationStylePopupForTesting()
+        {
+            LegacyHexColorInput.ClearFocus();
+            _informationStylePopupFeatureId = string.Empty;
+            _informationStylePopupAnchor = new LegacyUiRect();
+            _informationStylePopupAnchorVisible = false;
         }
 
         private static LegacyUiElement DrawInformationStyleSlider(object spriteBatch, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, string id, string label, int value, int minValue, int maxValue, int labelX, int valueX, int x, int y, int width, string suffix)

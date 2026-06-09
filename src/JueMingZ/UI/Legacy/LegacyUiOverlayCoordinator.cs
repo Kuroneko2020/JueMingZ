@@ -19,6 +19,7 @@ namespace JueMingZ.UI.Legacy
         public LegacyUiOverlayKind Kind { get; set; }
         public int ZIndex { get; set; }
         public int CacheSignature { get; set; }
+        public object State { get; set; }
         public Action<LegacyUiContext, LegacyUiOverlayRequest> Draw { get; set; }
         public Func<LegacyMouseSnapshot, int, bool> TryConsumeScroll { get; set; }
 
@@ -87,6 +88,7 @@ namespace JueMingZ.UI.Legacy
                 Kind = request.Kind,
                 ZIndex = request.ZIndex,
                 CacheSignature = request.CacheSignature,
+                State = request.State,
                 Draw = request.Draw,
                 TryConsumeScroll = request.TryConsumeScroll
             });
@@ -199,6 +201,7 @@ namespace JueMingZ.UI.Legacy
                     Kind = request.Kind,
                     ZIndex = request.ZIndex,
                     CacheSignature = request.CacheSignature,
+                    State = request.State,
                     TryConsumeScroll = request.TryConsumeScroll
                 });
             }

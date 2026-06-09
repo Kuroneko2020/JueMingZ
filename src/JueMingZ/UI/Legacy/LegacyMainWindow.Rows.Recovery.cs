@@ -166,10 +166,59 @@ namespace JueMingZ.UI.Legacy
             return hovered;
         }
 
+        private static bool RegisterAutoRecoveryItemConfigPopupOverlay(LegacyScrollArea area, AppSettings settings)
+        {
+            var kind = NormalizeAutoRecoveryItemConfigKind(_autoRecoveryItemConfigKind);
+            if (string.IsNullOrEmpty(kind) || !_autoRecoveryItemConfigAnchorVisible || area == null)
+            {
+                return false;
+            }
+
+            var heal = string.Equals(kind, "heal", StringComparison.Ordinal);
+            var definitions = heal
+                ? RecoveryPotionDefinitionCatalog.GetHealDefinitions()
+                : RecoveryPotionDefinitionCatalog.GetManaDefinitions();
+            int columns;
+            int optionWidth;
+            int columnGap;
+            int rowGap;
+            var popup = CalculateAutoRecoveryItemPopupRect(
+                area.Viewport,
+                _autoRecoveryItemConfigAnchor,
+                definitions == null ? 0 : definitions.Length,
+                out columns,
+                out optionWidth,
+                out columnGap,
+                out rowGap);
+            return LegacyUiOverlayCoordinator.Current.Register(new LegacyUiOverlayRequest
+            {
+                Id = "auto-recovery-item-config-popup",
+                OwnerPageId = "buff",
+                Bounds = popup,
+                Kind = LegacyUiOverlayKind.Modal,
+                ZIndex = 20,
+                CacheSignature = BuildAutoRecoveryItemPopupCacheSignature(settings, kind, definitions),
+                State = area,
+                Draw = DrawAutoRecoveryItemConfigPopupOverlay
+            });
+        }
+
+        private static void DrawAutoRecoveryItemConfigPopupOverlay(LegacyUiContext context, LegacyUiOverlayRequest request)
+        {
+            var area = request == null ? null : request.State as LegacyScrollArea;
+            var elements = context == null ? null : context.Elements as List<LegacyUiElement>;
+            if (context == null || area == null || elements == null)
+            {
+                return;
+            }
+
+            DrawAutoRecoveryItemConfigPopup(context.SpriteBatch, area, context.Mouse, elements);
+        }
+
         private static LegacyUiElement DrawAutoRecoveryItemConfigPopup(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements)
         {
             var kind = NormalizeAutoRecoveryItemConfigKind(_autoRecoveryItemConfigKind);
-            if (string.IsNullOrEmpty(kind) || !_autoRecoveryItemConfigAnchorVisible)
+            if (string.IsNullOrEmpty(kind) || !_autoRecoveryItemConfigAnchorVisible || area == null)
             {
                 return null;
             }
@@ -240,6 +289,21 @@ namespace JueMingZ.UI.Legacy
             }
 
             return hovered;
+        }
+
+        private static int BuildAutoRecoveryItemPopupCacheSignature(AppSettings settings, string kind, RecoveryPotionDefinition[] definitions)
+        {
+            unchecked
+            {
+                settings = settings ?? AppSettings.CreateDefault();
+                var hash = 17;
+                hash = hash * 31 + StringComparer.Ordinal.GetHashCode(kind ?? string.Empty);
+                hash = hash * 31 + settings.ConfigVersion;
+                hash = hash * 31 + (definitions == null ? 0 : definitions.Length);
+                hash = hash * 31 + AutoRecoveryItemFilter.CountBlockedHealItems(settings);
+                hash = hash * 31 + AutoRecoveryItemFilter.CountBlockedManaItems(settings);
+                return hash;
+            }
         }
 
         private static LegacyUiElement DrawAutoRecoverySmallButton(object spriteBatch, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, LegacyUiRect rect, string id, string label, string tooltip)
@@ -341,6 +405,21 @@ namespace JueMingZ.UI.Legacy
 
             y = ClampInt(y, viewport.Y + 6, Math.Max(viewport.Y + 6, viewport.Bottom - height - 6));
             return new LegacyUiRect(x, y, width, height);
+        }
+
+        internal static bool RegisterAutoRecoveryItemConfigPopupOverlayForTesting(LegacyScrollArea area, LegacyUiRect anchor, string kind)
+        {
+            _autoRecoveryItemConfigKind = NormalizeAutoRecoveryItemConfigKind(kind);
+            _autoRecoveryItemConfigAnchor = anchor;
+            _autoRecoveryItemConfigAnchorVisible = true;
+            return RegisterAutoRecoveryItemConfigPopupOverlay(area, AppSettings.CreateDefault());
+        }
+
+        internal static void ResetAutoRecoveryItemConfigPopupForTesting()
+        {
+            _autoRecoveryItemConfigKind = string.Empty;
+            _autoRecoveryItemConfigAnchor = new LegacyUiRect();
+            _autoRecoveryItemConfigAnchorVisible = false;
         }
 
         private static LegacyUiElement DrawRecoveryRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, string label, string toggleId, bool enabled, string sliderId, int threshold, string sliderLabel)

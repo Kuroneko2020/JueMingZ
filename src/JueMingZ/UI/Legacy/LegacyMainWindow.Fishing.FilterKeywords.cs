@@ -43,8 +43,7 @@ namespace JueMingZ.UI.Legacy
                 if (presetHeight > 0)
                 {
                     var presetRect = BuildFishingFilterFloatingRect(area, rect, presetListAnchor, presetHeight);
-                    DrawFishingFilterFloatingConnector(spriteBatch, area, presetRect, presetListAnchor);
-                    hovered = DrawFishingFilterPresetList(spriteBatch, area, mouse, elements, presetRect, settings, filterMode, FishingFilterMatchModes.Keyword) ?? hovered;
+                    RegisterFishingFilterPresetListOverlay(area, presetRect, presetListAnchor, settings, filterMode, FishingFilterMatchModes.Keyword);
                 }
             }
             else

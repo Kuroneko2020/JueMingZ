@@ -168,5 +168,14 @@ namespace JueMingZ.UI.Legacy
         private static int _contentHeightCacheValue;
         private static bool _contentHeightCacheValid;
 
+        private sealed class FishingFilterOverlayDrawState
+        {
+            public LegacyScrollArea Area { get; set; }
+            public LegacyUiRect Anchor { get; set; }
+            public AppSettings Settings { get; set; }
+            public string FilterMode { get; set; }
+            public string MatchMode { get; set; }
+        }
+
     }
 }
