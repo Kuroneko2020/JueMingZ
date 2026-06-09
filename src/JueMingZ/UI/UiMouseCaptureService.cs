@@ -53,6 +53,11 @@ namespace JueMingZ.UI
 
         public static bool SuppressMouseTextForOperationWindow()
         {
+            return SuppressPendingMouseTextForOperationWindow();
+        }
+
+        public static bool SuppressPendingMouseTextForOperationWindow()
+        {
             if (!TerrariaMainCompat.AllowsInputProcessing)
             {
                 return false;
@@ -71,7 +76,7 @@ namespace JueMingZ.UI
                 }
             }
 
-            var suppressed = TerrariaUiMouseCompat.TrySuppressMouseText();
+            var suppressed = TerrariaUiMouseCompat.TrySuppressPendingMouseTextForUi();
             lock (SyncRoot)
             {
                 _lastSuppressFrameKey = frameKey;

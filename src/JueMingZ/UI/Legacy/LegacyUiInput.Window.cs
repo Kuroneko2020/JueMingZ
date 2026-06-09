@@ -43,6 +43,11 @@ namespace JueMingZ.UI.Legacy
             return mouse.WindowHit || LegacyMainUiState.WindowRect.Contains(mouse.X, mouse.Y);
         }
 
+        public static bool ShouldSuppressVanillaMouseText(LegacyMouseSnapshot mouse)
+        {
+            return IsMouseInWindow(mouse) || LegacyUiOverlayCoordinator.Current.HasActiveModalAt(mouse);
+        }
+
         public static bool IsMouseInWindowForDiagnostics(DiagnosticMouseState raw)
         {
             if (raw == null)

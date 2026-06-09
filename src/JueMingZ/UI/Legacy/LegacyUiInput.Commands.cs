@@ -94,6 +94,33 @@ namespace JueMingZ.UI.Legacy
             return captured;
         }
 
+        public static bool SuppressCurrentMouseTextForWindow(string mode)
+        {
+            if (!TerrariaMainCompat.AllowsInputProcessing)
+            {
+                return false;
+            }
+
+            if (!LegacyMainUiState.Visible)
+            {
+                return false;
+            }
+
+            if (LegacyMainUiState.HideIfMainMenu(string.IsNullOrWhiteSpace(mode) ? "LegacyMainUi.MouseTextGuard" : mode))
+            {
+                return false;
+            }
+
+            var raw = DiagnosticMouseStateReader.Read();
+            var mouse = BuildMouseSnapshot(raw, false);
+            if (!ShouldSuppressVanillaMouseText(mouse))
+            {
+                return false;
+            }
+
+            return UiMouseCaptureService.SuppressPendingMouseTextForOperationWindow();
+        }
+
         private static LegacyUiCommand CreateCommand(LegacyUiElement element, LegacyMouseSnapshot mouse, bool captured)
         {
             var now = DateTime.UtcNow;

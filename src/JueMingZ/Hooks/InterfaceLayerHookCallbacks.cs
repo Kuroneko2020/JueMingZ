@@ -20,7 +20,7 @@ namespace JueMingZ.Hooks
         private const string InformationStatusPanelUnderVanillaUiDispatcherLayerName = "JueMing-Z: Information Status Panel Under Vanilla UI Dispatcher";
         private const string GameOverlayDispatcherLayerName = "JueMing-Z: Game Overlay Dispatcher";
         private const string UiOverlayDispatcherLayerName = "JueMing-Z: UI Overlay Dispatcher";
-        private const string LegacyMouseTextGuardLayerName = "JueMing-Z: Legacy Main UI Mouse Text Guard";
+        private const string LegacyFinalMouseTextGuardLayerName = "JueMing-Z: Legacy Final MouseText Guard";
 
         private static readonly object ReflectionCacheSyncRoot = new object();
         private static readonly Dictionary<Type, LayerNameAccessor> LayerNameAccessorCache = new Dictionary<Type, LayerNameAccessor>();
@@ -69,7 +69,7 @@ namespace JueMingZ.Hooks
         private static int _firstInformationStatusPanelUnderVanillaUiDispatcherInsertLogged;
         private static int _firstGameOverlayDispatcherInsertLogged;
         private static int _firstUiOverlayDispatcherInsertLogged;
-        private static int _firstLegacyMouseTextGuardInsertLogged;
+        private static int _firstLegacyFinalMouseTextGuardInsertLogged;
         private static int _informationWorldUnderVanillaUiDispatcherActive;
         private static int _informationStatusPanelUnderVanillaUiDispatcherActive;
 
@@ -204,12 +204,12 @@ namespace JueMingZ.Hooks
             InsertLayerIfMissing(
                 layers,
                 layerState,
-                LegacyMouseTextGuardLayerName,
+                LegacyFinalMouseTextGuardLayerName,
                 typeof(LegacyMainWindow).GetMethod("DrawMouseTextGuardLayer", BindingFlags.Public | BindingFlags.Static),
                 _uiScaleValue,
-                ref _firstLegacyMouseTextGuardInsertLogged,
-                "Legacy main UI mouse text guard layer inserted.",
-                layerState.MouseTextIndex);
+                ref _firstLegacyFinalMouseTextGuardInsertLogged,
+                "Legacy main UI final mouse text guard layer inserted.",
+                layerState.FinalMouseTextGuardIndex);
         }
 
         public static bool DrawInformationWorldUnderVanillaUiDispatcherLayer()
@@ -585,6 +585,11 @@ namespace JueMingZ.Hooks
             return BuildLayerSearchStateForTesting(layerNames).InformationUnderVanillaUiIndex;
         }
 
+        internal static int FindFinalMouseTextGuardInsertIndexForTesting(IList<string> layerNames)
+        {
+            return BuildLayerSearchStateForTesting(layerNames).FinalMouseTextGuardIndex;
+        }
+
         internal static int[] SimulateInformationUnderVanillaUiInsertIndicesForTesting(IList<string> layerNames)
         {
             var state = BuildLayerSearchStateForTesting(layerNames);
@@ -683,6 +688,10 @@ namespace JueMingZ.Hooks
 
             public int MouseTextIndex { get; private set; } = -1;
 
+            public int MouseOverIndex { get; private set; } = -1;
+
+            public int InteractItemIconIndex { get; private set; } = -1;
+
             public int MapMinimapIndex { get; private set; } = -1;
 
             public int ResourceBarsIndex { get; private set; } = -1;
@@ -712,6 +721,24 @@ namespace JueMingZ.Hooks
                 }
             }
 
+            public int FinalMouseTextGuardIndex
+            {
+                get
+                {
+                    if (InteractItemIconIndex >= 0)
+                    {
+                        return InteractItemIconIndex;
+                    }
+
+                    if (MouseOverIndex >= 0)
+                    {
+                        return MouseOverIndex + 1;
+                    }
+
+                    return MouseTextIndex;
+                }
+            }
+
             public bool Contains(string layerName)
             {
                 return _names.Contains(layerName ?? string.Empty);
@@ -725,6 +752,18 @@ namespace JueMingZ.Hooks
                     name.IndexOf("Mouse Text", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     MouseTextIndex = index;
+                }
+
+                if (MouseOverIndex < 0 &&
+                    name.IndexOf("Mouse Over", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    MouseOverIndex = index;
+                }
+
+                if (InteractItemIconIndex < 0 &&
+                    name.IndexOf("Interact Item Icon", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    InteractItemIconIndex = index;
                 }
 
                 if (MapMinimapIndex < 0 &&
@@ -751,6 +790,8 @@ namespace JueMingZ.Hooks
                 var name = layerName ?? string.Empty;
                 _names.Add(name);
                 MouseTextIndex = ShiftIndexAfterInsert(MouseTextIndex, index);
+                MouseOverIndex = ShiftIndexAfterInsert(MouseOverIndex, index);
+                InteractItemIconIndex = ShiftIndexAfterInsert(InteractItemIconIndex, index);
                 MapMinimapIndex = ShiftIndexAfterInsert(MapMinimapIndex, index);
                 ResourceBarsIndex = ShiftIndexAfterInsert(ResourceBarsIndex, index);
                 InventoryIndex = ShiftIndexAfterInsert(InventoryIndex, index);

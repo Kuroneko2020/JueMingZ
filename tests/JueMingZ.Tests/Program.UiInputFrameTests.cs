@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using JueMingZ.Compat;
 using JueMingZ.Config;
 using JueMingZ.UI;
@@ -188,6 +189,87 @@ namespace JueMingZ.Tests
             }
             finally
             {
+                ResetUiInputFrameTestState();
+                TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(null);
+                restoreRuntimeTypes();
+            }
+        }
+
+        private static void UiMouseCaptureServiceClearsPendingMouseTextAndNpcHover()
+        {
+            var restoreRuntimeTypes = PushUiMouseCompatMainType(typeof(FakePendingMouseTextMain));
+            try
+            {
+                TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(true);
+                ResetUiInputFrameTestState();
+                FakePendingMouseTextMain.Reset();
+
+                UiInputFrameClock.BeginDrawFrame("test.pending-mouse-text");
+                if (!UiMouseCaptureService.SuppressPendingMouseTextForOperationWindow())
+                {
+                    throw new InvalidOperationException("Expected pending MouseText suppression to find writable fake Terraria members.");
+                }
+
+                var cache = FakePendingMouseTextMain.instance.MouseTextCacheForTesting;
+                if (FakePendingMouseTextMain.mouseText ||
+                    FakePendingMouseTextMain.HoveringOverAnNPC ||
+                    !string.IsNullOrEmpty(FakePendingMouseTextMain.hoverItemName) ||
+                    !string.IsNullOrEmpty(FakePendingMouseTextMain.hoverItemName2) ||
+                    cache.isValid ||
+                    cache.noOverride ||
+                    !string.IsNullOrEmpty(cache.cursorText) ||
+                    !string.IsNullOrEmpty(cache.buffTooltip) ||
+                    FakePendingMouseTextMain.instance.mouseNPCIndex != -1 ||
+                    FakePendingMouseTextMain.instance.mouseNPCType != -1 ||
+                    FakePendingMouseTextMain.instance.currentNPCShowingChatBubble != -1)
+                {
+                    throw new InvalidOperationException("Expected pending MouseText, hover names, and NPC hover state to be cleared.");
+                }
+            }
+            finally
+            {
+                FakePendingMouseTextMain.Reset();
+                ResetUiInputFrameTestState();
+                TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(null);
+                restoreRuntimeTypes();
+            }
+        }
+
+        private static void LegacyMouseTextGuardSuppressesInsideF5Only()
+        {
+            var restoreRuntimeTypes = PushFakeTerrariaMainType();
+            try
+            {
+                TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(true);
+                ResetUiInputFrameTestState();
+                LegacyMainUiState.SetWindow(20, 20, LegacyUiMetrics.DefaultWidth, LegacyUiMetrics.DefaultHeight, false);
+                LegacyMainUiState.SetVisible(true);
+
+                Terraria.Main.mouseX = 40;
+                Terraria.Main.mouseY = 40;
+                SetFakeTerrariaMouseText("inside-f5");
+                LegacyMainWindow.DrawMouseTextGuardLayer();
+                if (Terraria.Main.mouseText ||
+                    !string.IsNullOrEmpty(Terraria.Main.hoverItemName) ||
+                    !string.IsNullOrEmpty(Terraria.Main.hoverItemName2))
+                {
+                    throw new InvalidOperationException("Expected final MouseText guard to suppress vanilla hover while the mouse is inside F5.");
+                }
+
+                SetFakeTerrariaMouseText("outside-f5");
+                Terraria.Main.mouseX = 1200;
+                Terraria.Main.mouseY = 760;
+                LegacyMainWindow.DrawMouseTextGuardLayer();
+                if (!Terraria.Main.mouseText ||
+                    !string.Equals(Terraria.Main.hoverItemName, "outside-f5", StringComparison.Ordinal) ||
+                    !string.Equals(Terraria.Main.hoverItemName2, "outside-f5", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected final MouseText guard to leave vanilla hover intact outside F5.");
+                }
+            }
+            finally
+            {
+                LegacyMainUiState.SetVisible(false);
                 ResetUiInputFrameTestState();
                 TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(null);
                 restoreRuntimeTypes();
@@ -423,6 +505,24 @@ namespace JueMingZ.Tests
             Terraria.Main.screenHeight = 800;
         }
 
+        private static Action PushUiMouseCompatMainType(Type mainType)
+        {
+            var runtimeMainField = typeof(TerrariaRuntimeTypes).GetField("_mainType", BindingFlags.Static | BindingFlags.NonPublic);
+            if (runtimeMainField == null)
+            {
+                throw new InvalidOperationException("Terraria runtime type cache field missing.");
+            }
+
+            var previousRuntimeMain = runtimeMainField.GetValue(null);
+            runtimeMainField.SetValue(null, mainType);
+            TerrariaUiMouseCompat.ResetUiMouseCaptureAccessorsForTesting();
+            return () =>
+            {
+                runtimeMainField.SetValue(null, previousRuntimeMain);
+                TerrariaUiMouseCompat.ResetUiMouseCaptureAccessorsForTesting();
+            };
+        }
+
         private static void SetFakeTerrariaMouseText(string value)
         {
             Terraria.Main.mouseText = true;
@@ -430,6 +530,61 @@ namespace JueMingZ.Tests
             Terraria.Main.hoverItemName2 = value;
             Terraria.Main.HoverItem = new object();
             Terraria.Main.hoverItem = new object();
+        }
+
+        private sealed class FakePendingMouseTextMain
+        {
+            public static bool mouseText;
+            public static bool HoveringOverAnNPC;
+            public static string hoverItemName;
+            public static string hoverItemName2;
+            public static object HoverItem;
+            public static object hoverItem;
+            public static FakePendingMouseTextMain instance;
+
+            private MouseTextCache _mouseTextCache;
+
+            public int mouseNPCIndex;
+            public int mouseNPCType;
+            public int currentNPCShowingChatBubble;
+
+            public FakePendingMouseTextMain()
+            {
+                _mouseTextCache = new MouseTextCache
+                {
+                    noOverride = true,
+                    isValid = true,
+                    cursorText = "npc name",
+                    buffTooltip = "npc tooltip"
+                };
+                mouseNPCIndex = 7;
+                mouseNPCType = 22;
+                currentNPCShowingChatBubble = 7;
+            }
+
+            public MouseTextCache MouseTextCacheForTesting
+            {
+                get { return _mouseTextCache; }
+            }
+
+            public static void Reset()
+            {
+                mouseText = true;
+                HoveringOverAnNPC = true;
+                hoverItemName = "npc name";
+                hoverItemName2 = "npc name 2";
+                HoverItem = new object();
+                hoverItem = new object();
+                instance = new FakePendingMouseTextMain();
+            }
+
+            public struct MouseTextCache
+            {
+                public bool noOverride;
+                public bool isValid;
+                public string cursorText;
+                public string buffTooltip;
+            }
         }
     }
 }

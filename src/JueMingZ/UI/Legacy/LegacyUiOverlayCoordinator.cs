@@ -186,6 +186,12 @@ namespace JueMingZ.UI.Legacy
                    (_requests.Count <= 0 && TryConsumeOrBlockScroll(_lastRequests, mouse, scrollDelta));
         }
 
+        public bool HasActiveModalAt(LegacyMouseSnapshot mouse)
+        {
+            return HasModalAt(_requests, mouse) ||
+                   (_requests.Count <= 0 && HasModalAt(_lastRequests, mouse));
+        }
+
         public void EndFrame()
         {
             _lastStackSignature = BuildStackSignature(_requests);
@@ -310,6 +316,25 @@ namespace JueMingZ.UI.Legacy
             }
 
             return true;
+        }
+
+        private static bool HasModalAt(IList<LegacyUiOverlayRequest> requests, LegacyMouseSnapshot mouse)
+        {
+            if (requests == null || mouse == null)
+            {
+                return false;
+            }
+
+            for (var index = 0; index < requests.Count; index++)
+            {
+                var request = requests[index];
+                if (request != null && request.Modal && request.Bounds.Contains(mouse.X, mouse.Y))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static int CompareRequestsForDraw(LegacyUiOverlayRequest left, LegacyUiOverlayRequest right)

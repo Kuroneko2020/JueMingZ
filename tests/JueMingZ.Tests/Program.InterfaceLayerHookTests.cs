@@ -85,6 +85,33 @@ namespace JueMingZ.Tests
             AssertIntEquals(insertIndices[1], -1, "missing status panel dispatcher insert index");
         }
 
+        private static void LegacyFinalMouseTextGuardRunsAfterMouseOver()
+        {
+            AssertIntEquals(
+                InterfaceLayerHookCallbacks.FindFinalMouseTextGuardInsertIndexForTesting(new List<string>
+                {
+                    "Vanilla: Mouse Text",
+                    "Vanilla: Player Chat",
+                    "Vanilla: Mouse Item / NPC Head",
+                    "Vanilla: Mouse Over",
+                    "Vanilla: Interact Item Icon",
+                    "Vanilla: Interface Logic 4"
+                }),
+                4,
+                "final mouse text guard before interact item icon");
+
+            AssertIntEquals(
+                InterfaceLayerHookCallbacks.FindFinalMouseTextGuardInsertIndexForTesting(new List<string>
+                {
+                    "Vanilla: Mouse Text",
+                    "Vanilla: Mouse Item / NPC Head",
+                    "Vanilla: Mouse Over",
+                    "Vanilla: Interface Logic 4"
+                }),
+                3,
+                "final mouse text guard after mouse over fallback");
+        }
+
         private static void InformationWorldOverlayRoutesInformationUnderVanillaUiAndAutoMiningAbove()
         {
             AssertStringArrayEquals(

@@ -54,6 +54,7 @@ namespace JueMingZ.Compat
         private static BooleanMemberAccessor _mainMouseLeftReleaseAccessor = BooleanMemberAccessor.Empty;
         private static BooleanMemberAccessor _mainMouseRightReleaseAccessor = BooleanMemberAccessor.Empty;
         private static BooleanMemberAccessor _mainMouseTextAccessor = BooleanMemberAccessor.Empty;
+        private static BooleanMemberAccessor _mainHoveringOverNpcAccessor = BooleanMemberAccessor.Empty;
         private static StringMemberAccessor _mainHoverItemNameAccessor = StringMemberAccessor.Empty;
         private static StringMemberAccessor _mainHoverItemName2Accessor = StringMemberAccessor.Empty;
         private static ObjectMemberAccessor _mainHoverItemAccessor = ObjectMemberAccessor.Empty;
@@ -62,6 +63,10 @@ namespace JueMingZ.Compat
         private static ObjectMemberAccessor _mainInstanceCapsAccessor = ObjectMemberAccessor.Empty;
         private static ObjectMemberAccessor _mainInstanceHoverItemAccessor = ObjectMemberAccessor.Empty;
         private static ObjectMemberAccessor _mainInstanceHoverItemLowerAccessor = ObjectMemberAccessor.Empty;
+        private static ObjectMemberAccessor _mainInstanceMouseTextCacheAccessor = ObjectMemberAccessor.Empty;
+        private static IntegerMemberAccessor _mainInstanceMouseNpcIndexAccessor = IntegerMemberAccessor.Empty;
+        private static IntegerMemberAccessor _mainInstanceMouseNpcTypeAccessor = IntegerMemberAccessor.Empty;
+        private static IntegerMemberAccessor _mainInstanceCurrentNpcShowingChatBubbleAccessor = IntegerMemberAccessor.Empty;
 
         public static bool UiMouseReadAvailable { get; private set; }
         public static string UiMouseReadLastMessage { get { return _mouseReadLastMessage; } }
@@ -207,6 +212,11 @@ namespace JueMingZ.Compat
 
         public static bool TrySuppressMouseText()
         {
+            return TrySuppressPendingMouseTextForUi();
+        }
+
+        public static bool TrySuppressPendingMouseTextForUi()
+        {
             try
             {
                 var mainType = TerrariaRuntimeTypes.MainType;
@@ -220,14 +230,30 @@ namespace JueMingZ.Compat
                 suppressed |= _mainHoverItemNameAccessor.TrySet(null, string.Empty);
                 suppressed |= _mainHoverItemName2Accessor.TrySet(null, string.Empty);
                 suppressed |= _mainMouseTextAccessor.TrySet(null, false);
+                suppressed |= _mainHoveringOverNpcAccessor.TrySet(null, false);
                 suppressed |= _mainHoverItemAccessor.TrySet(null, GetEmptyHoverItem(_mainHoverItemAccessor.MemberType));
                 suppressed |= _mainHoverItemLowerAccessor.TrySet(null, GetEmptyHoverItem(_mainHoverItemLowerAccessor.MemberType));
                 object mainInstance;
                 if (TryGetMainInstance(out mainInstance))
                 {
                     EnsureUiMouseMainInstanceAccessors(mainInstance.GetType());
+                    // MouseTextHackZoom writes a private pending cache after vanilla
+                    // Mouse Over; clearing only Main.mouseText is too early for F5.
+                    suppressed |= TryClearMouseTextCache(mainInstance);
+                    suppressed |= _mainInstanceMouseNpcIndexAccessor.TrySet(mainInstance, -1);
+                    suppressed |= _mainInstanceMouseNpcTypeAccessor.TrySet(mainInstance, -1);
+                    suppressed |= _mainInstanceCurrentNpcShowingChatBubbleAccessor.TrySet(mainInstance, -1);
                     suppressed |= _mainInstanceHoverItemAccessor.TrySet(mainInstance, GetEmptyHoverItem(_mainInstanceHoverItemAccessor.MemberType));
                     suppressed |= _mainInstanceHoverItemLowerAccessor.TrySet(mainInstance, GetEmptyHoverItem(_mainInstanceHoverItemLowerAccessor.MemberType));
+                }
+
+                if (!suppressed)
+                {
+                    LogThrottle.WarnThrottled(
+                        "ui-pending-mouse-text-suppress-unavailable",
+                        TimeSpan.FromSeconds(10),
+                        "TerrariaUiMouseCompat",
+                        "UI pending mouse text suppression found no writable Terraria mouse text members.");
                 }
 
                 return suppressed;
@@ -437,6 +463,7 @@ namespace JueMingZ.Compat
                 _mainMouseLeftReleaseAccessor = BooleanMemberAccessor.Empty;
                 _mainMouseRightReleaseAccessor = BooleanMemberAccessor.Empty;
                 _mainMouseTextAccessor = BooleanMemberAccessor.Empty;
+                _mainHoveringOverNpcAccessor = BooleanMemberAccessor.Empty;
                 _mainHoverItemNameAccessor = StringMemberAccessor.Empty;
                 _mainHoverItemName2Accessor = StringMemberAccessor.Empty;
                 _mainHoverItemAccessor = ObjectMemberAccessor.Empty;
@@ -445,6 +472,10 @@ namespace JueMingZ.Compat
                 _mainInstanceCapsAccessor = ObjectMemberAccessor.Empty;
                 _mainInstanceHoverItemAccessor = ObjectMemberAccessor.Empty;
                 _mainInstanceHoverItemLowerAccessor = ObjectMemberAccessor.Empty;
+                _mainInstanceMouseTextCacheAccessor = ObjectMemberAccessor.Empty;
+                _mainInstanceMouseNpcIndexAccessor = IntegerMemberAccessor.Empty;
+                _mainInstanceMouseNpcTypeAccessor = IntegerMemberAccessor.Empty;
+                _mainInstanceCurrentNpcShowingChatBubbleAccessor = IntegerMemberAccessor.Empty;
                 EmptyHoverItemsByType.Clear();
             }
         }
@@ -477,6 +508,7 @@ namespace JueMingZ.Compat
                 _mainMouseLeftReleaseAccessor = BooleanMemberAccessor.Resolve(mainType, "mouseLeftRelease", true);
                 _mainMouseRightReleaseAccessor = BooleanMemberAccessor.Resolve(mainType, "mouseRightRelease", true);
                 _mainMouseTextAccessor = BooleanMemberAccessor.Resolve(mainType, "mouseText", true);
+                _mainHoveringOverNpcAccessor = BooleanMemberAccessor.Resolve(mainType, "HoveringOverAnNPC", true);
                 _mainHoverItemNameAccessor = StringMemberAccessor.Resolve(mainType, "hoverItemName", true);
                 _mainHoverItemName2Accessor = StringMemberAccessor.Resolve(mainType, "hoverItemName2", true);
                 _mainHoverItemAccessor = ObjectMemberAccessor.Resolve(mainType, "HoverItem", true, true);
@@ -485,6 +517,10 @@ namespace JueMingZ.Compat
                 _mainInstanceCapsAccessor = ObjectMemberAccessor.Resolve(mainType, "Instance", true, false);
                 _mainInstanceHoverItemAccessor = ObjectMemberAccessor.Empty;
                 _mainInstanceHoverItemLowerAccessor = ObjectMemberAccessor.Empty;
+                _mainInstanceMouseTextCacheAccessor = ObjectMemberAccessor.Empty;
+                _mainInstanceMouseNpcIndexAccessor = IntegerMemberAccessor.Empty;
+                _mainInstanceMouseNpcTypeAccessor = IntegerMemberAccessor.Empty;
+                _mainInstanceCurrentNpcShowingChatBubbleAccessor = IntegerMemberAccessor.Empty;
             }
         }
 
@@ -510,6 +546,10 @@ namespace JueMingZ.Compat
                 _uiMouseAccessorMainInstanceType = instanceType;
                 _mainInstanceHoverItemAccessor = ObjectMemberAccessor.Resolve(instanceType, "HoverItem", false, true);
                 _mainInstanceHoverItemLowerAccessor = ObjectMemberAccessor.Resolve(instanceType, "hoverItem", false, true);
+                _mainInstanceMouseTextCacheAccessor = ObjectMemberAccessor.Resolve(instanceType, "_mouseTextCache", false, true);
+                _mainInstanceMouseNpcIndexAccessor = IntegerMemberAccessor.Resolve(instanceType, "mouseNPCIndex", false);
+                _mainInstanceMouseNpcTypeAccessor = IntegerMemberAccessor.Resolve(instanceType, "mouseNPCType", false);
+                _mainInstanceCurrentNpcShowingChatBubbleAccessor = IntegerMemberAccessor.Resolve(instanceType, "currentNPCShowingChatBubble", false);
             }
         }
 
@@ -585,6 +625,95 @@ namespace JueMingZ.Compat
 
             TrySetInstanceMember(item, "type", 0);
             TrySetInstanceMember(item, "stack", 0);
+        }
+
+        private static bool TryClearMouseTextCache(object mainInstance)
+        {
+            object cache;
+            if (!_mainInstanceMouseTextCacheAccessor.TryGet(mainInstance, out cache) || cache == null)
+            {
+                return false;
+            }
+
+            var changed = false;
+            changed |= TrySetInstanceBoolMember(cache, "isValid", false);
+            changed |= TrySetInstanceBoolMember(cache, "noOverride", false);
+            changed |= TrySetInstanceStringMember(cache, "cursorText", string.Empty);
+            changed |= TrySetInstanceStringMember(cache, "buffTooltip", string.Empty);
+            if (!changed)
+            {
+                return false;
+            }
+
+            return _mainInstanceMouseTextCacheAccessor.TrySet(mainInstance, cache);
+        }
+
+        private static bool TrySetInstanceBoolMember(object instance, string name, bool value)
+        {
+            if (instance == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                var type = instance.GetType();
+                FieldInfo field;
+                if (TerrariaMemberCache.TryGetField(type, name, false, out field) && field.FieldType == typeof(bool))
+                {
+                    field.SetValue(instance, value);
+                    return true;
+                }
+
+                PropertyInfo property;
+                if (TerrariaMemberCache.TryGetProperty(type, name, false, out property) &&
+                    property.CanWrite &&
+                    property.PropertyType == typeof(bool))
+                {
+                    property.SetValue(instance, value, null);
+                    return true;
+                }
+            }
+            catch (Exception error)
+            {
+                _mouseCaptureLastMessage = "Set mouse text cache bool failed: " + error.Message;
+            }
+
+            return false;
+        }
+
+        private static bool TrySetInstanceStringMember(object instance, string name, string value)
+        {
+            if (instance == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                var type = instance.GetType();
+                FieldInfo field;
+                if (TerrariaMemberCache.TryGetField(type, name, false, out field) && field.FieldType == typeof(string))
+                {
+                    field.SetValue(instance, value ?? string.Empty);
+                    return true;
+                }
+
+                PropertyInfo property;
+                if (TerrariaMemberCache.TryGetProperty(type, name, false, out property) &&
+                    property.CanWrite &&
+                    property.PropertyType == typeof(string))
+                {
+                    property.SetValue(instance, value ?? string.Empty, null);
+                    return true;
+                }
+            }
+            catch (Exception error)
+            {
+                _mouseCaptureLastMessage = "Set mouse text cache string failed: " + error.Message;
+            }
+
+            return false;
         }
 
         private static bool EnsureMainMouseAccessors()
@@ -1253,6 +1382,82 @@ namespace JueMingZ.Compat
                 }
 
                 return false;
+            }
+        }
+
+        private sealed class IntegerMemberAccessor
+        {
+            public static readonly IntegerMemberAccessor Empty = new IntegerMemberAccessor(null, null);
+
+            private readonly FieldInfo _field;
+            private readonly PropertyInfo _property;
+
+            private IntegerMemberAccessor(FieldInfo field, PropertyInfo property)
+            {
+                _field = field;
+                _property = property;
+            }
+
+            public static IntegerMemberAccessor Resolve(Type type, string name, bool isStatic)
+            {
+                if (type == null || string.IsNullOrWhiteSpace(name))
+                {
+                    return Empty;
+                }
+
+                var flags = BindingFlags.Public | BindingFlags.NonPublic | (isStatic ? BindingFlags.Static : BindingFlags.Instance);
+                try
+                {
+                    var field = type.GetField(name, flags);
+                    if (field != null && IsSupportedIntegerType(field.FieldType))
+                    {
+                        return new IntegerMemberAccessor(field, null);
+                    }
+
+                    var property = type.GetProperty(name, flags);
+                    if (property != null &&
+                        property.CanWrite &&
+                        IsSupportedIntegerType(property.PropertyType) &&
+                        property.GetIndexParameters().Length == 0)
+                    {
+                        return new IntegerMemberAccessor(null, property);
+                    }
+                }
+                catch
+                {
+                }
+
+                return Empty;
+            }
+
+            public bool TrySet(object instance, int value)
+            {
+                try
+                {
+                    if (_field != null)
+                    {
+                        _field.SetValue(instance, Convert.ChangeType(value, _field.FieldType));
+                        return true;
+                    }
+
+                    if (_property != null)
+                    {
+                        _property.SetValue(instance, Convert.ChangeType(value, _property.PropertyType), null);
+                        return true;
+                    }
+                }
+                catch (Exception error)
+                {
+                    _mouseCaptureLastMessage = "Set UI mouse integer failed: " + error.Message;
+                }
+
+                return false;
+            }
+
+            private static bool IsSupportedIntegerType(Type type)
+            {
+                return type == typeof(int) ||
+                       type == typeof(short);
             }
         }
 

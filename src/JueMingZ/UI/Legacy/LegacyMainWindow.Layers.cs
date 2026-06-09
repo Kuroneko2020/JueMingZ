@@ -185,7 +185,7 @@ namespace JueMingZ.UI.Legacy
                         DrawTooltip(spriteBatch, hoveredElement, mouse);
                     }
 
-                    if (inWindow)
+                    if (LegacyUiInput.ShouldSuppressVanillaMouseText(mouse))
                     {
                         UiMouseCaptureService.SuppressMouseTextForOperationWindow();
                     }
@@ -262,10 +262,9 @@ namespace JueMingZ.UI.Legacy
                     return true;
                 }
 
-                if (!LegacyMainUiState.HideIfMainMenu("LegacyMainUi.MouseTextGuard") &&
-                    LegacyUiInput.CaptureCurrentMouseForWindow("LegacyMainUi.MouseTextGuard"))
+                if (!LegacyMainUiState.HideIfMainMenu("LegacyMainUi.MouseTextGuard"))
                 {
-                    UiMouseCaptureService.SuppressMouseTextForOperationWindow();
+                    LegacyUiInput.SuppressCurrentMouseTextForWindow("LegacyMainUi.MouseTextGuard");
                 }
             }
             catch (Exception error)

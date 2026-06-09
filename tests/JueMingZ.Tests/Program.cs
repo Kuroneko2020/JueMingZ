@@ -767,6 +767,7 @@ namespace JueMingZ.Tests
             Run("information under vanilla UI anchor falls back through vanilla UI layers", ref failed, InformationUnderVanillaUiAnchorFallsBackThroughVanillaUiLayers);
             Run("information under vanilla UI insertion keeps dispatchers before anchor", ref failed, InformationUnderVanillaUiInsertionKeepsDispatchersBeforeAnchor);
             Run("information under vanilla UI anchor missing is safe", ref failed, InformationUnderVanillaUiAnchorMissingIsSafe);
+            Run("legacy final MouseText guard runs after Mouse Over", ref failed, LegacyFinalMouseTextGuardRunsAfterMouseOver);
             Run("information world overlay routes information under vanilla UI and automining above", ref failed, InformationWorldOverlayRoutesInformationUnderVanillaUiAndAutoMiningAbove);
             Run("information status panel routes under vanilla UI and legacy main window stays above", ref failed, InformationStatusPanelRoutesUnderVanillaUiAndLegacyMainWindowStaysAbove);
             Run("UI text renderer fast path keeps safe fallbacks", ref failed, UiTextRendererFastPathKeepsSafeFallbacks);
@@ -857,6 +858,8 @@ namespace JueMingZ.Tests
             Run("diagnostic mouse state reader refreshes when draw frame changes under same update", ref failed, DiagnosticMouseStateReaderRefreshesWhenDrawFrameChangesUnderSameUpdate);
             Run("UI mouse capture service short-circuits within draw frame", ref failed, UiMouseCaptureServiceShortCircuitsWithinDrawFrame);
             Run("UI mouse capture service rewrites capture and suppress on next draw frame", ref failed, UiMouseCaptureServiceRewritesCaptureAndSuppressOnNextDrawFrame);
+            Run("UI mouse capture service clears pending MouseText and NPC hover", ref failed, UiMouseCaptureServiceClearsPendingMouseTextAndNpcHover);
+            Run("legacy MouseText guard suppresses inside F5 only", ref failed, LegacyMouseTextGuardSuppressesInsideF5Only);
             Run("combat performance caches stable metadata only", ref failed, CombatPerformanceCachesStableMetadataOnly);
             Run("runtime performance diagnostics records slowest operation", ref failed, RuntimePerformanceDiagnosticsRecordsSlowestOperation);
             Run("information overlay diagnostics writer preserves section counts", ref failed, InformationOverlayDiagnosticsWriterPreservesSectionCounts);
