@@ -59,6 +59,7 @@ namespace JueMingZ.Automation.Combat
                     };
                     CombatAimTargetHistoryService.Clear();
                     CombatAimTargetLockService.Clear();
+                    CombatAimDecisionCache.Clear();
                     _lastSelectionTick = updateTick;
                     _lastSelectionSettingsKey = selectionSettingsKey;
                 }
@@ -80,6 +81,7 @@ namespace JueMingZ.Automation.Combat
                         SelectionPurpose = "Marker"
                     };
                     CombatAimTargetLockService.Clear();
+                    CombatAimDecisionCache.Clear();
                     _lastSelectionTick = updateTick;
                     _lastSelectionSettingsKey = selectionSettingsKey;
                 }
@@ -223,6 +225,7 @@ namespace JueMingZ.Automation.Combat
             AppendNullableInt(builder, "targetType", selection.Target == null ? (int?)null : selection.Target.Type, true);
             AppendString(builder, "targetName", selection.Target == null ? string.Empty : selection.Target.Name, true);
             AppendRaw(builder, "targetCenter", selection.Target == null ? "null" : BuildPointJson(selection.Target.CenterX, selection.Target.CenterY), true);
+            AppendTargetMotionJson(builder, selection.Target);
             AppendRaw(builder, "hitbox", selection.Target == null ? "null" : BuildRectJson(selection.Target.HitboxX, selection.Target.HitboxY, selection.Target.HitboxWidth, selection.Target.HitboxHeight), true);
             AppendRaw(builder, "centerDistanceTiles", FloatRaw(selection.CenterDistanceTiles), true);
             AppendRaw(builder, "hitboxDistanceTiles", FloatRaw(selection.HitboxDistanceTiles), true);
@@ -236,6 +239,10 @@ namespace JueMingZ.Automation.Combat
             AppendString(builder, "selectedSamplePoint", selection.SelectedSamplePoint, true);
             AppendString(builder, "attackSamplePoint", selection.AttackSamplePoint, true);
             AppendString(builder, "selectionSamplePoint", selection.SelectionSamplePoint, true);
+            AppendString(builder, "sampleSpace", selection.SampleSpace, true);
+            AppendRaw(builder, "predictedHitboxCenter", BuildPointJson(selection.PredictedHitboxCenterX, selection.PredictedHitboxCenterY), true);
+            AppendRaw(builder, "visibleSampleCount", IntRaw(selection.VisibleSampleCount), true);
+            AppendRaw(builder, "projectileHitRadius", FloatRaw(selection.ProjectileHitRadius), true);
             AppendRaw(builder, "lineOfSightRejectedSampleCount", IntRaw(selection.LineOfSightRejectedSampleCount), true);
             AppendRaw(builder, "nearestHitboxPointPenaltyApplied", BoolRaw(selection.NearestHitboxPointPenaltyApplied), true);
             AppendRaw(builder, "centerPreferred", BoolRaw(selection.CenterPreferred), true);
@@ -248,10 +255,17 @@ namespace JueMingZ.Automation.Combat
             AppendRaw(builder, "targetHoldTicksRemaining", IntRaw(selection.TargetHoldTicksRemaining), true);
             AppendString(builder, "selectionPurpose", selection.SelectionPurpose, true);
             AppendRaw(builder, "selectionCacheHit", BoolRaw(selection.SelectionCacheHit), true);
+            AppendRaw(builder, "aimDecisionCacheHit", BoolRaw(selection.SelectionCacheHit), true);
             AppendString(builder, "selectionCacheKey", selection.SelectionCacheKey, true);
+            AppendString(builder, "decisionCacheSource", selection.DecisionCacheSource, true);
+            AppendRaw(builder, "decisionCacheAgeTicks", selection.DecisionCacheAgeTicks < 0 ? "-1" : selection.DecisionCacheAgeTicks.ToString(CultureInfo.InvariantCulture), true);
+            AppendString(builder, "decisionCacheRevalidationReason", selection.DecisionCacheRevalidationReason, true);
+            AppendString(builder, "liveTargetRevalidation", ResolveLiveTargetRevalidation(selection), true);
             AppendRaw(builder, "markerTargetWhoAmI", selection.MarkerTargetWhoAmI >= 0 ? IntRaw(selection.MarkerTargetWhoAmI) : "null", true);
             AppendRaw(builder, "attackTargetWhoAmI", selection.AttackTargetWhoAmI >= 0 ? IntRaw(selection.AttackTargetWhoAmI) : "null", true);
             AppendRaw(builder, "markerAttackTargetMismatch", BoolRaw(selection.MarkerAttackTargetMismatch), true);
+            AppendString(builder, "markerAttackMismatchReason", selection.MarkerAttackMismatchReason, true);
+            AppendString(builder, "markerAttackTargetMismatchReason", selection.MarkerAttackMismatchReason, true);
             AppendRaw(builder, "markerTargetChangedForAttack", BoolRaw(selection.MarkerTargetChangedForAttack), true);
             AppendRaw(builder, "candidateCount", IntRaw(selection.CandidateCount), true);
             AppendRaw(builder, "cheapCandidateCount", IntRaw(selection.CheapCandidateCount), true);
@@ -261,6 +275,35 @@ namespace JueMingZ.Automation.Combat
             AppendString(builder, "skipReason", selection.SkipReason ?? string.Empty, false);
             builder.Append("}");
             return builder.ToString();
+        }
+
+        private static void AppendTargetMotionJson(StringBuilder builder, CombatTargetSnapshot target)
+        {
+            var profile = target == null ? null : target.MotionProfile;
+            AppendString(builder, "targetMotionProfileKind", profile == null ? CombatAimTargetMotionProfile.Unknown : UnknownIfEmpty(profile.MotionProfileKind), true);
+            AppendString(builder, "targetMotionKind", profile == null ? CombatAimTargetMotionProfile.Unknown : UnknownIfEmpty(profile.MotionProfileKind), true);
+            AppendRaw(builder, "targetMotionConfidence", FloatRaw(profile == null ? 0f : profile.MotionConfidence), true);
+            AppendRaw(builder, "targetVelocityConfidence", FloatRaw(profile == null ? 0f : profile.VelocityConfidence), true);
+            AppendRaw(builder, "targetAcceleration", profile == null ? "null" : BuildPointJson(profile.AccelerationX, profile.AccelerationY), true);
+            AppendRaw(builder, "targetAccelerationConfidence", FloatRaw(profile == null ? 0f : profile.AccelerationConfidence), true);
+            AppendRaw(builder, "targetRecommendedLeadScale", FloatRaw(profile == null ? 0f : profile.RecommendedLeadScale), true);
+            AppendRaw(builder, "targetRecommendedMaxLeadTicks", FloatRaw(profile == null ? 0f : profile.RecommendedMaxLeadTicks), true);
+            AppendRaw(builder, "targetPreferCurrentVelocity", BoolRaw(profile != null && profile.PreferCurrentVelocity), true);
+            AppendRaw(builder, "targetPreferSmoothedVelocity", BoolRaw(profile != null && profile.PreferSmoothedVelocity), true);
+            AppendString(builder, "targetHistoryResetReason", profile == null ? string.Empty : profile.HistoryResetReason, true);
+            AppendRaw(builder, "targetLastReadTick", target == null || target.LastReadTick <= 0 ? "null" : target.LastReadTick.ToString(CultureInfo.InvariantCulture), true);
+            AppendRaw(builder, "targetNpcAiStyle", IntRaw(target == null ? 0 : target.NpcAiStyle), true);
+            AppendRaw(builder, "targetNoGravity", BoolRaw(target != null && target.NoGravity), true);
+            AppendRaw(builder, "targetCollideX", BoolRaw(target != null && target.CollideX), true);
+            AppendRaw(builder, "targetCollideY", BoolRaw(target != null && target.CollideY), true);
+            AppendRaw(builder, "targetDirection", IntRaw(target == null ? 0 : target.Direction), true);
+            AppendRaw(builder, "targetDirectionY", IntRaw(target == null ? 0 : target.DirectionY), true);
+            AppendRaw(builder, "targetPlayer", target == null || target.TargetPlayer < 0 ? "null" : IntRaw(target.TargetPlayer), true);
+            AppendRaw(builder, "targetAiSummaryAvailable", BoolRaw(target != null && target.AiSummaryAvailable), true);
+            AppendRaw(builder, "targetAi0", FloatRaw(target == null ? 0f : target.Ai0), true);
+            AppendRaw(builder, "targetAi1", FloatRaw(target == null ? 0f : target.Ai1), true);
+            AppendRaw(builder, "targetAi2", FloatRaw(target == null ? 0f : target.Ai2), true);
+            AppendRaw(builder, "targetAi3", FloatRaw(target == null ? 0f : target.Ai3), true);
         }
 
         private static CombatAimTargetSelectionContext BuildSelectionContext(
@@ -286,6 +329,21 @@ namespace JueMingZ.Automation.Combat
                 Range = range,
                 SelectionPurpose = purpose ?? string.Empty
             };
+        }
+
+        private static string ResolveLiveTargetRevalidation(CombatAimTargetSelection selection)
+        {
+            if (selection == null)
+            {
+                return "unavailable";
+            }
+
+            if (!string.IsNullOrWhiteSpace(selection.DecisionCacheRevalidationReason))
+            {
+                return selection.DecisionCacheRevalidationReason;
+            }
+
+            return selection.SelectionCacheHit ? "ok" : "notCached";
         }
 
         private static int Clamp(int value, int min, int max)
@@ -342,6 +400,11 @@ namespace JueMingZ.Automation.Combat
             }
 
             return value.ToString("0.###", CultureInfo.InvariantCulture);
+        }
+
+        private static string UnknownIfEmpty(string value)
+        {
+            return string.IsNullOrWhiteSpace(value) ? "unknown" : value;
         }
 
         private static void AppendNullableInt(StringBuilder builder, string name, int? value, bool comma)

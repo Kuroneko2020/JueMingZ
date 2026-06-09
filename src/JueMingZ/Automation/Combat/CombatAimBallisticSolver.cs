@@ -1,9 +1,4 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Reflection;
-using JueMingZ.Compat;
 using JueMingZ.Diagnostics;
 using JueMingZ.GameState;
 
@@ -12,20 +7,16 @@ namespace JueMingZ.Automation.Combat
     // Ballistic solving is pure aim math; unavailable player, weapon, or target data returns no solution.
     public static class CombatAimBallisticSolver
     {
-        private const int MainInventoryEndExclusive = 54;
-        private const int CoinInventoryStart = 50;
-        private const int CoinInventoryEndExclusive = 54;
-        private const int AmmoInventoryStart = 54;
-        private const int AmmoInventoryEndExclusive = 58;
         private const float DefaultProjectileSpeed = 8f;
         private const float MaxLeadTicks = 45f;
         private const float MaxSpecialLeadTicks = 36f;
+        private const float MaxHighSpeedLeadTicks = 24f;
+        private const float MaxMediumLeadTicks = 48f;
+        private const float MaxSlowLeadTicks = 96f;
+        private const float MaxGravityLeadTicks = 72f;
+        private const float MaxReturningLeadTicks = 30f;
+        private const float MaxSpreadLeadTicks = 18f;
         private const float MaxGravityCompensationPixels = 180f;
-
-        private static readonly object CacheSync = new object();
-        private static readonly Dictionary<int, ProjectileDefaults> ProjectileDefaultsCache = new Dictionary<int, ProjectileDefaults>();
-        private static readonly Dictionary<string, int> StaticIdCache = new Dictionary<string, int>(StringComparer.Ordinal);
-        private static readonly Dictionary<string, bool[]> ItemSetBoolCache = new Dictionary<string, bool[]>(StringComparer.Ordinal);
 
         public static CombatAimBallisticSolution Solve(object player, CombatAimItemCheckDecision decision)
         {
@@ -67,41 +58,48 @@ namespace JueMingZ.Automation.Combat
                     return context;
                 }
 
-                AmmoSnapshot ammo;
-                var hasAmmo = TryFindAmmo(player, weapon.UseAmmo, weapon.CoinAmmoType, out ammo);
-                var projectileType = ResolveProjectileType(weapon, hasAmmo ? ammo : null);
-                var defaults = ResolveProjectileDefaults(projectileType);
-                var projectileSpeed = ResolveProjectileSpeed(weapon, hasAmmo ? ammo : null);
-                var extraUpdates = defaults.HasValue && defaults.ExtraUpdates > 0 ? defaults.ExtraUpdates : 0;
-                var effectiveSpeed = projectileSpeed * (extraUpdates + 1);
-                if (effectiveSpeed < 0.5f)
-                {
-                    effectiveSpeed = projectileSpeed < 0.5f ? DefaultProjectileSpeed : projectileSpeed;
-                }
+                var projectileProfile = CombatAimProjectileProfileResolver.Resolve(player, weapon);
 
-                context.ProjectileType = projectileType;
-                context.ProjectileName = defaults.Name ?? string.Empty;
-                context.ProjectileAiStyle = defaults.AiStyle;
-                context.ProjectileExtraUpdates = extraUpdates;
-                context.ProjectileDefaultsAvailable = defaults.HasValue;
-                context.ProjectileNoGravity = defaults.NoGravity;
-                context.ProjectileArrow = defaults.Arrow;
-                context.ProjectileTileCollide = defaults.TileCollide;
-                context.ProjectileWidth = defaults.Width;
-                context.ProjectileHeight = defaults.Height;
-                context.ProjectileFriendly = defaults.Friendly;
-                context.ProjectileHostile = defaults.Hostile;
-                context.ProjectileSpeed = projectileSpeed;
-                context.EffectiveProjectileSpeed = effectiveSpeed;
-                context.AmmoAvailable = hasAmmo;
-                context.AmmoType = hasAmmo ? ammo.AmmoType : 0;
-                context.AmmoItemType = hasAmmo ? ammo.ItemType : 0;
-                context.AmmoItemName = hasAmmo ? ammo.ItemName : string.Empty;
-                context.AmmoProjectileType = hasAmmo ? ammo.Shoot : 0;
-                context.AmmoSlot = hasAmmo ? ammo.Slot : -1;
-                context.AmmoShootSpeed = hasAmmo ? ammo.ShootSpeed : 0f;
-                context.AmmoArrowLike = IsArrowLikeAmmo(weapon, hasAmmo ? ammo : null, defaults);
-                context.AmmoBulletLike = IsBulletLikeAmmo(weapon, hasAmmo ? ammo : null);
+                context.ProjectileProfile = projectileProfile;
+                context.ProjectileType = projectileProfile.ProjectileType;
+                context.ProjectileName = projectileProfile.ProjectileName ?? string.Empty;
+                context.ProjectileAiStyle = projectileProfile.ProjectileAiStyle;
+                context.ProjectileExtraUpdates = projectileProfile.ProjectileExtraUpdates;
+                context.ProjectileDefaultsAvailable = projectileProfile.ProjectileDefaultsAvailable;
+                context.ProjectileNoGravity = projectileProfile.ProjectileNoGravity;
+                context.ProjectileArrow = projectileProfile.ProjectileArrow;
+                context.ProjectileTileCollide = projectileProfile.ProjectileTileCollide;
+                context.ProjectileWidth = projectileProfile.ProjectileWidth;
+                context.ProjectileHeight = projectileProfile.ProjectileHeight;
+                context.ProjectileFriendly = projectileProfile.ProjectileFriendly;
+                context.ProjectileHostile = projectileProfile.ProjectileHostile;
+                context.BaseProjectileSpeed = projectileProfile.BaseProjectileSpeed;
+                context.ProjectileSpeed = projectileProfile.BaseProjectileSpeed;
+                context.EffectiveProjectileSpeed = projectileProfile.EffectiveProjectileSpeed;
+                context.EffectiveUpdatesPerTick = projectileProfile.EffectiveUpdatesPerTick;
+                context.GravityPerTickCandidate = projectileProfile.GravityPerTickCandidate;
+                context.ProjectileRadiusForHit = projectileProfile.ProjectileRadiusForHit;
+                context.ProfileFamilyHint = projectileProfile.ProfileFamilyHint ?? string.Empty;
+                context.ProfileCompleteness = projectileProfile.ProfileCompleteness ?? string.Empty;
+                context.ProfileFallbackReason = projectileProfile.ProfileFallbackReason ?? string.Empty;
+                context.ProfileSpeedSource = projectileProfile.ProfileSpeedSource ?? string.Empty;
+                context.ProfileGunProj = projectileProfile.GunProj;
+                context.ProfileAmmoSpeedApplied = projectileProfile.AmmoSpeedApplied;
+                context.ProfileMagicQuiverApplied = projectileProfile.MagicQuiverApplied;
+                context.ProfileArcheryApplied = projectileProfile.ArcheryApplied;
+                context.ProfileArcherySpeedCapped = projectileProfile.ArcherySpeedCapped;
+                context.ProfileMagicQuiverEffectiveUpdateApplied = projectileProfile.MagicQuiverEffectiveUpdateApplied;
+                context.ProfileSpecificLauncherAmmoProjectileMatch = projectileProfile.SpecificLauncherAmmoProjectileMatch;
+                context.ProfileProjectileTransformRole = projectileProfile.ProjectileTransformRole ?? string.Empty;
+                context.AmmoAvailable = projectileProfile.AmmoAvailable;
+                context.AmmoType = projectileProfile.AmmoType;
+                context.AmmoItemType = projectileProfile.AmmoItemType;
+                context.AmmoItemName = projectileProfile.AmmoItemName ?? string.Empty;
+                context.AmmoProjectileType = projectileProfile.AmmoProjectileType;
+                context.AmmoSlot = projectileProfile.AmmoSlot;
+                context.AmmoShootSpeed = projectileProfile.AmmoShootSpeed;
+                context.AmmoArrowLike = projectileProfile.AmmoArrowLike;
+                context.AmmoBulletLike = projectileProfile.AmmoBulletLike;
                 context.Prepared = true;
                 return context;
             }
@@ -129,8 +127,8 @@ namespace JueMingZ.Automation.Combat
                     return solution;
                 }
 
-                solution.TargetVelocityX = target.SmoothedVelocityAvailable ? target.SmoothedVelocityX : target.VelocityX;
-                solution.TargetVelocityY = target.SmoothedVelocityAvailable ? target.SmoothedVelocityY : target.VelocityY;
+                ApplyTargetMotionMetadata(solution, target);
+                ApplyTargetVelocity(solution, target);
                 solution.PredictedTargetX = target.CenterX;
                 solution.PredictedTargetY = target.CenterY;
                 solution.AimWorldX = target.CenterX;
@@ -150,10 +148,13 @@ namespace JueMingZ.Automation.Combat
                     return Center(solution, "centerFallback", "weaponProfileUnavailable");
                 }
 
-                var defaults = FromPreparedDefaults(prepared);
+                var projectileProfile = prepared.ProjectileProfile;
                 var projectileType = prepared.ProjectileType;
                 var projectileSpeed = prepared.ProjectileSpeed;
-                var extraUpdates = prepared.ProjectileExtraUpdates;
+                var effectiveUpdatesPerTick = prepared.EffectiveUpdatesPerTick <= 0
+                    ? Math.Max(1, prepared.ProjectileExtraUpdates + 1)
+                    : prepared.EffectiveUpdatesPerTick;
+                var extraUpdates = Math.Max(0, effectiveUpdatesPerTick - 1);
                 var effectiveSpeed = prepared.EffectiveProjectileSpeed;
 
                 solution.ProjectileType = prepared.ProjectileType;
@@ -168,8 +169,24 @@ namespace JueMingZ.Automation.Combat
                 solution.ProjectileHeight = prepared.ProjectileHeight;
                 solution.ProjectileFriendly = prepared.ProjectileFriendly;
                 solution.ProjectileHostile = prepared.ProjectileHostile;
+                solution.BaseProjectileSpeed = prepared.BaseProjectileSpeed;
                 solution.ProjectileSpeed = prepared.ProjectileSpeed;
                 solution.EffectiveProjectileSpeed = prepared.EffectiveProjectileSpeed;
+                solution.EffectiveUpdatesPerTick = effectiveUpdatesPerTick;
+                solution.GravityPerTickCandidate = prepared.GravityPerTickCandidate;
+                solution.ProjectileRadiusForHit = prepared.ProjectileRadiusForHit;
+                solution.ProjectileProfileFamily = prepared.ProfileFamilyHint ?? string.Empty;
+                solution.ProjectileProfileStatus = prepared.ProfileCompleteness ?? string.Empty;
+                solution.ProjectileProfileDegradedReason = prepared.ProfileFallbackReason ?? string.Empty;
+                solution.ProjectileProfileSpeedSource = prepared.ProfileSpeedSource ?? string.Empty;
+                solution.ProjectileProfileGunProj = prepared.ProfileGunProj;
+                solution.ProjectileProfileAmmoSpeedApplied = prepared.ProfileAmmoSpeedApplied;
+                solution.ProjectileProfileMagicQuiverApplied = prepared.ProfileMagicQuiverApplied;
+                solution.ProjectileProfileArcheryApplied = prepared.ProfileArcheryApplied;
+                solution.ProjectileProfileArcherySpeedCapped = prepared.ProfileArcherySpeedCapped;
+                solution.ProjectileProfileMagicQuiverEffectiveUpdateApplied = prepared.ProfileMagicQuiverEffectiveUpdateApplied;
+                solution.ProjectileProfileSpecificLauncherAmmoProjectileMatch = prepared.ProfileSpecificLauncherAmmoProjectileMatch;
+                solution.ProjectileProfileTransformRole = prepared.ProfileProjectileTransformRole ?? string.Empty;
                 solution.AmmoAvailable = prepared.AmmoAvailable;
                 solution.AmmoType = prepared.AmmoType;
                 solution.AmmoItemType = prepared.AmmoItemType;
@@ -179,9 +196,9 @@ namespace JueMingZ.Automation.Combat
                 solution.AmmoShootSpeed = prepared.AmmoShootSpeed;
                 solution.AmmoArrowLike = prepared.AmmoArrowLike;
                 solution.AmmoBulletLike = prepared.AmmoBulletLike;
-                ApplyProjectileRoleMetadata(solution, weapon);
+                ApplyProjectileRoleMetadata(solution, weapon, projectileProfile);
 
-                var specialRule = ResolveSpecialWeaponRule(weapon, solution, defaults);
+                var specialRule = ResolveSpecialWeaponRule(weapon, solution, projectileProfile);
                 if (specialRule != null)
                 {
                     return SolveSpecialWeapon(solution, target, weapon, specialRule, effectiveSpeed, extraUpdates);
@@ -198,27 +215,8 @@ namespace JueMingZ.Automation.Combat
                     return Center(solution, "centerNoProjectile", "noProjectileSemantics");
                 }
 
-                if (solution.AmmoArrowLike && !defaults.NoGravity)
-                {
-                    return SolveArrowGravity(solution, target, effectiveSpeed, extraUpdates);
-                }
-
-                if (solution.AmmoBulletLike || IsLikelyStraightHighSpeed(weapon, projectileSpeed, effectiveSpeed))
-                {
-                    return SolveLinear(solution, target, effectiveSpeed, "linearHighSpeed");
-                }
-
-                if (weapon.Magic && projectileSpeed <= 12f)
-                {
-                    return SolveLinear(solution, target, effectiveSpeed, "linearSlowMagic");
-                }
-
-                if ((weapon.Ranged || weapon.Thrown) && projectileSpeed >= 8f)
-                {
-                    return SolveLinear(solution, target, effectiveSpeed, "linearBasic");
-                }
-
-                return Center(solution, "centerUnknownSpecial", "unclassifiedProjectile");
+                var strategy = SelectStrategy(weapon, solution, projectileSpeed, effectiveSpeed);
+                return SolveStrategy(solution, target, strategy, effectiveSpeed);
             }
             catch (Exception error)
             {
@@ -233,13 +231,179 @@ namespace JueMingZ.Automation.Combat
             }
         }
 
+        private static void ApplyTargetMotionMetadata(CombatAimBallisticSolution solution, CombatTargetSnapshot target)
+        {
+            if (solution == null || target == null)
+            {
+                return;
+            }
+
+            solution.TargetNpcAiStyle = target.NpcAiStyle;
+            solution.TargetNoGravity = target.NoGravity;
+            solution.TargetCollideX = target.CollideX;
+            solution.TargetCollideY = target.CollideY;
+
+            var profile = target.MotionProfile;
+            if (profile == null)
+            {
+                solution.TargetMotionProfileKind = CombatAimTargetMotionProfile.Unknown;
+                solution.TargetHistoryResetReason = string.Empty;
+                return;
+            }
+
+            solution.TargetMotionProfileKind = profile.MotionProfileKind ?? CombatAimTargetMotionProfile.Unknown;
+            solution.TargetMotionConfidence = profile.MotionConfidence;
+            solution.TargetVelocityConfidence = profile.VelocityConfidence;
+            solution.TargetAccelerationX = profile.AccelerationX;
+            solution.TargetAccelerationY = profile.AccelerationY;
+            solution.TargetAccelerationConfidence = profile.AccelerationConfidence;
+            solution.TargetRecommendedLeadScale = profile.RecommendedLeadScale;
+            solution.TargetRecommendedMaxLeadTicks = profile.RecommendedMaxLeadTicks;
+            solution.TargetPreferCurrentVelocity = profile.PreferCurrentVelocity;
+            solution.TargetPreferSmoothedVelocity = profile.PreferSmoothedVelocity;
+            solution.TargetHistoryResetReason = profile.HistoryResetReason ?? string.Empty;
+        }
+
+        private static void ApplyTargetVelocity(CombatAimBallisticSolution solution, CombatTargetSnapshot target)
+        {
+            if (solution == null || target == null)
+            {
+                return;
+            }
+
+            if (solution.TargetPreferCurrentVelocity)
+            {
+                solution.TargetVelocityX = target.VelocityX;
+                solution.TargetVelocityY = target.VelocityY;
+                return;
+            }
+
+            if (solution.TargetPreferSmoothedVelocity && target.SmoothedVelocityAvailable)
+            {
+                solution.TargetVelocityX = target.SmoothedVelocityX;
+                solution.TargetVelocityY = target.SmoothedVelocityY;
+                return;
+            }
+
+            solution.TargetVelocityX = target.SmoothedVelocityAvailable ? target.SmoothedVelocityX : target.VelocityX;
+            solution.TargetVelocityY = target.SmoothedVelocityAvailable ? target.SmoothedVelocityY : target.VelocityY;
+        }
+
+        private static BallisticStrategy SelectStrategy(
+            CombatAimWeaponProfile weapon,
+            CombatAimBallisticSolution solution,
+            float projectileSpeed,
+            float effectiveSpeed)
+        {
+            if (solution == null)
+            {
+                return BallisticStrategy.Fallback("centerFallback", "solutionUnavailable");
+            }
+
+            var family = solution.ProjectileProfileFamily ?? string.Empty;
+            if (IsProfileFamily(family, "ReleaseControlled"))
+            {
+                return BallisticStrategy.Fallback("centerConservative", "releaseControlledWeapon");
+            }
+
+            if (IsProfileFamily(family, "InstantOrBeam") ||
+                IsProfileFamily(family, "GuidedCursor") ||
+                IsProfileFamily(family, "HomingOrSelfCorrecting"))
+            {
+                return BallisticStrategy.Point("pointShortLead", 5f);
+            }
+
+            if (IsProfileFamily(family, "SpreadOrMultiShot"))
+            {
+                return BallisticStrategy.Create(
+                    CombatAimBallisticSolverKinds.Spread,
+                    "spreadCoverageLead",
+                    CombatAimLeadWindowKinds.SpreadCoverage,
+                    MaxSpreadLeadTicks);
+            }
+
+            if (IsProfileFamily(family, "Returning") || solution.ProjectileAiStyle == 3)
+            {
+                return BallisticStrategy.Create(
+                    CombatAimBallisticSolverKinds.ReturningProjectile,
+                    "returningOutboundLead",
+                    CombatAimLeadWindowKinds.ReturningOutbound,
+                    MaxReturningLeadTicks);
+            }
+
+            if (IsProfileFamily(family, "GravityArc") ||
+                solution.GravityPerTickCandidate > 0f ||
+                solution.AmmoArrowLike && !solution.ProjectileNoGravity)
+            {
+                return BallisticStrategy.Gravity("arrowGravity", MaxGravityLeadTicks, 10f, 0f);
+            }
+
+            if (IsProfileFamily(family, "HighSpeedLinear") ||
+                solution.AmmoBulletLike ||
+                IsLikelyStraightHighSpeed(weapon, projectileSpeed, effectiveSpeed))
+            {
+                return BallisticStrategy.Create(
+                    CombatAimBallisticSolverKinds.LinearIntercept,
+                    "linearHighSpeed",
+                    CombatAimLeadWindowKinds.HighSpeedShort,
+                    MaxHighSpeedLeadTicks);
+            }
+
+            if (IsProfileFamily(family, "SlowLinear") ||
+                weapon != null && weapon.Magic && projectileSpeed <= 12f)
+            {
+                return BallisticStrategy.Create(
+                    CombatAimBallisticSolverKinds.SlowProjectile,
+                    weapon != null && weapon.Magic ? "linearSlowMagic" : "linearSlowProjectile",
+                    CombatAimLeadWindowKinds.SlowLong,
+                    MaxSlowLeadTicks);
+            }
+
+            if (IsProfileFamily(family, "MediumLinear") ||
+                weapon != null && (weapon.Ranged || weapon.Thrown) && projectileSpeed >= 8f)
+            {
+                return BallisticStrategy.Create(
+                    CombatAimBallisticSolverKinds.LinearIntercept,
+                    "linearBasic",
+                    CombatAimLeadWindowKinds.Medium,
+                    MaxMediumLeadTicks);
+            }
+
+            return BallisticStrategy.Fallback("centerUnknownSpecial", "unclassifiedProjectile");
+        }
+
+        private static CombatAimBallisticSolution SolveStrategy(
+            CombatAimBallisticSolution solution,
+            CombatTargetSnapshot target,
+            BallisticStrategy strategy,
+            float speed)
+        {
+            if (string.Equals(strategy.SolverKind, CombatAimBallisticSolverKinds.FallbackCenter, StringComparison.Ordinal))
+            {
+                return Center(solution, strategy.Mode, strategy.FallbackReason);
+            }
+
+            if (strategy.FixedLeadTicks > 0f)
+            {
+                return SolvePointAim(solution, target, strategy);
+            }
+
+            if (strategy.UseGravity)
+            {
+                return SolveGravityArc(solution, target, speed, strategy);
+            }
+
+            return SolveLinear(solution, target, speed, strategy);
+        }
+
         private static CombatAimBallisticSolution SolveLinear(
             CombatAimBallisticSolution solution,
             CombatTargetSnapshot target,
             float speed,
-            string mode)
+            BallisticStrategy strategy)
         {
-            var leadTicks = EstimateInterceptTicks(
+            ApplyStrategyMetadata(solution, strategy);
+            var rawLeadTicks = EstimateInterceptTicks(
                 solution.PlayerCenterX,
                 solution.PlayerCenterY,
                 target.CenterX,
@@ -248,23 +412,197 @@ namespace JueMingZ.Automation.Combat
                 solution.TargetVelocityY,
                 speed);
 
-            leadTicks = Clamp(leadTicks, 0f, MaxLeadTicks);
-            solution.LeadTicks = leadTicks;
-            solution.PredictedTargetX = target.CenterX + solution.TargetVelocityX * leadTicks;
-            solution.PredictedTargetY = target.CenterY + solution.TargetVelocityY * leadTicks;
-            solution.AimWorldX = solution.PredictedTargetX;
-            solution.AimWorldY = solution.PredictedTargetY;
-            solution.Mode = mode;
+            var leadClamp = ResolveLeadClamp(solution, rawLeadTicks, strategy);
+            ApplyLead(solution, target, leadClamp);
+            solution.Mode = strategy.Mode;
             solution.Solved = true;
             solution.AimAdjusted = Distance(solution.AimWorldX, solution.AimWorldY, target.CenterX, target.CenterY) > 1f;
             return solution;
+        }
+
+        private static CombatAimBallisticSolution SolveGravityArc(
+            CombatAimBallisticSolution solution,
+            CombatTargetSnapshot target,
+            float speed,
+            BallisticStrategy strategy)
+        {
+            SolveLinear(solution, target, speed, strategy);
+            var gravityDelayTicks = strategy.GravityDelayTicks < 0f ? 0f : strategy.GravityDelayTicks;
+            var activeGravityTicks = Math.Max(0f, solution.LeadTicks - gravityDelayTicks);
+            var gravityCandidate = strategy.GravityPerTick > 0f
+                ? strategy.GravityPerTick
+                : solution.GravityPerTickCandidate > 0f
+                    ? solution.GravityPerTickCandidate
+                    : solution.AmmoArrowLike ? 0.1f : 0.14f;
+            var gravity = gravityCandidate * Math.Max(1, solution.EffectiveUpdatesPerTick);
+            var rawDrop = 0.5f * gravity * activeGravityTicks * activeGravityTicks;
+            var drop = Clamp(rawDrop, 0f, MaxGravityCompensationPixels);
+
+            solution.GravityDelayTicks = gravityDelayTicks;
+            solution.GravityPerTick = gravity;
+            solution.GravityCompensationPixels = drop;
+            solution.AimWorldY -= drop;
+            if (rawDrop > drop + 0.001f)
+            {
+                solution.LeadClampReason = CombatAimLeadClampReasons.GravityCompensationCap;
+                solution.LeadClamped = true;
+            }
+
+            solution.AimAdjusted = solution.AimAdjusted || drop > 0.5f;
+            return solution;
+        }
+
+        private static void ApplyStrategyMetadata(CombatAimBallisticSolution solution, BallisticStrategy strategy)
+        {
+            if (solution == null)
+            {
+                return;
+            }
+
+            solution.SolverKind = strategy.SolverKind ?? CombatAimBallisticSolverKinds.FallbackCenter;
+            solution.LeadWindowKind = strategy.LeadWindowKind ?? CombatAimLeadWindowKinds.Fallback;
+            solution.PredictionConfidence = ResolvePredictionConfidence(solution);
+            if (string.IsNullOrWhiteSpace(solution.LeadClampReason))
+            {
+                solution.LeadClampReason = CombatAimLeadClampReasons.None;
+            }
+        }
+
+        private static LeadClamp ResolveLeadClamp(
+            CombatAimBallisticSolution solution,
+            float rawLeadTicks,
+            BallisticStrategy strategy)
+        {
+            var rawLead = float.IsNaN(rawLeadTicks) || float.IsInfinity(rawLeadTicks) ? 0f : Math.Max(0f, rawLeadTicks);
+            var scale = ResolveLeadScale(solution, strategy);
+            var scaledLead = rawLead * scale;
+            var window = ResolveLeadWindow(solution, strategy);
+            var maxLead = window.MaxTicks <= 0f ? MaxLeadTicks : window.MaxTicks;
+            var clampedLead = Clamp(scaledLead, 0f, maxLead);
+            var reason = CombatAimLeadClampReasons.None;
+            var clamped = false;
+
+            if (scale < 0.999f && rawLead > scaledLead + 0.001f)
+            {
+                reason = CombatAimLeadClampReasons.MotionLeadScale;
+                clamped = true;
+            }
+
+            if (scaledLead > maxLead + 0.001f)
+            {
+                reason = string.IsNullOrWhiteSpace(window.ClampReason)
+                    ? CombatAimLeadClampReasons.ProjectileFamilyWindow
+                    : window.ClampReason;
+                clamped = true;
+            }
+
+            return new LeadClamp
+            {
+                RawLeadTicks = rawLead,
+                LeadTicks = clampedLead,
+                LeadScale = scale,
+                MaxLeadTicks = maxLead,
+                LeadClampReason = clamped ? reason : CombatAimLeadClampReasons.None,
+                LeadClamped = clamped
+            };
+        }
+
+        private static void ApplyLead(
+            CombatAimBallisticSolution solution,
+            CombatTargetSnapshot target,
+            LeadClamp leadClamp)
+        {
+            solution.RawLeadTicks = leadClamp.RawLeadTicks;
+            solution.LeadScale = leadClamp.LeadScale;
+            solution.LeadWindowMaxTicks = leadClamp.MaxLeadTicks;
+            solution.LeadTicks = leadClamp.LeadTicks;
+            solution.LeadClampReason = leadClamp.LeadClampReason ?? CombatAimLeadClampReasons.None;
+            solution.LeadClamped = leadClamp.LeadClamped;
+            solution.PredictedTargetX = target.CenterX + solution.TargetVelocityX * leadClamp.LeadTicks;
+            solution.PredictedTargetY = target.CenterY + solution.TargetVelocityY * leadClamp.LeadTicks;
+            solution.AimWorldX = solution.PredictedTargetX;
+            solution.AimWorldY = solution.PredictedTargetY;
+        }
+
+        private static float ResolveLeadScale(CombatAimBallisticSolution solution, BallisticStrategy strategy)
+        {
+            if (solution == null)
+            {
+                return 1f;
+            }
+
+            var scale = solution.TargetRecommendedLeadScale <= 0f ? 1f : solution.TargetRecommendedLeadScale;
+            scale = Clamp(scale, 0.2f, 1f);
+            if (string.Equals(strategy.SolverKind, CombatAimBallisticSolverKinds.SlowProjectile, StringComparison.Ordinal) &&
+                AllowsLongSlowLead(solution))
+            {
+                return Math.Max(0.85f, scale);
+            }
+
+            return scale;
+        }
+
+        private static LeadWindow ResolveLeadWindow(CombatAimBallisticSolution solution, BallisticStrategy strategy)
+        {
+            var maxLead = strategy.MaxLeadTicks <= 0f ? MaxLeadTicks : strategy.MaxLeadTicks;
+            var clampReason = CombatAimLeadClampReasons.ProjectileFamilyWindow;
+            if (solution == null)
+            {
+                return new LeadWindow(maxLead, clampReason);
+            }
+
+            if (string.Equals(strategy.SolverKind, CombatAimBallisticSolverKinds.SlowProjectile, StringComparison.Ordinal))
+            {
+                if (!IsProjectileProfileComplete(solution))
+                {
+                    return new LeadWindow(Math.Min(maxLead, MaxLeadTicks), CombatAimLeadClampReasons.ProjectileProfileDegraded);
+                }
+
+                if (AllowsLongSlowLead(solution))
+                {
+                    if (string.Equals(solution.TargetMotionProfileKind, CombatAimTargetMotionProfile.LargeOrSegmented, StringComparison.Ordinal))
+                    {
+                        return new LeadWindow(Math.Min(maxLead, 72f), CombatAimLeadClampReasons.MotionRecommendedMaxLead);
+                    }
+
+                    return new LeadWindow(maxLead, clampReason);
+                }
+
+                var motionMax = solution.TargetRecommendedMaxLeadTicks > 0f
+                    ? solution.TargetRecommendedMaxLeadTicks
+                    : MaxLeadTicks;
+                return new LeadWindow(Math.Min(maxLead, motionMax), CombatAimLeadClampReasons.MotionRecommendedMaxLead);
+            }
+
+            if (IsVeryLowPrediction(solution))
+            {
+                var confidenceMax = solution.TargetRecommendedMaxLeadTicks > 0f
+                    ? Math.Min(solution.TargetRecommendedMaxLeadTicks, 12f)
+                    : 12f;
+                return new LeadWindow(Math.Min(maxLead, confidenceMax), CombatAimLeadClampReasons.PredictionConfidence);
+            }
+
+            if (IsLowPrediction(solution))
+            {
+                var confidenceMax = solution.TargetRecommendedMaxLeadTicks > 0f
+                    ? solution.TargetRecommendedMaxLeadTicks
+                    : 24f;
+                return new LeadWindow(Math.Min(maxLead, confidenceMax), CombatAimLeadClampReasons.PredictionConfidence);
+            }
+
+            if (solution.TargetRecommendedMaxLeadTicks > 0f && solution.TargetRecommendedMaxLeadTicks < maxLead)
+            {
+                return new LeadWindow(solution.TargetRecommendedMaxLeadTicks, CombatAimLeadClampReasons.MotionRecommendedMaxLead);
+            }
+
+            return new LeadWindow(maxLead, clampReason);
         }
 
         private static CombatAimBallisticSolution SolveSpecialWeapon(
             CombatAimBallisticSolution solution,
             CombatTargetSnapshot target,
             CombatAimWeaponProfile weapon,
-            SpecialWeaponRule rule,
+            CombatAimSpecialWeaponRule rule,
             float effectiveSpeed,
             int extraUpdates)
         {
@@ -285,7 +623,7 @@ namespace JueMingZ.Automation.Combat
 
             if (rule.FixedLeadTicks > 0f)
             {
-                return SolvePointAim(solution, target, rule.Mode, rule.FixedLeadTicks);
+                return SolvePointAim(solution, target, BallisticStrategy.Point(rule.AimMode, rule.FixedLeadTicks));
             }
 
             if (rule.RainFromSky)
@@ -295,19 +633,49 @@ namespace JueMingZ.Automation.Combat
 
             if (rule.HeavyGravity)
             {
-                return SolveHeavyGravity(solution, target, speed, extraUpdates, rule);
+                var heavyStrategy = BallisticStrategy.Gravity(rule.AimMode, MaxGravityLeadTicks, rule.GravityDelayTicks, rule.GravityPerTick);
+                var heavy = SolveGravityArc(solution, target, speed, heavyStrategy);
+                heavy.SpecialLeadTicks = heavy.LeadTicks;
+                heavy.SpecialAimApplied = true;
+                return heavy;
             }
 
-            if (rule.ArrowGravity && solution.AmmoArrowLike)
+            if (string.Equals(rule.SolverKind, CombatAimBallisticSolverKinds.ReturningProjectile, StringComparison.Ordinal))
             {
-                SolveArrowGravity(solution, target, speed, extraUpdates);
-                solution.Mode = rule.Mode;
+                var returningStrategy = BallisticStrategy.Create(
+                    CombatAimBallisticSolverKinds.ReturningProjectile,
+                    rule.AimMode,
+                    CombatAimLeadWindowKinds.ReturningOutbound,
+                    MaxReturningLeadTicks);
+                SolveLinear(solution, target, speed, returningStrategy);
                 solution.SpecialLeadTicks = solution.LeadTicks;
                 solution.SpecialAimApplied = true;
                 return solution;
             }
 
-            SolveLinear(solution, target, speed, rule.Mode);
+            if (rule.ArrowGravity && solution.AmmoArrowLike)
+            {
+                var gravityStrategy = IsSpreadRule(rule)
+                    ? BallisticStrategy.SpreadGravity(rule.AimMode, MaxGravityLeadTicks, 10f, 0f)
+                    : BallisticStrategy.Gravity(rule.AimMode, MaxGravityLeadTicks, 10f, 0f);
+                var gravity = SolveGravityArc(solution, target, speed, gravityStrategy);
+                gravity.SpecialLeadTicks = gravity.LeadTicks;
+                gravity.SpecialAimApplied = true;
+                return gravity;
+            }
+
+            var linearStrategy = IsSpreadRule(rule)
+                ? BallisticStrategy.Create(
+                    CombatAimBallisticSolverKinds.Spread,
+                    rule.AimMode,
+                    CombatAimLeadWindowKinds.SpreadCoverage,
+                    MaxSpreadLeadTicks)
+                : BallisticStrategy.Create(
+                    string.IsNullOrWhiteSpace(rule.SolverKind) ? CombatAimBallisticSolverKinds.LinearIntercept : rule.SolverKind,
+                    rule.AimMode,
+                    string.IsNullOrWhiteSpace(rule.LeadWindowKind) ? CombatAimLeadWindowKinds.Medium : rule.LeadWindowKind,
+                    MaxSpecialLeadTicks);
+            SolveLinear(solution, target, speed, linearStrategy);
             solution.SpecialLeadTicks = solution.LeadTicks;
             solution.SpecialAimApplied = true;
             return solution;
@@ -316,7 +684,7 @@ namespace JueMingZ.Automation.Combat
         private static CombatAimBallisticSolution SolveRainFromSky(
             CombatAimBallisticSolution solution,
             CombatTargetSnapshot target,
-            SpecialWeaponRule rule)
+            CombatAimSpecialWeaponRule rule)
         {
             var targetSpeedSq = solution.TargetVelocityX * solution.TargetVelocityX + solution.TargetVelocityY * solution.TargetVelocityY;
             var leadTicks = rule.FixedLeadTicks > 0f
@@ -324,8 +692,14 @@ namespace JueMingZ.Automation.Combat
                 : targetSpeedSq > 36f ? 6f : targetSpeedSq > 9f ? 9f : 12f;
             leadTicks = Clamp(leadTicks, 0f, MaxSpecialLeadTicks);
 
-            solution.Mode = rule.Mode;
+            var strategy = BallisticStrategy.Point(rule.AimMode, leadTicks);
+            ApplyStrategyMetadata(solution, strategy);
+            solution.Mode = rule.AimMode;
+            solution.RawLeadTicks = leadTicks;
             solution.LeadTicks = leadTicks;
+            solution.LeadScale = 1f;
+            solution.LeadWindowMaxTicks = MaxSpecialLeadTicks;
+            solution.LeadClampReason = CombatAimLeadClampReasons.FixedPointLead;
             solution.SpecialLeadTicks = leadTicks;
             solution.PredictedTargetX = target.CenterX + solution.TargetVelocityX * leadTicks;
             solution.PredictedTargetY = target.CenterY + solution.TargetVelocityY * leadTicks;
@@ -341,12 +715,17 @@ namespace JueMingZ.Automation.Combat
         private static CombatAimBallisticSolution SolvePointAim(
             CombatAimBallisticSolution solution,
             CombatTargetSnapshot target,
-            string mode,
-            float leadTicks)
+            BallisticStrategy strategy)
         {
-            leadTicks = Clamp(leadTicks, 0f, MaxSpecialLeadTicks);
-            solution.Mode = mode ?? "specialPointAim";
+            ApplyStrategyMetadata(solution, strategy);
+            var leadTicks = Clamp(strategy.FixedLeadTicks, 0f, strategy.MaxLeadTicks <= 0f ? MaxSpecialLeadTicks : strategy.MaxLeadTicks);
+            solution.Mode = strategy.Mode ?? "specialPointAim";
+            solution.RawLeadTicks = strategy.FixedLeadTicks;
             solution.LeadTicks = leadTicks;
+            solution.LeadScale = 1f;
+            solution.LeadWindowMaxTicks = strategy.MaxLeadTicks <= 0f ? MaxSpecialLeadTicks : strategy.MaxLeadTicks;
+            solution.LeadClampReason = CombatAimLeadClampReasons.FixedPointLead;
+            solution.LeadClamped = Math.Abs(strategy.FixedLeadTicks - leadTicks) > 0.001f;
             solution.SpecialLeadTicks = leadTicks;
             solution.PredictedTargetX = target.CenterX + solution.TargetVelocityX * leadTicks;
             solution.PredictedTargetY = target.CenterY + solution.TargetVelocityY * leadTicks;
@@ -358,54 +737,144 @@ namespace JueMingZ.Automation.Combat
             return solution;
         }
 
-        private static CombatAimBallisticSolution SolveHeavyGravity(
-            CombatAimBallisticSolution solution,
-            CombatTargetSnapshot target,
-            float speed,
-            int extraUpdates,
-            SpecialWeaponRule rule)
-        {
-            SolveLinear(solution, target, speed, rule.Mode);
-            var activeGravityTicks = Math.Max(0f, solution.LeadTicks - rule.GravityDelayTicks);
-            var gravity = rule.GravityPerTick * Math.Max(1, extraUpdates + 1);
-            var drop = 0.5f * gravity * activeGravityTicks * activeGravityTicks;
-            drop = Clamp(drop, 0f, MaxGravityCompensationPixels);
-
-            solution.GravityPerTick = gravity;
-            solution.GravityCompensationPixels = drop;
-            solution.AimWorldY -= drop;
-            solution.SpecialLeadTicks = solution.LeadTicks;
-            solution.SpecialAimApplied = true;
-            solution.AimAdjusted = solution.AimAdjusted || drop > 0.5f;
-            return solution;
-        }
-
         private static CombatAimBallisticSolution SolveArrowGravity(
             CombatAimBallisticSolution solution,
             CombatTargetSnapshot target,
             float speed,
             int extraUpdates)
         {
-            SolveLinear(solution, target, speed, "arrowGravity");
-            var activeGravityTicks = Math.Max(0f, solution.LeadTicks - 10f);
-            var gravity = 0.1f * Math.Max(1, extraUpdates + 1);
-            var drop = 0.5f * gravity * activeGravityTicks * activeGravityTicks;
-            drop = Clamp(drop, 0f, MaxGravityCompensationPixels);
-
-            solution.GravityPerTick = gravity;
-            solution.GravityCompensationPixels = drop;
-            solution.AimWorldY -= drop;
-            solution.AimAdjusted = solution.AimAdjusted || drop > 0.5f;
-            return solution;
+            return SolveGravityArc(solution, target, speed, BallisticStrategy.Gravity("arrowGravity", MaxGravityLeadTicks, 10f, 0f));
         }
 
         private static CombatAimBallisticSolution Center(CombatAimBallisticSolution solution, string mode, string reason)
         {
             solution.Mode = mode ?? string.Empty;
             solution.FallbackReason = reason ?? string.Empty;
+            solution.SolverKind = CombatAimBallisticSolverKinds.FallbackCenter;
+            solution.LeadWindowKind = CombatAimLeadWindowKinds.Fallback;
+            solution.LeadClampReason = CombatAimLeadClampReasons.CenterFallback;
+            solution.PredictionConfidence = ResolvePredictionConfidence(solution);
+            solution.LeadWindowMaxTicks = 0f;
+            solution.LeadScale = 0f;
+            solution.LeadClamped = true;
             solution.ConservativeCenter = true;
             solution.Solved = true;
             return solution;
+        }
+
+        private static bool IsProfileFamily(string family, string expected)
+        {
+            return string.Equals(family ?? string.Empty, expected, StringComparison.Ordinal);
+        }
+
+        private static bool IsSpreadRule(CombatAimSpecialWeaponRule rule)
+        {
+            if (rule == null)
+            {
+                return false;
+            }
+
+            return string.Equals(rule.SolverKind, CombatAimBallisticSolverKinds.Spread, StringComparison.Ordinal) ||
+                   string.Equals(rule.Kind, "spreadMultiShot", StringComparison.Ordinal) ||
+                   string.Equals(rule.Kind, "dualProjectileSpread", StringComparison.Ordinal) ||
+                   string.Equals(rule.Kind, "parallelMultiShot", StringComparison.Ordinal);
+        }
+
+        private static string ResolvePredictionConfidence(CombatAimBallisticSolution solution)
+        {
+            if (solution == null)
+            {
+                return CombatAimPredictionConfidenceKinds.Unknown;
+            }
+
+            if (IsHardMotionReset(solution.TargetHistoryResetReason) ||
+                string.Equals(solution.TargetMotionProfileKind, CombatAimTargetMotionProfile.TeleportOrDashRecent, StringComparison.Ordinal))
+            {
+                return CombatAimPredictionConfidenceKinds.VeryLow;
+            }
+
+            var motionConfidence = Clamp01(solution.TargetMotionConfidence);
+            var velocityConfidence = Clamp01(solution.TargetVelocityConfidence);
+            if (motionConfidence <= 0f && velocityConfidence <= 0f)
+            {
+                return CombatAimPredictionConfidenceKinds.Unknown;
+            }
+
+            var combined = motionConfidence <= 0f
+                ? velocityConfidence
+                : velocityConfidence <= 0f
+                    ? motionConfidence
+                    : Math.Min(motionConfidence, velocityConfidence);
+
+            if (!IsProjectileProfileComplete(solution))
+            {
+                combined = Math.Min(combined, 0.45f);
+            }
+
+            if (combined >= 0.75f)
+            {
+                return CombatAimPredictionConfidenceKinds.High;
+            }
+
+            if (combined >= 0.5f)
+            {
+                return CombatAimPredictionConfidenceKinds.Medium;
+            }
+
+            if (combined >= 0.3f)
+            {
+                return CombatAimPredictionConfidenceKinds.Low;
+            }
+
+            return CombatAimPredictionConfidenceKinds.VeryLow;
+        }
+
+        private static bool AllowsLongSlowLead(CombatAimBallisticSolution solution)
+        {
+            if (solution == null || !IsProjectileProfileComplete(solution))
+            {
+                return false;
+            }
+
+            if (!string.Equals(solution.PredictionConfidence, CombatAimPredictionConfidenceKinds.High, StringComparison.Ordinal) &&
+                !string.Equals(solution.PredictionConfidence, CombatAimPredictionConfidenceKinds.Medium, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            return string.Equals(solution.TargetMotionProfileKind, CombatAimTargetMotionProfile.StableLinear, StringComparison.Ordinal) ||
+                   string.Equals(solution.TargetMotionProfileKind, CombatAimTargetMotionProfile.LargeOrSegmented, StringComparison.Ordinal);
+        }
+
+        private static bool IsProjectileProfileComplete(CombatAimBallisticSolution solution)
+        {
+            return solution != null &&
+                   string.Equals(solution.ProjectileProfileStatus, "complete", StringComparison.Ordinal);
+        }
+
+        private static bool IsVeryLowPrediction(CombatAimBallisticSolution solution)
+        {
+            return solution == null ||
+                   string.Equals(solution.PredictionConfidence, CombatAimPredictionConfidenceKinds.Unknown, StringComparison.Ordinal) ||
+                   string.Equals(solution.PredictionConfidence, CombatAimPredictionConfidenceKinds.VeryLow, StringComparison.Ordinal);
+        }
+
+        private static bool IsLowPrediction(CombatAimBallisticSolution solution)
+        {
+            return solution != null &&
+                   string.Equals(solution.PredictionConfidence, CombatAimPredictionConfidenceKinds.Low, StringComparison.Ordinal);
+        }
+
+        private static bool IsHardMotionReset(string resetReason)
+        {
+            return string.Equals(resetReason, "teleportDistance", StringComparison.Ordinal) ||
+                   string.Equals(resetReason, "staleTickGap", StringComparison.Ordinal) ||
+                   string.Equals(resetReason, "measuredVelocitySpike", StringComparison.Ordinal);
+        }
+
+        private static float Clamp01(float value)
+        {
+            return Clamp(value, 0f, 1f);
         }
 
         private static float EstimateInterceptTicks(
@@ -458,113 +927,18 @@ namespace JueMingZ.Automation.Combat
             return result == float.MaxValue ? (float)Math.Sqrt(c) / speed : result;
         }
 
-        private static SpecialWeaponRule ResolveSpecialWeaponRule(
+        private static CombatAimSpecialWeaponRule ResolveSpecialWeaponRule(
             CombatAimWeaponProfile weapon,
             CombatAimBallisticSolution solution,
-            ProjectileDefaults defaults)
+            CombatAimProjectileProfile projectileProfile)
         {
-            if (weapon == null || weapon.ItemType <= 0)
-            {
-                return null;
-            }
-
-            if (weapon.IsCoinGun)
-            {
-                return new SpecialWeaponRule
-                {
-                    Kind = "coinGun",
-                    Name = "CoinGun",
-                    Rule = "coinLinearWeaponVelocityOnly",
-                    Mode = "specialCoinGunLinear",
-                    ShotCount = 1,
-                    UseWeaponShootSpeedOnly = true
-                };
-            }
-
-            if (IsRainFromSkyWeapon(weapon.ItemType, out var rainName))
-            {
-                return new SpecialWeaponRule
-                {
-                    Kind = "rainFromSky",
-                    Name = rainName,
-                    Rule = "cursorTargetWithVelocityLead",
-                    Mode = "specialRainFromSky",
-                    ShotCount = 1,
-                    RainFromSky = true,
-                    CursorTarget = true
-                };
-            }
-
-            SpecialWeaponRule multiRule;
-            if (TryResolveParallelMultiShotRule(weapon.ItemType, out multiRule))
-            {
-                return multiRule;
-            }
-
-            if (TryResolveSpreadMultiShotRule(weapon.ItemType, out multiRule))
-            {
-                return multiRule;
-            }
-
-            if (IsGuidedCursorWeapon(weapon.ItemType, out var guidedName))
-            {
-                return new SpecialWeaponRule
-                {
-                    Kind = "guidedCursor",
-                    Name = guidedName,
-                    Rule = "shortLeadCursorControl",
-                    Mode = "specialGuidedCursor",
-                    ShotCount = 1,
-                    FixedLeadTicks = 5f,
-                    CursorTarget = true
-                };
-            }
-
-            if (IsHomingProjectile(solution == null ? 0 : solution.ProjectileType, defaults.AiStyle))
-            {
-                return new SpecialWeaponRule
-                {
-                    Kind = "homingOrSelfCorrecting",
-                    Name = "ProjectileHoming",
-                    Rule = "shortLeadPointAim",
-                    Mode = "specialHomingPoint",
-                    ShotCount = 1,
-                    FixedLeadTicks = 5f
-                };
-            }
-
-            if (IsBeamLikeProjectile(solution == null ? 0 : solution.ProjectileType, defaults.AiStyle))
-            {
-                return new SpecialWeaponRule
-                {
-                    Kind = "beamOrInstant",
-                    Name = "BeamOrInstant",
-                    Rule = "nearInstantPointAim",
-                    Mode = "specialBeamOrInstant",
-                    ShotCount = 1,
-                    FixedLeadTicks = 2f
-                };
-            }
-
-            if (IsHeavyGravityProjectile(weapon, solution, defaults))
-            {
-                return new SpecialWeaponRule
-                {
-                    Kind = "heavyGravity",
-                    Name = "HeavyGravityProjectile",
-                    Rule = "strongGravityCompensation",
-                    Mode = "specialHeavyGravity",
-                    ShotCount = 1,
-                    HeavyGravity = true,
-                    GravityPerTick = defaults.AiStyle == 16 || defaults.AiStyle == 68 ? 0.2f : 0.14f,
-                    GravityDelayTicks = defaults.AiStyle == 1 ? 10f : 0f
-                };
-            }
-
-            return null;
+            CombatAimSpecialWeaponRule rule;
+            return CombatAimSpecialWeaponRuleResolver.TryResolve(weapon, solution, projectileProfile, out rule)
+                ? rule
+                : null;
         }
 
-        private static void ApplySpecialMetadata(CombatAimBallisticSolution solution, SpecialWeaponRule rule)
+        private static void ApplySpecialMetadata(CombatAimBallisticSolution solution, CombatAimSpecialWeaponRule rule)
         {
             if (solution == null || rule == null)
             {
@@ -577,9 +951,14 @@ namespace JueMingZ.Automation.Combat
             solution.SpecialShotCount = rule.ShotCount < 1 ? 1 : rule.ShotCount;
             solution.SpecialSpreadDegrees = rule.SpreadDegrees;
             solution.SpecialParallelSpacingPixels = rule.ParallelSpacingPixels;
-            solution.SpecialCursorTarget = rule.CursorTarget;
+            solution.SpecialCursorTarget = rule.UsesCursorTarget;
             solution.SpecialWeaponUsesWeaponShoot = rule.UsesWeaponShoot;
             solution.SpecialWeaponUsesAmmoShoot = rule.UsesAmmoShoot;
+            solution.SpecialWeaponSolverKind = rule.SolverKind ?? string.Empty;
+            solution.SpecialWeaponLeadWindowKind = rule.LeadWindowKind ?? string.Empty;
+            solution.SpecialWeaponLeadPolicy = rule.LeadPolicy ?? string.Empty;
+            solution.SpecialWeaponDiagnosticsReason = rule.DiagnosticsReason ?? string.Empty;
+            solution.ReturningPhaseAssumption = rule.ReturningPhaseAssumption ?? string.Empty;
             if (rule.UsesWeaponShoot &&
                 solution.WeaponShootProjectileType > 0 &&
                 solution.WeaponShootProjectileType != solution.ProjectileType)
@@ -599,47 +978,30 @@ namespace JueMingZ.Automation.Combat
             }
         }
 
-        private static void ApplyProjectileRoleMetadata(CombatAimBallisticSolution solution, CombatAimWeaponProfile weapon)
+        private static void ApplyProjectileRoleMetadata(
+            CombatAimBallisticSolution solution,
+            CombatAimWeaponProfile weapon,
+            CombatAimProjectileProfile projectileProfile)
         {
             if (solution == null)
             {
                 return;
             }
 
+            if (projectileProfile != null)
+            {
+                solution.WeaponShootProjectileType = projectileProfile.WeaponShootProjectileType;
+                solution.WeaponShootProjectileName = projectileProfile.WeaponShootProjectileName ?? string.Empty;
+                solution.AmmoProjectileName = projectileProfile.AmmoProjectileName ?? string.Empty;
+                solution.ResolvedProjectileRole = projectileProfile.ResolvedProjectileRole ?? string.Empty;
+                solution.PrimaryProjectileType = projectileProfile.PrimaryProjectileType;
+                solution.PrimaryProjectileName = projectileProfile.PrimaryProjectileName ?? string.Empty;
+                solution.PrimaryProjectileRole = projectileProfile.PrimaryProjectileRole ?? string.Empty;
+                return;
+            }
+
             var weaponShoot = weapon == null ? 0 : weapon.Shoot;
             solution.WeaponShootProjectileType = weaponShoot;
-            if (weaponShoot > 0)
-            {
-                var weaponDefaults = ResolveProjectileDefaults(weaponShoot);
-                solution.WeaponShootProjectileName = weaponDefaults.Name ?? string.Empty;
-            }
-
-            if (solution.AmmoProjectileType > 0)
-            {
-                var ammoDefaults = ResolveProjectileDefaults(solution.AmmoProjectileType);
-                solution.AmmoProjectileName = ammoDefaults.Name ?? string.Empty;
-            }
-
-            if (solution.ProjectileType > 0 &&
-                solution.AmmoProjectileType > 0 &&
-                solution.ProjectileType == solution.AmmoProjectileType)
-            {
-                solution.ResolvedProjectileRole = "ammoProjectile";
-                solution.PrimaryProjectileType = solution.ProjectileType;
-                solution.PrimaryProjectileName = solution.ProjectileName ?? string.Empty;
-                solution.PrimaryProjectileRole = "ammoPrimary";
-                return;
-            }
-
-            if (solution.ProjectileType > 0 && solution.ProjectileType == weaponShoot)
-            {
-                solution.ResolvedProjectileRole = "weaponShootProjectile";
-                solution.PrimaryProjectileType = solution.ProjectileType;
-                solution.PrimaryProjectileName = solution.ProjectileName ?? string.Empty;
-                solution.PrimaryProjectileRole = "weaponPrimary";
-                return;
-            }
-
             solution.ResolvedProjectileRole = solution.ProjectileType > 0 ? "resolvedProjectile" : "none";
             solution.PrimaryProjectileType = solution.ProjectileType;
             solution.PrimaryProjectileName = solution.ProjectileName ?? string.Empty;
@@ -670,222 +1032,6 @@ namespace JueMingZ.Automation.Combat
             return false;
         }
 
-        private static bool IsRainFromSkyWeapon(int itemType, out string name)
-        {
-            name = string.Empty;
-            if (MatchesItemId(itemType, "DaedalusStormbow"))
-            {
-                name = "DaedalusStormbow";
-                return true;
-            }
-
-            if (MatchesItemId(itemType, "BloodRainBow"))
-            {
-                name = "BloodRainBow";
-                return true;
-            }
-
-            if (MatchesItemId(itemType, "MeteorStaff"))
-            {
-                name = "MeteorStaff";
-                return true;
-            }
-
-            if (MatchesItemId(itemType, "Starfury"))
-            {
-                name = "Starfury";
-                return true;
-            }
-
-            if (MatchesItemId(itemType, "StarWrath"))
-            {
-                name = "StarWrath";
-                return true;
-            }
-
-            if (MatchesItemId(itemType, "LunarFlareBook"))
-            {
-                name = "LunarFlareBook";
-                return true;
-            }
-
-            return false;
-        }
-
-        private static bool TryResolveParallelMultiShotRule(int itemType, out SpecialWeaponRule rule)
-        {
-            rule = null;
-            if (MatchesItemId(itemType, "Tsunami"))
-            {
-                rule = CreateMultiShotRule("parallelMultiShot", "Tsunami", "parallelArrowLeadGravity", "specialParallelMultiShot", 5, 0f, 9f, true);
-                return true;
-            }
-
-            if (MatchesItemId(itemType, "ChlorophyteShotbow"))
-            {
-                rule = CreateMultiShotRule("parallelMultiShot", "ChlorophyteShotbow", "parallelArrowLeadGravity", "specialParallelMultiShot", 3, 0f, 8f, true);
-                return true;
-            }
-
-            if (MatchesItemId(itemType, "Phantasm"))
-            {
-                rule = CreateMultiShotRule("parallelMultiShot", "Phantasm", "parallelArrowLeadGravityPlusHoming", "specialParallelMultiShot", 4, 0f, 7f, true);
-                return true;
-            }
-
-            return false;
-        }
-
-        private static bool TryResolveSpreadMultiShotRule(int itemType, out SpecialWeaponRule rule)
-        {
-            rule = null;
-            if (MatchesItemId(itemType, "Xenopopper"))
-            {
-                rule = CreateMultiShotRule("cursorSpawnBurst", "Xenopopper", "cursorSpawnBubbleBullet", "specialCursorSpawnBurst", 4, 0f, 0f, false);
-                rule.CursorTarget = true;
-                rule.FixedLeadTicks = 4f;
-                rule.UsesWeaponShoot = true;
-                rule.UsesAmmoShoot = true;
-                return true;
-            }
-
-            if (MatchesItemId(itemType, "Shotgun"))
-            {
-                rule = CreateMultiShotRule("spreadMultiShot", "Shotgun", "spreadBulletLead", "specialSpreadMultiShot", 4, 10f, 0f, false);
-                return true;
-            }
-
-            if (MatchesItemId(itemType, "Boomstick"))
-            {
-                rule = CreateMultiShotRule("spreadMultiShot", "Boomstick", "spreadBulletLead", "specialSpreadMultiShot", 4, 14f, 0f, false);
-                return true;
-            }
-
-            if (MatchesItemId(itemType, "QuadBarrelShotgun"))
-            {
-                rule = CreateMultiShotRule("spreadMultiShot", "QuadBarrelShotgun", "spreadBulletLead", "specialSpreadMultiShot", 6, 18f, 0f, false);
-                return true;
-            }
-
-            if (MatchesItemId(itemType, "OnyxBlaster"))
-            {
-                rule = CreateMultiShotRule("spreadMultiShot", "OnyxBlaster", "spreadBulletLeadWithDarkBolt", "specialSpreadMultiShot", 5, 12f, 0f, false);
-                rule.UsesWeaponShoot = true;
-                rule.UsesAmmoShoot = true;
-                return true;
-            }
-
-            if (MatchesItemId(itemType, "VortexBeater"))
-            {
-                rule = CreateMultiShotRule("dualProjectileSpread", "VortexBeater", "bulletSpreadWithRocketAssist", "specialSpreadMultiShot", 3, 8f, 0f, false);
-                rule.UsesWeaponShoot = true;
-                rule.UsesAmmoShoot = true;
-                return true;
-            }
-
-            return false;
-        }
-
-        private static SpecialWeaponRule CreateMultiShotRule(
-            string kind,
-            string name,
-            string rule,
-            string mode,
-            int shotCount,
-            float spreadDegrees,
-            float parallelSpacingPixels,
-            bool arrowGravity)
-        {
-            return new SpecialWeaponRule
-            {
-                Kind = kind,
-                Name = name,
-                Rule = rule,
-                Mode = mode,
-                ShotCount = shotCount,
-                SpreadDegrees = spreadDegrees,
-                ParallelSpacingPixels = parallelSpacingPixels,
-                ArrowGravity = arrowGravity
-            };
-        }
-
-        private static bool IsGuidedCursorWeapon(int itemType, out string name)
-        {
-            name = string.Empty;
-            if (MatchesItemId(itemType, "MagicMissile"))
-            {
-                name = "MagicMissile";
-                return true;
-            }
-
-            if (MatchesItemId(itemType, "Flamelash"))
-            {
-                name = "Flamelash";
-                return true;
-            }
-
-            if (MatchesItemId(itemType, "RainbowRod"))
-            {
-                name = "RainbowRod";
-                return true;
-            }
-
-            return false;
-        }
-
-        private static bool IsHomingProjectile(int projectileType, int aiStyle)
-        {
-            if (projectileType <= 0)
-            {
-                return false;
-            }
-
-            return MatchesProjectileId(projectileType, "ChlorophyteBullet") ||
-                   MatchesProjectileId(projectileType, "ChlorophyteArrow") ||
-                   MatchesProjectileId(projectileType, "VortexBeaterRocket") ||
-                   MatchesProjectileId(projectileType, "PhantasmArrow") ||
-                   MatchesProjectileId(projectileType, "SpectreWrath") ||
-                   MatchesProjectileId(projectileType, "Bat") ||
-                   aiStyle == 99;
-        }
-
-        private static bool IsBeamLikeProjectile(int projectileType, int aiStyle)
-        {
-            if (projectileType <= 0)
-            {
-                return false;
-            }
-
-            return aiStyle == 4 ||
-                   aiStyle == 84 ||
-                   MatchesProjectileId(projectileType, "HeatRay") ||
-                   MatchesProjectileId(projectileType, "LaserMachinegunLaser") ||
-                   MatchesProjectileId(projectileType, "MartianWalkerLaser") ||
-                   MatchesProjectileId(projectileType, "LastPrismLaser");
-        }
-
-        private static bool IsHeavyGravityProjectile(CombatAimWeaponProfile weapon, CombatAimBallisticSolution solution, ProjectileDefaults defaults)
-        {
-            if (weapon == null || solution == null || solution.ProjectileType <= 0 || defaults.NoGravity)
-            {
-                return false;
-            }
-
-            if (defaults.AiStyle == 2 || defaults.AiStyle == 16 || defaults.AiStyle == 68)
-            {
-                return true;
-            }
-
-            return MatchesAmmoId(weapon.UseAmmo, "Snowball") ||
-                   MatchesAmmoId(weapon.UseAmmo, "StyngerBolt") ||
-                   MatchesAmmoId(weapon.UseAmmo, "JackOLantern") ||
-                   MatchesAmmoId(weapon.UseAmmo, "CandyCorn") ||
-                   MatchesAmmoId(solution.AmmoType, "Snowball") ||
-                   MatchesAmmoId(solution.AmmoType, "StyngerBolt") ||
-                   MatchesAmmoId(solution.AmmoType, "JackOLantern") ||
-                   MatchesAmmoId(solution.AmmoType, "CandyCorn");
-        }
-
         private static bool IsLikelyStraightHighSpeed(CombatAimWeaponProfile weapon, float projectileSpeed, float effectiveSpeed)
         {
             if (weapon == null)
@@ -899,66 +1045,6 @@ namespace JueMingZ.Automation.Combat
             }
 
             return effectiveSpeed >= 14f && !weapon.Melee;
-        }
-
-        private static bool IsArrowLikeAmmo(CombatAimWeaponProfile weapon, AmmoSnapshot ammo, ProjectileDefaults defaults)
-        {
-            if (defaults.HasValue && defaults.Arrow)
-            {
-                return true;
-            }
-
-            var weaponUseAmmo = weapon == null ? 0 : weapon.UseAmmo;
-            if (weaponUseAmmo > 0 &&
-                (weaponUseAmmo == ReadAmmoId("Arrow") ||
-                 weaponUseAmmo == ReadAmmoId("Stake") ||
-                 weaponUseAmmo == ReadAmmoId("Dart")))
-            {
-                return true;
-            }
-
-            return ammo != null &&
-                   (ammo.AmmoType == ReadAmmoId("Arrow") ||
-                    ammo.AmmoType == ReadAmmoId("Stake") ||
-                    ammo.AmmoType == ReadAmmoId("Dart"));
-        }
-
-        private static bool IsBulletLikeAmmo(CombatAimWeaponProfile weapon, AmmoSnapshot ammo)
-        {
-            var bullet = ReadAmmoId("Bullet");
-            if (bullet <= 0)
-            {
-                return false;
-            }
-
-            return weapon != null && weapon.UseAmmo == bullet ||
-                   ammo != null && ammo.AmmoType == bullet;
-        }
-
-        private static int ResolveProjectileType(CombatAimWeaponProfile weapon, AmmoSnapshot ammo)
-        {
-            if (weapon == null)
-            {
-                return 0;
-            }
-
-            if (ammo != null && ammo.Shoot > 0)
-            {
-                return ammo.Shoot;
-            }
-
-            return weapon.Shoot;
-        }
-
-        private static float ResolveProjectileSpeed(CombatAimWeaponProfile weapon, AmmoSnapshot ammo)
-        {
-            var speed = weapon == null || weapon.ShootSpeed <= 0f ? DefaultProjectileSpeed : weapon.ShootSpeed;
-            if (ammo != null && ammo.ShootSpeed > 0f && !ReadItemSetFlag("gunProj", weapon == null ? 0 : weapon.ItemType))
-            {
-                speed += ammo.ShootSpeed;
-            }
-
-            return speed < 0.5f ? DefaultProjectileSpeed : speed;
         }
 
         private static bool TryReadPlayerCenter(object player, out float x, out float y)
@@ -991,372 +1077,6 @@ namespace JueMingZ.Automation.Combat
             return true;
         }
 
-        private static bool TryFindAmmo(object player, int ammoType, int coinAmmoType, out AmmoSnapshot ammo)
-        {
-            ammo = null;
-            if (player == null || ammoType <= 0)
-            {
-                return false;
-            }
-
-            var inventory = GameStateReflection.AsList(GameStateReflection.GetMember(player, "inventory"));
-            if (inventory == null)
-            {
-                return false;
-            }
-
-            if (ammoType == coinAmmoType &&
-                TryFindAmmoInRange(inventory, ammoType, true, CoinInventoryStart, CoinInventoryEndExclusive, out ammo))
-            {
-                return true;
-            }
-
-            if (TryFindAmmoInRange(inventory, ammoType, false, AmmoInventoryStart, AmmoInventoryEndExclusive, out ammo))
-            {
-                return true;
-            }
-
-            return TryFindAmmoInRange(inventory, ammoType, ammoType == coinAmmoType, 0, MainInventoryEndExclusive, out ammo);
-        }
-
-        private static bool TryFindAmmoInRange(IList inventory, int ammoType, bool allowCoinItemType, int start, int endExclusive, out AmmoSnapshot ammo)
-        {
-            ammo = null;
-            if (inventory == null || start < 0)
-            {
-                return false;
-            }
-
-            var end = inventory.Count < endExclusive ? inventory.Count : endExclusive;
-            for (var index = start; index < end; index++)
-            {
-                var item = inventory[index];
-                if (item == null)
-                {
-                    continue;
-                }
-
-                var itemType = ReadInt(item, "type", 0);
-                var stack = ReadInt(item, "stack", 0);
-                if (itemType <= 0 || stack <= 0)
-                {
-                    continue;
-                }
-
-                var itemAmmo = ReadInt(item, "ammo", 0);
-                if (itemAmmo != ammoType && !(allowCoinItemType && IsVanillaCoinItemType(itemType)))
-                {
-                    continue;
-                }
-
-                ammo = new AmmoSnapshot
-                {
-                    Slot = index,
-                    ItemType = itemType,
-                    ItemName = ReadItemName(item),
-                    AmmoType = itemAmmo,
-                    Shoot = ReadInt(item, "shoot", 0),
-                    ShootSpeed = ReadFloat(item, "shootSpeed", 0f)
-                };
-                return true;
-            }
-
-            return false;
-        }
-
-        private static ProjectileDefaults ResolveProjectileDefaults(int projectileType)
-        {
-            if (projectileType <= 0)
-            {
-                return ProjectileDefaults.Empty;
-            }
-
-            lock (CacheSync)
-            {
-                ProjectileDefaults cached;
-                if (ProjectileDefaultsCache.TryGetValue(projectileType, out cached))
-                {
-                    return cached;
-                }
-            }
-
-            var resolved = ReadProjectileDefaults(projectileType);
-            lock (CacheSync)
-            {
-                ProjectileDefaultsCache[projectileType] = resolved;
-            }
-
-            return resolved;
-        }
-
-        private static ProjectileDefaults FromPreparedDefaults(CombatAimBallisticContext prepared)
-        {
-            if (prepared == null)
-            {
-                return ProjectileDefaults.Empty;
-            }
-
-            return new ProjectileDefaults
-            {
-                HasValue = prepared.ProjectileDefaultsAvailable,
-                Name = prepared.ProjectileName ?? string.Empty,
-                ExtraUpdates = prepared.ProjectileExtraUpdates,
-                Arrow = prepared.ProjectileArrow,
-                AiStyle = prepared.ProjectileAiStyle,
-                NoGravity = prepared.ProjectileNoGravity,
-                TileCollide = prepared.ProjectileTileCollide,
-                Width = prepared.ProjectileWidth,
-                Height = prepared.ProjectileHeight,
-                Friendly = prepared.ProjectileFriendly,
-                Hostile = prepared.ProjectileHostile
-            };
-        }
-
-        private static ProjectileDefaults ReadProjectileDefaults(int projectileType)
-        {
-            try
-            {
-                var projectileTypeObject = FindType("Terraria.Projectile");
-                if (projectileTypeObject == null)
-                {
-                    return ProjectileDefaults.Empty;
-                }
-
-                var projectile = Activator.CreateInstance(projectileTypeObject);
-                var setDefaults = projectileTypeObject.GetMethod("SetDefaults", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance, null, new[] { typeof(int) }, null);
-                if (setDefaults == null)
-                {
-                    return ProjectileDefaults.Empty;
-                }
-
-                setDefaults.Invoke(projectile, new object[] { projectileType });
-                return new ProjectileDefaults
-                {
-                    HasValue = true,
-                    Name = ReadProjectileName(projectile),
-                    ExtraUpdates = ReadInt(projectile, "extraUpdates", 0),
-                    Arrow = ReadBool(projectile, "arrow", false),
-                    AiStyle = ReadInt(projectile, "aiStyle", 0),
-                    Width = ReadInt(projectile, "width", 2),
-                    Height = ReadInt(projectile, "height", 2),
-                    TileCollide = ReadBool(projectile, "tileCollide", true),
-                    NoGravity = ReadBool(projectile, "noGravity", false),
-                    Friendly = ReadBool(projectile, "friendly", false),
-                    Hostile = ReadBool(projectile, "hostile", false)
-                };
-            }
-            catch (Exception error)
-            {
-                LogThrottle.WarnThrottled(
-                    "combat-aim-projectile-defaults-failed-" + projectileType.ToString(CultureInfo.InvariantCulture),
-                    TimeSpan.FromSeconds(30),
-                    "CombatAimBallisticSolver",
-                    "Projectile defaults unavailable for type " + projectileType.ToString(CultureInfo.InvariantCulture) + ": " + error.Message);
-                return ProjectileDefaults.Empty;
-            }
-        }
-
-        private static string ReadItemName(object item)
-        {
-            try
-            {
-                var name = GameStateReflection.GetMember(item, "Name") ??
-                           GameStateReflection.GetMember(item, "name");
-                return name == null ? string.Empty : Convert.ToString(name, CultureInfo.InvariantCulture);
-            }
-            catch
-            {
-                return string.Empty;
-            }
-        }
-
-        private static string ReadProjectileName(object projectile)
-        {
-            try
-            {
-                var name = GameStateReflection.GetMember(projectile, "Name") ??
-                           GameStateReflection.GetMember(projectile, "name");
-                return name == null ? string.Empty : Convert.ToString(name, CultureInfo.InvariantCulture);
-            }
-            catch
-            {
-                return string.Empty;
-            }
-        }
-
-        private static int ReadItemId(string memberName)
-        {
-            return ResolveStaticInt("Terraria.ID.ItemID", memberName);
-        }
-
-        private static int ReadAmmoId(string memberName)
-        {
-            return ResolveStaticInt("Terraria.ID.AmmoID", memberName);
-        }
-
-        private static int ReadProjectileId(string memberName)
-        {
-            return ResolveStaticInt("Terraria.ID.ProjectileID", memberName);
-        }
-
-        private static bool MatchesItemId(int itemType, string memberName)
-        {
-            var id = ReadItemId(memberName);
-            if (id <= 0)
-            {
-                id = ReadKnownItemId(memberName);
-            }
-
-            return id > 0 && itemType == id;
-        }
-
-        private static int ReadKnownItemId(string memberName)
-        {
-            if (string.Equals(memberName, "Xenopopper", StringComparison.Ordinal))
-            {
-                return 2797;
-            }
-
-            if (string.Equals(memberName, "VortexBeater", StringComparison.Ordinal))
-            {
-                return 3475;
-            }
-
-            if (string.Equals(memberName, "OnyxBlaster", StringComparison.Ordinal))
-            {
-                return 3788;
-            }
-
-            return 0;
-        }
-
-        private static bool MatchesProjectileId(int projectileType, string memberName)
-        {
-            var id = ReadProjectileId(memberName);
-            return id > 0 && projectileType == id;
-        }
-
-        private static bool MatchesAmmoId(int ammoType, string memberName)
-        {
-            var id = ReadAmmoId(memberName);
-            return id > 0 && ammoType == id;
-        }
-
-        private static int ResolveStaticInt(string typeName, string memberName)
-        {
-            var key = typeName + "." + memberName;
-            lock (CacheSync)
-            {
-                int cached;
-                if (StaticIdCache.TryGetValue(key, out cached))
-                {
-                    return cached;
-                }
-            }
-
-            var value = 0;
-            try
-            {
-                var type = FindType(typeName);
-                if (type != null)
-                {
-                    var raw = GameStateReflection.GetStaticMember(type, memberName);
-                    if (raw != null)
-                    {
-                        value = Convert.ToInt32(raw, CultureInfo.InvariantCulture);
-                    }
-                }
-            }
-            catch
-            {
-                value = 0;
-            }
-
-            lock (CacheSync)
-            {
-                StaticIdCache[key] = value;
-            }
-
-            return value;
-        }
-
-        private static bool ReadItemSetFlag(string memberName, int index)
-        {
-            if (index < 0)
-            {
-                return false;
-            }
-
-            var boolArray = ResolveItemSetBoolArray(memberName);
-            return boolArray != null && index < boolArray.Length && boolArray[index];
-        }
-
-        private static bool[] ResolveItemSetBoolArray(string memberName)
-        {
-            if (string.IsNullOrWhiteSpace(memberName))
-            {
-                return null;
-            }
-
-            lock (CacheSync)
-            {
-                bool[] cached;
-                if (ItemSetBoolCache.TryGetValue(memberName, out cached))
-                {
-                    return cached;
-                }
-            }
-
-            bool[] resolved = null;
-            try
-            {
-                var type = FindType("Terraria.ID.ItemID+Sets");
-                if (type != null)
-                {
-                    resolved = GameStateReflection.GetStaticMember(type, memberName) as bool[];
-                }
-            }
-            catch
-            {
-                resolved = null;
-            }
-
-            lock (CacheSync)
-            {
-                ItemSetBoolCache[memberName] = resolved;
-            }
-
-            return resolved;
-        }
-
-        private static Type FindType(string fullName)
-        {
-            return TerrariaTypeCache.Find(fullName);
-        }
-
-        private static int ReadInt(object source, string name, int fallback)
-        {
-            int value;
-            return GameStateReflection.TryGetInt(source, name, out value) ? value : fallback;
-        }
-
-        private static float ReadFloat(object source, string name, float fallback)
-        {
-            float value;
-            return GameStateReflection.TryGetFloat(source, name, out value) ? value : fallback;
-        }
-
-        private static bool ReadBool(object source, string name, bool fallback)
-        {
-            bool value;
-            return GameStateReflection.TryGetBool(source, name, out value) ? value : fallback;
-        }
-
-        private static bool IsVanillaCoinItemType(int itemType)
-        {
-            return itemType >= 71 && itemType <= 74;
-        }
-
         private static float Distance(float ax, float ay, float bx, float by)
         {
             var dx = ax - bx;
@@ -1374,61 +1094,103 @@ namespace JueMingZ.Automation.Combat
             return value > max ? max : value;
         }
 
-        private sealed class AmmoSnapshot
+        private struct BallisticStrategy
         {
-            public int Slot;
-            public int ItemType;
-            public string ItemName;
-            public int AmmoType;
-            public int Shoot;
-            public float ShootSpeed;
-        }
-
-        private sealed class SpecialWeaponRule
-        {
-            public string Kind;
-            public string Name;
-            public string Rule;
+            public string SolverKind;
             public string Mode;
-            public int ShotCount;
-            public float SpreadDegrees;
-            public float ParallelSpacingPixels;
+            public string LeadWindowKind;
+            public string FallbackReason;
+            public float MaxLeadTicks;
             public float FixedLeadTicks;
             public float GravityPerTick;
             public float GravityDelayTicks;
-            public bool ArrowGravity;
-            public bool RainFromSky;
-            public bool HeavyGravity;
-            public bool CursorTarget;
-            public bool UseWeaponShootSpeedOnly;
-            public bool UsesWeaponShoot;
-            public bool UsesAmmoShoot;
+            public bool UseGravity;
 
-            public SpecialWeaponRule()
+            public static BallisticStrategy Create(
+                string solverKind,
+                string mode,
+                string leadWindowKind,
+                float maxLeadTicks)
             {
-                Kind = string.Empty;
-                Name = string.Empty;
-                Rule = string.Empty;
-                Mode = string.Empty;
-                ShotCount = 1;
+                return new BallisticStrategy
+                {
+                    SolverKind = solverKind ?? CombatAimBallisticSolverKinds.FallbackCenter,
+                    Mode = mode ?? string.Empty,
+                    LeadWindowKind = leadWindowKind ?? CombatAimLeadWindowKinds.Fallback,
+                    MaxLeadTicks = maxLeadTicks
+                };
+            }
+
+            public static BallisticStrategy Point(string mode, float fixedLeadTicks)
+            {
+                var strategy = Create(
+                    CombatAimBallisticSolverKinds.PointAim,
+                    string.IsNullOrWhiteSpace(mode) ? "specialPointAim" : mode,
+                    CombatAimLeadWindowKinds.PointShort,
+                    MaxSpecialLeadTicks);
+                strategy.FixedLeadTicks = fixedLeadTicks;
+                return strategy;
+            }
+
+            public static BallisticStrategy Gravity(string mode, float maxLeadTicks, float gravityDelayTicks, float gravityPerTick)
+            {
+                var strategy = Create(
+                    CombatAimBallisticSolverKinds.GravityArc,
+                    mode,
+                    CombatAimLeadWindowKinds.GravityArc,
+                    maxLeadTicks);
+                strategy.UseGravity = true;
+                strategy.GravityDelayTicks = gravityDelayTicks;
+                strategy.GravityPerTick = gravityPerTick;
+                return strategy;
+            }
+
+            public static BallisticStrategy SpreadGravity(string mode, float maxLeadTicks, float gravityDelayTicks, float gravityPerTick)
+            {
+                var strategy = Create(
+                    CombatAimBallisticSolverKinds.Spread,
+                    mode,
+                    CombatAimLeadWindowKinds.SpreadCoverage,
+                    maxLeadTicks);
+                strategy.UseGravity = true;
+                strategy.GravityDelayTicks = gravityDelayTicks;
+                strategy.GravityPerTick = gravityPerTick;
+                return strategy;
+            }
+
+            public static BallisticStrategy Fallback(string mode, string reason)
+            {
+                var strategy = Create(
+                    CombatAimBallisticSolverKinds.FallbackCenter,
+                    mode,
+                    CombatAimLeadWindowKinds.Fallback,
+                    0f);
+                strategy.FallbackReason = reason ?? string.Empty;
+                return strategy;
             }
         }
 
-        private struct ProjectileDefaults
+        private struct LeadWindow
         {
-            public static readonly ProjectileDefaults Empty = new ProjectileDefaults();
+            public readonly float MaxTicks;
+            public readonly string ClampReason;
 
-            public bool HasValue;
-            public string Name;
-            public int ExtraUpdates;
-            public bool Arrow;
-            public int AiStyle;
-            public int Width;
-            public int Height;
-            public bool TileCollide;
-            public bool NoGravity;
-            public bool Friendly;
-            public bool Hostile;
+            public LeadWindow(float maxTicks, string clampReason)
+            {
+                MaxTicks = maxTicks;
+                ClampReason = clampReason ?? CombatAimLeadClampReasons.ProjectileFamilyWindow;
+            }
         }
+
+        private struct LeadClamp
+        {
+            public float RawLeadTicks;
+            public float LeadTicks;
+            public float LeadScale;
+            public float MaxLeadTicks;
+            public string LeadClampReason;
+            public bool LeadClamped;
+        }
+
     }
 }

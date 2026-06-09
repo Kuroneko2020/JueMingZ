@@ -12,6 +12,16 @@ namespace JueMingZ.UI
             try
             {
                 var selection = CombatAutoAimService.CurrentSelection;
+                long tick;
+                if (TerrariaInputCompat.TryReadGameUpdateCount(out tick))
+                {
+                    CombatAimTargetSelection cachedSelection;
+                    if (CombatAimDecisionCache.TryGetRecentMarkerSelection(tick, out cachedSelection))
+                    {
+                        selection = cachedSelection;
+                    }
+                }
+
                 if (selection == null || !selection.MarkerEnabled || selection.Target == null)
                 {
                     return true;

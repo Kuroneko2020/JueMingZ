@@ -47,11 +47,16 @@ namespace JueMingZ.Automation.Combat
         public string SelectedSamplePoint { get; set; } = string.Empty;
         public string AttackSamplePoint { get; set; } = string.Empty;
         public string SelectionSamplePoint { get; set; } = string.Empty;
+        public string SampleSpace { get; set; } = string.Empty;
         public int LineOfSightRejectedSampleCount { get; set; }
+        public int VisibleSampleCount { get; set; }
         public bool NearestHitboxPointPenaltyApplied { get; set; }
         public bool CenterPreferred { get; set; }
         public float SelectedSampleWorldX { get; set; }
         public float SelectedSampleWorldY { get; set; }
+        public float PredictedHitboxCenterX { get; set; }
+        public float PredictedHitboxCenterY { get; set; }
+        public float ProjectileHitRadius { get; set; }
         public string SelectedReason { get; set; } = string.Empty;
         public int LockedTargetId { get; set; } = -1;
         public int LockedTargetType { get; set; }
@@ -69,6 +74,10 @@ namespace JueMingZ.Automation.Combat
         public int AttackTargetType { get; set; }
         public bool MarkerAttackTargetMismatch { get; set; }
         public bool MarkerTargetChangedForAttack { get; set; }
+        public string MarkerAttackMismatchReason { get; set; } = string.Empty;
+        public string DecisionCacheSource { get; set; } = string.Empty;
+        public long DecisionCacheAgeTicks { get; set; }
+        public string DecisionCacheRevalidationReason { get; set; } = string.Empty;
 
         public bool HasTarget
         {

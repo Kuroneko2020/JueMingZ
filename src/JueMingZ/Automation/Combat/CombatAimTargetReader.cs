@@ -528,6 +528,8 @@ namespace JueMingZ.Automation.Combat
             var width = TerrariaNpcReadCompat.Width(npc);
             var height = TerrariaNpcReadCompat.Height(npc);
             var hitbox = TerrariaNpcReadCompat.Hitbox(npc);
+            var ai = TerrariaNpcReadCompat.Ai(npc);
+            var aiSummaryAvailable = ai != null && ai.Length >= 4;
 
             if (width <= 0)
             {
@@ -570,6 +572,18 @@ namespace JueMingZ.Automation.Combat
                 CenterY = center.Y,
                 VelocityX = velocity.X,
                 VelocityY = velocity.Y,
+                NpcAiStyle = TerrariaNpcReadCompat.AiStyle(npc),
+                NoGravity = TerrariaNpcReadCompat.NoGravity(npc),
+                CollideX = TerrariaNpcReadCompat.CollideX(npc),
+                CollideY = TerrariaNpcReadCompat.CollideY(npc),
+                Direction = TerrariaNpcReadCompat.Direction(npc),
+                DirectionY = TerrariaNpcReadCompat.DirectionY(npc),
+                TargetPlayer = TerrariaNpcReadCompat.TargetPlayer(npc),
+                AiSummaryAvailable = aiSummaryAvailable,
+                Ai0 = ReadAiValue(ai, 0),
+                Ai1 = ReadAiValue(ai, 1),
+                Ai2 = ReadAiValue(ai, 2),
+                Ai3 = ReadAiValue(ai, 3),
                 HitboxX = hitbox.X,
                 HitboxY = hitbox.Y,
                 HitboxWidth = hitbox.Width,
@@ -796,6 +810,33 @@ namespace JueMingZ.Automation.Combat
                 AddSkip(skipCounts, "hitboxFallbackToCenter");
             }
 
+            int npcAiStyle;
+            TryGetInt(npc, "aiStyle", out npcAiStyle);
+            bool noGravity;
+            TryGetBool(npc, "noGravity", out noGravity);
+            bool collideX;
+            TryGetBool(npc, "collideX", out collideX);
+            bool collideY;
+            TryGetBool(npc, "collideY", out collideY);
+            int direction;
+            TryGetInt(npc, "direction", out direction);
+            int directionY;
+            TryGetInt(npc, "directionY", out directionY);
+            int targetPlayer;
+            if (!TryGetInt(npc, "target", out targetPlayer))
+            {
+                targetPlayer = -1;
+            }
+
+            float ai0;
+            float ai1;
+            float ai2;
+            float ai3;
+            var aiSummaryAvailable = TryReadAiValue(npc, 0, out ai0) &
+                                     TryReadAiValue(npc, 1, out ai1) &
+                                     TryReadAiValue(npc, 2, out ai2) &
+                                     TryReadAiValue(npc, 3, out ai3);
+
             target = new CombatTargetSnapshot
             {
                 WhoAmI = whoAmI,
@@ -819,6 +860,18 @@ namespace JueMingZ.Automation.Combat
                 CenterY = centerY,
                 VelocityX = velocityX,
                 VelocityY = velocityY,
+                NpcAiStyle = npcAiStyle,
+                NoGravity = noGravity,
+                CollideX = collideX,
+                CollideY = collideY,
+                Direction = direction,
+                DirectionY = directionY,
+                TargetPlayer = targetPlayer,
+                AiSummaryAvailable = aiSummaryAvailable,
+                Ai0 = ai0,
+                Ai1 = ai1,
+                Ai2 = ai2,
+                Ai3 = ai3,
                 HitboxX = hitboxX,
                 HitboxY = hitboxY,
                 HitboxWidth = hitboxWidth,
@@ -975,6 +1028,37 @@ namespace JueMingZ.Automation.Combat
             catch
             {
                 return string.Empty;
+            }
+        }
+
+        private static float ReadAiValue(float[] ai, int index)
+        {
+            return ai != null && index >= 0 && index < ai.Length ? ai[index] : 0f;
+        }
+
+        private static bool TryReadAiValue(object npc, int index, out float value)
+        {
+            value = 0f;
+            if (npc == null || index < 0)
+            {
+                return false;
+            }
+
+            var ai = GameStateReflection.AsList(GameStateReflection.GetMember(npc, "ai"));
+            if (ai == null || index >= ai.Count)
+            {
+                return false;
+            }
+
+            try
+            {
+                value = Convert.ToSingle(ai[index], CultureInfo.InvariantCulture);
+                return true;
+            }
+            catch
+            {
+                value = 0f;
+                return false;
             }
         }
 

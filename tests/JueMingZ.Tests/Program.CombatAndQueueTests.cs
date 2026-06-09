@@ -2370,6 +2370,13 @@ namespace JueMingZ.Tests
             AssertContains(json, "\"applyPolicy\"");
             AssertContains(json, "\"lineOfSightResult\"");
             AssertContains(json, "\"markerAttackTargetMismatch\"");
+            AssertContains(json, "\"markerAttackMismatchReason\"");
+            AssertContains(json, "\"markerAttackTargetMismatchReason\"");
+            AssertContains(json, "\"decisionCacheSource\"");
+            AssertContains(json, "\"decisionCacheAgeTicks\"");
+            AssertContains(json, "\"decisionCacheRevalidationReason\"");
+            AssertContains(json, "\"aimDecisionCacheHit\"");
+            AssertContains(json, "\"liveTargetRevalidation\"");
             AssertContains(json, "\"itemCheckAimEntered\"");
             AssertContains(json, "\"mouseStateCaptured\"");
             AssertContains(json, "\"weaponFamily\"");
@@ -2436,13 +2443,862 @@ namespace JueMingZ.Tests
             AssertContains(json, "\"specialWeaponRuleKind\"");
             AssertContains(json, "\"specialWeaponRuleName\"");
             AssertContains(json, "\"specialWeaponRuleApplied\"");
+            AssertContains(json, "\"specialWeaponSolverKind\"");
+            AssertContains(json, "\"specialWeaponLeadWindowKind\"");
+            AssertContains(json, "\"specialWeaponLeadPolicy\"");
+            AssertContains(json, "\"specialWeaponDiagnosticsReason\"");
             AssertContains(json, "\"specialWeaponAimMode\"");
             AssertContains(json, "\"specialWeaponAimPoint\"");
+            AssertContains(json, "\"returningPhaseAssumption\"");
             AssertContains(json, "\"specialWeaponUsesCursorTarget\"");
             AssertContains(json, "\"specialWeaponUsesWeaponProjectile\"");
             AssertContains(json, "\"specialWeaponUsesAmmoProjectile\"");
             AssertContains(json, "\"specialWeaponUsesWeaponShoot\"");
             AssertContains(json, "\"specialWeaponUsesAmmoShoot\"");
+            AssertContains(json, "\"projectileProfileFamily\"");
+            AssertContains(json, "\"projectileProfileKind\"");
+            AssertContains(json, "\"projectileProfileStatus\"");
+            AssertContains(json, "\"projectileProfileDegradedReason\"");
+            AssertContains(json, "\"profileFallbackReason\"");
+            AssertContains(json, "\"projectileProfileSpeedSource\"");
+            AssertContains(json, "\"effectiveProjectileSpeedSource\"");
+            AssertContains(json, "\"projectileProfileMagicQuiverApplied\"");
+            AssertContains(json, "\"magicQuiverApplied\"");
+            AssertContains(json, "\"projectileProfileArcheryApplied\"");
+            AssertContains(json, "\"archeryApplied\"");
+            AssertContains(json, "\"projectileEffectiveUpdatesPerTick\"");
+            AssertContains(json, "\"effectiveUpdatesPerTick\"");
+            AssertContains(json, "\"projectileRadiusForHit\"");
+            AssertContains(json, "\"ballisticSolverKind\"");
+            AssertContains(json, "\"solverKind\"");
+            AssertContains(json, "\"ballisticLeadWindowKind\"");
+            AssertContains(json, "\"leadWindowKind\"");
+            AssertContains(json, "\"ballisticLeadClampReason\"");
+            AssertContains(json, "\"leadClampReason\"");
+            AssertContains(json, "\"ballisticPredictionConfidence\"");
+            AssertContains(json, "\"predictionConfidence\"");
+            AssertContains(json, "\"sampleSpace\"");
+            AssertContains(json, "\"predictedHitboxCenter\"");
+            AssertContains(json, "\"visibleSampleCount\"");
+            AssertContains(json, "\"projectileHitRadius\"");
+            AssertContains(json, "\"ballisticSampleSpace\"");
+            AssertContains(json, "\"ballisticSelectedSamplePoint\"");
+            AssertContains(json, "\"ballisticRawLeadTicks\"");
+            AssertContains(json, "\"ballisticLeadWindowMaxTicks\"");
+            AssertContains(json, "\"ballisticLeadScale\"");
+            AssertContains(json, "\"ballisticGravityDelayTicks\"");
+            AssertContains(json, "\"ballisticGravityCompensationPixels\"");
+            AssertContains(json, "\"gravityCompensationPixels\"");
+            AssertContains(json, "\"effectiveProjectileSpeed\"");
+            AssertContains(json, "\"targetMotionProfileKind\"");
+            AssertContains(json, "\"targetMotionKind\"");
+            AssertContains(json, "\"targetVelocityConfidence\"");
+            AssertContains(json, "\"targetAcceleration\"");
+            AssertContains(json, "\"targetRecommendedMaxLeadTicks\"");
+            AssertContains(json, "\"targetHistoryResetReason\"");
+            AssertContains(json, "\"aimDecisionCacheHit\":true");
+            AssertContains(json, "\"liveTargetRevalidation\":\"lineOfSightChanged\"");
+            AssertContains(json, "\"markerAttackTargetMismatchReason\":\"lineOfSightChanged\"");
+            AssertContains(json, "\"projectileProfileKind\":\"GravityArc\"");
+            AssertContains(json, "\"effectiveProjectileSpeed\":13.5");
+            AssertContains(json, "\"gravityCompensationPixels\":3.25");
+        }
+
+        private static void CombatAimProjectileProfileResolvesBowAndArrow()
+        {
+            var player = new FakePlayer();
+            var profile = BuildCombatAimProjectileProfile(
+                player,
+                new FakeItem
+                {
+                    type = 10000,
+                    stack = 1,
+                    Name = "Profile Test Bow",
+                    damage = 9,
+                    shoot = Terraria.ID.ProjectileID.WoodenArrowFriendly,
+                    shootSpeed = 6f,
+                    useAmmo = Terraria.ID.AmmoID.Arrow,
+                    ranged = true
+                },
+                new FakeItem
+                {
+                    type = 40,
+                    stack = 99,
+                    Name = "Wooden Arrow",
+                    ammo = Terraria.ID.AmmoID.Arrow,
+                    shoot = Terraria.ID.ProjectileID.WoodenArrowFriendly,
+                    shootSpeed = 3f,
+                    damage = 5,
+                    knockBack = 1.25f
+                });
+
+            AssertStringEquals(profile.ProfileCompleteness, "complete", "profile status");
+            AssertStringEquals(profile.ProfileFamilyHint, "GravityArc", "profile family");
+            AssertStringEquals(profile.ResolvedProjectileRole, "ammoProjectile", "projectile role");
+            AssertNear(profile.BaseProjectileSpeed, 9d, "bow arrow base speed");
+            AssertNear(profile.EffectiveProjectileSpeed, 9d, "bow arrow effective speed");
+            if (!profile.AmmoAvailable ||
+                !profile.AmmoArrowLike ||
+                profile.ProjectileType != Terraria.ID.ProjectileID.WoodenArrowFriendly ||
+                profile.ProjectileRadiusForHit < 5f)
+            {
+                throw new InvalidOperationException("Expected basic bow + arrow profile to resolve ammo, arrow role, projectile type, and hit radius.");
+            }
+        }
+
+        private static void CombatAimProjectileProfileAppliesQuiverAndArcherySpeed()
+        {
+            var player = new FakePlayer
+            {
+                magicQuiver = true
+            };
+            player.buffType[0] = Terraria.ID.BuffID.Archery;
+            player.buffTime[0] = 60;
+
+            var profile = BuildCombatAimProjectileProfile(
+                player,
+                new FakeItem
+                {
+                    type = 10001,
+                    stack = 1,
+                    Name = "Profile Test Bow",
+                    damage = 9,
+                    shoot = Terraria.ID.ProjectileID.WoodenArrowFriendly,
+                    shootSpeed = 16f,
+                    useAmmo = Terraria.ID.AmmoID.Arrow,
+                    ranged = true
+                },
+                new FakeItem
+                {
+                    type = 40,
+                    stack = 99,
+                    Name = "Wooden Arrow",
+                    ammo = Terraria.ID.AmmoID.Arrow,
+                    shoot = Terraria.ID.ProjectileID.WoodenArrowFriendly,
+                    shootSpeed = 0.5f
+                });
+
+            AssertNear(profile.BaseProjectileSpeed, 20d, "quiver archery capped speed");
+            AssertNear(profile.EffectiveProjectileSpeed, 40d, "quiver archery effective speed");
+            if (!profile.MagicQuiverApplied ||
+                !profile.ArcheryApplied ||
+                !profile.ArcherySpeedCapped ||
+                !profile.MagicQuiverEffectiveUpdateApplied ||
+                profile.EffectiveUpdatesPerTick != 2)
+            {
+                throw new InvalidOperationException("Expected quiver + archery profile to apply speed cap and friendly-arrow effective update floor.");
+            }
+        }
+
+        private static void CombatAimProjectileProfileKeepsGunProjWeaponSpeed()
+        {
+            const int gunProjWeaponType = 5002;
+            var previous = Terraria.ID.ItemID.Sets.gunProj[gunProjWeaponType];
+            Terraria.ID.ItemID.Sets.gunProj[gunProjWeaponType] = true;
+            try
+            {
+                var profile = BuildCombatAimProjectileProfile(
+                    new FakePlayer(),
+                    new FakeItem
+                    {
+                        type = gunProjWeaponType,
+                        stack = 1,
+                        Name = "Profile Test Gun",
+                        damage = 12,
+                        shoot = Terraria.ID.ProjectileID.Bullet,
+                        shootSpeed = 10f,
+                        useAmmo = Terraria.ID.AmmoID.Bullet,
+                        ranged = true
+                    },
+                    new FakeItem
+                    {
+                        type = 97,
+                        stack = 99,
+                        Name = "Musket Ball",
+                        ammo = Terraria.ID.AmmoID.Bullet,
+                        shoot = Terraria.ID.ProjectileID.Bullet,
+                        shootSpeed = 4f
+                    });
+
+                AssertNear(profile.BaseProjectileSpeed, 10d, "gunProj base speed");
+                AssertNear(profile.EffectiveProjectileSpeed, 10d, "gunProj effective speed");
+                AssertStringEquals(profile.ProfileSpeedSource, "weaponGunProjOnly", "gunProj speed source");
+                if (!profile.GunProj || profile.AmmoSpeedApplied)
+                {
+                    throw new InvalidOperationException("Expected gunProj profile to use weapon shootSpeed without ammo speed.");
+                }
+            }
+            finally
+            {
+                Terraria.ID.ItemID.Sets.gunProj[gunProjWeaponType] = previous;
+            }
+        }
+
+        private static void CombatAimProjectileProfileResolvesSpecificLauncherMapping()
+        {
+            const int launcherType = 10003;
+            const int ammoItemType = 10004;
+            Dictionary<int, int> previous;
+            Terraria.ID.AmmoID.Sets.SpecificLauncherAmmoProjectileMatches.TryGetValue(launcherType, out previous);
+            Terraria.ID.AmmoID.Sets.SpecificLauncherAmmoProjectileMatches[launcherType] = new Dictionary<int, int>
+            {
+                { ammoItemType, 9000 }
+            };
+
+            try
+            {
+                var profile = BuildCombatAimProjectileProfile(
+                    new FakePlayer(),
+                    new FakeItem
+                    {
+                        type = launcherType,
+                        stack = 1,
+                        Name = "Profile Test Launcher",
+                        damage = 20,
+                        shoot = 100,
+                        shootSpeed = 8f,
+                        useAmmo = ammoItemType,
+                        ranged = true
+                    },
+                    new FakeItem
+                    {
+                        type = ammoItemType,
+                        stack = 99,
+                        Name = "Mapped Ammo",
+                        ammo = ammoItemType,
+                        shoot = 101,
+                        shootSpeed = 2f
+                    });
+
+                if (!profile.SpecificLauncherAmmoProjectileMatch ||
+                    profile.ProjectileType != 9000 ||
+                    !string.Equals(profile.ProjectileName, "Specific Launcher Projectile", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected specific launcher mapping to override ammo projectile.");
+                }
+            }
+            finally
+            {
+                if (previous == null)
+                {
+                    Terraria.ID.AmmoID.Sets.SpecificLauncherAmmoProjectileMatches.Remove(launcherType);
+                }
+                else
+                {
+                    Terraria.ID.AmmoID.Sets.SpecificLauncherAmmoProjectileMatches[launcherType] = previous;
+                }
+            }
+        }
+
+        private static void CombatAimProjectileProfileCarriesEffectiveExtraUpdates()
+        {
+            var profile = BuildCombatAimProjectileProfile(
+                new FakePlayer(),
+                new FakeItem
+                {
+                    type = 10005,
+                    stack = 1,
+                    Name = "Profile Test Fast Bow",
+                    damage = 9,
+                    shoot = Terraria.ID.ProjectileID.WoodenArrowFriendly,
+                    shootSpeed = 7f,
+                    useAmmo = Terraria.ID.AmmoID.Arrow,
+                    ranged = true
+                },
+                new FakeItem
+                {
+                    type = 10006,
+                    stack = 99,
+                    Name = "Fast Test Arrow",
+                    ammo = Terraria.ID.AmmoID.Arrow,
+                    shoot = 9001,
+                    shootSpeed = 3f
+                });
+
+            if (profile.ProjectileExtraUpdates != 2 || profile.EffectiveUpdatesPerTick != 3)
+            {
+                throw new InvalidOperationException("Expected projectile defaults extraUpdates=2 to become 3 effective updates per tick.");
+            }
+
+            AssertNear(profile.EffectiveProjectileSpeed, 30d, "extra update effective speed");
+        }
+
+        private static void CombatAimTargetMotionProfileClassifiesStableLinear()
+        {
+            CombatAimTargetHistoryService.Clear();
+            try
+            {
+                CombatAimTargetHistoryService.UpdateFromRead(ReadResultWith(TargetSnapshot(7, 100, 0f, 0f, 2f, 0f, 0, false, false)), 10);
+                var current = TargetSnapshot(7, 100, 2f, 0f, 2f, 0f, 0, false, false);
+                CombatAimTargetHistoryService.UpdateFromRead(ReadResultWith(current), 11);
+
+                AssertMotionKind(current, CombatAimTargetMotionProfile.StableLinear);
+                if (!current.SmoothedVelocityAvailable ||
+                    current.MotionProfile == null ||
+                    current.MotionProfile.VelocityConfidence < 0.9f ||
+                    !current.MotionProfile.PreferSmoothedVelocity)
+                {
+                    throw new InvalidOperationException("Expected stable linear target to keep high smoothed velocity confidence.");
+                }
+            }
+            finally
+            {
+                CombatAimTargetHistoryService.Clear();
+            }
+        }
+
+        private static void CombatAimTargetMotionProfileResetsOnTeleport()
+        {
+            CombatAimTargetHistoryService.Clear();
+            try
+            {
+                CombatAimTargetHistoryService.UpdateFromRead(ReadResultWith(TargetSnapshot(8, 101, 0f, 0f, 0f, 0f, 0, false, false)), 20);
+                var current = TargetSnapshot(8, 101, 500f, 0f, 0f, 0f, 0, false, false);
+                CombatAimTargetHistoryService.UpdateFromRead(ReadResultWith(current), 21);
+
+                AssertMotionKind(current, CombatAimTargetMotionProfile.TeleportOrDashRecent);
+                AssertStringEquals(current.MotionProfile.HistoryResetReason, "teleportDistance", "teleport reset reason");
+                AssertNear(current.SmoothedVelocityX, 0d, "teleport smoothed velocity");
+            }
+            finally
+            {
+                CombatAimTargetHistoryService.Clear();
+            }
+        }
+
+        private static void CombatAimTargetMotionProfileMarksAiStyleOneGrounded()
+        {
+            CombatAimTargetHistoryService.Clear();
+            try
+            {
+                var current = TargetSnapshot(9, 102, 0f, 0f, 0.2f, 0f, 1, false, true);
+                CombatAimTargetHistoryService.UpdateFromRead(ReadResultWith(current), 30);
+
+                AssertMotionKind(current, CombatAimTargetMotionProfile.JumpingGrounded);
+                if (current.MotionProfile.MotionConfidence >= 0.6f ||
+                    current.MotionProfile.RecommendedMaxLeadTicks > 18.001f ||
+                    !current.MotionProfile.PreferCurrentVelocity)
+                {
+                    throw new InvalidOperationException("Expected grounded aiStyle=1 target to use a conservative low-trust motion profile.");
+                }
+            }
+            finally
+            {
+                CombatAimTargetHistoryService.Clear();
+            }
+        }
+
+        private static void CombatAimTargetMotionProfileTickGapAvoidsHugeMeasuredVelocity()
+        {
+            CombatAimTargetHistoryService.Clear();
+            try
+            {
+                CombatAimTargetHistoryService.UpdateFromRead(ReadResultWith(TargetSnapshot(10, 103, 0f, 0f, 1f, 0f, 0, false, false)), 40);
+                var current = TargetSnapshot(10, 103, 400f, 0f, 1f, 0f, 0, false, false);
+                CombatAimTargetHistoryService.UpdateFromRead(ReadResultWith(current), 75);
+
+                AssertMotionKind(current, CombatAimTargetMotionProfile.TeleportOrDashRecent);
+                AssertStringEquals(current.MotionProfile.HistoryResetReason, "staleTickGap", "tick gap reset reason");
+                AssertNear(current.SmoothedVelocityX, 1d, "tick gap smoothed velocity");
+            }
+            finally
+            {
+                CombatAimTargetHistoryService.Clear();
+            }
+        }
+
+        private static void CombatAimTargetMotionProfileClampsAcceleration()
+        {
+            CombatAimTargetHistoryService.Clear();
+            try
+            {
+                CombatAimTargetHistoryService.UpdateFromRead(ReadResultWith(TargetSnapshot(11, 104, 0f, 0f, 0f, 0f, 0, false, false)), 80);
+                CombatAimTargetHistoryService.UpdateFromRead(ReadResultWith(TargetSnapshot(11, 104, 2f, 0f, 2f, 0f, 0, false, false)), 81);
+                var current = TargetSnapshot(11, 104, 14f, 0f, 12f, 0f, 0, false, false);
+                CombatAimTargetHistoryService.UpdateFromRead(ReadResultWith(current), 82);
+
+                if (current.MotionProfile == null ||
+                    Math.Abs(current.MotionProfile.AccelerationX) > 3.001f ||
+                    Math.Abs(current.MotionProfile.AccelerationY) > 3.001f)
+                {
+                    throw new InvalidOperationException("Expected target acceleration to be clamped to the bounded profile budget.");
+                }
+            }
+            finally
+            {
+                CombatAimTargetHistoryService.Clear();
+            }
+        }
+
+        private static void CombatAimBallisticSolverUsesPointSolverForBeams()
+        {
+            var solution = SolveCombatAimBallistic(
+                new FakePlayer(),
+                new FakeItem
+                {
+                    type = 10100,
+                    stack = 1,
+                    Name = "Beam Test Staff",
+                    damage = 30,
+                    shoot = 9004,
+                    shootSpeed = 16f,
+                    magic = true
+                },
+                null,
+                BallisticTarget(260f, 21f, 3f, 0f, CombatAimTargetMotionProfile.StableLinear, 0.9f, 0.95f, 1f, 45f, false));
+
+            AssertStringEquals(solution.SolverKind, CombatAimBallisticSolverKinds.PointAim, "beam solver kind");
+            AssertStringEquals(solution.LeadWindowKind, CombatAimLeadWindowKinds.PointShort, "beam lead window");
+            AssertStringEquals(solution.LeadClampReason, CombatAimLeadClampReasons.FixedPointLead, "beam clamp reason");
+            AssertStringEquals(solution.SpecialWeaponKind, "beamOrInstant", "beam special kind");
+            AssertStringEquals(solution.SpecialWeaponLeadPolicy, "nearInstantShortLead", "beam lead policy");
+            AssertNear(solution.LeadTicks, 2d, "beam fixed lead");
+        }
+
+        private static void CombatAimBallisticSolverUsesShortLeadForHoming()
+        {
+            var solution = SolveCombatAimBallistic(
+                new FakePlayer(),
+                new FakeItem
+                {
+                    type = 10105,
+                    stack = 1,
+                    Name = "Homing Test Staff",
+                    damage = 30,
+                    shoot = 9005,
+                    shootSpeed = 9f,
+                    magic = true
+                },
+                null,
+                BallisticTarget(360f, 21f, 3f, 0f, CombatAimTargetMotionProfile.StableLinear, 0.9f, 0.95f, 1f, 45f, false));
+
+            AssertStringEquals(solution.SolverKind, CombatAimBallisticSolverKinds.PointAim, "homing solver kind");
+            AssertStringEquals(solution.LeadWindowKind, CombatAimLeadWindowKinds.PointShort, "homing lead window");
+            AssertStringEquals(solution.SpecialWeaponKind, "homingOrSelfCorrecting", "homing special kind");
+            AssertStringEquals(solution.SpecialWeaponLeadPolicy, "homingShortLead", "homing lead policy");
+            AssertNear(solution.LeadTicks, 5d, "homing fixed lead");
+        }
+
+        private static void CombatAimBallisticSolverKeepsHighSpeedLeadShort()
+        {
+            var solution = SolveCombatAimBallistic(
+                new FakePlayer(),
+                new FakeItem
+                {
+                    type = 10101,
+                    stack = 1,
+                    Name = "Fast Test Gun",
+                    damage = 24,
+                    shoot = Terraria.ID.ProjectileID.Bullet,
+                    shootSpeed = 20f,
+                    useAmmo = Terraria.ID.AmmoID.Bullet,
+                    ranged = true
+                },
+                new FakeItem
+                {
+                    type = 97,
+                    stack = 99,
+                    Name = "Musket Ball",
+                    ammo = Terraria.ID.AmmoID.Bullet,
+                    shoot = Terraria.ID.ProjectileID.Bullet,
+                    shootSpeed = 4f
+                },
+                BallisticTarget(1000f, 21f, 4f, 0f, CombatAimTargetMotionProfile.StableLinear, 0.9f, 0.95f, 1f, 45f, false));
+
+            AssertStringEquals(solution.SolverKind, CombatAimBallisticSolverKinds.LinearIntercept, "high speed solver kind");
+            AssertStringEquals(solution.LeadWindowKind, CombatAimLeadWindowKinds.HighSpeedShort, "high speed lead window");
+            if (solution.LeadTicks > 24.001f ||
+                solution.LeadWindowMaxTicks > 24.001f ||
+                !solution.LeadClamped)
+            {
+                throw new InvalidOperationException("Expected high speed projectile lead to stay inside the short window.");
+            }
+        }
+
+        private static void CombatAimBallisticSolverAllowsTrustedSlowProjectileLead()
+        {
+            var solution = SolveCombatAimBallistic(
+                new FakePlayer(),
+                SlowMagicWeapon(),
+                null,
+                BallisticTarget(260f, 21f, 2f, 0f, CombatAimTargetMotionProfile.StableLinear, 0.9f, 0.95f, 1f, 45f, false));
+
+            AssertStringEquals(solution.SolverKind, CombatAimBallisticSolverKinds.SlowProjectile, "slow projectile solver kind");
+            AssertStringEquals(solution.LeadWindowKind, CombatAimLeadWindowKinds.SlowLong, "slow projectile lead window");
+            if (solution.LeadTicks <= 45.001f || solution.LeadWindowMaxTicks < 90f)
+            {
+                throw new InvalidOperationException("Expected trusted slow projectile to use a long lead window above the old 45 tick cap.");
+            }
+        }
+
+        private static void CombatAimBallisticSolverClampsSlowProjectileLowTrustLead()
+        {
+            var solution = SolveCombatAimBallistic(
+                new FakePlayer(),
+                SlowMagicWeapon(),
+                null,
+                BallisticTarget(260f, 21f, 2f, 0f, CombatAimTargetMotionProfile.JumpingGrounded, 0.45f, 0.5f, 0.55f, 18f, true));
+
+            AssertStringEquals(solution.SolverKind, CombatAimBallisticSolverKinds.SlowProjectile, "low trust slow solver kind");
+            if (solution.LeadTicks > 18.001f ||
+                solution.LeadWindowMaxTicks > 18.001f ||
+                !string.Equals(solution.LeadClampReason, CombatAimLeadClampReasons.MotionRecommendedMaxLead, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected low-trust jumping target to clamp slow projectile prediction to the motion profile window.");
+            }
+        }
+
+        private static void CombatAimBallisticSolverUsesGravityProfileInputs()
+        {
+            var player = new FakePlayer
+            {
+                magicQuiver = true
+            };
+            player.buffType[0] = Terraria.ID.BuffID.Archery;
+            player.buffTime[0] = 60;
+
+            var solution = SolveCombatAimBallistic(
+                player,
+                new FakeItem
+                {
+                    type = 10102,
+                    stack = 1,
+                    Name = "Gravity Test Bow",
+                    damage = 12,
+                    shoot = Terraria.ID.ProjectileID.WoodenArrowFriendly,
+                    shootSpeed = 16f,
+                    useAmmo = Terraria.ID.AmmoID.Arrow,
+                    ranged = true
+                },
+                new FakeItem
+                {
+                    type = 40,
+                    stack = 99,
+                    Name = "Wooden Arrow",
+                    ammo = Terraria.ID.AmmoID.Arrow,
+                    shoot = Terraria.ID.ProjectileID.WoodenArrowFriendly,
+                    shootSpeed = 0.5f
+                },
+                BallisticTarget(500f, 21f, 1.5f, 0f, CombatAimTargetMotionProfile.StableLinear, 0.9f, 0.95f, 1f, 45f, false));
+
+            AssertStringEquals(solution.SolverKind, CombatAimBallisticSolverKinds.GravityArc, "gravity solver kind");
+            AssertStringEquals(solution.LeadWindowKind, CombatAimLeadWindowKinds.GravityArc, "gravity lead window");
+            AssertNear(solution.EffectiveProjectileSpeed, 40d, "gravity solver effective speed");
+            AssertNear(solution.GravityPerTick, 0.2d, "gravity solver effective gravity");
+            AssertNear(solution.GravityDelayTicks, 10d, "gravity delay");
+        }
+
+        private static void CombatAimBallisticSolverClassifiesReturningOutbound()
+        {
+            var solution = SolveCombatAimBallistic(
+                new FakePlayer(),
+                new FakeItem
+                {
+                    type = 10103,
+                    stack = 1,
+                    Name = "Returning Test Weapon",
+                    damage = 18,
+                    shoot = 9003,
+                    shootSpeed = 10f,
+                    ranged = true
+                },
+                null,
+                BallisticTarget(520f, 21f, 2.5f, 0f, CombatAimTargetMotionProfile.StableLinear, 0.9f, 0.95f, 1f, 45f, false));
+
+            AssertStringEquals(solution.SolverKind, CombatAimBallisticSolverKinds.ReturningProjectile, "returning solver kind");
+            AssertStringEquals(solution.LeadWindowKind, CombatAimLeadWindowKinds.ReturningOutbound, "returning lead window");
+            AssertStringEquals(solution.SpecialWeaponKind, "returning", "returning special kind");
+            AssertStringEquals(solution.SpecialWeaponLeadPolicy, "outboundOnly", "returning lead policy");
+            AssertStringEquals(solution.ReturningPhaseAssumption, "outboundOnly", "returning phase assumption");
+            if (solution.LeadWindowMaxTicks > 30.001f)
+            {
+                throw new InvalidOperationException("Expected returning projectile to stay in the outbound lead window.");
+            }
+        }
+
+        private static void CombatAimBallisticSolverClassifiesSpreadCoverage()
+        {
+            var solution = SolveCombatAimBallistic(
+                new FakePlayer(),
+                new FakeItem
+                {
+                    type = 3475,
+                    stack = 1,
+                    Name = "Vortex Beater",
+                    damage = 50,
+                    shoot = 615,
+                    shootSpeed = 14f,
+                    useAmmo = Terraria.ID.AmmoID.Bullet,
+                    ranged = true
+                },
+                new FakeItem
+                {
+                    type = 97,
+                    stack = 99,
+                    Name = "Musket Ball",
+                    ammo = Terraria.ID.AmmoID.Bullet,
+                    shoot = Terraria.ID.ProjectileID.Bullet,
+                    shootSpeed = 4f
+                },
+                BallisticTarget(500f, 21f, 2f, 0f, CombatAimTargetMotionProfile.StableLinear, 0.9f, 0.95f, 1f, 45f, false));
+
+            AssertStringEquals(solution.SolverKind, CombatAimBallisticSolverKinds.Spread, "spread solver kind");
+            AssertStringEquals(solution.LeadWindowKind, CombatAimLeadWindowKinds.SpreadCoverage, "spread lead window");
+            AssertStringEquals(solution.SpecialWeaponKind, "dualProjectileSpread", "spread special kind");
+            AssertStringEquals(solution.SpecialWeaponLeadPolicy, "spreadCoverage", "spread lead policy");
+            AssertNear(solution.SpecialSpreadDegrees, 8d, "spread coverage degrees");
+            if (solution.LeadWindowMaxTicks > 18.001f)
+            {
+                throw new InvalidOperationException("Expected spread solver to use a coverage window, not the ordinary single-projectile window.");
+            }
+        }
+
+        private static void CombatAimBallisticSolverFallsBackWithoutProjectile()
+        {
+            var solution = SolveCombatAimBallistic(
+                new FakePlayer(),
+                new FakeItem
+                {
+                    type = 10104,
+                    stack = 1,
+                    Name = "Fallback Test Sword",
+                    damage = 12,
+                    melee = true
+                },
+                null,
+                BallisticTarget(240f, 21f, 2f, 0f, CombatAimTargetMotionProfile.StableLinear, 0.9f, 0.95f, 1f, 45f, false));
+
+            AssertStringEquals(solution.SolverKind, CombatAimBallisticSolverKinds.FallbackCenter, "fallback solver kind");
+            AssertStringEquals(solution.LeadWindowKind, CombatAimLeadWindowKinds.Fallback, "fallback lead window");
+            AssertStringEquals(solution.LeadClampReason, CombatAimLeadClampReasons.CenterFallback, "fallback clamp reason");
+            if (!solution.ConservativeCenter || !solution.Solved)
+            {
+                throw new InvalidOperationException("Expected missing projectile semantics to fall back to the target center.");
+            }
+        }
+
+        private static void CombatAimPredictedSamplerLeadsSmallMovingHitbox()
+        {
+            CombatAimLineOfSight.SetCanHitLineOverrideForTesting((fromX, fromY, toX, toY) => true);
+            try
+            {
+                var target = BallisticTarget(300f, 21f, 4f, 0f, CombatAimTargetMotionProfile.StableLinear, 0.92f, 0.95f, 1f, 45f, false);
+                var selection = SelectCombatAimSampleForTesting(target, CombatAimModes.TargetPriorityClearLine, CombatAimTargetMotionProfile.StableLinear, 18f);
+
+                AssertStringEquals(selection.SampleSpace, CombatAimPredictedHitboxSampler.SampleSpacePredicted, "moving hitbox sample space");
+                if (selection.BallisticTarget == null ||
+                    selection.BallisticSolution == null ||
+                    selection.SelectedSampleWorldX <= target.CenterX + 8f ||
+                    Math.Abs(selection.BallisticTarget.CenterX - selection.SelectedSampleWorldX) > 0.001f ||
+                    Math.Abs(selection.BallisticSolution.AimWorldX - selection.SelectedSampleWorldX) > 0.001f)
+                {
+                    throw new InvalidOperationException("Expected predicted sampler to bind the final moving-hitbox sample to both BallisticTarget and ballistic aim.");
+                }
+            }
+            finally
+            {
+                CombatAimLineOfSight.SetCanHitLineOverrideForTesting(null);
+            }
+        }
+
+        private static void CombatAimPredictedSamplerChoosesVisibleLargeHitboxSample()
+        {
+            CombatAimLineOfSight.SetCanHitLineOverrideForTesting((fromX, fromY, toX, toY) => toX >= 398f);
+            try
+            {
+                var target = BallisticTarget(360f, 21f, 0f, 0f, CombatAimTargetMotionProfile.LargeOrSegmented, 0.8f, 0.8f, 1f, 36f, false);
+                target.HitboxX = 280f;
+                target.HitboxY = -29f;
+                target.HitboxWidth = 160f;
+                target.HitboxHeight = 100f;
+                target.Width = 160;
+                target.Height = 100;
+                target.LifeMax = 3000;
+
+                var selection = SelectCombatAimSampleForTesting(target, CombatAimModes.TargetPriorityClearLine, CombatAimTargetMotionProfile.LargeOrSegmented, 18f);
+
+                AssertStringEquals(selection.SelectedSamplePoint, "rightMid", "large visible sample");
+                if (!selection.LineClear ||
+                    selection.VisibleSampleCount <= 0 ||
+                    selection.LineOfSightRejectedSampleCount <= 0)
+                {
+                    throw new InvalidOperationException("Expected large semi-blocked target to reject blocked samples and keep a visible hitbox sample.");
+                }
+            }
+            finally
+            {
+                CombatAimLineOfSight.SetCanHitLineOverrideForTesting(null);
+            }
+        }
+
+        private static void CombatAimPredictedSamplerKeepsLowConfidenceCurrent()
+        {
+            CombatAimLineOfSight.SetCanHitLineOverrideForTesting((fromX, fromY, toX, toY) => true);
+            try
+            {
+                var target = BallisticTarget(300f, 21f, 5f, -2f, CombatAimTargetMotionProfile.JumpingAirborne, 0.35f, 0.35f, 0.75f, 18f, true);
+                var selection = SelectCombatAimSampleForTesting(target, CombatAimModes.TargetPriorityClearLine, CombatAimTargetMotionProfile.JumpingAirborne, 18f);
+
+                AssertStringEquals(selection.SampleSpace, CombatAimPredictedHitboxSampler.SampleSpaceCurrent, "low confidence sample space");
+                AssertStringEquals(selection.SelectedSamplePoint, "center", "low confidence stable sample");
+                if (selection.PredictedHitboxCenterX <= target.CenterX)
+                {
+                    throw new InvalidOperationException("Expected low-confidence diagnostics to still expose the predicted hitbox center.");
+                }
+            }
+            finally
+            {
+                CombatAimLineOfSight.SetCanHitLineOverrideForTesting(null);
+            }
+        }
+
+        private static void CombatAimPredictedSamplerKeepsCenterOverNearest()
+        {
+            var target = BallisticTarget(300f, 21f, 0f, 0f, CombatAimTargetMotionProfile.StableLinear, 0.9f, 0.9f, 1f, 36f, false);
+            var selection = SelectCombatAimSampleForTesting(target, CombatAimModes.TargetPriorityNearest, CombatAimTargetMotionProfile.StableLinear, 18f);
+
+            AssertStringEquals(selection.SampleSpace, CombatAimPredictedHitboxSampler.SampleSpaceCurrent, "nearest sample space");
+            AssertStringEquals(selection.SelectedSamplePoint, "center", "nearest sample center preference");
+            if (!selection.CenterPreferred || !selection.NearestHitboxPointPenaltyApplied)
+            {
+                throw new InvalidOperationException("Expected nearestHitboxPoint to remain penalized unless visibility clearly justifies it.");
+            }
+        }
+
+        private static void CombatAimDecisionCacheReusesAttackSelectionWithinTtl()
+        {
+            CombatAimDecisionCache.ResetForTesting();
+            try
+            {
+                var selection = CachedCombatAimSelectionForTesting(7, 101, 120f, 140f);
+                CombatAimDecisionCache.StoreSelection("cache-key", 100, selection, "Attack");
+
+                CombatAimTargetSelection cached;
+                if (!CombatAimDecisionCache.TryGetSelection("cache-key", 103, out cached))
+                {
+                    throw new InvalidOperationException("Expected cached combat aim decision to be reusable within the short TTL.");
+                }
+
+                if (!cached.SelectionCacheHit ||
+                    cached.DecisionCacheAgeTicks != 3 ||
+                    !string.Equals(cached.DecisionCacheSource, "Attack", StringComparison.Ordinal) ||
+                    cached.Target == null ||
+                    cached.Target.WhoAmI != 7 ||
+                    !string.Equals(cached.SelectedSamplePoint, "center", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected cached decision metadata and target identity to survive cloning.");
+                }
+
+                cached.Target.CenterX = 999f;
+                CombatAimTargetSelection cachedAgain;
+                if (!CombatAimDecisionCache.TryGetSelection("cache-key", 103, out cachedAgain) ||
+                    Math.Abs(cachedAgain.Target.CenterX - 120f) > 0.001f)
+                {
+                    throw new InvalidOperationException("Expected decision cache to return cloned selections, not shared mutable instances.");
+                }
+            }
+            finally
+            {
+                CombatAimDecisionCache.ResetForTesting();
+            }
+        }
+
+        private static void CombatAimDecisionCacheExpiresStaleSelection()
+        {
+            CombatAimDecisionCache.ResetForTesting();
+            try
+            {
+                CombatAimDecisionCache.StoreSelection("cache-key", 100, CachedCombatAimSelectionForTesting(7, 101, 120f, 140f), "Attack");
+                CombatAimTargetSelection cached;
+                if (CombatAimDecisionCache.TryGetSelection("cache-key", 105, out cached))
+                {
+                    throw new InvalidOperationException("Expected combat aim decision cache to expire after the short TTL.");
+                }
+            }
+            finally
+            {
+                CombatAimDecisionCache.ResetForTesting();
+            }
+        }
+
+        private static void CombatAimCachedSelectionValidationRejectsStaleTarget()
+        {
+            var selection = CachedCombatAimSelectionForTesting(7, 101, 120f, 140f);
+            string reason;
+            if (CombatAimItemCheckService.ValidateCachedSelectionForTesting(
+                    selection,
+                    null,
+                    false,
+                    "targetNotFound",
+                    CombatAimModes.TargetPriorityClearLine,
+                    out reason) ||
+                !string.Equals(reason, "targetStale:targetNotFound", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected missing live target to reject cached aim with a targetStale reason, got " + reason);
+            }
+
+            var moved = CachedCombatAimSelectionForTesting(7, 101, 160f, 140f).Target;
+            if (CombatAimItemCheckService.ValidateCachedSelectionForTesting(
+                    selection,
+                    moved,
+                    true,
+                    string.Empty,
+                    CombatAimModes.TargetPriorityClearLine,
+                    out reason) ||
+                !string.Equals(reason, "targetStale:hitboxMoved", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected moved live target to reject cached aim, got " + reason);
+            }
+        }
+
+        private static void CombatAimSelectorExplainsMarkerAttackMismatch()
+        {
+            CombatAimLineOfSight.SetCanHitLineOverrideForTesting((fromX, fromY, toX, toY) => true);
+            try
+            {
+                var attackTarget = BallisticTarget(120f, 21f, 0f, 0f, CombatAimTargetMotionProfile.StableLinear, 0.9f, 0.9f, 1f, 36f, false);
+                attackTarget.WhoAmI = 1;
+                attackTarget.Type = 101;
+                var markerTargetOutsideRange = BallisticTarget(1200f, 21f, 0f, 0f, CombatAimTargetMotionProfile.StableLinear, 0.9f, 0.9f, 1f, 36f, false);
+                markerTargetOutsideRange.WhoAmI = 2;
+                markerTargetOutsideRange.Type = 102;
+                var readResult = ReadResultWith(attackTarget, markerTargetOutsideRange);
+                readResult.CursorWorldX = 640f;
+                readResult.CursorWorldY = 21f;
+
+                var selection = CombatAimTargetSelector.Select(
+                    readResult,
+                    20,
+                    false,
+                    true,
+                    new CombatAimTargetSelectionContext
+                    {
+                        AimRangeOrigin = CombatAimModes.RangeOriginPlayer,
+                        AimTargetPriority = CombatAimModes.TargetPriorityClearLine,
+                        CursorAimRadius = 20,
+                        PlayerAimRadius = 20,
+                        HasPlayerCenter = true,
+                        PlayerCenterX = 0f,
+                        PlayerCenterY = 21f,
+                        SelectionPurpose = "Attack",
+                        PreferredTargetWhoAmI = 2,
+                        PreferredTargetType = 102
+                    });
+
+                if (selection == null ||
+                    selection.Target == null ||
+                    selection.Target.WhoAmI != 1 ||
+                    !selection.MarkerAttackTargetMismatch ||
+                    !selection.MarkerTargetChangedForAttack ||
+                    !string.Equals(selection.MarkerAttackMismatchReason, "itemCheckAttackRequiresStricterPath", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected selector to explain marker/attack target mismatch with the stricter attack-path reason.");
+                }
+            }
+            finally
+            {
+                CombatAimLineOfSight.SetCanHitLineOverrideForTesting(null);
+            }
         }
 
         private static void FlailDiagnosticsPublisherKeepsMetadataFieldNames()
@@ -2633,6 +3489,23 @@ namespace JueMingZ.Tests
                 }),
                 new CombatAimBallisticSolution { ProjectileType = 14, ProjectileAiStyle = 1, AmmoProjectileType = 14 },
                 CombatAimWeaponFamilies.SpecialDualProjectile);
+
+            AssertWeaponFamily(
+                "Onyx Blaster",
+                BuildCombatAimWeaponProfile(new FakeItem
+                {
+                    type = 3788,
+                    stack = 1,
+                    Name = "Onyx Blaster",
+                    damage = 28,
+                    shoot = 661,
+                    shootSpeed = 14f,
+                    useAmmo = 97,
+                    ranged = true,
+                    useStyle = 5
+                }),
+                new CombatAimBallisticSolution { ProjectileType = 14, ProjectileAiStyle = 1, AmmoProjectileType = 14 },
+                CombatAimWeaponFamilies.SpecialSpreadOrMultiShot);
 
             AssertWeaponFamily(
                 "Spear",
@@ -2911,9 +3784,11 @@ namespace JueMingZ.Tests
             AssertPersistentCursorEligibility(boomstickEligibility, false, "notEligible:notChannelProjectile", "none");
 
             CombatAimSpecialWeaponRule boomstickRule;
-            if (CombatAimSpecialWeaponRuleResolver.TryResolve(boomstick, out boomstickRule))
+            if (!CombatAimSpecialWeaponRuleResolver.TryResolve(boomstick, out boomstickRule) ||
+                !string.Equals(boomstickRule.Kind, "spreadMultiShot", StringComparison.Ordinal) ||
+                boomstickRule.AllowsProjectileAiScoped)
             {
-                throw new InvalidOperationException("Expected Boomstick to stay out of special projectile scoped weapon rules.");
+                throw new InvalidOperationException("Expected Boomstick to resolve only as an unscoped spread rule.");
             }
         }
 
@@ -4816,24 +5691,29 @@ namespace JueMingZ.Tests
         private static void SpecialProjectileRulesDistinguishWeaponAndAmmoProjectiles()
         {
             var xenopopper = ResolveSpreadRuleForTesting(2797);
-            AssertPrivateStringField(xenopopper, "Kind", "cursorSpawnBurst");
-            AssertPrivateStringField(xenopopper, "Name", "Xenopopper");
-            AssertPrivateStringField(xenopopper, "Rule", "cursorSpawnBubbleBullet");
-            AssertPrivateBoolField(xenopopper, "CursorTarget", true);
-            AssertPrivateBoolField(xenopopper, "UsesWeaponShoot", true);
-            AssertPrivateBoolField(xenopopper, "UsesAmmoShoot", true);
+            AssertStringEquals(xenopopper.Kind, "cursorSpawnBurst", "Xenopopper special kind");
+            AssertStringEquals(xenopopper.Name, "Xenopopper", "Xenopopper special name");
+            AssertStringEquals(xenopopper.Rule, "cursorSpawnBubbleBullet", "Xenopopper special rule");
+            if (!xenopopper.UsesCursorTarget || !xenopopper.UsesWeaponShoot || !xenopopper.UsesAmmoShoot)
+            {
+                throw new InvalidOperationException("Expected Xenopopper to retain cursor, weapon, and ammo projectile roles.");
+            }
 
             var vortex = ResolveSpreadRuleForTesting(3475);
-            AssertPrivateStringField(vortex, "Kind", "dualProjectileSpread");
-            AssertPrivateStringField(vortex, "Name", "VortexBeater");
-            AssertPrivateBoolField(vortex, "UsesWeaponShoot", true);
-            AssertPrivateBoolField(vortex, "UsesAmmoShoot", true);
+            AssertStringEquals(vortex.Kind, "dualProjectileSpread", "Vortex special kind");
+            AssertStringEquals(vortex.Name, "VortexBeater", "Vortex special name");
+            if (!vortex.UsesWeaponShoot || !vortex.UsesAmmoShoot || !vortex.AllowsProjectileAiScoped)
+            {
+                throw new InvalidOperationException("Expected Vortex Beater assist projectiles to stay scoped and role-aware.");
+            }
 
             var onyx = ResolveSpreadRuleForTesting(3788);
-            AssertPrivateStringField(onyx, "Kind", "spreadMultiShot");
-            AssertPrivateStringField(onyx, "Name", "OnyxBlaster");
-            AssertPrivateBoolField(onyx, "UsesWeaponShoot", true);
-            AssertPrivateBoolField(onyx, "UsesAmmoShoot", true);
+            AssertStringEquals(onyx.Kind, "spreadMultiShot", "Onyx special kind");
+            AssertStringEquals(onyx.Name, "OnyxBlaster", "Onyx special name");
+            if (!onyx.UsesWeaponShoot || !onyx.UsesAmmoShoot || onyx.AllowsProjectileAiScoped)
+            {
+                throw new InvalidOperationException("Expected Onyx Blaster to use spread role metadata without scoped cursor ownership.");
+            }
 
             var player = new FakePlayer();
             var item = new FakeItem
@@ -4850,6 +5730,16 @@ namespace JueMingZ.Tests
             };
             player.inventory[0] = item;
             var profile = CombatAimWeaponProfile.Read(player, item);
+            player.inventory[54] = new FakeItem
+            {
+                type = 97,
+                stack = 99,
+                Name = "Bullet",
+                ammo = 97,
+                shoot = 14,
+                shootSpeed = 4f
+            };
+            var projectileProfile = CombatAimProjectileProfileResolver.Resolve(player, profile);
             var solution = new CombatAimBallisticSolution
             {
                 ProjectileType = 14,
@@ -4859,7 +5749,7 @@ namespace JueMingZ.Tests
                 AmmoItemName = "Bullet"
             };
 
-            InvokePrivateStatic("ApplyProjectileRoleMetadata", solution, profile);
+            InvokePrivateStatic("ApplyProjectileRoleMetadata", solution, profile, projectileProfile);
             if (solution.WeaponShootProjectileType != 444 ||
                 !string.Equals(solution.ResolvedProjectileRole, "ammoProjectile", StringComparison.Ordinal) ||
                 solution.PrimaryProjectileType != 14 ||
@@ -4999,9 +5889,11 @@ namespace JueMingZ.Tests
             }
 
             CombatAimSpecialWeaponRule scopedRule;
-            if (CombatAimSpecialWeaponRuleResolver.TryResolve(profile, out scopedRule))
+            if (!CombatAimSpecialWeaponRuleResolver.TryResolve(profile, out scopedRule) ||
+                !string.Equals(scopedRule.Kind, "spreadMultiShot", StringComparison.Ordinal) ||
+                scopedRule.AllowsProjectileAiScoped)
             {
-                throw new InvalidOperationException("Expected Onyx Blaster not to resolve as special projectile scoped weapon.");
+                throw new InvalidOperationException("Expected Onyx Blaster to resolve as unscoped spread rule.");
             }
 
             string role;
@@ -5510,9 +6402,11 @@ namespace JueMingZ.Tests
             }
 
             CombatAimSpecialWeaponRule rule;
-            if (CombatAimSpecialWeaponRuleResolver.TryResolve(profile, out rule))
+            if (!CombatAimSpecialWeaponRuleResolver.TryResolve(profile, out rule) ||
+                !string.Equals(rule.Kind, "spreadMultiShot", StringComparison.Ordinal) ||
+                rule.AllowsProjectileAiScoped)
             {
-                throw new InvalidOperationException("Expected " + name + " not to resolve as special projectile scoped weapon.");
+                throw new InvalidOperationException("Expected " + name + " to resolve as unscoped spread rule.");
             }
 
             string role;
@@ -5532,22 +6426,31 @@ namespace JueMingZ.Tests
             }
         }
 
-        private static object ResolveSpreadRuleForTesting(int itemType)
+        private static CombatAimSpecialWeaponRule ResolveSpreadRuleForTesting(int itemType)
         {
-            var method = typeof(CombatAimBallisticSolver).GetMethod("TryResolveSpreadMultiShotRule", BindingFlags.Static | BindingFlags.NonPublic);
-            if (method == null)
+            var player = new FakePlayer();
+            var item = new FakeItem
             {
-                throw new InvalidOperationException("TryResolveSpreadMultiShotRule not found.");
-            }
+                type = itemType,
+                stack = 1,
+                Name = "Special Spread Test",
+                damage = 24,
+                shoot = itemType == 2797 ? 444 : itemType == 3475 ? 615 : itemType == 3788 ? 661 : 14,
+                shootSpeed = 10f,
+                useAmmo = 97,
+                ranged = true,
+                useStyle = 5
+            };
+            player.inventory[0] = item;
+            var profile = CombatAimWeaponProfile.Read(player, item);
 
-            var args = new object[] { itemType, null };
-            var matched = (bool)method.Invoke(null, args);
-            if (!matched || args[1] == null)
+            CombatAimSpecialWeaponRule rule;
+            if (!CombatAimSpecialWeaponRuleResolver.TryResolve(profile, out rule))
             {
                 throw new InvalidOperationException("Expected special spread rule for item " + itemType + ".");
             }
 
-            return args[1];
+            return rule;
         }
 
         private static void InvokePrivateStatic(string name, params object[] args)
@@ -5736,6 +6639,77 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static CombatAimTargetSelection CachedCombatAimSelectionForTesting(int whoAmI, int type, float centerX, float centerY)
+        {
+            var target = new CombatTargetSnapshot
+            {
+                WhoAmI = whoAmI,
+                Type = type,
+                Name = "Cached Target",
+                Active = true,
+                Life = 100,
+                LifeMax = 100,
+                CenterX = centerX,
+                CenterY = centerY,
+                HitboxX = centerX - 20f,
+                HitboxY = centerY - 20f,
+                HitboxWidth = 40f,
+                HitboxHeight = 40f,
+                Width = 40,
+                Height = 40,
+                MotionProfile = new CombatAimTargetMotionProfile
+                {
+                    MotionProfileKind = CombatAimTargetMotionProfile.StableLinear,
+                    MotionConfidence = 0.9f
+                }
+            };
+
+            return new CombatAimTargetSelection
+            {
+                Enabled = true,
+                RadiusTiles = 20,
+                TrackDummy = false,
+                MarkerEnabled = true,
+                AimRangeOrigin = CombatAimModes.RangeOriginPlayer,
+                AimTargetPriority = CombatAimModes.TargetPriorityClearLine,
+                ActiveRangeMode = "playerScreen",
+                Target = target,
+                BallisticTarget = target.CloneForAimSample(centerX, centerY),
+                BallisticSolution = new CombatAimBallisticSolution
+                {
+                    Solved = true,
+                    AimWorldX = centerX,
+                    AimWorldY = centerY,
+                    PlayerCenterX = 0f,
+                    PlayerCenterY = centerY,
+                    SolverKind = CombatAimBallisticSolverKinds.LinearIntercept,
+                    PredictionConfidence = CombatAimPredictionConfidenceKinds.High,
+                    SelectedSamplePoint = "center",
+                    SelectedSampleWorldX = centerX,
+                    SelectedSampleWorldY = centerY
+                },
+                SelectedSamplePoint = "center",
+                AttackSamplePoint = "center",
+                SelectionSamplePoint = "center",
+                SampleSpace = CombatAimPredictedHitboxSampler.SampleSpaceCurrent,
+                SelectedSampleWorldX = centerX,
+                SelectedSampleWorldY = centerY,
+                PredictedHitboxCenterX = centerX,
+                PredictedHitboxCenterY = centerY,
+                VisibleSampleCount = 1,
+                ProjectileHitRadius = 5f,
+                LineClear = true,
+                LineClearAvailable = true,
+                SelectionPurpose = "Attack",
+                MarkerTargetWhoAmI = whoAmI,
+                MarkerTargetType = type,
+                AttackTargetWhoAmI = whoAmI,
+                AttackTargetType = type,
+                ResultCode = "TargetSelected",
+                SkipReason = "none"
+            };
+        }
+
         private static CombatAimItemCheckDecision BuildCombatAimDiagnosticDecision()
         {
             var item = new FakeItem
@@ -5767,18 +6741,42 @@ namespace JueMingZ.Tests
                     HitboxX = 100f,
                     HitboxY = 120f,
                     HitboxWidth = 40f,
-                    HitboxHeight = 40f
+                    HitboxHeight = 40f,
+                    MotionProfile = new CombatAimTargetMotionProfile
+                    {
+                        MotionProfileKind = CombatAimTargetMotionProfile.StableLinear,
+                        MotionConfidence = 0.9f,
+                        VelocityConfidence = 0.8f,
+                        AccelerationX = 0.1f,
+                        AccelerationY = -0.05f,
+                        AccelerationConfidence = 0.7f,
+                        RecommendedLeadScale = 0.75f,
+                        RecommendedMaxLeadTicks = 24f,
+                        PreferSmoothedVelocity = true,
+                        HistoryResetReason = "none"
+                    }
                 },
                 SelectedSamplePoint = "center",
                 AttackSamplePoint = "center",
                 SelectionSamplePoint = "center",
+                SampleSpace = CombatAimPredictedHitboxSampler.SampleSpacePredicted,
                 SelectedSampleWorldX = 120f,
                 SelectedSampleWorldY = 140f,
+                PredictedHitboxCenterX = 124f,
+                PredictedHitboxCenterY = 140f,
+                VisibleSampleCount = 4,
+                ProjectileHitRadius = 6f,
                 LineClear = true,
                 LineClearAvailable = true,
                 MarkerTargetWhoAmI = 2,
                 AttackTargetWhoAmI = 3,
                 MarkerAttackTargetMismatch = true,
+                MarkerAttackMismatchReason = "lineOfSightChanged",
+                SelectionCacheHit = true,
+                SelectionCacheKey = "diagnostic-cache-key",
+                DecisionCacheSource = "attackSelectionCache",
+                DecisionCacheAgeTicks = 2,
+                DecisionCacheRevalidationReason = "lineOfSightChanged",
                 SelectionPurpose = "Attack"
             };
 
@@ -5818,12 +6816,33 @@ namespace JueMingZ.Tests
                     ProjectileWidth = 10,
                     ProjectileHeight = 12,
                     ProjectileFriendly = true,
+                    BaseProjectileSpeed = 9.5f,
+                    EffectiveProjectileSpeed = 13.5f,
+                    EffectiveUpdatesPerTick = 2,
+                    ProjectileProfileFamily = "GravityArc",
+                    ProjectileProfileStatus = "complete",
+                    ProjectileProfileSpeedSource = "ammo",
+                    ProjectileProfileMagicQuiverApplied = true,
+                    ProjectileProfileArcheryApplied = true,
                     AmmoAvailable = true,
                     AmmoItemType = 40,
                     AmmoItemName = "Diagnostic Arrow",
                     AmmoProjectileType = 12,
                     AmmoShootSpeed = 2f,
-                    ProjectileSpeed = 10.5f
+                    ProjectileSpeed = 10.5f,
+                    SolverKind = CombatAimBallisticSolverKinds.GravityArc,
+                    LeadWindowKind = CombatAimLeadWindowKinds.GravityArc,
+                    LeadClampReason = CombatAimLeadClampReasons.None,
+                    PredictionConfidence = CombatAimPredictionConfidenceKinds.High,
+                    GravityCompensationPixels = 3.25f,
+                    SampleSpace = CombatAimPredictedHitboxSampler.SampleSpacePredicted,
+                    SelectedSamplePoint = "center",
+                    SelectedSampleWorldX = 120f,
+                    SelectedSampleWorldY = 140f,
+                    PredictedHitboxCenterX = 124f,
+                    PredictedHitboxCenterY = 140f,
+                    VisibleSampleCount = 4,
+                    ProjectileHitRadius = 6f
                 }
             };
         }
@@ -6060,6 +7079,231 @@ namespace JueMingZ.Tests
             var player = new FakePlayer();
             player.inventory[0] = item;
             return CombatAimWeaponProfile.Read(player, item);
+        }
+
+        private static CombatAimProjectileProfile BuildCombatAimProjectileProfile(FakePlayer player, FakeItem weapon, FakeItem ammo)
+        {
+            player = player ?? new FakePlayer();
+            player.inventory[0] = weapon;
+            if (ammo != null)
+            {
+                player.inventory[54] = ammo;
+            }
+
+            var weaponProfile = CombatAimWeaponProfile.Read(player, weapon);
+            return CombatAimProjectileProfileResolver.Resolve(player, weaponProfile);
+        }
+
+        private static FakeItem SlowMagicWeapon()
+        {
+            return new FakeItem
+            {
+                type = 10105,
+                stack = 1,
+                Name = "Slow Test Magic Weapon",
+                damage = 22,
+                shoot = 9002,
+                shootSpeed = 4f,
+                magic = true
+            };
+        }
+
+        private static CombatAimBallisticSolution SolveCombatAimBallistic(
+            FakePlayer player,
+            FakeItem weapon,
+            FakeItem ammo,
+            CombatTargetSnapshot target)
+        {
+            player = player ?? new FakePlayer();
+            player.inventory[0] = weapon;
+            if (ammo != null)
+            {
+                player.inventory[54] = ammo;
+            }
+
+            var weaponProfile = CombatAimWeaponProfile.Read(player, weapon);
+            return CombatAimBallisticSolver.Solve(player, weaponProfile, target);
+        }
+
+        private static CombatAimTargetSelection SelectCombatAimSampleForTesting(
+            CombatTargetSnapshot target,
+            string priority,
+            string motionKind,
+            float projectileSpeed)
+        {
+            var player = new FakePlayer();
+            var weapon = new FakeItem
+            {
+                type = 10120,
+                stack = 1,
+                Name = "Sample Test Rifle",
+                damage = 20,
+                shoot = Terraria.ID.ProjectileID.Bullet,
+                shootSpeed = projectileSpeed,
+                useAmmo = Terraria.ID.AmmoID.Bullet,
+                ranged = true,
+                useStyle = 5
+            };
+            player.inventory[0] = weapon;
+            var weaponProfile = CombatAimWeaponProfile.Read(player, weapon);
+            if (target != null && target.MotionProfile != null)
+            {
+                target.MotionProfile.MotionProfileKind = motionKind ?? target.MotionProfile.MotionProfileKind;
+            }
+
+            var readResult = ReadResultWith(target);
+            readResult.CursorWorldX = 640f;
+            readResult.CursorWorldY = 21f;
+
+            return CombatAimTargetSelector.Select(
+                readResult,
+                80,
+                false,
+                true,
+                new CombatAimTargetSelectionContext
+                {
+                    AimRangeOrigin = CombatAimModes.RangeOriginPlayer,
+                    AimTargetPriority = priority,
+                    CursorAimRadius = 80,
+                    PlayerAimRadius = 80,
+                    HasPlayerCenter = true,
+                    PlayerCenterX = 0f,
+                    PlayerCenterY = 21f,
+                    Player = player,
+                    WeaponProfile = weaponProfile,
+                    IncludeBallisticScoring = true,
+                    SelectionPurpose = "Attack",
+                    BallisticContext = new CombatAimBallisticContext
+                    {
+                        Prepared = true,
+                        Weapon = weaponProfile,
+                        HasPlayerCenter = true,
+                        PlayerCenterX = 0f,
+                        PlayerCenterY = 21f,
+                        ProjectileType = Terraria.ID.ProjectileID.Bullet,
+                        ProjectileName = "Bullet",
+                        ProjectileAiStyle = 1,
+                        ProjectileDefaultsAvailable = true,
+                        ProjectileNoGravity = true,
+                        ProjectileTileCollide = true,
+                        ProjectileWidth = 10,
+                        ProjectileHeight = 10,
+                        ProjectileFriendly = true,
+                        BaseProjectileSpeed = projectileSpeed,
+                        ProjectileSpeed = projectileSpeed,
+                        EffectiveProjectileSpeed = projectileSpeed,
+                        EffectiveUpdatesPerTick = 1,
+                        ProjectileRadiusForHit = 5f,
+                        ProfileFamilyHint = "HighSpeedLinear",
+                        ProfileCompleteness = "complete",
+                        ProfileSpeedSource = "testing",
+                        AmmoAvailable = true,
+                        AmmoType = Terraria.ID.AmmoID.Bullet,
+                        AmmoItemType = 97,
+                        AmmoProjectileType = Terraria.ID.ProjectileID.Bullet,
+                        AmmoShootSpeed = 0f,
+                        AmmoBulletLike = true
+                    }
+                });
+        }
+
+        private static CombatTargetSnapshot BallisticTarget(
+            float centerX,
+            float centerY,
+            float velocityX,
+            float velocityY,
+            string motionKind,
+            float motionConfidence,
+            float velocityConfidence,
+            float leadScale,
+            float maxLeadTicks,
+            bool preferCurrentVelocity)
+        {
+            var target = TargetSnapshot(31, 131, centerX, centerY, velocityX, velocityY, 0, false, false);
+            target.SmoothedVelocityAvailable = !preferCurrentVelocity;
+            target.SmoothedVelocityX = velocityX;
+            target.SmoothedVelocityY = velocityY;
+            target.MotionProfile = new CombatAimTargetMotionProfile
+            {
+                MotionProfileKind = motionKind ?? CombatAimTargetMotionProfile.Unknown,
+                MotionConfidence = motionConfidence,
+                VelocityConfidence = velocityConfidence,
+                RecommendedLeadScale = leadScale,
+                RecommendedMaxLeadTicks = maxLeadTicks,
+                PreferCurrentVelocity = preferCurrentVelocity,
+                PreferSmoothedVelocity = !preferCurrentVelocity
+            };
+            return target;
+        }
+
+        private static CombatAimReadResult ReadResultWith(params CombatTargetSnapshot[] targets)
+        {
+            var result = new CombatAimReadResult
+            {
+                CanSearch = true
+            };
+
+            if (targets != null)
+            {
+                for (var index = 0; index < targets.Length; index++)
+                {
+                    result.Candidates.Add(targets[index]);
+                }
+            }
+
+            return result;
+        }
+
+        private static CombatTargetSnapshot TargetSnapshot(
+            int whoAmI,
+            int type,
+            float centerX,
+            float centerY,
+            float velocityX,
+            float velocityY,
+            int aiStyle,
+            bool noGravity,
+            bool collideY)
+        {
+            return new CombatTargetSnapshot
+            {
+                WhoAmI = whoAmI,
+                Type = type,
+                Name = "Motion Target",
+                Active = true,
+                Life = 100,
+                LifeMax = 100,
+                Chaseable = true,
+                CenterX = centerX,
+                CenterY = centerY,
+                PositionX = centerX - 20f,
+                PositionY = centerY - 20f,
+                Width = 40,
+                Height = 40,
+                HitboxX = centerX - 20f,
+                HitboxY = centerY - 20f,
+                HitboxWidth = 40f,
+                HitboxHeight = 40f,
+                VelocityX = velocityX,
+                VelocityY = velocityY,
+                NpcAiStyle = aiStyle,
+                NoGravity = noGravity,
+                CollideY = collideY,
+                Direction = velocityX < 0f ? -1 : 1,
+                DirectionY = velocityY < 0f ? -1 : velocityY > 0f ? 1 : 0,
+                TargetPlayer = 0,
+                AiSummaryAvailable = true
+            };
+        }
+
+        private static void AssertMotionKind(CombatTargetSnapshot target, string expectedKind)
+        {
+            if (target == null || target.MotionProfile == null)
+            {
+                throw new InvalidOperationException("Expected motion profile " + expectedKind + ", got null.");
+            }
+
+            AssertStringEquals(target.MotionProfile.MotionProfileKind, expectedKind, "motion profile kind");
         }
 
         private static void AssertWeaponFamily(

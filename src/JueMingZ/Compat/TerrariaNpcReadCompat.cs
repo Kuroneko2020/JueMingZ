@@ -82,9 +82,44 @@ namespace JueMingZ.Compat
             return npc == null ? -1 : npc.realLife;
         }
 
+        public static int AiStyle(NPC npc)
+        {
+            return npc == null ? 0 : npc.aiStyle;
+        }
+
         public static float[] Ai(NPC npc)
         {
             return npc == null ? null : npc.ai;
+        }
+
+        public static bool NoGravity(NPC npc)
+        {
+            return npc != null && npc.noGravity;
+        }
+
+        public static bool CollideX(NPC npc)
+        {
+            return npc != null && npc.collideX;
+        }
+
+        public static bool CollideY(NPC npc)
+        {
+            return npc != null && npc.collideY;
+        }
+
+        public static int Direction(NPC npc)
+        {
+            return npc == null ? 0 : npc.direction;
+        }
+
+        public static int DirectionY(NPC npc)
+        {
+            return npc == null ? 0 : npc.directionY;
+        }
+
+        public static int TargetPlayer(NPC npc)
+        {
+            return npc == null ? -1 : npc.target;
         }
 
         public static int CatchItem(NPC npc)

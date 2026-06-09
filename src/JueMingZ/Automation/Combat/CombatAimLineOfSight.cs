@@ -13,6 +13,7 @@ namespace JueMingZ.Automation.Combat
         private static readonly object SyncRoot = new object();
         private static long _cacheGameUpdateCount = long.MinValue;
         private static readonly Dictionary<LineKey, bool> FrameCache = new Dictionary<LineKey, bool>();
+        private static Func<float, float, float, float, bool> _canHitLineOverrideForTesting;
 
         public static bool LastCacheHit { get; private set; }
 
@@ -20,6 +21,13 @@ namespace JueMingZ.Automation.Combat
         {
             LastCacheHit = false;
             lineClear = false;
+            var canHitLineOverride = _canHitLineOverrideForTesting;
+            if (canHitLineOverride != null)
+            {
+                lineClear = canHitLineOverride(fromX, fromY, toX, toY);
+                return true;
+            }
+
             if (!IsLateBootstrapCompleted())
             {
                 return false;
@@ -72,6 +80,12 @@ namespace JueMingZ.Automation.Combat
                     "Collision line-of-sight check failed: " + error.Message);
                 return false;
             }
+        }
+
+        internal static void SetCanHitLineOverrideForTesting(Func<float, float, float, float, bool> canHitLine)
+        {
+            _canHitLineOverrideForTesting = canHitLine;
+            LastCacheHit = false;
         }
 
         private static LineKey BuildCacheKey(float fromX, float fromY, float toX, float toY)

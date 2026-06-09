@@ -27,6 +27,20 @@ namespace JueMingZ.Automation.Combat
         public bool SmoothedVelocityAvailable { get; set; }
         public float SmoothedVelocityX { get; set; }
         public float SmoothedVelocityY { get; set; }
+        public int NpcAiStyle { get; set; }
+        public bool NoGravity { get; set; }
+        public bool CollideX { get; set; }
+        public bool CollideY { get; set; }
+        public int Direction { get; set; }
+        public int DirectionY { get; set; }
+        public int TargetPlayer { get; set; } = -1;
+        public bool AiSummaryAvailable { get; set; }
+        public float Ai0 { get; set; }
+        public float Ai1 { get; set; }
+        public float Ai2 { get; set; }
+        public float Ai3 { get; set; }
+        public long LastReadTick { get; set; }
+        public CombatAimTargetMotionProfile MotionProfile { get; set; }
         public float HitboxX { get; set; }
         public float HitboxY { get; set; }
         public float HitboxWidth { get; set; }
@@ -60,6 +74,20 @@ namespace JueMingZ.Automation.Combat
                 SmoothedVelocityAvailable = SmoothedVelocityAvailable,
                 SmoothedVelocityX = SmoothedVelocityX,
                 SmoothedVelocityY = SmoothedVelocityY,
+                NpcAiStyle = NpcAiStyle,
+                NoGravity = NoGravity,
+                CollideX = CollideX,
+                CollideY = CollideY,
+                Direction = Direction,
+                DirectionY = DirectionY,
+                TargetPlayer = TargetPlayer,
+                AiSummaryAvailable = AiSummaryAvailable,
+                Ai0 = Ai0,
+                Ai1 = Ai1,
+                Ai2 = Ai2,
+                Ai3 = Ai3,
+                LastReadTick = LastReadTick,
+                MotionProfile = MotionProfile == null ? null : MotionProfile.Clone(),
                 HitboxX = HitboxX,
                 HitboxY = HitboxY,
                 HitboxWidth = HitboxWidth,

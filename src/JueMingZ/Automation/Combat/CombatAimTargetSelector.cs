@@ -69,6 +69,7 @@ namespace JueMingZ.Automation.Combat
                 SelectionPurpose = string.IsNullOrWhiteSpace(context.SelectionPurpose) ? "Marker" : context.SelectionPurpose,
                 SelectionCacheHit = context.SelectionCacheHit,
                 SelectionCacheKey = context.SelectionCacheKey ?? string.Empty,
+                DecisionCacheRevalidationReason = context.DecisionCacheRejectedReason ?? string.Empty,
                 PreferredTargetWhoAmI = context.PreferredTargetWhoAmI,
                 PreferredTargetType = context.PreferredTargetType
             };
@@ -183,13 +184,33 @@ namespace JueMingZ.Automation.Combat
             for (var index = 0; index < expensive.Count; index++)
             {
                 var candidate = expensive[index];
-                var samples = BuildSamples(candidate.Target, rangeCenterX, rangeCenterY);
-                for (var sampleIndex = 0; sampleIndex < samples.Count; sampleIndex++)
+                var candidateBallistic = SolveCandidateCenterBallistic(candidate, context);
+                var sampleSet = CombatAimPredictedHitboxSampler.BuildSamples(candidate.Target, rangeCenterX, rangeCenterY, candidateBallistic);
+                var scoredSamples = new List<ScoredSample>(sampleSet.Samples.Count);
+                var visibleSampleCount = 0;
+                for (var sampleIndex = 0; sampleIndex < sampleSet.Samples.Count; sampleIndex++)
                 {
-                    var scored = ScoreSample(candidate, samples[sampleIndex], readResult, context, priority, rangeCenterX, rangeCenterY);
+                    var scored = ScoreSample(candidate, sampleSet.Samples[sampleIndex], readResult, context, priority, rangeCenterX, rangeCenterY, candidateBallistic, sampleSet);
                     if (scored == null)
                     {
                         continue;
+                    }
+
+                    if (scored.LineClearAvailable && scored.LineClear)
+                    {
+                        visibleSampleCount++;
+                    }
+
+                    scoredSamples.Add(scored);
+                }
+
+                for (var scoredIndex = 0; scoredIndex < scoredSamples.Count; scoredIndex++)
+                {
+                    var scored = scoredSamples[scoredIndex];
+                    scored.VisibleSampleCount = visibleSampleCount;
+                    if (scored.BallisticSolution != null)
+                    {
+                        scored.BallisticSolution.VisibleSampleCount = visibleSampleCount;
                     }
 
                     nearestHitboxPointPenaltyApplied = nearestHitboxPointPenaltyApplied || scored.NearestHitboxPointPenaltyApplied;
@@ -236,8 +257,13 @@ namespace JueMingZ.Automation.Combat
             selection.SelectedSamplePoint = best.Sample.Name;
             selection.AttackSamplePoint = best.Sample.Name;
             selection.SelectionSamplePoint = best.Sample.Name;
+            selection.SampleSpace = best.Sample.Space;
             selection.SelectedSampleWorldX = best.Sample.X;
             selection.SelectedSampleWorldY = best.Sample.Y;
+            selection.PredictedHitboxCenterX = best.PredictedHitboxCenterX;
+            selection.PredictedHitboxCenterY = best.PredictedHitboxCenterY;
+            selection.VisibleSampleCount = best.VisibleSampleCount;
+            selection.ProjectileHitRadius = best.ProjectileHitRadius;
             selection.SelectedReason = best.Reason;
             selection.LockedTargetStillValid = CombatAimTargetLockService.IsLockedTarget(best.Target.WhoAmI, best.Target.Type);
             selection.AttackTargetWhoAmI = best.Target.WhoAmI;
@@ -249,9 +275,43 @@ namespace JueMingZ.Automation.Combat
                                                     context.PreferredTargetType != best.Target.Type);
             selection.MarkerTargetChangedForAttack = selection.MarkerAttackTargetMismatch &&
                                                      string.Equals(selection.SelectionPurpose, "Attack", StringComparison.OrdinalIgnoreCase);
+            selection.MarkerAttackMismatchReason = ResolveMarkerAttackMismatchReason(selection, context);
             selection.ResultCode = "TargetSelected";
             selection.SkipReason = string.IsNullOrWhiteSpace(selection.SkipReason) ? "none" : selection.SkipReason;
             return selection;
+        }
+
+        private static string ResolveMarkerAttackMismatchReason(
+            CombatAimTargetSelection selection,
+            CombatAimTargetSelectionContext context)
+        {
+            if (selection == null || !selection.MarkerAttackTargetMismatch)
+            {
+                return string.Empty;
+            }
+
+            var rejectedReason = context == null ? string.Empty : context.DecisionCacheRejectedReason ?? string.Empty;
+            if (StartsWithOrdinal(rejectedReason, "targetStale"))
+            {
+                return "targetStale";
+            }
+
+            if (StartsWithOrdinal(rejectedReason, "lineOfSightChanged"))
+            {
+                return "lineOfSightChanged";
+            }
+
+            if (StartsWithOrdinal(rejectedReason, "weaponProfileChanged"))
+            {
+                return "weaponProfileChanged";
+            }
+
+            if (string.Equals(selection.SelectionPurpose, "PersistentCursor", StringComparison.OrdinalIgnoreCase))
+            {
+                return "persistentCursorEligibilityChanged";
+            }
+
+            return "itemCheckAttackRequiresStricterPath";
         }
 
         private static List<CandidateRange> BuildInRangeCandidates(CombatAimReadResult readResult, float rangeCenterX, float rangeCenterY, float radiusPixels)
@@ -382,12 +442,14 @@ namespace JueMingZ.Automation.Combat
 
         private static ScoredSample ScoreSample(
             CandidateRange candidate,
-            AimSample sample,
+            CombatAimHitboxSample sample,
             CombatAimReadResult readResult,
             CombatAimTargetSelectionContext context,
             string priority,
             float rangeCenterX,
-            float rangeCenterY)
+            float rangeCenterY,
+            CombatAimBallisticSolution candidateBallistic,
+            CombatAimHitboxSampleSet sampleSet)
         {
             if (candidate == null || candidate.Target == null || sample == null || readResult == null || context == null)
             {
@@ -414,7 +476,9 @@ namespace JueMingZ.Automation.Combat
             bool nearestHitboxPenalty;
             bool centerPreferred;
             var sampleBias = GetSampleBias(sample.Name, out nearestHitboxPenalty, out centerPreferred);
-            var ballisticTarget = candidate.Target.CloneForAimSample(sample.X, sample.Y);
+            var ballisticTarget = CreateBallisticTarget(candidate.Target, sample);
+            var predictedHitboxCenterX = sampleSet == null ? sample.HitboxCenterX : sampleSet.PredictedHitboxCenterX;
+            var predictedHitboxCenterY = sampleSet == null ? sample.HitboxCenterY : sampleSet.PredictedHitboxCenterY;
 
             if (clearLinePriority && lineAvailable && !lineClear)
             {
@@ -435,17 +499,24 @@ namespace JueMingZ.Automation.Combat
                     Reason = "blockedByLineOfSight",
                     Rejected = true,
                     NearestHitboxPointPenaltyApplied = nearestHitboxPenalty,
-                    CenterPreferred = centerPreferred
+                    CenterPreferred = centerPreferred,
+                    ProjectileHitRadius = sampleSet == null ? 0f : sampleSet.ProjectileHitRadius,
+                    PredictedHitboxCenterX = predictedHitboxCenterX,
+                    PredictedHitboxCenterY = predictedHitboxCenterY
                 };
             }
 
             CombatAimBallisticSolution ballistic = null;
             if (context.IncludeBallisticScoring && context.Player != null && context.WeaponProfile != null)
             {
-                ballistic = context.BallisticContext == null
-                    ? CombatAimBallisticSolver.Solve(context.Player, context.WeaponProfile, ballisticTarget)
-                    : CombatAimBallisticSolver.Solve(context.BallisticContext, ballisticTarget);
+                ballistic = string.Equals(sample.Space, CombatAimPredictedHitboxSampler.SampleSpacePredicted, StringComparison.Ordinal)
+                    ? BindPredictedSampleBallistic(candidateBallistic, sample)
+                    : context.BallisticContext == null
+                        ? CombatAimBallisticSolver.Solve(context.Player, context.WeaponProfile, ballisticTarget)
+                        : CombatAimBallisticSolver.Solve(context.BallisticContext, ballisticTarget);
             }
+
+            BindSampleMetadata(ballistic, sample, sampleSet);
 
             float score;
             string reason;
@@ -463,10 +534,16 @@ namespace JueMingZ.Automation.Combat
             else
             {
                 var playerMode = string.Equals(CombatAimModes.NormalizeRangeOrigin(context.AimRangeOrigin), CombatAimModes.RangeOriginPlayer, StringComparison.OrdinalIgnoreCase);
-                score = sampleBias;
+                score = sampleBias + ResolveSampleSpaceBias(sample, ballistic);
+                score += sample.CoverageScore * (IsLargeTarget(candidate.Target) ? 58f : 82f);
+                score -= sample.CenterDistanceRatio * ResolveCenterDistancePenalty(candidate.Target, ballistic);
                 if (lineAvailable)
                 {
                     score += lineClear ? 360f : -460f;
+                    if (lineClear && IsLargeTarget(candidate.Target))
+                    {
+                        score += 95f;
+                    }
                 }
 
                 if (playerMode)
@@ -491,6 +568,7 @@ namespace JueMingZ.Automation.Combat
                     score += ballistic.Solved ? 50f : -30f;
                     score += ballistic.ConservativeCenter ? -20f : 20f;
                     score -= Math.Min(80f, ballistic.GravityCompensationPixels * 0.15f);
+                    score -= Math.Min(70f, ballistic.LeadTicks * 0.35f);
                 }
 
                 reason = "clearLine";
@@ -513,8 +591,141 @@ namespace JueMingZ.Automation.Combat
                 Reason = reason,
                 Rejected = false,
                 NearestHitboxPointPenaltyApplied = nearestHitboxPenalty,
-                CenterPreferred = centerPreferred
+                CenterPreferred = centerPreferred,
+                ProjectileHitRadius = sampleSet == null ? 0f : sampleSet.ProjectileHitRadius,
+                PredictedHitboxCenterX = predictedHitboxCenterX,
+                PredictedHitboxCenterY = predictedHitboxCenterY
             };
+        }
+
+        private static CombatAimBallisticSolution SolveCandidateCenterBallistic(
+            CandidateRange candidate,
+            CombatAimTargetSelectionContext context)
+        {
+            if (candidate == null ||
+                candidate.Target == null ||
+                context == null ||
+                !context.IncludeBallisticScoring ||
+                context.Player == null ||
+                context.WeaponProfile == null)
+            {
+                return null;
+            }
+
+            return context.BallisticContext == null
+                ? CombatAimBallisticSolver.Solve(context.Player, context.WeaponProfile, candidate.Target)
+                : CombatAimBallisticSolver.Solve(context.BallisticContext, candidate.Target);
+        }
+
+        private static CombatTargetSnapshot CreateBallisticTarget(CombatTargetSnapshot target, CombatAimHitboxSample sample)
+        {
+            var clone = target.CloneForAimSample(sample.X, sample.Y);
+            clone.PositionX = sample.HitboxLeft;
+            clone.PositionY = sample.HitboxTop;
+            clone.HitboxX = sample.HitboxLeft;
+            clone.HitboxY = sample.HitboxTop;
+            clone.HitboxWidth = sample.HitboxWidth;
+            clone.HitboxHeight = sample.HitboxHeight;
+            return clone;
+        }
+
+        private static CombatAimBallisticSolution BindPredictedSampleBallistic(
+            CombatAimBallisticSolution candidateBallistic,
+            CombatAimHitboxSample sample)
+        {
+            if (candidateBallistic == null || sample == null)
+            {
+                return null;
+            }
+
+            var clone = candidateBallistic.Clone();
+            clone.AimWorldX = sample.X;
+            clone.AimWorldY = sample.Y;
+            clone.AimAdjusted = clone.AimAdjusted || Distance(sample.X, sample.Y, sample.HitboxCenterX, sample.HitboxCenterY) > 1f;
+            return clone;
+        }
+
+        private static void BindSampleMetadata(
+            CombatAimBallisticSolution ballistic,
+            CombatAimHitboxSample sample,
+            CombatAimHitboxSampleSet sampleSet)
+        {
+            if (ballistic == null || sample == null)
+            {
+                return;
+            }
+
+            ballistic.SampleSpace = sample.Space ?? string.Empty;
+            ballistic.SelectedSamplePoint = sample.Name ?? string.Empty;
+            ballistic.SelectedSampleWorldX = sample.X;
+            ballistic.SelectedSampleWorldY = sample.Y;
+            ballistic.PredictedHitboxCenterX = sampleSet == null ? sample.HitboxCenterX : sampleSet.PredictedHitboxCenterX;
+            ballistic.PredictedHitboxCenterY = sampleSet == null ? sample.HitboxCenterY : sampleSet.PredictedHitboxCenterY;
+            ballistic.ProjectileHitRadius = sampleSet == null ? 0f : sampleSet.ProjectileHitRadius;
+        }
+
+        private static float ResolveSampleSpaceBias(CombatAimHitboxSample sample, CombatAimBallisticSolution ballistic)
+        {
+            if (sample == null || !string.Equals(sample.Space, CombatAimPredictedHitboxSampler.SampleSpacePredicted, StringComparison.Ordinal))
+            {
+                return IsLowConfidence(ballistic) ? 36f : 0f;
+            }
+
+            var leadDistance = ballistic == null
+                ? 0f
+                : Distance(ballistic.PredictedTargetX, ballistic.PredictedTargetY, ballistic.AimWorldX, ballistic.AimWorldY);
+            if (ballistic == null ||
+                string.Equals(ballistic.PredictionConfidence, CombatAimPredictionConfidenceKinds.Unknown, StringComparison.Ordinal) ||
+                string.Equals(ballistic.PredictionConfidence, CombatAimPredictionConfidenceKinds.VeryLow, StringComparison.Ordinal))
+            {
+                return -220f - Math.Min(90f, leadDistance * 0.3f);
+            }
+
+            if (string.Equals(ballistic.PredictionConfidence, CombatAimPredictionConfidenceKinds.Low, StringComparison.Ordinal))
+            {
+                return -85f - Math.Min(55f, leadDistance * 0.16f);
+            }
+
+            if (string.Equals(ballistic.PredictionConfidence, CombatAimPredictionConfidenceKinds.Medium, StringComparison.Ordinal))
+            {
+                return 82f - Math.Min(35f, leadDistance * 0.06f);
+            }
+
+            return 142f - Math.Min(30f, leadDistance * 0.04f);
+        }
+
+        private static float ResolveCenterDistancePenalty(CombatTargetSnapshot target, CombatAimBallisticSolution ballistic)
+        {
+            if (IsLowConfidence(ballistic))
+            {
+                return 78f;
+            }
+
+            return IsLargeTarget(target) ? 20f : 34f;
+        }
+
+        private static bool IsLowConfidence(CombatAimBallisticSolution ballistic)
+        {
+            return ballistic == null ||
+                   string.Equals(ballistic.PredictionConfidence, CombatAimPredictionConfidenceKinds.Unknown, StringComparison.Ordinal) ||
+                   string.Equals(ballistic.PredictionConfidence, CombatAimPredictionConfidenceKinds.VeryLow, StringComparison.Ordinal) ||
+                   string.Equals(ballistic.PredictionConfidence, CombatAimPredictionConfidenceKinds.Low, StringComparison.Ordinal);
+        }
+
+        private static bool IsLargeTarget(CombatTargetSnapshot target)
+        {
+            if (target == null)
+            {
+                return false;
+            }
+
+            if (target.HitboxWidth >= 96f || target.HitboxHeight >= 96f)
+            {
+                return true;
+            }
+
+            return target.MotionProfile != null &&
+                   string.Equals(target.MotionProfile.MotionProfileKind, CombatAimTargetMotionProfile.LargeOrSegmented, StringComparison.Ordinal);
         }
 
         private static float GetSampleBias(string sampleName, out bool nearestHitboxPenaltyApplied, out bool centerPreferred)
@@ -542,41 +753,6 @@ namespace JueMingZ.Automation.Combat
             }
 
             return 0f;
-        }
-
-        private static List<AimSample> BuildSamples(CombatTargetSnapshot target, float rangeCenterX, float rangeCenterY)
-        {
-            var samples = new List<AimSample>();
-            if (target == null)
-            {
-                return samples;
-            }
-
-            var left = target.HitboxX;
-            var top = target.HitboxY;
-            var width = Math.Max(1f, target.HitboxWidth);
-            var height = Math.Max(1f, target.HitboxHeight);
-            var right = left + width;
-            var bottom = top + height;
-            var centerX = Clamp(target.CenterX, left, right);
-            var centerY = Clamp(target.CenterY, top, bottom);
-            AddSample(samples, "center", centerX, centerY, left, top, right, bottom);
-            AddSample(samples, "topMid", centerX, top + height * 0.24f, left, top, right, bottom);
-            AddSample(samples, "bottomMid", centerX, bottom - height * 0.24f, left, top, right, bottom);
-            AddSample(samples, "leftMid", left + width * 0.24f, centerY, left, top, right, bottom);
-            AddSample(samples, "rightMid", right - width * 0.24f, centerY, left, top, right, bottom);
-            AddSample(samples, "nearestHitboxPoint", Clamp(rangeCenterX, left, right), Clamp(rangeCenterY, top, bottom), left, top, right, bottom);
-            return samples;
-        }
-
-        private static void AddSample(List<AimSample> samples, string name, float x, float y, float left, float top, float right, float bottom)
-        {
-            samples.Add(new AimSample
-            {
-                Name = name,
-                X = Clamp(x, left, right),
-                Y = Clamp(y, top, bottom)
-            });
         }
 
         private static float HitboxDistance(float x, float y, CombatTargetSnapshot target)
@@ -639,6 +815,13 @@ namespace JueMingZ.Automation.Combat
             return Math.Abs(a - b) <= 0.001f;
         }
 
+        private static bool StartsWithOrdinal(string value, string prefix)
+        {
+            return !string.IsNullOrEmpty(value) &&
+                   !string.IsNullOrEmpty(prefix) &&
+                   value.StartsWith(prefix, StringComparison.Ordinal);
+        }
+
         private static string CombineSkipReason(string existing, string reason)
         {
             if (string.IsNullOrWhiteSpace(existing) || string.Equals(existing, "none", StringComparison.OrdinalIgnoreCase))
@@ -661,19 +844,12 @@ namespace JueMingZ.Automation.Combat
             public float CheapScore;
         }
 
-        private sealed class AimSample
-        {
-            public string Name;
-            public float X;
-            public float Y;
-        }
-
         private sealed class ScoredSample
         {
             public CombatTargetSnapshot Target;
             public CombatTargetSnapshot BallisticTarget;
             public CombatAimBallisticSolution BallisticSolution;
-            public AimSample Sample;
+            public CombatAimHitboxSample Sample;
             public float Score;
             public float RangeDistance;
             public bool LineClear;
@@ -686,6 +862,10 @@ namespace JueMingZ.Automation.Combat
             public bool Rejected;
             public bool NearestHitboxPointPenaltyApplied;
             public bool CenterPreferred;
+            public int VisibleSampleCount;
+            public float ProjectileHitRadius;
+            public float PredictedHitboxCenterX;
+            public float PredictedHitboxCenterY;
         }
     }
 }

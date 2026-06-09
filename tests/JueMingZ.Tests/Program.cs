@@ -115,6 +115,125 @@ namespace Terraria
         public int statManaMax2;
         public int[] buffType = new int[22];
         public int[] buffTime = new int[22];
+        public bool magicQuiver;
+        public bool hasMoltenQuiver;
+        public bool archery;
+    }
+
+    internal sealed class Projectile
+    {
+        public int type;
+        public string Name = string.Empty;
+        public int extraUpdates;
+        public bool arrow;
+        public int aiStyle;
+        public int width = 2;
+        public int height = 2;
+        public bool tileCollide = true;
+        public bool noGravity;
+        public bool friendly;
+        public bool hostile;
+
+        public void SetDefaults(int projectileType)
+        {
+            type = projectileType;
+            Name = projectileType.ToString(CultureInfo.InvariantCulture);
+            extraUpdates = 0;
+            arrow = false;
+            aiStyle = 1;
+            width = 2;
+            height = 2;
+            tileCollide = true;
+            noGravity = false;
+            friendly = true;
+            hostile = false;
+
+            if (projectileType == Terraria.ID.ProjectileID.WoodenArrowFriendly)
+            {
+                Name = "Wooden Arrow";
+                arrow = true;
+                width = 10;
+                height = 10;
+                return;
+            }
+
+            if (projectileType == Terraria.ID.ProjectileID.Bullet)
+            {
+                Name = "Bullet";
+                width = 4;
+                height = 4;
+                noGravity = true;
+                return;
+            }
+
+            if (projectileType == 1058)
+            {
+                Name = "Flairon";
+                aiStyle = 15;
+                width = 18;
+                height = 18;
+                noGravity = true;
+                return;
+            }
+
+            if (projectileType == 9000)
+            {
+                Name = "Specific Launcher Projectile";
+                width = 12;
+                height = 12;
+                noGravity = true;
+                return;
+            }
+
+            if (projectileType == 9001)
+            {
+                Name = "Fast Test Arrow";
+                arrow = true;
+                extraUpdates = 2;
+                width = 10;
+                height = 10;
+                return;
+            }
+
+            if (projectileType == 9002)
+            {
+                Name = "Slow Test Magic";
+                aiStyle = 1;
+                width = 12;
+                height = 12;
+                noGravity = true;
+                return;
+            }
+
+            if (projectileType == 9003)
+            {
+                Name = "Returning Test Projectile";
+                aiStyle = 3;
+                width = 16;
+                height = 16;
+                noGravity = true;
+                return;
+            }
+
+            if (projectileType == 9004)
+            {
+                Name = "Beam Test Projectile";
+                aiStyle = 4;
+                width = 4;
+                height = 4;
+                noGravity = true;
+                return;
+            }
+
+            if (projectileType == 9005)
+            {
+                Name = "Homing Test Projectile";
+                aiStyle = 99;
+                width = 12;
+                height = 12;
+                noGravity = true;
+            }
+        }
     }
 
     internal sealed class CreativeMenuStub
@@ -235,6 +354,7 @@ namespace Terraria.ID
 
         internal static class Sets
         {
+            public static bool[] gunProj = new bool[6000];
             public static bool[] HasRightFire = new bool[6000];
             public static bool[] ItemsThatAllowRepeatedRightClick = new bool[6000];
             public static bool[] ShootsOnUseRelease = new bool[6000];
@@ -243,6 +363,48 @@ namespace Terraria.ID
             public static bool[] CanFishInLava = new bool[6000];
             public static bool[] IsLavaBait = new bool[6000];
         }
+    }
+
+    internal static class AmmoID
+    {
+        public static int Arrow = 40;
+        public static int Bullet = 97;
+        public static int Rocket = 771;
+        public static int Solution = 780;
+        public static int Dart = 283;
+        public static int Snowball = 949;
+        public static int StyngerBolt = 1261;
+        public static int CandyCorn = 1783;
+        public static int JackOLantern = 1785;
+        public static int Stake = 1836;
+        public static int Coin = 71;
+
+        internal static class Sets
+        {
+            public static Dictionary<int, Dictionary<int, int>> SpecificLauncherAmmoProjectileMatches = new Dictionary<int, Dictionary<int, int>>();
+            public static bool[] IsArrow = new bool[6000];
+            public static bool[] IsBullet = new bool[6000];
+
+            static Sets()
+            {
+                IsArrow[Arrow] = true;
+                IsArrow[Stake] = true;
+                IsBullet[Bullet] = true;
+                IsBullet[CandyCorn] = true;
+            }
+        }
+    }
+
+    internal static class ProjectileID
+    {
+        public static int WoodenArrowFriendly = 1;
+        public static int FireArrow = 2;
+        public static int Bullet = 14;
+    }
+
+    internal static class BuffID
+    {
+        public static int Archery = 16;
     }
 
     internal static class NPCID
@@ -669,6 +831,33 @@ namespace JueMingZ.Tests
             Run("continuous dash request has queue timeout", ref failed, ContinuousDashRequestHasQueueTimeout);
             Run("auto facing request has queue timeout", ref failed, AutoFacingRequestHasQueueTimeout);
             Run("combat aim diagnostics metadata keeps stable field names", ref failed, CombatAimDiagnosticsMetadataKeepsStableFieldNames);
+            Run("combat aim projectile profile resolves bow and arrow", ref failed, CombatAimProjectileProfileResolvesBowAndArrow);
+            Run("combat aim projectile profile applies quiver and archery speed", ref failed, CombatAimProjectileProfileAppliesQuiverAndArcherySpeed);
+            Run("combat aim projectile profile keeps gunProj weapon speed", ref failed, CombatAimProjectileProfileKeepsGunProjWeaponSpeed);
+            Run("combat aim projectile profile resolves specific launcher mapping", ref failed, CombatAimProjectileProfileResolvesSpecificLauncherMapping);
+            Run("combat aim projectile profile carries effective extra updates", ref failed, CombatAimProjectileProfileCarriesEffectiveExtraUpdates);
+            Run("combat aim target motion profile classifies stable linear", ref failed, CombatAimTargetMotionProfileClassifiesStableLinear);
+            Run("combat aim target motion profile resets on teleport", ref failed, CombatAimTargetMotionProfileResetsOnTeleport);
+            Run("combat aim target motion profile marks aiStyle1 jumping grounded", ref failed, CombatAimTargetMotionProfileMarksAiStyleOneGrounded);
+            Run("combat aim target motion profile tick gap avoids huge measured velocity", ref failed, CombatAimTargetMotionProfileTickGapAvoidsHugeMeasuredVelocity);
+            Run("combat aim target motion profile clamps acceleration", ref failed, CombatAimTargetMotionProfileClampsAcceleration);
+            Run("combat aim ballistic solver uses point solver for beams", ref failed, CombatAimBallisticSolverUsesPointSolverForBeams);
+            Run("combat aim ballistic solver uses short lead for homing", ref failed, CombatAimBallisticSolverUsesShortLeadForHoming);
+            Run("combat aim ballistic solver keeps high speed lead short", ref failed, CombatAimBallisticSolverKeepsHighSpeedLeadShort);
+            Run("combat aim ballistic solver allows trusted slow projectile lead", ref failed, CombatAimBallisticSolverAllowsTrustedSlowProjectileLead);
+            Run("combat aim ballistic solver clamps slow projectile low trust lead", ref failed, CombatAimBallisticSolverClampsSlowProjectileLowTrustLead);
+            Run("combat aim ballistic solver uses gravity profile inputs", ref failed, CombatAimBallisticSolverUsesGravityProfileInputs);
+            Run("combat aim ballistic solver classifies returning outbound", ref failed, CombatAimBallisticSolverClassifiesReturningOutbound);
+            Run("combat aim ballistic solver classifies spread coverage", ref failed, CombatAimBallisticSolverClassifiesSpreadCoverage);
+            Run("combat aim ballistic solver falls back without projectile", ref failed, CombatAimBallisticSolverFallsBackWithoutProjectile);
+            Run("combat aim predicted sampler leads small moving hitbox", ref failed, CombatAimPredictedSamplerLeadsSmallMovingHitbox);
+            Run("combat aim predicted sampler chooses visible large hitbox sample", ref failed, CombatAimPredictedSamplerChoosesVisibleLargeHitboxSample);
+            Run("combat aim predicted sampler keeps low confidence current", ref failed, CombatAimPredictedSamplerKeepsLowConfidenceCurrent);
+            Run("combat aim predicted sampler keeps center over nearest", ref failed, CombatAimPredictedSamplerKeepsCenterOverNearest);
+            Run("combat aim decision cache reuses attack selection within TTL", ref failed, CombatAimDecisionCacheReusesAttackSelectionWithinTtl);
+            Run("combat aim decision cache expires stale selection", ref failed, CombatAimDecisionCacheExpiresStaleSelection);
+            Run("combat aim cached selection validation rejects stale target", ref failed, CombatAimCachedSelectionValidationRejectsStaleTarget);
+            Run("combat aim selector explains marker attack mismatch", ref failed, CombatAimSelectorExplainsMarkerAttackMismatch);
             Run("flail diagnostics publisher keeps metadata field names", ref failed, FlailDiagnosticsPublisherKeepsMetadataFieldNames);
             Run("flail diagnostics publisher suppresses duplicate inactive snapshots", ref failed, FlailDiagnosticsPublisherSuppressesDuplicateInactiveSnapshots);
             Run("combat aim weapon family resolver classifies requested families", ref failed, CombatAimWeaponFamilyResolverClassifiesRequestedFamilies);

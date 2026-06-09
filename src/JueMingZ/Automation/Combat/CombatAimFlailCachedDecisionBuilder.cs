@@ -208,6 +208,7 @@ namespace JueMingZ.Automation.Combat
                 SelectedSamplePoint = "cachedReleaseAim",
                 AttackSamplePoint = "cachedReleaseAim",
                 SelectionSamplePoint = "cachedReleaseAim",
+                SampleSpace = "cachedReleaseAim",
                 SelectionPurpose = "FlailRelease"
             };
         }

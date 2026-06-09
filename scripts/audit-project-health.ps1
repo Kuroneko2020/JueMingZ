@@ -1100,6 +1100,43 @@ function Test-LegacyUiOverlayGovernance {
     }
 }
 
+function Test-CombatAimDiagnosticsGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $path = Join-Path $RepoRoot "src\JueMingZ\Automation\Combat\CombatAimItemCheckService.cs"
+    $text = Read-TextIfExists -Path $path
+    if ($null -eq $text) {
+        Write-FailHealth "CombatAimItemCheckService.cs missing."
+        return
+    }
+
+    $buildDecisionJsonCalls = [System.Text.RegularExpressions.Regex]::Matches($text, '\bBuildDecisionJson\s*\(')
+    if ($buildDecisionJsonCalls.Count -eq 2) {
+        Write-Pass "Combat aim ItemCheck diagnostics JSON has only the gated call and helper declaration."
+    }
+    else {
+        Write-FailHealth "Combat aim ItemCheck diagnostics JSON call count changed; keep JSON building behind the action-event gate."
+    }
+
+    $recordMethod = [System.Text.RegularExpressions.Regex]::Match(
+        $text,
+        'public\s+static\s+void\s+RecordItemCheckAim[\s\S]*?internal\s+static\s+void\s+ResetLogThrottleForTesting')
+    if (-not $recordMethod.Success) {
+        Write-FailHealth "Combat aim ItemCheck diagnostics recorder method was not found."
+        return
+    }
+
+    $recordText = $recordMethod.Value
+    $gateIndex = $recordText.IndexOf("ShouldRecordLogLocked", [System.StringComparison]::Ordinal)
+    $jsonIndex = $recordText.IndexOf("BuildDecisionJson(decision, mouseOverrideApplied, restored)", [System.StringComparison]::Ordinal)
+    if ($gateIndex -ge 0 -and $jsonIndex -gt $gateIndex) {
+        Write-Pass "Combat aim ItemCheck diagnostics JSON stays behind the log throttle and action-event gate."
+    }
+    else {
+        Write-FailHealth "Combat aim ItemCheck diagnostics JSON must remain after the log throttle gate."
+    }
+}
+
 function Test-IterationLogNumbers {
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
     $updatesDir = ConvertFrom-CodePoints @(0x66f4, 0x65b0, 0x8bb0, 0x5f55)
@@ -1171,6 +1208,7 @@ else {
 }
 Test-InformationFishingFallbackCleanup -RepoRoot $repoRoot
 Test-LegacyUiOverlayGovernance -RepoRoot $repoRoot
+Test-CombatAimDiagnosticsGovernance -RepoRoot $repoRoot
 Test-IterationLogNumbers -RepoRoot $repoRoot
 
 if ($script:FailCount -gt 0) {

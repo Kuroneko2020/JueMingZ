@@ -22,6 +22,7 @@ namespace JueMingZ.Automation.Combat
         public bool AllowRelaxedReleaseValidation { get; set; }
         public bool SelectionCacheHit { get; set; }
         public string SelectionCacheKey { get; set; }
+        public string DecisionCacheRejectedReason { get; set; }
         public CombatAimBallisticContext BallisticContext { get; set; }
 
         public CombatAimTargetSelectionContext()
@@ -32,6 +33,7 @@ namespace JueMingZ.Automation.Combat
             PreferredTargetWhoAmI = -1;
             PreferredTargetType = 0;
             SelectionCacheKey = string.Empty;
+            DecisionCacheRejectedReason = string.Empty;
         }
     }
 }

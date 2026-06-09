@@ -15,12 +15,9 @@ namespace JueMingZ.Automation.Combat
         private static readonly object LogSync = new object();
         private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(5);
         private const int MaxLogThrottleKeys = 128;
-        private const long SelectionCacheTtlTicks = 0;
+        private const long SelectionCacheTtlTicks = CombatAimDecisionCache.AttackSelectionTtlTicks;
+        private const float CachedTargetMaxCenterDriftPixels = 10f;
         private static readonly Dictionary<string, DateTime> LastLogUtcByKey = new Dictionary<string, DateTime>(StringComparer.Ordinal);
-        private static readonly object SelectionCacheSync = new object();
-        private static string _cachedSelectionKey = string.Empty;
-        private static long _cachedSelectionTick = long.MinValue;
-        private static CombatAimTargetSelection _cachedSelection;
 
         public static bool TryCreateAimDecision(object player, out CombatAimItemCheckDecision decision)
         {
@@ -229,9 +226,33 @@ namespace JueMingZ.Automation.Combat
 
                 var markerSelection = CombatAutoAimService.CurrentSelection;
                 var ballisticContext = CombatAimBallisticSolver.Prepare(player, decision.WeaponProfile);
-                var selectionCacheKey = BuildSelectionCacheKey(decision, range, inputState);
+                var selectionPurpose = string.Equals(decision.AimApplyMode, CombatAimApplyModes.PersistentCursor, StringComparison.OrdinalIgnoreCase) ? "PersistentCursor" : "Attack";
+                var selectionCacheKey = BuildSelectionCacheKey(decision, range, inputState, markerSelection, ballisticContext);
+                var decisionCacheRejectedReason = string.Empty;
                 CombatAimTargetSelection selection;
-                if (!TryGetCachedSelection(selectionCacheKey, inputState.GameUpdateCount, out selection))
+                if (TryGetCachedSelection(selectionCacheKey, inputState.GameUpdateCount, out selection))
+                {
+                    string validationReason;
+                    if (!TryValidateCachedSelectionForUse(selection, decision, out validationReason))
+                    {
+                        decisionCacheRejectedReason = validationReason;
+                        selection = null;
+                    }
+                }
+                else
+                {
+                    CombatAimTargetSelection differentKeySelection;
+                    if (CombatAimDecisionCache.TryGetRecentSelectionForDifferentKey(
+                            selectionCacheKey,
+                            inputState.GameUpdateCount,
+                            SelectionCacheTtlTicks,
+                            out differentKeySelection))
+                    {
+                        decisionCacheRejectedReason = "weaponProfileChanged";
+                    }
+                }
+
+                if (selection == null)
                 {
                     selection = CombatAimTargetSelector.Select(
                         readResult,
@@ -252,13 +273,18 @@ namespace JueMingZ.Automation.Combat
                             IncludeBallisticScoring = true,
                             HasResolvedRange = true,
                             Range = range,
-                            SelectionPurpose = string.Equals(decision.AimApplyMode, CombatAimApplyModes.PersistentCursor, StringComparison.OrdinalIgnoreCase) ? "PersistentCursor" : "Attack",
+                            SelectionPurpose = selectionPurpose,
                             PreferredTargetWhoAmI = markerSelection == null || markerSelection.Target == null ? -1 : markerSelection.Target.WhoAmI,
                             PreferredTargetType = markerSelection == null || markerSelection.Target == null ? 0 : markerSelection.Target.Type,
                             BallisticContext = ballisticContext,
-                            SelectionCacheKey = selectionCacheKey
+                            SelectionCacheKey = selectionCacheKey,
+                            DecisionCacheRejectedReason = decisionCacheRejectedReason
                         });
-                    StoreCachedSelection(selectionCacheKey, inputState.GameUpdateCount, selection);
+                    StoreCachedSelection(selectionCacheKey, inputState.GameUpdateCount, selection, selectionPurpose);
+                }
+                else
+                {
+                    selection.SelectionPurpose = selectionPurpose;
                 }
                 decision.Selection = selection;
                 decision.RangeCenterWorldX = selection == null ? 0f : selection.RangeCenterWorldX;
@@ -730,52 +756,170 @@ namespace JueMingZ.Automation.Combat
 
         private static bool TryGetCachedSelection(string key, long tick, out CombatAimTargetSelection selection)
         {
-            selection = null;
-            if (string.IsNullOrWhiteSpace(key))
+            return CombatAimDecisionCache.TryGetSelection(key, tick, SelectionCacheTtlTicks, out selection);
+        }
+
+        private static void StoreCachedSelection(string key, long tick, CombatAimTargetSelection selection, string source)
+        {
+            if (selection != null)
             {
+                selection.SelectionCacheKey = key ?? string.Empty;
+                selection.DecisionCacheSource = source ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(selection.DecisionCacheRevalidationReason))
+                {
+                    selection.DecisionCacheRevalidationReason = "stored";
+                }
+            }
+
+            CombatAimDecisionCache.StoreSelection(key, tick, selection, source);
+        }
+
+        private static bool TryValidateCachedSelectionForUse(
+            CombatAimTargetSelection selection,
+            CombatAimItemCheckDecision decision,
+            out string reason)
+        {
+            reason = string.Empty;
+            if (selection == null || selection.Target == null)
+            {
+                reason = "targetStale:missingCachedTarget";
                 return false;
             }
 
-            lock (SelectionCacheSync)
+            CombatTargetSnapshot refreshed;
+            string refreshSkipReason;
+            if (!CombatAimTargetReader.TryReadTargetByIdentity(
+                    selection.Target.WhoAmI,
+                    selection.Target.Type,
+                    selection.TrackDummy,
+                    out refreshed,
+                    out refreshSkipReason))
             {
-                if (_cachedSelection == null || !string.Equals(_cachedSelectionKey, key, StringComparison.Ordinal))
-                {
-                    return false;
-                }
-
-                var age = tick - _cachedSelectionTick;
-                if (age < 0 || age > SelectionCacheTtlTicks)
-                {
-                    return false;
-                }
-
-                selection = _cachedSelection;
-                selection.SelectionCacheHit = true;
-                selection.SelectionCacheKey = key;
-                return true;
+                reason = "targetStale:" + (string.IsNullOrWhiteSpace(refreshSkipReason) ? "targetUnavailable" : refreshSkipReason);
+                return false;
             }
+
+            if (!IsCachedTargetStillClose(selection.Target, refreshed))
+            {
+                reason = "targetStale:hitboxMoved";
+                return false;
+            }
+
+            if (ShouldRevalidateLineOfSight(selection, decision) &&
+                !IsCachedLineOfSightStillClear(selection))
+            {
+                reason = "lineOfSightChanged";
+                return false;
+            }
+
+            selection.Target = refreshed;
+            if (selection.BallisticTarget != null)
+            {
+                selection.BallisticTarget.Active = refreshed.Active;
+                selection.BallisticTarget.Life = refreshed.Life;
+                selection.BallisticTarget.LifeMax = refreshed.LifeMax;
+                selection.BallisticTarget.MotionProfile = refreshed.MotionProfile == null ? null : refreshed.MotionProfile.Clone();
+            }
+
+            selection.DecisionCacheRevalidationReason = "validated";
+            return true;
         }
 
-        private static void StoreCachedSelection(string key, long tick, CombatAimTargetSelection selection)
+        internal static bool ValidateCachedSelectionForTesting(
+            CombatAimTargetSelection selection,
+            CombatTargetSnapshot refreshed,
+            bool refreshedAvailable,
+            string refreshSkipReason,
+            string aimTargetPriority,
+            out string reason)
         {
-            if (string.IsNullOrWhiteSpace(key) || selection == null || !selection.HasTarget)
+            reason = string.Empty;
+            if (selection == null || selection.Target == null)
             {
-                return;
+                reason = "targetStale:missingCachedTarget";
+                return false;
             }
 
-            lock (SelectionCacheSync)
+            if (!refreshedAvailable || refreshed == null)
             {
-                _cachedSelectionKey = key;
-                _cachedSelectionTick = tick;
-                _cachedSelection = selection;
+                reason = "targetStale:" + (string.IsNullOrWhiteSpace(refreshSkipReason) ? "targetUnavailable" : refreshSkipReason);
+                return false;
             }
+
+            if (!IsCachedTargetStillClose(selection.Target, refreshed))
+            {
+                reason = "targetStale:hitboxMoved";
+                return false;
+            }
+
+            if (selection.LineClearAvailable &&
+                selection.LineClear &&
+                string.Equals(CombatAimModes.NormalizeTargetPriority(aimTargetPriority), CombatAimModes.TargetPriorityClearLine, StringComparison.OrdinalIgnoreCase) &&
+                selection.DecisionCacheRevalidationReason == "forceLineOfSightChangedForTesting")
+            {
+                reason = "lineOfSightChanged";
+                return false;
+            }
+
+            reason = "validated";
+            return true;
         }
 
-        private static string BuildSelectionCacheKey(CombatAimItemCheckDecision decision, CombatAimRangeResolveResult range, CombatAimUseInputSnapshot input)
+        private static bool IsCachedTargetStillClose(CombatTargetSnapshot cached, CombatTargetSnapshot refreshed)
         {
+            return cached != null &&
+                   refreshed != null &&
+                   cached.WhoAmI == refreshed.WhoAmI &&
+                   cached.Type == refreshed.Type &&
+                   Math.Abs(cached.CenterX - refreshed.CenterX) <= CachedTargetMaxCenterDriftPixels &&
+                   Math.Abs(cached.CenterY - refreshed.CenterY) <= CachedTargetMaxCenterDriftPixels &&
+                   Math.Abs(cached.HitboxWidth - refreshed.HitboxWidth) <= 1f &&
+                   Math.Abs(cached.HitboxHeight - refreshed.HitboxHeight) <= 1f;
+        }
+
+        private static bool ShouldRevalidateLineOfSight(CombatAimTargetSelection selection, CombatAimItemCheckDecision decision)
+        {
+            return selection != null &&
+                   selection.LineClearAvailable &&
+                   selection.LineClear &&
+                   decision != null &&
+                   string.Equals(CombatAimModes.NormalizeTargetPriority(decision.AimTargetPriority), CombatAimModes.TargetPriorityClearLine, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsCachedLineOfSightStillClear(CombatAimTargetSelection selection)
+        {
+            var ballistic = selection == null ? null : selection.BallisticSolution;
+            var originX = ballistic == null ? selection.RangeCenterWorldX : ballistic.PlayerCenterX;
+            var originY = ballistic == null ? selection.RangeCenterWorldY : ballistic.PlayerCenterY;
+            var aimX = ballistic == null ? selection.SelectedSampleWorldX : ballistic.AimWorldX;
+            var aimY = ballistic == null ? selection.SelectedSampleWorldY : ballistic.AimWorldY;
+            bool lineClear;
+            return CombatAimLineOfSight.TryCanHitLine(originX, originY, aimX, aimY, out lineClear) && lineClear;
+        }
+
+        private static string BuildSelectionCacheKey(
+            CombatAimItemCheckDecision decision,
+            CombatAimRangeResolveResult range,
+            CombatAimUseInputSnapshot input,
+            CombatAimTargetSelection markerSelection,
+            CombatAimBallisticContext ballisticContext)
+        {
+            var profile = decision == null ? null : decision.WeaponProfile;
+            var markerTarget = markerSelection == null ? null : markerSelection.Target;
+            var markerMotion = markerTarget == null ? null : markerTarget.MotionProfile;
             return (decision == null ? string.Empty : decision.AimApplyMode ?? string.Empty) + ":" +
                    (decision == null ? 0 : decision.ItemType).ToString(CultureInfo.InvariantCulture) + ":" +
                    (decision == null ? -1 : decision.SelectedSlot).ToString(CultureInfo.InvariantCulture) + ":" +
+                   (profile == null ? 0 : profile.Shoot).ToString(CultureInfo.InvariantCulture) + ":" +
+                   Quantize(profile == null ? 0f : profile.ShootSpeed, 0.25f).ToString(CultureInfo.InvariantCulture) + ":" +
+                   (profile == null ? 0 : profile.UseAmmo).ToString(CultureInfo.InvariantCulture) + ":" +
+                   (profile != null && profile.Channel ? "channel" : "noch") + ":" +
+                   (ballisticContext == null ? 0 : ballisticContext.ProjectileType).ToString(CultureInfo.InvariantCulture) + ":" +
+                   (ballisticContext == null ? 0 : ballisticContext.AmmoItemType).ToString(CultureInfo.InvariantCulture) + ":" +
+                   (ballisticContext == null ? 0 : ballisticContext.AmmoProjectileType).ToString(CultureInfo.InvariantCulture) + ":" +
+                   Quantize(ballisticContext == null ? 0f : ballisticContext.EffectiveProjectileSpeed, 0.25f).ToString(CultureInfo.InvariantCulture) + ":" +
+                   (ballisticContext == null ? string.Empty : ballisticContext.ProfileFamilyHint ?? string.Empty) + ":" +
+                   (ballisticContext == null ? string.Empty : ballisticContext.ProfileCompleteness ?? string.Empty) + ":" +
                    (decision == null ? string.Empty : decision.AimRangeOrigin ?? string.Empty) + ":" +
                    (decision == null ? string.Empty : decision.AimTargetPriority ?? string.Empty) + ":" +
                    (range == null ? string.Empty : range.RangeMode ?? string.Empty) + ":" +
@@ -784,7 +928,11 @@ namespace JueMingZ.Automation.Combat
                    Quantize(range == null ? 0f : range.RangeCenterWorldY, 16f).ToString(CultureInfo.InvariantCulture) + ":" +
                    (decision == null ? 0 : decision.CursorAimRadius).ToString(CultureInfo.InvariantCulture) + ":" +
                    (decision == null ? 0 : decision.PlayerAimRadius).ToString(CultureInfo.InvariantCulture) + ":" +
-                   (decision != null && decision.MarkerEnabled ? "marker" : "nomarker");
+                   (decision != null && decision.MarkerEnabled ? "marker" : "nomarker") + ":" +
+                   (markerTarget == null ? -1 : markerTarget.WhoAmI).ToString(CultureInfo.InvariantCulture) + ":" +
+                   (markerTarget == null ? 0 : markerTarget.Type).ToString(CultureInfo.InvariantCulture) + ":" +
+                   (markerMotion == null ? string.Empty : markerMotion.MotionProfileKind ?? string.Empty) + ":" +
+                   Quantize(markerMotion == null ? 0f : markerMotion.MotionConfidence, 0.1f).ToString(CultureInfo.InvariantCulture);
         }
 
         private static int Quantize(float value, float step)
@@ -947,10 +1095,15 @@ namespace JueMingZ.Automation.Combat
             AppendRaw(builder, "targetType", decision.Target == null ? "null" : IntRaw(decision.Target.Type), true);
             AppendString(builder, "targetName", decision.Target == null ? "unknown" : UnknownIfEmpty(decision.Target.Name), true);
             AppendRaw(builder, "targetCenter", decision.Target == null ? "null" : BuildPointJson(decision.Target.CenterX, decision.Target.CenterY), true);
+            AppendTargetMotionJson(builder, decision.Target);
             AppendRaw(builder, "selectedSampleWorld", decision.Selection == null ? "null" : BuildPointJson(decision.Selection.SelectedSampleWorldX, decision.Selection.SelectedSampleWorldY), true);
             AppendString(builder, "selectedSamplePoint", decision.Selection == null ? string.Empty : decision.Selection.SelectedSamplePoint, true);
             AppendString(builder, "attackSamplePoint", decision.Selection == null ? string.Empty : decision.Selection.AttackSamplePoint, true);
             AppendString(builder, "selectionSamplePoint", decision.Selection == null ? string.Empty : decision.Selection.SelectionSamplePoint, true);
+            AppendString(builder, "sampleSpace", decision.Selection == null ? string.Empty : decision.Selection.SampleSpace, true);
+            AppendRaw(builder, "predictedHitboxCenter", decision.Selection == null ? "null" : BuildPointJson(decision.Selection.PredictedHitboxCenterX, decision.Selection.PredictedHitboxCenterY), true);
+            AppendRaw(builder, "visibleSampleCount", IntRaw(decision.Selection == null ? 0 : decision.Selection.VisibleSampleCount), true);
+            AppendRaw(builder, "projectileHitRadius", FloatRaw(decision.Selection == null ? 0f : decision.Selection.ProjectileHitRadius), true);
             AppendRaw(builder, "lineOfSightRejectedSampleCount", IntRaw(decision.Selection == null ? 0 : decision.Selection.LineOfSightRejectedSampleCount), true);
             AppendRaw(builder, "nearestHitboxPointPenaltyApplied", BoolRaw(decision.Selection != null && decision.Selection.NearestHitboxPointPenaltyApplied), true);
             AppendRaw(builder, "centerPreferred", BoolRaw(decision.Selection != null && decision.Selection.CenterPreferred), true);
@@ -977,10 +1130,17 @@ namespace JueMingZ.Automation.Combat
             AppendRaw(builder, "targetHoldTicksRemaining", IntRaw(decision.Selection == null ? 0 : decision.Selection.TargetHoldTicksRemaining), true);
             AppendString(builder, "selectionPurpose", decision.Selection == null ? string.Empty : decision.Selection.SelectionPurpose, true);
             AppendRaw(builder, "selectionCacheHit", BoolRaw(decision.Selection != null && decision.Selection.SelectionCacheHit), true);
+            AppendRaw(builder, "aimDecisionCacheHit", BoolRaw(decision.Selection != null && decision.Selection.SelectionCacheHit), true);
             AppendString(builder, "selectionCacheKey", decision.Selection == null ? string.Empty : decision.Selection.SelectionCacheKey, true);
+            AppendString(builder, "decisionCacheSource", decision.Selection == null ? string.Empty : decision.Selection.DecisionCacheSource, true);
+            AppendRaw(builder, "decisionCacheAgeTicks", decision.Selection == null ? "-1" : decision.Selection.DecisionCacheAgeTicks.ToString(CultureInfo.InvariantCulture), true);
+            AppendString(builder, "decisionCacheRevalidationReason", decision.Selection == null ? string.Empty : decision.Selection.DecisionCacheRevalidationReason, true);
+            AppendString(builder, "liveTargetRevalidation", ResolveLiveTargetRevalidation(decision.Selection), true);
             AppendRaw(builder, "markerTargetWhoAmI", decision.Selection == null || decision.Selection.MarkerTargetWhoAmI < 0 ? "null" : IntRaw(decision.Selection.MarkerTargetWhoAmI), true);
             AppendRaw(builder, "attackTargetWhoAmI", decision.Selection == null || decision.Selection.AttackTargetWhoAmI < 0 ? "null" : IntRaw(decision.Selection.AttackTargetWhoAmI), true);
             AppendRaw(builder, "markerAttackTargetMismatch", BoolRaw(decision.Selection != null && decision.Selection.MarkerAttackTargetMismatch), true);
+            AppendString(builder, "markerAttackMismatchReason", decision.Selection == null ? string.Empty : decision.Selection.MarkerAttackMismatchReason, true);
+            AppendString(builder, "markerAttackTargetMismatchReason", decision.Selection == null ? string.Empty : decision.Selection.MarkerAttackMismatchReason, true);
             AppendRaw(builder, "markerTargetChangedForAttack", BoolRaw(decision.Selection != null && decision.Selection.MarkerTargetChangedForAttack), true);
             AppendRaw(builder, "candidateCount", IntRaw(decision.Selection == null ? 0 : decision.Selection.CandidateCount), true);
             AppendRaw(builder, "cheapCandidateCount", IntRaw(decision.Selection == null ? 0 : decision.Selection.CheapCandidateCount), true);
@@ -1030,11 +1190,48 @@ namespace JueMingZ.Automation.Combat
             AppendRaw(builder, "coinAmmoStack", IntRaw(profile == null ? 0 : profile.CoinAmmoStack), true);
         }
 
+        private static void AppendTargetMotionJson(StringBuilder builder, CombatTargetSnapshot target)
+        {
+            var profile = target == null ? null : target.MotionProfile;
+            AppendString(builder, "targetMotionProfileKind", profile == null ? CombatAimTargetMotionProfile.Unknown : UnknownIfEmpty(profile.MotionProfileKind), true);
+            AppendString(builder, "targetMotionKind", profile == null ? CombatAimTargetMotionProfile.Unknown : UnknownIfEmpty(profile.MotionProfileKind), true);
+            AppendRaw(builder, "targetMotionConfidence", FloatRaw(profile == null ? 0f : profile.MotionConfidence), true);
+            AppendRaw(builder, "targetVelocityConfidence", FloatRaw(profile == null ? 0f : profile.VelocityConfidence), true);
+            AppendRaw(builder, "targetAcceleration", profile == null ? "null" : BuildPointJson(profile.AccelerationX, profile.AccelerationY), true);
+            AppendRaw(builder, "targetAccelerationConfidence", FloatRaw(profile == null ? 0f : profile.AccelerationConfidence), true);
+            AppendRaw(builder, "targetRecommendedLeadScale", FloatRaw(profile == null ? 0f : profile.RecommendedLeadScale), true);
+            AppendRaw(builder, "targetRecommendedMaxLeadTicks", FloatRaw(profile == null ? 0f : profile.RecommendedMaxLeadTicks), true);
+            AppendRaw(builder, "targetPreferCurrentVelocity", BoolRaw(profile != null && profile.PreferCurrentVelocity), true);
+            AppendRaw(builder, "targetPreferSmoothedVelocity", BoolRaw(profile != null && profile.PreferSmoothedVelocity), true);
+            AppendString(builder, "targetHistoryResetReason", profile == null ? string.Empty : profile.HistoryResetReason, true);
+            AppendRaw(builder, "targetLastReadTick", target == null || target.LastReadTick <= 0 ? "null" : target.LastReadTick.ToString(CultureInfo.InvariantCulture), true);
+            AppendRaw(builder, "targetNpcAiStyle", IntRaw(target == null ? 0 : target.NpcAiStyle), true);
+            AppendRaw(builder, "targetNoGravity", BoolRaw(target != null && target.NoGravity), true);
+            AppendRaw(builder, "targetCollideX", BoolRaw(target != null && target.CollideX), true);
+            AppendRaw(builder, "targetCollideY", BoolRaw(target != null && target.CollideY), true);
+            AppendRaw(builder, "targetDirection", IntRaw(target == null ? 0 : target.Direction), true);
+            AppendRaw(builder, "targetDirectionY", IntRaw(target == null ? 0 : target.DirectionY), true);
+            AppendRaw(builder, "targetPlayer", target == null || target.TargetPlayer < 0 ? "null" : IntRaw(target.TargetPlayer), true);
+            AppendRaw(builder, "targetAiSummaryAvailable", BoolRaw(target != null && target.AiSummaryAvailable), true);
+            AppendRaw(builder, "targetAi0", FloatRaw(target == null ? 0f : target.Ai0), true);
+            AppendRaw(builder, "targetAi1", FloatRaw(target == null ? 0f : target.Ai1), true);
+            AppendRaw(builder, "targetAi2", FloatRaw(target == null ? 0f : target.Ai2), true);
+            AppendRaw(builder, "targetAi3", FloatRaw(target == null ? 0f : target.Ai3), true);
+        }
+
         private static void AppendBallisticJson(StringBuilder builder, CombatAimBallisticSolution solution)
         {
             AppendRaw(builder, "ballisticSolved", BoolRaw(solution != null && solution.Solved), true);
             AppendString(builder, "ballisticMode", solution == null ? "unknown" : UnknownIfEmpty(solution.Mode), true);
             AppendString(builder, "ballisticFallbackReason", solution == null ? "unknown" : UnknownIfEmpty(solution.FallbackReason), true);
+            AppendString(builder, "ballisticSolverKind", solution == null ? "unknown" : UnknownIfEmpty(solution.SolverKind), true);
+            AppendString(builder, "solverKind", solution == null ? "unknown" : UnknownIfEmpty(solution.SolverKind), true);
+            AppendString(builder, "ballisticLeadWindowKind", solution == null ? "unknown" : UnknownIfEmpty(solution.LeadWindowKind), true);
+            AppendString(builder, "leadWindowKind", solution == null ? "unknown" : UnknownIfEmpty(solution.LeadWindowKind), true);
+            AppendString(builder, "ballisticLeadClampReason", solution == null ? "unknown" : UnknownIfEmpty(solution.LeadClampReason), true);
+            AppendString(builder, "leadClampReason", solution == null ? "unknown" : UnknownIfEmpty(solution.LeadClampReason), true);
+            AppendString(builder, "ballisticPredictionConfidence", solution == null ? "unknown" : UnknownIfEmpty(solution.PredictionConfidence), true);
+            AppendString(builder, "predictionConfidence", solution == null ? "unknown" : UnknownIfEmpty(solution.PredictionConfidence), true);
             AppendRaw(builder, "ballisticProjectileType", IntRaw(solution == null ? 0 : solution.ProjectileType), true);
             AppendRaw(builder, "resolvedProjectileType", IntRaw(solution == null ? 0 : solution.ProjectileType), true);
             AppendString(builder, "resolvedProjectileName", solution == null ? "unknown" : UnknownIfEmpty(solution.ProjectileName), true);
@@ -1054,7 +1251,27 @@ namespace JueMingZ.Automation.Combat
             AppendRaw(builder, "ballisticProjectileExtraUpdates", IntRaw(solution == null ? 0 : solution.ProjectileExtraUpdates), true);
             AppendRaw(builder, "projectileExtraUpdates", IntRaw(solution == null ? 0 : solution.ProjectileExtraUpdates), true);
             AppendRaw(builder, "ballisticProjectileDefaultsAvailable", BoolRaw(solution != null && solution.ProjectileDefaultsAvailable), true);
-            AppendString(builder, "projectileProfileStatus", solution != null && solution.ProjectileDefaultsAvailable ? "resolved" : "unknown", true);
+            AppendString(builder, "projectileProfileFamily", solution == null ? "unknown" : UnknownIfEmpty(solution.ProjectileProfileFamily), true);
+            AppendString(builder, "projectileProfileKind", solution == null ? "unknown" : UnknownIfEmpty(solution.ProjectileProfileFamily), true);
+            AppendString(builder, "projectileProfileStatus", solution == null ? "unknown" : UnknownIfEmpty(solution.ProjectileProfileStatus), true);
+            AppendString(builder, "projectileProfileDegradedReason", solution == null ? string.Empty : solution.ProjectileProfileDegradedReason, true);
+            AppendString(builder, "profileFallbackReason", solution == null ? string.Empty : solution.ProjectileProfileDegradedReason, true);
+            AppendString(builder, "projectileProfileSpeedSource", solution == null ? string.Empty : solution.ProjectileProfileSpeedSource, true);
+            AppendString(builder, "effectiveProjectileSpeedSource", solution == null ? string.Empty : solution.ProjectileProfileSpeedSource, true);
+            AppendRaw(builder, "projectileProfileGunProj", BoolRaw(solution != null && solution.ProjectileProfileGunProj), true);
+            AppendRaw(builder, "projectileProfileAmmoSpeedApplied", BoolRaw(solution != null && solution.ProjectileProfileAmmoSpeedApplied), true);
+            AppendRaw(builder, "projectileProfileMagicQuiverApplied", BoolRaw(solution != null && solution.ProjectileProfileMagicQuiverApplied), true);
+            AppendRaw(builder, "magicQuiverApplied", BoolRaw(solution != null && solution.ProjectileProfileMagicQuiverApplied), true);
+            AppendRaw(builder, "projectileProfileArcheryApplied", BoolRaw(solution != null && solution.ProjectileProfileArcheryApplied), true);
+            AppendRaw(builder, "archeryApplied", BoolRaw(solution != null && solution.ProjectileProfileArcheryApplied), true);
+            AppendRaw(builder, "projectileProfileArcherySpeedCapped", BoolRaw(solution != null && solution.ProjectileProfileArcherySpeedCapped), true);
+            AppendRaw(builder, "projectileProfileMagicQuiverEffectiveUpdateApplied", BoolRaw(solution != null && solution.ProjectileProfileMagicQuiverEffectiveUpdateApplied), true);
+            AppendRaw(builder, "projectileProfileSpecificLauncherMatch", BoolRaw(solution != null && solution.ProjectileProfileSpecificLauncherAmmoProjectileMatch), true);
+            AppendString(builder, "projectileProfileTransformRole", solution == null ? string.Empty : solution.ProjectileProfileTransformRole, true);
+            AppendRaw(builder, "projectileEffectiveUpdatesPerTick", IntRaw(solution == null ? 0 : solution.EffectiveUpdatesPerTick), true);
+            AppendRaw(builder, "effectiveUpdatesPerTick", IntRaw(solution == null ? 0 : solution.EffectiveUpdatesPerTick), true);
+            AppendRaw(builder, "projectileRadiusForHit", FloatRaw(solution == null ? 0f : solution.ProjectileRadiusForHit), true);
+            AppendRaw(builder, "projectileGravityPerTickCandidate", FloatRaw(solution == null ? 0f : solution.GravityPerTickCandidate), true);
             AppendRaw(builder, "ballisticProjectileNoGravity", BoolRaw(solution != null && solution.ProjectileNoGravity), true);
             AppendRaw(builder, "ballisticProjectileArrow", BoolRaw(solution != null && solution.ProjectileArrow), true);
             AppendRaw(builder, "projectileTileCollide", BoolRaw(solution != null && solution.ProjectileTileCollide), true);
@@ -1080,8 +1297,13 @@ namespace JueMingZ.Automation.Combat
             AppendString(builder, "specialWeaponRuleKind", solution == null ? string.Empty : solution.SpecialWeaponKind, true);
             AppendString(builder, "specialWeaponRuleName", solution == null ? string.Empty : solution.SpecialWeaponName, true);
             AppendRaw(builder, "specialWeaponRuleApplied", BoolRaw(solution != null && !string.IsNullOrWhiteSpace(solution.SpecialWeaponKind)), true);
+            AppendString(builder, "specialWeaponSolverKind", solution == null ? string.Empty : solution.SpecialWeaponSolverKind, true);
+            AppendString(builder, "specialWeaponLeadWindowKind", solution == null ? string.Empty : solution.SpecialWeaponLeadWindowKind, true);
+            AppendString(builder, "specialWeaponLeadPolicy", solution == null ? string.Empty : solution.SpecialWeaponLeadPolicy, true);
+            AppendString(builder, "specialWeaponDiagnosticsReason", solution == null ? string.Empty : solution.SpecialWeaponDiagnosticsReason, true);
             AppendString(builder, "specialWeaponAimMode", solution == null ? string.Empty : solution.Mode, true);
             AppendRaw(builder, "specialWeaponAimPoint", solution == null ? "null" : BuildPointJson(solution.AimWorldX, solution.AimWorldY), true);
+            AppendString(builder, "returningPhaseAssumption", solution == null ? string.Empty : solution.ReturningPhaseAssumption, true);
             AppendRaw(builder, "ballisticSpecialShotCount", IntRaw(solution == null ? 0 : solution.SpecialShotCount), true);
             AppendRaw(builder, "ballisticSpecialSpreadDegrees", FloatRaw(solution == null ? 0f : solution.SpecialSpreadDegrees), true);
             AppendRaw(builder, "ballisticSpecialParallelSpacingPixels", FloatRaw(solution == null ? 0f : solution.SpecialParallelSpacingPixels), true);
@@ -1098,12 +1320,26 @@ namespace JueMingZ.Automation.Combat
             AppendRaw(builder, "ballisticPlayerCenter", solution == null ? "null" : BuildPointJson(solution.PlayerCenterX, solution.PlayerCenterY), true);
             AppendRaw(builder, "ballisticTargetVelocity", solution == null ? "null" : BuildPointJson(solution.TargetVelocityX, solution.TargetVelocityY), true);
             AppendRaw(builder, "ballisticPredictedTargetCenter", solution == null ? "null" : BuildPointJson(solution.PredictedTargetX, solution.PredictedTargetY), true);
+            AppendRaw(builder, "ballisticBaseProjectileSpeed", FloatRaw(solution == null ? 0f : solution.BaseProjectileSpeed), true);
             AppendRaw(builder, "ballisticProjectileSpeed", FloatRaw(solution == null ? 0f : solution.ProjectileSpeed), true);
             AppendRaw(builder, "resolvedProjectileSpeed", FloatRaw(solution == null ? 0f : solution.ProjectileSpeed), true);
             AppendRaw(builder, "ballisticEffectiveProjectileSpeed", FloatRaw(solution == null ? 0f : solution.EffectiveProjectileSpeed), true);
+            AppendRaw(builder, "effectiveProjectileSpeed", FloatRaw(solution == null ? 0f : solution.EffectiveProjectileSpeed), true);
+            AppendRaw(builder, "ballisticRawLeadTicks", FloatRaw(solution == null ? 0f : solution.RawLeadTicks), true);
+            AppendRaw(builder, "ballisticLeadWindowMaxTicks", FloatRaw(solution == null ? 0f : solution.LeadWindowMaxTicks), true);
+            AppendRaw(builder, "ballisticLeadScale", FloatRaw(solution == null ? 0f : solution.LeadScale), true);
+            AppendRaw(builder, "ballisticLeadClamped", BoolRaw(solution != null && solution.LeadClamped), true);
             AppendRaw(builder, "ballisticLeadTicks", FloatRaw(solution == null ? 0f : solution.LeadTicks), true);
             AppendRaw(builder, "ballisticGravityPerTick", FloatRaw(solution == null ? 0f : solution.GravityPerTick), true);
+            AppendRaw(builder, "ballisticGravityDelayTicks", FloatRaw(solution == null ? 0f : solution.GravityDelayTicks), true);
             AppendRaw(builder, "ballisticGravityCompensationPixels", FloatRaw(solution == null ? 0f : solution.GravityCompensationPixels), true);
+            AppendRaw(builder, "gravityCompensationPixels", FloatRaw(solution == null ? 0f : solution.GravityCompensationPixels), true);
+            AppendString(builder, "ballisticSampleSpace", solution == null ? string.Empty : solution.SampleSpace, true);
+            AppendString(builder, "ballisticSelectedSamplePoint", solution == null ? string.Empty : solution.SelectedSamplePoint, true);
+            AppendRaw(builder, "ballisticSelectedSampleWorld", solution == null ? "null" : BuildPointJson(solution.SelectedSampleWorldX, solution.SelectedSampleWorldY), true);
+            AppendRaw(builder, "ballisticPredictedHitboxCenter", solution == null ? "null" : BuildPointJson(solution.PredictedHitboxCenterX, solution.PredictedHitboxCenterY), true);
+            AppendRaw(builder, "ballisticVisibleSampleCount", IntRaw(solution == null ? 0 : solution.VisibleSampleCount), true);
+            AppendRaw(builder, "ballisticProjectileHitRadius", FloatRaw(solution == null ? 0f : solution.ProjectileHitRadius), true);
         }
 
         private static string ResolveAimPurpose(CombatAimItemCheckDecision decision)
@@ -1124,6 +1360,21 @@ namespace JueMingZ.Automation.Combat
             }
 
             return "other";
+        }
+
+        private static string ResolveLiveTargetRevalidation(CombatAimTargetSelection selection)
+        {
+            if (selection == null)
+            {
+                return "unavailable";
+            }
+
+            if (!string.IsNullOrWhiteSpace(selection.DecisionCacheRevalidationReason))
+            {
+                return selection.DecisionCacheRevalidationReason;
+            }
+
+            return selection.SelectionCacheHit ? "ok" : "notCached";
         }
 
         private static string ResolveLineOfSightResult(CombatAimTargetSelection selection)

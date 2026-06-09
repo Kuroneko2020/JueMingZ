@@ -513,6 +513,11 @@ namespace JueMingZ.Tests
             public bool dead;
             public bool ghost;
             public bool creativeGodMode;
+            public int[] buffType = new int[22];
+            public int[] buffTime = new int[22];
+            public bool magicQuiver;
+            public bool hasMoltenQuiver;
+            public bool archery;
             public int grapCount;
             public bool CCed;
             public bool controlUseItem;
@@ -621,6 +626,7 @@ namespace JueMingZ.Tests
             public int prefix;
             public string Name;
             public int damage;
+            public float knockBack;
             public int shoot;
             public float shootSpeed;
             public int useAmmo;

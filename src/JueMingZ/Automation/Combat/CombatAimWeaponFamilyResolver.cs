@@ -9,6 +9,7 @@ namespace JueMingZ.Automation.Combat
         public const string FlailAiStyle15 = "FlailAiStyle15";
         public const string SpecialCursorSpawnBurst = "SpecialCursorSpawnBurst";
         public const string SpecialDualProjectile = "SpecialDualProjectile";
+        public const string SpecialSpreadOrMultiShot = "SpecialSpreadOrMultiShot";
         public const string SpearAiStyle19 = "SpearAiStyle19";
         public const string ReturningBoomerangAiStyle3 = "ReturningBoomerangAiStyle3";
         public const string Yoyo = "Yoyo";
@@ -101,6 +102,17 @@ namespace JueMingZ.Automation.Combat
             if (string.Equals(specialRuleKind, "dualProjectileSpread", StringComparison.Ordinal))
             {
                 return Result(CombatAimWeaponFamilies.SpecialDualProjectile, "specialWeaponRuleKind=dualProjectileSpread", projectileAiStyle, specialRuleKind);
+            }
+
+            if (string.Equals(specialRuleKind, "spreadMultiShot", StringComparison.Ordinal) ||
+                string.Equals(specialRuleKind, "parallelMultiShot", StringComparison.Ordinal))
+            {
+                return Result(CombatAimWeaponFamilies.SpecialSpreadOrMultiShot, "specialWeaponRuleKind=" + specialRuleKind, projectileAiStyle, specialRuleKind);
+            }
+
+            if (string.Equals(specialRuleKind, "returning", StringComparison.Ordinal))
+            {
+                return Result(CombatAimWeaponFamilies.ReturningBoomerangAiStyle3, "specialWeaponRuleKind=returning", projectileAiStyle, specialRuleKind);
             }
 
             if (string.Equals(specialRuleKind, "rainFromSky", StringComparison.Ordinal))
