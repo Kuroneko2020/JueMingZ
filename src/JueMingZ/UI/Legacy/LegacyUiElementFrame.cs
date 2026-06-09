@@ -207,7 +207,18 @@ namespace JueMingZ.UI.Legacy
             IList<LegacyUiElement> elements,
             LegacyMouseSnapshot mouse)
         {
-            var hovered = preferred ?? _currentHoveredElement;
+            return ResolveHoveredElement(preferred, elements, mouse, null);
+        }
+
+        public static LegacyUiElement ResolveHoveredElement(
+            LegacyUiElement preferred,
+            IList<LegacyUiElement> elements,
+            LegacyMouseSnapshot mouse,
+            LegacyUiOverlayCoordinator overlayCoordinator)
+        {
+            var hovered = overlayCoordinator == null
+                ? preferred ?? _currentHoveredElement
+                : overlayCoordinator.ResolveHoveredElement(preferred ?? _currentHoveredElement, elements, mouse);
             if (_hoverFrameActive && _hoverReuseActive && !_hoverResolved && hovered == null)
             {
                 hovered = FindHoveredElement(elements, mouse);

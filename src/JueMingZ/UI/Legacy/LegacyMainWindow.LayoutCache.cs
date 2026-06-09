@@ -58,7 +58,7 @@ namespace JueMingZ.UI.Legacy
             List<LegacyUiElement> elements,
             LegacyMouseSnapshot mouse)
         {
-            return LegacyUiElementFrame.ResolveHoveredElement(preferred, elements, mouse);
+            return LegacyUiElementFrame.ResolveHoveredElement(preferred, elements, mouse, LegacyUiOverlayCoordinator.Current);
         }
 
         private static LegacyUiElement AddFrameElement(
@@ -124,6 +124,7 @@ namespace JueMingZ.UI.Legacy
                 AddHash(ref hash, UiTextRenderer.FontSignatureForLayoutCache);
                 AddHash(ref hash, UiTextRenderer.CacheGenerationForLayoutCache);
                 AddHash(ref hash, _pageLayoutCacheRebuildCount);
+                AddHash(ref hash, LegacyUiOverlayCoordinator.Current.LastStackSignature);
                 return hash;
             }
         }

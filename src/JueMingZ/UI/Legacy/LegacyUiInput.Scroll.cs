@@ -243,10 +243,12 @@ namespace JueMingZ.UI.Legacy
             var rawScrollDelta = scroll.EffectiveScrollDelta;
             var hotbarSlotGuarded = LegacyHotbarScrollGuard.CaptureBeforeTerrariaUpdate(scroll, mouseInLegacyWindow, activeInteraction);
             var before = LegacyMainUiState.ScrollOffset;
-            var nestedScrollConsumed = string.Equals(LegacyMainUiState.SelectedPageId, "fishing", StringComparison.Ordinal) &&
+            var overlayScrollBlocked = LegacyUiOverlayCoordinator.Current.ShouldBlockMainScroll(mouse, rawScrollDelta);
+            var nestedScrollConsumed = !overlayScrollBlocked &&
+                                       string.Equals(LegacyMainUiState.SelectedPageId, "fishing", StringComparison.Ordinal) &&
                                        FishingFilterUiState.TryConsumeNestedScroll(mouse, rawScrollDelta);
             var after = before;
-            if (!nestedScrollConsumed)
+            if (!overlayScrollBlocked && !nestedScrollConsumed)
             {
                 var scrollDelta = WheelDeltaToScrollOffset(rawScrollDelta);
                 after = LegacyMainUiState.ScrollByKnownMax(scrollDelta);

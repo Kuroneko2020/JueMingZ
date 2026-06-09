@@ -108,15 +108,35 @@ namespace JueMingZ.UI.Legacy
         {
             // Click handling stops at LegacyUiCommand enqueue so Draw never invokes
             // feature services directly.
-            if (elements == null || mouse == null || !mouse.LeftPressed ||
-                (LegacyUiInput.IsActiveInteraction() && !LegacyTextInput.IsAnyFocused))
+            bool blocked;
+            var element = ResolveClickableElement(elements, mouse, titleRect, resizeRect, out blocked);
+            if (element == null || blocked)
             {
                 return;
             }
 
+            LegacyUiInput.EnqueueClick(element, mouse, true);
+        }
+
+        private static LegacyUiElement ResolveClickableElement(List<LegacyUiElement> elements, LegacyMouseSnapshot mouse, LegacyUiRect titleRect, LegacyUiRect resizeRect, out bool blocked)
+        {
+            blocked = false;
+            if (elements == null || mouse == null || !mouse.LeftPressed ||
+                (LegacyUiInput.IsActiveInteraction() && !LegacyTextInput.IsAnyFocused))
+            {
+                return null;
+            }
+
             if (titleRect.Contains(mouse.X, mouse.Y) || resizeRect.Contains(mouse.X, mouse.Y))
             {
-                return;
+                blocked = true;
+                return null;
+            }
+
+            LegacyUiElement overlayElement;
+            if (LegacyUiOverlayCoordinator.Current.TryResolveClickElement(elements, mouse, out overlayElement, out blocked))
+            {
+                return blocked ? null : overlayElement;
             }
 
             for (var index = elements.Count - 1; index >= 0; index--)
@@ -126,13 +146,21 @@ namespace JueMingZ.UI.Legacy
                 {
                     if (string.Equals(element.Kind, "blocker", StringComparison.OrdinalIgnoreCase))
                     {
-                        return;
+                        blocked = true;
+                        return null;
                     }
 
-                    LegacyUiInput.EnqueueClick(element, mouse, true);
-                    return;
+                    return element;
                 }
             }
+
+            return null;
+        }
+
+        internal static string ResolveClickableElementIdForTesting(List<LegacyUiElement> elements, LegacyMouseSnapshot mouse, out bool blocked)
+        {
+            var element = ResolveClickableElement(elements, mouse, new LegacyUiRect(), new LegacyUiRect(), out blocked);
+            return element == null ? string.Empty : element.Id ?? string.Empty;
         }
 
         private static void DrawFooter(object spriteBatch, LegacyUiRect window)

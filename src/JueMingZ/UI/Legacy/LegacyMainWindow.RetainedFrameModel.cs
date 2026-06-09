@@ -197,6 +197,7 @@ namespace JueMingZ.UI.Legacy
                 settings.ConfigVersion,
                 BuildPageStateSignature(selectedPage, settings),
                 BuildFrameHoverLayoutToken(selectedPage, windowRect, contentRect, scrollArea, settings),
+                LegacyUiOverlayCoordinator.Current.LastStackSignature,
                 UiTextRenderer.FontSignatureForLayoutCache,
                 UiTextRenderer.CacheGenerationForLayoutCache);
         }
@@ -385,6 +386,7 @@ namespace JueMingZ.UI.Legacy
                 int settingsVersion,
                 int pageStateSignature,
                 int layoutToken,
+                int overlayStackSignature,
                 string fontSignature,
                 int fontCacheGeneration)
             {
@@ -403,6 +405,7 @@ namespace JueMingZ.UI.Legacy
                 SettingsVersion = settingsVersion;
                 PageStateSignature = pageStateSignature;
                 LayoutToken = layoutToken;
+                OverlayStackSignature = overlayStackSignature;
                 FontSignature = fontSignature ?? string.Empty;
                 FontCacheGeneration = fontCacheGeneration;
             }
@@ -422,6 +425,7 @@ namespace JueMingZ.UI.Legacy
             public int SettingsVersion { get; private set; }
             public int PageStateSignature { get; private set; }
             public int LayoutToken { get; private set; }
+            public int OverlayStackSignature { get; private set; }
             public string FontSignature { get; private set; }
             public int FontCacheGeneration { get; private set; }
 
@@ -440,6 +444,7 @@ namespace JueMingZ.UI.Legacy
                        SettingsVersion == other.SettingsVersion &&
                        PageStateSignature == other.PageStateSignature &&
                        LayoutToken == other.LayoutToken &&
+                       OverlayStackSignature == other.OverlayStackSignature &&
                        FontCacheGeneration == other.FontCacheGeneration &&
                        string.Equals(PageId, other.PageId, StringComparison.Ordinal) &&
                        string.Equals(FontSignature, other.FontSignature, StringComparison.Ordinal);

@@ -24,6 +24,8 @@ namespace JueMingZ.UI.Legacy
         {
             UiInputFrameClock.BeginDrawFrame("LegacyMainWindow.Draw");
             var elementFrameStarted = false;
+            var overlayFrameStarted = false;
+            var overlayFrameCompleted = false;
             try
             {
                 if (!LegacyMainUiState.Visible)
@@ -71,11 +73,19 @@ namespace JueMingZ.UI.Legacy
                     var contentHeight = pageLayout.ContentHeight;
                     var scrollArea = pageLayout.CreateScrollArea(contentRect);
                     LegacyMainUiState.SetScrollOffset(scrollArea.ScrollOffset, scrollArea.MaxScroll);
+                    LegacyUiOverlayCoordinator.Current.BeginFrame(selectedPage);
+                    overlayFrameStarted = true;
 
                     if (inWindow && mouse.ScrollDelta != 0)
                     {
                         var scrollSnapshot = TerrariaUiMouseCompat.ReadScrollSnapshot(mouse.ScrollDelta);
-                        if (string.Equals(selectedPage, "fishing", StringComparison.Ordinal) &&
+                        if (LegacyUiOverlayCoordinator.Current.ShouldBlockMainScroll(mouse, mouse.ScrollDelta))
+                        {
+                            LegacyUiInput.CaptureIfNeeded(true);
+                            LegacyHotbarScrollGuard.RestoreLateUiWheelIfNeeded(scrollSnapshot, inWindow, LegacyUiInput.IsActiveInteraction());
+                            LegacyUiInput.SuppressHotbarScroll();
+                        }
+                        else if (string.Equals(selectedPage, "fishing", StringComparison.Ordinal) &&
                             (FishingFilterUiState.TryConsumePickerScroll(mouse) ||
                              FishingFilterUiState.TryConsumePresetScroll(mouse) ||
                              FishingFilterUiState.TryConsumeEntryScroll(mouse)))
@@ -167,6 +177,8 @@ namespace JueMingZ.UI.Legacy
                     {
                         DrawFooter(spriteBatch, window);
                     }
+
+                    LegacyUiOverlayCoordinator.Current.DrawOverlays(spriteBatch, mouse, window, selectedPage, settings, elements);
                     hoveredElement = ResolveFrameHoveredElement(hoveredElement, elements, mouse);
                     if (hoveredElement != null)
                     {
@@ -181,6 +193,8 @@ namespace JueMingZ.UI.Legacy
                     HandleClicks(elements, mouse, shell.TitleRect, shell.ResizeRect);
                     LegacyUiInput.FinishFrame(mouse, inWindow);
                     FinishRetainedFrameModel(elements);
+                    LegacyUiOverlayCoordinator.Current.EndFrame();
+                    overlayFrameCompleted = true;
                 }
             }
             catch (Exception error)
@@ -198,6 +212,11 @@ namespace JueMingZ.UI.Legacy
                 if (elementFrameStarted)
                 {
                     FinishFrameElements();
+                }
+
+                if (overlayFrameStarted && !overlayFrameCompleted)
+                {
+                    LegacyUiOverlayCoordinator.Current.EndFrame();
                 }
             }
 
