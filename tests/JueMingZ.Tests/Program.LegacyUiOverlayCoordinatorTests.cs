@@ -244,5 +244,118 @@ namespace JueMingZ.Tests
 
             coordinator.ResetForTesting();
         }
+
+        private static void LegacyAutoCaptureConfigOverlayBlocksLowerHoverAndClick()
+        {
+            var coordinator = LegacyUiOverlayCoordinator.Current;
+            coordinator.ResetForTesting();
+            LegacyMainWindow.ResetAutoCaptureCritterConfigPopupForTesting();
+            var viewport = new LegacyUiRect(20, 20, 360, 180);
+            var area = LegacyScrollArea.Create(viewport, 620, 0);
+            var anchor = new LegacyUiRect(300, 60, 50, 24);
+            var elements = new List<LegacyUiElement>
+            {
+                CreateLegacyUiElementForTesting("misc-auto-harvest-mode:On", "自动收获:开启", "button", viewport)
+            };
+            var mouse = new LegacyMouseSnapshot
+            {
+                ReadAvailable = true,
+                LeftPressed = true
+            };
+
+            coordinator.BeginFrame("misc");
+            if (!LegacyMainWindow.RegisterAutoCaptureCritterConfigPopupOverlayForTesting(area, anchor))
+            {
+                throw new InvalidOperationException("Expected auto capture config popup to register as a modal overlay.");
+            }
+
+            coordinator.DrawOverlays(null, mouse, new LegacyUiRect(0, 0, 500, 300), "misc", AppSettings.CreateDefault(), elements);
+            var popup = FindLegacyUiElementForTesting(elements, "misc-auto-capture-critter-config-popup");
+            mouse.X = popup.Rect.X + 12;
+            mouse.Y = popup.Rect.Y + 38;
+
+            var hovered = LegacyUiElementFrame.ResolveHoveredElement(null, elements, mouse, coordinator);
+            bool blocked;
+            var clickId = LegacyMainWindow.ResolveClickableElementIdForTesting(elements, mouse, out blocked);
+            coordinator.EndFrame();
+
+            if (hovered == null || string.Equals(hovered.Id, "misc-auto-harvest-mode:On", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected auto capture modal overlay to own hover above later misc rows.");
+            }
+
+            if (!blocked || clickId.Length != 0)
+            {
+                throw new InvalidOperationException("Expected auto capture modal overlay to block clicks from reaching later misc rows.");
+            }
+
+            coordinator.ResetForTesting();
+            LegacyMainWindow.ResetAutoCaptureCritterConfigPopupForTesting();
+        }
+
+        private static void LegacyAutoCaptureConfigOverlayCheckboxStaysClickable()
+        {
+            var coordinator = LegacyUiOverlayCoordinator.Current;
+            coordinator.ResetForTesting();
+            LegacyMainWindow.ResetAutoCaptureCritterConfigPopupForTesting();
+            var viewport = new LegacyUiRect(20, 20, 360, 180);
+            var area = LegacyScrollArea.Create(viewport, 620, 0);
+            var anchor = new LegacyUiRect(300, 60, 50, 24);
+            var elements = new List<LegacyUiElement>
+            {
+                CreateLegacyUiElementForTesting("misc-quick-bag-open-mode:On", "持续开袋:开启", "button", viewport)
+            };
+            var mouse = new LegacyMouseSnapshot
+            {
+                ReadAvailable = true,
+                LeftPressed = true
+            };
+
+            coordinator.BeginFrame("misc");
+            if (!LegacyMainWindow.RegisterAutoCaptureCritterConfigPopupOverlayForTesting(area, anchor))
+            {
+                throw new InvalidOperationException("Expected auto capture config popup to register as a modal overlay.");
+            }
+
+            coordinator.DrawOverlays(null, mouse, new LegacyUiRect(0, 0, 500, 300), "misc", AppSettings.CreateDefault(), elements);
+            var option = FindLegacyUiElementForTesting(elements, "misc-auto-capture-critter-option:bait");
+            mouse.X = option.Rect.X + Math.Max(1, option.Rect.Width / 2);
+            mouse.Y = option.Rect.Y + Math.Max(1, option.Rect.Height / 2);
+
+            var hovered = LegacyUiElementFrame.ResolveHoveredElement(null, elements, mouse, coordinator);
+            bool blocked;
+            var clickId = LegacyMainWindow.ResolveClickableElementIdForTesting(elements, mouse, out blocked);
+            coordinator.EndFrame();
+
+            if (hovered == null || hovered.Id != "misc-auto-capture-critter-option:bait")
+            {
+                throw new InvalidOperationException("Expected auto capture category checkbox to win hover over the modal blocker.");
+            }
+
+            if (blocked || clickId != "misc-auto-capture-critter-option:bait")
+            {
+                throw new InvalidOperationException("Expected auto capture category checkbox to remain clickable inside the modal overlay.");
+            }
+
+            coordinator.ResetForTesting();
+            LegacyMainWindow.ResetAutoCaptureCritterConfigPopupForTesting();
+        }
+
+        private static LegacyUiElement FindLegacyUiElementForTesting(IList<LegacyUiElement> elements, string id)
+        {
+            if (elements != null)
+            {
+                for (var index = 0; index < elements.Count; index++)
+                {
+                    var element = elements[index];
+                    if (element != null && string.Equals(element.Id, id, StringComparison.Ordinal))
+                    {
+                        return element;
+                    }
+                }
+            }
+
+            throw new InvalidOperationException("Expected legacy UI element was not registered: " + id);
+        }
     }
 }

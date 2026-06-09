@@ -38,7 +38,7 @@ namespace JueMingZ.UI.Legacy
             hovered = DrawAutoMiningRow(spriteBatch, area, mouse, elements, y, settings) ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawAutoCaptureCritterRow(spriteBatch, area, mouse, elements, y, settings) ?? hovered;
-            hovered = DrawAutoCaptureCritterConfigPopup(spriteBatch, area, mouse, elements) ?? hovered;
+            RegisterAutoCaptureCritterConfigPopupOverlay(area, settings);
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "自动收获", settings.WorldAutomationAutoHarvestEnabled, "misc-auto-harvest-mode:", "携带再生法杖自动收获/种植") ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
@@ -151,11 +151,11 @@ namespace JueMingZ.UI.Legacy
             return null;
         }
 
-        private static LegacyUiElement DrawAutoCaptureCritterConfigPopup(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements)
+        private static bool RegisterAutoCaptureCritterConfigPopupOverlay(LegacyScrollArea area, AppSettings settings)
         {
-            if (!_autoCaptureCritterConfigOpen || !_autoCaptureCritterConfigAnchorVisible)
+            if (!_autoCaptureCritterConfigOpen || !_autoCaptureCritterConfigAnchorVisible || area == null)
             {
-                return null;
+                return false;
             }
 
             var options = AutoCaptureCritterCategoryCatalog.Options;
@@ -171,8 +171,41 @@ namespace JueMingZ.UI.Legacy
                 out optionWidth,
                 out columnGap,
                 out rowGap);
-            var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
-            var context = LegacyUiContext.ForScrollArea(spriteBatch, mouse, area, elements, settings);
+            settings = settings ?? AppSettings.CreateDefault();
+            // The config popup is modal overlay content. Keeping it registered
+            // here prevents later misc rows from drawing or hit-testing above it.
+            return LegacyUiOverlayCoordinator.Current.Register(new LegacyUiOverlayRequest
+            {
+                Id = "misc-auto-capture-critter-config-popup",
+                OwnerPageId = "misc",
+                Bounds = popup,
+                Kind = LegacyUiOverlayKind.Modal,
+                ZIndex = 20,
+                CacheSignature = BuildAutoCaptureCritterPopupCacheSignature(settings, options == null ? 0 : options.Length),
+                Draw = DrawAutoCaptureCritterConfigPopupOverlay
+            });
+        }
+
+        private static void DrawAutoCaptureCritterConfigPopupOverlay(LegacyUiContext context, LegacyUiOverlayRequest request)
+        {
+            if (context == null || request == null)
+            {
+                return;
+            }
+
+            var popup = request.Bounds;
+            var options = AutoCaptureCritterCategoryCatalog.Options;
+            int columns;
+            int optionWidth;
+            int columnGap;
+            int rowGap;
+            CalculateAutoCaptureCritterOptionGrid(
+                popup,
+                options == null ? 0 : options.Length,
+                out columns,
+                out optionWidth,
+                out columnGap,
+                out rowGap);
             new LegacyPopupPanelControl
             {
                 Id = "misc-auto-capture-critter-config-popup",
@@ -181,10 +214,9 @@ namespace JueMingZ.UI.Legacy
                 Bounds = popup
             }.Draw(context);
 
-            UiTextRenderer.DrawText(spriteBatch, "自动捕捉配置", popup.X + 16, popup.Y + 11, 238, 238, 226, 255, 0.82f);
-            var hovered = (LegacyUiElement)null;
+            UiTextRenderer.DrawText(context.SpriteBatch, "自动捕捉配置", popup.X + 16, popup.Y + 11, 238, 238, 226, 255, 0.82f);
             var close = new LegacyUiRect(popup.Right - 54, popup.Y + 8, 40, 20);
-            hovered = DrawAutoCaptureCritterSmallButton(spriteBatch, mouse, elements, close, "misc-auto-capture-critter-config:toggle", "关闭", "关闭配置") ?? hovered;
+            DrawAutoCaptureCritterSmallButton(context, close, "misc-auto-capture-critter-config:toggle", "关闭", "关闭配置");
 
             var startX = popup.X + AutoCaptureCritterPopupHorizontalPadding;
             var startY = popup.Y + AutoCaptureCritterPopupContentStartY;
@@ -203,15 +235,12 @@ namespace JueMingZ.UI.Legacy
                     startY + row * (AutoCaptureCritterOptionHeight + rowGap),
                     optionWidth,
                     AutoCaptureCritterOptionHeight);
-                hovered = DrawAutoCaptureCritterOption(spriteBatch, mouse, elements, rect, option, AutoCaptureCritterCategoryCatalog.GetEnabled(settings, option.Id)) ?? hovered;
+                DrawAutoCaptureCritterOption(context, rect, option, AutoCaptureCritterCategoryCatalog.GetEnabled(context.Settings, option.Id));
             }
-
-            return hovered;
         }
 
-        private static LegacyUiElement DrawAutoCaptureCritterSmallButton(object spriteBatch, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, LegacyUiRect rect, string id, string label, string tooltip)
+        private static LegacyUiElement DrawAutoCaptureCritterSmallButton(LegacyUiContext context, LegacyUiRect rect, string id, string label, string tooltip)
         {
-            var context = new LegacyUiContext(spriteBatch, mouse, LegacyMainUiState.WindowRect, LegacyMainUiState.SelectedPageId, ConfigService.AppSettings ?? AppSettings.CreateDefault(), elements);
             var element = new LegacySmallButtonControl
             {
                 Id = id,
@@ -223,9 +252,8 @@ namespace JueMingZ.UI.Legacy
             return element != null && context.IsElementHovered(element.Id, rect) ? element : null;
         }
 
-        private static LegacyUiElement DrawAutoCaptureCritterOption(object spriteBatch, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, LegacyUiRect rect, AutoCaptureCritterCategoryDefinition option, bool enabled)
+        private static LegacyUiElement DrawAutoCaptureCritterOption(LegacyUiContext context, LegacyUiRect rect, AutoCaptureCritterCategoryDefinition option, bool enabled)
         {
-            var context = new LegacyUiContext(spriteBatch, mouse, LegacyMainUiState.WindowRect, LegacyMainUiState.SelectedPageId, ConfigService.AppSettings ?? AppSettings.CreateDefault(), elements);
             var element = new LegacyCheckboxButtonControl
             {
                 Id = "misc-auto-capture-critter-option:" + option.Id,
@@ -243,9 +271,8 @@ namespace JueMingZ.UI.Legacy
             return element != null && context.IsElementHovered(element.Id, rect) ? element : null;
         }
 
-        private static LegacyUiRect CalculateAutoCaptureCritterPopupRect(
-            LegacyUiRect viewport,
-            LegacyUiRect anchor,
+        private static void CalculateAutoCaptureCritterOptionGrid(
+            LegacyUiRect popup,
             int optionCount,
             out int columns,
             out int optionWidth,
@@ -256,12 +283,49 @@ namespace JueMingZ.UI.Legacy
             columnGap = AutoCaptureCritterPopupColumnGap;
             rowGap = AutoCaptureCritterPopupRowGap;
             columns = optionCount <= 8 ? 2 : 3;
+            if (popup.Width < 420)
+            {
+                columns = Math.Min(columns, 2);
+            }
+
+            columns = Math.Max(1, Math.Min(columns, optionCount));
+            optionWidth = Math.Max(
+                AutoCaptureCritterOptionMinWidth,
+                (popup.Width - AutoCaptureCritterPopupHorizontalPadding * 2 - (columns - 1) * columnGap) / columns);
+        }
+
+        private static int BuildAutoCaptureCritterPopupCacheSignature(AppSettings settings, int optionCount)
+        {
+            unchecked
+            {
+                settings = settings ?? AppSettings.CreateDefault();
+                var hash = 17;
+                hash = hash * 31 + optionCount;
+                hash = hash * 31 + settings.ConfigVersion;
+                hash = hash * 31 + AutoCaptureCritterCategoryCatalog.CountDisabled(settings);
+                return hash;
+            }
+        }
+
+        private static LegacyUiRect CalculateAutoCaptureCritterPopupRect(
+            LegacyUiRect viewport,
+            LegacyUiRect anchor,
+            int optionCount,
+            out int columns,
+            out int optionWidth,
+            out int columnGap,
+            out int rowGap)
+        {
+            optionCount = Math.Max(1, optionCount);
+            columns = optionCount <= 8 ? 2 : 3;
             if (viewport.Width < 420)
             {
                 columns = Math.Min(columns, 2);
             }
 
             columns = Math.Max(1, Math.Min(columns, optionCount));
+            columnGap = AutoCaptureCritterPopupColumnGap;
+            rowGap = AutoCaptureCritterPopupRowGap;
             var desiredWidth = AutoCaptureCritterPopupHorizontalPadding * 2 +
                                columns * AutoCaptureCritterOptionMinWidth +
                                (columns - 1) * columnGap;
@@ -287,6 +351,21 @@ namespace JueMingZ.UI.Legacy
 
             y = ClampInt(y, viewport.Y + 6, Math.Max(viewport.Y + 6, viewport.Bottom - height - 6));
             return new LegacyUiRect(x, y, width, height);
+        }
+
+        internal static bool RegisterAutoCaptureCritterConfigPopupOverlayForTesting(LegacyScrollArea area, LegacyUiRect anchor)
+        {
+            _autoCaptureCritterConfigOpen = true;
+            _autoCaptureCritterConfigAnchor = anchor;
+            _autoCaptureCritterConfigAnchorVisible = true;
+            return RegisterAutoCaptureCritterConfigPopupOverlay(area, AppSettings.CreateDefault());
+        }
+
+        internal static void ResetAutoCaptureCritterConfigPopupForTesting()
+        {
+            _autoCaptureCritterConfigOpen = false;
+            _autoCaptureCritterConfigAnchor = new LegacyUiRect();
+            _autoCaptureCritterConfigAnchorVisible = false;
         }
 
         private static int MiscExpandableRowHeight(int panelHeight)

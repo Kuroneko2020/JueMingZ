@@ -835,6 +835,8 @@ namespace JueMingZ.Tests
             Run("legacy UI overlay child controls beat modal blocker", ref failed, LegacyUiOverlayChildControlsBeatModalBlocker);
             Run("legacy UI overlay modal blocks main scroll", ref failed, LegacyUiOverlayModalBlocksMainScroll);
             Run("legacy UI overlay stack dirties hover token and retained frame", ref failed, LegacyUiOverlayStackDirtiesHoverTokenAndRetainedFrame);
+            Run("legacy auto capture config overlay blocks lower hover and click", ref failed, LegacyAutoCaptureConfigOverlayBlocksLowerHoverAndClick);
+            Run("legacy auto capture config overlay checkbox stays clickable", ref failed, LegacyAutoCaptureConfigOverlayCheckboxStaysClickable);
             Run("legacy UI action update gate skips idle frames", ref failed, LegacyUiActionUpdateGateSkipsIdleFrames);
             Run("legacy UI action update gate runs pending commands when hidden", ref failed, LegacyUiActionUpdateGateRunsPendingCommandsWhenHidden);
             Run("legacy UI action update gate skips drag dispatch without commands", ref failed, LegacyUiActionUpdateGateSkipsDragDispatchWithoutCommands);
