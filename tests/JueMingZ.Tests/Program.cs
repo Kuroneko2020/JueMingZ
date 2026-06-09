@@ -237,6 +237,7 @@ namespace Terraria.ID
         {
             public static bool[] HasRightFire = new bool[6000];
             public static bool[] ItemsThatAllowRepeatedRightClick = new bool[6000];
+            public static bool[] ShootsOnUseRelease = new bool[6000];
             public static bool[] IsFishingCrate = new bool[6000];
             public static bool[] IsFishingCrateHardmode = new bool[6000];
             public static bool[] CanFishInLava = new bool[6000];
@@ -605,6 +606,7 @@ namespace JueMingZ.Tests
             Run("combat ItemCheck auto clicker respects vanilla auto reuse", ref failed, CombatItemCheckAutoClickerRespectsVanillaAutoReuse);
             Run("combat ItemCheck auto clicker samples and hard excludes", ref failed, CombatItemCheckAutoClickerSamplesAndHardExcludes);
             Run("combat ItemCheck auto clicker reads tool fields", ref failed, CombatItemCheckAutoClickerReadsToolFields);
+            Run("combat ItemCheck auto clicker reads shoots-on-release set", ref failed, CombatItemCheckAutoClickerReadsShootsOnReleaseSet);
             Run("combat ItemCheck auto clicker fails closed when vanilla switch unavailable", ref failed, CombatItemCheckAutoClickerFailsClosedWhenVanillaSwitchUnavailable);
             Run("combat ItemCheck auto clicker reads mouse item slot", ref failed, CombatItemCheckAutoClickerReadsMouseItemSlot);
             Run("combat ItemCheck auto clicker yields to adjacent scoped use", ref failed, CombatItemCheckAutoClickerYieldsToAdjacentScopedUse);
@@ -714,6 +716,7 @@ namespace JueMingZ.Tests
             Run("special dual projectile tail recomputes aim for moving assist target", ref failed, SpecialDualProjectileTailRecomputesAimForMovingAssistTarget);
             Run("special projectile tail expires inactive bubble and ignores ammo bullet", ref failed, SpecialProjectileTailExpiresInactiveBubbleAndIgnoresAmmoBullet);
             Run("combat aim itemcheck log throttle keeps independent keys", ref failed, CombatAimItemCheckLogThrottleKeepsIndependentKeys);
+            Run("release hold pending expiration clears state before held input check", ref failed, ReleaseHoldPendingExpirationClearsStateBeforeHeldInputCheck);
             Run("release hold target dummy validation respects track dummy", ref failed, ReleaseHoldTargetDummyValidationRespectsTrackDummy);
             Run("input action queue releases channel after terminal start", ref failed, InputActionQueueReleasesChannelAfterTerminalStart);
             Run("input action queue releases channel after start exception", ref failed, InputActionQueueReleasesChannelAfterStartException);

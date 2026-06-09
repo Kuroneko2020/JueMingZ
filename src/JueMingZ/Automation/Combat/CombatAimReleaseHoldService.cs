@@ -281,6 +281,7 @@ namespace JueMingZ.Automation.Combat
                 {
                     _state.State = ReleaseHoldStates.Expired;
                     _state = null;
+                    return;
                 }
             }
 

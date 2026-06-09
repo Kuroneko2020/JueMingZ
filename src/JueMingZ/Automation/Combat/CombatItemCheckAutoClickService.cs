@@ -30,6 +30,8 @@ namespace JueMingZ.Automation.Combat
         };
         private static readonly object DiagnosticsSyncRoot = new object();
         private static ItemCheckAutoClickDiagnostics _diagnostics = new ItemCheckAutoClickDiagnostics();
+        private static bool _shootsOnUseReleaseResolved;
+        private static bool[] _shootsOnUseRelease;
 
         public static ItemCheckAutoClickDiagnostics GetDiagnostics()
         {
@@ -273,6 +275,7 @@ namespace JueMingZ.Automation.Combat
 
             profile.ItemType = ReadInt(item, "type", 0);
             profile.ItemStack = ReadInt(item, "stack", 0);
+            profile.ShootsOnUseRelease = ReadShootsOnUseRelease(profile.ItemType);
             profile.UseStyle = ReadInt(item, "useStyle", 0);
             profile.UseAnimation = ReadInt(item, "useAnimation", 0);
             profile.UseTime = ReadInt(item, "useTime", 0);
@@ -346,6 +349,15 @@ namespace JueMingZ.Automation.Combat
             if (profile.Channel)
             {
                 reason = "excludedChannelItem";
+                return false;
+            }
+
+            // Release-on-use weapons, including phaseblade lightsabers, depend
+            // on one uninterrupted physical hold/release; generic fresh-click
+            // takeover would swallow the vanilla throw/recall edge.
+            if (profile.ShootsOnUseRelease)
+            {
+                reason = "excludedShootsOnUseReleaseItem";
                 return false;
             }
 
@@ -468,6 +480,39 @@ namespace JueMingZ.Automation.Combat
             }
         }
 
+        private static bool ReadShootsOnUseRelease(int itemType)
+        {
+            if (itemType < 0)
+            {
+                return false;
+            }
+
+            try
+            {
+                if (!_shootsOnUseReleaseResolved)
+                {
+                    _shootsOnUseReleaseResolved = true;
+                    var setsType = TerrariaTypeCache.Find("Terraria.ID.ItemID+Sets");
+                    _shootsOnUseRelease = setsType == null
+                        ? null
+                        : GameStateReflection.GetStaticMember(setsType, "ShootsOnUseRelease") as bool[];
+                }
+
+                return _shootsOnUseRelease != null &&
+                       itemType < _shootsOnUseRelease.Length &&
+                       _shootsOnUseRelease[itemType];
+            }
+            catch (Exception error)
+            {
+                LogThrottle.WarnThrottled(
+                    "combat-itemcheck-auto-clicker-shoots-on-release-set",
+                    TimeSpan.FromSeconds(30),
+                    "CombatItemCheckAutoClickService",
+                    "ItemID.Sets.ShootsOnUseRelease reflection failed: " + error.Message);
+                return false;
+            }
+        }
+
         private static int ReadInt(object instance, string name, int fallback)
         {
             int value;
@@ -568,6 +613,7 @@ namespace JueMingZ.Automation.Combat
             public int Pick { get; set; }
             public int Axe { get; set; }
             public int Hammer { get; set; }
+            public bool ShootsOnUseRelease { get; set; }
             public bool AutoReuse { get; set; }
             public bool Channel { get; set; }
             public bool PlayerChannel { get; set; }

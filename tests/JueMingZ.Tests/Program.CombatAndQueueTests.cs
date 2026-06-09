@@ -242,6 +242,10 @@ namespace JueMingZ.Tests
             ExpectAutoClickDecision(CreateAutoClickerProfile(itemType: 990, pick: 200, axe: 110), true, false, false, false, "excludedToolItem", "pickaxe-axe tool exclusion");
             ExpectAutoClickDecision(CreateAutoClickerProfile(itemType: 2176, pick: 200), true, false, false, false, "excludedToolItem", "drill/claw pick-field tool exclusion");
 
+            var phaseblade = CreateAutoClickerProfile(itemType: 5535, damage: 30, shootsOnUseRelease: true);
+            ExpectAutoClickDecision(phaseblade, true, false, false, false, "excludedShootsOnUseReleaseItem", "phaseblade release-on-use exclusion with vanilla auto reuse off");
+            ExpectAutoClickDecision(phaseblade, true, true, false, false, "excludedShootsOnUseReleaseItem", "phaseblade release-on-use exclusion with vanilla auto reuse on");
+
             if (!CombatItemCheckAutoClickService.IsKnownFishingRodItemTypeForTesting(4442) ||
                 CombatItemCheckAutoClickService.IsKnownFishingRodItemTypeForTesting(1))
             {
@@ -305,6 +309,64 @@ namespace JueMingZ.Tests
             }
             finally
             {
+                Terraria.Main.SettingsEnabled_AutoReuseAllItems = previousAutoReuseAll;
+                restoreRuntimeTypes();
+            }
+        }
+
+        private static void CombatItemCheckAutoClickerReadsShootsOnReleaseSet()
+        {
+            var restoreRuntimeTypes = PushFakeTerrariaMainType();
+            var previousAutoReuseAll = Terraria.Main.SettingsEnabled_AutoReuseAllItems;
+            var previousSetValue = Terraria.ID.ItemID.Sets.ShootsOnUseRelease[5535];
+            try
+            {
+                Terraria.Main.SettingsEnabled_AutoReuseAllItems = false;
+                Terraria.ID.ItemID.Sets.ShootsOnUseRelease[5535] = true;
+                var player = new FakePlayer
+                {
+                    selectedItem = 0,
+                    active = true
+                };
+                player.inventory[0] = new FakeItem
+                {
+                    type = 5535,
+                    stack = 1,
+                    useStyle = 1,
+                    useAnimation = 15,
+                    useTime = 15,
+                    damage = 30,
+                    Name = "Pink Phaseblade"
+                };
+
+                CombatItemCheckAutoClickService.ItemCheckAutoClickProfile profile;
+                string reason;
+                if (!CombatItemCheckAutoClickService.TryReadProfileForTesting(player, out profile, out reason))
+                {
+                    throw new InvalidOperationException("Expected ItemCheck auto clicker to read ShootsOnUseRelease set: " + reason);
+                }
+
+                if (profile == null ||
+                    !profile.Available ||
+                    profile.Eligible ||
+                    !profile.ShootsOnUseRelease ||
+                    !string.Equals(profile.Reason, "excludedShootsOnUseReleaseItem", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected ShootsOnUseRelease profile to be excluded, got shootsOnUseRelease=" +
+                                                        (profile != null && profile.ShootsOnUseRelease) +
+                                                        " reason=" + (profile == null ? string.Empty : profile.Reason) + ".");
+                }
+
+                var decision = CombatItemCheckAutoClickService.CreateDecision(profile, true, true, profile.VanillaAutoReuseAllWeapons);
+                if (decision.ApplyTakeover ||
+                    !string.Equals(decision.Reason, "excludedShootsOnUseReleaseItem", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected ShootsOnUseRelease profile to be excluded, got " + decision.Reason + ".");
+                }
+            }
+            finally
+            {
+                Terraria.ID.ItemID.Sets.ShootsOnUseRelease[5535] = previousSetValue;
                 Terraria.Main.SettingsEnabled_AutoReuseAllItems = previousAutoReuseAll;
                 restoreRuntimeTypes();
             }
@@ -1293,7 +1355,8 @@ namespace JueMingZ.Tests
             int fishingPole = 0,
             int pick = 0,
             int axe = 0,
-            int hammer = 0)
+            int hammer = 0,
+            bool shootsOnUseRelease = false)
         {
             return new CombatItemCheckAutoClickService.ItemCheckAutoClickProfile
             {
@@ -1313,6 +1376,7 @@ namespace JueMingZ.Tests
                 Pick = pick,
                 Axe = axe,
                 Hammer = hammer,
+                ShootsOnUseRelease = shootsOnUseRelease,
                 ItemAnimation = 0,
                 ItemTime = 0,
                 ReuseDelay = 0,
@@ -5514,6 +5578,123 @@ namespace JueMingZ.Tests
             if (actual != expected)
             {
                 throw new InvalidOperationException("Expected " + fieldName + "=" + expected + ", got " + actual);
+            }
+        }
+
+        private static void ReleaseHoldPendingExpirationClearsStateBeforeHeldInputCheck()
+        {
+            var restoreRuntimeTypes = PushFakeTerrariaMainType();
+            var previousLocalPlayer = Terraria.Main.LocalPlayer;
+            var previousPlayerZero = Terraria.Main.player[0];
+            var previousMyPlayer = Terraria.Main.myPlayer;
+            var settings = AppSettings.CreateDefault();
+            settings.CursorAimRadius = 25;
+            settings.ReleaseHoldTicks = 1;
+            var runtimeSettings = RuntimeSettingsSnapshot.FromSettings(settings);
+            TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(true);
+            try
+            {
+                CombatAimReleaseHoldService.Tick(false, runtimeSettings);
+
+                var player = new Terraria.Player
+                {
+                    whoAmI = 0,
+                    active = true,
+                    selectedItem = 0
+                };
+                player.inventory[0] = new FakeItem
+                {
+                    type = 5535,
+                    stack = 1
+                };
+                Terraria.Main.myPlayer = 0;
+                Terraria.Main.LocalPlayer = player;
+                Terraria.Main.player[0] = player;
+
+                var target = new CombatTargetSnapshot
+                {
+                    WhoAmI = 3,
+                    Type = 488,
+                    Name = "Target Dummy",
+                    Active = true,
+                    IsTargetDummy = true,
+                    Life = 100,
+                    LifeMax = 100,
+                    HitboxWidth = 20,
+                    HitboxHeight = 40
+                };
+                var recordDecision = new CombatAimItemCheckDecision
+                {
+                    UseItemHeld = true,
+                    SelectedSlot = 0,
+                    ItemType = 5535,
+                    Selection = new CombatAimTargetSelection
+                    {
+                        Target = target,
+                        SelectedSamplePoint = "center"
+                    },
+                    AimWorldX = 100f,
+                    AimWorldY = 120f,
+                    GameUpdateCount = 10
+                };
+                CombatAimReleaseHoldService.Record(recordDecision, 1);
+
+                var releaseInput = new CombatAimUseInputSnapshot
+                {
+                    Available = true,
+                    UseItemHeld = false,
+                    UseItemReleased = true,
+                    ItemAnimation = 0,
+                    ItemTime = 0,
+                    SelectedSlot = 0,
+                    ItemType = 5535,
+                    GameUpdateCount = 11
+                };
+                var releaseDecision = new CombatAimItemCheckDecision
+                {
+                    SelectedSlot = 0,
+                    ItemType = 5535,
+                    TrackDummy = true
+                };
+                var readResult = new CombatAimReadResult();
+                readResult.Candidates.Add(target);
+
+                string reason;
+                if (CombatAimReleaseHoldService.TryApply(player, releaseDecision, readResult, releaseInput, null, settings, out reason) ||
+                    !string.Equals(reason, "releaseHoldRangeDisabled", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected release-hold to stay pending behind range validation, got " + reason + ".");
+                }
+
+                player.controlUseItem = true;
+                player.releaseUseItem = false;
+                player.selectedItem = 0;
+                Terraria.Main.GameUpdateCount = 12;
+                CombatAimReleaseHoldService.Tick(true, runtimeSettings);
+
+                var afterDecision = new CombatAimItemCheckDecision();
+                CombatAimReleaseHoldService.DecorateDecision(
+                    afterDecision,
+                    new CombatAimUseInputSnapshot
+                    {
+                        Available = true,
+                        UseItemHeld = true,
+                        SelectedSlot = 0,
+                        ItemType = 5535
+                    });
+                if (!string.Equals(afterDecision.ReleaseHoldState, ReleaseHoldStates.Idle, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected expired release-hold state to clear to Idle, got " + afterDecision.ReleaseHoldState + ".");
+                }
+            }
+            finally
+            {
+                CombatAimReleaseHoldService.Tick(false, runtimeSettings);
+                TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(null);
+                Terraria.Main.LocalPlayer = previousLocalPlayer;
+                Terraria.Main.player[0] = previousPlayerZero;
+                Terraria.Main.myPlayer = previousMyPlayer;
+                restoreRuntimeTypes();
             }
         }
 
