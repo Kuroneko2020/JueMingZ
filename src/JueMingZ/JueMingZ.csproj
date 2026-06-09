@@ -7,10 +7,10 @@
     <Platforms>AnyCPU;x86</Platforms>
     <PlatformTarget>x86</PlatformTarget>
     <LangVersion>7.3</LangVersion>
-    <Version>1.7.485</Version>
-    <AssemblyVersion>1.7.485.0</AssemblyVersion>
-    <FileVersion>1.7.485.0</FileVersion>
-    <InformationalVersion>1.7.485-f5-ui-overlay-governance</InformationalVersion>
+    <Version>1.7.486</Version>
+    <AssemblyVersion>1.7.486.0</AssemblyVersion>
+    <FileVersion>1.7.486.0</FileVersion>
+    <InformationalVersion>1.7.486-f5-ui-layer-closeout</InformationalVersion>
     <Deterministic>true</Deterministic>
     <RestoreConfigFile>$(MSBuildThisFileDirectory)..\..\NuGet.Config</RestoreConfigFile>
     <RestorePackagesPath>$(MSBuildThisFileDirectory)..\..\.nuget\packages</RestorePackagesPath>
