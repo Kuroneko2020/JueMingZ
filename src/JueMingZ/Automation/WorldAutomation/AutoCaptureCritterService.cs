@@ -266,9 +266,15 @@ namespace JueMingZ.Automation.WorldAutomation
 
         internal static bool TryBuildCaptureRequestForTesting(GameStateSnapshot gameState, string mode, out InputActionRequest request, out string message)
         {
+            return TryBuildCaptureRequestForTesting(gameState, mode, AppSettings.CreateDefault(), out request, out message);
+        }
+
+        internal static bool TryBuildCaptureRequestForTesting(GameStateSnapshot gameState, string mode, AppSettings settings, out InputActionRequest request, out string message)
+        {
             request = null;
             message = string.Empty;
             mode = AutoCaptureCritterModes.Normalize(mode);
+            settings = settings ?? AppSettings.CreateDefault();
 
             BugNetCandidate bugNet;
             if (!TryFindBestBugNet(gameState, mode, out bugNet, out message))
@@ -277,7 +283,7 @@ namespace JueMingZ.Automation.WorldAutomation
             }
 
             NpcSnapshot target;
-            if (!TryFindCaptureTarget(gameState, bugNet, out target, out message))
+            if (!TryFindCaptureTarget(gameState, bugNet, settings, out target, out message))
             {
                 return false;
             }
@@ -345,9 +351,10 @@ namespace JueMingZ.Automation.WorldAutomation
             NpcSnapshot target;
             string targetMessage;
             var captureInFlight = HasCaptureRequestInFlight();
+            var settings = settingsSnapshot == null ? AppSettings.CreateDefault() : settingsSnapshot.SourceSettings;
             if (captureInFlight)
             {
-                if (!TryFindActiveSustainedTarget(gameState, bugNet, out target, out targetMessage))
+                if (!TryFindActiveSustainedTarget(gameState, bugNet, settings, out target, out targetMessage))
                 {
                     RecordFairnessUnavailable(tick, targetMessage);
                     AutoCaptureCritterSustainedUseBridge.ClearDesiredTarget(targetMessage);
@@ -355,7 +362,7 @@ namespace JueMingZ.Automation.WorldAutomation
                     return;
                 }
             }
-            else if (!TryFindCaptureTarget(gameState, bugNet, out target, out targetMessage))
+            else if (!TryFindCaptureTarget(gameState, bugNet, settings, out target, out targetMessage))
             {
                 RecordFairnessUnavailable(tick, targetMessage);
                 AutoCaptureCritterSustainedUseBridge.ClearDesiredTarget(targetMessage);
@@ -506,7 +513,7 @@ namespace JueMingZ.Automation.WorldAutomation
             return true;
         }
 
-        private static bool TryFindCaptureTarget(GameStateSnapshot gameState, BugNetCandidate bugNet, out NpcSnapshot target, out string message)
+        private static bool TryFindCaptureTarget(GameStateSnapshot gameState, BugNetCandidate bugNet, AppSettings settings, out NpcSnapshot target, out string message)
         {
             target = null;
             message = string.Empty;
@@ -521,6 +528,7 @@ namespace JueMingZ.Automation.WorldAutomation
 
             var bestDistance = float.MaxValue;
             var player = gameState.Player;
+            var disabledCandidateSeen = false;
             if (player == null)
             {
                 message = "player snapshot unavailable";
@@ -534,6 +542,12 @@ namespace JueMingZ.Automation.WorldAutomation
                 var critter = critters[index];
                 if (critter == null || !critter.Active || critter.CatchItem <= 0)
                 {
+                    continue;
+                }
+
+                if (!AutoCaptureCritterCategoryCatalog.IsEnabledFor(settings, critter))
+                {
+                    disabledCandidateSeen = true;
                     continue;
                 }
 
@@ -556,14 +570,16 @@ namespace JueMingZ.Automation.WorldAutomation
 
             if (target == null)
             {
-                message = "catchable critters outside bug net range";
+                message = disabledCandidateSeen
+                    ? "catchable critters disabled by auto capture config"
+                    : "catchable critters outside bug net range";
                 return false;
             }
 
             return true;
         }
 
-        private static bool TryFindActiveSustainedTarget(GameStateSnapshot gameState, BugNetCandidate bugNet, out NpcSnapshot target, out string message)
+        private static bool TryFindActiveSustainedTarget(GameStateSnapshot gameState, BugNetCandidate bugNet, AppSettings settings, out NpcSnapshot target, out string message)
         {
             target = null;
             message = string.Empty;
@@ -576,7 +592,7 @@ namespace JueMingZ.Automation.WorldAutomation
 
             if (activeTargetNpcIndex < 0)
             {
-                return TryFindCaptureTarget(gameState, bugNet, out target, out message);
+                return TryFindCaptureTarget(gameState, bugNet, settings, out target, out message);
             }
 
             var critters = gameState == null || gameState.Npcs == null
@@ -597,6 +613,12 @@ namespace JueMingZ.Automation.WorldAutomation
                     critter.CatchItem <= 0)
                 {
                     continue;
+                }
+
+                if (!AutoCaptureCritterCategoryCatalog.IsEnabledFor(settings, critter))
+                {
+                    message = "sustained capture target disabled by auto capture config";
+                    return false;
                 }
 
                 if (!IsWithinSustainedTrackingRange(gameState == null ? null : gameState.Player, critter))

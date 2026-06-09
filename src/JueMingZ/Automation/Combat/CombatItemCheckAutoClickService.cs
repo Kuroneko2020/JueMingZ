@@ -278,6 +278,9 @@ namespace JueMingZ.Automation.Combat
             profile.UseTime = ReadInt(item, "useTime", 0);
             profile.Damage = ReadInt(item, "damage", 0);
             profile.FishingPole = ReadInt(item, "fishingPole", 0);
+            profile.Pick = ReadInt(item, "pick", 0);
+            profile.Axe = ReadInt(item, "axe", 0);
+            profile.Hammer = ReadInt(item, "hammer", 0);
             profile.AutoReuse = ReadBool(item, "autoReuse", false);
             profile.Channel = ReadBool(item, "channel", false);
             profile.PlayerChannel = ReadBool(player, "channel", false);
@@ -360,6 +363,14 @@ namespace JueMingZ.Automation.Combat
                 return false;
             }
 
+            // Tool items must keep vanilla sustained hold cadence; scoped fresh
+            // clicks here would fight mining/chopping/hammering and auto-mining.
+            if (IsToolItem(profile))
+            {
+                reason = "excludedToolItem";
+                return false;
+            }
+
             if (profile.UseStyle <= 0 || profile.UseAnimation <= 0 || profile.UseTime <= 0)
             {
                 reason = "notUsable";
@@ -398,6 +409,12 @@ namespace JueMingZ.Automation.Combat
         {
             return profile != null &&
                    (profile.FishingPole > 0 || IsKnownFishingRodItemType(profile.ItemType));
+        }
+
+        private static bool IsToolItem(ItemCheckAutoClickProfile profile)
+        {
+            return profile != null &&
+                   (profile.Pick > 0 || profile.Axe > 0 || profile.Hammer > 0);
         }
 
         private static bool IsKnownFishingRodItemType(int itemType)
@@ -548,6 +565,9 @@ namespace JueMingZ.Automation.Combat
             public int UseTime { get; set; }
             public int Damage { get; set; }
             public int FishingPole { get; set; }
+            public int Pick { get; set; }
+            public int Axe { get; set; }
+            public int Hammer { get; set; }
             public bool AutoReuse { get; set; }
             public bool Channel { get; set; }
             public bool PlayerChannel { get; set; }

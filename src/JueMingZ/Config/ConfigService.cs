@@ -645,6 +645,11 @@ namespace JueMingZ.Config
             settings.NpcAutoReforgePrefixes = NormalizeQuickReforgePrefixes(settings.NpcAutoReforgePrefixes);
             settings.WorldAutomationAutoMiningMode = AutoMiningModes.Normalize(settings.WorldAutomationAutoMiningMode);
             settings.WorldAutomationAutoCaptureCritterMode = AutoCaptureCritterModes.Normalize(settings.WorldAutomationAutoCaptureCritterMode, settings.MiscAutoCaptureCritterEnabled);
+            if (!settings.MiscAutoCaptureCritterCategoryDefaultsMigrated)
+            {
+                AutoCaptureCritterCategoryCatalog.ApplyDefaultOptions(settings);
+            }
+
             settings.MiscWorldGenDebugViewerEnabled = true;
             settings.MiscDeveloperDebugCommandsEnabled = true;
 

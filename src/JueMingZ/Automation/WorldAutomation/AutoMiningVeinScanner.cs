@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace JueMingZ.Automation.WorldAutomation
 {
-    public delegate bool AutoMiningTileMatch(int x, int y, int tileType);
+    public delegate bool AutoMiningTileReader(int x, int y, out bool active, out int tileType);
 
     public sealed class AutoMiningVeinScanResult
     {
@@ -33,7 +33,7 @@ namespace JueMingZ.Automation.WorldAutomation
             int minY,
             int maxX,
             int maxY,
-            AutoMiningTileMatch matches)
+            AutoMiningTileReader readTile)
         {
             var result = new AutoMiningVeinScanResult
             {
@@ -44,14 +44,15 @@ namespace JueMingZ.Automation.WorldAutomation
                 MaxY = seedY
             };
 
-            if (tileType < 0 || matches == null || minX > maxX || minY > maxY)
+            if (tileType < 0 || readTile == null || minX > maxX || minY > maxY)
             {
                 return result;
             }
 
+            var matchGroup = AutoMiningTileMatchGroup.ForSeedTileType(tileType);
             var queue = new Queue<AutoMiningTilePoint>();
             var queued = new HashSet<long>();
-            EnqueueSeedCandidates(seedX, seedY, tileType, minX, minY, maxX, maxY, matches, queue, queued);
+            EnqueueSeedCandidates(seedX, seedY, matchGroup, minX, minY, maxX, maxY, readTile, queue, queued);
 
             var accepted = new HashSet<long>();
             while (queue.Count > 0 && result.Tiles.Count < MaxVeinTiles)
@@ -68,13 +69,14 @@ namespace JueMingZ.Automation.WorldAutomation
                     continue;
                 }
 
-                if (!matches(point.X, point.Y, tileType))
+                int actualTileType;
+                if (!TryReadMatchingActiveTile(readTile, point.X, point.Y, matchGroup, out actualTileType))
                 {
                     continue;
                 }
 
                 accepted.Add(key);
-                result.Tiles.Add(new AutoMiningTile(point.X, point.Y));
+                result.Tiles.Add(new AutoMiningTile(point.X, point.Y, actualTileType));
                 result.MinX = Math.Min(result.MinX, point.X);
                 result.MinY = Math.Min(result.MinY, point.Y);
                 result.MaxX = Math.Max(result.MaxX, point.X);
@@ -103,7 +105,7 @@ namespace JueMingZ.Automation.WorldAutomation
                         }
 
                         queued.Add(nextKey);
-                        if (matches(nx, ny, tileType))
+                        if (TryReadMatchingActiveTile(readTile, nx, ny, matchGroup, out actualTileType))
                         {
                             queue.Enqueue(new AutoMiningTilePoint(nx, ny));
                         }
@@ -117,12 +119,12 @@ namespace JueMingZ.Automation.WorldAutomation
         private static void EnqueueSeedCandidates(
             int seedX,
             int seedY,
-            int tileType,
+            AutoMiningTileMatchGroup matchGroup,
             int minX,
             int minY,
             int maxX,
             int maxY,
-            AutoMiningTileMatch matches,
+            AutoMiningTileReader readTile,
             Queue<AutoMiningTilePoint> queue,
             ISet<long> queued)
         {
@@ -137,7 +139,8 @@ namespace JueMingZ.Automation.WorldAutomation
                         continue;
                     }
 
-                    if (!matches(x, y, tileType))
+                    int actualTileType;
+                    if (!TryReadMatchingActiveTile(readTile, x, y, matchGroup, out actualTileType))
                     {
                         continue;
                     }
@@ -152,6 +155,21 @@ namespace JueMingZ.Automation.WorldAutomation
                     queue.Enqueue(new AutoMiningTilePoint(x, y));
                 }
             }
+        }
+
+        private static bool TryReadMatchingActiveTile(
+            AutoMiningTileReader readTile,
+            int x,
+            int y,
+            AutoMiningTileMatchGroup matchGroup,
+            out int tileType)
+        {
+            tileType = -1;
+            bool active;
+            return readTile != null &&
+                   readTile(x, y, out active, out tileType) &&
+                   active &&
+                   matchGroup.Matches(tileType);
         }
 
         private static long BuildPointKey(int x, int y)

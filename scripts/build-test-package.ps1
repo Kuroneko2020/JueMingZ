@@ -1,4 +1,5 @@
 ﻿param(
+    [switch]$IncludeReadme,
     [switch]$Zip
 )
 
@@ -94,13 +95,16 @@ if ((Test-Path $packageDir) -and (Test-IsInsideDirectory -Parent $repoRoot -Chil
                 Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
             }
         }
+
+        Get-ChildItem -LiteralPath $packageDir -File -Filter "README_#U*.txt" -ErrorAction SilentlyContinue |
+            Remove-Item -Force -ErrorAction SilentlyContinue
     }
 }
 
 New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
 
-# Keep the first-level test package narrow: JueMingZ.dll, config,
-# VERSION, and README only. Harmony is embedded in the DLL.
+# Keep the default first-level test package narrow: JueMingZ.dll, config,
+# and VERSION. The user-facing README is only generated on explicit request.
 $jmzDll = Join-Path $outputDir "JueMingZ.dll"
 if (-not (Test-Path $jmzDll)) {
     Write-Error "JueMingZ.dll was not found: $jmzDll"
@@ -131,43 +135,46 @@ $configContent = @"
 "@
 Set-Content -Path (Join-Path $packageDir "Terraria.exe.config") -Value $configContent -Encoding UTF8
 
-$readmeFileName = "README_测试说明.txt"
-$readmeTemplate = Join-Path $repoRoot "文档\项目规则\测试包README模板.zh-CN.txt"
-if (-not (Test-Path $readmeTemplate)) {
-    Write-Error "README testing template was not found: $readmeTemplate"
-}
+$readmeOutputPath = $null
+if ($IncludeReadme) {
+    $readmeFileName = "README_测试说明.txt"
+    $readmeTemplate = Join-Path $repoRoot "文档\项目规则\测试包README模板.zh-CN.txt"
+    if (-not (Test-Path $readmeTemplate)) {
+        Write-Error "README testing template was not found: $readmeTemplate"
+    }
 
-# Generate the user-facing README from the local template without copying
-# the local docs tree into the package.
-$readmeOutputPath = Join-Path $packageDir $readmeFileName
-$utf8Bom = New-Object System.Text.UTF8Encoding($true)
-$templateText = [System.IO.File]::ReadAllText($readmeTemplate, [System.Text.Encoding]::UTF8)
-$buildTimeLocal = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-$readmeText = $templateText.Replace("{{RuntimeVersion}}", $runtimeVersion).Replace("{{BuildTimeLocal}}", $buildTimeLocal)
-[System.IO.File]::WriteAllText($readmeOutputPath, $readmeText, $utf8Bom)
+    # Generate the optional user-facing README from the local template without
+    # copying the local docs tree into the package.
+    $readmeOutputPath = Join-Path $packageDir $readmeFileName
+    $utf8Bom = New-Object System.Text.UTF8Encoding($true)
+    $templateText = [System.IO.File]::ReadAllText($readmeTemplate, [System.Text.Encoding]::UTF8)
+    $buildTimeLocal = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $readmeText = $templateText.Replace("{{RuntimeVersion}}", $runtimeVersion).Replace("{{BuildTimeLocal}}", $buildTimeLocal)
+    [System.IO.File]::WriteAllText($readmeOutputPath, $readmeText, $utf8Bom)
 
-if (-not (Test-Path -LiteralPath $readmeOutputPath)) {
-    throw "README_测试说明.txt was not created: $readmeOutputPath"
-}
+    if (-not (Test-Path -LiteralPath $readmeOutputPath)) {
+        throw "README_测试说明.txt was not created: $readmeOutputPath"
+    }
 
-$readmeCheckText = [System.IO.File]::ReadAllText($readmeOutputPath, [System.Text.Encoding]::UTF8)
-if (-not $readmeCheckText.Contains($runtimeVersion)) {
-    throw "README_测试说明.txt does not contain RuntimeVersion: $runtimeVersion"
-}
+    $readmeCheckText = [System.IO.File]::ReadAllText($readmeOutputPath, [System.Text.Encoding]::UTF8)
+    if (-not $readmeCheckText.Contains($runtimeVersion)) {
+        throw "README_测试说明.txt does not contain RuntimeVersion: $runtimeVersion"
+    }
 
-$staleReadmePatterns = @(
-    "只需要确认",
-    "当前测试只需要",
-    "松露虫提示文案确认",
-    "猪鲨提示文案确认",
-    "松露虫 / 猪鲨提示文案确认",
-    "旧防回归清单：",
-    "成功路径回归",
-    "轻量回归"
-)
-foreach ($pattern in $staleReadmePatterns) {
-    if ($readmeCheckText.Contains($pattern)) {
-        throw "README_测试说明.txt contains stale focused-test wording: $pattern"
+    $staleReadmePatterns = @(
+        "只需要确认",
+        "当前测试只需要",
+        "松露虫提示文案确认",
+        "猪鲨提示文案确认",
+        "松露虫 / 猪鲨提示文案确认",
+        "旧防回归清单：",
+        "成功路径回归",
+        "轻量回归"
+    )
+    foreach ($pattern in $staleReadmePatterns) {
+        if ($readmeCheckText.Contains($pattern)) {
+            throw "README_测试说明.txt contains stale focused-test wording: $pattern"
+        }
     }
 }
 
@@ -204,7 +211,12 @@ if ($Zip) {
 
 Write-Host "JueMingZ test package created: $packageDir"
 Write-Host "RuntimeVersion: $runtimeVersion"
-Write-Host "README generated: $readmeOutputPath"
+if ($IncludeReadme) {
+    Write-Host "README generated: $readmeOutputPath"
+}
+else {
+    Write-Host "README skipped by default; pass -IncludeReadme only when the user explicitly asks for it."
+}
 Write-Host "First-level files:"
 Get-ChildItem -Path $packageDir -File | Select-Object Name,Length | Format-Table -AutoSize
 if ($Zip) {

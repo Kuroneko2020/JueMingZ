@@ -305,6 +305,33 @@ namespace JueMingZ.Config
         [DataMember(Order = 170)]
         public string MiscAutoCaptureCritterMode { get; set; }
 
+        [DataMember(Order = 176)]
+        public bool MiscAutoCaptureCritterCategoryDefaultsMigrated { get; set; }
+
+        [DataMember(Order = 177)]
+        public bool MiscAutoCaptureCritterBaitEnabled { get; set; }
+
+        [DataMember(Order = 178)]
+        public bool MiscAutoCaptureCritterFairyEnabled { get; set; }
+
+        [DataMember(Order = 179)]
+        public bool MiscAutoCaptureCritterGoldCritterEnabled { get; set; }
+
+        [DataMember(Order = 180)]
+        public bool MiscAutoCaptureCritterGemCritterEnabled { get; set; }
+
+        [DataMember(Order = 181)]
+        public bool MiscAutoCaptureCritterNormalCritterEnabled { get; set; }
+
+        [DataMember(Order = 182)]
+        public bool MiscAutoCaptureCritterTruffleWormEnabled { get; set; }
+
+        [DataMember(Order = 183)]
+        public bool MiscAutoCaptureCritterEmpressButterflyEnabled { get; set; }
+
+        [DataMember(Order = 184)]
+        public bool MiscAutoCaptureCritterOtherEnabled { get; set; }
+
         [DataMember(Order = 164)]
         public bool MiscAutoHarvestEnabled { get; set; }
 
@@ -780,6 +807,15 @@ namespace JueMingZ.Config
                 MiscAutoMiningMode = "Off",
                 MiscAutoCaptureCritterEnabled = false,
                 MiscAutoCaptureCritterMode = AutoCaptureCritterModes.Off,
+                MiscAutoCaptureCritterCategoryDefaultsMigrated = true,
+                MiscAutoCaptureCritterBaitEnabled = true,
+                MiscAutoCaptureCritterFairyEnabled = true,
+                MiscAutoCaptureCritterGoldCritterEnabled = true,
+                MiscAutoCaptureCritterGemCritterEnabled = true,
+                MiscAutoCaptureCritterNormalCritterEnabled = true,
+                MiscAutoCaptureCritterTruffleWormEnabled = true,
+                MiscAutoCaptureCritterEmpressButterflyEnabled = true,
+                MiscAutoCaptureCritterOtherEnabled = true,
                 MiscAutoHarvestEnabled = false,
                 MiscQuickBagOpenEnabled = false,
                 MiscAutoDepositCoinsEnabled = false,

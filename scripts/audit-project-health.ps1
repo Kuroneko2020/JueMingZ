@@ -1,5 +1,6 @@
 ﻿param(
-    [switch]$IncludeSourcePackageZip
+    [switch]$IncludeSourcePackageZip,
+    [switch]$AllowTestPackageReadme
 )
 
 $ErrorActionPreference = "Stop"
@@ -448,7 +449,8 @@ function Test-SourcePackageZip {
 function Test-TestPackage {
     param(
         [Parameter(Mandatory = $true)][string]$RepoRoot,
-        [Parameter(Mandatory = $true)][string]$RuntimeVersion
+        [Parameter(Mandatory = $true)][string]$RuntimeVersion,
+        [switch]$AllowReadme
     )
     # Audit the user-facing package payload only; absence before packaging is
     # allowed, but stale templates or extra runtime DLLs are failures afterward.
@@ -504,16 +506,34 @@ function Test-TestPackage {
     $isWindows = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
         [System.Runtime.InteropServices.OSPlatform]::Windows)
 
-    # The Chinese README filename is a Windows-facing delivery contract; non-
-    # Windows encoded names require Windows validation before becoming fatal.
+    if (-not $AllowReadme) {
+        if ($hasChineseReadme) {
+            Write-FailHealth "Default test package should not contain README_测试说明.txt; generate it only when the user explicitly asks."
+        }
+        else {
+            Write-Pass "Default test package omits README_测试说明.txt."
+        }
+
+        if ($hasEncodedReadme) {
+            Write-FailHealth "Default test package should not contain encoded README_#U*.txt files."
+        }
+        else {
+            Write-Pass "No encoded README_#U*.txt file found in default test package."
+        }
+
+        return
+    }
+
+    # Optional README delivery remains Windows-facing; non-Windows encoded names
+    # require Windows validation before becoming fatal.
     if ($hasChineseReadme) {
-        Write-Pass "Test package contains Chinese README file."
+        Write-Pass "Optional test package README exists."
     }
     elseif ($hasEncodedReadme -and -not $isWindows) {
-        Write-WarnHealth "Chinese README file is absent, but README_#U*.txt was observed outside Windows; require Windows validation before treating this as user-facing failure."
+        Write-WarnHealth "Optional Chinese README file is absent, but README_#U*.txt was observed outside Windows; require Windows validation before treating this as user-facing failure."
     }
     else {
-        Write-FailHealth "Test package missing Chinese README file."
+        Write-FailHealth "Optional test package README was requested but is missing."
     }
 
     if ($encoded -and $encoded.Count -gt 0) {
@@ -525,7 +545,7 @@ function Test-TestPackage {
         }
     }
     else {
-        Write-Pass "No encoded README_#U*.txt file found in test package."
+        Write-Pass "No encoded README_#U*.txt file found in optional README package."
     }
 
     if ($hasChineseReadme) {
@@ -657,10 +677,16 @@ function Test-DocsConsistency {
     $featureIntroDir = ConvertFrom-CodePoints @(0x529f, 0x80fd, 0x4ecb, 0x7ecd)
     $combatPageDir = ConvertFrom-CodePoints @(0x6218, 0x6597, 0x9875)
     $movementPageDir = ConvertFrom-CodePoints @(0x79fb, 0x52a8, 0x9875)
+    $updateRecordsDir = ConvertFrom-CodePoints @(0x66f4, 0x65b0, 0x8bb0, 0x5f55)
+    $aiExperienceDir = "AI" + (ConvertFrom-CodePoints @(0x7ecf, 0x9a8c, 0x7b14, 0x8bb0))
+    $currentPlanDir = ConvertFrom-CodePoints @(0x5f53, 0x524d, 0x5728, 0x505a, 0x8ba1, 0x5212)
+    $archivePlanDir = ConvertFrom-CodePoints @(0x5f52, 0x6863, 0x5386, 0x53f2, 0x8ba1, 0x5212)
+    $docChangeHistoryDir = ConvertFrom-CodePoints @(0x6587, 0x6863, 0x66f4, 0x6539, 0x5386, 0x53f2)
 
     $currentStatusFile = (ConvertFrom-CodePoints @(0x5f53, 0x524d, 0x4ed3, 0x5e93, 0x72b6, 0x6001)) + ".md"
     $coldStartFile = (ConvertFrom-CodePoints @(0x51b7, 0x542f, 0x52a8, 0x8bf4, 0x660e)) + ".md"
     $directoryFile = (ConvertFrom-CodePoints @(0x76ee, 0x5f55)) + ".md"
+    $indexFile = (ConvertFrom-CodePoints @(0x7d22, 0x5f15)) + ".md"
     $documentationGuideFile = (ConvertFrom-CodePoints @(0x6587, 0x6863, 0x4e66, 0x5199, 0x89c4, 0x8303)) + ".md"
     $migrationMapFile = (ConvertFrom-CodePoints @(0x8fc1, 0x79fb, 0x6620, 0x5c04, 0x8868)) + ".md"
     $packagingRulesFile = "AI" + (ConvertFrom-CodePoints @(0x6253, 0x5305, 0x4ea4, 0x4ed8, 0x89c4, 0x5219)) + ".md"
@@ -720,7 +746,7 @@ function Test-DocsConsistency {
     if ($null -eq $documentationGuide) {
         Write-FailHealth "New documentation writing guide missing."
     }
-    elseif ($documentationGuide.Contains($currentStatusFile) -and
+    elseif ($documentationGuide.Contains($updateRecordsDir) -and
         $documentationGuide.Contains($migrationMapFile) -and
         $documentationGuide.Contains($projectRulesDir) -and
         $documentationGuide.Contains("UTF-8")) {
@@ -781,35 +807,11 @@ function Test-DocsConsistency {
     }
 
     $currentStatusPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @($currentStatusFile)
-    $currentStatus = Read-TextIfExists -Path $currentStatusPath
-    if ($null -eq $currentStatus) {
-        Write-FailHealth "New current status document missing."
+    if (Test-Path -LiteralPath $currentStatusPath) {
+        Write-FailHealth "Deprecated current status document still exists; use recent update records for handoff instead."
     }
     else {
-        if ($currentStatus.Contains($RuntimeVersion)) {
-            Write-Pass "New current status contains RuntimeVersion $RuntimeVersion"
-        }
-        else {
-            Write-FailHealth "New current status does not contain RuntimeVersion $RuntimeVersion"
-        }
-
-        if ($currentStatus.Contains($directoryFile) -and
-            $currentStatus.Contains($documentationGuideFile) -and
-            $currentStatus.Contains($migrationMapFile)) {
-            Write-Pass "New current status references the new documentation rules instead of duplicating them."
-        }
-        else {
-            Write-FailHealth "New current status lacks expected documentation rule references."
-        }
-
-        $length = (Get-Item -LiteralPath $currentStatusPath).Length
-        $currentStatusGuard = Get-DocumentationSizeGuard -RepoRoot $RepoRoot -Kind "CurrentStatus"
-        if ($length -gt $currentStatusGuard.Limit) {
-            Write-FailHealth "New current status is over adaptive size guard ($length > $($currentStatusGuard.Limit) bytes; registeredFeatures=$($currentStatusGuard.FeatureCount)); move historical details to update records or diagnostics docs."
-        }
-        else {
-            Write-Pass "New current status stays below adaptive size guard ($length <= $($currentStatusGuard.Limit) bytes; registeredFeatures=$($currentStatusGuard.FeatureCount))."
-        }
+        Write-Pass "Deprecated current status document is absent."
     }
 
     $handoffPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @($coldStartFile)
@@ -825,6 +827,51 @@ function Test-DocsConsistency {
         }
         else {
             Write-Pass "New cold-start handoff stays below adaptive size guard ($handoffLength <= $($handoffGuard.Limit) bytes; registeredFeatures=$($handoffGuard.FeatureCount))."
+        }
+
+        if ($handoff.Contains("RuntimeVersion") -or $handoff -match "1\.7\.\d+") {
+            Write-FailHealth "Cold-start handoff contains concrete version handoff content; keep version details in update records."
+        }
+        else {
+            Write-Pass "Cold-start handoff avoids concrete version handoff content."
+        }
+    }
+
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @($updateRecordsDir, $indexFile)
+    $updateIndex = Read-TextIfExists -Path $updateIndexPath
+    if ($null -eq $updateIndex) {
+        Write-FailHealth "Update record index missing."
+    }
+    elseif ($updateIndex.Contains($RuntimeVersion) -and
+        $updateIndex.Contains("最近 3") -and
+        $updateIndex.Contains("实际交接")) {
+        Write-Pass "Update record index carries the current handoff role and RuntimeVersion."
+    }
+    else {
+        Write-FailHealth "Update record index does not describe recent-record handoff or current RuntimeVersion."
+    }
+
+    $requiredRoleDocs = @(
+        @{ Segments = @($documentationRulesDir, $directoryFile); Description = "documentation rules directory map" },
+        @{ Segments = @($projectRulesDir, $indexFile); Description = "project rules index" },
+        @{ Segments = @($featureIntroDir, $featureIndexFile); Description = "feature introduction index" },
+        @{ Segments = @($updateRecordsDir, $indexFile); Description = "update records index" },
+        @{ Segments = @($docChangeHistoryDir, $indexFile); Description = "documentation change history index" },
+        @{ Segments = @($aiExperienceDir, $indexFile); Description = "AI experience notes index" },
+        @{ Segments = @($currentPlanDir, $indexFile); Description = "current plans index" },
+        @{ Segments = @($archivePlanDir, $indexFile); Description = "archived plans index" }
+    )
+
+    foreach ($roleDoc in $requiredRoleDocs) {
+        $roleText = Read-TextIfExists -Path (Join-LocalDocsPath -RepoRoot $RepoRoot -Segments $roleDoc.Segments)
+        if ($null -eq $roleText) {
+            Write-FailHealth "Folder role document missing: $($roleDoc.Description)"
+        }
+        elseif ($roleText.Contains("限制") -or $roleText.Contains("不负责") -or $roleText.Contains("不是")) {
+            Write-Pass "Folder role document declares limits: $($roleDoc.Description)"
+        }
+        else {
+            Write-FailHealth "Folder role document lacks explicit limits: $($roleDoc.Description)"
         }
     }
 
@@ -1020,10 +1067,10 @@ else {
     Write-Pass "Source package zip audit skipped by default; use -IncludeSourcePackageZip only when a source export was explicitly requested."
 }
 if ($runtimeVersion) {
-    Test-TestPackage -RepoRoot $repoRoot -RuntimeVersion $runtimeVersion
+    Test-TestPackage -RepoRoot $repoRoot -RuntimeVersion $runtimeVersion -AllowReadme:$AllowTestPackageReadme
 }
 else {
-    Test-TestPackage -RepoRoot $repoRoot -RuntimeVersion "Unknown"
+    Test-TestPackage -RepoRoot $repoRoot -RuntimeVersion "Unknown" -AllowReadme:$AllowTestPackageReadme
 }
 Test-InformationFishingFallbackCleanup -RepoRoot $repoRoot
 Test-IterationLogNumbers -RepoRoot $repoRoot

@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using JueMingZ.Automation.WorldAutomation;
 using JueMingZ.Automation.Information;
 
@@ -14,13 +15,40 @@ namespace JueMingZ.Compat
         private const int VanillaPlayerWidth = 20;
         private const int VanillaPlayerHeight = 42;
         private const int SimpleTileReachLimit = 20;
+        private const int DefaultMaxTilesX = 8400;
+        private const int DefaultMaxTilesY = 2400;
         private static readonly object SyncRoot = new object();
         private static readonly HashSet<int> FallbackMineableOreTiles = new HashSet<int>
         {
             6, 7, 8, 9, 22, 37, 58, 107, 108, 111, 166, 167, 168, 169, 204, 211, 221, 222, 223,
-            407, 408, 63, 64, 65, 66, 67, 68, 566
+            407, 408, 56, 404, 123, 224, 63, 64, 65, 66, 67, 68, 178, 566
         };
         private static readonly Dictionary<int, bool> MineableOreCache = new Dictionary<int, bool>();
+        private static bool _tileReachSettingsResolved;
+        private static object _tileReachSettingsSimple;
+        private static MethodInfo _tileReachRegionByRefMethod;
+        private static MethodInfo _tileReachRegionRectangleMethod;
+        private static bool _worldGenCanKillTileResolved;
+        private static MethodInfo _worldGenCanKillTileMethod;
+
+        internal struct MiningReachProfile
+        {
+            public bool Available;
+            public int Left;
+            public int Top;
+            public int Right;
+            public int Bottom;
+            public float CenterX;
+            public float CenterY;
+            public float MaxDistanceWorld;
+        }
+
+        private enum AutoMiningReachSource
+        {
+            Unavailable = 0,
+            VanillaTileReachRegion = 1,
+            FallbackMiningRange = 2
+        }
 
         public static bool TryGetTileContext(out Type mainType, out object tiles, out int maxTilesX, out int maxTilesY, out string message)
         {
@@ -122,6 +150,19 @@ namespace JueMingZ.Compat
             return TryReadTile(tiles, x, y, out active, out actualType) &&
                    active &&
                    actualType == tileType;
+        }
+
+        internal static bool TryReadActiveTileMatchingGroup(
+            object tiles,
+            int x,
+            int y,
+            AutoMiningTileMatchGroup matchGroup,
+            out int actualType)
+        {
+            bool active;
+            return TryReadTile(tiles, x, y, out active, out actualType) &&
+                   active &&
+                   matchGroup.Matches(actualType);
         }
 
         public static bool TryGetCursorMineableOre(out int tileX, out int tileY, out int tileType, out string message)
@@ -290,6 +331,13 @@ namespace JueMingZ.Compat
 
         public static bool IsTileInMiningReach(object player, int tileX, int tileY, int tileBoost)
         {
+            AutoMiningReachSource source;
+            return IsTileInMiningReach(player, tileX, tileY, tileBoost, out source);
+        }
+
+        private static bool IsTileInMiningReach(object player, int tileX, int tileY, int tileBoost, out AutoMiningReachSource source)
+        {
+            source = AutoMiningReachSource.Unavailable;
             if (player == null)
             {
                 return false;
@@ -304,41 +352,161 @@ namespace JueMingZ.Compat
             float maxDistanceWorld;
             return TryGetMiningReachProfile(
                        player,
-                       Math.Max(0, tileBoost),
+                       tileBoost,
                        out left,
                        out top,
                        out right,
                        out bottom,
                        out centerX,
                        out centerY,
-                       out maxDistanceWorld) &&
-                   IsTileInsideReachShape(tileX, tileY, left, top, right, bottom, centerX, centerY, maxDistanceWorld);
+                       out maxDistanceWorld,
+                       out source) &&
+                   (source == AutoMiningReachSource.VanillaTileReachRegion
+                       ? IsTileInsideReachRegion(tileX, tileY, left, top, right, bottom)
+                       : IsTileInsideReachShape(tileX, tileY, left, top, right, bottom, centerX, centerY, maxDistanceWorld));
         }
 
         public static bool CanMineTileWithPickaxe(object player, int tileX, int tileY, int tileType, int pickPower, int tileBoost)
         {
+            MiningReachProfile reachProfile;
+            if (!TryBuildMiningTakeoverReachProfile(player, tileBoost, out reachProfile))
+            {
+                return false;
+            }
+
+            return CanMineTileWithPickaxe(reachProfile, tileX, tileY, tileType, pickPower);
+        }
+
+        internal static bool CanMineTileWithPickaxe(MiningReachProfile reachProfile, int tileX, int tileY, int tileType, int pickPower)
+        {
+            // Auto-mining takeover is stricter than generic interaction reach: a vanilla reach
+            // rectangle edge can still produce an ItemCheck swing that does not damage the tile.
             return pickPower > 0 &&
-                   CanKillTile(tileX, tileY) &&
-                   IsTileInMiningReach(player, tileX, tileY, tileBoost) &&
-                   IsPickPowerSufficientForTile(tileType, tileY, pickPower);
+                   IsTileInsideMiningTakeoverReach(reachProfile, tileX, tileY) &&
+                   IsPickPowerSufficientForTile(tileType, tileY, pickPower) &&
+                   CanKillTile(tileX, tileY);
         }
 
         public static bool CanKillTile(int tileX, int tileY)
         {
-            var worldGenType = InformationReflection.FindType("Terraria.WorldGen");
-            object raw;
-            if (InformationReflection.TryInvokeStatic(worldGenType, "CanKillTile", new object[] { tileX, tileY }, out raw) && raw != null)
+            MethodInfo method;
+            if (!TryResolveWorldGenCanKillTile(out method))
             {
-                try
+                return true;
+            }
+
+            object raw;
+            try
+            {
+                raw = method.Invoke(null, new object[] { tileX, tileY });
+                if (raw != null)
                 {
                     return Convert.ToBoolean(raw);
                 }
-                catch
-                {
-                }
+            }
+            catch
+            {
             }
 
             return true;
+        }
+
+        private static bool TryResolveWorldGenCanKillTile(out MethodInfo method)
+        {
+            lock (SyncRoot)
+            {
+                if (!_worldGenCanKillTileResolved)
+                {
+                    _worldGenCanKillTileResolved = true;
+                    var worldGenType = InformationReflection.FindType("Terraria.WorldGen");
+                    if (worldGenType != null)
+                    {
+                        var methods = worldGenType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+                        for (var index = 0; index < methods.Length; index++)
+                        {
+                            var candidate = methods[index];
+                            var parameters = candidate.GetParameters();
+                            if (string.Equals(candidate.Name, "CanKillTile", StringComparison.Ordinal) &&
+                                candidate.ReturnType == typeof(bool) &&
+                                parameters.Length == 2 &&
+                                parameters[0].ParameterType == typeof(int) &&
+                                parameters[1].ParameterType == typeof(int))
+                            {
+                                _worldGenCanKillTileMethod = candidate;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                method = _worldGenCanKillTileMethod;
+            }
+
+            return method != null;
+        }
+
+        private static bool IsTileInStrictMiningTakeoverReach(object player, int tileX, int tileY, int tileBoost)
+        {
+            MiningReachProfile reachProfile;
+            return TryBuildMiningTakeoverReachProfile(player, tileBoost, out reachProfile) &&
+                   IsTileInsideMiningTakeoverReach(reachProfile, tileX, tileY);
+        }
+
+        internal static bool TryBuildMiningTakeoverReachProfile(object player, int tileBoost, out MiningReachProfile reachProfile)
+        {
+            reachProfile = new MiningReachProfile();
+            if (player == null)
+            {
+                return false;
+            }
+
+            int left;
+            int top;
+            int right;
+            int bottom;
+            float centerX;
+            float centerY;
+            float maxDistanceWorld;
+            AutoMiningReachSource source;
+            if (!TryGetMiningReachProfile(
+                    player,
+                    tileBoost,
+                    out left,
+                    out top,
+                    out right,
+                    out bottom,
+                    out centerX,
+                    out centerY,
+                    out maxDistanceWorld,
+                    out source))
+            {
+                return false;
+            }
+
+            reachProfile.Available = true;
+            reachProfile.Left = left;
+            reachProfile.Top = top;
+            reachProfile.Right = right;
+            reachProfile.Bottom = bottom;
+            reachProfile.CenterX = centerX;
+            reachProfile.CenterY = centerY;
+            reachProfile.MaxDistanceWorld = maxDistanceWorld;
+            return true;
+        }
+
+        internal static bool IsTileInsideMiningTakeoverReach(MiningReachProfile reachProfile, int tileX, int tileY)
+        {
+            return reachProfile.Available &&
+                   IsTileInsideReachShape(
+                       tileX,
+                       tileY,
+                       reachProfile.Left,
+                       reachProfile.Top,
+                       reachProfile.Right,
+                       reachProfile.Bottom,
+                       reachProfile.CenterX,
+                       reachProfile.CenterY,
+                       reachProfile.MaxDistanceWorld);
         }
 
         public static bool IsMineableOreTileType(int tileType)
@@ -375,6 +543,12 @@ namespace JueMingZ.Compat
             }
         }
 
+        public static bool IsGravityAffectedMiningTileType(int tileType)
+        {
+            return tileType == 123 ||
+                   tileType == 224;
+        }
+
         public static long ReadGameUpdateCount()
         {
             if (!TerrariaRuntimeTypes.EnsureInitializedLateOnly() || TerrariaRuntimeTypes.MainType == null)
@@ -406,6 +580,27 @@ namespace JueMingZ.Compat
             float maxDistanceWorld)
         {
             return IsTileInsideReachShape(tileX, tileY, left, top, right, bottom, centerX, centerY, maxDistanceWorld);
+        }
+
+        internal static bool IsTileInMiningReachForTesting(object player, int tileX, int tileY, int tileBoost, out string source)
+        {
+            AutoMiningReachSource reachSource;
+            var reachable = IsTileInMiningReach(player, tileX, tileY, tileBoost, out reachSource);
+            source = FormatReachSource(reachSource);
+            return reachable;
+        }
+
+        internal static bool TryGetVanillaTileReachRegionForTesting(
+            object player,
+            int tileBoost,
+            int maxTilesX,
+            int maxTilesY,
+            out int left,
+            out int top,
+            out int right,
+            out int bottom)
+        {
+            return TryGetVanillaTileReachRegion(player, tileBoost, maxTilesX, maxTilesY, out left, out top, out right, out bottom);
         }
 
         internal static bool IsPickPowerSufficientForTileForTesting(int tileType, int tileY, int pickPower)
@@ -451,6 +646,32 @@ namespace JueMingZ.Compat
             out float centerY,
             out float maxDistanceWorld)
         {
+            AutoMiningReachSource source;
+            return TryGetMiningReachProfile(
+                player,
+                tileBoost,
+                out left,
+                out top,
+                out right,
+                out bottom,
+                out centerX,
+                out centerY,
+                out maxDistanceWorld,
+                out source);
+        }
+
+        private static bool TryGetMiningReachProfile(
+            object player,
+            int tileBoost,
+            out int left,
+            out int top,
+            out int right,
+            out int bottom,
+            out float centerX,
+            out float centerY,
+            out float maxDistanceWorld,
+            out AutoMiningReachSource source)
+        {
             left = 0;
             top = 0;
             right = -1;
@@ -458,11 +679,42 @@ namespace JueMingZ.Compat
             centerX = 0f;
             centerY = 0f;
             maxDistanceWorld = 0f;
+            source = AutoMiningReachSource.Unavailable;
             if (player == null)
             {
                 return false;
             }
 
+            // Preserve vanilla item.tileBoost exactly; negative boosts intentionally shrink mining reach.
+            int maxTilesX;
+            int maxTilesY;
+            TryReadWorldTileBounds(out maxTilesX, out maxTilesY);
+            if (TryGetVanillaTileReachRegion(player, tileBoost, maxTilesX, maxTilesY, out left, out top, out right, out bottom))
+            {
+                float rawPositionX;
+                float rawPositionY;
+                int rawWidth;
+                int rawHeight;
+                if (TryReadPlayerBounds(player, out rawPositionX, out rawPositionY, out rawWidth, out rawHeight))
+                {
+                    centerX = rawPositionX + rawWidth / 2f;
+                    centerY = rawPositionY + rawHeight / 2f;
+                }
+                else
+                {
+                    centerX = (left + right + 1) * TileSize / 2f;
+                    centerY = (top + bottom + 1) * TileSize / 2f;
+                }
+
+                int vanillaRangeX;
+                int vanillaRangeY;
+                TryReadMiningRange(out vanillaRangeX, out vanillaRangeY);
+                maxDistanceWorld = Math.Max(vanillaRangeX + tileBoost, vanillaRangeY + tileBoost) * TileSize;
+                source = AutoMiningReachSource.VanillaTileReachRegion;
+                return true;
+            }
+
+            // Fallback is compatibility-only when vanilla reach APIs are unavailable; it must stay conservative and never expand auto-mining range.
             float positionX;
             float positionY;
             int width;
@@ -475,8 +727,8 @@ namespace JueMingZ.Compat
             int rangeX;
             int rangeY;
             TryReadMiningRange(out rangeX, out rangeY);
-            var extraX = rangeX + Math.Max(0, tileBoost);
-            var extraY = rangeY + Math.Max(0, tileBoost);
+            var extraX = rangeX + tileBoost;
+            var extraY = rangeY + tileBoost;
 
             left = (int)Math.Floor(positionX / TileSize) - extraX;
             right = (int)Math.Ceiling((positionX + width) / TileSize) - 1 + extraX;
@@ -485,10 +737,250 @@ namespace JueMingZ.Compat
             centerX = positionX + width / 2f;
             centerY = positionY + height / 2f;
             maxDistanceWorld = Math.Max(extraX, extraY) * TileSize;
+            source = AutoMiningReachSource.FallbackMiningRange;
             return true;
         }
 
+        private static bool TryGetVanillaTileReachRegion(
+            object player,
+            int tileBoost,
+            int maxTilesX,
+            int maxTilesY,
+            out int left,
+            out int top,
+            out int right,
+            out int bottom)
+        {
+            left = 0;
+            top = 0;
+            right = -1;
+            bottom = -1;
+            if (player == null)
+            {
+                return false;
+            }
+
+            object simple;
+            MethodInfo byRefMethod;
+            MethodInfo rectangleMethod;
+            if (!TryResolveTileReachRegionMembers(out simple, out byRefMethod, out rectangleMethod))
+            {
+                return false;
+            }
+
+            if (TryInvokeTileReachRegionByRef(simple, byRefMethod, player, tileBoost, out left, out top, out right, out bottom) ||
+                TryInvokeTileReachRegionRectangle(simple, rectangleMethod, player, tileBoost, out left, out top, out right, out bottom))
+            {
+                maxTilesX = maxTilesX <= 0 ? DefaultMaxTilesX : maxTilesX;
+                maxTilesY = maxTilesY <= 0 ? DefaultMaxTilesY : maxTilesY;
+                left = Clamp(left, 0, maxTilesX - 1);
+                right = Clamp(right, 0, maxTilesX - 1);
+                top = Clamp(top, 0, maxTilesY - 1);
+                bottom = Clamp(bottom, 0, maxTilesY - 1);
+                return right >= left && bottom >= top;
+            }
+
+            return false;
+        }
+
+        private static bool TryResolveTileReachRegionMembers(out object simple, out MethodInfo byRefMethod, out MethodInfo rectangleMethod)
+        {
+            lock (SyncRoot)
+            {
+                if (!_tileReachSettingsResolved)
+                {
+                    _tileReachSettingsResolved = true;
+                    var settingsType = TerrariaTypeCache.Find("Terraria.DataStructures.TileReachCheckSettings");
+                    if (settingsType != null)
+                    {
+                        _tileReachSettingsSimple = InformationReflection.GetStaticMember(settingsType, "Simple");
+                        var methods = settingsType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                        for (var index = 0; index < methods.Length; index++)
+                        {
+                            var method = methods[index];
+                            if (_tileReachRegionByRefMethod == null && IsTileReachRegionByRefMethod(method))
+                            {
+                                _tileReachRegionByRefMethod = method;
+                            }
+                            else if (_tileReachRegionRectangleMethod == null && IsTileReachRegionRectangleMethod(method))
+                            {
+                                _tileReachRegionRectangleMethod = method;
+                            }
+                        }
+                    }
+                }
+
+                simple = _tileReachSettingsSimple;
+                byRefMethod = _tileReachRegionByRefMethod;
+                rectangleMethod = _tileReachRegionRectangleMethod;
+            }
+
+            return simple != null && (byRefMethod != null || rectangleMethod != null);
+        }
+
+        private static bool TryInvokeTileReachRegionByRef(
+            object simple,
+            MethodInfo method,
+            object player,
+            int tileBoost,
+            out int left,
+            out int top,
+            out int right,
+            out int bottom)
+        {
+            left = 0;
+            top = 0;
+            right = -1;
+            bottom = -1;
+            if (!CanInvokeTileReachRegionMethod(method, player))
+            {
+                return false;
+            }
+
+            try
+            {
+                var args = new object[] { player, 0, 0, 0, 0, tileBoost };
+                method.Invoke(simple, args);
+                left = Convert.ToInt32(args[1]);
+                top = Convert.ToInt32(args[2]);
+                right = Convert.ToInt32(args[3]);
+                bottom = Convert.ToInt32(args[4]);
+                return right >= left && bottom >= top;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool TryInvokeTileReachRegionRectangle(
+            object simple,
+            MethodInfo method,
+            object player,
+            int tileBoost,
+            out int left,
+            out int top,
+            out int right,
+            out int bottom)
+        {
+            left = 0;
+            top = 0;
+            right = -1;
+            bottom = -1;
+            if (!CanInvokeTileReachRegionMethod(method, player))
+            {
+                return false;
+            }
+
+            try
+            {
+                var region = method.Invoke(simple, new object[] { player, tileBoost });
+                int x;
+                int y;
+                int width;
+                int height;
+                if (!InformationReflection.TryReadRectangle(region, out x, out y, out width, out height) || width <= 0 || height <= 0)
+                {
+                    return false;
+                }
+
+                left = x;
+                top = y;
+                right = x + width;
+                bottom = y + height;
+                return right >= left && bottom >= top;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool IsTileReachRegionByRefMethod(MethodInfo method)
+        {
+            if (method == null ||
+                method.IsStatic ||
+                method.ReturnType != typeof(void) ||
+                !string.Equals(method.Name, "GetTileRegion", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            var parameters = method.GetParameters();
+            return parameters.Length == 6 &&
+                   parameters[1].ParameterType.IsByRef &&
+                   parameters[2].ParameterType.IsByRef &&
+                   parameters[3].ParameterType.IsByRef &&
+                   parameters[4].ParameterType.IsByRef &&
+                   parameters[5].ParameterType == typeof(int);
+        }
+
+        private static bool IsTileReachRegionRectangleMethod(MethodInfo method)
+        {
+            if (method == null ||
+                method.IsStatic ||
+                method.ReturnType == typeof(void) ||
+                !string.Equals(method.Name, "GetTileRegion", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            var parameters = method.GetParameters();
+            return parameters.Length == 2 &&
+                   parameters[1].ParameterType == typeof(int);
+        }
+
+        private static bool CanInvokeTileReachRegionMethod(MethodInfo method, object player)
+        {
+            if (method == null || player == null)
+            {
+                return false;
+            }
+
+            var parameters = method.GetParameters();
+            return parameters.Length > 0 &&
+                   parameters[0].ParameterType.IsAssignableFrom(player.GetType());
+        }
+
+        private static void TryReadWorldTileBounds(out int maxTilesX, out int maxTilesY)
+        {
+            maxTilesX = DefaultMaxTilesX;
+            maxTilesY = DefaultMaxTilesY;
+            var mainType = InformationReflection.FindType("Terraria.Main");
+            int value;
+            if (InformationReflection.TryReadStaticInt(mainType, "maxTilesX", out value) && value > 0)
+            {
+                maxTilesX = value;
+            }
+
+            if (InformationReflection.TryReadStaticInt(mainType, "maxTilesY", out value) && value > 0)
+            {
+                maxTilesY = value;
+            }
+        }
+
         private static bool TryGetMiningPlayerBounds(object player, out float positionX, out float positionY, out int width, out int height)
+        {
+            if (!TryReadPlayerBounds(player, out positionX, out positionY, out width, out height))
+            {
+                return false;
+            }
+
+            if (IsPlayerMounted(player))
+            {
+                // Terraria expands player.height for mounts; fallback reach keeps using the rider body so it cannot expand mining reach.
+                var normalizedCenterX = positionX + width / 2f;
+                var bottomY = positionY + height;
+                width = VanillaPlayerWidth;
+                height = VanillaPlayerHeight;
+                positionX = normalizedCenterX - width / 2f;
+                positionY = bottomY - height;
+            }
+
+            return true;
+        }
+
+        private static bool TryReadPlayerBounds(object player, out float positionX, out float positionY, out int width, out int height)
         {
             positionX = 0f;
             positionY = 0f;
@@ -507,17 +999,6 @@ namespace JueMingZ.Compat
             if (!InformationReflection.TryReadInt(player, "height", out height) || height <= 0)
             {
                 height = VanillaPlayerHeight;
-            }
-
-            if (IsPlayerMounted(player))
-            {
-                // Terraria expands player.height for mounts; auto-mining uses the rider body to avoid green edge tiles from mount height boosts.
-                var normalizedCenterX = positionX + width / 2f;
-                var bottomY = positionY + height;
-                width = VanillaPlayerWidth;
-                height = VanillaPlayerHeight;
-                positionX = normalizedCenterX - width / 2f;
-                positionY = bottomY - height;
             }
 
             return true;
@@ -577,7 +1058,28 @@ namespace JueMingZ.Compat
             return dx * dx + dy * dy <= maxDistanceSquared + 0.01f;
         }
 
-        private static bool IsPickPowerSufficientForTile(int tileType, int tileY, int pickPower)
+        private static bool IsTileInsideReachRegion(int tileX, int tileY, int left, int top, int right, int bottom)
+        {
+            return tileX >= left &&
+                   tileX <= right &&
+                   tileY >= top &&
+                   tileY <= bottom;
+        }
+
+        private static string FormatReachSource(AutoMiningReachSource source)
+        {
+            switch (source)
+            {
+                case AutoMiningReachSource.VanillaTileReachRegion:
+                    return "vanillaTileReachRegion";
+                case AutoMiningReachSource.FallbackMiningRange:
+                    return "fallbackMiningRange";
+                default:
+                    return "unavailable";
+            }
+        }
+
+        internal static bool IsPickPowerSufficientForTile(int tileType, int tileY, int pickPower)
         {
             if (tileType < 0 || pickPower <= 0)
             {
@@ -596,6 +1098,8 @@ namespace JueMingZ.Compat
                     return 55;
                 case 37:
                     return 50;
+                case 56:
+                    return 55;
                 case 58:
                     return 65;
                 case 107:

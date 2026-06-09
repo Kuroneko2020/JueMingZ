@@ -19,15 +19,77 @@ namespace JueMingZ.Automation.WorldAutomation
     {
         public int X { get; set; }
         public int Y { get; set; }
+        public int TileType { get; set; }
 
         public AutoMiningTile()
         {
+            TileType = -1;
         }
 
         public AutoMiningTile(int x, int y)
+            : this(x, y, -1)
+        {
+        }
+
+        public AutoMiningTile(int x, int y, int tileType)
         {
             X = x;
             Y = y;
+            TileType = tileType;
+        }
+    }
+
+    internal sealed class AutoMiningGravityRelocation
+    {
+        public int SourceX { get; set; }
+        public int SourceY { get; set; }
+        public int TileType { get; set; }
+        public long CreatedTick { get; set; }
+    }
+
+    internal enum AutoMiningTileMatchGroupKind
+    {
+        SingleTileType = 0,
+        GemCluster = 1
+    }
+
+    internal struct AutoMiningTileMatchGroup
+    {
+        public int SeedTileType { get; private set; }
+        public AutoMiningTileMatchGroupKind Kind { get; private set; }
+
+        public static AutoMiningTileMatchGroup ForSeedTileType(int seedTileType)
+        {
+            return new AutoMiningTileMatchGroup
+            {
+                SeedTileType = seedTileType,
+                Kind = IsGemClusterTileType(seedTileType)
+                    ? AutoMiningTileMatchGroupKind.GemCluster
+                    : AutoMiningTileMatchGroupKind.SingleTileType
+            };
+        }
+
+        public bool Matches(int actualTileType)
+        {
+            if (actualTileType < 0)
+            {
+                return false;
+            }
+
+            if (Kind == AutoMiningTileMatchGroupKind.GemCluster)
+            {
+                return IsGemClusterTileType(actualTileType);
+            }
+
+            return actualTileType == SeedTileType;
+        }
+
+        public static bool IsGemClusterTileType(int tileType)
+        {
+            // GemCluster is the only mixed-type auto-mining vein; normal ores remain single-tile-type selections.
+            return (tileType >= 63 && tileType <= 68) ||
+                   tileType == 178 ||
+                   tileType == 566;
         }
     }
 
@@ -55,6 +117,7 @@ namespace JueMingZ.Automation.WorldAutomation
     internal sealed class AutoMiningVeinSelection
     {
         public int TileType { get; set; }
+        public AutoMiningTileMatchGroup MatchGroup { get; set; }
         public int PickItemType { get; set; }
         public int PickSlot { get; set; }
         public int PickPower { get; set; }
@@ -67,12 +130,20 @@ namespace JueMingZ.Automation.WorldAutomation
         public string SourceMode { get; set; }
         public string SourceHotkey { get; set; }
         public List<AutoMiningTile> Tiles { get; private set; }
+        public List<AutoMiningGravityRelocation> PendingGravityRelocations { get; private set; }
 
         public AutoMiningVeinSelection()
         {
             SourceMode = string.Empty;
             SourceHotkey = string.Empty;
             Tiles = new List<AutoMiningTile>();
+            PendingGravityRelocations = new List<AutoMiningGravityRelocation>();
+            MatchGroup = AutoMiningTileMatchGroup.ForSeedTileType(-1);
+        }
+
+        public bool Matches(int actualTileType)
+        {
+            return MatchGroup.Matches(actualTileType);
         }
     }
 
@@ -80,6 +151,7 @@ namespace JueMingZ.Automation.WorldAutomation
     {
         public int X { get; set; }
         public int Y { get; set; }
+        public int TileType { get; set; }
     }
 
     public sealed class AutoMiningOverlaySnapshot

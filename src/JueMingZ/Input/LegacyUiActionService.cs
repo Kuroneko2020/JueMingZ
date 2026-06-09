@@ -556,6 +556,18 @@ namespace JueMingZ.Input
                 return;
             }
 
+            if (command.ElementId.StartsWith("misc-auto-capture-critter-config:", StringComparison.Ordinal))
+            {
+                ToggleMiscAutoCaptureCritterConfig(command, command.ElementId.Substring("misc-auto-capture-critter-config:".Length));
+                return;
+            }
+
+            if (command.ElementId.StartsWith("misc-auto-capture-critter-option:", StringComparison.Ordinal))
+            {
+                ToggleMiscAutoCaptureCritterOption(command, command.ElementId.Substring("misc-auto-capture-critter-option:".Length));
+                return;
+            }
+
             if (command.ElementId.StartsWith("misc-auto-harvest-mode:", StringComparison.Ordinal))
             {
                 HandleMiscAutoHarvestMode(command, command.ElementId.Substring("misc-auto-harvest-mode:".Length));

@@ -111,6 +111,14 @@ namespace JueMingZ.Runtime
             private string _worldAutomationAutoMiningMode;
             private bool _worldAutomationAutoCaptureCritterEnabled;
             private string _worldAutomationAutoCaptureCritterMode;
+            private bool _worldAutomationAutoCaptureCritterBaitEnabled;
+            private bool _worldAutomationAutoCaptureCritterFairyEnabled;
+            private bool _worldAutomationAutoCaptureCritterGoldCritterEnabled;
+            private bool _worldAutomationAutoCaptureCritterGemCritterEnabled;
+            private bool _worldAutomationAutoCaptureCritterNormalCritterEnabled;
+            private bool _worldAutomationAutoCaptureCritterTruffleWormEnabled;
+            private bool _worldAutomationAutoCaptureCritterEmpressButterflyEnabled;
+            private bool _worldAutomationAutoCaptureCritterOtherEnabled;
             private bool _worldAutomationAutoHarvestEnabled;
             private bool _fishingAutoFishEnabled;
             private bool _fishingAutoLoadoutEnabled;
@@ -221,6 +229,14 @@ namespace JueMingZ.Runtime
                     _worldAutomationAutoMiningMode = settings.WorldAutomationAutoMiningMode,
                     _worldAutomationAutoCaptureCritterEnabled = settings.MiscAutoCaptureCritterEnabled,
                     _worldAutomationAutoCaptureCritterMode = settings.WorldAutomationAutoCaptureCritterMode,
+                    _worldAutomationAutoCaptureCritterBaitEnabled = settings.MiscAutoCaptureCritterBaitEnabled,
+                    _worldAutomationAutoCaptureCritterFairyEnabled = settings.MiscAutoCaptureCritterFairyEnabled,
+                    _worldAutomationAutoCaptureCritterGoldCritterEnabled = settings.MiscAutoCaptureCritterGoldCritterEnabled,
+                    _worldAutomationAutoCaptureCritterGemCritterEnabled = settings.MiscAutoCaptureCritterGemCritterEnabled,
+                    _worldAutomationAutoCaptureCritterNormalCritterEnabled = settings.MiscAutoCaptureCritterNormalCritterEnabled,
+                    _worldAutomationAutoCaptureCritterTruffleWormEnabled = settings.MiscAutoCaptureCritterTruffleWormEnabled,
+                    _worldAutomationAutoCaptureCritterEmpressButterflyEnabled = settings.MiscAutoCaptureCritterEmpressButterflyEnabled,
+                    _worldAutomationAutoCaptureCritterOtherEnabled = settings.MiscAutoCaptureCritterOtherEnabled,
                     _worldAutomationAutoHarvestEnabled = settings.WorldAutomationAutoHarvestEnabled,
                     _fishingAutoFishEnabled = settings.FishingAutoFishEnabled,
                     _fishingAutoLoadoutEnabled = settings.FishingAutoLoadoutEnabled,
@@ -326,6 +342,14 @@ namespace JueMingZ.Runtime
                        Same(_worldAutomationAutoMiningMode, other._worldAutomationAutoMiningMode) &&
                        _worldAutomationAutoCaptureCritterEnabled == other._worldAutomationAutoCaptureCritterEnabled &&
                        Same(_worldAutomationAutoCaptureCritterMode, other._worldAutomationAutoCaptureCritterMode) &&
+                       _worldAutomationAutoCaptureCritterBaitEnabled == other._worldAutomationAutoCaptureCritterBaitEnabled &&
+                       _worldAutomationAutoCaptureCritterFairyEnabled == other._worldAutomationAutoCaptureCritterFairyEnabled &&
+                       _worldAutomationAutoCaptureCritterGoldCritterEnabled == other._worldAutomationAutoCaptureCritterGoldCritterEnabled &&
+                       _worldAutomationAutoCaptureCritterGemCritterEnabled == other._worldAutomationAutoCaptureCritterGemCritterEnabled &&
+                       _worldAutomationAutoCaptureCritterNormalCritterEnabled == other._worldAutomationAutoCaptureCritterNormalCritterEnabled &&
+                       _worldAutomationAutoCaptureCritterTruffleWormEnabled == other._worldAutomationAutoCaptureCritterTruffleWormEnabled &&
+                       _worldAutomationAutoCaptureCritterEmpressButterflyEnabled == other._worldAutomationAutoCaptureCritterEmpressButterflyEnabled &&
+                       _worldAutomationAutoCaptureCritterOtherEnabled == other._worldAutomationAutoCaptureCritterOtherEnabled &&
                        _worldAutomationAutoHarvestEnabled == other._worldAutomationAutoHarvestEnabled &&
                        _fishingAutoFishEnabled == other._fishingAutoFishEnabled &&
                        _fishingAutoLoadoutEnabled == other._fishingAutoLoadoutEnabled &&

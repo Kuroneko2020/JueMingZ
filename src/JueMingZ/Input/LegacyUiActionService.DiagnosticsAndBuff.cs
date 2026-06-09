@@ -209,6 +209,7 @@ namespace JueMingZ.Input
                    "\"miscAutoMiningMode\":\"" + EscapeJson(AutoMiningModes.Normalize(settings.WorldAutomationAutoMiningMode)) + "\"," +
                    "\"miscAutoCaptureCritterMode\":\"" + EscapeJson(AutoCaptureCritterModes.Normalize(settings.WorldAutomationAutoCaptureCritterMode, settings.MiscAutoCaptureCritterEnabled)) + "\"," +
                    "\"miscAutoCaptureCritterEnabled\":" + BoolRaw(settings.WorldAutomationAutoCaptureCritterEnabled) + "," +
+                   "\"miscAutoCaptureCritterDisabledCategoryCount\":" + IntRaw(AutoCaptureCritterCategoryCatalog.CountDisabled(settings)) + "," +
                    "\"miscAutoHarvestEnabled\":" + BoolRaw(settings.WorldAutomationAutoHarvestEnabled) + "," +
                    "\"miscAutoStackEnabled\":" + BoolRaw(settings.InventoryAutoStackEnabled) + "," +
                    "\"miscQuickBagOpenEnabled\":" + BoolRaw(settings.InventoryQuickBagOpenEnabled) + "," +

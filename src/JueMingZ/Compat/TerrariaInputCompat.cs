@@ -1841,6 +1841,43 @@ namespace JueMingZ.Compat
             return ok ? ClearInputError() : Fail("Cannot apply auto harvest sustained use input override.");
         }
 
+        public static bool TryApplyAutoMiningSustainedUseForItemCheck(object player, int targetSlot, float mouseWorldX, float mouseWorldY, int direction)
+        {
+            if (player == null)
+            {
+                return Fail("Cannot apply auto mining sustained use: player unavailable.");
+            }
+
+            int selectedSlot;
+            if (!TryGetSelectedItem(player, out selectedSlot))
+            {
+                return false;
+            }
+
+            if (selectedSlot != targetSlot)
+            {
+                return Fail("Cannot apply auto mining sustained use: selected slot changed. selectedSlot=" + selectedSlot + ", targetSlot=" + targetSlot + ".");
+            }
+
+            var ok = true;
+            ok &= TrySetMouseWorldPosition(mouseWorldX, mouseWorldY);
+            SuppressSmartInteractionState();
+
+            if (direction != 0)
+            {
+                int beforeDirection;
+                int afterDirection;
+                string method;
+                TryChangePlayerDirection(player, direction, false, out beforeDirection, out afterDirection, out method);
+            }
+
+            // Controlled input write: auto mining supplies one scoped held-pickaxe ItemCheck tick without selecting a slot.
+            ok &= SetMember(player, "controlUseItem", true);
+            ok &= SetMember(player, "releaseUseItem", true);
+            TryApplyMainMouseLeftForItemUseBridge();
+            return ok ? ClearInputError() : Fail("Cannot apply auto mining sustained use input override.");
+        }
+
         public static bool TryApplyAutoCaptureCritterSustainedUseForItemCheck(object player, int targetSlot, float mouseWorldX, float mouseWorldY, int direction)
         {
             if (player == null)
@@ -2006,6 +2043,21 @@ namespace JueMingZ.Compat
         public static bool TryCaptureMouseTargetState(out MouseTargetInputState state)
         {
             return TryCaptureMouseTargetState(null, out state);
+        }
+
+        public static bool TryReadTileTarget(out int tileX, out int tileY)
+        {
+            tileX = -1;
+            tileY = -1;
+            if (!EnsureTileTargetAccessors())
+            {
+                return Fail("Cannot read Player.tileTargetX/Y.");
+            }
+
+            return TryGetOptionalStatic(_tileTargetXField, null, out tileX) &&
+                   TryGetOptionalStatic(_tileTargetYField, null, out tileY)
+                ? ClearInputError()
+                : Fail("Cannot read Player.tileTargetX/Y.");
         }
 
         public static bool TryCaptureMouseTargetState(object player, out MouseTargetInputState state)

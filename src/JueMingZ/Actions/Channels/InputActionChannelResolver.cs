@@ -322,6 +322,16 @@ namespace JueMingZ.Actions.Channels
                        InputActionChannel.RawInput;
             }
 
+            if (string.Equals(mode, "AutoMiningSustainedUse", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(scenario, ScenarioNames.WorldAutomationAutoMining, StringComparison.OrdinalIgnoreCase))
+            {
+                return InputActionChannel.UseItem |
+                       InputActionChannel.MouseTarget |
+                       InputActionChannel.InventorySlot |
+                       InputActionChannel.HotbarSelection |
+                       InputActionChannel.RawInput;
+            }
+
             if (string.Equals(mode, "AutoCaptureCritterSustainedUse", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(scenario, ScenarioNames.WorldAutomationAutoCaptureCritter, StringComparison.OrdinalIgnoreCase))
             {

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using JueMingZ.Automation.BuffAndRecovery;
 using JueMingZ.Automation.Information;
 using JueMingZ.Automation.Movement;
+using JueMingZ.Automation.WorldAutomation;
 using JueMingZ.Config;
 using JueMingZ.UI;
 
@@ -273,6 +274,7 @@ namespace JueMingZ.UI.Legacy
                     AddHash(ref hash, _autoSellPickerOpen);
                     AddHash(ref hash, _autoDiscardPickerOpen);
                     AddHash(ref hash, _autoMiningHotkeyCaptureActive);
+                    AddHash(ref hash, _autoCaptureCritterConfigOpen);
                     AddHash(ref hash, Count(ConfigService.HotkeySettings == null ? null : ConfigService.HotkeySettings.QuickItemHotkeyBindings));
                     AddHash(ref hash, Count(GetAutoSellItemIds()));
                     AddHash(ref hash, Count(GetAutoDiscardItemIds()));
@@ -407,6 +409,22 @@ namespace JueMingZ.UI.Legacy
                     AddHash(ref hash, FishingFilterUiState.PresetScrollOffset);
                     AddHash(ref hash, FishingFilterUiState.EntryScrollOffset);
                     AddHash(ref hash, FishingFilterUiState.PresetSaveNotice);
+                }
+                else if (string.Equals(selectedPage, "misc", StringComparison.Ordinal))
+                {
+                    AddHash(ref hash, settings.WorldAutomationAutoCaptureCritterMode);
+                    AddHash(ref hash, settings.MiscAutoCaptureCritterEnabled);
+                    AddHash(ref hash, _autoCaptureCritterConfigOpen);
+                    var options = AutoCaptureCritterCategoryCatalog.Options;
+                    if (options != null)
+                    {
+                        for (var index = 0; index < options.Length; index++)
+                        {
+                            var option = options[index];
+                            AddHash(ref hash, option == null ? string.Empty : option.Id);
+                            AddHash(ref hash, option != null && AutoCaptureCritterCategoryCatalog.GetEnabled(settings, option.Id));
+                        }
+                    }
                 }
                 else if (string.Equals(selectedPage, "movement", StringComparison.Ordinal))
                 {

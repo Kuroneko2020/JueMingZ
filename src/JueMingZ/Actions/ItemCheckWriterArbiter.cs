@@ -9,6 +9,7 @@ namespace JueMingZ.Actions
         None,
         ItemUseBridge,
         UseItemPulseBridge,
+        AutoMiningSustainedUse,
         AutoCaptureCritterSustainedUse,
         AutoHarvestSustainedUse,
         CombatPerfectRevolver,
@@ -24,6 +25,7 @@ namespace JueMingZ.Actions
         public bool BridgePendingAtStart { get; set; }
         public bool BridgePendingNow { get; set; }
         public bool UseItemPulseActive { get; set; }
+        public bool AutoMiningActive { get; set; }
         public bool AutoCaptureCritterActive { get; set; }
         public bool AutoHarvestActive { get; set; }
     }
@@ -158,6 +160,18 @@ namespace JueMingZ.Actions
                 return decision;
             }
 
+            if (context.AutoMiningActive)
+            {
+                decision = BuildDecision(
+                    ItemCheckWriterKind.AutoMiningSustainedUse,
+                    AutoMiningSustainedUseBridge.ActiveRequestId,
+                    "sustainedUse",
+                    "autoMiningActive",
+                    BuildBlockedCandidates(ItemCheckWriterKind.AutoMiningSustainedUse));
+                RecordDecision(decision);
+                return decision;
+            }
+
             // UseItemPulse is also an active writer owner for this frame; later
             // combat writers may only observe the block, not double-write.
             if (context.UseItemPulseActive)
@@ -193,6 +207,7 @@ namespace JueMingZ.Actions
                 "bridgeStart=" + context.BridgePendingAtStart +
                 ";bridgeNow=" + context.BridgePendingNow +
                 ";pulse=" + context.UseItemPulseActive +
+                ";autoMining=" + context.AutoMiningActive +
                 ";autoCapture=" + context.AutoCaptureCritterActive +
                 ";autoHarvest=" + context.AutoHarvestActive +
                 ";blocked=" + (decision == null ? string.Empty : decision.BlockedCandidatesSummary);
@@ -278,13 +293,16 @@ namespace JueMingZ.Actions
             switch (owner)
             {
                 case ItemCheckWriterKind.ItemUseBridge:
-                    return "UseItemPulseBridge:blockedByItemUseBridge; AutoCaptureCritterSustainedUse:blockedByItemUseBridge; AutoHarvestSustainedUse:blockedByItemUseBridge; CombatPerfectRevolver:blockedByItemUseBridge; CombatFlailCombo:blockedByItemUseBridge; CombatItemCheckAutoClicker:blockedByItemUseBridge; CombatAim:blockedByItemUseBridge";
+                    return "UseItemPulseBridge:blockedByItemUseBridge; AutoMiningSustainedUse:blockedByItemUseBridge; AutoCaptureCritterSustainedUse:blockedByItemUseBridge; AutoHarvestSustainedUse:blockedByItemUseBridge; CombatPerfectRevolver:blockedByItemUseBridge; CombatFlailCombo:blockedByItemUseBridge; CombatItemCheckAutoClicker:blockedByItemUseBridge; CombatAim:blockedByItemUseBridge";
+
+                case ItemCheckWriterKind.AutoMiningSustainedUse:
+                    return "UseItemPulseBridge:blockedByAutoMining; AutoCaptureCritterSustainedUse:blockedByAutoMining; AutoHarvestSustainedUse:blockedByAutoMining; CombatPerfectRevolver:blockedByAutoMining; CombatFlailCombo:blockedByAutoMining; CombatItemCheckAutoClicker:blockedByAutoMining; CombatAim:blockedByAutoMining";
 
                 case ItemCheckWriterKind.AutoCaptureCritterSustainedUse:
-                    return "UseItemPulseBridge:blockedByAutoCapture; AutoHarvestSustainedUse:blockedByAutoCapture; CombatPerfectRevolver:blockedByAutoCapture; CombatFlailCombo:blockedByAutoCapture; CombatItemCheckAutoClicker:blockedByAutoCapture; CombatAim:blockedByAutoCapture";
+                    return "UseItemPulseBridge:blockedByAutoCapture; AutoMiningSustainedUse:blockedByAutoCapture; AutoHarvestSustainedUse:blockedByAutoCapture; CombatPerfectRevolver:blockedByAutoCapture; CombatFlailCombo:blockedByAutoCapture; CombatItemCheckAutoClicker:blockedByAutoCapture; CombatAim:blockedByAutoCapture";
 
                 case ItemCheckWriterKind.AutoHarvestSustainedUse:
-                    return "UseItemPulseBridge:blockedByAutoHarvest; AutoCaptureCritterSustainedUse:blockedByAutoHarvest; CombatPerfectRevolver:blockedByAutoHarvest; CombatFlailCombo:blockedByAutoHarvest; CombatItemCheckAutoClicker:blockedByAutoHarvest; CombatAim:blockedByAutoHarvest";
+                    return "UseItemPulseBridge:blockedByAutoHarvest; AutoMiningSustainedUse:blockedByAutoHarvest; AutoCaptureCritterSustainedUse:blockedByAutoHarvest; CombatPerfectRevolver:blockedByAutoHarvest; CombatFlailCombo:blockedByAutoHarvest; CombatItemCheckAutoClicker:blockedByAutoHarvest; CombatAim:blockedByAutoHarvest";
 
                 case ItemCheckWriterKind.UseItemPulseBridge:
                     return "CombatPerfectRevolver:blockedByUseItemPulse; CombatFlailCombo:blockedByUseItemPulse; CombatItemCheckAutoClicker:blockedByUseItemPulse";

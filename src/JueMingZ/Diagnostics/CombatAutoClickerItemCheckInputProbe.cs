@@ -33,6 +33,8 @@ namespace JueMingZ.Diagnostics
             bool pulseApplied,
             bool pulsePressed,
             Guid pulseRequestId,
+            bool autoMiningApplied,
+            Guid autoMiningRequestId,
             bool autoHarvestApplied,
             Guid autoHarvestRequestId,
             bool autoCaptureApplied,
@@ -45,6 +47,7 @@ namespace JueMingZ.Diagnostics
         {
             var anyScopedWriter = bridgeApplied ||
                                    pulseApplied ||
+                                   autoMiningApplied ||
                                    autoHarvestApplied ||
                                    autoCaptureApplied ||
                                    autoClickerApplied ||
@@ -67,6 +70,8 @@ namespace JueMingZ.Diagnostics
                 pulseApplied,
                 pulsePressed,
                 pulseRequestId,
+                autoMiningApplied,
+                autoMiningRequestId,
                 autoHarvestApplied,
                 autoHarvestRequestId,
                 autoCaptureApplied,
@@ -413,6 +418,8 @@ namespace JueMingZ.Diagnostics
             bool pulseApplied,
             bool pulsePressed,
             Guid pulseRequestId,
+            bool autoMiningApplied,
+            Guid autoMiningRequestId,
             bool autoHarvestApplied,
             Guid autoHarvestRequestId,
             bool autoCaptureApplied,
@@ -437,6 +444,8 @@ namespace JueMingZ.Diagnostics
             AppendRaw(builder, "pulseApplied", BoolRaw(pulseApplied), true);
             AppendRaw(builder, "pulsePressed", BoolRaw(pulsePressed), true);
             AppendString(builder, "pulseRequestId", pulseRequestId == Guid.Empty ? string.Empty : pulseRequestId.ToString(), true);
+            AppendRaw(builder, "autoMiningApplied", BoolRaw(autoMiningApplied), true);
+            AppendString(builder, "autoMiningRequestId", autoMiningRequestId == Guid.Empty ? string.Empty : autoMiningRequestId.ToString(), true);
             AppendRaw(builder, "autoHarvestApplied", BoolRaw(autoHarvestApplied), true);
             AppendString(builder, "autoHarvestRequestId", autoHarvestRequestId == Guid.Empty ? string.Empty : autoHarvestRequestId.ToString(), true);
             AppendRaw(builder, "autoCaptureApplied", BoolRaw(autoCaptureApplied), true);

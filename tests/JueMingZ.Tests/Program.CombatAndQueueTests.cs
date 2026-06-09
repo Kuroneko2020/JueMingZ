@@ -236,11 +236,77 @@ namespace JueMingZ.Tests
             ExpectAutoClickDecision(CreateAutoClickerProfile(2294, 0, false, false, false, 45), true, false, false, false, "excludedFishingRod", "fishing pole field exclusion");
             ExpectAutoClickDecision(CreateAutoClickerProfile(2289, 0, false, false, false, 0), true, false, false, false, "excludedFishingRod", "known fishing pole id fallback");
             ExpectAutoClickDecision(CreateAutoClickerProfile(2269, 15, false, false, false, 0), true, false, false, false, "excludedRevolver", "perfect revolver exclusion");
+            ExpectAutoClickDecision(CreateAutoClickerProfile(itemType: 3509, pick: 55), true, false, false, false, "excludedToolItem", "pickaxe tool exclusion");
+            ExpectAutoClickDecision(CreateAutoClickerProfile(itemType: 10, axe: 9), true, false, false, false, "excludedToolItem", "axe tool exclusion");
+            ExpectAutoClickDecision(CreateAutoClickerProfile(itemType: 7, hammer: 35), true, false, false, false, "excludedToolItem", "hammer tool exclusion");
+            ExpectAutoClickDecision(CreateAutoClickerProfile(itemType: 990, pick: 200, axe: 110), true, false, false, false, "excludedToolItem", "pickaxe-axe tool exclusion");
+            ExpectAutoClickDecision(CreateAutoClickerProfile(itemType: 2176, pick: 200), true, false, false, false, "excludedToolItem", "drill/claw pick-field tool exclusion");
 
             if (!CombatItemCheckAutoClickService.IsKnownFishingRodItemTypeForTesting(4442) ||
                 CombatItemCheckAutoClickService.IsKnownFishingRodItemTypeForTesting(1))
             {
                 throw new InvalidOperationException("Expected auto clicker fishing rod fallback id table to stay scoped.");
+            }
+        }
+
+        private static void CombatItemCheckAutoClickerReadsToolFields()
+        {
+            var restoreRuntimeTypes = PushFakeTerrariaMainType();
+            var previousAutoReuseAll = Terraria.Main.SettingsEnabled_AutoReuseAllItems;
+            try
+            {
+                Terraria.Main.SettingsEnabled_AutoReuseAllItems = false;
+                var player = new FakePlayer
+                {
+                    selectedItem = 0,
+                    active = true
+                };
+                player.inventory[0] = new FakeItem
+                {
+                    type = 2176,
+                    stack = 1,
+                    useStyle = 1,
+                    useAnimation = 20,
+                    useTime = 20,
+                    pick = 200,
+                    axe = 50,
+                    hammer = 30,
+                    Name = "Mushroom Claw"
+                };
+
+                CombatItemCheckAutoClickService.ItemCheckAutoClickProfile profile;
+                string reason;
+                if (!CombatItemCheckAutoClickService.TryReadProfileForTesting(player, out profile, out reason))
+                {
+                    throw new InvalidOperationException("Expected ItemCheck auto clicker to read tool fields: " + reason);
+                }
+
+                if (profile == null ||
+                    !profile.Available ||
+                    profile.Eligible ||
+                    profile.Pick != 200 ||
+                    profile.Axe != 50 ||
+                    profile.Hammer != 30 ||
+                    !string.Equals(profile.Reason, "excludedToolItem", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected tool profile fields to be read and excluded, got pick=" +
+                                                        (profile == null ? 0 : profile.Pick) +
+                                                        " axe=" + (profile == null ? 0 : profile.Axe) +
+                                                        " hammer=" + (profile == null ? 0 : profile.Hammer) +
+                                                        " reason=" + (profile == null ? string.Empty : profile.Reason) + ".");
+                }
+
+                var decision = CombatItemCheckAutoClickService.CreateDecision(profile, true, true, profile.VanillaAutoReuseAllWeapons);
+                if (decision.ApplyTakeover ||
+                    !string.Equals(decision.Reason, "excludedToolItem", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected read tool profile to be excluded, got " + decision.Reason + ".");
+                }
+            }
+            finally
+            {
+                Terraria.Main.SettingsEnabled_AutoReuseAllItems = previousAutoReuseAll;
+                restoreRuntimeTypes();
             }
         }
 
@@ -318,16 +384,17 @@ namespace JueMingZ.Tests
 
         private static void CombatItemCheckAutoClickerYieldsToAdjacentScopedUse()
         {
-            if (!ItemUseHookCallbacks.ShouldAttemptAutoClickerTakeoverForTesting(false, false, false, false, false))
+            if (!ItemUseHookCallbacks.ShouldAttemptAutoClickerTakeoverForTesting(false, false, false, false, false, false))
             {
                 throw new InvalidOperationException("Expected auto clicker to run when no adjacent scoped use is active.");
             }
 
-            AssertAutoClickerYield(true, false, false, false, false, "bridge pending at start");
-            AssertAutoClickerYield(false, true, false, false, false, "bridge pending now");
-            AssertAutoClickerYield(false, false, true, false, false, "UseItemPulseBridge");
-            AssertAutoClickerYield(false, false, false, true, false, "auto harvest");
-            AssertAutoClickerYield(false, false, false, false, true, "auto capture");
+            AssertAutoClickerYield(true, false, false, false, false, false, "bridge pending at start");
+            AssertAutoClickerYield(false, true, false, false, false, false, "bridge pending now");
+            AssertAutoClickerYield(false, false, true, false, false, false, "UseItemPulseBridge");
+            AssertAutoClickerYield(false, false, false, true, false, false, "auto mining");
+            AssertAutoClickerYield(false, false, false, false, true, false, "auto harvest");
+            AssertAutoClickerYield(false, false, false, false, false, true, "auto capture");
         }
 
         private static void CombatItemCheckAutoClickerTakeoverRestoresInputState()
@@ -667,16 +734,17 @@ namespace JueMingZ.Tests
 
         private static void CombatFlailComboYieldsToAdjacentScopedUse()
         {
-            if (!ItemUseHookCallbacks.ShouldAttemptFlailComboTakeoverForTesting(false, false, false, false, false))
+            if (!ItemUseHookCallbacks.ShouldAttemptFlailComboTakeoverForTesting(false, false, false, false, false, false))
             {
                 throw new InvalidOperationException("Expected flail combo to run when no adjacent scoped use is active.");
             }
 
-            AssertFlailComboYield(true, false, false, false, false, "bridge pending at start");
-            AssertFlailComboYield(false, true, false, false, false, "bridge pending now");
-            AssertFlailComboYield(false, false, true, false, false, "UseItemPulseBridge");
-            AssertFlailComboYield(false, false, false, true, false, "auto harvest");
-            AssertFlailComboYield(false, false, false, false, true, "auto capture");
+            AssertFlailComboYield(true, false, false, false, false, false, "bridge pending at start");
+            AssertFlailComboYield(false, true, false, false, false, false, "bridge pending now");
+            AssertFlailComboYield(false, false, true, false, false, false, "UseItemPulseBridge");
+            AssertFlailComboYield(false, false, false, true, false, false, "auto mining");
+            AssertFlailComboYield(false, false, false, false, true, false, "auto harvest");
+            AssertFlailComboYield(false, false, false, false, false, true, "auto capture");
         }
 
         private static void ItemCheckWriterArbiterPrioritizesBridgeOverCombatWriters()
@@ -729,8 +797,8 @@ namespace JueMingZ.Tests
                     throw new InvalidOperationException("Expected ItemUseBridge to own ItemCheck writer while bridge is pending.");
                 }
 
-                if (ItemUseHookCallbacks.ShouldAttemptAutoClickerTakeoverForTesting(true, true, false, false, false) ||
-                    ItemUseHookCallbacks.ShouldAttemptFlailComboTakeoverForTesting(true, true, false, false, false))
+                if (ItemUseHookCallbacks.ShouldAttemptAutoClickerTakeoverForTesting(true, true, false, false, false, false) ||
+                    ItemUseHookCallbacks.ShouldAttemptFlailComboTakeoverForTesting(true, true, false, false, false, false))
                 {
                     throw new InvalidOperationException("Combat writers must yield while ItemUseBridge is pending.");
                 }
@@ -752,6 +820,7 @@ namespace JueMingZ.Tests
 
             var both = ItemCheckWriterArbiter.ResolveOwner(new ItemCheckWriterArbiterContext
             {
+                AutoMiningActive = true,
                 AutoCaptureCritterActive = true,
                 AutoHarvestActive = true
             });
@@ -764,6 +833,7 @@ namespace JueMingZ.Tests
 
             var rotated = ItemCheckWriterArbiter.ResolveOwner(new ItemCheckWriterArbiterContext
             {
+                AutoMiningActive = true,
                 AutoCaptureCritterActive = true,
                 AutoHarvestActive = true
             });
@@ -784,8 +854,19 @@ namespace JueMingZ.Tests
                 throw new InvalidOperationException("Expected auto harvest to own ItemCheck writer when it is the only active sustained session.");
             }
 
-            if (ItemUseHookCallbacks.ShouldAttemptAutoClickerTakeoverForTesting(false, false, false, true, true) ||
-                ItemUseHookCallbacks.ShouldAttemptFlailComboTakeoverForTesting(false, false, false, true, true))
+            var miningOnly = ItemCheckWriterArbiter.ResolveOwner(new ItemCheckWriterArbiterContext
+            {
+                AutoMiningActive = true
+            });
+
+            if (miningOnly.Owner != ItemCheckWriterKind.AutoMiningSustainedUse ||
+                miningOnly.BlockedCandidatesSummary.IndexOf("CombatItemCheckAutoClicker:blockedByAutoMining", StringComparison.Ordinal) < 0)
+            {
+                throw new InvalidOperationException("Expected auto mining to own ItemCheck writer when it is the only active sustained session.");
+            }
+
+            if (ItemUseHookCallbacks.ShouldAttemptAutoClickerTakeoverForTesting(false, false, false, true, true, true) ||
+                ItemUseHookCallbacks.ShouldAttemptFlailComboTakeoverForTesting(false, false, false, true, true, true))
             {
                 throw new InvalidOperationException("Combat writers must yield while sustained world automation owns ItemCheck.");
             }
@@ -801,6 +882,10 @@ namespace JueMingZ.Tests
                 new ItemCheckWriterArbiterContext { AutoHarvestActive = true },
                 ItemCheckWriterKind.AutoHarvestSustainedUse,
                 "auto harvest active");
+            AssertCombatAimWritersBlockedByActiveOwner(
+                new ItemCheckWriterArbiterContext { AutoMiningActive = true },
+                ItemCheckWriterKind.AutoMiningSustainedUse,
+                "auto mining active");
             AssertCombatAimWritersBlockedByActiveOwner(
                 new ItemCheckWriterArbiterContext { UseItemPulseActive = true },
                 ItemCheckWriterKind.UseItemPulseBridge,
@@ -1127,6 +1212,7 @@ namespace JueMingZ.Tests
             bool bridgePendingAtStart,
             bool bridgePendingNow,
             bool pulseApplied,
+            bool autoMiningApplied,
             bool autoHarvestApplied,
             bool autoCaptureApplied,
             string label)
@@ -1135,6 +1221,7 @@ namespace JueMingZ.Tests
                 bridgePendingAtStart,
                 bridgePendingNow,
                 pulseApplied,
+                autoMiningApplied,
                 autoHarvestApplied,
                 autoCaptureApplied))
             {
@@ -1146,6 +1233,7 @@ namespace JueMingZ.Tests
             bool bridgePendingAtStart,
             bool bridgePendingNow,
             bool pulseApplied,
+            bool autoMiningApplied,
             bool autoHarvestApplied,
             bool autoCaptureApplied,
             string label)
@@ -1154,6 +1242,7 @@ namespace JueMingZ.Tests
                 bridgePendingAtStart,
                 bridgePendingNow,
                 pulseApplied,
+                autoMiningApplied,
                 autoHarvestApplied,
                 autoCaptureApplied))
             {
@@ -1201,7 +1290,10 @@ namespace JueMingZ.Tests
             bool autoReuse = false,
             bool channel = false,
             bool playerChannel = false,
-            int fishingPole = 0)
+            int fishingPole = 0,
+            int pick = 0,
+            int axe = 0,
+            int hammer = 0)
         {
             return new CombatItemCheckAutoClickService.ItemCheckAutoClickProfile
             {
@@ -1218,6 +1310,9 @@ namespace JueMingZ.Tests
                 Channel = channel,
                 PlayerChannel = playerChannel,
                 FishingPole = fishingPole,
+                Pick = pick,
+                Axe = axe,
+                Hammer = hammer,
                 ItemAnimation = 0,
                 ItemTime = 0,
                 ReuseDelay = 0,

@@ -11,7 +11,7 @@ namespace JueMingZ.Features.Catalog
             registry.Register(FeatureDefinitionBuilder.Create(FeatureIds.WorldAutomationAutoMining, "自动挖矿", "手持镐子对准矿物点击快捷键，或手动挖下第一个矿物后自动采集矿脉。")
                 .Domain(FeatureCodeDomain.WorldAutomation)
                 .Category(FeatureUserCategory.Misc)
-                .Actions(InputActionKind.TileInteract, InputActionKind.MouseTarget, InputActionKind.ItemUse)
+                .Actions(InputActionKind.TileInteract, InputActionKind.MouseTarget, InputActionKind.ItemUse, InputActionKind.RawInput)
                 .GameState(GameStateKind.Tiles, GameStateKind.Player, GameStateKind.Inventory)
                 .Multiplayer(FeatureMultiplayerSupport.SupportedByOriginalAction)
                 .Config(FeatureConfigUiKind.InlineHotkey)

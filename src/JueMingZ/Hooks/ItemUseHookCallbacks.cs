@@ -19,6 +19,7 @@ namespace JueMingZ.Hooks
             public bool PulseApplied;
             public bool PulsePressed;
             public bool PulseAllowCombatAim;
+            public bool AutoMiningSustainedUseApplied;
             public bool AutoHarvestSustainedUseApplied;
             public bool AutoCaptureCritterSustainedUseApplied;
             public bool AutoClickerTakeoverApplied;
@@ -29,14 +30,17 @@ namespace JueMingZ.Hooks
             public bool BridgePendingAtStart;
             public Guid RequestId;
             public Guid PulseRequestId;
+            public Guid AutoMiningSustainedUseRequestId;
             public Guid AutoHarvestSustainedUseRequestId;
             public Guid AutoCaptureCritterSustainedUseRequestId;
             public UseItemInputState RestoreState;
             public UseItemInputState PulseRestoreState;
+            public UseItemInputState AutoMiningSustainedUseRestoreState;
             public UseItemInputState AutoHarvestSustainedUseRestoreState;
             public UseItemInputState AutoCaptureCritterSustainedUseRestoreState;
             public MouseTargetInputState AimRestoreState;
             public MouseTargetInputState BridgeMouseRestoreState;
+            public MouseTargetInputState AutoMiningSustainedUseMouseRestoreState;
             public MouseTargetInputState AutoHarvestSustainedUseMouseRestoreState;
             public MouseTargetInputState AutoCaptureCritterSustainedUseMouseRestoreState;
             public int AutoCaptureCritterSustainedUseRestoreSlot;
@@ -123,6 +127,7 @@ namespace JueMingZ.Hooks
                             __state.BridgePendingAtStart,
                             ItemUseBridge.PendingRequestId != Guid.Empty,
                             __state.PulseApplied,
+                            __state.AutoMiningSustainedUseApplied,
                             __state.AutoHarvestSustainedUseApplied,
                             __state.AutoCaptureCritterSustainedUseApplied) &&
                         TryApplyFlailComboTakeover(__instance, ref __state))
@@ -153,6 +158,7 @@ namespace JueMingZ.Hooks
                             __state.BridgePendingAtStart,
                             ItemUseBridge.PendingRequestId != Guid.Empty,
                             __state.PulseApplied,
+                            __state.AutoMiningSustainedUseApplied,
                             __state.AutoHarvestSustainedUseApplied,
                             __state.AutoCaptureCritterSustainedUseApplied) &&
                         TryApplyAutoClickerTakeover(__instance, ref __state))
@@ -298,6 +304,11 @@ namespace JueMingZ.Hooks
                     RestorePulseInput(__instance, __state.PulseRestoreState);
                 }
 
+                if (__state.AutoMiningSustainedUseApplied)
+                {
+                    RestoreAutoMiningSustainedUse(__instance, __state.AutoMiningSustainedUseRestoreState, __state.AutoMiningSustainedUseMouseRestoreState);
+                }
+
                 if (__state.AutoHarvestSustainedUseApplied)
                 {
                     RestoreAutoHarvestSustainedUse(__instance, __state.AutoHarvestSustainedUseRestoreState, __state.AutoHarvestSustainedUseMouseRestoreState);
@@ -389,6 +400,7 @@ namespace JueMingZ.Hooks
             bool bridgePendingAtStart,
             bool bridgePendingNow,
             bool pulseApplied,
+            bool autoMiningApplied,
             bool autoHarvestApplied,
             bool autoCaptureApplied)
         {
@@ -396,6 +408,7 @@ namespace JueMingZ.Hooks
                 bridgePendingAtStart,
                 bridgePendingNow,
                 pulseApplied,
+                autoMiningApplied,
                 autoHarvestApplied,
                 autoCaptureApplied);
         }
@@ -404,6 +417,7 @@ namespace JueMingZ.Hooks
             bool bridgePendingAtStart,
             bool bridgePendingNow,
             bool pulseApplied,
+            bool autoMiningApplied,
             bool autoHarvestApplied,
             bool autoCaptureApplied)
         {
@@ -411,6 +425,7 @@ namespace JueMingZ.Hooks
                 bridgePendingAtStart,
                 bridgePendingNow,
                 pulseApplied,
+                autoMiningApplied,
                 autoHarvestApplied,
                 autoCaptureApplied);
         }
@@ -429,6 +444,8 @@ namespace JueMingZ.Hooks
                     state.PulseApplied,
                     state.PulsePressed,
                     state.PulseRequestId,
+                    state.AutoMiningSustainedUseApplied,
+                    state.AutoMiningSustainedUseRequestId,
                     state.AutoHarvestSustainedUseApplied,
                     state.AutoHarvestSustainedUseRequestId,
                     state.AutoCaptureCritterSustainedUseApplied,
@@ -537,6 +554,7 @@ namespace JueMingZ.Hooks
             bool bridgePendingAtStart,
             bool bridgePendingNow,
             bool pulseApplied,
+            bool autoMiningApplied,
             bool autoHarvestApplied,
             bool autoCaptureApplied)
         {
@@ -548,6 +566,7 @@ namespace JueMingZ.Hooks
                     BridgePendingAtStart = bridgePendingAtStart,
                     BridgePendingNow = bridgePendingNow,
                     UseItemPulseActive = pulseApplied,
+                    AutoMiningActive = autoMiningApplied,
                     AutoHarvestActive = autoHarvestApplied,
                     AutoCaptureCritterActive = autoCaptureApplied
                 },
@@ -558,6 +577,7 @@ namespace JueMingZ.Hooks
             bool bridgePendingAtStart,
             bool bridgePendingNow,
             bool pulseApplied,
+            bool autoMiningApplied,
             bool autoHarvestApplied,
             bool autoCaptureApplied)
         {
@@ -569,6 +589,7 @@ namespace JueMingZ.Hooks
                     BridgePendingAtStart = bridgePendingAtStart,
                     BridgePendingNow = bridgePendingNow,
                     UseItemPulseActive = pulseApplied,
+                    AutoMiningActive = autoMiningApplied,
                     AutoHarvestActive = autoHarvestApplied,
                     AutoCaptureCritterActive = autoCaptureApplied
                 },
@@ -600,6 +621,7 @@ namespace JueMingZ.Hooks
                 BridgePendingAtStart = bridgePendingAtStart,
                 BridgePendingNow = ItemUseBridge.PendingRequestId != Guid.Empty,
                 UseItemPulseActive = UseItemPulseBridge.HasActivePulse,
+                AutoMiningActive = AutoMiningSustainedUseBridge.HasActiveUse,
                 AutoCaptureCritterActive = AutoCaptureCritterSustainedUseBridge.HasActiveUse,
                 AutoHarvestActive = AutoHarvestSustainedUseBridge.HasActiveUse
             };
@@ -617,6 +639,28 @@ namespace JueMingZ.Hooks
 
             if (decision.Owner == ItemCheckWriterKind.ItemUseBridge)
             {
+                CombatItemCheckAutoClickService.RecordExternalSkip(decision.Reason);
+                return true;
+            }
+
+            if (decision.Owner == ItemCheckWriterKind.AutoMiningSustainedUse)
+            {
+                AutoMiningSustainedUseApplyResult autoMiningUse;
+                if (AutoMiningSustainedUseBridge.TryApplyItemCheckUse(player, out autoMiningUse) && autoMiningUse != null)
+                {
+                    state.FollowUseObservation = null;
+                    state.AutoMiningSustainedUseApplied = true;
+                    state.AutoMiningSustainedUseRequestId = autoMiningUse.RequestId;
+                    state.AutoMiningSustainedUseRestoreState = autoMiningUse.RestoreState;
+                    state.AutoMiningSustainedUseMouseRestoreState = autoMiningUse.MouseRestoreState;
+                    ItemCheckWriterArbiter.RecordApplied(
+                        ItemCheckWriterKind.AutoMiningSustainedUse,
+                        autoMiningUse.RequestId,
+                        "sustainedUse",
+                        decision.Reason,
+                        decision.BlockedCandidatesSummary);
+                }
+
                 CombatItemCheckAutoClickService.RecordExternalSkip(decision.Reason);
                 return true;
             }
@@ -843,6 +887,24 @@ namespace JueMingZ.Hooks
                     TimeSpan.FromSeconds(10),
                     "ItemUseHookCallbacks",
                     "ItemCheck pulse input restore failed; exception swallowed.", restoreError);
+            }
+        }
+
+        private static void RestoreAutoMiningSustainedUse(object player, UseItemInputState restoreState, MouseTargetInputState mouseRestoreState)
+        {
+            try
+            {
+                TerrariaInputCompat.TryRestoreUseItemInputState(player, restoreState);
+                TerrariaInputCompat.TryRestoreMouseTargetState(mouseRestoreState);
+            }
+            catch (Exception restoreError)
+            {
+                RuntimeDiagnostics.RecordError("ItemUseHookCallbacks.AutoMiningSustainedUseRestore", restoreError);
+                LogThrottle.ErrorThrottled(
+                    "itemcheck-auto-mining-sustained-use-restore-failed",
+                    TimeSpan.FromSeconds(10),
+                    "ItemUseHookCallbacks",
+                    "Auto mining ItemCheck input restore failed; exception swallowed.", restoreError);
             }
         }
 

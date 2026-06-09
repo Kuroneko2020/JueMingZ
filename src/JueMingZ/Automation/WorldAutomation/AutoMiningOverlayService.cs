@@ -39,41 +39,48 @@ namespace JueMingZ.Automation.WorldAutomation
 
                 object player;
                 AutoMiningCompat.TryGetLocalPlayer(out player, out message);
+                var reachProfile = new AutoMiningCompat.MiningReachProfile();
+                // Resolve vanilla reach once per overlay draw; per-tile reflection here is a frame-rate failure mode.
+                var reachAvailable = player != null &&
+                                     AutoMiningCompat.TryBuildMiningTakeoverReachProfile(player, snapshot.PickTileBoost, out reachProfile);
+                var matchGroup = AutoMiningTileMatchGroup.ForSeedTileType(snapshot.TileType);
                 var activeLookup = new Dictionary<long, AutoMiningTile>();
                 for (var index = 0; index < snapshot.Tiles.Count; index++)
                 {
                     var tile = snapshot.Tiles[index];
+                    int actualType;
                     if (tile == null ||
-                        !AutoMiningCompat.IsActiveTileOfType(tiles, tile.X, tile.Y, snapshot.TileType))
+                        !AutoMiningCompat.TryReadActiveTileMatchingGroup(tiles, tile.X, tile.Y, matchGroup, out actualType))
                     {
                         continue;
                     }
 
-                    activeLookup[((long)tile.X << 32) ^ (uint)tile.Y] = new AutoMiningTile(tile.X, tile.Y);
+                    activeLookup[((long)tile.X << 32) ^ (uint)tile.Y] = new AutoMiningTile(tile.X, tile.Y, actualType);
                 }
 
-                var pulse = 145 + (int)(Math.Abs(Math.Sin(context.GameUpdateCount / 10d)) * 90d);
                 for (var index = 0; index < snapshot.Tiles.Count; index++)
                 {
                     var tile = snapshot.Tiles[index];
+                    int actualType;
                     if (tile == null ||
-                        !AutoMiningCompat.IsActiveTileOfType(tiles, tile.X, tile.Y, snapshot.TileType))
+                        !AutoMiningCompat.TryReadActiveTileMatchingGroup(tiles, tile.X, tile.Y, matchGroup, out actualType))
                     {
                         continue;
                     }
 
-                    var reachable = player != null &&
+                    var frontier = AutoMiningTargetSelector.IsImmediateFrontierTile(
+                        activeLookup,
+                        tile.X,
+                        tile.Y);
+                    var reachable = reachAvailable &&
+                                    frontier &&
                                     AutoMiningCompat.CanMineTileWithPickaxe(
-                                        player,
+                                        reachProfile,
                                         tile.X,
                                         tile.Y,
-                                        snapshot.TileType,
-                                        snapshot.PickPower,
-                                        snapshot.PickTileBoost) &&
-                                    AutoMiningTargetSelector.IsImmediateFrontierTile(
-                                        activeLookup,
-                                        new AutoMiningTile(tile.X, tile.Y));
-                    DrawTile(spriteBatch, context, tile.X, tile.Y, reachable, pulse);
+                                        actualType,
+                                        snapshot.PickPower);
+                    DrawTile(spriteBatch, context, tile.X, tile.Y, reachable);
                 }
             }
             catch (Exception error)
@@ -87,16 +94,95 @@ namespace JueMingZ.Automation.WorldAutomation
             }
         }
 
-        private static void DrawTile(object spriteBatch, InformationWorldContext context, int tileX, int tileY, bool reachable, int pulse)
+        private static void DrawTile(object spriteBatch, InformationWorldContext context, int tileX, int tileY, bool reachable)
         {
             var x = (int)Math.Round(tileX * AutoMiningCompat.TileSize - context.ScreenX);
             var y = (int)Math.Round(tileY * AutoMiningCompat.TileSize - context.ScreenY);
-            var r = reachable ? 82 : 236;
-            var g = reachable ? 238 : 82;
-            var b = reachable ? 126 : 82;
-            UiPrimitiveRenderer.DrawFilledRect(spriteBatch, x + 1, y + 1, AutoMiningCompat.TileSize - 2, AutoMiningCompat.TileSize - 2, r, g, b, 55);
-            UiPrimitiveRenderer.DrawRectBorder(spriteBatch, x, y, AutoMiningCompat.TileSize, AutoMiningCompat.TileSize, 1, r, g, b, Math.Min(245, pulse));
-            UiPrimitiveRenderer.DrawRectBorder(spriteBatch, x + 2, y + 2, AutoMiningCompat.TileSize - 4, AutoMiningCompat.TileSize - 4, 1, 255, 255, 255, reachable ? 70 : 52);
+            var style = ResolveTileStyle(reachable);
+            var drawStyle = ResolveTileDrawStyle(style);
+
+            // Green and red share the same reach predicate above; keep this as a single translucent fill
+            // so selected clusters stay readable without per-tile grid borders or extra draw calls.
+            UiPrimitiveRenderer.DrawFilledRect(spriteBatch, x, y, AutoMiningCompat.TileSize, AutoMiningCompat.TileSize, drawStyle.R, drawStyle.G, drawStyle.B, drawStyle.FillAlpha);
+        }
+
+        private static AutoMiningOverlayTileStyle ResolveTileStyle(bool reachable)
+        {
+            // Contract: reachable/frontier tiles are green; selected-but-unreachable tiles are red.
+            // AlphaBlend still blends against the already-lit world pixels, so keep the fill transparent but
+            // high enough that cave darkness does not erase the marker. Visibility comes from hue, not borders.
+            // BorderAlpha stays zero because per-tile borders turn dense veins into a grid.
+            if (reachable)
+            {
+                return new AutoMiningOverlayTileStyle
+                {
+                    R = 150,
+                    G = 216,
+                    B = 138,
+                    FillAlpha = 64,
+                    BorderAlpha = 0
+                };
+            }
+
+            return new AutoMiningOverlayTileStyle
+            {
+                R = 240,
+                G = 160,
+                B = 142,
+                FillAlpha = 64,
+                BorderAlpha = 0
+            };
+        }
+
+        private static AutoMiningOverlayTileStyle ResolveTileDrawStyle(AutoMiningOverlayTileStyle style)
+        {
+            // Terraria's active interface SpriteBatch uses premultiplied AlphaBlend semantics:
+            // lowering alpha alone keeps pale RGB too bright, while over-premultiplying makes dark caves swallow it.
+            // Premultiply only this overlay's source RGB; do not change other UI rendering contracts here.
+            return new AutoMiningOverlayTileStyle
+            {
+                R = PremultiplyForAlphaBlend(style.R, style.FillAlpha),
+                G = PremultiplyForAlphaBlend(style.G, style.FillAlpha),
+                B = PremultiplyForAlphaBlend(style.B, style.FillAlpha),
+                FillAlpha = style.FillAlpha,
+                BorderAlpha = style.BorderAlpha
+            };
+        }
+
+        private static int PremultiplyForAlphaBlend(int component, int alpha)
+        {
+            var clampedComponent = ClampColorComponent(component);
+            var clampedAlpha = ClampColorComponent(alpha);
+            return (clampedComponent * clampedAlpha + 127) / 255;
+        }
+
+        private static int ClampColorComponent(int value)
+        {
+            if (value < 0)
+            {
+                return 0;
+            }
+
+            return value > 255 ? 255 : value;
+        }
+
+        internal static AutoMiningOverlayTileStyle ResolveTileStyleForTesting(bool reachable)
+        {
+            return ResolveTileStyle(reachable);
+        }
+
+        internal static AutoMiningOverlayTileStyle ResolveTileDrawStyleForTesting(bool reachable)
+        {
+            return ResolveTileDrawStyle(ResolveTileStyle(reachable));
+        }
+
+        internal struct AutoMiningOverlayTileStyle
+        {
+            public int R;
+            public int G;
+            public int B;
+            public int FillAlpha;
+            public int BorderAlpha;
         }
     }
 }

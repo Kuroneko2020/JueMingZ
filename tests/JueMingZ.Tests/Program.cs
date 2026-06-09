@@ -86,6 +86,8 @@ namespace Terraria
 
     internal sealed class Player
     {
+        public static int tileTargetX;
+        public static int tileTargetY;
         public int whoAmI;
         public bool active = true;
         public bool dead;
@@ -154,6 +156,24 @@ namespace Terraria
 
 namespace Terraria.DataStructures
 {
+    internal struct TileReachCheckSettings
+    {
+        public static TileReachCheckSettings Simple
+        {
+            get { return new TileReachCheckSettings(); }
+        }
+
+        public void GetTileRegion(Terraria.Player player, out int LX, out int LY, out int HX, out int HY, int TB)
+        {
+            var extraX = 5 + TB;
+            var extraY = 4 + TB;
+            LX = (int)Math.Floor(player.position.X / 16f) - extraX;
+            HX = (int)Math.Ceiling((player.position.X + player.width) / 16f) - 1 + extraX;
+            LY = (int)Math.Floor(player.position.Y / 16f) - extraY;
+            HY = (int)Math.Ceiling((player.position.Y + player.height) / 16f) - 1 + extraY;
+        }
+    }
+
     public sealed class FishingAttempt
     {
         public object playerFishingConditions;
@@ -203,6 +223,14 @@ namespace Terraria.ID
 {
     internal static class ItemID
     {
+        public const short Worm = 2002;
+        public const short Bunny = 2019;
+        public const short TruffleWorm = 2673;
+        public const short GoldWorm = 2895;
+        public const short FairyCritterBlue = 4070;
+        public const short GemBunnyRuby = 4842;
+        public const short EmpressButterfly = 4961;
+
         internal static TestItemIdSearch Search = new TestItemIdSearch();
 
         internal static class Sets
@@ -218,11 +246,18 @@ namespace Terraria.ID
 
     internal static class NPCID
     {
+        public const short Bunny = 46;
+        public const short Worm = 357;
+        public const short TruffleWorm = 374;
+        public const short GoldWorm = 448;
         public const short ZombieMerman = 586;
         public const short EyeballFlyingFish = 587;
+        public const short FairyCritterBlue = 585;
         public const short BloodNautilus = 618;
         public const short GoblinShark = 620;
         public const short BloodEelHead = 621;
+        public const short GemBunnyRuby = 650;
+        public const short EmpressButterfly = 661;
         public const short TownSlimeRed = 682;
 
         internal static TestNpcIdSearch Search = new TestNpcIdSearch();
@@ -433,6 +468,7 @@ namespace JueMingZ.Tests
             Run("channel resolver maps dash to dash and direction", ref failed, ChannelResolverDashUsesDashAndDirection);
             Run("channel resolver maps magic string raw input", ref failed, ChannelResolverMagicStringUsesPulseBridge);
             Run("channel resolver maps auto harvest sustained raw input", ref failed, ChannelResolverAutoHarvestSustainedUse);
+            Run("channel resolver maps auto mining sustained raw input", ref failed, ChannelResolverAutoMiningSustainedUse);
             Run("channel resolver maps auto capture sustained raw input", ref failed, ChannelResolverAutoCaptureCritterSustainedUse);
             Run("channel resolver maps shop to npc and inventory", ref failed, ChannelResolverShopUsesNpcAndInventory);
             Run("channel resolver maps trash slot to inventory", ref failed, ChannelResolverTrashSlotUsesInventory);
@@ -482,8 +518,18 @@ namespace JueMingZ.Tests
             Run("feature catalog exposes auto harvest", ref failed, FeatureCatalogExposesAutoHarvest);
             Run("auto mining scanner links three-tile gaps", ref failed, AutoMiningScannerLinksThreeTileGaps);
             Run("auto mining scanner keeps inactive mined seed connectivity", ref failed, AutoMiningScannerKeepsInactiveMinedSeedConnectivity);
+            Run("auto mining scanner groups gem cluster tiles", ref failed, AutoMiningScannerGroupsGemClusterTiles);
+            Run("auto mining scanner keeps normal ore single type", ref failed, AutoMiningScannerKeepsNormalOreSingleType);
+            Run("auto mining target uses actual tile type for pick power", ref failed, AutoMiningTargetUsesActualTileTypeForPickPower);
+            Run("auto mining fallback recognizes extra ore and gravity tiles", ref failed, AutoMiningFallbackRecognizesExtraOreAndGravityTiles);
+            Run("auto mining refresh tracks nearby gravity tile after vanilla fall", ref failed, AutoMiningRefreshTracksNearbyGravityTileAfterVanillaFall);
+            Run("auto mining refresh relocates gravity tile beyond old three tile radius", ref failed, AutoMiningRefreshRelocatesGravityTileBeyondOldThreeTileRadius);
+            Run("auto mining refresh keeps shifted gravity column marked", ref failed, AutoMiningRefreshKeepsShiftedGravityColumnMarked);
+            Run("auto mining refresh expires out of range gravity relocation", ref failed, AutoMiningRefreshExpiresOutOfRangeGravityRelocation);
+            Run("auto mining refresh keeps normal ore from gravity rescan", ref failed, AutoMiningRefreshKeepsNormalOreFromGravityRescan);
             Run("auto mining selected slot switch interrupts selection", ref failed, AutoMiningSelectedSlotSwitchInterruptsSelection);
-            Run("auto mining request uses item use metadata", ref failed, AutoMiningRequestUsesItemUseMetadata);
+            Run("auto mining manual observation can reselect outside active vein", ref failed, AutoMiningManualObservationCanReselectOutsideActiveVein);
+            Run("auto mining request uses sustained raw input metadata", ref failed, AutoMiningRequestUsesSustainedRawInputMetadata);
             Run("auto capture critter request uses sustained raw input metadata", ref failed, AutoCaptureCritterRequestUsesSustainedRawInputMetadata);
             Run("auto capture critter range uses bug net reach", ref failed, AutoCaptureCritterRangeUsesBugNetReach);
             Run("auto capture critter restore pole keeps fishing slot selected", ref failed, AutoCaptureCritterRestorePoleKeepsFishingSlotSelected);
@@ -492,13 +538,25 @@ namespace JueMingZ.Tests
             Run("fishing loadout restore attempted keeps session for retry", ref failed, FishingLoadoutRestoreAttemptedKeepsSessionForRetry);
             Run("auto capture critter recognizes bug net item type", ref failed, AutoCaptureCritterRecognizesBugNetItemType);
             Run("auto capture critter manual mode requires held bug net", ref failed, AutoCaptureCritterManualModeRequiresHeldBugNet);
+            Run("auto capture critter category defaults enable all options", ref failed, AutoCaptureCritterCategoryDefaultsEnableAllOptions);
+            Run("auto capture critter categories separate special bait", ref failed, AutoCaptureCritterCategoriesSeparateSpecialBait);
+            Run("auto capture critter disabled category blocks request", ref failed, AutoCaptureCritterDisabledCategoryBlocksRequest);
             Run("auto capture critter tick enqueues request when nearby", ref failed, AutoCaptureCritterTickEnqueuesRequestWhenNearby);
             Run("auto harvest maps exact herb seeds", ref failed, AutoHarvestMapsExactHerbSeeds);
             Run("auto harvest request uses sustained raw input metadata", ref failed, AutoHarvestRequestUsesSustainedRawInputMetadata);
             Run("auto harvest replant request uses exact seed metadata", ref failed, AutoHarvestReplantRequestUsesExactSeedMetadata);
             Run("auto mining targets nearest reachable frontier tile", ref failed, AutoMiningTargetsNearestReachableFrontierTile);
+            Run("auto mining skips reach checks for interior tiles", ref failed, AutoMiningSkipsReachChecksForInteriorTiles);
+            Run("auto mining refuses reachable interior fallback", ref failed, AutoMiningRefusesReachableInteriorFallback);
+            Run("auto mining sustained use validates exact mineable target", ref failed, AutoMiningSustainedUseValidatesExactMineableTarget);
             Run("auto mining reach excludes rectangle corners outside helper radius", ref failed, AutoMiningReachExcludesRectangleCornersOutsideHelperRadius);
+            Run("auto mining reach uses vanilla tile region when available", ref failed, AutoMiningReachUsesVanillaTileRegionWhenAvailable);
+            Run("auto mining takeover rejects vanilla edge outside strict radius", ref failed, AutoMiningTakeoverRejectsVanillaEdgeOutsideStrictRadius);
+            Run("auto mining takeover preserves negative tile boost", ref failed, AutoMiningTakeoverPreservesNegativeTileBoost);
+            Run("auto mining reach keeps fallback detectable when vanilla region unavailable", ref failed, AutoMiningReachKeepsFallbackDetectableWhenVanillaRegionUnavailable);
             Run("auto mining green reach respects pick power", ref failed, AutoMiningGreenReachRespectsPickPower);
+            Run("auto mining itemcheck override syncs exact tile target", ref failed, AutoMiningItemCheckOverrideSyncsExactTileTarget);
+            Run("auto mining overlay uses low alpha green red style", ref failed, AutoMiningOverlayUsesLowAlphaGreenRedStyle);
             Run("worldgen debug viewer and developer menu are always available", ref failed, WorldGenDebugViewerAndDeveloperMenuAlwaysAvailable);
             Run("diagnostic snapshot writes worldgen debug state", ref failed, DiagnosticSnapshotWritesWorldGenDebugState);
             Run("diagnostic snapshot writes action queue admission state", ref failed, DiagnosticSnapshotWritesActionQueueAdmissionState);
@@ -546,6 +604,7 @@ namespace JueMingZ.Tests
             Run("combat ItemCheck auto clicker four quadrants", ref failed, CombatItemCheckAutoClickerFourQuadrants);
             Run("combat ItemCheck auto clicker respects vanilla auto reuse", ref failed, CombatItemCheckAutoClickerRespectsVanillaAutoReuse);
             Run("combat ItemCheck auto clicker samples and hard excludes", ref failed, CombatItemCheckAutoClickerSamplesAndHardExcludes);
+            Run("combat ItemCheck auto clicker reads tool fields", ref failed, CombatItemCheckAutoClickerReadsToolFields);
             Run("combat ItemCheck auto clicker fails closed when vanilla switch unavailable", ref failed, CombatItemCheckAutoClickerFailsClosedWhenVanillaSwitchUnavailable);
             Run("combat ItemCheck auto clicker reads mouse item slot", ref failed, CombatItemCheckAutoClickerReadsMouseItemSlot);
             Run("combat ItemCheck auto clicker yields to adjacent scoped use", ref failed, CombatItemCheckAutoClickerYieldsToAdjacentScopedUse);

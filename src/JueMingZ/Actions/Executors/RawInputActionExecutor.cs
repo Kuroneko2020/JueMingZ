@@ -11,6 +11,7 @@ namespace JueMingZ.Actions.Executors
     {
         private const string ModeMagicStringClicker = "MagicStringClicker";
         private const string ModeAutoFacing = "AutoFacing";
+        private const string ModeAutoMiningSustainedUse = "AutoMiningSustainedUse";
         private const string ModeAutoHarvestSustainedUse = "AutoHarvestSustainedUse";
         private const string ModeAutoCaptureCritterSustainedUse = "AutoCaptureCritterSustainedUse";
         private const string AutoCapturePendingBugNetSelectionState = "AutoCapturePendingBugNetSelection";
@@ -37,6 +38,11 @@ namespace JueMingZ.Actions.Executors
             if (string.Equals(mode, ModeAutoHarvestSustainedUse, StringComparison.OrdinalIgnoreCase))
             {
                 return StartAutoHarvestSustainedUse(execution, snapshot);
+            }
+
+            if (string.Equals(mode, ModeAutoMiningSustainedUse, StringComparison.OrdinalIgnoreCase))
+            {
+                return StartAutoMiningSustainedUse(execution, snapshot);
             }
 
             if (string.Equals(mode, ModeAutoCaptureCritterSustainedUse, StringComparison.OrdinalIgnoreCase))
@@ -181,6 +187,30 @@ namespace JueMingZ.Actions.Executors
             return InputActionExecutionStepResult.Running("Auto harvest sustained use started.");
         }
 
+        private static InputActionExecutionStepResult StartAutoMiningSustainedUse(InputActionExecution execution, GameStateSnapshot snapshot)
+        {
+            if (IsBlockedForCombatInput(snapshot))
+            {
+                return CompleteWithCode(execution, InputActionStatus.BlockedByUi, DiagnosticResultCode.BlockedByUi, "Auto mining sustained use did not start: world input is blocked.");
+            }
+
+            string message;
+            // Mining bridge ownership starts here; ItemCheck remains the only place
+            // that applies and restores the held-pickaxe input override.
+            if (!AutoMiningSustainedUseBridge.TryBegin(
+                execution.Request.RequestId,
+                execution.Request.SourceFeatureId,
+                GetMetadataString(execution, "Scenario", "WorldAutomation.AutoMining"),
+                execution.Request.Timeout,
+                out message))
+            {
+                return CompleteWithCode(execution, InputActionStatus.NotApplicable, DiagnosticResultCode.NotApplicable, message);
+            }
+
+            SetResultCode(execution, DiagnosticResultCode.Queued);
+            return InputActionExecutionStepResult.Running("Auto mining sustained use started.");
+        }
+
         private static InputActionExecutionStepResult StartAutoCaptureCritterSustainedUse(InputActionExecution execution, GameStateSnapshot snapshot)
         {
             if (IsBlockedForCombatInput(snapshot))
@@ -312,6 +342,11 @@ namespace JueMingZ.Actions.Executors
                 return UpdateAutoHarvestSustainedUse(execution, snapshot);
             }
 
+            if (string.Equals(mode, ModeAutoMiningSustainedUse, StringComparison.OrdinalIgnoreCase))
+            {
+                return UpdateAutoMiningSustainedUse(execution, snapshot);
+            }
+
             if (string.Equals(mode, ModeAutoCaptureCritterSustainedUse, StringComparison.OrdinalIgnoreCase))
             {
                 return UpdateAutoCaptureCritterSustainedUse(execution, snapshot);
@@ -360,6 +395,31 @@ namespace JueMingZ.Actions.Executors
             }
 
             RecordAutoHarvestSustainedCompletionEvent(execution, use);
+            SetResultCode(execution, use.ResultCode);
+            MarkActionEventRecorded(execution);
+            return InputActionExecutionStepResult.Complete(use.Status, use.Message);
+        }
+
+        private static InputActionExecutionStepResult UpdateAutoMiningSustainedUse(InputActionExecution execution, GameStateSnapshot snapshot)
+        {
+            var blocked = IsBlockedForCombatInput(snapshot);
+            var use = AutoMiningSustainedUseBridge.Update(
+                execution.Request.RequestId,
+                blocked,
+                blocked ? "Auto mining sustained use stopped: world input is blocked." : string.Empty);
+
+            if (use != null && use.Status == InputActionStatus.Running)
+            {
+                return InputActionExecutionStepResult.Running(use.Message);
+            }
+
+            if (use == null)
+            {
+                SetResultCode(execution, DiagnosticResultCode.Failed);
+                return InputActionExecutionStepResult.Complete(InputActionStatus.Failed, "Auto mining sustained use state was lost.");
+            }
+
+            RecordAutoMiningSustainedCompletionEvent(execution, use);
             SetResultCode(execution, use.ResultCode);
             MarkActionEventRecorded(execution);
             return InputActionExecutionStepResult.Complete(use.Status, use.Message);
@@ -467,6 +527,11 @@ namespace JueMingZ.Actions.Executors
                 {
                     defaultReason = "Auto harvest sustained use cancelled.";
                     AutoHarvestSustainedUseBridge.Cancel(execution.Request.RequestId, reason ?? defaultReason);
+                }
+                else if (string.Equals(mode, ModeAutoMiningSustainedUse, StringComparison.OrdinalIgnoreCase))
+                {
+                    defaultReason = "Auto mining sustained use cancelled.";
+                    AutoMiningSustainedUseBridge.Cancel(execution.Request.RequestId, reason ?? defaultReason);
                 }
                 else if (string.Equals(mode, ModeAutoCaptureCritterSustainedUse, StringComparison.OrdinalIgnoreCase))
                 {
@@ -621,6 +686,51 @@ namespace JueMingZ.Actions.Executors
             DiagnosticActionRecorder.RecordCustomEvent(
                 execution.Request.RequestId,
                 GetMetadata(execution, "Scenario", "WorldAutomation.AutoHarvest"),
+                InputActionKind.RawInput.ToString(),
+                GetMetadata(execution, "SourceHotkey", string.Empty),
+                use.Status.ToString(),
+                use.ResultCode.ToString(),
+                use.Message,
+                use.DurationMs,
+                beforeJson,
+                afterJson,
+                verificationJson,
+                GetMetadata(execution, "SourceKind", string.Empty),
+                GetMetadata(execution, "SourceUi", string.Empty),
+                GetMetadata(execution, "ButtonId", string.Empty),
+                GetMetadata(execution, "ButtonLabel", string.Empty));
+        }
+
+        private static void RecordAutoMiningSustainedCompletionEvent(InputActionExecution execution, AutoMiningSustainedUseBridgeSnapshot use)
+        {
+            if (execution == null || execution.Request == null || use == null)
+            {
+                return;
+            }
+
+            var beforeJson = "{" +
+                             "\"selectedSlot\":" + SlotRaw(use.PickSlot) + "," +
+                             "\"selectedSlotDisplay\":" + SlotDisplayRaw(use.PickSlot) + "," +
+                             "\"itemType\":" + IntRaw(use.PickItemType) + "," +
+                             "\"itemName\":\"" + EscapeJson(use.PickItemName) + "\"," +
+                             "\"targetTile\":" + BuildTileJson(use.TileX, use.TileY) + "," +
+                             "\"tileType\":" + IntRaw(use.TileType) +
+                             "}";
+            var afterJson = "{" +
+                            "\"itemCheckApplyCount\":" + IntRaw(use.ApplyCount) + "," +
+                            "\"targetRefreshCount\":" + IntRaw(use.TargetRefreshCount) + "," +
+                            "\"lastAppliedTick\":" + (use.LastAppliedTick == long.MinValue ? "null" : use.LastAppliedTick.ToString(CultureInfo.InvariantCulture)) +
+                            "}";
+            var verificationJson = "{" +
+                                   "\"rawInputMode\":\"AutoMiningSustainedUse\"," +
+                                   "\"autoMiningSustainedUseApplied\":" + BoolRaw(use.ApplyCount > 0) + "," +
+                                   "\"sourceMode\":\"" + EscapeJson(use.SourceMode) + "\"," +
+                                   "\"targetWorld\":" + BuildPointJson(use.WorldX, use.WorldY) +
+                                   "}";
+
+            DiagnosticActionRecorder.RecordCustomEvent(
+                execution.Request.RequestId,
+                GetMetadata(execution, "Scenario", "WorldAutomation.AutoMining"),
                 InputActionKind.RawInput.ToString(),
                 GetMetadata(execution, "SourceHotkey", string.Empty),
                 use.Status.ToString(),

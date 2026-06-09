@@ -81,6 +81,11 @@ namespace JueMingZ.Compat
             return item == null ? 0 : item.tileBoost;
         }
 
+        public static int BaitPower(Item item)
+        {
+            return item == null ? 0 : item.bait;
+        }
+
         public static int HealLife(Item item)
         {
             return item == null ? 0 : item.healLife;

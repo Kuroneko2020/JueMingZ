@@ -50,40 +50,43 @@ namespace JueMingZ.Automation.WorldAutomation
             }
 
             AutoMiningTile bestFrontier = null;
-            AutoMiningTile bestFallback = null;
             var bestFrontierDistance = float.MaxValue;
-            var bestFallbackDistance = float.MaxValue;
 
             foreach (var tile in activeTiles.Values)
             {
-                if (isReachable != null && !isReachable(tile))
+                // Frontier is a cheap topology gate; keep it before reach checks so dense veins do not call expensive per-tile compat paths.
+                if (!IsImmediateFrontierTile(activeTiles, tile))
                 {
                     continue;
                 }
 
                 var distanceSquared = ComputeDistanceSquared(tile, playerCenterX, playerCenterY);
-                if (IsImmediateFrontierTile(activeTiles, tile))
+                if (isReachable != null && !isReachable(tile))
                 {
-                    if (ShouldReplace(tile, distanceSquared, bestFrontier, bestFrontierDistance))
-                    {
-                        bestFrontier = tile;
-                        bestFrontierDistance = distanceSquared;
-                    }
+                    continue;
                 }
-                else if (ShouldReplace(tile, distanceSquared, bestFallback, bestFallbackDistance))
+
+                if (ShouldReplace(tile, distanceSquared, bestFrontier, bestFrontierDistance))
                 {
-                    bestFallback = tile;
-                    bestFallbackDistance = distanceSquared;
+                    bestFrontier = tile;
+                    bestFrontierDistance = distanceSquared;
                 }
             }
 
-            target = bestFrontier ?? bestFallback;
+            // Only frontier tiles are allowed to reach ItemCheck; enclosed fallback targets can look selected
+            // but fail to damage the visible ore, which reads as an empty swing.
+            target = bestFrontier;
             return target != null;
         }
 
         public static bool IsImmediateFrontierTile(IReadOnlyDictionary<long, AutoMiningTile> activeTiles, AutoMiningTile tile)
         {
-            if (activeTiles == null || tile == null)
+            return tile != null && IsImmediateFrontierTile(activeTiles, tile.X, tile.Y);
+        }
+
+        public static bool IsImmediateFrontierTile(IReadOnlyDictionary<long, AutoMiningTile> activeTiles, int tileX, int tileY)
+        {
+            if (activeTiles == null)
             {
                 return false;
             }
@@ -97,7 +100,7 @@ namespace JueMingZ.Automation.WorldAutomation
                         continue;
                     }
 
-                    if (!activeTiles.ContainsKey(EncodeTileKey(tile.X + offsetX, tile.Y + offsetY)))
+                    if (!activeTiles.ContainsKey(EncodeTileKey(tileX + offsetX, tileY + offsetY)))
                     {
                         return true;
                     }

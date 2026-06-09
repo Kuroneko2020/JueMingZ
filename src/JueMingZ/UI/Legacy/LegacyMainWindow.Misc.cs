@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using JueMingZ.Automation.WorldAutomation;
 using JueMingZ.Compat;
 using JueMingZ.Config;
+using JueMingZ.UI.Legacy.Controls;
 using JueMingZ.UI.Legacy.Framework;
 
 namespace JueMingZ.UI.Legacy
@@ -14,6 +15,7 @@ namespace JueMingZ.UI.Legacy
             var hovered = (LegacyUiElement)null;
             var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
             var y = 0;
+            _autoCaptureCritterConfigAnchorVisible = false;
 
             hovered = DrawQuickItemHotkeysRow(spriteBatch, area, mouse, elements, y, settings) ?? hovered;
             int quickItemPanelHeight;
@@ -35,18 +37,8 @@ namespace JueMingZ.UI.Legacy
             y += MiscExpandableRowHeight(quickReforgePanelHeight);
             hovered = DrawAutoMiningRow(spriteBatch, area, mouse, elements, y, settings) ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
-            hovered = DrawRightModeRow(
-                spriteBatch,
-                area,
-                mouse,
-                elements,
-                y,
-                "自动捕捉",
-                AutoCaptureCritterModes.Normalize(settings.WorldAutomationAutoCaptureCritterMode),
-                new[] { "自动", "手持", "关闭" },
-                new[] { AutoCaptureCritterModes.Auto, AutoCaptureCritterModes.Manual, AutoCaptureCritterModes.Off },
-                "misc-auto-capture-critter-mode:",
-                new[] { "身上带着虫网就行", "必须手持虫网", null }) ?? hovered;
+            hovered = DrawAutoCaptureCritterRow(spriteBatch, area, mouse, elements, y, settings) ?? hovered;
+            hovered = DrawAutoCaptureCritterConfigPopup(spriteBatch, area, mouse, elements) ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "自动收获", settings.WorldAutomationAutoHarvestEnabled, "misc-auto-harvest-mode:", "携带再生法杖自动收获/种植") ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
@@ -66,6 +58,235 @@ namespace JueMingZ.UI.Legacy
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawDeveloperEasterEggRow(spriteBatch, area, mouse, elements, y) ?? hovered;
             return hovered;
+        }
+
+        private static LegacyUiElement DrawAutoCaptureCritterRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, AppSettings settings)
+        {
+            settings = settings ?? AppSettings.CreateDefault();
+            var row = new LegacyUiRect(area.Viewport.X, area.ToScreenY(contentY), area.Viewport.Width, LegacyUiMetrics.RowHeight);
+            if (!area.IsVisible(row))
+            {
+                return null;
+            }
+
+            var selectedMode = AutoCaptureCritterModes.Normalize(settings.WorldAutomationAutoCaptureCritterMode, settings.MiscAutoCaptureCritterEnabled);
+            var labels = new[] { "配置", "自动", "手持", "关闭" };
+            var values = new[] { "Config", AutoCaptureCritterModes.Auto, AutoCaptureCritterModes.Manual, AutoCaptureCritterModes.Off };
+            var totalWidth = 0;
+            for (var index = 0; index < labels.Length; index++)
+            {
+                totalWidth += ModeButtonWidth(labels[index]);
+                if (index > 0)
+                {
+                    totalWidth += 6;
+                }
+            }
+
+            var x = row.Right - totalWidth - 10;
+            var context = LegacyUiContext.ForScrollArea(spriteBatch, mouse, area, elements, settings);
+            LegacySettingRowControl.DrawBackgroundAndLabel(context, row, "自动捕捉", x);
+
+            var hovered = (LegacyUiElement)null;
+            var buttonY = RowModeButtonY(row);
+            for (var index = 0; index < labels.Length; index++)
+            {
+                var width = ModeButtonWidth(labels[index]);
+                var rect = new LegacyUiRect(x, buttonY, width, RowModeButtonHeight);
+                var configButton = index == 0;
+                var selected = configButton
+                    ? _autoCaptureCritterConfigOpen
+                    : string.Equals(selectedMode, values[index], StringComparison.Ordinal);
+                var element = new LegacyButtonControl
+                {
+                    Id = configButton
+                        ? "misc-auto-capture-critter-config:toggle"
+                        : "misc-auto-capture-critter-mode:" + values[index],
+                    Label = labels[index],
+                    Text = labels[index],
+                    ElementLabel = "自动捕捉:" + labels[index],
+                    Kind = "button",
+                    Bounds = rect,
+                    Selected = selected,
+                    TextScale = 0.78f,
+                    TooltipLines = BuildAutoCaptureCritterRowTooltip(index, settings)
+                }.Draw(context);
+
+                if (configButton && _autoCaptureCritterConfigOpen)
+                {
+                    _autoCaptureCritterConfigAnchor = rect;
+                    _autoCaptureCritterConfigAnchorVisible = true;
+                }
+
+                if (element != null && context.IsElementHovered(element.Id, rect))
+                {
+                    hovered = element;
+                }
+
+                x += width + 6;
+            }
+
+            return hovered;
+        }
+
+        private static string[] BuildAutoCaptureCritterRowTooltip(int index, AppSettings settings)
+        {
+            if (index == 0)
+            {
+                var disabled = AutoCaptureCritterCategoryCatalog.CountDisabled(settings);
+                return disabled > 0
+                    ? new[] { disabled.ToString(System.Globalization.CultureInfo.InvariantCulture) + " 个捕捉分类已关闭" }
+                    : null;
+            }
+
+            if (index == 1)
+            {
+                return new[] { "身上带着虫网就行" };
+            }
+
+            if (index == 2)
+            {
+                return new[] { "必须手持虫网" };
+            }
+
+            return null;
+        }
+
+        private static LegacyUiElement DrawAutoCaptureCritterConfigPopup(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements)
+        {
+            if (!_autoCaptureCritterConfigOpen || !_autoCaptureCritterConfigAnchorVisible)
+            {
+                return null;
+            }
+
+            var options = AutoCaptureCritterCategoryCatalog.Options;
+            int columns;
+            int optionWidth;
+            int columnGap;
+            int rowGap;
+            var popup = CalculateAutoCaptureCritterPopupRect(
+                area.Viewport,
+                _autoCaptureCritterConfigAnchor,
+                options == null ? 0 : options.Length,
+                out columns,
+                out optionWidth,
+                out columnGap,
+                out rowGap);
+            var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
+            var context = LegacyUiContext.ForScrollArea(spriteBatch, mouse, area, elements, settings);
+            new LegacyPopupPanelControl
+            {
+                Id = "misc-auto-capture-critter-config-popup",
+                Label = "自动捕捉配置",
+                Kind = "blocker",
+                Bounds = popup
+            }.Draw(context);
+
+            UiTextRenderer.DrawText(spriteBatch, "自动捕捉配置", popup.X + 16, popup.Y + 11, 238, 238, 226, 255, 0.82f);
+            var hovered = (LegacyUiElement)null;
+            var close = new LegacyUiRect(popup.Right - 54, popup.Y + 8, 40, 20);
+            hovered = DrawAutoCaptureCritterSmallButton(spriteBatch, mouse, elements, close, "misc-auto-capture-critter-config:toggle", "关闭", "关闭配置") ?? hovered;
+
+            var startX = popup.X + AutoCaptureCritterPopupHorizontalPadding;
+            var startY = popup.Y + AutoCaptureCritterPopupContentStartY;
+            for (var index = 0; options != null && index < options.Length; index++)
+            {
+                var option = options[index];
+                if (option == null)
+                {
+                    continue;
+                }
+
+                var column = index % columns;
+                var row = index / columns;
+                var rect = new LegacyUiRect(
+                    startX + column * (optionWidth + columnGap),
+                    startY + row * (AutoCaptureCritterOptionHeight + rowGap),
+                    optionWidth,
+                    AutoCaptureCritterOptionHeight);
+                hovered = DrawAutoCaptureCritterOption(spriteBatch, mouse, elements, rect, option, AutoCaptureCritterCategoryCatalog.GetEnabled(settings, option.Id)) ?? hovered;
+            }
+
+            return hovered;
+        }
+
+        private static LegacyUiElement DrawAutoCaptureCritterSmallButton(object spriteBatch, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, LegacyUiRect rect, string id, string label, string tooltip)
+        {
+            var context = new LegacyUiContext(spriteBatch, mouse, LegacyMainUiState.WindowRect, LegacyMainUiState.SelectedPageId, ConfigService.AppSettings ?? AppSettings.CreateDefault(), elements);
+            var element = new LegacySmallButtonControl
+            {
+                Id = id,
+                Label = label,
+                Kind = "button",
+                Bounds = rect,
+                TooltipLines = string.IsNullOrWhiteSpace(tooltip) ? null : new[] { tooltip }
+            }.Draw(context);
+            return element != null && context.IsElementHovered(element.Id, rect) ? element : null;
+        }
+
+        private static LegacyUiElement DrawAutoCaptureCritterOption(object spriteBatch, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, LegacyUiRect rect, AutoCaptureCritterCategoryDefinition option, bool enabled)
+        {
+            var context = new LegacyUiContext(spriteBatch, mouse, LegacyMainUiState.WindowRect, LegacyMainUiState.SelectedPageId, ConfigService.AppSettings ?? AppSettings.CreateDefault(), elements);
+            var element = new LegacyCheckboxButtonControl
+            {
+                Id = "misc-auto-capture-critter-option:" + option.Id,
+                Label = option.Label,
+                Kind = "button",
+                Bounds = rect,
+                Selected = enabled,
+                TextScale = 0.70f
+            }.Draw(context);
+            if (element != null)
+            {
+                element.Label = "自动捕捉:" + option.Label;
+            }
+
+            return element != null && context.IsElementHovered(element.Id, rect) ? element : null;
+        }
+
+        private static LegacyUiRect CalculateAutoCaptureCritterPopupRect(
+            LegacyUiRect viewport,
+            LegacyUiRect anchor,
+            int optionCount,
+            out int columns,
+            out int optionWidth,
+            out int columnGap,
+            out int rowGap)
+        {
+            optionCount = Math.Max(1, optionCount);
+            columnGap = AutoCaptureCritterPopupColumnGap;
+            rowGap = AutoCaptureCritterPopupRowGap;
+            columns = optionCount <= 8 ? 2 : 3;
+            if (viewport.Width < 420)
+            {
+                columns = Math.Min(columns, 2);
+            }
+
+            columns = Math.Max(1, Math.Min(columns, optionCount));
+            var desiredWidth = AutoCaptureCritterPopupHorizontalPadding * 2 +
+                               columns * AutoCaptureCritterOptionMinWidth +
+                               (columns - 1) * columnGap;
+            var maxWidth = Math.Min(AutoCaptureCritterPopupMaxWidth, Math.Max(AutoCaptureCritterPopupMinWidth, viewport.Width - 12));
+            var width = ClampInt(desiredWidth, AutoCaptureCritterPopupMinWidth, maxWidth);
+            optionWidth = Math.Max(
+                AutoCaptureCritterOptionMinWidth,
+                (width - AutoCaptureCritterPopupHorizontalPadding * 2 - (columns - 1) * columnGap) / columns);
+
+            var rows = (optionCount + columns - 1) / columns;
+            var desiredHeight = AutoCaptureCritterPopupContentStartY +
+                                rows * AutoCaptureCritterOptionHeight +
+                                Math.Max(0, rows - 1) * rowGap +
+                                AutoCaptureCritterPopupBottomPadding;
+            var maxHeight = Math.Min(AutoCaptureCritterPopupMaxHeight, Math.Max(AutoCaptureCritterPopupMinHeight, viewport.Height - 12));
+            var height = ClampInt(desiredHeight, AutoCaptureCritterPopupMinHeight, maxHeight);
+            var x = ClampInt(anchor.X - width + anchor.Width, viewport.X + 6, Math.Max(viewport.X + 6, viewport.Right - width - 6));
+            var y = anchor.Bottom + 8;
+            if (y + height > viewport.Bottom - 6)
+            {
+                y = anchor.Y - height - 8;
+            }
+
+            y = ClampInt(y, viewport.Y + 6, Math.Max(viewport.Y + 6, viewport.Bottom - height - 6));
+            return new LegacyUiRect(x, y, width, height);
         }
 
         private static int MiscExpandableRowHeight(int panelHeight)

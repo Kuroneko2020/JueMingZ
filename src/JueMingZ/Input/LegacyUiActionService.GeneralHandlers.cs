@@ -506,6 +506,58 @@ namespace JueMingZ.Input
                 "Button");
         }
 
+        private static void ToggleMiscAutoCaptureCritterConfig(LegacyUiCommand command, string payload)
+        {
+            var before = BuildUiOptionStateJson();
+            LegacyMainWindow.ToggleAutoCaptureCritterConfigPopup();
+            Record(
+                command,
+                "Ui.Toggle.MiscAutoCaptureCritterConfig",
+                "UI",
+                "Succeeded",
+                "自动捕捉配置已切换。",
+                before,
+                BuildUiOptionStateJson(),
+                "{\"submitted\":false,\"implemented\":true,\"uiOnly\":true,\"payload\":\"" + EscapeJson(payload) + "\",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                "Button");
+        }
+
+        private static void ToggleMiscAutoCaptureCritterOption(LegacyUiCommand command, string optionId)
+        {
+            var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
+            var before = BuildUiOptionStateJson();
+            var option = AutoCaptureCritterCategoryCatalog.Find(optionId);
+            if (option == null)
+            {
+                Record(
+                    command,
+                    "Ui.Toggle.MiscAutoCaptureCritterOption",
+                    "UI",
+                    "NotApplicable",
+                    "Unknown auto capture critter category: " + optionId + ".",
+                    before,
+                    BuildUiOptionStateJson(),
+                    "{\"submitted\":false,\"implemented\":false,\"uiOnly\":true,\"optionId\":\"" + EscapeJson(optionId) + "\",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                    "Button");
+                return;
+            }
+
+            var enabled = !AutoCaptureCritterCategoryCatalog.GetEnabled(settings, option.Id);
+            AutoCaptureCritterCategoryCatalog.SetEnabled(settings, option.Id, enabled);
+            settings.MiscAutoCaptureCritterCategoryDefaultsMigrated = true;
+            ConfigService.SaveAll();
+            Record(
+                command,
+                "Ui.Toggle.MiscAutoCaptureCritterOption",
+                "WorldAutomation",
+                "Succeeded",
+                "自动捕捉分类：" + option.Label + (enabled ? "已开启。" : "已关闭。"),
+                before,
+                BuildUiOptionStateJson(),
+                "{\"submitted\":false,\"implemented\":true,\"featureId\":\"" + EscapeJson(FeatureIds.WorldAutomationAutoCaptureCritter) + "\",\"optionId\":\"" + EscapeJson(option.Id) + "\",\"label\":\"" + EscapeJson(option.Label) + "\",\"enabled\":" + BoolRaw(enabled) + ",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                "Button");
+        }
+
         private static void HandleMiscAutoHarvestMode(LegacyUiCommand command, string payload)
         {
             var before = BuildUiOptionStateJson();

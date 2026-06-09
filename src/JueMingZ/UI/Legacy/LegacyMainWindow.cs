@@ -47,6 +47,17 @@ namespace JueMingZ.UI.Legacy
         private const int MovementSafeLandingPopupRowGap = 6;
         private const int MovementSafeLandingOptionMinWidth = 96;
         private const int MovementSafeLandingOptionHeight = 32;
+        private const int AutoCaptureCritterPopupMaxWidth = 460;
+        private const int AutoCaptureCritterPopupMinWidth = 332;
+        private const int AutoCaptureCritterPopupMaxHeight = 260;
+        private const int AutoCaptureCritterPopupMinHeight = 168;
+        private const int AutoCaptureCritterPopupHorizontalPadding = 14;
+        private const int AutoCaptureCritterPopupContentStartY = 46;
+        private const int AutoCaptureCritterPopupBottomPadding = 12;
+        private const int AutoCaptureCritterPopupColumnGap = 10;
+        private const int AutoCaptureCritterPopupRowGap = 6;
+        private const int AutoCaptureCritterOptionMinWidth = 112;
+        private const int AutoCaptureCritterOptionHeight = 32;
         private const int AutoRecoveryItemPopupMaxWidth = 520;
         private const int AutoRecoveryItemPopupMinWidth = 360;
         private const int AutoRecoveryItemPopupMaxHeight = 360;
@@ -120,6 +131,9 @@ namespace JueMingZ.UI.Legacy
         private static bool _movementSafeLandingConfigOpen;
         private static LegacyUiRect _movementSafeLandingConfigAnchor;
         private static bool _movementSafeLandingConfigAnchorVisible;
+        private static bool _autoCaptureCritterConfigOpen;
+        private static LegacyUiRect _autoCaptureCritterConfigAnchor;
+        private static bool _autoCaptureCritterConfigAnchorVisible;
         private static string _autoRecoveryItemConfigKind = string.Empty;
         private static LegacyUiRect _autoRecoveryItemConfigAnchor;
         private static bool _autoRecoveryItemConfigAnchorVisible;

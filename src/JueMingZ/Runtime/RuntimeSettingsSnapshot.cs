@@ -100,6 +100,14 @@ namespace JueMingZ.Runtime
                 WorldAutomationAutoMiningEnabled = AutoMiningModes.IsEnabled(autoMiningMode),
                 WorldAutomationAutoCaptureCritterMode = autoCaptureMode,
                 WorldAutomationAutoCaptureCritterEnabled = AutoCaptureCritterModes.IsEnabled(autoCaptureMode),
+                WorldAutomationAutoCaptureCritterBaitEnabled = settings.MiscAutoCaptureCritterBaitEnabled,
+                WorldAutomationAutoCaptureCritterFairyEnabled = settings.MiscAutoCaptureCritterFairyEnabled,
+                WorldAutomationAutoCaptureCritterGoldCritterEnabled = settings.MiscAutoCaptureCritterGoldCritterEnabled,
+                WorldAutomationAutoCaptureCritterGemCritterEnabled = settings.MiscAutoCaptureCritterGemCritterEnabled,
+                WorldAutomationAutoCaptureCritterNormalCritterEnabled = settings.MiscAutoCaptureCritterNormalCritterEnabled,
+                WorldAutomationAutoCaptureCritterTruffleWormEnabled = settings.MiscAutoCaptureCritterTruffleWormEnabled,
+                WorldAutomationAutoCaptureCritterEmpressButterflyEnabled = settings.MiscAutoCaptureCritterEmpressButterflyEnabled,
+                WorldAutomationAutoCaptureCritterOtherEnabled = settings.MiscAutoCaptureCritterOtherEnabled,
                 WorldAutomationAutoHarvestEnabled = settings.WorldAutomationAutoHarvestEnabled,
                 FishingAutoFishEnabled = settings.FishingAutoFishEnabled,
                 FishingAutoLoadoutEnabled = settings.FishingAutoLoadoutEnabled,
@@ -195,6 +203,14 @@ namespace JueMingZ.Runtime
         public bool WorldAutomationAutoMiningEnabled { get; private set; }
         public string WorldAutomationAutoCaptureCritterMode { get; private set; }
         public bool WorldAutomationAutoCaptureCritterEnabled { get; private set; }
+        public bool WorldAutomationAutoCaptureCritterBaitEnabled { get; private set; }
+        public bool WorldAutomationAutoCaptureCritterFairyEnabled { get; private set; }
+        public bool WorldAutomationAutoCaptureCritterGoldCritterEnabled { get; private set; }
+        public bool WorldAutomationAutoCaptureCritterGemCritterEnabled { get; private set; }
+        public bool WorldAutomationAutoCaptureCritterNormalCritterEnabled { get; private set; }
+        public bool WorldAutomationAutoCaptureCritterTruffleWormEnabled { get; private set; }
+        public bool WorldAutomationAutoCaptureCritterEmpressButterflyEnabled { get; private set; }
+        public bool WorldAutomationAutoCaptureCritterOtherEnabled { get; private set; }
         public bool WorldAutomationAutoHarvestEnabled { get; private set; }
         public bool FishingAutoFishEnabled { get; private set; }
         public bool FishingAutoLoadoutEnabled { get; private set; }

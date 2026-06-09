@@ -60,6 +60,11 @@ namespace JueMingZ.UI.Legacy
             _movementSafeLandingConfigOpen = !_movementSafeLandingConfigOpen;
         }
 
+        public static void ToggleAutoCaptureCritterConfigPopup()
+        {
+            _autoCaptureCritterConfigOpen = !_autoCaptureCritterConfigOpen;
+        }
+
         public static void ToggleAutoRecoveryItemConfigPopup(string kind)
         {
             kind = NormalizeAutoRecoveryItemConfigKind(kind);

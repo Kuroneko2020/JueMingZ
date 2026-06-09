@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using JueMingZ.Actions;
+using JueMingZ.Actions.Channels;
 using JueMingZ.Common;
 using JueMingZ.Compat;
 using JueMingZ.Config;
@@ -16,12 +17,20 @@ namespace JueMingZ.Automation.WorldAutomation
     {
         private const int ScanRadiusTiles = 80;
         private const int CancelDistanceTiles = 30;
-        private const long UseIntervalTicks = 4;
+        // Gravity relocation is an event-bounded repair for vanilla-fallen silt/slush; do not turn these caps into per-tick world scanning.
+        private const int GravityRelocationSearchDepthTiles = 18;
+        private const int GravityRelocationHorizontalOffsetTiles = 1;
+        private const int GravityRelocationLifetimeTicks = 45;
+        private const int GravityRelocationSourceLimitPerTick = 8;
+        private const int GravityRelocationMaxResolvedTilesPerTick = 24;
+        private const int SustainedQueueTimeoutMilliseconds = 100;
+        // Pending mining input should expire quickly, but a running held-pickaxe session
+        // is ended by target refresh/stale gates; this timeout is only a dead-man guard.
+        private static readonly TimeSpan SustainedRequestTimeout = TimeSpan.FromMinutes(10);
         private const long ManualObservationLifetimeTicks = 30;
         private static readonly object SyncRoot = new object();
         private static AutoMiningVeinSelection _selection;
         private static ManualMiningObservation _manualObservation;
-        private static long _lastUseTick = -UseIntervalTicks;
         private static long _ignoreManualObservationUntilTick;
         private static string _lastDecision = string.Empty;
 
@@ -77,7 +86,8 @@ namespace JueMingZ.Automation.WorldAutomation
                     tiles.Add(new AutoMiningOverlayTile
                     {
                         X = _selection.Tiles[index].X,
-                        Y = _selection.Tiles[index].Y
+                        Y = _selection.Tiles[index].Y,
+                        TileType = _selection.Tiles[index].TileType
                     });
                 }
 
@@ -94,17 +104,20 @@ namespace JueMingZ.Automation.WorldAutomation
 
         public static void ClearSelection(string reason)
         {
+            var safeReason = string.IsNullOrWhiteSpace(reason) ? "selection cleared" : reason;
             lock (SyncRoot)
             {
                 _selection = null;
                 _manualObservation = null;
-                RecordDecisionLocked(string.IsNullOrWhiteSpace(reason) ? "selection cleared" : reason);
+                RecordDecisionLocked(safeReason);
             }
+
+            AutoMiningSustainedUseBridge.ClearDesiredTarget(safeReason);
         }
 
-        internal static InputActionRequest BuildMiningRequestForTesting(int tileX, int tileY, int selectedSlot, string sourceHotkey)
+        internal static InputActionRequest BuildSustainedMiningRequestForTesting(int tileX, int tileY, int selectedSlot, int pickItemType, string sourceMode, string sourceHotkey)
         {
-            return BuildMiningRequest(tileX, tileY, selectedSlot, 0, 0, sourceHotkey);
+            return BuildSustainedMiningRequest(tileX, tileY, selectedSlot, pickItemType, 0, 0, sourceMode, sourceHotkey);
         }
 
         internal static bool IsSelectedSlotInterruptForTesting(int selectionPickSlot, int selectedSlot)
@@ -132,6 +145,32 @@ namespace JueMingZ.Automation.WorldAutomation
             return target;
         }
 
+        internal static int RefreshSelectionTilesForTesting(AutoMiningVeinSelection selection, AutoMiningTileReader readTile)
+        {
+            return RefreshSelectionTiles(selection, readTile, 0);
+        }
+
+        internal static int RefreshSelectionTilesForTesting(AutoMiningVeinSelection selection, AutoMiningTileReader readTile, long tick)
+        {
+            return RefreshSelectionTiles(selection, readTile, tick);
+        }
+
+        internal static int GetPendingGravityRelocationCountForTesting(AutoMiningVeinSelection selection)
+        {
+            return CountPendingGravityRelocations(selection);
+        }
+
+        internal static bool ShouldIgnoreManualObservationForTesting(
+            AutoMiningVeinSelection selection,
+            long tick,
+            long ignoreUntilTick,
+            int tileX,
+            int tileY)
+        {
+            string reason;
+            return ShouldIgnoreManualObservation(selection, tick, ignoreUntilTick, tileX, tileY, out reason);
+        }
+
         internal static void ObserveManualTileMined(int tileX, int tileY, int tileType, int pickItemType, int pickSlot)
         {
             if (tileType < 0 || pickItemType <= 0)
@@ -142,7 +181,8 @@ namespace JueMingZ.Automation.WorldAutomation
             var tick = AutoMiningCompat.ReadGameUpdateCount();
             lock (SyncRoot)
             {
-                if (_selection != null || tick <= _ignoreManualObservationUntilTick)
+                string ignoreReason;
+                if (ShouldIgnoreManualObservation(_selection, tick, _ignoreManualObservationUntilTick, tileX, tileY, out ignoreReason))
                 {
                     return;
                 }
@@ -154,7 +194,8 @@ namespace JueMingZ.Automation.WorldAutomation
                     TileType = tileType,
                     PickItemType = pickItemType,
                     PickSlot = pickSlot,
-                    SeenTick = tick
+                    SeenTick = tick,
+                    ReplacesExistingSelection = _selection != null
                 };
                 RecordDecisionLocked(
                     "manual mined ore observed: " +
@@ -173,7 +214,7 @@ namespace JueMingZ.Automation.WorldAutomation
 
             if (!AutoMiningModes.IsEnabled(mode))
             {
-                ClearSelection("disabled");
+                CancelSelectionAndActions(queue, "disabled");
                 return;
             }
 
@@ -185,7 +226,7 @@ namespace JueMingZ.Automation.WorldAutomation
                 gameState.Player.Dead ||
                 gameState.Player.Ghost)
             {
-                ClearSelection("player unavailable");
+                CancelSelectionAndActions(queue, "player unavailable");
                 return;
             }
 
@@ -337,8 +378,59 @@ namespace JueMingZ.Automation.WorldAutomation
 
             if (!selected)
             {
+                if (observation.ReplacesExistingSelection)
+                {
+                    ClearSelection("manual observation consumed: replacement vein has no remaining tiles");
+                    return;
+                }
+
                 RecordDecision("manual observation consumed: no remaining vein tiles");
             }
+        }
+
+        private static bool ShouldIgnoreManualObservation(
+            AutoMiningVeinSelection selection,
+            long tick,
+            long ignoreUntilTick,
+            int tileX,
+            int tileY,
+            out string reason)
+        {
+            reason = string.Empty;
+            if (selection != null && IsTrackedSelectionCoordinate(selection, tileX, tileY))
+            {
+                // PickTile also fires for our sustained held-pickaxe target. Only coordinates already in
+                // the active selection are self-noise; a newly mined ore elsewhere is the user's reselect signal.
+                reason = "active selection tile";
+                return true;
+            }
+
+            if (selection == null && tick <= ignoreUntilTick)
+            {
+                reason = "recent auto mining tick";
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsTrackedSelectionCoordinate(AutoMiningVeinSelection selection, int tileX, int tileY)
+        {
+            if (selection == null || selection.Tiles == null)
+            {
+                return false;
+            }
+
+            for (var index = 0; index < selection.Tiles.Count; index++)
+            {
+                var tile = selection.Tiles[index];
+                if (tile != null && tile.X == tileX && tile.Y == tileY)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static bool TrySelectVein(int tileX, int tileY, int tileType, string sourceMode, string sourceHotkey, AutoMiningPickaxeProfile pickaxe, long tick)
@@ -358,6 +450,7 @@ namespace JueMingZ.Automation.WorldAutomation
             var minY = Math.Max(0, tileY - ScanRadiusTiles);
             var maxX = Math.Min(maxTilesX - 1, tileX + ScanRadiusTiles);
             var maxY = Math.Min(maxTilesY - 1, tileY + ScanRadiusTiles);
+            var matchGroup = AutoMiningTileMatchGroup.ForSeedTileType(tileType);
             var scan = AutoMiningVeinScanner.Scan(
                 tileX,
                 tileY,
@@ -366,7 +459,7 @@ namespace JueMingZ.Automation.WorldAutomation
                 minY,
                 maxX,
                 maxY,
-                (x, y, type) => AutoMiningCompat.IsActiveTileOfType(tiles, x, y, type));
+                (int x, int y, out bool active, out int actualType) => AutoMiningCompat.TryReadTile(tiles, x, y, out active, out actualType));
 
             if (scan == null || scan.Tiles.Count <= 0)
             {
@@ -377,6 +470,7 @@ namespace JueMingZ.Automation.WorldAutomation
             var selection = new AutoMiningVeinSelection
             {
                 TileType = tileType,
+                MatchGroup = matchGroup,
                 PickItemType = pickaxe.ItemType,
                 PickSlot = pickaxe.SelectedSlot,
                 PickPower = pickaxe.PickPower,
@@ -408,7 +502,8 @@ namespace JueMingZ.Automation.WorldAutomation
                 selection = _selection;
             }
 
-            if (selection == null || selection.Tiles.Count <= 0)
+            if (selection == null ||
+                (selection.Tiles.Count <= 0 && CountPendingGravityRelocations(selection) <= 0))
             {
                 return;
             }
@@ -433,12 +528,21 @@ namespace JueMingZ.Automation.WorldAutomation
 
             if (DistanceOutsideBounds(playerTileX, playerTileY, selection) > CancelDistanceTiles)
             {
-                ClearSelection("selection cancelled: player left vein range");
+                CancelSelectionAndActions(queue, "selection cancelled: player left vein range");
                 return;
             }
 
-            if (tick - _lastUseTick < UseIntervalTicks || queue == null)
+            if (queue == null)
             {
+                AutoMiningSustainedUseBridge.ClearDesiredTarget("auto mining queue unavailable");
+                RecordDecision("queue unavailable");
+                return;
+            }
+
+            if (HasPendingWorkThatShouldPreemptMining(queue))
+            {
+                AutoMiningSustainedUseBridge.ClearDesiredTarget("queue pending; releasing auto mining");
+                RecordDecision("queue busy");
                 return;
             }
 
@@ -448,6 +552,7 @@ namespace JueMingZ.Automation.WorldAutomation
             int maxTilesY;
             if (!AutoMiningCompat.TryGetTileContext(out mainType, out tiles, out maxTilesX, out maxTilesY, out message))
             {
+                AutoMiningSustainedUseBridge.ClearDesiredTarget("tile context unavailable");
                 RecordDecision("waiting: " + message);
                 return;
             }
@@ -455,13 +560,15 @@ namespace JueMingZ.Automation.WorldAutomation
             object player;
             if (!AutoMiningCompat.TryGetLocalPlayer(out player, out message))
             {
+                AutoMiningSustainedUseBridge.ClearDesiredTarget("player unavailable");
                 RecordDecision("waiting: " + message);
                 return;
             }
 
             AutoMiningTile target;
             int remaining;
-            if (!TryFindNextTarget(selection, tiles, player, pickaxe.PickPower, pickaxe.TileBoost, out target, out remaining))
+            int targetTileType;
+            if (!TryFindNextTarget(selection, tiles, player, pickaxe.PickPower, pickaxe.TileBoost, tick, out target, out targetTileType, out remaining))
             {
                 if (remaining <= 0)
                 {
@@ -469,23 +576,31 @@ namespace JueMingZ.Automation.WorldAutomation
                 }
                 else
                 {
+                    AutoMiningSustainedUseBridge.ClearDesiredTarget("waiting for mining reach");
                     RecordDecision("waiting for mining reach");
                 }
 
                 return;
             }
 
-            InputActionAdmissionResult admission;
-            var request = BuildMiningRequest(target.X, target.Y, pickaxe.SelectedSlot, selection.TileType, remaining, selection.SourceHotkey);
-            if (!queue.TryEnqueue(request, out admission))
+            if (!TryValidateSustainedMiningTarget(tiles, selection, target, player, pickaxe, out targetTileType))
             {
-                RecordDecision("queue denied: " + (admission == null ? "unknown" : admission.Summary));
+                AutoMiningSustainedUseBridge.ClearDesiredTarget("waiting for validated mining target");
+                RecordDecision("waiting: target not ready for sustained mining");
                 return;
             }
 
-            _lastUseTick = tick;
+            var desiredTarget = BuildSustainedUseTarget(selection, pickaxe, target, targetTileType, player, tick);
+            AutoMiningSustainedUseBridge.SetDesiredTarget(desiredTarget);
+            if (!EnsureSustainedMiningRequest(queue, pickaxe, target, targetTileType, remaining, selection.SourceMode, selection.SourceHotkey))
+            {
+                AutoMiningSustainedUseBridge.ClearDesiredTarget("auto mining sustained request was not admitted");
+                RecordDecision("queue denied sustained mining");
+                return;
+            }
+
             _ignoreManualObservationUntilTick = tick + 12;
-            RecordDecision("submitted mining target " + target.X.ToString(CultureInfo.InvariantCulture) + "," + target.Y.ToString(CultureInfo.InvariantCulture));
+            RecordDecision("sustained mining target refreshed " + target.X.ToString(CultureInfo.InvariantCulture) + "," + target.Y.ToString(CultureInfo.InvariantCulture));
         }
 
         private static bool TryFindNextTarget(
@@ -494,16 +609,404 @@ namespace JueMingZ.Automation.WorldAutomation
             object player,
             int pickPower,
             int pickTileBoost,
+            long tick,
             out AutoMiningTile target,
+            out int targetTileType,
             out int remaining)
         {
-            return TryChooseNextTarget(
+            targetTileType = -1;
+            RefreshSelectionTiles(
+                selection,
+                (int x, int y, out bool active, out int actualType) => AutoMiningCompat.TryReadTile(tiles, x, y, out active, out actualType),
+                tick);
+
+            if (selection == null || selection.Tiles.Count <= 0)
+            {
+                target = null;
+                remaining = CountPendingGravityRelocations(selection);
+                return false;
+            }
+
+            AutoMiningCompat.MiningReachProfile reachProfile;
+            if (!AutoMiningCompat.TryBuildMiningTakeoverReachProfile(player, pickTileBoost, out reachProfile))
+            {
+                target = null;
+                remaining = selection.Tiles.Count;
+                return false;
+            }
+
+            var found = TryChooseNextTarget(
                 selection.Tiles,
-                tile => AutoMiningCompat.IsActiveTileOfType(tiles, tile.X, tile.Y, selection.TileType),
-                tile => AutoMiningCompat.CanMineTileWithPickaxe(player, tile.X, tile.Y, selection.TileType, pickPower, pickTileBoost),
+                tile => IsActiveSelectionTile(tiles, selection, tile),
+                tile => IsReachableSelectionTile(tiles, selection, tile, reachProfile, pickPower),
                 player,
                 out target,
                 out remaining);
+            if (!found || target == null)
+            {
+                return false;
+            }
+
+            return TryReadSelectionTileType(tiles, selection, target, out targetTileType);
+        }
+
+        private static bool TryValidateSustainedMiningTarget(
+            object tiles,
+            AutoMiningVeinSelection selection,
+            AutoMiningTile target,
+            object player,
+            AutoMiningPickaxeProfile pickaxe,
+            out int targetTileType)
+        {
+            targetTileType = -1;
+            int actualType;
+            if (selection == null ||
+                target == null ||
+                player == null ||
+                pickaxe == null ||
+                !pickaxe.IsUsablePickaxe ||
+                !TryReadSelectionTileType(tiles, selection, target, out actualType))
+            {
+                return false;
+            }
+
+            // This is the last cheap service-layer gate before ItemCheck ownership:
+            // the target must still be the selected ore and still pass the same mineability rule as green overlay.
+            if (!AutoMiningCompat.CanMineTileWithPickaxe(player, target.X, target.Y, actualType, pickaxe.PickPower, pickaxe.TileBoost))
+            {
+                return false;
+            }
+
+            target.TileType = actualType;
+            targetTileType = actualType;
+            return true;
+        }
+
+        private static int RefreshSelectionTiles(AutoMiningVeinSelection selection, AutoMiningTileReader readTile, long tick)
+        {
+            if (selection == null || selection.Tiles == null || readTile == null)
+            {
+                return 0;
+            }
+
+            RemoveExpiredGravityRelocations(selection, tick);
+            for (var index = selection.Tiles.Count - 1; index >= 0; index--)
+            {
+                var tile = selection.Tiles[index];
+                if (tile == null)
+                {
+                    selection.Tiles.RemoveAt(index);
+                    continue;
+                }
+
+                int actualType;
+                if (TryReadMatchingSelectionTile(readTile, selection, tile.X, tile.Y, out actualType))
+                {
+                    tile.TileType = actualType;
+                    continue;
+                }
+
+                selection.Tiles.RemoveAt(index);
+                TryQueueGravityRelocation(selection, tile, tick);
+            }
+
+            var added = ResolvePendingGravityRelocations(selection, readTile, tick);
+
+            RecalculateSelectionBounds(selection);
+            return added;
+        }
+
+        private static void TryQueueGravityRelocation(
+            AutoMiningVeinSelection selection,
+            AutoMiningTile source,
+            long tick)
+        {
+            if (selection == null ||
+                selection.PendingGravityRelocations == null ||
+                source == null ||
+                !AutoMiningCompat.IsGravityAffectedMiningTileType(source.TileType) ||
+                !AutoMiningCompat.IsPickPowerSufficientForTile(source.TileType, source.Y, selection.PickPower))
+            {
+                return;
+            }
+
+            for (var index = 0; index < selection.PendingGravityRelocations.Count; index++)
+            {
+                var pending = selection.PendingGravityRelocations[index];
+                if (pending != null &&
+                    pending.SourceX == source.X &&
+                    pending.SourceY == source.Y &&
+                    pending.TileType == source.TileType)
+                {
+                    return;
+                }
+            }
+
+            selection.PendingGravityRelocations.Add(new AutoMiningGravityRelocation
+            {
+                SourceX = source.X,
+                SourceY = source.Y,
+                TileType = source.TileType,
+                CreatedTick = tick
+            });
+        }
+
+        private static int ResolvePendingGravityRelocations(
+            AutoMiningVeinSelection selection,
+            AutoMiningTileReader readTile,
+            long tick)
+        {
+            if (selection == null ||
+                selection.PendingGravityRelocations == null ||
+                selection.PendingGravityRelocations.Count <= 0 ||
+                readTile == null)
+            {
+                return 0;
+            }
+
+            var trackedTileKeys = BuildSelectionTileKeySet(selection);
+            var added = 0;
+            var processed = 0;
+            var index = 0;
+            while (index < selection.PendingGravityRelocations.Count &&
+                   processed < GravityRelocationSourceLimitPerTick &&
+                   added < GravityRelocationMaxResolvedTilesPerTick)
+            {
+                var pending = selection.PendingGravityRelocations[index];
+                if (pending == null || IsGravityRelocationExpired(pending, tick))
+                {
+                    selection.PendingGravityRelocations.RemoveAt(index);
+                    continue;
+                }
+
+                processed++;
+                int relocatedX;
+                int relocatedY;
+                int actualType;
+                if (TryFindRelocatedGravityTile(selection, readTile, pending, trackedTileKeys, out relocatedX, out relocatedY, out actualType))
+                {
+                    selection.PendingGravityRelocations.RemoveAt(index);
+                    var relocatedKey = EncodeTileKey(relocatedX, relocatedY);
+                    if (trackedTileKeys.Add(relocatedKey))
+                    {
+                        selection.Tiles.Add(new AutoMiningTile(relocatedX, relocatedY, actualType));
+                        added++;
+                    }
+
+                    continue;
+                }
+
+                index++;
+            }
+
+            return added;
+        }
+
+        private static bool TryFindRelocatedGravityTile(
+            AutoMiningVeinSelection selection,
+            AutoMiningTileReader readTile,
+            AutoMiningGravityRelocation pending,
+            HashSet<long> trackedTileKeys,
+            out int relocatedX,
+            out int relocatedY,
+            out int actualType)
+        {
+            relocatedX = -1;
+            relocatedY = -1;
+            actualType = -1;
+            if (selection == null || readTile == null || pending == null)
+            {
+                return false;
+            }
+
+            for (var dy = 1; dy <= GravityRelocationSearchDepthTiles; dy++)
+            {
+                if (TryAcceptRelocatedGravityTile(selection, readTile, pending.SourceX, pending.SourceY + dy, trackedTileKeys, out actualType))
+                {
+                    relocatedX = pending.SourceX;
+                    relocatedY = pending.SourceY + dy;
+                    return true;
+                }
+            }
+
+            for (var dy = 1; dy <= GravityRelocationSearchDepthTiles; dy++)
+            {
+                for (var dx = -GravityRelocationHorizontalOffsetTiles; dx <= GravityRelocationHorizontalOffsetTiles; dx++)
+                {
+                    if (dx == 0)
+                    {
+                        continue;
+                    }
+
+                    var x = pending.SourceX + dx;
+                    var y = pending.SourceY + dy;
+                    if (TryAcceptRelocatedGravityTile(selection, readTile, x, y, trackedTileKeys, out actualType))
+                    {
+                        relocatedX = x;
+                        relocatedY = y;
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryAcceptRelocatedGravityTile(
+            AutoMiningVeinSelection selection,
+            AutoMiningTileReader readTile,
+            int x,
+            int y,
+            HashSet<long> trackedTileKeys,
+            out int actualType)
+        {
+            actualType = -1;
+            if (x < 0 ||
+                y < 0 ||
+                // A falling column can pass through coordinates already kept in the selection; skip them and keep scanning for the new untracked landing tile.
+                (trackedTileKeys != null && trackedTileKeys.Contains(EncodeTileKey(x, y))) ||
+                !TryReadMatchingSelectionTile(readTile, selection, x, y, out actualType) ||
+                !AutoMiningCompat.IsGravityAffectedMiningTileType(actualType))
+            {
+                return false;
+            }
+
+            return AutoMiningCompat.IsPickPowerSufficientForTile(actualType, y, selection.PickPower);
+        }
+
+        private static HashSet<long> BuildSelectionTileKeySet(AutoMiningVeinSelection selection)
+        {
+            var keys = new HashSet<long>();
+            if (selection == null || selection.Tiles == null)
+            {
+                return keys;
+            }
+
+            for (var index = 0; index < selection.Tiles.Count; index++)
+            {
+                var tile = selection.Tiles[index];
+                if (tile != null)
+                {
+                    keys.Add(EncodeTileKey(tile.X, tile.Y));
+                }
+            }
+
+            return keys;
+        }
+
+        private static void RemoveExpiredGravityRelocations(AutoMiningVeinSelection selection, long tick)
+        {
+            if (selection == null || selection.PendingGravityRelocations == null)
+            {
+                return;
+            }
+
+            for (var index = selection.PendingGravityRelocations.Count - 1; index >= 0; index--)
+            {
+                var pending = selection.PendingGravityRelocations[index];
+                if (pending == null || IsGravityRelocationExpired(pending, tick))
+                {
+                    selection.PendingGravityRelocations.RemoveAt(index);
+                }
+            }
+        }
+
+        private static bool IsGravityRelocationExpired(AutoMiningGravityRelocation pending, long tick)
+        {
+            return pending != null &&
+                   tick >= pending.CreatedTick &&
+                   tick - pending.CreatedTick > GravityRelocationLifetimeTicks;
+        }
+
+        private static int CountPendingGravityRelocations(AutoMiningVeinSelection selection)
+        {
+            return selection == null || selection.PendingGravityRelocations == null
+                ? 0
+                : selection.PendingGravityRelocations.Count;
+        }
+
+        private static bool TryReadMatchingSelectionTile(
+            AutoMiningTileReader readTile,
+            AutoMiningVeinSelection selection,
+            int x,
+            int y,
+            out int actualType)
+        {
+            actualType = -1;
+            bool active;
+            return selection != null &&
+                   readTile != null &&
+                   readTile(x, y, out active, out actualType) &&
+                   active &&
+                   selection.Matches(actualType);
+        }
+
+        private static bool IsActiveSelectionTile(object tiles, AutoMiningVeinSelection selection, AutoMiningTile tile)
+        {
+            int actualType;
+            return TryReadSelectionTileType(tiles, selection, tile, out actualType);
+        }
+
+        private static bool IsReachableSelectionTile(
+            object tiles,
+            AutoMiningVeinSelection selection,
+            AutoMiningTile tile,
+            AutoMiningCompat.MiningReachProfile reachProfile,
+            int pickPower)
+        {
+            int actualType;
+            return TryReadSelectionTileType(tiles, selection, tile, out actualType) &&
+                   AutoMiningCompat.CanMineTileWithPickaxe(reachProfile, tile.X, tile.Y, actualType, pickPower);
+        }
+
+        private static bool TryReadSelectionTileType(
+            object tiles,
+            AutoMiningVeinSelection selection,
+            AutoMiningTile tile,
+            out int actualType)
+        {
+            actualType = -1;
+            return selection != null &&
+                   tile != null &&
+                   AutoMiningCompat.TryReadActiveTileMatchingGroup(tiles, tile.X, tile.Y, selection.MatchGroup, out actualType);
+        }
+
+        private static long EncodeTileKey(int x, int y)
+        {
+            return ((long)x << 32) ^ (uint)y;
+        }
+
+        private static void RecalculateSelectionBounds(AutoMiningVeinSelection selection)
+        {
+            if (selection == null || selection.Tiles == null || selection.Tiles.Count <= 0)
+            {
+                return;
+            }
+
+            var initialized = false;
+            for (var index = 0; index < selection.Tiles.Count; index++)
+            {
+                var tile = selection.Tiles[index];
+                if (tile == null)
+                {
+                    continue;
+                }
+
+                if (!initialized)
+                {
+                    selection.MinX = tile.X;
+                    selection.MinY = tile.Y;
+                    selection.MaxX = tile.X;
+                    selection.MaxY = tile.Y;
+                    initialized = true;
+                    continue;
+                }
+
+                selection.MinX = Math.Min(selection.MinX, tile.X);
+                selection.MinY = Math.Min(selection.MinY, tile.Y);
+                selection.MaxX = Math.Max(selection.MaxX, tile.X);
+                selection.MaxY = Math.Max(selection.MaxY, tile.Y);
+            }
         }
 
         private static bool TryChooseNextTarget(
@@ -532,31 +1035,147 @@ namespace JueMingZ.Automation.WorldAutomation
                 out remaining);
         }
 
-        private static InputActionRequest BuildMiningRequest(int tileX, int tileY, int selectedSlot, int tileType, int remaining, string sourceHotkey)
+        private static AutoMiningSustainedUseTarget BuildSustainedUseTarget(
+            AutoMiningVeinSelection selection,
+            AutoMiningPickaxeProfile pickaxe,
+            AutoMiningTile target,
+            int targetTileType,
+            object player,
+            long tick)
+        {
+            selection = selection ?? new AutoMiningVeinSelection();
+            pickaxe = pickaxe ?? new AutoMiningPickaxeProfile();
+            target = target ?? new AutoMiningTile(-1, -1);
+            var worldX = target.X * AutoMiningCompat.TileSize + AutoMiningCompat.TileSize / 2f;
+            var worldY = target.Y * AutoMiningCompat.TileSize + AutoMiningCompat.TileSize / 2f;
+            float playerCenterX;
+            float playerCenterY;
+            var direction = 0;
+            if (AutoMiningCompat.TryGetMiningCenterWorld(player, out playerCenterX, out playerCenterY))
+            {
+                direction = worldX >= playerCenterX ? 1 : -1;
+            }
+
+            return new AutoMiningSustainedUseTarget
+            {
+                PickSlot = pickaxe.SelectedSlot,
+                PickItemType = pickaxe.ItemType,
+                PickItemName = pickaxe.ItemName ?? string.Empty,
+                TileX = target.X,
+                TileY = target.Y,
+                TileType = targetTileType,
+                PickPower = pickaxe.PickPower,
+                TileBoost = pickaxe.TileBoost,
+                SourceMode = selection.SourceMode ?? string.Empty,
+                SourceHotkey = selection.SourceHotkey ?? string.Empty,
+                WorldX = worldX,
+                WorldY = worldY,
+                Direction = direction,
+                UpdatedTick = tick,
+                UpdatedUtc = DateTime.UtcNow
+            };
+        }
+
+        private static bool EnsureSustainedMiningRequest(
+            InputActionQueue queue,
+            AutoMiningPickaxeProfile pickaxe,
+            AutoMiningTile target,
+            int tileType,
+            int remaining,
+            string sourceMode,
+            string sourceHotkey)
+        {
+            if (queue == null)
+            {
+                return false;
+            }
+
+            var snapshot = queue.GetFastState();
+            if (IsRunningAutoMiningSustainedUse(snapshot))
+            {
+                return true;
+            }
+
+            if (snapshot == null ||
+                snapshot.PendingCount > 0 || snapshot.HasRunningAction ||
+                ItemUseBridge.PendingRequestId != Guid.Empty)
+            {
+                return false;
+            }
+
+            var request = BuildSustainedMiningRequest(
+                target == null ? -1 : target.X,
+                target == null ? -1 : target.Y,
+                pickaxe == null ? -1 : pickaxe.SelectedSlot,
+                pickaxe == null ? 0 : pickaxe.ItemType,
+                tileType,
+                remaining,
+                sourceMode,
+                sourceHotkey);
+            InputActionAdmissionResult admission;
+            return queue.TryEnqueue(request, out admission);
+        }
+
+        private static bool HasPendingWorkThatShouldPreemptMining(InputActionQueue queue)
+        {
+            var snapshot = queue == null ? null : queue.GetFastState();
+            if (snapshot == null)
+            {
+                return true;
+            }
+
+            if (snapshot.PendingCount > 0)
+            {
+                return true;
+            }
+
+            if (string.IsNullOrWhiteSpace(snapshot.RunningActionKind))
+            {
+                return false;
+            }
+
+            return !IsRunningAutoMiningSustainedUse(snapshot);
+        }
+
+        private static bool IsRunningAutoMiningSustainedUse(InputActionQueueFastState snapshot)
+        {
+            return snapshot != null &&
+                   string.Equals(snapshot.RunningActionKind, InputActionKind.RawInput.ToString(), StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(snapshot.RunningActionSource, FeatureIds.WorldAutomationAutoMining, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static InputActionRequest BuildSustainedMiningRequest(int tileX, int tileY, int selectedSlot, int pickItemType, int tileType, int remaining, string sourceMode, string sourceHotkey)
         {
             var request = new InputActionRequest
             {
-                Kind = InputActionKind.ItemUse,
+                Kind = InputActionKind.RawInput,
                 Priority = InputActionPriority.Low,
                 SourceFeatureId = FeatureIds.WorldAutomationAutoMining,
-                Description = "Auto mine ore tile",
-                Timeout = TimeSpan.FromSeconds(2),
-                AdmissionKey = FeatureIds.WorldAutomationAutoMining
+                Description = "Auto mine ore tile sustained use",
+                QueueTimeout = TimeSpan.FromMilliseconds(SustainedQueueTimeoutMilliseconds),
+                Timeout = SustainedRequestTimeout,
+                AdmissionKey = FeatureIds.WorldAutomationAutoMining + ".sustained",
+                RequiredChannels = InputActionChannel.UseItem |
+                                   InputActionChannel.MouseTarget |
+                                   InputActionChannel.InventorySlot |
+                                   InputActionChannel.HotbarSelection |
+                                   InputActionChannel.RawInput
             };
             request.Metadata[ActionMetadataKeys.Scenario] = ScenarioNames.WorldAutomationAutoMining;
             request.Metadata[ActionMetadataKeys.SourceKind] = "Automation";
+            request.Metadata[ActionMetadataKeys.RawInputMode] = "AutoMiningSustainedUse";
             request.Metadata["SourceHotkey"] = sourceHotkey ?? string.Empty;
             request.Metadata[ActionMetadataKeys.TargetSlot] = selectedSlot.ToString(CultureInfo.InvariantCulture);
             request.Metadata[ActionMetadataKeys.RequireSelectedSlotUnchanged] = "true";
             request.Metadata[ActionMetadataKeys.WorldX] = (tileX * AutoMiningCompat.TileSize + AutoMiningCompat.TileSize / 2f).ToString(CultureInfo.InvariantCulture);
             request.Metadata[ActionMetadataKeys.WorldY] = (tileY * AutoMiningCompat.TileSize + AutoMiningCompat.TileSize / 2f).ToString(CultureInfo.InvariantCulture);
-            request.Metadata["ApplyMainMouseLeftForItemCheck"] = "true";
-            request.Metadata["AllowEarlyItemCheck"] = "true";
-            request.Metadata["EarlyItemCheckWindowTicks"] = "2";
+            request.Metadata["AutoMiningAction"] = "SustainedUse";
+            request.Metadata["AutoMiningPickItemType"] = pickItemType.ToString(CultureInfo.InvariantCulture);
             request.Metadata["AutoMiningTileX"] = tileX.ToString(CultureInfo.InvariantCulture);
             request.Metadata["AutoMiningTileY"] = tileY.ToString(CultureInfo.InvariantCulture);
             request.Metadata["AutoMiningTileType"] = tileType.ToString(CultureInfo.InvariantCulture);
             request.Metadata["AutoMiningRemainingTiles"] = remaining.ToString(CultureInfo.InvariantCulture);
+            request.Metadata["AutoMiningMode"] = sourceMode ?? string.Empty;
             return request;
         }
 
@@ -605,6 +1224,7 @@ namespace JueMingZ.Automation.WorldAutomation
             public int PickItemType;
             public int PickSlot;
             public long SeenTick;
+            public bool ReplacesExistingSelection;
         }
     }
 }
