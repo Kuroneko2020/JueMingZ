@@ -1137,6 +1137,53 @@ function Test-CombatAimDiagnosticsGovernance {
     }
 }
 
+function Test-PhasebladeQuickSwitchDiagnosticsGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $runtimePath = Join-Path $RepoRoot "src\JueMingZ\Automation\Combat\CombatPhasebladeQuickSwitchRuntimeService.cs"
+    $executorPath = Join-Path $RepoRoot "src\JueMingZ\Actions\Executors\RawInputActionExecutor.cs"
+    $runtimeText = Read-TextIfExists -Path $runtimePath
+    $executorText = Read-TextIfExists -Path $executorPath
+    if ($null -eq $runtimeText) {
+        Write-FailHealth "CombatPhasebladeQuickSwitchRuntimeService.cs missing."
+        return
+    }
+
+    if ($runtimeText.Contains("DiagnosticActionRecorder.Record")) {
+        Write-FailHealth "Phaseblade quick switch runtime must not append action events from its tick path."
+    }
+    else {
+        Write-Pass "Phaseblade quick switch runtime keeps action-event writes out of the tick path."
+    }
+
+    $enabledGateIndex = $runtimeText.IndexOf("!settings.CombatPhasebladeQuickSwitchEnabled", [System.StringComparison]::Ordinal)
+    $playerReadIndex = $runtimeText.IndexOf("TerrariaInputCompat.TryGetLocalPlayer", [System.StringComparison]::Ordinal)
+    $rightNotHeldIndex = $runtimeText.IndexOf("if (!rightHeld)", [System.StringComparison]::Ordinal)
+    $hotbarScanIndex = $runtimeText.IndexOf("FindEligibleHotbarSlots(inventory, eligibleSlots)", [System.StringComparison]::Ordinal)
+    if ($enabledGateIndex -ge 0 -and
+        $playerReadIndex -gt $enabledGateIndex -and
+        $rightNotHeldIndex -gt $enabledGateIndex -and
+        $hotbarScanIndex -gt $rightNotHeldIndex) {
+        Write-Pass "Phaseblade quick switch keeps disabled and right-not-held paths ahead of player/hotbar work."
+    }
+    else {
+        Write-FailHealth "Phaseblade quick switch hotbar scan must stay behind enabled and right-held gates."
+    }
+
+    if ($null -eq $executorText) {
+        Write-FailHealth "RawInputActionExecutor.cs missing."
+        return
+    }
+
+    $phasebladeEventCalls = [System.Text.RegularExpressions.Regex]::Matches($executorText, '\bRecordPhasebladeQuickSwitchCompletionEvent\s*\(')
+    if ($phasebladeEventCalls.Count -eq 2) {
+        Write-Pass "Phaseblade quick switch action event remains a completion-only RawInput event."
+    }
+    else {
+        Write-FailHealth "Phaseblade quick switch action event call count changed; keep JSON construction off idle/runtime paths."
+    }
+}
+
 function Test-IterationLogNumbers {
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
     $updatesDir = ConvertFrom-CodePoints @(0x66f4, 0x65b0, 0x8bb0, 0x5f55)
@@ -1209,6 +1256,7 @@ else {
 Test-InformationFishingFallbackCleanup -RepoRoot $repoRoot
 Test-LegacyUiOverlayGovernance -RepoRoot $repoRoot
 Test-CombatAimDiagnosticsGovernance -RepoRoot $repoRoot
+Test-PhasebladeQuickSwitchDiagnosticsGovernance -RepoRoot $repoRoot
 Test-IterationLogNumbers -RepoRoot $repoRoot
 
 if ($script:FailCount -gt 0) {

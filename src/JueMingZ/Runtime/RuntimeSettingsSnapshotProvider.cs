@@ -84,6 +84,8 @@ namespace JueMingZ.Runtime
             private bool _combatAimMarkerEnabled;
             private bool _combatAutoClickerEnabled;
             private bool _combatFlailComboEnabled;
+            private bool _combatPhasebladeQuickSwitchEnabled;
+            private int _combatPhasebladeQuickSwitchIntervalTicks;
             private bool _combatPerfectRevolverEnabled;
             private bool _combatMagicStringClickerEnabled;
             private bool _combatAutoFacingEnabled;
@@ -202,6 +204,8 @@ namespace JueMingZ.Runtime
                     _combatAimMarkerEnabled = settings.CombatAimMarkerEnabled,
                     _combatAutoClickerEnabled = settings.CombatAutoClickerEnabled,
                     _combatFlailComboEnabled = settings.CombatFlailComboEnabled,
+                    _combatPhasebladeQuickSwitchEnabled = settings.CombatPhasebladeQuickSwitchEnabled,
+                    _combatPhasebladeQuickSwitchIntervalTicks = settings.CombatPhasebladeQuickSwitchIntervalTicks,
                     _combatPerfectRevolverEnabled = settings.CombatPerfectRevolverEnabled,
                     _combatMagicStringClickerEnabled = settings.CombatMagicStringClickerEnabled,
                     _combatAutoFacingEnabled = settings.CombatAutoFacingEnabled,
@@ -315,6 +319,8 @@ namespace JueMingZ.Runtime
                        _combatAimMarkerEnabled == other._combatAimMarkerEnabled &&
                        _combatAutoClickerEnabled == other._combatAutoClickerEnabled &&
                        _combatFlailComboEnabled == other._combatFlailComboEnabled &&
+                       _combatPhasebladeQuickSwitchEnabled == other._combatPhasebladeQuickSwitchEnabled &&
+                       _combatPhasebladeQuickSwitchIntervalTicks == other._combatPhasebladeQuickSwitchIntervalTicks &&
                        _combatPerfectRevolverEnabled == other._combatPerfectRevolverEnabled &&
                        _combatMagicStringClickerEnabled == other._combatMagicStringClickerEnabled &&
                        _combatAutoFacingEnabled == other._combatAutoFacingEnabled &&

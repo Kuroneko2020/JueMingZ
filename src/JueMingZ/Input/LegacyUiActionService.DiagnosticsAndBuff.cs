@@ -244,6 +244,8 @@ namespace JueMingZ.Input
                    "\"combatAimMarkerEnabled\":" + BoolRaw(settings.CombatAimMarkerEnabled) + "," +
                    "\"combatAutoClickerEnabled\":" + BoolRaw(settings.CombatAutoClickerEnabled) + "," +
                    "\"combatFlailComboEnabled\":" + BoolRaw(settings.CombatFlailComboEnabled) + "," +
+                   "\"combatPhasebladeQuickSwitchEnabled\":" + BoolRaw(settings.CombatPhasebladeQuickSwitchEnabled) + "," +
+                   "\"combatPhasebladeQuickSwitchIntervalTicks\":" + IntRaw(CombatPhasebladeQuickSwitchSettings.NormalizeIntervalTicks(settings.CombatPhasebladeQuickSwitchIntervalTicks)) + "," +
                    "\"combatPerfectRevolverEnabled\":" + BoolRaw(settings.CombatPerfectRevolverEnabled) + "," +
                    "\"combatMagicStringClickerEnabled\":" + BoolRaw(settings.CombatMagicStringClickerEnabled) + "," +
                    "\"combatAutoFacingEnabled\":" + BoolRaw(settings.CombatAutoFacingEnabled) + "," +

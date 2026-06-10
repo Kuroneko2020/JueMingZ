@@ -60,6 +60,9 @@ namespace JueMingZ.Runtime
                 CombatAimMarkerEnabled = settings.CombatAimMarkerEnabled,
                 CombatAutoClickerEnabled = settings.CombatAutoClickerEnabled,
                 CombatFlailComboEnabled = settings.CombatFlailComboEnabled,
+                CombatPhasebladeQuickSwitchEnabled = settings.CombatPhasebladeQuickSwitchEnabled,
+                CombatPhasebladeQuickSwitchIntervalTicks =
+                    CombatPhasebladeQuickSwitchSettings.NormalizeIntervalTicks(settings.CombatPhasebladeQuickSwitchIntervalTicks),
                 CombatPerfectRevolverEnabled = settings.CombatPerfectRevolverEnabled,
                 CombatMagicStringClickerEnabled = settings.CombatMagicStringClickerEnabled,
                 CombatAutoFacingEnabled = settings.CombatAutoFacingEnabled,
@@ -177,6 +180,8 @@ namespace JueMingZ.Runtime
         public bool CombatAimMarkerEnabled { get; private set; }
         public bool CombatAutoClickerEnabled { get; private set; }
         public bool CombatFlailComboEnabled { get; private set; }
+        public bool CombatPhasebladeQuickSwitchEnabled { get; private set; }
+        public int CombatPhasebladeQuickSwitchIntervalTicks { get; private set; }
         public bool CombatPerfectRevolverEnabled { get; private set; }
         public bool CombatMagicStringClickerEnabled { get; private set; }
         public bool CombatAutoFacingEnabled { get; private set; }

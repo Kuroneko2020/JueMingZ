@@ -342,6 +342,15 @@ namespace JueMingZ.Actions.Channels
                        InputActionChannel.RawInput;
             }
 
+            if (string.Equals(mode, "PhasebladeQuickSwitch", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(scenario, ScenarioNames.CombatPhasebladeQuickSwitch, StringComparison.OrdinalIgnoreCase))
+            {
+                return InputActionChannel.UseItem |
+                       InputActionChannel.HotbarSelection |
+                       InputActionChannel.MouseTarget |
+                       InputActionChannel.RawInput;
+            }
+
             // Unrecognized RawInput remains globally exclusive. Narrow channels are only
             // granted to allowlisted modes with known restore semantics.
             return InputActionChannel.GlobalExclusive | InputActionChannel.RawInput;

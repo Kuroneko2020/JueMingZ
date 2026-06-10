@@ -165,6 +165,23 @@ namespace JueMingZ.Tests
             AssertHas(profile.RequiredChannels, InputActionChannel.RawInput, "auto capture required");
         }
 
+        private static void ChannelResolverPhasebladeQuickSwitch()
+        {
+            var request = new InputActionRequest { Kind = InputActionKind.RawInput };
+            request.Metadata[ActionMetadataKeys.Scenario] = ScenarioNames.CombatPhasebladeQuickSwitch;
+            request.Metadata[ActionMetadataKeys.RawInputMode] = "PhasebladeQuickSwitch";
+
+            var profile = InputActionChannelResolver.Resolve(request);
+            AssertHas(profile.RequiredChannels, InputActionChannel.UseItem, "phaseblade required");
+            AssertHas(profile.RequiredChannels, InputActionChannel.HotbarSelection, "phaseblade required");
+            AssertHas(profile.RequiredChannels, InputActionChannel.MouseTarget, "phaseblade required");
+            AssertHas(profile.RequiredChannels, InputActionChannel.RawInput, "phaseblade required");
+            if ((profile.RequiredChannels & InputActionChannel.InventorySlot) != 0)
+            {
+                throw new InvalidOperationException("Phaseblade quick switch must not reserve general inventory slots.");
+            }
+        }
+
         private static void ChannelResolverShopUsesNpcAndInventory()
         {
             var request = new InputActionRequest
@@ -3135,6 +3152,41 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void FeatureCatalogExposesPhasebladeQuickSwitchConfig()
+        {
+            var registry = FeatureRegistry.CreateDefault();
+            FeatureDefinition feature;
+            if (!registry.TryGet(FeatureIds.CombatPhasebladeQuickSwitch, out feature) || feature == null)
+            {
+                throw new InvalidOperationException("Expected phaseblade quick switch feature to be registered.");
+            }
+
+            if (!feature.VisibleInMainUi || !feature.IsImplemented)
+            {
+                throw new InvalidOperationException("Phaseblade quick switch config must be visible in the combat UI.");
+            }
+
+            if (feature.DefaultEnabled)
+            {
+                throw new InvalidOperationException("Phaseblade quick switch must default to disabled.");
+            }
+
+            if (feature.CodeDomain != FeatureCodeDomain.Combat ||
+                feature.UserCategory != FeatureUserCategory.Combat)
+            {
+                throw new InvalidOperationException("Phaseblade quick switch must stay Combat code-domain and Combat UI category.");
+            }
+
+            if (!HasRequiredAction(feature, InputActionKind.ItemUse) ||
+                !HasRequiredAction(feature, InputActionKind.SelectHotbarSlot) ||
+                !HasRequiredAction(feature, InputActionKind.RawInput))
+            {
+                throw new InvalidOperationException("Phaseblade quick switch must declare item use, hotbar selection, and raw input requirements.");
+            }
+
+            AssertStringEquals(feature.Description, "按住右键快切快捷栏的光剑", "phaseblade quick switch description");
+        }
+
         private static void WorldGenDebugViewerAndDeveloperMenuAlwaysAvailable()
         {
             var registry = FeatureRegistry.CreateDefault();
@@ -3547,6 +3599,46 @@ namespace JueMingZ.Tests
             AssertContains(json, "\"CombatFlailComboSkippedCount\": 7");
         }
 
+        private static void DiagnosticSnapshotWritesCombatPhasebladeQuickSwitchState()
+        {
+            var snapshot = new DiagnosticSnapshot
+            {
+                CombatPhasebladeQuickSwitchEnabled = true,
+                CombatPhasebladeQuickSwitchRightHeld = true,
+                CombatPhasebladeQuickSwitchEligible = true,
+                CombatPhasebladeQuickSwitchLastDecision = "submitted",
+                CombatPhasebladeQuickSwitchLastReason = "ready",
+                CombatPhasebladeQuickSwitchLastDecisionUtc = new DateTime(2026, 6, 9, 4, 5, 6, DateTimeKind.Utc),
+                CombatPhasebladeQuickSwitchCurrentSlot = 1,
+                CombatPhasebladeQuickSwitchNextSlot = 4,
+                CombatPhasebladeQuickSwitchEligibleSlotCount = 3,
+                CombatPhasebladeQuickSwitchIntervalTicks = 12,
+                CombatPhasebladeQuickSwitchScopedPress = true,
+                CombatPhasebladeQuickSwitchScopedRelease = false,
+                CombatPhasebladeQuickSwitchRestoreOk = true,
+                CombatPhasebladeQuickSwitchAppliedCount = 8,
+                CombatPhasebladeQuickSwitchSkippedCount = 2
+            };
+
+            var json = InvokeDiagnosticSnapshotJson(snapshot);
+
+            AssertContains(json, "\"CombatPhasebladeQuickSwitchEnabled\": true");
+            AssertContains(json, "\"CombatPhasebladeQuickSwitchRightHeld\": true");
+            AssertContains(json, "\"CombatPhasebladeQuickSwitchEligible\": true");
+            AssertContains(json, "\"CombatPhasebladeQuickSwitchLastDecision\": \"submitted\"");
+            AssertContains(json, "\"CombatPhasebladeQuickSwitchLastReason\": \"ready\"");
+            AssertContains(json, "\"CombatPhasebladeQuickSwitchLastDecisionUtc\": \"2026-06-09T04:05:06.0000000Z\"");
+            AssertContains(json, "\"CombatPhasebladeQuickSwitchCurrentSlot\": 1");
+            AssertContains(json, "\"CombatPhasebladeQuickSwitchNextSlot\": 4");
+            AssertContains(json, "\"CombatPhasebladeQuickSwitchEligibleSlotCount\": 3");
+            AssertContains(json, "\"CombatPhasebladeQuickSwitchIntervalTicks\": 12");
+            AssertContains(json, "\"CombatPhasebladeQuickSwitchScopedPress\": true");
+            AssertContains(json, "\"CombatPhasebladeQuickSwitchScopedRelease\": false");
+            AssertContains(json, "\"CombatPhasebladeQuickSwitchRestoreOk\": true");
+            AssertContains(json, "\"CombatPhasebladeQuickSwitchAppliedCount\": 8");
+            AssertContains(json, "\"CombatPhasebladeQuickSwitchSkippedCount\": 2");
+        }
+
         private static void DiagnosticSnapshotWritesFishingIdlePipelineState()
         {
             var snapshot = new DiagnosticSnapshot
@@ -3811,6 +3903,8 @@ namespace JueMingZ.Tests
             settings.WorldAutomationAutoCaptureCritterMode = AutoCaptureCritterModes.Auto;
             settings.MiscAutoCaptureCritterBaitEnabled = false;
             settings.NpcAutoTaxCollectEnabled = true;
+            settings.CombatPhasebladeQuickSwitchEnabled = true;
+            settings.CombatPhasebladeQuickSwitchIntervalTicks = 99;
 
             var snapshot = RuntimeSettingsSnapshot.FromSettings(settings);
 
@@ -3849,6 +3943,26 @@ namespace JueMingZ.Tests
             if (!snapshot.NpcAutoTaxCollectEnabled || !snapshot.NpcAutomationAnyEnabled)
             {
                 throw new InvalidOperationException("Runtime settings snapshot must expose auto tax collect as NPC automation.");
+            }
+
+            if (!snapshot.CombatPhasebladeQuickSwitchEnabled ||
+                snapshot.CombatPhasebladeQuickSwitchIntervalTicks != CombatPhasebladeQuickSwitchSettings.MaxIntervalTicks)
+            {
+                throw new InvalidOperationException("Runtime settings snapshot must expose and clamp phaseblade quick switch settings.");
+            }
+
+            settings.CombatPhasebladeQuickSwitchIntervalTicks = 1;
+            var lowInterval = RuntimeSettingsSnapshot.FromSettings(settings);
+            if (lowInterval.CombatPhasebladeQuickSwitchIntervalTicks != CombatPhasebladeQuickSwitchSettings.MinIntervalTicks)
+            {
+                throw new InvalidOperationException("Runtime settings snapshot must clamp phaseblade quick switch interval to the lower bound.");
+            }
+
+            settings.CombatPhasebladeQuickSwitchIntervalTicks = 0;
+            var defaultInterval = RuntimeSettingsSnapshot.FromSettings(settings);
+            if (defaultInterval.CombatPhasebladeQuickSwitchIntervalTicks != CombatPhasebladeQuickSwitchSettings.DefaultIntervalTicks)
+            {
+                throw new InvalidOperationException("Runtime settings snapshot must normalize missing phaseblade quick switch interval to the default.");
             }
         }
 
@@ -4087,12 +4201,14 @@ namespace JueMingZ.Tests
             var settings = ConfigService.AppSettings;
             var originalCursorAimRadius = settings.CursorAimRadius;
             var originalPlayerAimRadius = settings.PlayerAimRadius;
+            var originalPhasebladeQuickSwitchIntervalTicks = settings.CombatPhasebladeQuickSwitchIntervalTicks;
 
             try
             {
                 RuntimeSettingsSnapshotProvider.ResetForTesting();
                 settings.CursorAimRadius = 3;
                 settings.PlayerAimRadius = 4;
+                settings.CombatPhasebladeQuickSwitchIntervalTicks = CombatPhasebladeQuickSwitchSettings.DefaultIntervalTicks;
                 var first = RuntimeSettingsSnapshotProvider.GetCurrent();
 
                 settings.CursorAimRadius = 8;
@@ -4107,11 +4223,20 @@ namespace JueMingZ.Tests
                 {
                     throw new InvalidOperationException("Runtime settings snapshot provider returned stale normalized values.");
                 }
+
+                settings.CombatPhasebladeQuickSwitchIntervalTicks = 20;
+                var third = RuntimeSettingsSnapshotProvider.GetCurrent();
+                if (object.ReferenceEquals(second, third) ||
+                    third.CombatPhasebladeQuickSwitchIntervalTicks != 20)
+                {
+                    throw new InvalidOperationException("Runtime settings snapshot provider must rebuild after phaseblade quick switch interval mutation.");
+                }
             }
             finally
             {
                 settings.CursorAimRadius = originalCursorAimRadius;
                 settings.PlayerAimRadius = originalPlayerAimRadius;
+                settings.CombatPhasebladeQuickSwitchIntervalTicks = originalPhasebladeQuickSwitchIntervalTicks;
                 RuntimeSettingsSnapshotProvider.ResetForTesting();
             }
         }
@@ -4456,6 +4581,24 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static bool HasRequiredAction(FeatureDefinition feature, InputActionKind kind)
+        {
+            if (feature == null || feature.RequiredActions == null)
+            {
+                return false;
+            }
+
+            for (var index = 0; index < feature.RequiredActions.Count; index++)
+            {
+                if (feature.RequiredActions[index] == kind)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static void FirstRunAppSettingsDefaultsMatchRequestedUiBaseline()
         {
             var settings = AppSettings.CreateDefault();
@@ -4494,6 +4637,8 @@ namespace JueMingZ.Tests
             AssertDefault(!settings.CombatAimTrackDummyEnabled, "combat aim track dummy off");
             AssertDefault(settings.CombatAimMarkerEnabled, "combat aim marker on");
             AssertDefault(!settings.CombatAutoClickerEnabled, "combat auto clicker off");
+            AssertDefault(!settings.CombatPhasebladeQuickSwitchEnabled, "combat phaseblade quick switch off");
+            AssertDefault(settings.CombatPhasebladeQuickSwitchIntervalTicks == CombatPhasebladeQuickSwitchSettings.DefaultIntervalTicks, "combat phaseblade quick switch default interval");
             AssertDefault(!settings.CombatPerfectRevolverEnabled, "combat perfect revolver off");
             AssertDefault(!settings.CombatMagicStringClickerEnabled, "combat magic string clicker off");
             AssertDefault(!settings.CombatAutoFacingEnabled, "combat auto facing off");

@@ -12,6 +12,7 @@ namespace JueMingZ.Actions
         AutoMiningSustainedUse,
         AutoCaptureCritterSustainedUse,
         AutoHarvestSustainedUse,
+        CombatPhasebladeQuickSwitch,
         CombatPerfectRevolver,
         CombatFlailCombo,
         CombatItemCheckAutoClicker,
@@ -28,6 +29,7 @@ namespace JueMingZ.Actions
         public bool AutoMiningActive { get; set; }
         public bool AutoCaptureCritterActive { get; set; }
         public bool AutoHarvestActive { get; set; }
+        public bool PhasebladeQuickSwitchActive { get; set; }
     }
 
     public sealed class ItemCheckWriterDecision
@@ -186,6 +188,18 @@ namespace JueMingZ.Actions
                 return decision;
             }
 
+            if (context.PhasebladeQuickSwitchActive)
+            {
+                decision = BuildDecision(
+                    ItemCheckWriterKind.CombatPhasebladeQuickSwitch,
+                    PhasebladeQuickSwitchBridge.ActiveRequestId,
+                    "phasebladeQuickSwitch",
+                    "phasebladeQuickSwitchActive",
+                    BuildBlockedCandidates(ItemCheckWriterKind.CombatPhasebladeQuickSwitch));
+                RecordDecision(decision);
+                return decision;
+            }
+
             decision = ItemCheckWriterDecision.None.Clone();
             decision.DecidedUtc = DateTime.UtcNow;
             RecordDecision(decision);
@@ -210,6 +224,7 @@ namespace JueMingZ.Actions
                 ";autoMining=" + context.AutoMiningActive +
                 ";autoCapture=" + context.AutoCaptureCritterActive +
                 ";autoHarvest=" + context.AutoHarvestActive +
+                ";phaseblade=" + context.PhasebladeQuickSwitchActive +
                 ";blocked=" + (decision == null ? string.Empty : decision.BlockedCandidatesSummary);
 
             PerformanceHitchRecorder.RecordOperationIfNeeded(
@@ -293,19 +308,22 @@ namespace JueMingZ.Actions
             switch (owner)
             {
                 case ItemCheckWriterKind.ItemUseBridge:
-                    return "UseItemPulseBridge:blockedByItemUseBridge; AutoMiningSustainedUse:blockedByItemUseBridge; AutoCaptureCritterSustainedUse:blockedByItemUseBridge; AutoHarvestSustainedUse:blockedByItemUseBridge; CombatPerfectRevolver:blockedByItemUseBridge; CombatFlailCombo:blockedByItemUseBridge; CombatItemCheckAutoClicker:blockedByItemUseBridge; CombatAim:blockedByItemUseBridge";
+                    return "UseItemPulseBridge:blockedByItemUseBridge; AutoMiningSustainedUse:blockedByItemUseBridge; AutoCaptureCritterSustainedUse:blockedByItemUseBridge; AutoHarvestSustainedUse:blockedByItemUseBridge; CombatPhasebladeQuickSwitch:blockedByItemUseBridge; CombatPerfectRevolver:blockedByItemUseBridge; CombatFlailCombo:blockedByItemUseBridge; CombatItemCheckAutoClicker:blockedByItemUseBridge; CombatAim:blockedByItemUseBridge";
 
                 case ItemCheckWriterKind.AutoMiningSustainedUse:
-                    return "UseItemPulseBridge:blockedByAutoMining; AutoCaptureCritterSustainedUse:blockedByAutoMining; AutoHarvestSustainedUse:blockedByAutoMining; CombatPerfectRevolver:blockedByAutoMining; CombatFlailCombo:blockedByAutoMining; CombatItemCheckAutoClicker:blockedByAutoMining; CombatAim:blockedByAutoMining";
+                    return "UseItemPulseBridge:blockedByAutoMining; AutoCaptureCritterSustainedUse:blockedByAutoMining; AutoHarvestSustainedUse:blockedByAutoMining; CombatPhasebladeQuickSwitch:blockedByAutoMining; CombatPerfectRevolver:blockedByAutoMining; CombatFlailCombo:blockedByAutoMining; CombatItemCheckAutoClicker:blockedByAutoMining; CombatAim:blockedByAutoMining";
 
                 case ItemCheckWriterKind.AutoCaptureCritterSustainedUse:
-                    return "UseItemPulseBridge:blockedByAutoCapture; AutoMiningSustainedUse:blockedByAutoCapture; AutoHarvestSustainedUse:blockedByAutoCapture; CombatPerfectRevolver:blockedByAutoCapture; CombatFlailCombo:blockedByAutoCapture; CombatItemCheckAutoClicker:blockedByAutoCapture; CombatAim:blockedByAutoCapture";
+                    return "UseItemPulseBridge:blockedByAutoCapture; AutoMiningSustainedUse:blockedByAutoCapture; AutoHarvestSustainedUse:blockedByAutoCapture; CombatPhasebladeQuickSwitch:blockedByAutoCapture; CombatPerfectRevolver:blockedByAutoCapture; CombatFlailCombo:blockedByAutoCapture; CombatItemCheckAutoClicker:blockedByAutoCapture; CombatAim:blockedByAutoCapture";
 
                 case ItemCheckWriterKind.AutoHarvestSustainedUse:
-                    return "UseItemPulseBridge:blockedByAutoHarvest; AutoMiningSustainedUse:blockedByAutoHarvest; AutoCaptureCritterSustainedUse:blockedByAutoHarvest; CombatPerfectRevolver:blockedByAutoHarvest; CombatFlailCombo:blockedByAutoHarvest; CombatItemCheckAutoClicker:blockedByAutoHarvest; CombatAim:blockedByAutoHarvest";
+                    return "UseItemPulseBridge:blockedByAutoHarvest; AutoMiningSustainedUse:blockedByAutoHarvest; AutoCaptureCritterSustainedUse:blockedByAutoHarvest; CombatPhasebladeQuickSwitch:blockedByAutoHarvest; CombatPerfectRevolver:blockedByAutoHarvest; CombatFlailCombo:blockedByAutoHarvest; CombatItemCheckAutoClicker:blockedByAutoHarvest; CombatAim:blockedByAutoHarvest";
 
                 case ItemCheckWriterKind.UseItemPulseBridge:
-                    return "CombatPerfectRevolver:blockedByUseItemPulse; CombatFlailCombo:blockedByUseItemPulse; CombatItemCheckAutoClicker:blockedByUseItemPulse";
+                    return "CombatPhasebladeQuickSwitch:blockedByUseItemPulse; CombatPerfectRevolver:blockedByUseItemPulse; CombatFlailCombo:blockedByUseItemPulse; CombatItemCheckAutoClicker:blockedByUseItemPulse";
+
+                case ItemCheckWriterKind.CombatPhasebladeQuickSwitch:
+                    return "CombatPerfectRevolver:blockedByPhasebladeQuickSwitch; CombatFlailCombo:blockedByPhasebladeQuickSwitch; CombatItemCheckAutoClicker:blockedByPhasebladeQuickSwitch; CombatAim:blockedByPhasebladeQuickSwitch";
 
                 case ItemCheckWriterKind.CombatPerfectRevolver:
                     return "CombatFlailCombo:blockedByPerfectRevolver; CombatItemCheckAutoClicker:blockedByPerfectRevolver";

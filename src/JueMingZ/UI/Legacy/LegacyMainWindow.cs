@@ -31,6 +31,7 @@ namespace JueMingZ.UI.Legacy
         private const int CombatSmallToggleHeight = 24;
         private const int CombatAimValueTextWidth = 112;
         private const int CombatAimValueTextHeight = 22;
+        private const string CombatPhasebladeQuickSwitchIntervalSliderId = "combat-phaseblade-quick-switch-interval";
         private const int InformationDividerHeight = 22;
         private const int InformationStyleConfigButtonWidth = 64;
         private const int InformationStylePopupWidth = 368;

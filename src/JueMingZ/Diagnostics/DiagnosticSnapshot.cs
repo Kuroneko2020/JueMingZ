@@ -774,6 +774,21 @@ namespace JueMingZ.Diagnostics
         public bool CombatFlailComboRestoreOk { get; set; }
         public long CombatFlailComboAppliedCount { get; set; }
         public long CombatFlailComboSkippedCount { get; set; }
+        public bool CombatPhasebladeQuickSwitchEnabled { get; set; }
+        public bool CombatPhasebladeQuickSwitchRightHeld { get; set; }
+        public bool CombatPhasebladeQuickSwitchEligible { get; set; }
+        public string CombatPhasebladeQuickSwitchLastDecision { get; set; }
+        public string CombatPhasebladeQuickSwitchLastReason { get; set; }
+        public DateTime? CombatPhasebladeQuickSwitchLastDecisionUtc { get; set; }
+        public int CombatPhasebladeQuickSwitchCurrentSlot { get; set; }
+        public int CombatPhasebladeQuickSwitchNextSlot { get; set; }
+        public int CombatPhasebladeQuickSwitchEligibleSlotCount { get; set; }
+        public int CombatPhasebladeQuickSwitchIntervalTicks { get; set; }
+        public bool CombatPhasebladeQuickSwitchScopedPress { get; set; }
+        public bool CombatPhasebladeQuickSwitchScopedRelease { get; set; }
+        public bool CombatPhasebladeQuickSwitchRestoreOk { get; set; }
+        public long CombatPhasebladeQuickSwitchAppliedCount { get; set; }
+        public long CombatPhasebladeQuickSwitchSkippedCount { get; set; }
         public string CombatItemCheckAutoClickerLastDecision { get; set; }
         public string CombatItemCheckAutoClickerLastReason { get; set; }
         public DateTime? CombatItemCheckAutoClickerLastDecisionUtc { get; set; }
@@ -1115,6 +1130,11 @@ namespace JueMingZ.Diagnostics
             CombatFlailComboLastDecision = string.Empty;
             CombatFlailComboLastReason = string.Empty;
             CombatFlailComboRestoreOk = true;
+            CombatPhasebladeQuickSwitchLastDecision = string.Empty;
+            CombatPhasebladeQuickSwitchLastReason = string.Empty;
+            CombatPhasebladeQuickSwitchCurrentSlot = -1;
+            CombatPhasebladeQuickSwitchNextSlot = -1;
+            CombatPhasebladeQuickSwitchRestoreOk = true;
             CombatItemCheckAutoClickerLastDecision = string.Empty;
             CombatItemCheckAutoClickerLastReason = string.Empty;
             CombatMagicStringClickerLastDecision = string.Empty;

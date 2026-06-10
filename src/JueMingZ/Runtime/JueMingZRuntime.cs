@@ -11,6 +11,7 @@ using JueMingZ.Automation.Movement;
 using JueMingZ.Automation.NpcServices;
 using JueMingZ.Automation.WorldAutomation;
 using JueMingZ.Bootstrap;
+using JueMingZ.Common;
 using JueMingZ.Compat;
 using JueMingZ.Config;
 using JueMingZ.Diagnostics;
@@ -48,7 +49,7 @@ namespace JueMingZ.Runtime
         private static readonly Dictionary<string, long> ServiceSchedulerLastRunTick =
             new Dictionary<string, long>(StringComparer.Ordinal);
 
-        public const string Version = "1.7.496-auto-aim-accuracy-closeout";
+        public const string Version = "1.7.508-combat-ui-slider-text-polish";
 
         public static RuntimeState State { get; private set; } = new RuntimeState();
         public static FeatureRegistry FeatureRegistry { get; private set; }
@@ -410,6 +411,19 @@ namespace JueMingZ.Runtime
             {
                 CombatAutoFacingService.Tick(ActionQueue, gameState, State, settings);
                 RecordOperationTiming(context, "dispatch.combat-auto-facing", operationStart);
+                operationStart = Stopwatch.GetTimestamp();
+            }
+
+            if (ShouldRunService(
+                "combat-phaseblade-quick-switch",
+                settings.CombatPhasebladeQuickSwitchEnabled ||
+                    PhasebladeQuickSwitchBridge.HasActiveUse ||
+                    ActionQueue != null && ActionQueue.IsSourcePendingOrRunning(FeatureIds.CombatPhasebladeQuickSwitch),
+                1,
+                tick))
+            {
+                CombatPhasebladeQuickSwitchRuntimeService.Tick(ActionQueue, gameState, State, settings);
+                RecordOperationTiming(context, "dispatch.combat-phaseblade-quick-switch", operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
@@ -968,6 +982,8 @@ namespace JueMingZ.Runtime
             var autoFacing = CombatAutoFacingService.GetDiagnostics();
             var perfectRevolver = CombatPerfectRevolverService.GetDiagnostics();
             var flailCombo = CombatFlailComboService.GetDiagnostics();
+            var phasebladeQuickSwitch = CombatPhasebladeQuickSwitchRuntimeService.GetDiagnostics();
+            var phasebladeQuickSwitchBridge = PhasebladeQuickSwitchBridge.GetSnapshot();
             var itemCheckAutoClicker = CombatItemCheckAutoClickService.GetDiagnostics();
             var itemCheckWriter = ItemCheckWriterArbiter.GetLastDecision();
             var worldAutomationFairness = WorldAutomationFairnessCoordinator.GetSnapshot();
@@ -976,6 +992,12 @@ namespace JueMingZ.Runtime
             var fishing = FishingAutomationService.GetDiagnostics();
             var settingsSnapshot = RuntimeSettingsSnapshotProvider.GetCurrent();
             var fishingHasResidualState = FishingAutomationService.HasResidualState;
+            var phasebladeQuickSwitchEnabled = settingsSnapshot != null && settingsSnapshot.CombatPhasebladeQuickSwitchEnabled;
+            var phasebladeQuickSwitchIntervalTicks = phasebladeQuickSwitch != null && phasebladeQuickSwitch.IntervalTicks > 0
+                ? phasebladeQuickSwitch.IntervalTicks
+                : settingsSnapshot == null
+                    ? CombatPhasebladeQuickSwitchSettings.DefaultIntervalTicks
+                    : settingsSnapshot.CombatPhasebladeQuickSwitchIntervalTicks;
             var simulatedJump = MovementSimulatedJumpService.GetDiagnostics();
             var continuousDash = MovementContinuousDashService.GetDiagnostics();
             var teleportCorrection = MovementTeleportCorrectionService.GetDiagnostics();
@@ -1753,6 +1775,29 @@ namespace JueMingZ.Runtime
                 CombatFlailComboRestoreOk = flailCombo == null || flailCombo.RestoreOk,
                 CombatFlailComboAppliedCount = flailCombo == null ? 0 : flailCombo.AppliedCount,
                 CombatFlailComboSkippedCount = flailCombo == null ? 0 : flailCombo.SkippedCount,
+                CombatPhasebladeQuickSwitchEnabled = phasebladeQuickSwitchEnabled,
+                CombatPhasebladeQuickSwitchRightHeld = phasebladeQuickSwitchEnabled && phasebladeQuickSwitch != null && phasebladeQuickSwitch.RightHeld,
+                CombatPhasebladeQuickSwitchEligible = phasebladeQuickSwitchEnabled && phasebladeQuickSwitch != null && phasebladeQuickSwitch.Eligible,
+                CombatPhasebladeQuickSwitchLastDecision = phasebladeQuickSwitchEnabled
+                    ? phasebladeQuickSwitch == null ? string.Empty : phasebladeQuickSwitch.LastDecision
+                    : "disabled",
+                CombatPhasebladeQuickSwitchLastReason = phasebladeQuickSwitchEnabled
+                    ? phasebladeQuickSwitch == null ? string.Empty : phasebladeQuickSwitch.LastReason
+                    : "disabled",
+                CombatPhasebladeQuickSwitchLastDecisionUtc = phasebladeQuickSwitch == null ? null : phasebladeQuickSwitch.LastDecisionUtc,
+                CombatPhasebladeQuickSwitchCurrentSlot = phasebladeQuickSwitchEnabled && phasebladeQuickSwitch != null ? phasebladeQuickSwitch.CurrentSlot : -1,
+                CombatPhasebladeQuickSwitchNextSlot = phasebladeQuickSwitchEnabled && phasebladeQuickSwitch != null ? phasebladeQuickSwitch.NextSlot : -1,
+                CombatPhasebladeQuickSwitchEligibleSlotCount = phasebladeQuickSwitchEnabled && phasebladeQuickSwitch != null ? phasebladeQuickSwitch.EligibleSlotCount : 0,
+                CombatPhasebladeQuickSwitchIntervalTicks = phasebladeQuickSwitchIntervalTicks,
+                CombatPhasebladeQuickSwitchScopedPress = phasebladeQuickSwitchBridge != null &&
+                                                        phasebladeQuickSwitchBridge.LastAppliedTick != long.MinValue &&
+                                                        phasebladeQuickSwitchBridge.LastAppliedPress,
+                CombatPhasebladeQuickSwitchScopedRelease = phasebladeQuickSwitchBridge != null &&
+                                                          phasebladeQuickSwitchBridge.LastAppliedTick != long.MinValue &&
+                                                          !phasebladeQuickSwitchBridge.LastAppliedPress,
+                CombatPhasebladeQuickSwitchRestoreOk = phasebladeQuickSwitchBridge == null || phasebladeQuickSwitchBridge.LastRestoreSucceeded,
+                CombatPhasebladeQuickSwitchAppliedCount = phasebladeQuickSwitchBridge == null ? 0 : phasebladeQuickSwitchBridge.ApplyCount,
+                CombatPhasebladeQuickSwitchSkippedCount = phasebladeQuickSwitch == null ? 0 : phasebladeQuickSwitch.SkippedCount,
                 CombatItemCheckAutoClickerLastDecision = itemCheckAutoClicker == null ? string.Empty : itemCheckAutoClicker.LastDecision,
                 CombatItemCheckAutoClickerLastReason = itemCheckAutoClicker == null ? string.Empty : itemCheckAutoClicker.LastReason,
                 CombatItemCheckAutoClickerLastDecisionUtc = itemCheckAutoClicker == null ? null : itemCheckAutoClicker.LastDecisionUtc,

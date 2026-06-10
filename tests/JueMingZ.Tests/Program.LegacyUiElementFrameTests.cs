@@ -240,5 +240,28 @@ namespace JueMingZ.Tests
                 throw new InvalidOperationException("Expected tooltip content changes to be recorded as cache misses, not stale hits.");
             }
         }
+
+        private static void LegacyCombatAimRadiusStatusTextReflectsZeroDisabled()
+        {
+            if (!string.Equals(LegacyMainWindow.BuildCombatAimRadiusStatusTextForTesting(12, false), "鼠标半径 12", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected mouse-center combat aim radius to display the numeric mouse radius.");
+            }
+
+            if (!string.Equals(LegacyMainWindow.BuildCombatAimRadiusStatusTextForTesting(0, false), "已关闭自瞄", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected zero mouse-center combat aim radius to display disabled text.");
+            }
+
+            if (!string.Equals(LegacyMainWindow.BuildCombatAimRadiusStatusTextForTesting(0, true), "已关闭自瞄", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected player-center combat aim label to stay disabled when the mouse radius setting is zero.");
+            }
+
+            if (!string.Equals(LegacyMainWindow.BuildCombatAimRadiusStatusTextForTesting(12, true), "屏幕范围", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected nonzero player-center combat aim radius to keep the screen range label.");
+            }
+        }
     }
 }

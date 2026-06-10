@@ -2260,6 +2260,16 @@ namespace JueMingZ.Input
                     ? "链球连击已开启：手持链球长按右键时，会在原版右键无意义的安全场景中用 ItemCheck 节奏触发连击。"
                     : "链球连击已关闭。";
             }
+            else if (string.Equals(option, "phasebladeQuickSwitch", StringComparison.Ordinal))
+            {
+                changed = settings.CombatPhasebladeQuickSwitchEnabled != enabled;
+                settings.CombatPhasebladeQuickSwitchEnabled = enabled;
+                scenario = "Ui.Toggle.CombatPhasebladeQuickSwitch";
+                implemented = true;
+                message = enabled
+                    ? "光剑快切已开启：本阶段只保存配置，实际右键快切运行逻辑由后续治理阶段接入。"
+                    : "光剑快切已关闭。";
+            }
             else if (string.Equals(option, "perfectRevolver", StringComparison.Ordinal))
             {
                 changed = settings.CombatPerfectRevolverEnabled != enabled;
@@ -2336,6 +2346,27 @@ namespace JueMingZ.Input
                 BuildCombatUiStateJson(),
                 "{\"submitted\":false,\"implemented\":" + BoolRaw(implemented) + ",\"enabled\":" + BoolRaw(enabled) + ",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
                 "Button");
+        }
+
+        private static void SetCombatPhasebladeQuickSwitchInterval(LegacyUiCommand command)
+        {
+            var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
+            var before = BuildCombatUiStateJson();
+            var value = CombatPhasebladeQuickSwitchSettings.NormalizeIntervalTicks(command.IntValue);
+            var changed = settings.CombatPhasebladeQuickSwitchIntervalTicks != value;
+            settings.CombatPhasebladeQuickSwitchIntervalTicks = value;
+            ConfigService.SaveAll();
+            Record(
+                command,
+                "Ui.Slider.CombatPhasebladeQuickSwitchInterval",
+                "UI",
+                changed ? "Succeeded" : "NotApplicable",
+                "光剑快切间隔设置为 " + value.ToString(CultureInfo.InvariantCulture) + " tick。",
+                before,
+                BuildCombatUiStateJson(),
+                "{\"submitted\":false,\"implemented\":true,\"intervalTicks\":" + IntRaw(value) + ",\"minIntervalTicks\":" + IntRaw(CombatPhasebladeQuickSwitchSettings.MinIntervalTicks) + ",\"maxIntervalTicks\":" + IntRaw(CombatPhasebladeQuickSwitchSettings.MaxIntervalTicks) + ",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                "UI");
+            LegacyUiInput.ClearPendingSlider(command.ElementId);
         }
 
         private static void SetFishingFeatureEnabled(LegacyUiCommand command, string payload)

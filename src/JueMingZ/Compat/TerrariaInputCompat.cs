@@ -1918,6 +1918,47 @@ namespace JueMingZ.Compat
             return ok ? ClearInputError() : Fail("Cannot apply use item pulse input override.");
         }
 
+        public static bool TryApplyPhasebladeQuickSwitchForItemCheck(object player, bool pressed)
+        {
+            if (player == null)
+            {
+                return Fail("Cannot apply phaseblade quick switch: player unavailable.");
+            }
+
+            // Controlled input write: phaseblade quick switch uses a scoped
+            // left-click press/release while suppressing the held right-click gate.
+            return ApplyUseItemTakeoverFields(player, pressed, false, true)
+                ? ClearInputError()
+                : Fail("Cannot apply phaseblade quick switch input override.");
+        }
+
+        public static bool TryApplyPhasebladeQuickSwitchPostItemCheckState(object player, bool pressed)
+        {
+            if (player == null)
+            {
+                return Fail("Cannot apply phaseblade quick switch post-ItemCheck state: player unavailable.");
+            }
+
+            // Phaseblade projectile AI checks the owner's held item and controlUseItem
+            // after ItemCheck. Keep only the synthetic left-button lifecycle visible
+            // across that boundary; mouse target and slot restoration stay scoped.
+            var ok = SetMember(player, "controlUseItem", pressed);
+            ok &= SetMember(player, "releaseUseItem", !pressed);
+
+            var mainType = ResolveMainTypeForInputWrite();
+            if (mainType != null)
+            {
+                TrySetStaticIfExists(mainType, "mouseLeft", pressed);
+                TrySetStaticIfExists(mainType, "mouseLeftRelease", !pressed);
+                TrySetStaticIfExists(mainType, "mouseRight", false);
+                TrySetStaticIfExists(mainType, "mouseRightRelease", false);
+            }
+
+            return ok
+                ? ClearInputError()
+                : Fail("Cannot apply phaseblade quick switch post-ItemCheck input state.");
+        }
+
         public static bool TryApplyUseItemReleaseForItemCheck(object player)
         {
             if (player == null)

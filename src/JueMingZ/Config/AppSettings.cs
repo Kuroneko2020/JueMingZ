@@ -125,6 +125,12 @@ namespace JueMingZ.Config
         [DataMember(Order = 175)]
         public bool CombatFlailComboEnabled { get; set; }
 
+        [DataMember(Order = 185)]
+        public bool CombatPhasebladeQuickSwitchEnabled { get; set; }
+
+        [DataMember(Order = 186)]
+        public int CombatPhasebladeQuickSwitchIntervalTicks { get; set; } = CombatPhasebladeQuickSwitchSettings.DefaultIntervalTicks;
+
         [DataMember(Order = 37)]
         public bool CombatPerfectRevolverEnabled { get; set; }
 
@@ -751,6 +757,8 @@ namespace JueMingZ.Config
                 CombatAimMarkerEnabled = true,
                 CombatAutoClickerEnabled = false,
                 CombatFlailComboEnabled = false,
+                CombatPhasebladeQuickSwitchEnabled = false,
+                CombatPhasebladeQuickSwitchIntervalTicks = CombatPhasebladeQuickSwitchSettings.DefaultIntervalTicks,
                 CombatPerfectRevolverEnabled = false,
                 CombatMagicStringClickerEnabled = false,
                 CombatAutoFacingEnabled = false,

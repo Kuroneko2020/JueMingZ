@@ -22,6 +22,10 @@ namespace JueMingZ.Hooks
             public bool AutoMiningSustainedUseApplied;
             public bool AutoHarvestSustainedUseApplied;
             public bool AutoCaptureCritterSustainedUseApplied;
+            public bool PhasebladeQuickSwitchApplied;
+            public bool PhasebladeQuickSwitchPressed;
+            public bool PhasebladeQuickSwitchReleased;
+            public bool PhasebladeQuickSwitchAllowCombatAim;
             public bool AutoClickerTakeoverApplied;
             public bool FlailComboTakeoverApplied;
             public bool PerfectRevolverTakeoverApplied;
@@ -33,11 +37,13 @@ namespace JueMingZ.Hooks
             public Guid AutoMiningSustainedUseRequestId;
             public Guid AutoHarvestSustainedUseRequestId;
             public Guid AutoCaptureCritterSustainedUseRequestId;
+            public Guid PhasebladeQuickSwitchRequestId;
             public UseItemInputState RestoreState;
             public UseItemInputState PulseRestoreState;
             public UseItemInputState AutoMiningSustainedUseRestoreState;
             public UseItemInputState AutoHarvestSustainedUseRestoreState;
             public UseItemInputState AutoCaptureCritterSustainedUseRestoreState;
+            public UseItemInputState PhasebladeQuickSwitchRestoreState;
             public MouseTargetInputState AimRestoreState;
             public MouseTargetInputState BridgeMouseRestoreState;
             public MouseTargetInputState AutoMiningSustainedUseMouseRestoreState;
@@ -304,6 +310,15 @@ namespace JueMingZ.Hooks
                     RestorePulseInput(__instance, __state.PulseRestoreState);
                 }
 
+                if (__state.PhasebladeQuickSwitchApplied)
+                {
+                    RestorePhasebladeQuickSwitchUse(
+                        __instance,
+                        __state.PhasebladeQuickSwitchRequestId,
+                        __state.PhasebladeQuickSwitchRestoreState,
+                        __state.PhasebladeQuickSwitchPressed);
+                }
+
                 if (__state.AutoMiningSustainedUseApplied)
                 {
                     RestoreAutoMiningSustainedUse(__instance, __state.AutoMiningSustainedUseRestoreState, __state.AutoMiningSustainedUseMouseRestoreState);
@@ -568,7 +583,8 @@ namespace JueMingZ.Hooks
                     UseItemPulseActive = pulseApplied,
                     AutoMiningActive = autoMiningApplied,
                     AutoHarvestActive = autoHarvestApplied,
-                    AutoCaptureCritterActive = autoCaptureApplied
+                    AutoCaptureCritterActive = autoCaptureApplied,
+                    PhasebladeQuickSwitchActive = PhasebladeQuickSwitchBridge.HasActiveUse
                 },
                 out decision);
         }
@@ -591,7 +607,8 @@ namespace JueMingZ.Hooks
                     UseItemPulseActive = pulseApplied,
                     AutoMiningActive = autoMiningApplied,
                     AutoHarvestActive = autoHarvestApplied,
-                    AutoCaptureCritterActive = autoCaptureApplied
+                    AutoCaptureCritterActive = autoCaptureApplied,
+                    PhasebladeQuickSwitchActive = PhasebladeQuickSwitchBridge.HasActiveUse
                 },
                 out decision);
         }
@@ -623,7 +640,8 @@ namespace JueMingZ.Hooks
                 UseItemPulseActive = UseItemPulseBridge.HasActivePulse,
                 AutoMiningActive = AutoMiningSustainedUseBridge.HasActiveUse,
                 AutoCaptureCritterActive = AutoCaptureCritterSustainedUseBridge.HasActiveUse,
-                AutoHarvestActive = AutoHarvestSustainedUseBridge.HasActiveUse
+                AutoHarvestActive = AutoHarvestSustainedUseBridge.HasActiveUse,
+                PhasebladeQuickSwitchActive = PhasebladeQuickSwitchBridge.HasActiveUse
             };
         }
 
@@ -706,6 +724,38 @@ namespace JueMingZ.Hooks
                         "sustainedUse",
                         decision.Reason,
                         decision.BlockedCandidatesSummary);
+                }
+
+                CombatItemCheckAutoClickService.RecordExternalSkip(decision.Reason);
+                return true;
+            }
+
+            if (decision.Owner == ItemCheckWriterKind.CombatPhasebladeQuickSwitch)
+            {
+                PhasebladeQuickSwitchApplyResult phasebladeUse;
+                if (PhasebladeQuickSwitchBridge.TryApplyItemCheckUse(player, out phasebladeUse) && phasebladeUse != null)
+                {
+                    state.FollowUseObservation = null;
+                    state.PhasebladeQuickSwitchApplied = true;
+                    state.PhasebladeQuickSwitchRequestId = phasebladeUse.RequestId;
+                    state.PhasebladeQuickSwitchPressed = phasebladeUse.Pressed;
+                    state.PhasebladeQuickSwitchReleased = phasebladeUse.Released;
+                    state.PhasebladeQuickSwitchAllowCombatAim = phasebladeUse.AllowCombatAim;
+                    state.PhasebladeQuickSwitchRestoreState = phasebladeUse.RestoreState;
+                    ItemCheckWriterArbiter.RecordApplied(
+                        ItemCheckWriterKind.CombatPhasebladeQuickSwitch,
+                        phasebladeUse.RequestId,
+                        phasebladeUse.Pressed ? "press" : "release",
+                        decision.Reason,
+                        decision.BlockedCandidatesSummary);
+
+                    // Phaseblade quick switch reuses the normal ItemCheck aim
+                    // path on both press and release ticks; release-on-use
+                    // swords need the existing release-hold aim edge intact.
+                    if (phasebladeUse.AllowCombatAim && (phasebladeUse.Pressed || phasebladeUse.Released))
+                    {
+                        TryApplyCombatAim(player, ref state, false);
+                    }
                 }
 
                 CombatItemCheckAutoClickService.RecordExternalSkip(decision.Reason);
@@ -887,6 +937,26 @@ namespace JueMingZ.Hooks
                     TimeSpan.FromSeconds(10),
                     "ItemUseHookCallbacks",
                     "ItemCheck pulse input restore failed; exception swallowed.", restoreError);
+            }
+        }
+
+        private static void RestorePhasebladeQuickSwitchUse(object player, Guid requestId, UseItemInputState restoreState, bool pressed)
+        {
+            try
+            {
+                var restored = TerrariaInputCompat.TryRestoreUseItemInputState(player, restoreState);
+                var postItemCheckStateApplied = TerrariaInputCompat.TryApplyPhasebladeQuickSwitchPostItemCheckState(player, pressed);
+                PhasebladeQuickSwitchBridge.RecordRestoreStatus(requestId, restored && postItemCheckStateApplied);
+            }
+            catch (Exception restoreError)
+            {
+                PhasebladeQuickSwitchBridge.RecordRestoreStatus(requestId, false);
+                RuntimeDiagnostics.RecordError("ItemUseHookCallbacks.PhasebladeQuickSwitchRestore", restoreError);
+                LogThrottle.ErrorThrottled(
+                    "itemcheck-phaseblade-quick-switch-restore-failed",
+                    TimeSpan.FromSeconds(10),
+                    "ItemUseHookCallbacks",
+                    "Phaseblade quick switch ItemCheck input restore failed; exception swallowed.", restoreError);
             }
         }
 

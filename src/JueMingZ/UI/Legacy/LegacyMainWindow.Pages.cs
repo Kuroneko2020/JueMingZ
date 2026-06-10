@@ -58,6 +58,8 @@ namespace JueMingZ.UI.Legacy
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "链球连击", settings.CombatFlailComboEnabled, "combat-flail-combo-mode:", "长按右键触发连击") ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
+            hovered = DrawCombatPhasebladeQuickSwitchRow(spriteBatch, area, mouse, elements, y, settings) ?? hovered;
+            y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "完美左轮", settings.CombatPerfectRevolverEnabled, "combat-perfect-revolver-mode:", "最大程度发挥左轮威力") ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "省力魔法绳", settings.CombatMagicStringClickerEnabled, "combat-magic-string-clicker-mode:", "长按实现装备魔法绳连点的效果") ?? hovered;

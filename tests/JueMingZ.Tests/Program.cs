@@ -633,6 +633,7 @@ namespace JueMingZ.Tests
             Run("channel resolver maps auto harvest sustained raw input", ref failed, ChannelResolverAutoHarvestSustainedUse);
             Run("channel resolver maps auto mining sustained raw input", ref failed, ChannelResolverAutoMiningSustainedUse);
             Run("channel resolver maps auto capture sustained raw input", ref failed, ChannelResolverAutoCaptureCritterSustainedUse);
+            Run("channel resolver maps phaseblade quick switch raw input", ref failed, ChannelResolverPhasebladeQuickSwitch);
             Run("channel resolver maps shop to npc and inventory", ref failed, ChannelResolverShopUsesNpcAndInventory);
             Run("channel resolver maps trash slot to inventory", ref failed, ChannelResolverTrashSlotUsesInventory);
             Run("channel resolver maps reforge to npc and inventory", ref failed, ChannelResolverReforgeUsesNpcAndInventory);
@@ -731,12 +732,14 @@ namespace JueMingZ.Tests
             Run("diagnostic snapshot writes auto harvest state", ref failed, DiagnosticSnapshotWritesAutoHarvestState);
             Run("diagnostic snapshot writes combat ItemCheck auto clicker state", ref failed, DiagnosticSnapshotWritesCombatItemCheckAutoClickerState);
             Run("diagnostic snapshot writes combat flail combo state", ref failed, DiagnosticSnapshotWritesCombatFlailComboState);
+            Run("diagnostic snapshot writes combat phaseblade quick switch state", ref failed, DiagnosticSnapshotWritesCombatPhasebladeQuickSwitchState);
             Run("diagnostic snapshot writes fishing idle pipeline state", ref failed, DiagnosticSnapshotWritesFishingIdlePipelineState);
             Run("performance hitch recorder detects runtime gaps", ref failed, PerformanceHitchRecorderDetectsRuntimeGaps);
             Run("performance operation recorder uses scenario thresholds", ref failed, PerformanceOperationRecorderUsesScenarioThresholds);
             Run("diagnostic snapshot writes performance hitch state", ref failed, DiagnosticSnapshotWritesPerformanceHitchState);
             Run("feature catalog exposes implemented misc inventory automation", ref failed, FeatureCatalogExposesImplementedMiscInventoryAutomation);
             Run("feature catalog exposes goblin execution", ref failed, FeatureCatalogExposesGoblinExecution);
+            Run("feature catalog exposes phaseblade quick switch config", ref failed, FeatureCatalogExposesPhasebladeQuickSwitchConfig);
             Run("first-run app settings defaults match requested UI baseline", ref failed, FirstRunAppSettingsDefaultsMatchRequestedUiBaseline);
             Run("auto capture critter mode aliases preserve legacy bool", ref failed, AutoCaptureCritterModeAliasesPreserveLegacyBool);
             Run("app settings code-domain aliases preserve misc storage", ref failed, AppSettingsCodeDomainAliasesPreserveMiscStorage);
@@ -774,6 +777,15 @@ namespace JueMingZ.Tests
             Run("combat ItemCheck auto clicker yields to adjacent scoped use", ref failed, CombatItemCheckAutoClickerYieldsToAdjacentScopedUse);
             Run("combat ItemCheck auto clicker takeover restores input state", ref failed, CombatItemCheckAutoClickerTakeoverRestoresInputState);
             Run("combat ItemCheck auto clicker diagnostics record scoped decision", ref failed, CombatItemCheckAutoClickerDiagnosticsRecordScopedDecision);
+            Run("combat phaseblade quick switch recognizes fixed item list", ref failed, CombatPhasebladeQuickSwitchRecognizesFixedItemList);
+            Run("combat phaseblade quick switch scans hotbar only", ref failed, CombatPhasebladeQuickSwitchScansHotbarOnly);
+            Run("combat phaseblade quick switch state machine cycles actions", ref failed, CombatPhasebladeQuickSwitchStateMachineCyclesActions);
+            Run("combat phaseblade quick switch state machine resets and clamps", ref failed, CombatPhasebladeQuickSwitchStateMachineResetsAndClamps);
+            Run("combat phaseblade quick switch raw input executor lifecycle", ref failed, CombatPhasebladeQuickSwitchRawInputExecutorLifecycle);
+            Run("combat phaseblade quick switch bridge applies scoped input and leaves last slot", ref failed, CombatPhasebladeQuickSwitchBridgeAppliesScopedInputAndLeavesLastSlot);
+            Run("combat phaseblade quick switch runtime guard submits right held request", ref failed, CombatPhasebladeQuickSwitchRuntimeGuardSubmitsRightHeldRequest);
+            Run("combat phaseblade quick switch runtime guard blocks unsafe context", ref failed, CombatPhasebladeQuickSwitchRuntimeGuardBlocksUnsafeContext);
+            Run("combat phaseblade quick switch diagnostics record profile summary", ref failed, CombatPhasebladeQuickSwitchDiagnosticsRecordProfileSummary);
             Run("combat flail combo core launches releases and recalls", ref failed, CombatFlailComboCoreLaunchesReleasesAndRecalls);
             Run("combat flail combo blocks vanilla right click semantics", ref failed, CombatFlailComboBlocksVanillaRightClickSemantics);
             Run("combat flail combo item set guard fails closed", ref failed, CombatFlailComboItemSetGuardFailsClosed);
@@ -783,6 +795,7 @@ namespace JueMingZ.Tests
             Run("combat flail combo yields to adjacent scoped use", ref failed, CombatFlailComboYieldsToAdjacentScopedUse);
             Run("ItemCheck writer arbiter prioritizes bridge over combat writers", ref failed, ItemCheckWriterArbiterPrioritizesBridgeOverCombatWriters);
             Run("ItemCheck writer arbiter selects single world automation writer", ref failed, ItemCheckWriterArbiterSelectsSingleWorldAutomationWriter);
+            Run("ItemCheck writer arbiter owns phaseblade quick switch after adjacent writers", ref failed, ItemCheckWriterArbiterOwnsPhasebladeQuickSwitchAfterAdjacentWriters);
             Run("combat aim flail release yields to active ItemCheck writer", ref failed, CombatAimFlailReleaseYieldsToActiveItemCheckWriter);
             Run("world automation fairness coordinator rotates runtime winners", ref failed, WorldAutomationFairnessCoordinatorRotatesRuntimeWinners);
             Run("combat flail combo diagnostics record scoped decision", ref failed, CombatFlailComboDiagnosticsRecordScopedDecision);
@@ -1023,6 +1036,7 @@ namespace JueMingZ.Tests
             Run("legacy UI context hover uses cached element id", ref failed, LegacyUiContextHoverUsesCachedElementId);
             Run("legacy UI tooltip cache reuses stable hover model", ref failed, LegacyUiTooltipCacheReusesStableHoverModel);
             Run("legacy UI tooltip cache dirties on content change", ref failed, LegacyUiTooltipCacheDirtiesOnContentChange);
+            Run("legacy combat aim radius status text reflects zero disabled", ref failed, LegacyCombatAimRadiusStatusTextReflectsZeroDisabled);
             Run("legacy UI overlay coordinator draws after page content", ref failed, LegacyUiOverlayCoordinatorDrawsAfterPageContent);
             Run("legacy UI overlay request rejects invalid contract", ref failed, LegacyUiOverlayRequestRejectsInvalidContract);
             Run("legacy UI overlay modal blocker stops lower hover and click", ref failed, LegacyUiOverlayModalBlockerStopsLowerHoverAndClick);

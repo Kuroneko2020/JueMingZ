@@ -2,6 +2,7 @@ using System;
 using System.Globalization;
 using JueMingZ.Common;
 using JueMingZ.Compat;
+using JueMingZ.Config;
 using JueMingZ.Diagnostics;
 using JueMingZ.GameState;
 
@@ -14,6 +15,7 @@ namespace JueMingZ.Actions.Executors
         private const string ModeAutoMiningSustainedUse = "AutoMiningSustainedUse";
         private const string ModeAutoHarvestSustainedUse = "AutoHarvestSustainedUse";
         private const string ModeAutoCaptureCritterSustainedUse = "AutoCaptureCritterSustainedUse";
+        private const string ModePhasebladeQuickSwitch = "PhasebladeQuickSwitch";
         private const string AutoCapturePendingBugNetSelectionState = "AutoCapturePendingBugNetSelection";
         private const string AutoCaptureTargetSlotState = "AutoCaptureTargetSlot";
         private const string AutoCaptureOriginalSelectedSlotState = "AutoCaptureOriginalSelectedSlot";
@@ -48,6 +50,11 @@ namespace JueMingZ.Actions.Executors
             if (string.Equals(mode, ModeAutoCaptureCritterSustainedUse, StringComparison.OrdinalIgnoreCase))
             {
                 return StartAutoCaptureCritterSustainedUse(execution, snapshot);
+            }
+
+            if (string.Equals(mode, ModePhasebladeQuickSwitch, StringComparison.OrdinalIgnoreCase))
+            {
+                return StartPhasebladeQuickSwitch(execution, snapshot);
             }
 
             if (!string.Equals(mode, ModeMagicStringClicker, StringComparison.OrdinalIgnoreCase))
@@ -211,6 +218,36 @@ namespace JueMingZ.Actions.Executors
             return InputActionExecutionStepResult.Running("Auto mining sustained use started.");
         }
 
+        private static InputActionExecutionStepResult StartPhasebladeQuickSwitch(InputActionExecution execution, GameStateSnapshot snapshot)
+        {
+            if (IsBlockedForCombatInput(snapshot))
+            {
+                return CompleteWithCode(execution, InputActionStatus.BlockedByUi, DiagnosticResultCode.BlockedByUi, "Phaseblade quick switch did not start: world input is blocked.");
+            }
+
+            var intervalTicks = GetMetadataInt(execution, "PhasebladeQuickSwitchIntervalTicks", CombatPhasebladeQuickSwitchSettings.DefaultIntervalTicks);
+            var allowCombatAim = string.Equals(GetMetadataString(execution, "AllowCombatAim", "true"), "true", StringComparison.OrdinalIgnoreCase);
+            string message;
+            // The phaseblade bridge owns only lifecycle and scoped ItemCheck
+            // press/release; later right-click gates may decide when to enqueue it.
+            if (!PhasebladeQuickSwitchBridge.TryBegin(
+                execution.Request.RequestId,
+                execution.Request.SourceFeatureId,
+                GetMetadataString(execution, ActionMetadataKeys.Scenario, ScenarioNames.CombatPhasebladeQuickSwitch),
+                intervalTicks,
+                allowCombatAim,
+                execution.Request.Timeout,
+                out message))
+            {
+                return CompleteWithCode(execution, InputActionStatus.Failed, DiagnosticResultCode.Failed, message);
+            }
+
+            execution.State["PhasebladeQuickSwitchIntervalTicks"] = CombatPhasebladeQuickSwitchSettings.NormalizeIntervalTicks(intervalTicks).ToString(CultureInfo.InvariantCulture);
+            execution.State["PhasebladeQuickSwitchAllowCombatAim"] = allowCombatAim ? "true" : "false";
+            SetResultCode(execution, DiagnosticResultCode.Queued);
+            return InputActionExecutionStepResult.Running("Phaseblade quick switch bridge started.");
+        }
+
         private static InputActionExecutionStepResult StartAutoCaptureCritterSustainedUse(InputActionExecution execution, GameStateSnapshot snapshot)
         {
             if (IsBlockedForCombatInput(snapshot))
@@ -352,6 +389,11 @@ namespace JueMingZ.Actions.Executors
                 return UpdateAutoCaptureCritterSustainedUse(execution, snapshot);
             }
 
+            if (string.Equals(mode, ModePhasebladeQuickSwitch, StringComparison.OrdinalIgnoreCase))
+            {
+                return UpdatePhasebladeQuickSwitch(execution, snapshot);
+            }
+
             var blocked = IsBlockedForCombatInput(snapshot);
             var pulse = UseItemPulseBridge.Update(
                 execution.Request.RequestId,
@@ -420,6 +462,31 @@ namespace JueMingZ.Actions.Executors
             }
 
             RecordAutoMiningSustainedCompletionEvent(execution, use);
+            SetResultCode(execution, use.ResultCode);
+            MarkActionEventRecorded(execution);
+            return InputActionExecutionStepResult.Complete(use.Status, use.Message);
+        }
+
+        private static InputActionExecutionStepResult UpdatePhasebladeQuickSwitch(InputActionExecution execution, GameStateSnapshot snapshot)
+        {
+            var blocked = IsBlockedForCombatInput(snapshot);
+            var use = PhasebladeQuickSwitchBridge.Update(
+                execution.Request.RequestId,
+                blocked,
+                blocked ? "Phaseblade quick switch stopped: world input is blocked." : string.Empty);
+
+            if (use != null && use.Status == InputActionStatus.Running)
+            {
+                return InputActionExecutionStepResult.Running(use.Message);
+            }
+
+            if (use == null)
+            {
+                SetResultCode(execution, DiagnosticResultCode.Failed);
+                return InputActionExecutionStepResult.Complete(InputActionStatus.Failed, "Phaseblade quick switch state was lost.");
+            }
+
+            RecordPhasebladeQuickSwitchCompletionEvent(execution, use);
             SetResultCode(execution, use.ResultCode);
             MarkActionEventRecorded(execution);
             return InputActionExecutionStepResult.Complete(use.Status, use.Message);
@@ -540,6 +607,11 @@ namespace JueMingZ.Actions.Executors
                     // Cancel must release bridge ownership and restore any preselected
                     // bug net slot before the queue records the terminal cancellation.
                     TryRestoreAutoCaptureOriginalSelection(execution);
+                }
+                else if (string.Equals(mode, ModePhasebladeQuickSwitch, StringComparison.OrdinalIgnoreCase))
+                {
+                    defaultReason = "Phaseblade quick switch cancelled.";
+                    PhasebladeQuickSwitchBridge.Cancel(execution.Request.RequestId, reason ?? defaultReason);
                 }
                 else
                 {
@@ -731,6 +803,59 @@ namespace JueMingZ.Actions.Executors
             DiagnosticActionRecorder.RecordCustomEvent(
                 execution.Request.RequestId,
                 GetMetadata(execution, "Scenario", "WorldAutomation.AutoMining"),
+                InputActionKind.RawInput.ToString(),
+                GetMetadata(execution, "SourceHotkey", string.Empty),
+                use.Status.ToString(),
+                use.ResultCode.ToString(),
+                use.Message,
+                use.DurationMs,
+                beforeJson,
+                afterJson,
+                verificationJson,
+                GetMetadata(execution, "SourceKind", string.Empty),
+                GetMetadata(execution, "SourceUi", string.Empty),
+                GetMetadata(execution, "ButtonId", string.Empty),
+                GetMetadata(execution, "ButtonLabel", string.Empty));
+        }
+
+        private static void RecordPhasebladeQuickSwitchCompletionEvent(InputActionExecution execution, PhasebladeQuickSwitchBridgeSnapshot use)
+        {
+            if (execution == null || execution.Request == null || use == null)
+            {
+                return;
+            }
+
+            var beforeJson = "{" +
+                             "\"selectedSlot\":" + SlotRaw(use.LastSelectedSlot) + "," +
+                             "\"selectedSlotDisplay\":" + SlotDisplayRaw(use.LastSelectedSlot) + "," +
+                             "\"itemType\":" + IntRaw(use.LastItemType) + "," +
+                             "\"intervalTicks\":" + IntRaw(use.IntervalTicks) + "," +
+                             "\"eligibleSlotCount\":" + IntRaw(GetMetadataInt(execution, "PhasebladeQuickSwitchEligibleSlotCount", 0)) + "," +
+                             "\"nextSlot\":" + SlotRaw(GetMetadataInt(execution, "PhasebladeQuickSwitchNextSlot", -1)) +
+                             "}";
+            var afterJson = "{" +
+                            "\"itemCheckApplyCount\":" + IntRaw(use.ApplyCount) + "," +
+                            "\"pressCount\":" + IntRaw(use.PressCount) + "," +
+                            "\"releaseCount\":" + IntRaw(use.ReleaseCount) + "," +
+                            "\"switchRequestCount\":" + IntRaw(use.SwitchRequestCount) + "," +
+                            "\"restoreSuccessCount\":" + IntRaw(use.RestoreSuccessCount) + "," +
+                            "\"restoreOk\":" + BoolRaw(use.LastRestoreSucceeded) + "," +
+                            "\"lastTargetSlot\":" + SlotRaw(use.LastTargetSlot) + "," +
+                            "\"lastTargetSlotDisplay\":" + SlotDisplayRaw(use.LastTargetSlot) + "," +
+                            "\"lastAppliedTick\":" + (use.LastAppliedTick == long.MinValue ? "null" : use.LastAppliedTick.ToString(CultureInfo.InvariantCulture)) +
+                            "}";
+            var verificationJson = "{" +
+                                   "\"rawInputMode\":\"PhasebladeQuickSwitch\"," +
+                                   "\"phasebladeQuickSwitchApplied\":" + BoolRaw(use.ApplyCount > 0) + "," +
+                                   "\"allowCombatAim\":" + BoolRaw(use.AllowCombatAim) + "," +
+                                   "\"lastDecisionState\":\"" + EscapeJson(use.LastDecisionState) + "\"," +
+                                   "\"lastDecisionReason\":\"" + EscapeJson(use.LastDecisionReason) + "\"," +
+                                   "\"lastSwitchMethod\":\"" + EscapeJson(use.LastSwitchMethod) + "\"" +
+                                   "}";
+
+            DiagnosticActionRecorder.RecordCustomEvent(
+                execution.Request.RequestId,
+                GetMetadata(execution, ActionMetadataKeys.Scenario, ScenarioNames.CombatPhasebladeQuickSwitch),
                 InputActionKind.RawInput.ToString(),
                 GetMetadata(execution, "SourceHotkey", string.Empty),
                 use.Status.ToString(),

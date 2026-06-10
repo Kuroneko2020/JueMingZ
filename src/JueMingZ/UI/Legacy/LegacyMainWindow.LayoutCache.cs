@@ -411,6 +411,25 @@ namespace JueMingZ.UI.Legacy
                     AddHash(ref hash, FishingFilterUiState.EntryScrollOffset);
                     AddHash(ref hash, FishingFilterUiState.PresetSaveNotice);
                 }
+                else if (string.Equals(selectedPage, "combat", StringComparison.Ordinal))
+                {
+                    AddHash(ref hash, settings.CombatAimAssistRadius);
+                    AddHash(ref hash, settings.AimRangeOrigin);
+                    AddHash(ref hash, settings.AimTargetPriority);
+                    AddHash(ref hash, settings.CursorAimRadius);
+                    AddHash(ref hash, settings.PlayerAimRadius);
+                    AddHash(ref hash, settings.CombatAimTrackDummyEnabled);
+                    AddHash(ref hash, settings.CombatAimMarkerEnabled);
+                    AddHash(ref hash, settings.CombatAutoClickerEnabled);
+                    AddHash(ref hash, settings.CombatFlailComboEnabled);
+                    AddHash(ref hash, settings.CombatPhasebladeQuickSwitchEnabled);
+                    AddHash(ref hash, CombatPhasebladeQuickSwitchSettings.NormalizeIntervalTicks(settings.CombatPhasebladeQuickSwitchIntervalTicks));
+                    AddHash(ref hash, settings.CombatPerfectRevolverEnabled);
+                    AddHash(ref hash, settings.CombatMagicStringClickerEnabled);
+                    AddHash(ref hash, settings.CombatAutoFacingEnabled);
+                    AddHash(ref hash, settings.CombatEquipmentWarningEnabled);
+                    AddHash(ref hash, settings.CombatGoblinExecutionEnabled);
+                }
                 else if (string.Equals(selectedPage, "misc", StringComparison.Ordinal))
                 {
                     AddHash(ref hash, settings.WorldAutomationAutoCaptureCritterMode);

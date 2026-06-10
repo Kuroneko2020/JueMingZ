@@ -24,6 +24,12 @@ namespace JueMingZ.Features.Catalog
                 .Priority(18)
                 .Notes("默认关闭。手持 aiStyle 15 且非悠悠球的链球/连枷时，长按右键在 Player.ItemCheck scoped takeover 内制造左键按下/松开节奏；右键 UI、交互 Tile/NPC 和物品自身右键语义全部原版优先并 fail-closed。只读取 projectile 状态，不写 projectile/NPC/Tile/玩家状态；按下 tick 可继续让 combat.auto_aim 应用目标。"), true);
 
+            Add(registry, FeatureDefinitionBuilder.Create(FeatureIds.CombatPhasebladeQuickSwitch, "光剑快切", "按住右键快切快捷栏的光剑")
+                .Actions(InputActionKind.ItemUse, InputActionKind.SelectHotbarSlot, InputActionKind.RawInput)
+                .GameState(GameStateKind.Player, GameStateKind.Inventory, GameStateKind.CombatTargets)
+                .Priority(17)
+                .Notes("默认关闭。当前已具备固定 18 个 Phaseblade / Phasesaber 物品资格、专用 RawInput bridge 和 Player.ItemCheck scoped takeover；右键安全门禁和运行入口由后续治理阶段接入。只扫描快捷栏 0-9，不搜索背包，不能复用通用自动连点资格。"), true);
+
             Add(registry, FeatureDefinitionBuilder.Create(FeatureIds.CombatPerfectRevolver, "完美左轮", "最大程度发挥左轮威力")
                 .Actions(InputActionKind.ItemUse, InputActionKind.RawInput)
                 .GameState(GameStateKind.Player, GameStateKind.Inventory)

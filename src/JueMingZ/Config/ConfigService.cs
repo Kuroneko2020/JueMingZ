@@ -173,6 +173,7 @@ namespace JueMingZ.Config
             SetFeatureEnabledLocked("combat.auto_aim", settings.CombatAimAssistRadius > 0 || settings.CursorAimRadius > 0 || settings.PlayerAimRadius > 0);
             SetFeatureEnabledLocked(FeatureIds.CombatAutoClicker, settings.CombatAutoClickerEnabled);
             SetFeatureEnabledLocked(FeatureIds.CombatFlailCombo, settings.CombatFlailComboEnabled);
+            SetFeatureEnabledLocked(FeatureIds.CombatPhasebladeQuickSwitch, settings.CombatPhasebladeQuickSwitchEnabled);
             SetFeatureEnabledLocked(FeatureIds.CombatPerfectRevolver, settings.CombatPerfectRevolverEnabled);
             SetFeatureEnabledLocked(FeatureIds.CombatMagicStringClicker, settings.CombatMagicStringClickerEnabled);
             SetFeatureEnabledLocked(FeatureIds.CombatAutoFacing, settings.CombatAutoFacingEnabled);
@@ -243,6 +244,7 @@ namespace JueMingZ.Config
             if (settings.CombatAimAssistRadius > 0 || settings.CursorAimRadius > 0 || settings.PlayerAimRadius > 0) count++;
             if (settings.CombatAutoClickerEnabled) count++;
             if (settings.CombatFlailComboEnabled) count++;
+            if (settings.CombatPhasebladeQuickSwitchEnabled) count++;
             if (settings.CombatPerfectRevolverEnabled) count++;
             if (settings.CombatMagicStringClickerEnabled) count++;
             if (settings.CombatAutoFacingEnabled) count++;
@@ -578,6 +580,8 @@ namespace JueMingZ.Config
             settings.PlayerAimRadius = Clamp(settings.PlayerAimRadius, 0, 50);
             settings.ReleaseHoldTicks = Clamp(settings.ReleaseHoldTicks, 0, 20);
             settings.CombatAimAssistRadius = settings.CursorAimRadius;
+            settings.CombatPhasebladeQuickSwitchIntervalTicks =
+                CombatPhasebladeQuickSwitchSettings.NormalizeIntervalTicks(settings.CombatPhasebladeQuickSwitchIntervalTicks);
             settings.InformationNpcNameLabelsMode = NormalizeInformationNpcNameLabelsMode(settings.InformationNpcNameLabelsMode);
             settings.InformationChestNameLabelsMode = NormalizeInformationChestNameLabelsMode(settings.InformationChestNameLabelsMode, settings.InformationChestNameLabelsEnabled);
             settings.InformationChestNameLabelsEnabled = !string.Equals(settings.InformationChestNameLabelsMode, "Off", StringComparison.OrdinalIgnoreCase);

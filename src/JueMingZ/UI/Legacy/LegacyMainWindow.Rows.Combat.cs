@@ -81,10 +81,137 @@ namespace JueMingZ.UI.Legacy
             var sliderValue = LegacyUiInput.GetSliderDisplayValue(slider.Id, slider.IntValue);
             var sliderHovered = IsFrameElementHovered(slider.Id, slider.Bounds, mouse);
             DrawCombatAimRadiusSlider(spriteBatch, slider.Bounds, sliderValue, sliderHovered, sliderDragging, playerCenterMode, area.Viewport);
-            DrawCombatAimValueText(spriteBatch, valueText, playerCenterMode ? "屏幕范围" : "鼠标半径 " + sliderValue.ToString(CultureInfo.InvariantCulture), playerCenterMode, area.Viewport);
+            DrawCombatAimValueText(spriteBatch, valueText, BuildCombatAimRadiusStatusText(sliderValue, playerCenterMode), playerCenterMode, area.Viewport);
             if (sliderHovered)
             {
                 hovered = sliderElement;
+            }
+
+            return hovered;
+        }
+
+        private static LegacyUiElement DrawCombatPhasebladeQuickSwitchRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, AppSettings settings)
+        {
+            var row = new LegacyUiRect(area.Viewport.X, area.ToScreenY(contentY), area.Viewport.Width, LegacyUiMetrics.RowHeight);
+            if (!area.IsVisible(row))
+            {
+                return null;
+            }
+
+            settings = settings ?? AppSettings.CreateDefault();
+            var context = LegacyUiContext.ForScrollArea(spriteBatch, mouse, area, elements, settings);
+            LegacyUiTheme.DrawRowClipped(spriteBatch, row, area.Viewport);
+
+            const int rowPadding = 10;
+            const int buttonGap = 6;
+            var title = "光剑快切";
+            var titleWidth = Math.Max(78, UiTextRenderer.EstimateTextWidth(title, 0.86f) + 8);
+            UiTextRenderer.DrawAlignedTextClipped(
+                spriteBatch,
+                title,
+                row.X + rowPadding,
+                row.Y,
+                titleWidth,
+                row.Height,
+                UiTextHorizontalAlignment.Left,
+                area.Viewport.X,
+                area.Viewport.Y,
+                area.Viewport.Width,
+                area.Viewport.Height,
+                238,
+                238,
+                226,
+                255,
+                0.86f);
+
+            var buttonLabels = new[] { "开启", "关闭" };
+            var buttonValues = new[] { "On", "Off" };
+            var selectedMode = settings.CombatPhasebladeQuickSwitchEnabled ? "On" : "Off";
+            var buttonGroupWidth = ModeButtonWidth(buttonLabels[0]) + buttonGap + ModeButtonWidth(buttonLabels[1]);
+            var buttonX = row.Right - buttonGroupWidth - rowPadding;
+            var inlineLeft = row.X + rowPadding + titleWidth + 12;
+            var inlineRight = buttonX - 12;
+            var inlineWidth = Math.Max(1, inlineRight - inlineLeft);
+            var intervalLabelWidth = inlineWidth >= 170 ? 38 : 0;
+            var intervalValueWidth = inlineWidth >= 148 ? 58 : 48;
+            var value = CombatPhasebladeQuickSwitchSettings.NormalizeIntervalTicks(settings.CombatPhasebladeQuickSwitchIntervalTicks);
+            var valueRect = new LegacyUiRect(inlineRight - intervalValueWidth, RowModeButtonY(row), intervalValueWidth, RowModeButtonHeight);
+            var sliderX = inlineLeft + intervalLabelWidth + (intervalLabelWidth > 0 ? 6 : 0);
+            var sliderRight = valueRect.X - 8;
+            var sliderRect = new LegacyUiRect(sliderX, row.Y + 3, Math.Max(1, sliderRight - sliderX), LegacyUiMetrics.SliderHeight);
+
+            if (intervalLabelWidth > 0)
+            {
+                UiTextRenderer.DrawAlignedTextClipped(
+                    spriteBatch,
+                    "间隔",
+                    inlineLeft,
+                    row.Y,
+                    intervalLabelWidth,
+                    row.Height,
+                    UiTextHorizontalAlignment.Left,
+                    area.Viewport.X,
+                    area.Viewport.Y,
+                    area.Viewport.Width,
+                    area.Viewport.Height,
+                    206,
+                    218,
+                    238,
+                    230,
+                    0.72f);
+            }
+
+            var slider = new LegacySliderControl
+            {
+                Id = CombatPhasebladeQuickSwitchIntervalSliderId,
+                Label = "光剑快切间隔",
+                Bounds = sliderRect,
+                IntValue = value,
+                MinValue = CombatPhasebladeQuickSwitchSettings.MinIntervalTicks,
+                MaxValue = CombatPhasebladeQuickSwitchSettings.MaxIntervalTicks
+            };
+            var sliderElement = slider.RegisterAndUpdate(context);
+            var sliderDragging = string.Equals(LegacyUiInput.ActiveSliderId, slider.Id, StringComparison.Ordinal);
+            var sliderValue = LegacyUiInput.GetSliderDisplayValue(slider.Id, slider.IntValue);
+            var sliderHovered = IsFrameElementHovered(slider.Id, slider.Bounds, mouse);
+            DrawCombatInlineSlider(
+                spriteBatch,
+                slider.Bounds,
+                sliderValue,
+                CombatPhasebladeQuickSwitchSettings.MinIntervalTicks,
+                CombatPhasebladeQuickSwitchSettings.MaxIntervalTicks,
+                sliderHovered,
+                sliderDragging,
+                false,
+                area.Viewport);
+            DrawCombatAimValueText(spriteBatch, valueRect, sliderValue.ToString(CultureInfo.InvariantCulture) + " tick", false, area.Viewport);
+
+            var hovered = sliderHovered ? sliderElement : null;
+            var buttonY = RowModeButtonY(row);
+            for (var index = 0; index < buttonLabels.Length; index++)
+            {
+                var width = ModeButtonWidth(buttonLabels[index]);
+                var rect = new LegacyUiRect(buttonX, buttonY, width, RowModeButtonHeight);
+                var selected = string.Equals(selectedMode, buttonValues[index], StringComparison.OrdinalIgnoreCase);
+                var element = new LegacyButtonControl
+                {
+                    Id = "combat-phaseblade-quick-switch-mode:" + buttonValues[index],
+                    Label = buttonLabels[index],
+                    Text = buttonLabels[index],
+                    ElementLabel = "光剑快切:" + buttonLabels[index],
+                    Kind = "button",
+                    Bounds = rect,
+                    Selected = selected,
+                    TextScale = 0.78f,
+                    TooltipLines = index == 0 ? new[] { "按住右键快切快捷栏的光剑" } : null
+                }.Draw(context);
+
+                if (element != null && context.IsElementHovered(element.Id, rect))
+                {
+                    hovered = element;
+                }
+
+                buttonX += width + buttonGap;
             }
 
             return hovered;
@@ -118,13 +245,37 @@ namespace JueMingZ.UI.Legacy
             UiTextRenderer.DrawCenteredTextClipped(spriteBatch, text, rect.X, rect.Y, rect.Width, rect.Height, clip.X, clip.Y, clip.Width, clip.Height, disabled ? 222 : 238, disabled ? 224 : 238, disabled ? 228 : 214, disabled ? 230 : 255, 0.72f);
         }
 
+        private static string BuildCombatAimRadiusStatusText(int radius, bool playerCenterMode)
+        {
+            radius = LegacyMainUiState.Clamp(radius, CombatAimRadiusMin, CombatAimRadiusMax);
+            if (radius <= 0)
+            {
+                return "已关闭自瞄";
+            }
+
+            return playerCenterMode
+                ? "屏幕范围"
+                : "鼠标半径 " + radius.ToString(CultureInfo.InvariantCulture);
+        }
+
+        internal static string BuildCombatAimRadiusStatusTextForTesting(int radius, bool playerCenterMode)
+        {
+            return BuildCombatAimRadiusStatusText(radius, playerCenterMode);
+        }
+
         private static void DrawCombatAimRadiusSlider(object spriteBatch, LegacyUiRect rect, int value, bool hovered, bool dragging, bool disabled, LegacyUiRect clip)
         {
-            value = LegacyMainUiState.Clamp(value, CombatAimRadiusMin, CombatAimRadiusMax);
+            DrawCombatInlineSlider(spriteBatch, rect, value, CombatAimRadiusMin, CombatAimRadiusMax, hovered, dragging, disabled, clip);
+        }
+
+        private static void DrawCombatInlineSlider(object spriteBatch, LegacyUiRect rect, int value, int minValue, int maxValue, bool hovered, bool dragging, bool disabled, LegacyUiRect clip)
+        {
+            value = LegacyMainUiState.Clamp(value, minValue, maxValue);
             var trackY = rect.Y + rect.Height / 2 - 3;
             var trackX = rect.X + 10;
             var trackWidth = Math.Max(1, rect.Width - 20);
-            var fillWidth = disabled ? trackWidth : (int)Math.Round(trackWidth * ((value - CombatAimRadiusMin) / (double)(CombatAimRadiusMax - CombatAimRadiusMin)));
+            var valueRange = Math.Max(1, maxValue - minValue);
+            var fillWidth = disabled ? trackWidth : (int)Math.Round(trackWidth * ((value - minValue) / (double)valueRange));
             object texture;
             if (VanillaUiSkinCompat.TryGetColorBarTexture(out texture))
             {

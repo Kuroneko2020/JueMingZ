@@ -250,6 +250,12 @@ namespace JueMingZ.Input
                 return;
             }
 
+            if (command.ElementId.StartsWith("combat-phaseblade-quick-switch-mode:", StringComparison.Ordinal))
+            {
+                SetCombatFeatureEnabled(command, "phasebladeQuickSwitch", IsOnMode(command.ElementId.Substring("combat-phaseblade-quick-switch-mode:".Length)));
+                return;
+            }
+
             if (command.ElementId.StartsWith("combat-perfect-revolver-mode:", StringComparison.Ordinal))
             {
                 SetCombatFeatureEnabled(command, "perfectRevolver", IsOnMode(command.ElementId.Substring("combat-perfect-revolver-mode:".Length)));
@@ -680,6 +686,9 @@ namespace JueMingZ.Input
                     break;
                 case "combat-aim-radius":
                     SetCombatAimRadius(command);
+                    break;
+                case "combat-phaseblade-quick-switch-interval":
+                    SetCombatPhasebladeQuickSwitchInterval(command);
                     break;
                 case "combat-aim-priority-toggle":
                     ToggleCombatAimPriority(command);
