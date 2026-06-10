@@ -114,7 +114,7 @@ namespace JueMingZ.Tests
             }
         }
 
-        private static void LegacyMiscContentHeightIncludesBottomActionRows()
+        private static void LegacyItemsAndMiscContentHeightsIncludeBottomActionRows()
         {
             LegacyMainWindow.ResetPageLayoutCacheForTesting();
             var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
@@ -134,25 +134,34 @@ namespace JueMingZ.Tests
                 var window = new LegacyUiRect(40, 50, LegacyUiMetrics.DefaultWidth, LegacyUiMetrics.DefaultHeight);
                 var shell = LegacyMainWindowShell.Create(window);
                 var content = shell.ContentRect;
-                var expectedHeight =
-                    (LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap) * 4 +
-                    LegacyUiMetrics.RowHeight * 12 +
-                    LegacyUiMetrics.SettingRowGap * 11 +
+                var expectedItemsHeight =
+                    (LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap) * 3 +
+                    (LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap) * 6 +
+                    LegacyUiMetrics.RowHeight +
                     24;
-                var actualHeight = LegacyMainWindow.CalculateMiscContentHeightForTesting(content);
+                var actualItemsHeight = LegacyMainWindow.CalculateItemsContentHeightForTesting(content);
 
-                if (actualHeight != expectedHeight)
+                if (actualItemsHeight != expectedItemsHeight)
                 {
-                    throw new InvalidOperationException("Expected default misc content height " + expectedHeight + ", got " + actualHeight + ".");
+                    throw new InvalidOperationException("Expected default items content height " + expectedItemsHeight + ", got " + actualItemsHeight + ".");
                 }
 
-                var snapshot = LegacyMainWindow.BuildPageLayoutSnapshotForTesting("misc", window, content, 99999, settings);
-                var finalRowTop = expectedHeight - 24 - LegacyUiMetrics.RowHeight;
-                var finalRowBottomAtMaxScroll = snapshot.Viewport.Y + finalRowTop - snapshot.ScrollOffset + LegacyUiMetrics.RowHeight;
-                if (finalRowBottomAtMaxScroll > snapshot.Viewport.Bottom)
+                var itemsSnapshot = LegacyMainWindow.BuildPageLayoutSnapshotForTesting("home", window, content, 99999, settings);
+                AssertBottomRowVisibleAtMaxScroll(itemsSnapshot, expectedItemsHeight, "items");
+
+                var expectedMiscHeight =
+                    (LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap) +
+                    (LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap) * 4 +
+                    LegacyUiMetrics.RowHeight +
+                    24;
+                var actualMiscHeight = LegacyMainWindow.CalculateMiscContentHeightForTesting(content);
+                if (actualMiscHeight != expectedMiscHeight)
                 {
-                    throw new InvalidOperationException("Expected the bottom misc action row to be fully visible at max scroll.");
+                    throw new InvalidOperationException("Expected default misc content height " + expectedMiscHeight + ", got " + actualMiscHeight + ".");
                 }
+
+                var miscSnapshot = LegacyMainWindow.BuildPageLayoutSnapshotForTesting("misc", window, content, 99999, settings);
+                AssertBottomRowVisibleAtMaxScroll(miscSnapshot, expectedMiscHeight, "misc");
             }
             finally
             {
@@ -160,6 +169,16 @@ namespace JueMingZ.Tests
                 settings.InventoryAutoDiscardItemIds = originalAutoDiscardIds;
                 settings.NpcAutoReforgePrefixes = originalQuickReforgePrefixes;
                 hotkeys.QuickItemHotkeyBindings = originalQuickItemBindings;
+            }
+        }
+
+        private static void AssertBottomRowVisibleAtMaxScroll(LegacyMainWindow.LegacyUiPageLayoutSnapshot snapshot, int contentHeight, string pageName)
+        {
+            var finalRowTop = contentHeight - 24 - LegacyUiMetrics.RowHeight;
+            var finalRowBottomAtMaxScroll = snapshot.Viewport.Y + finalRowTop - snapshot.ScrollOffset + LegacyUiMetrics.RowHeight;
+            if (finalRowBottomAtMaxScroll > snapshot.Viewport.Bottom)
+            {
+                throw new InvalidOperationException("Expected the bottom " + pageName + " action row to be fully visible at max scroll.");
             }
         }
 
@@ -261,6 +280,7 @@ namespace JueMingZ.Tests
             }
 
             if (!string.Equals(elements[0].Id, "tab:home", StringComparison.Ordinal) ||
+                !string.Equals(elements[0].Label, "物品", StringComparison.Ordinal) ||
                 !string.Equals(elements[elements.Count - 1].Id, "tab:movement", StringComparison.Ordinal))
             {
                 throw new InvalidOperationException("Expected the registered F5 tab sequence to remain intact.");

@@ -12,6 +12,7 @@ namespace JueMingZ.Features
         MoreInformation,
         Buff,
         Movement,
-        Diagnostics
+        Diagnostics,
+        Items
     }
 }

@@ -325,13 +325,13 @@ namespace JueMingZ.Tests
                 LeftPressed = true
             };
 
-            coordinator.BeginFrame("misc");
+            coordinator.BeginFrame("home");
             if (!LegacyMainWindow.RegisterAutoCaptureCritterConfigPopupOverlayForTesting(area, anchor))
             {
                 throw new InvalidOperationException("Expected auto capture config popup to register as a modal overlay.");
             }
 
-            coordinator.DrawOverlays(null, mouse, new LegacyUiRect(0, 0, 500, 300), "misc", AppSettings.CreateDefault(), elements);
+            coordinator.DrawOverlays(null, mouse, new LegacyUiRect(0, 0, 500, 300), "home", AppSettings.CreateDefault(), elements);
             var popup = FindLegacyUiElementForTesting(elements, "misc-auto-capture-critter-config-popup");
             mouse.X = popup.Rect.X + 12;
             mouse.Y = popup.Rect.Y + 38;
@@ -343,12 +343,12 @@ namespace JueMingZ.Tests
 
             if (hovered == null || string.Equals(hovered.Id, "misc-auto-harvest-mode:On", StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("Expected auto capture modal overlay to own hover above later misc rows.");
+                throw new InvalidOperationException("Expected auto capture modal overlay to own hover above later items rows.");
             }
 
             if (!blocked || clickId.Length != 0)
             {
-                throw new InvalidOperationException("Expected auto capture modal overlay to block clicks from reaching later misc rows.");
+                throw new InvalidOperationException("Expected auto capture modal overlay to block clicks from reaching later items rows.");
             }
 
             coordinator.ResetForTesting();
@@ -373,13 +373,13 @@ namespace JueMingZ.Tests
                 LeftPressed = true
             };
 
-            coordinator.BeginFrame("misc");
+            coordinator.BeginFrame("home");
             if (!LegacyMainWindow.RegisterAutoCaptureCritterConfigPopupOverlayForTesting(area, anchor))
             {
                 throw new InvalidOperationException("Expected auto capture config popup to register as a modal overlay.");
             }
 
-            coordinator.DrawOverlays(null, mouse, new LegacyUiRect(0, 0, 500, 300), "misc", AppSettings.CreateDefault(), elements);
+            coordinator.DrawOverlays(null, mouse, new LegacyUiRect(0, 0, 500, 300), "home", AppSettings.CreateDefault(), elements);
             var option = FindLegacyUiElementForTesting(elements, "misc-auto-capture-critter-option:bait");
             mouse.X = option.Rect.X + Math.Max(1, option.Rect.Width / 2);
             mouse.Y = option.Rect.Y + Math.Max(1, option.Rect.Height / 2);

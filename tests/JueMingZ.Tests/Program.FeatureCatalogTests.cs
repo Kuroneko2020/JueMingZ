@@ -53,9 +53,9 @@ namespace JueMingZ.Tests
             }
 
             if (feature.CodeDomain != FeatureCodeDomain.InventoryAndItems ||
-                feature.UserCategory != FeatureUserCategory.Misc)
+                feature.UserCategory != FeatureUserCategory.Items)
             {
-                throw new InvalidOperationException("Auto discard must stay InventoryAndItems code-domain and Misc UI category.");
+                throw new InvalidOperationException("Auto discard must stay InventoryAndItems code-domain and Items UI category.");
             }
 
             if (feature.MultiplayerSupport != FeatureMultiplayerSupport.SupportedByOriginalAction)
@@ -200,9 +200,9 @@ namespace JueMingZ.Tests
             }
 
             if (feature.CodeDomain != FeatureCodeDomain.WorldAutomation ||
-                feature.UserCategory != FeatureUserCategory.Misc)
+                feature.UserCategory != FeatureUserCategory.Items)
             {
-                throw new InvalidOperationException("Auto capture critter must stay WorldAutomation code-domain and Misc UI category.");
+                throw new InvalidOperationException("Auto capture critter must stay WorldAutomation code-domain and Items UI category.");
             }
 
             if (feature.MultiplayerSupport != FeatureMultiplayerSupport.SupportedByOriginalAction)
@@ -236,9 +236,9 @@ namespace JueMingZ.Tests
             }
 
             if (feature.CodeDomain != FeatureCodeDomain.WorldAutomation ||
-                feature.UserCategory != FeatureUserCategory.Misc)
+                feature.UserCategory != FeatureUserCategory.Items)
             {
-                throw new InvalidOperationException("Auto harvest must stay WorldAutomation code-domain and Misc UI category.");
+                throw new InvalidOperationException("Auto harvest must stay WorldAutomation code-domain and Items UI category.");
             }
 
             if (feature.MultiplayerSupport != FeatureMultiplayerSupport.SupportedByOriginalAction)
@@ -304,13 +304,17 @@ namespace JueMingZ.Tests
             }
         }
 
-        private static void FeatureCatalogExposesImplementedMiscInventoryAutomation()
+        private static void FeatureCatalogExposesImplementedItemsInventoryAutomation()
         {
             var registry = FeatureRegistry.CreateDefault();
-            AssertImplementedFeatureVisible(registry, "inventory.continuous_bag_open");
-            AssertImplementedFeatureVisible(registry, "inventory.auto_deposit_coins");
-            AssertImplementedFeatureVisible(registry, "inventory.auto_extractinator");
-            AssertImplementedFeatureVisible(registry, "inventory.keep_favorited");
+            AssertImplementedFeatureVisible(registry, FeatureIds.InventoryQuickItemHotkeys, FeatureUserCategory.Items);
+            AssertImplementedFeatureVisible(registry, FeatureIds.InventoryAutoStack, FeatureUserCategory.Items);
+            AssertImplementedFeatureVisible(registry, FeatureIds.InventoryAutoSell, FeatureUserCategory.Items);
+            AssertImplementedFeatureVisible(registry, FeatureIds.InventoryAutoDiscard, FeatureUserCategory.Items);
+            AssertImplementedFeatureVisible(registry, FeatureIds.InventoryQuickBagOpen, FeatureUserCategory.Items);
+            AssertImplementedFeatureVisible(registry, FeatureIds.InventoryAutoDepositCoins, FeatureUserCategory.Items);
+            AssertImplementedFeatureVisible(registry, FeatureIds.InventoryAutoExtractinator, FeatureUserCategory.Items);
+            AssertImplementedFeatureVisible(registry, FeatureIds.InventoryKeepFavorited, FeatureUserCategory.Items);
         }
 
         private static void FeatureCatalogExposesGoblinExecution()
@@ -410,6 +414,11 @@ namespace JueMingZ.Tests
 
         private static void AssertImplementedFeatureVisible(FeatureRegistry registry, string featureId)
         {
+            AssertImplementedFeatureVisible(registry, featureId, null);
+        }
+
+        private static void AssertImplementedFeatureVisible(FeatureRegistry registry, string featureId, FeatureUserCategory? expectedCategory)
+        {
             FeatureDefinition feature;
             if (!registry.TryGet(featureId, out feature) || feature == null)
             {
@@ -429,6 +438,11 @@ namespace JueMingZ.Tests
             if (feature.LifecycleStatus != FeatureLifecycleStatus.Implemented)
             {
                 throw new InvalidOperationException("Expected implemented lifecycle for implemented feature: " + featureId);
+            }
+
+            if (expectedCategory.HasValue && feature.UserCategory != expectedCategory.Value)
+            {
+                throw new InvalidOperationException("Implemented feature has unexpected UI category: " + featureId);
             }
         }
 

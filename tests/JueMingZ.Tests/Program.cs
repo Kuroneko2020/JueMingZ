@@ -737,7 +737,7 @@ namespace JueMingZ.Tests
             Run("performance hitch recorder detects runtime gaps", ref failed, PerformanceHitchRecorderDetectsRuntimeGaps);
             Run("performance operation recorder uses scenario thresholds", ref failed, PerformanceOperationRecorderUsesScenarioThresholds);
             Run("diagnostic snapshot writes performance hitch state", ref failed, DiagnosticSnapshotWritesPerformanceHitchState);
-            Run("feature catalog exposes implemented misc inventory automation", ref failed, FeatureCatalogExposesImplementedMiscInventoryAutomation);
+            Run("feature catalog exposes implemented items inventory automation", ref failed, FeatureCatalogExposesImplementedItemsInventoryAutomation);
             Run("feature catalog exposes goblin execution", ref failed, FeatureCatalogExposesGoblinExecution);
             Run("feature catalog exposes phaseblade quick switch config", ref failed, FeatureCatalogExposesPhasebladeQuickSwitchConfig);
             Run("first-run app settings defaults match requested UI baseline", ref failed, FirstRunAppSettingsDefaultsMatchRequestedUiBaseline);
@@ -1024,7 +1024,7 @@ namespace JueMingZ.Tests
             Run("recovery potion selection skips blocked mana candidates", ref failed, RecoveryPotionSelectionSkipsBlockedManaCandidates);
             Run("runtime settings snapshot carries recovery item filters", ref failed, RuntimeSettingsSnapshotCarriesRecoveryItemFilters);
             Run("feature catalog exposes recovery item config windows", ref failed, FeatureCatalogExposesRecoveryItemConfigWindows);
-            Run("legacy misc content height includes bottom action rows", ref failed, LegacyMiscContentHeightIncludesBottomActionRows);
+            Run("legacy items and misc content heights include bottom action rows", ref failed, LegacyItemsAndMiscContentHeightsIncludeBottomActionRows);
             Run("legacy UI hover layout token ignores window and content position", ref failed, LegacyUiHoverLayoutTokenIgnoresWindowAndContentPosition);
             Run("legacy UI hover layout token dirties on page size scroll settings and font", ref failed, LegacyUiHoverLayoutTokenDirtiesOnPageSizeScrollSettingsAndFont);
             Run("legacy UI tabs ignore content scroll clip", ref failed, LegacyUiTabsIgnoreContentScrollClip);

@@ -135,7 +135,11 @@ namespace JueMingZ.UI.Legacy
                     LegacyUiTheme.DrawContentPanel(spriteBatch, contentRect);
 
                     LegacyUiElement hoveredElement = null;
-                    if (string.Equals(selectedPage, "buff", StringComparison.Ordinal))
+                    if (string.Equals(selectedPage, "home", StringComparison.Ordinal))
+                    {
+                        hoveredElement = DrawItemsPage(spriteBatch, scrollArea, mouse, elements);
+                    }
+                    else if (string.Equals(selectedPage, "buff", StringComparison.Ordinal))
                     {
                         hoveredElement = DrawBuffPage(spriteBatch, scrollArea, mouse, elements);
                     }

@@ -23,15 +23,15 @@ namespace JueMingZ.Runtime
             var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
             var legacyMainUiVisible = LegacyMainUiState.Visible;
             var legacySelectedPageId = LegacyMainUiState.SelectedPageId ?? string.Empty;
-            var legacyMiscUiNeedsInventory =
+            var legacyItemsUiNeedsInventory =
                 legacyMainUiVisible &&
-                string.Equals(legacySelectedPageId, "misc", StringComparison.Ordinal) &&
-                LegacyMainWindow.NeedsMiscInventorySnapshot();
+                string.Equals(legacySelectedPageId, "home", StringComparison.Ordinal) &&
+                LegacyMainWindow.NeedsItemsInventorySnapshot();
             var signature = RuntimeSettingsSignature.Capture(
                 settings,
                 legacyMainUiVisible,
                 legacySelectedPageId,
-                legacyMiscUiNeedsInventory);
+                legacyItemsUiNeedsInventory);
 
             // Normalize once per signature so high-frequency services can read
             // stable flags without rebuilding defaults or full settings each tick.
@@ -45,7 +45,7 @@ namespace JueMingZ.Runtime
                         settings,
                         legacyMainUiVisible,
                         legacySelectedPageId,
-                        legacyMiscUiNeedsInventory);
+                        legacyItemsUiNeedsInventory);
                     _signature = signature;
                 }
 

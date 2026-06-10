@@ -233,6 +233,11 @@ namespace JueMingZ.UI.Legacy
 
         public static bool NeedsMiscInventorySnapshot()
         {
+            return NeedsItemsInventorySnapshot();
+        }
+
+        public static bool NeedsItemsInventorySnapshot()
+        {
             return _quickItemPickerOpen || _autoSellPickerOpen || _autoDiscardPickerOpen;
         }
 

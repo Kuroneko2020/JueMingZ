@@ -20,7 +20,6 @@ namespace JueMingZ.UI.Legacy
 {
     public static partial class LegacyMainWindow
     {
-        private const int MiscFixedRowCount = 12;
         private const int PageContentBottomPadding = 24;
 
         private static int CalculateBuffContentHeight(LegacyUiRect contentRect)
@@ -42,7 +41,7 @@ namespace JueMingZ.UI.Legacy
             return CombatAimRowHeight + LegacyUiMetrics.SettingRowGap * 8 + LegacyUiMetrics.RowHeight * 8 + 24;
         }
 
-        private static int CalculateMiscContentHeight(LegacyUiRect contentRect)
+        private static int CalculateItemsContentHeight(LegacyUiRect contentRect)
         {
             var viewportWidth = Math.Max(120, contentRect.Width - LegacyUiMetrics.ContentPadding * 2 - LegacyUiMetrics.ScrollbarWidth - 8);
             var bindings = ConfigService.HotkeySettings == null || ConfigService.HotkeySettings.QuickItemHotkeyBindings == null
@@ -71,17 +70,30 @@ namespace JueMingZ.UI.Legacy
             var autoDiscardPanelHeight = autoDiscardItemIds.Count > 0 || _autoDiscardPickerOpen
                 ? CalculateAutoSellPanelHeight(viewportWidth, autoDiscardItemIds.Count, _autoDiscardPickerOpen, autoDiscardPickerCandidateCount)
                 : 0;
+            return MiscExpandableRowHeight(quickItemPanelHeight) +
+                   MiscExpandableRowHeight(autoSellPanelHeight) +
+                   MiscExpandableRowHeight(autoDiscardPanelHeight) +
+                   (LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap) * 6 +
+                   LegacyUiMetrics.RowHeight +
+                   PageContentBottomPadding;
+        }
+
+        private static int CalculateMiscContentHeight(LegacyUiRect contentRect)
+        {
+            var viewportWidth = Math.Max(120, contentRect.Width - LegacyUiMetrics.ContentPadding * 2 - LegacyUiMetrics.ScrollbarWidth - 8);
             var quickReforgePrefixes = GetQuickReforgePrefixes();
             var quickReforgePanelHeight = quickReforgePrefixes.Count > 0
                 ? CalculateQuickReforgePanelHeight(viewportWidth, quickReforgePrefixes.Count)
                 : 0;
-            return MiscExpandableRowHeight(quickItemPanelHeight) +
-                   MiscExpandableRowHeight(autoSellPanelHeight) +
-                   MiscExpandableRowHeight(autoDiscardPanelHeight) +
-                   MiscExpandableRowHeight(quickReforgePanelHeight) +
-                   (LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap) * Math.Max(0, MiscFixedRowCount - 1) +
+            return MiscExpandableRowHeight(quickReforgePanelHeight) +
+                   (LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap) * 4 +
                    LegacyUiMetrics.RowHeight +
                    PageContentBottomPadding;
+        }
+
+        internal static int CalculateItemsContentHeightForTesting(LegacyUiRect contentRect)
+        {
+            return CalculateItemsContentHeight(contentRect);
         }
 
         private static int CalculateInformationContentHeight(AppSettings settings)

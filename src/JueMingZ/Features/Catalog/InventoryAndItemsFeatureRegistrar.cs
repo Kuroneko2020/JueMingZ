@@ -61,7 +61,7 @@ namespace JueMingZ.Features.Catalog
         {
             registry.Register(builder
                 .Domain(FeatureCodeDomain.InventoryAndItems)
-                .Category(FeatureUserCategory.Misc)
+                .Category(FeatureUserCategory.Items)
                 .Multiplayer(FeatureMultiplayerSupport.SupportedByOriginalAction)
                 .VisibleInMainUi(implemented)
                 .Implemented(implemented)

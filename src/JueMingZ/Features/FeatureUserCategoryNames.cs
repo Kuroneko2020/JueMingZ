@@ -28,6 +28,8 @@ namespace JueMingZ.Features
                     return "移动";
                 case FeatureUserCategory.Diagnostics:
                     return "诊断";
+                case FeatureUserCategory.Items:
+                    return "物品";
                 default:
                     return category.ToString();
             }

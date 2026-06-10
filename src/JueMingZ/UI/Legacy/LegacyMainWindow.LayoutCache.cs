@@ -223,6 +223,11 @@ namespace JueMingZ.UI.Legacy
                 return CalculateCombatContentHeight();
             }
 
+            if (string.Equals(selectedPage, "home", StringComparison.Ordinal))
+            {
+                return CalculateItemsContentHeight(contentRect);
+            }
+
             if (string.Equals(selectedPage, "misc", StringComparison.Ordinal))
             {
                 return CalculateMiscContentHeight(contentRect);
@@ -268,21 +273,24 @@ namespace JueMingZ.UI.Legacy
                     AddHash(ref hash, settings.InformationSignTextLabelsMode);
                     AddHash(ref hash, settings.InformationTombstoneTextLabelsMode);
                 }
-                else if (string.Equals(selectedPage, "misc", StringComparison.Ordinal))
+                else if (string.Equals(selectedPage, "home", StringComparison.Ordinal))
                 {
                     AddHash(ref hash, _quickItemPickerOpen);
                     AddHash(ref hash, _quickItemHotkeyCaptureActive);
                     AddHash(ref hash, _autoSellPickerOpen);
                     AddHash(ref hash, _autoDiscardPickerOpen);
-                    AddHash(ref hash, _autoMiningHotkeyCaptureActive);
                     AddHash(ref hash, _autoCaptureCritterConfigOpen);
                     AddHash(ref hash, Count(ConfigService.HotkeySettings == null ? null : ConfigService.HotkeySettings.QuickItemHotkeyBindings));
                     AddHash(ref hash, Count(GetAutoSellItemIds()));
                     AddHash(ref hash, Count(GetAutoDiscardItemIds()));
-                    AddHash(ref hash, Count(GetQuickReforgePrefixes()));
                     AddHash(ref hash, _quickItemPickerOpen ? Count(GetQuickItemPickerCandidates()) : 0);
                     AddHash(ref hash, _autoSellPickerOpen ? Count(GetAutoSellPickerCandidates()) : 0);
                     AddHash(ref hash, _autoDiscardPickerOpen ? Count(GetAutoDiscardPickerCandidates()) : 0);
+                }
+                else if (string.Equals(selectedPage, "misc", StringComparison.Ordinal))
+                {
+                    AddHash(ref hash, _autoMiningHotkeyCaptureActive);
+                    AddHash(ref hash, Count(GetQuickReforgePrefixes()));
                 }
 
                 return hash;
@@ -430,10 +438,19 @@ namespace JueMingZ.UI.Legacy
                     AddHash(ref hash, settings.CombatEquipmentWarningEnabled);
                     AddHash(ref hash, settings.CombatGoblinExecutionEnabled);
                 }
-                else if (string.Equals(selectedPage, "misc", StringComparison.Ordinal))
+                else if (string.Equals(selectedPage, "home", StringComparison.Ordinal))
                 {
+                    AddHash(ref hash, settings.MiscQuickItemHotkeysEnabled);
+                    AddHash(ref hash, settings.InventoryAutoStackEnabled);
+                    AddHash(ref hash, settings.MiscAutoSellEnabled);
+                    AddHash(ref hash, settings.MiscAutoDiscardEnabled);
                     AddHash(ref hash, settings.WorldAutomationAutoCaptureCritterMode);
                     AddHash(ref hash, settings.MiscAutoCaptureCritterEnabled);
+                    AddHash(ref hash, settings.WorldAutomationAutoHarvestEnabled);
+                    AddHash(ref hash, settings.InventoryQuickBagOpenEnabled);
+                    AddHash(ref hash, settings.InventoryAutoDepositCoinsEnabled);
+                    AddHash(ref hash, settings.InventoryAutoExtractinatorEnabled);
+                    AddHash(ref hash, settings.InventoryKeepFavoritedEnabled);
                     AddHash(ref hash, _autoCaptureCritterConfigOpen);
                     var options = AutoCaptureCritterCategoryCatalog.Options;
                     if (options != null)
@@ -445,6 +462,15 @@ namespace JueMingZ.UI.Legacy
                             AddHash(ref hash, option != null && AutoCaptureCritterCategoryCatalog.GetEnabled(settings, option.Id));
                         }
                     }
+                }
+                else if (string.Equals(selectedPage, "misc", StringComparison.Ordinal))
+                {
+                    AddHash(ref hash, settings.NpcAutoReforgeEnabled);
+                    AddHash(ref hash, settings.WorldAutomationAutoMiningMode);
+                    AddHash(ref hash, GetAutoMiningHotkeyDisplay());
+                    AddHash(ref hash, settings.NpcAutoTaxCollectEnabled);
+                    AddHash(ref hash, settings.WorldAutomationTravelMenuEnabled);
+                    AddHash(ref hash, _autoMiningHotkeyCaptureActive);
                 }
                 else if (string.Equals(selectedPage, "movement", StringComparison.Ordinal))
                 {
