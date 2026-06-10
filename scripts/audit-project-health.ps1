@@ -1597,6 +1597,437 @@ function Test-NewFeatureBoundaryGovernance {
     }
 }
 
+function Test-DeepStructureBoundaryGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    function Get-DeepStructureLineCount {
+        param([Parameter(Mandatory = $true)][string]$Text)
+        return @($Text -split "\r?\n").Count
+    }
+
+    function Test-DeepStructureAnchors {
+        param(
+            [Parameter(Mandatory = $true)][string]$RepoRoot,
+            [Parameter(Mandatory = $true)]$Spec
+        )
+
+        $path = Join-Path $RepoRoot $Spec.Path
+        $text = Read-TextIfExists -Path $path
+        if ($null -eq $text) {
+            Write-FailHealth "Deep structure boundary file missing: $($Spec.Path)"
+            return
+        }
+
+        $missing = @()
+        foreach ($anchor in $Spec.Required) {
+            if (-not $text.Contains($anchor)) {
+                $missing += $anchor
+            }
+        }
+
+        if ($missing.Count -gt 0) {
+            Write-FailHealth "Deep structure boundary anchors missing from $($Spec.Path): $($missing -join ', ')"
+        }
+        else {
+            Write-Pass "Deep structure boundary anchors remain in $($Spec.Path)."
+        }
+    }
+
+    function Test-DeepStructureForbiddenPatterns {
+        param(
+            [Parameter(Mandatory = $true)][string]$RepoRoot,
+            [Parameter(Mandatory = $true)]$Spec
+        )
+
+        $path = Join-Path $RepoRoot $Spec.Path
+        $text = Read-TextIfExists -Path $path
+        if ($null -eq $text) {
+            Write-FailHealth "Deep structure boundary file missing for forbidden-pattern audit: $($Spec.Path)"
+            return
+        }
+
+        $matches = @()
+        foreach ($pattern in $Spec.Patterns) {
+            if ([System.Text.RegularExpressions.Regex]::IsMatch($text, $pattern)) {
+                $matches += $pattern
+            }
+        }
+
+        if ($matches.Count -gt 0) {
+            Write-FailHealth "Deep structure old pit appears to own split responsibility again in $($Spec.Path): $($matches -join ', ')"
+        }
+        else {
+            Write-Pass "Deep structure old pit remains thin in $($Spec.Path)."
+        }
+    }
+
+    $docAnchors = @(
+        @{
+            Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "工程规则.md")
+            Name = "工程规则.md"
+            Required = @(
+                "结构回流健康审计",
+                "旧深坑主文件",
+                "Runtime diagnostics snapshot builder",
+                "旧综合测试入口只保留导航注释"
+            )
+        },
+        @{
+            Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI测试规则.md")
+            Name = "AI测试规则.md"
+            Required = @(
+                "结构回流健康审计",
+                "旧综合测试入口只保留导航注释",
+                "InputActionQueueTests",
+                "超过约 1000 行"
+            )
+        }
+    )
+
+    foreach ($doc in $docAnchors) {
+        $text = Read-TextIfExists -Path $doc.Path
+        if ($null -eq $text) {
+            Write-FailHealth "Deep structure governance document missing: $($doc.Name)"
+            continue
+        }
+
+        $missing = @()
+        foreach ($required in $doc.Required) {
+            if (-not $text.Contains($required)) {
+                $missing += $required
+            }
+        }
+
+        if ($missing.Count -gt 0) {
+            Write-FailHealth "Deep structure governance document $($doc.Name) lacks required anchor(s): $($missing -join ', ')"
+        }
+        else {
+            Write-Pass "Deep structure governance document $($doc.Name) keeps required anchors."
+        }
+    }
+
+    $requiredFiles = @(
+        "src\JueMingZ\Runtime\JueMingZRuntime.cs",
+        "src\JueMingZ\Runtime\RuntimeAutomationDispatcher.cs",
+        "src\JueMingZ\Runtime\RuntimeDispatchStep.cs",
+        "src\JueMingZ\Runtime\RuntimeGameStateReadOptionsBuilder.cs",
+        "src\JueMingZ\Runtime\RuntimeStartupDiagnosticNoop.cs",
+        "src\JueMingZ\Runtime\Diagnostics\RuntimeDiagnosticSnapshotBuilder.cs",
+        "src\JueMingZ\Runtime\Diagnostics\RuntimeDiagnosticSnapshotBuilder.Bootstrap.cs",
+        "src\JueMingZ\Runtime\Diagnostics\RuntimeDiagnosticSnapshotBuilder.ActionQueue.cs",
+        "src\JueMingZ\Runtime\Diagnostics\RuntimeDiagnosticSnapshotBuilder.DiagnosticUi.cs",
+        "src\JueMingZ\Runtime\Diagnostics\RuntimeDiagnosticSnapshotBuilder.Performance.cs",
+        "src\JueMingZ\Runtime\Diagnostics\RuntimeDiagnosticSnapshotBuilder.InventoryInformationFishing.cs",
+        "src\JueMingZ\Runtime\Diagnostics\RuntimeDiagnosticSnapshotBuilder.Movement.cs",
+        "src\JueMingZ\Runtime\Diagnostics\RuntimeDiagnosticSnapshotBuilder.CombatRecovery.cs",
+        "src\JueMingZ\Actions\InputActionQueue.cs",
+        "src\JueMingZ\Actions\InputActionQueueModels.cs",
+        "src\JueMingZ\Actions\InputActionQueue.Admission.cs",
+        "src\JueMingZ\Actions\InputActionQueue.CleanupLease.cs",
+        "src\JueMingZ\Actions\InputActionQueue.Scheduler.cs",
+        "src\JueMingZ\Actions\InputActionQueue.Execution.cs",
+        "src\JueMingZ\Actions\InputActionQueue.Snapshot.cs",
+        "src\JueMingZ\Actions\InputActionResultStore.cs",
+        "src\JueMingZ\Compat\TerrariaInputCompat.UseItem.cs",
+        "src\JueMingZ\Compat\TerrariaInputCompat.UseItem.Scope.cs",
+        "src\JueMingZ\Compat\TerrariaInputCompat.UseItem.PhysicalInput.cs",
+        "src\JueMingZ\Compat\TerrariaInputCompat.UseItem.Read.cs",
+        "src\JueMingZ\Compat\TerrariaInputCompat.UseItem.UiContext.cs",
+        "src\JueMingZ\Compat\TerrariaInputCompat.UseItem.ItemCheckBridge.cs",
+        "src\JueMingZ\Compat\TerrariaInputCompat.Movement.cs",
+        "src\JueMingZ\Compat\TerrariaInputCompat.Movement.Direction.cs",
+        "src\JueMingZ\Compat\TerrariaInputCompat.Movement.Read.cs",
+        "src\JueMingZ\Compat\TerrariaInputCompat.Movement.JumpProfile.cs",
+        "src\JueMingZ\Compat\TerrariaInputCompat.Movement.Emitters.cs",
+        "src\JueMingZ\Compat\TerrariaInputCompat.Movement.Capabilities.cs",
+        "src\JueMingZ\Compat\TerrariaInputCompat.Movement.AutoFacing.cs",
+        "src\JueMingZ\Automation\Movement\MovementSafeLandingService.Recovery.cs",
+        "src\JueMingZ\Automation\Movement\MovementSafeLandingService.Recovery.ResultRouter.cs",
+        "src\JueMingZ\Automation\Movement\MovementSafeLandingService.Recovery.DisabledCleanup.cs",
+        "src\JueMingZ\Automation\Movement\MovementSafeLandingService.Recovery.TemporaryEquipment.cs",
+        "src\JueMingZ\Automation\Movement\MovementSafeLandingService.Recovery.MountCancel.cs",
+        "src\JueMingZ\Automation\Movement\MovementSafeLandingService.Recovery.GravityRestore.cs",
+        "src\JueMingZ\Automation\Movement\MovementSafeLandingService.Recovery.Shared.cs",
+        "src\JueMingZ\Compat\MovementSafeLandingEquipmentCompat.cs",
+        "src\JueMingZ\Compat\MovementSafeLandingEquipmentCompat.Catalog.cs",
+        "src\JueMingZ\Compat\MovementSafeLandingEquipmentCompat.Scan.cs",
+        "src\JueMingZ\Compat\MovementSafeLandingEquipmentCompat.PlanBuilder.cs",
+        "src\JueMingZ\Compat\MovementSafeLandingEquipmentCompat.CapabilityRead.cs",
+        "src\JueMingZ\Compat\MovementSafeLandingEquipmentCompat.Store.cs",
+        "src\JueMingZ\Compat\MovementSafeLandingEquipmentCompat.Apply.cs",
+        "src\JueMingZ\Compat\MovementSafeLandingEquipmentCompat.FunctionalRefresh.cs",
+        "src\JueMingZ\Compat\MovementSafeLandingEquipmentCompat.Restore.cs",
+        "src\JueMingZ\Compat\MovementSafeLandingEquipmentCompat.RestoreSafety.cs",
+        "src\JueMingZ\Compat\MovementSafeLandingEquipmentCompat.Reflection.cs",
+        "src\JueMingZ\Compat\MovementSafeLandingEquipmentCompat.Result.cs",
+        "src\JueMingZ\Input\LegacyUiActionService.cs",
+        "src\JueMingZ\Input\LegacyUiActionService.CommandRouter.cs",
+        "src\JueMingZ\Input\LegacyUiActionService.GeneralDiagnostics.cs",
+        "src\JueMingZ\Input\LegacyUiActionService.GeneralSettings.cs",
+        "src\JueMingZ\Input\LegacyUiActionService.WorldAutomationHandlers.cs",
+        "src\JueMingZ\Input\LegacyUiActionService.InventoryListHandlers.cs",
+        "src\JueMingZ\Input\LegacyUiActionService.InventoryQuickItemHandlers.cs",
+        "src\JueMingZ\Input\LegacyUiActionService.NpcQuickReforgeHandlers.cs",
+        "src\JueMingZ\Input\LegacyUiActionService.AutoRecoveryHandlers.cs",
+        "src\JueMingZ\Input\LegacyUiActionService.CombatHandlers.cs",
+        "src\JueMingZ\Input\LegacyUiActionService.FishingHandlers.cs",
+        "src\JueMingZ\Input\LegacyUiActionService.MovementHandlers.cs",
+        "tests\JueMingZ.Tests\Program.CombatAndQueueTests.cs",
+        "tests\JueMingZ.Tests\Program.CombatAutoClickerTests.cs",
+        "tests\JueMingZ.Tests\Program.CombatPhasebladeQuickSwitchTests.cs",
+        "tests\JueMingZ.Tests\Program.CombatFlailComboTests.cs",
+        "tests\JueMingZ.Tests\Program.ItemCheckWriterArbiterTests.cs",
+        "tests\JueMingZ.Tests\Program.CombatAimProjectileProfileTests.cs",
+        "tests\JueMingZ.Tests\Program.CombatAimMotionSolverTests.cs",
+        "tests\JueMingZ.Tests\Program.CombatAimCursorPolicyTests.cs",
+        "tests\JueMingZ.Tests\Program.CombatAimFlailControlTests.cs",
+        "tests\JueMingZ.Tests\Program.CombatAimFlailReleaseTailTests.cs",
+        "tests\JueMingZ.Tests\Program.CombatAimSpecialProjectileTests.cs",
+        "tests\JueMingZ.Tests\Program.CombatAimReleaseHoldTests.cs",
+        "tests\JueMingZ.Tests\Program.CombatAimSharedHelpers.cs",
+        "tests\JueMingZ.Tests\Program.ActionCatalogTests.cs",
+        "tests\JueMingZ.Tests\Program.ActionChannelResolverTests.cs",
+        "tests\JueMingZ.Tests\Program.InventoryAutomationActionTests.cs",
+        "tests\JueMingZ.Tests\Program.WorldAutomationActionTests.cs",
+        "tests\JueMingZ.Tests\Program.RuntimeDiagnosticsAndDispatchTests.cs",
+        "tests\JueMingZ.Tests\Program.FeatureCatalogTests.cs",
+        "tests\JueMingZ.Tests\Program.AppSettingsDefaultTests.cs",
+        "tests\JueMingZ.Tests\Program.ActionCatalogSharedHelpers.cs",
+        "tests\JueMingZ.Tests\Program.SafeLandingTests.cs",
+        "tests\JueMingZ.Tests\Program.SafeLandingEquipmentTests.cs",
+        "tests\JueMingZ.Tests\Program.SafeLandingAnalysisAndStrategyTests.cs",
+        "tests\JueMingZ.Tests\Program.TravelMenuTests.cs",
+        "tests\JueMingZ.Tests\Program.FishingInformationUiTests.cs",
+        "tests\JueMingZ.Tests\Program.FishingAutomationTests.cs",
+        "tests\JueMingZ.Tests\Program.InformationOverlayUiTests.cs",
+        "tests\JueMingZ.Tests\Program.InformationFishingCatchTests.cs",
+        "tests\JueMingZ.Tests\Program.InformationChestLabelTests.cs",
+        "tests\JueMingZ.Tests\Program.LegacyUiInteractionTests.cs"
+    )
+
+    $missingFiles = @()
+    foreach ($relative in $requiredFiles) {
+        if (-not (Test-Path -LiteralPath (Join-Path $RepoRoot $relative))) {
+            $missingFiles += $relative
+        }
+    }
+
+    if ($missingFiles.Count -gt 0) {
+        Write-FailHealth "Deep structure split boundary file(s) missing: $($missingFiles -join ', ')"
+    }
+    else {
+        Write-Pass "Deep structure split boundary files exist."
+    }
+
+    $generalHandlersPath = Join-Path $RepoRoot "src\JueMingZ\Input\LegacyUiActionService.GeneralHandlers.cs"
+    if (Test-Path -LiteralPath $generalHandlersPath) {
+        Write-FailHealth "LegacyUiActionService.GeneralHandlers.cs must not be recreated as a catch-all handler."
+    }
+    else {
+        Write-Pass "LegacyUiActionService.GeneralHandlers.cs remains deleted."
+    }
+
+    $anchorSpecs = @(
+        @{
+            Path = "src\JueMingZ\Runtime\JueMingZRuntime.cs"
+            Required = @("RuntimeDiagnosticSnapshotBuilder.Build", "RuntimeAutomationDispatcher.DispatchAutomationRequests", "RuntimeGameStateReadOptionsBuilder.Build")
+        },
+        @{
+            Path = "src\JueMingZ\Runtime\Diagnostics\RuntimeDiagnosticSnapshotBuilder.cs"
+            Required = @("public static DiagnosticSnapshot Build", "WriteActionQueue", "WritePerformanceAndConfig", "WriteInventoryInformationFishing", "WriteCombatAndRecovery")
+        },
+        @{
+            Path = "src\JueMingZ\Runtime\RuntimeAutomationDispatcher.cs"
+            Required = @("RunTargetingAndUiActions", "DispatchAutomationRequests", "ShouldDispatchFishingAutomation", "RuntimeStartupDiagnosticNoop.QueueIfReady")
+        },
+        @{
+            Path = "src\JueMingZ\Actions\InputActionQueue.Admission.cs"
+            Required = @("BuildAdmissionLocked", "ApplyAcceptedAdmissionLocked", "BuildPendingConflictSummaryLocked", "TryFindPreemptableBackgroundPendingLocked")
+        },
+        @{
+            Path = "src\JueMingZ\Actions\InputActionQueue.Execution.cs"
+            Required = @("TryStartNextActionLocked", "UpdateRunningActionLocked", "CancelRunningLocked", "RecordResultLocked")
+        },
+        @{
+            Path = "src\JueMingZ\Actions\InputActionQueue.Scheduler.cs"
+            Required = @("SelectNextStartableActionLocked", "ExpirePendingLocked", "IsExpiredBeforeStart")
+        },
+        @{
+            Path = "src\JueMingZ\Compat\TerrariaInputCompat.UseItem.Scope.cs"
+            Required = @("ScopedUseItemTakeover", "TryBeginScopedUseItemTakeover", "TryRestoreScopedUseItemTakeover")
+        },
+        @{
+            Path = "src\JueMingZ\Compat\TerrariaInputCompat.UseItem.ItemCheckBridge.cs"
+            Required = @("TryCaptureUseItemInputState", "TryApplyUseItemOverrideForItemCheck", "TryRestoreUseItemInputState", "TryApplyPhasebladeQuickSwitchForItemCheck")
+        },
+        @{
+            Path = "src\JueMingZ\Compat\TerrariaInputCompat.Movement.Emitters.cs"
+            Required = @("TryPrimeJumpReleaseForNextTick", "TryReleaseSafeLandingControlInputs", "TrySetNamedControlInput")
+        },
+        @{
+            Path = "src\JueMingZ\Compat\TerrariaInputCompat.Movement.JumpProfile.cs"
+            Required = @("TryReadJumpInputProfile", "ReadMountJumpProfile", "ReadEquippedMovementAssistProfile")
+        },
+        @{
+            Path = "src\JueMingZ\Compat\TerrariaInputCompat.Movement.Capabilities.cs"
+            Required = @("ReadMountJumpProfile", "ReadEquippedMovementAssistProfile", "TryResolveMountNoFallDamage")
+        },
+        @{
+            Path = "src\JueMingZ\Automation\Movement\MovementSafeLandingService.Recovery.ResultRouter.cs"
+            Required = @("RouteSafeLandingActionQueueResult", "TemporaryEquipmentApplyCompleted", "TemporaryEquipmentRestoreCompleted")
+        },
+        @{
+            Path = "src\JueMingZ\Automation\Movement\MovementSafeLandingService.Recovery.TemporaryEquipment.cs"
+            Required = @("HandleTemporaryEquipmentRestore", "TryHandleTemporaryEquipmentActivation", "TryEnqueueTemporaryEquipmentRestore")
+        },
+        @{
+            Path = "src\JueMingZ\Compat\MovementSafeLandingEquipmentCompat.PlanBuilder.cs"
+            Required = @("TryBuildTemporaryEquipmentPlan", "TryBuildCushionBlockHotbarPlan")
+        },
+        @{
+            Path = "src\JueMingZ\Compat\MovementSafeLandingEquipmentCompat.Store.cs"
+            Required = @("RegisterApplyPlan", "TryApplyRegisteredPlan", "TryRestoreRegisteredRecords", "TryTakeRestoreResult")
+        },
+        @{
+            Path = "src\JueMingZ\Input\LegacyUiActionService.CommandRouter.cs"
+            Required = @("Element id order is the legacy command protocol", "Domain handlers may update settings", "game-state mutations still belong to Actions/Compat")
+        },
+        @{
+            Path = "tests\JueMingZ.Tests\Program.CombatAndQueueTests.cs"
+            Required = @("coverage is split by domain")
+        },
+        @{
+            Path = "tests\JueMingZ.Tests\Program.ActionCatalogTests.cs"
+            Required = @("coverage is split into channel resolver")
+        },
+        @{
+            Path = "tests\JueMingZ.Tests\Program.SafeLandingTests.cs"
+            Required = @("SafeLanding coverage is split")
+        },
+        @{
+            Path = "tests\JueMingZ.Tests\Program.FishingInformationUiTests.cs"
+            Required = @("Fishing, information overlay, chest labels, and legacy UI interaction tests are split")
+        }
+    )
+
+    foreach ($spec in $anchorSpecs) {
+        Test-DeepStructureAnchors -RepoRoot $RepoRoot -Spec $spec
+    }
+
+    $forbiddenSpecs = @(
+        @{
+            Path = "src\JueMingZ\Actions\InputActionQueue.cs"
+            Patterns = @(
+                "private\s+InputActionAdmissionResult\s+BuildAdmissionLocked",
+                "private\s+void\s+ApplyAcceptedAdmissionLocked",
+                "private\s+InputActionRequest\s+SelectNextStartableActionLocked",
+                "private\s+InputActionResult\s+TryStartNextActionLocked",
+                "public\s+InputActionQueueSnapshot\s+GetSnapshot"
+            )
+        },
+        @{
+            Path = "src\JueMingZ\Compat\TerrariaInputCompat.UseItem.cs"
+            Patterns = @("ScopedUseItemTakeover", "TryReadPhysicalUseItemHeld", "TryCaptureUseItemInputState", "TryApplyUseItemOverrideForItemCheck")
+        },
+        @{
+            Path = "src\JueMingZ\Compat\TerrariaInputCompat.Movement.cs"
+            Patterns = @("TryReadPlayerDirection", "TrySetControlDown", "TryReadJumpInputProfile", "BeginAutoFacingDirectionOverride")
+        },
+        @{
+            Path = "src\JueMingZ\Automation\Movement\MovementSafeLandingService.Recovery.cs"
+            Patterns = @(
+                "private\s+static\s+void\s+RouteSafeLandingActionQueueResult",
+                "private\s+static\s+bool\s+TryHandleDisabledResidualState",
+                "private\s+static\s+void\s+HandleTemporaryEquipmentRestore",
+                "private\s+static\s+bool\s+TryHandlePendingSafeLandingMountCancel",
+                "private\s+static\s+bool\s+TryHandlePendingSafeLandingGravityRestore"
+            )
+        },
+        @{
+            Path = "src\JueMingZ\Compat\MovementSafeLandingEquipmentCompat.cs"
+            Patterns = @("CandidateMatchesCategory", "ScanSources", "TryBuildTemporaryEquipmentPlan", "TryApplyRegisteredPlan", "TryRestoreRegisteredRecords", "TryIsSafeToRestoreTemporaryEquipment")
+        }
+    )
+
+    foreach ($spec in $forbiddenSpecs) {
+        Test-DeepStructureForbiddenPatterns -RepoRoot $RepoRoot -Spec $spec
+    }
+
+    $thinBudgets = @(
+        @{ Path = "src\JueMingZ\Runtime\JueMingZRuntime.cs"; Max = 1000 },
+        @{ Path = "src\JueMingZ\Actions\InputActionQueue.cs"; Max = 1000 },
+        @{ Path = "src\JueMingZ\Compat\TerrariaInputCompat.UseItem.cs"; Max = 200 },
+        @{ Path = "src\JueMingZ\Compat\TerrariaInputCompat.Movement.cs"; Max = 200 },
+        @{ Path = "src\JueMingZ\Automation\Movement\MovementSafeLandingService.Recovery.cs"; Max = 200 },
+        @{ Path = "src\JueMingZ\Compat\MovementSafeLandingEquipmentCompat.cs"; Max = 200 },
+        @{ Path = "src\JueMingZ\Input\LegacyUiActionService.cs"; Max = 1000 },
+        @{ Path = "src\JueMingZ\Input\LegacyUiActionService.CommandRouter.cs"; Max = 1000 }
+    )
+
+    foreach ($budget in $thinBudgets) {
+        $path = Join-Path $RepoRoot $budget.Path
+        $text = Read-TextIfExists -Path $path
+        if ($null -eq $text) {
+            continue
+        }
+
+        $lineCount = Get-DeepStructureLineCount -Text $text
+        if ($lineCount -gt $budget.Max) {
+            Write-FailHealth "Deep structure old pit line budget exceeded: $($budget.Path) has $lineCount line(s), max $($budget.Max)."
+        }
+        else {
+            Write-Pass "Deep structure old pit line budget ok: $($budget.Path) has $lineCount line(s)."
+        }
+    }
+
+    $navigationTests = @(
+        "tests\JueMingZ.Tests\Program.CombatAndQueueTests.cs",
+        "tests\JueMingZ.Tests\Program.ActionCatalogTests.cs",
+        "tests\JueMingZ.Tests\Program.SafeLandingTests.cs",
+        "tests\JueMingZ.Tests\Program.FishingInformationUiTests.cs"
+    )
+
+    foreach ($relative in $navigationTests) {
+        $path = Join-Path $RepoRoot $relative
+        $text = Read-TextIfExists -Path $path
+        if ($null -eq $text) {
+            continue
+        }
+
+        $lineCount = Get-DeepStructureLineCount -Text $text
+        $hasMethodBody = [System.Text.RegularExpressions.Regex]::IsMatch(
+            $text,
+            '\b(private|internal|public)\s+static\s+(?!partial\s+class)[A-Za-z0-9_<>,\[\]\.]+\s+[A-Za-z_][A-Za-z0-9_]*\s*\(')
+        if ($lineCount -gt 200 -or $hasMethodBody) {
+            Write-FailHealth "Old comprehensive test entry must remain navigation-only: $relative has $lineCount line(s), methodBody=$hasMethodBody."
+        }
+        else {
+            Write-Pass "Old comprehensive test entry remains navigation-only: $relative."
+        }
+    }
+
+    $largeSingleResponsibilityFiles = @(
+        @{ Path = "src\JueMingZ\Input\LegacyUiActionService.FishingFilter.cs"; Reason = "single fishing filter command/picker domain" },
+        @{ Path = "tests\JueMingZ.Tests\Program.InputActionQueueTests.cs"; Reason = "single ActionQueue admission/channel contract suite" },
+        @{ Path = "tests\JueMingZ.Tests\Program.RuntimeDiagnosticsAndDispatchTests.cs"; Reason = "single Runtime diagnostics/dispatch contract suite" },
+        @{ Path = "tests\JueMingZ.Tests\Program.SafeLandingEquipmentTests.cs"; Reason = "single SafeLanding equipment transaction suite" },
+        @{ Path = "tests\JueMingZ.Tests\Program.SafeLandingAnalysisAndStrategyTests.cs"; Reason = "single SafeLanding analysis/strategy suite" }
+    )
+
+    foreach ($entry in $largeSingleResponsibilityFiles) {
+        $path = Join-Path $RepoRoot $entry.Path
+        $text = Read-TextIfExists -Path $path
+        if ($null -eq $text) {
+            continue
+        }
+
+        $lineCount = Get-DeepStructureLineCount -Text $text
+        if ($lineCount -gt 1000) {
+            Write-WarnHealth "Large single-responsibility file remains above line alarm: $($entry.Path) has $lineCount line(s); accepted reason: $($entry.Reason). Split if responsibilities widen."
+        }
+    }
+}
+
 function Test-IterationLogNumbers {
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
     $updatesDir = ConvertFrom-CodePoints @(0x66f4, 0x65b0, 0x8bb0, 0x5f55)
@@ -1672,6 +2103,7 @@ Test-CombatAimDiagnosticsGovernance -RepoRoot $repoRoot
 Test-PhasebladeQuickSwitchDiagnosticsGovernance -RepoRoot $repoRoot
 Test-ActionQueueDirectEnqueueGovernance -RepoRoot $repoRoot
 Test-NewFeatureBoundaryGovernance -RepoRoot $repoRoot
+Test-DeepStructureBoundaryGovernance -RepoRoot $repoRoot
 Test-IterationLogNumbers -RepoRoot $repoRoot
 
 if ($script:FailCount -gt 0) {

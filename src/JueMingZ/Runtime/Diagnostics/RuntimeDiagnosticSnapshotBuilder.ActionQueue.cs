@@ -1,0 +1,120 @@
+using System;
+using JueMingZ.Actions;
+using JueMingZ.Automation.AutoRecovery;
+using JueMingZ.Automation.Combat;
+using JueMingZ.Automation.Fishing;
+using JueMingZ.Automation.Information;
+using JueMingZ.Automation.InventoryAndItems;
+using JueMingZ.Automation.Movement;
+using JueMingZ.Automation.NpcServices;
+using JueMingZ.Automation.WorldAutomation;
+using JueMingZ.Bootstrap;
+using JueMingZ.Common;
+using JueMingZ.Compat;
+using JueMingZ.Config;
+using JueMingZ.Diagnostics;
+using JueMingZ.Features;
+using JueMingZ.GameState;
+using JueMingZ.Input;
+using JueMingZ.UI;
+using JueMingZ.UI.Information;
+using JueMingZ.UI.Legacy;
+
+namespace JueMingZ.Runtime
+{
+    internal static partial class RuntimeDiagnosticSnapshotBuilder
+    {
+        private static void WriteActionQueue(DiagnosticSnapshot snapshot, RuntimeDiagnosticSnapshotSource source)
+        {
+            var actionSnapshot = source.ActionSnapshot;
+            var lastActionUserMessage = source.LastActionUserMessage;
+            var lastActionResultCode = source.LastActionResultCode;
+            var lastActionKind = source.LastActionKind;
+            var worldAutomationFairness = WorldAutomationFairnessCoordinator.GetSnapshot();
+            var itemCheckWriter = ItemCheckWriterArbiter.GetLastDecision();
+
+            snapshot.PendingActionCount = actionSnapshot.PendingCount;
+            snapshot.ActionQueueUpdateCount = actionSnapshot.UpdateCount;
+            snapshot.RunningAction = actionSnapshot.RunningAction;
+            snapshot.RunningActionKind = actionSnapshot.RunningActionKind;
+            snapshot.RunningActionSource = actionSnapshot.RunningActionSource;
+            snapshot.RunningActionStatus = actionSnapshot.RunningActionStatus;
+            snapshot.LastActionKind = lastActionKind;
+            snapshot.LastActionStatus = actionSnapshot.LastActionStatus;
+            snapshot.LastActionMessage = actionSnapshot.LastActionMessage;
+            snapshot.LastActionUserMessage = lastActionUserMessage;
+            snapshot.LastActionResultCode = lastActionResultCode;
+            snapshot.LastActionDurationMs = actionSnapshot.LastActionDurationMs;
+            snapshot.RecentActionResultsCount = actionSnapshot.RecentResultsCount;
+            snapshot.LastActionResult = actionSnapshot.LastActionResult;
+            snapshot.RecentActionLine1 = FirstNonEmpty(DiagnosticActionHotkeyService.GetRecentFeedbackLine(0), actionSnapshot.RecentActionLine1);
+            snapshot.RecentActionLine2 = FirstNonEmpty(DiagnosticActionHotkeyService.GetRecentFeedbackLine(1), actionSnapshot.RecentActionLine2);
+            snapshot.RecentActionLine3 = FirstNonEmpty(DiagnosticActionHotkeyService.GetRecentFeedbackLine(2), actionSnapshot.RecentActionLine3);
+            snapshot.ActionQueueChannelLeaseCount = actionSnapshot.ActionQueueChannelLeaseCount;
+            snapshot.ActionQueueRunningChannels = actionSnapshot.ActionQueueRunningChannels;
+            snapshot.ActionQueueOccupiedChannels = actionSnapshot.ActionQueueOccupiedChannels;
+            snapshot.ActionQueueBridgeBusyChannels = actionSnapshot.ActionQueueBridgeBusyChannels;
+            snapshot.ActionQueueRunningLeaseChannels = actionSnapshot.ActionQueueRunningLeaseChannels;
+            snapshot.ActionQueueBlockedPendingCount = actionSnapshot.ActionQueueBlockedPendingCount;
+            snapshot.ActionQueueLastChannelDecision = actionSnapshot.ActionQueueLastChannelDecision;
+            snapshot.ActionQueueLastChannelBlockedReason = actionSnapshot.ActionQueueLastChannelBlockedReason;
+            snapshot.ActionQueueChannelOwnerSummary = actionSnapshot.ActionQueueChannelOwnerSummary;
+            snapshot.ActionQueueBridgeBusySummary = actionSnapshot.ActionQueueBridgeBusySummary;
+            snapshot.ActionQueuePendingChannelSummary = actionSnapshot.ActionQueuePendingChannelSummary;
+            snapshot.ActionQueuePendingOwnerSummary = actionSnapshot.ActionQueuePendingOwnerSummary;
+            snapshot.ActionQueueLastAdmissionStatus = actionSnapshot.ActionQueueLastAdmissionStatus;
+            snapshot.ActionQueueLastAdmissionDecision = actionSnapshot.ActionQueueLastAdmissionDecision;
+            snapshot.ActionQueueLastAdmissionReason = actionSnapshot.ActionQueueLastAdmissionReason;
+            snapshot.ActionQueueLastAdmissionKind = actionSnapshot.ActionQueueLastAdmissionKind;
+            snapshot.ActionQueueLastAdmissionSource = actionSnapshot.ActionQueueLastAdmissionSource;
+            snapshot.ActionQueueLastAdmissionScenario = actionSnapshot.ActionQueueLastAdmissionScenario;
+            snapshot.ActionQueueLastAdmissionKey = actionSnapshot.ActionQueueLastAdmissionKey;
+            snapshot.ActionQueueLastAdmissionRequiredChannels = actionSnapshot.ActionQueueLastAdmissionRequiredChannels;
+            snapshot.ActionQueueLastAdmissionBlockingChannels = actionSnapshot.ActionQueueLastAdmissionBlockingChannels;
+            snapshot.ActionQueueLastAdmissionConflictChannels = actionSnapshot.ActionQueueLastAdmissionConflictChannels;
+            snapshot.ActionQueueLastAdmissionPendingConflictSummary = actionSnapshot.ActionQueueLastAdmissionPendingConflictSummary;
+            snapshot.ActionQueueLastAdmissionRunningConflictSummary = actionSnapshot.ActionQueueLastAdmissionRunningConflictSummary;
+            snapshot.ActionQueueLastAdmissionBridgeBusySummary = actionSnapshot.ActionQueueLastAdmissionBridgeBusySummary;
+            snapshot.ActionQueueLastAdmissionOwnerSummary = actionSnapshot.ActionQueueLastAdmissionOwnerSummary;
+            snapshot.ActionQueueLastAdmissionSupersededRequestId = actionSnapshot.ActionQueueLastAdmissionSupersededRequestId;
+            snapshot.ActionQueueLastAdmissionCoalescedRequestId = actionSnapshot.ActionQueueLastAdmissionCoalescedRequestId;
+            snapshot.ActionQueueSupersededPendingCount = actionSnapshot.ActionQueueSupersededPendingCount;
+            snapshot.ActionQueueCoalescedPendingCount = actionSnapshot.ActionQueueCoalescedPendingCount;
+            snapshot.SchedulerLastSelectedRequest = actionSnapshot.SchedulerLastSelectedRequest;
+            snapshot.SchedulerLastSupersededRequest = actionSnapshot.SchedulerLastSupersededRequest;
+            snapshot.SchedulerLastFairnessBucket = actionSnapshot.SchedulerLastFairnessBucket;
+            snapshot.WorldAutomationLastWinner = worldAutomationFairness == null ? string.Empty : worldAutomationFairness.LastWinner;
+            snapshot.WorldAutomationFairnessDebt = worldAutomationFairness == null ? string.Empty : worldAutomationFairness.FairnessDebt;
+            snapshot.WorldAutomationFairnessDecisionUtc = worldAutomationFairness == null ? null : worldAutomationFairness.LastDecisionUtc;
+            snapshot.BackgroundRequestCoalescedCount = actionSnapshot.BackgroundRequestCoalescedCount;
+            snapshot.ExpiredPendingDroppedCount = actionSnapshot.ExpiredPendingDroppedCount;
+            snapshot.ActionQueueCleanupLeaseCount = actionSnapshot.ActionQueueCleanupLeaseCount;
+            snapshot.ActionQueueCleanupLeaseChannels = actionSnapshot.ActionQueueCleanupLeaseChannels;
+            snapshot.ActionQueueLastCleanupOwner = actionSnapshot.ActionQueueLastCleanupOwner;
+            snapshot.ActionQueueLastCleanupReason = actionSnapshot.ActionQueueLastCleanupReason;
+            snapshot.ActionQueueDirectEnqueueCount = actionSnapshot.ActionQueueDirectEnqueueCount;
+            snapshot.ActionQueueLastDirectEnqueueKind = actionSnapshot.ActionQueueLastDirectEnqueueKind;
+            snapshot.ActionQueueLastDirectEnqueueSource = actionSnapshot.ActionQueueLastDirectEnqueueSource;
+            snapshot.ActionQueueLastDirectEnqueueScenario = actionSnapshot.ActionQueueLastDirectEnqueueScenario;
+            snapshot.ActionQueueLastDirectEnqueueAdmissionKey = actionSnapshot.ActionQueueLastDirectEnqueueAdmissionKey;
+            snapshot.ActionQueueLastDirectEnqueueRequiredChannels = actionSnapshot.ActionQueueLastDirectEnqueueRequiredChannels;
+            snapshot.ActionQueueExpiredPendingCount = actionSnapshot.ActionQueueExpiredPendingCount;
+            snapshot.ActionQueueLastPendingExpiryReason = actionSnapshot.ActionQueueLastPendingExpiryReason;
+            snapshot.ItemUseBridgeLastStatus = ItemUseBridge.LastStatus;
+            snapshot.ItemUseBridgeLastMessage = ItemUseBridge.LastMessage;
+            snapshot.ItemUseBridgeLastRequestId = ItemUseBridge.LastRequestId == Guid.Empty ? string.Empty : ItemUseBridge.LastRequestId.ToString();
+            snapshot.ItemUseBridgePendingRequestId = ItemUseBridge.PendingRequestId == Guid.Empty ? string.Empty : ItemUseBridge.PendingRequestId.ToString();
+            snapshot.ItemUseBridgePendingAgeMs = ItemUseBridge.PendingAgeMs;
+            snapshot.ItemUseBridgeConsumeCount = ItemUseBridge.ConsumeCount;
+            snapshot.ItemUseBridgeSucceededCount = ItemUseBridge.SucceededCount;
+            snapshot.ItemUseBridgeAttemptedButUnverifiedCount = ItemUseBridge.AttemptedButUnverifiedCount;
+            snapshot.ItemUseBridgeFailedCount = ItemUseBridge.FailedCount;
+            snapshot.ItemCheckWriterOwner = itemCheckWriter == null ? string.Empty : itemCheckWriter.OwnerName;
+            snapshot.ItemCheckWriterOwnerRequestId = itemCheckWriter == null || itemCheckWriter.OwnerRequestId == Guid.Empty ? string.Empty : itemCheckWriter.OwnerRequestId.ToString();
+            snapshot.ItemCheckWriterPhase = itemCheckWriter == null ? string.Empty : itemCheckWriter.Phase;
+            snapshot.ItemCheckWriterDecisionReason = itemCheckWriter == null ? string.Empty : itemCheckWriter.Reason;
+            snapshot.ItemCheckWriterBlockedCandidates = itemCheckWriter == null ? string.Empty : itemCheckWriter.BlockedCandidatesSummary;
+            snapshot.ItemCheckWriterDecisionUtc = itemCheckWriter == null ? null : (DateTime?)itemCheckWriter.DecidedUtc;
+        }
+    }
+}

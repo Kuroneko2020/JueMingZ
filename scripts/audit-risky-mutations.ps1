@@ -144,6 +144,8 @@ function Test-IsAllowedControlledBuffMutationPath {
            $normalized.Equals("src\JueMingZ\Compat\AutoSellCompat.cs", [System.StringComparison]::OrdinalIgnoreCase) -or
            $normalized.Equals("src\JueMingZ\Compat\FishingAutoEquipmentCompat.cs", [System.StringComparison]::OrdinalIgnoreCase) -or
            $normalized.Equals("src\JueMingZ\Compat\MovementSafeLandingEquipmentCompat.cs", [System.StringComparison]::OrdinalIgnoreCase) -or
+           ($normalized.StartsWith("src\JueMingZ\Compat\MovementSafeLandingEquipmentCompat.", [System.StringComparison]::OrdinalIgnoreCase) -and
+            $normalized.EndsWith(".cs", [System.StringComparison]::OrdinalIgnoreCase)) -or
            $normalized.StartsWith("src\JueMingZ\Automation\BuffAndRecovery\", [System.StringComparison]::OrdinalIgnoreCase)
 }
 

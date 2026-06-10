@@ -759,6 +759,7 @@ namespace JueMingZ.Tests
             Run("runtime settings snapshot provider rebuilds after config mutation", ref failed, RuntimeSettingsSnapshotProviderRebuildsAfterConfigMutation);
             Run("runtime settings snapshot provider skips disabled list hashes", ref failed, RuntimeSettingsSnapshotProviderSkipsDisabledListHashes);
             Run("runtime service scheduler honors cadence and disabled cleanup", ref failed, RuntimeServiceSchedulerHonorsCadenceAndDisabledCleanup);
+            Run("runtime automation dispatcher preserves dispatch contract", ref failed, RuntimeAutomationDispatcherPreservesDispatchContract);
             Run("runtime input focus guard uses game state focus", ref failed, RuntimeInputFocusGuardUsesGameStateFocus);
             Run("movement teleport correction requires vanilla use frame", ref failed, MovementTeleportCorrectionRequiresVanillaUseFrame);
             Run("combat perfect revolver ItemCheck takeover mirrors helper cadence", ref failed, CombatPerfectRevolverItemCheckTakeoverMirrorsHelperCadence);
