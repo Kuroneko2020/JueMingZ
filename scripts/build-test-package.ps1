@@ -45,6 +45,23 @@ function Assert-ArchiveExcludesTerrariaDecompiled {
     }
 }
 
+function Get-Sha256Hex {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+
+function Get-AssemblyInformationalVersion {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $versionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($Path)
+    if ([string]::IsNullOrWhiteSpace($versionInfo.ProductVersion)) {
+        return "Unknown"
+    }
+
+    return $versionInfo.ProductVersion
+}
+
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
 
@@ -113,6 +130,10 @@ if (-not (Test-Path $jmzDll)) {
 Copy-Item $jmzDll (Join-Path $packageDir "JueMingZ.dll") -Force
 
 $assemblyName = [System.Reflection.AssemblyName]::GetAssemblyName($jmzDll)
+$assemblyInformationalVersion = Get-AssemblyInformationalVersion -Path $jmzDll
+$dllSha256 = Get-Sha256Hex -Path $jmzDll
+$dllLastWriteUtc = (Get-Item -LiteralPath $jmzDll).LastWriteTimeUtc.ToString("o", [System.Globalization.CultureInfo]::InvariantCulture)
+$packagedAtUtc = (Get-Date).ToUniversalTime().ToString("o", [System.Globalization.CultureInfo]::InvariantCulture)
 $assemblyDisplayName = "JueMingZ, Version=$($assemblyName.Version), Culture=neutral, PublicKeyToken=null"
 $runtimeSourcePath = Join-Path $repoRoot "src\JueMingZ\Runtime\JueMingZRuntime.cs"
 $runtimeVersion = "Unknown"
@@ -189,7 +210,17 @@ if ($encodedReadmeFiles -and $encodedReadmeFiles.Count -gt 0) {
     Write-Warning "README_#U*.txt was observed in a non-Windows environment. Chinese filenames can display incorrectly in non-Windows/zip tools; use Windows local validation before treating this as a user-facing package failure."
 }
 
-$versionText = "RuntimeVersion=$runtimeVersion"
+$versionText = @(
+    "PackageManifestVersion=1",
+    "BuildTestPackageScriptVersion=1",
+    "RuntimeVersion=$runtimeVersion",
+    "AssemblyVersion=$($assemblyName.Version)",
+    "AssemblyInformationalVersion=$assemblyInformationalVersion",
+    "JueMingZDllSha256=$dllSha256",
+    "BuildOutputRelativePath=src/JueMingZ/bin/x86/Release/net472/JueMingZ.dll",
+    "BuildOutputLastWriteUtc=$dllLastWriteUtc",
+    "PackagedAtUtc=$packagedAtUtc"
+) -join [System.Environment]::NewLine
 Set-Content -Path (Join-Path $packageDir "VERSION.txt") -Value $versionText -Encoding UTF8
 
 foreach ($name in $compileOnlyDependencyNames) {
@@ -211,6 +242,7 @@ if ($Zip) {
 
 Write-Host "JueMingZ test package created: $packageDir"
 Write-Host "RuntimeVersion: $runtimeVersion"
+Write-Host "JueMingZ.dll SHA256: $dllSha256"
 if ($IncludeReadme) {
     Write-Host "README generated: $readmeOutputPath"
 }

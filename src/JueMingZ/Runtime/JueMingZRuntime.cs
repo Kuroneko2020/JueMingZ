@@ -43,13 +43,8 @@ namespace JueMingZ.Runtime
         private static long _nextHiddenDiagnosticSnapshotProbeTick;
         private static long _lastRuntimeUpdateStartTimestamp;
         private static readonly RuntimeTickPipeline TickPipeline = CreateTickPipeline();
-        private static readonly object ServiceSchedulerSyncRoot = new object();
-        private static readonly Dictionary<string, bool> ServiceSchedulerLastEnabled =
-            new Dictionary<string, bool>(StringComparer.Ordinal);
-        private static readonly Dictionary<string, long> ServiceSchedulerLastRunTick =
-            new Dictionary<string, long>(StringComparer.Ordinal);
 
-        public const string Version = "1.7.508-combat-ui-slider-text-polish";
+        public const string Version = "1.7.520-new-feature-boundary-closeout";
 
         public static RuntimeState State { get; private set; } = new RuntimeState();
         public static FeatureRegistry FeatureRegistry { get; private set; }
@@ -211,14 +206,14 @@ namespace JueMingZ.Runtime
             var gameState = context.GameState;
             var settings = context.SettingsSnapshot ?? RuntimeSettingsSnapshotProvider.GetCurrent();
             var operationStart = Stopwatch.GetTimestamp();
-            if (ShouldRunService("targeting.combat-release-hold", settings.CombatAimAnyEnabled, 1, context.UpdateTick))
+            if (RuntimeServiceScheduler.ShouldRun("targeting.combat-release-hold", settings.CombatAimAnyEnabled, 1, context.UpdateTick))
             {
                 CombatAimReleaseHoldService.Tick(gameState != null && gameState.IsInWorld, settings);
                 RecordOperationTiming(context, "targeting.combat-release-hold", operationStart);
             }
 
             operationStart = Stopwatch.GetTimestamp();
-            if (ShouldRunService(
+            if (RuntimeServiceScheduler.ShouldRun(
                 "targeting.combat-auto-aim",
                 settings.CursorAimRadius > 0,
                 1,
@@ -229,7 +224,7 @@ namespace JueMingZ.Runtime
             }
 
             operationStart = Stopwatch.GetTimestamp();
-            if (ShouldRunService("targeting.combat-flail-control", settings.CursorAimRadius > 0, 1, context.UpdateTick))
+            if (RuntimeServiceScheduler.ShouldRun("targeting.combat-flail-control", settings.CursorAimRadius > 0, 1, context.UpdateTick))
             {
                 CombatAimFlailControlService.Update();
                 RecordOperationTiming(context, "targeting.combat-flail-control", operationStart);
@@ -252,7 +247,7 @@ namespace JueMingZ.Runtime
         private static void DispatchAutomationRequests(RuntimeTickContext context)
         {
             // The dispatch gate and per-service cadence are the idle-path budget;
-            // do not move service scans ahead of ShouldRunService checks.
+            // do not move service scans ahead of RuntimeServiceScheduler checks.
             if (!ShouldDispatchAutomation(context.GameState))
             {
                 return;
@@ -262,7 +257,7 @@ namespace JueMingZ.Runtime
             var settings = context.SettingsSnapshot ?? RuntimeSettingsSnapshotProvider.GetCurrent();
             var tick = context.UpdateTick;
             var operationStart = Stopwatch.GetTimestamp();
-            if (ShouldRunService(
+            if (RuntimeServiceScheduler.ShouldRun(
                 "travel-menu",
                 settings.WorldAutomationTravelMenuEnabled || TravelMenuService.RequiresRuntimeTickWhenDisabled(),
                 1,
@@ -280,7 +275,7 @@ namespace JueMingZ.Runtime
                 return;
             }
 
-            if (ShouldRunService("auto-recovery", settings.RecoveryAnyEnabled, 1, tick))
+            if (RuntimeServiceScheduler.ShouldRun("auto-recovery", settings.RecoveryAnyEnabled, 1, tick))
             {
                 AutoRecoveryService.Tick(ActionQueue, gameState, State, settings);
                 RecordOperationTiming(context, "dispatch.auto-recovery", operationStart);
@@ -290,7 +285,7 @@ namespace JueMingZ.Runtime
             var fishingHasResidualState = FishingAutomationService.HasResidualState;
             var fishingDispatch = GetFishingAutomationDispatchDecision(settings, fishingHasResidualState, tick);
             FishingAutomationService.RecordDispatchState(fishingDispatch.Reason, fishingDispatch.CadenceTicks);
-            if (ShouldRunService(
+            if (RuntimeServiceScheduler.ShouldRun(
                 "fishing-automation",
                 fishingDispatch.Enabled,
                 fishingDispatch.CadenceTicks,
@@ -301,84 +296,84 @@ namespace JueMingZ.Runtime
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRunService("quick-item-hotkeys", settings.InventoryQuickItemHotkeysEnabled, 1, tick))
+            if (RuntimeServiceScheduler.ShouldRun("quick-item-hotkeys", settings.InventoryQuickItemHotkeysEnabled, 1, tick))
             {
                 QuickItemHotkeyService.Tick(ActionQueue, gameState, State, settings);
                 RecordOperationTiming(context, "dispatch.quick-item-hotkeys", operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRunService("auto-capture-critter", settings.WorldAutomationAutoCaptureCritterEnabled, 4, tick))
+            if (RuntimeServiceScheduler.ShouldRun("auto-capture-critter", settings.WorldAutomationAutoCaptureCritterEnabled, 4, tick))
             {
                 AutoCaptureCritterService.Tick(ActionQueue, gameState, State, settings);
                 RecordOperationTiming(context, "dispatch.auto-capture-critter", operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRunService("auto-harvest", settings.WorldAutomationAutoHarvestEnabled, 1, tick))
+            if (RuntimeServiceScheduler.ShouldRun("auto-harvest", settings.WorldAutomationAutoHarvestEnabled, 1, tick))
             {
                 AutoHarvestService.Tick(ActionQueue, gameState, State, settings);
                 RecordOperationTiming(context, "dispatch.auto-harvest", operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRunService("auto-mining", settings.WorldAutomationAutoMiningEnabled, 1, tick))
+            if (RuntimeServiceScheduler.ShouldRun("auto-mining", settings.WorldAutomationAutoMiningEnabled, 1, tick))
             {
                 AutoMiningService.Tick(ActionQueue, gameState, State, settings);
                 RecordOperationTiming(context, "dispatch.auto-mining", operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRunService("auto-stack", settings.InventoryAutoStackEnabled, 5, tick))
+            if (RuntimeServiceScheduler.ShouldRun("auto-stack", settings.InventoryAutoStackEnabled, 5, tick))
             {
                 AutoStackService.Tick(ActionQueue, gameState, State, settings);
                 RecordOperationTiming(context, "dispatch.auto-stack", operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRunService("auto-sell", settings.InventoryAutoSellEnabled, 15, tick))
+            if (RuntimeServiceScheduler.ShouldRun("auto-sell", settings.InventoryAutoSellEnabled, 15, tick))
             {
                 AutoSellService.Tick(ActionQueue, gameState, State, settings);
                 RecordOperationTiming(context, "dispatch.auto-sell", operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRunService("auto-discard", settings.InventoryAutoDiscardEnabled, 15, tick))
+            if (RuntimeServiceScheduler.ShouldRun("auto-discard", settings.InventoryAutoDiscardEnabled, 15, tick))
             {
                 AutoDiscardService.Tick(ActionQueue, gameState, State, settings);
                 RecordOperationTiming(context, "dispatch.auto-discard", operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRunService("quick-bag-open", settings.InventoryQuickBagOpenEnabled, 1, tick))
+            if (RuntimeServiceScheduler.ShouldRun("quick-bag-open", settings.InventoryQuickBagOpenEnabled, 1, tick))
             {
                 QuickBagOpenService.Tick(ActionQueue, gameState, State, settings);
                 RecordOperationTiming(context, "dispatch.quick-bag-open", operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRunService("auto-deposit-coins", settings.InventoryAutoDepositCoinsEnabled, 15, tick))
+            if (RuntimeServiceScheduler.ShouldRun("auto-deposit-coins", settings.InventoryAutoDepositCoinsEnabled, 15, tick))
             {
                 AutoDepositCoinsService.Tick(ActionQueue, gameState, State, settings);
                 RecordOperationTiming(context, "dispatch.auto-deposit-coins", operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRunService("auto-extractinator", settings.InventoryAutoExtractinatorEnabled, 3, tick))
+            if (RuntimeServiceScheduler.ShouldRun("auto-extractinator", settings.InventoryAutoExtractinatorEnabled, 3, tick))
             {
                 AutoExtractinatorService.Tick(ActionQueue, gameState, State, settings);
                 RecordOperationTiming(context, "dispatch.auto-extractinator", operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRunService("keep-favorited", settings.InventoryKeepFavoritedEnabled, 2, tick))
+            if (RuntimeServiceScheduler.ShouldRun("keep-favorited", settings.InventoryKeepFavoritedEnabled, 2, tick))
             {
                 KeepFavoritedService.Tick(ActionQueue, gameState, State, settings);
                 RecordOperationTiming(context, "dispatch.keep-favorited", operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRunService("quick-reforge", settings.NpcAutoReforgeEnabled, 1, tick))
+            if (RuntimeServiceScheduler.ShouldRun("quick-reforge", settings.NpcAutoReforgeEnabled, 1, tick))
             {
                 QuickReforgeService.Tick(ActionQueue, gameState, State, settings);
                 RecordOperationTiming(context, "dispatch.quick-reforge", operationStart);
@@ -386,35 +381,35 @@ namespace JueMingZ.Runtime
             }
 
             operationStart = Stopwatch.GetTimestamp();
-            if (ShouldRunService("auto-tax-collect", settings.NpcAutoTaxCollectEnabled, 30, tick))
+            if (RuntimeServiceScheduler.ShouldRun("auto-tax-collect", settings.NpcAutoTaxCollectEnabled, 30, tick))
             {
                 AutoTaxCollectorService.Tick(ActionQueue, gameState, State, settings);
                 RecordOperationTiming(context, "dispatch.auto-tax-collect", operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRunService("combat-perfect-revolver", settings.CombatPerfectRevolverEnabled, 1, tick))
+            if (RuntimeServiceScheduler.ShouldRun("combat-perfect-revolver", settings.CombatPerfectRevolverEnabled, 1, tick))
             {
                 CombatPerfectRevolverService.Tick(ActionQueue, gameState, State);
                 RecordOperationTiming(context, "dispatch.combat-perfect-revolver", operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRunService("combat-magic-string", settings.CombatMagicStringClickerEnabled, 1, tick))
+            if (RuntimeServiceScheduler.ShouldRun("combat-magic-string", settings.CombatMagicStringClickerEnabled, 1, tick))
             {
                 CombatMagicStringClickerService.Tick(ActionQueue, gameState, State);
                 RecordOperationTiming(context, "dispatch.combat-magic-string", operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRunService("combat-auto-facing", settings.CombatAutoFacingEnabled, 1, tick))
+            if (RuntimeServiceScheduler.ShouldRun("combat-auto-facing", settings.CombatAutoFacingEnabled, 1, tick))
             {
                 CombatAutoFacingService.Tick(ActionQueue, gameState, State, settings);
                 RecordOperationTiming(context, "dispatch.combat-auto-facing", operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRunService(
+            if (RuntimeServiceScheduler.ShouldRun(
                 "combat-phaseblade-quick-switch",
                 settings.CombatPhasebladeQuickSwitchEnabled ||
                     PhasebladeQuickSwitchBridge.HasActiveUse ||
@@ -427,7 +422,7 @@ namespace JueMingZ.Runtime
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRunService("combat-equipment-warning", settings.CombatEquipmentWarningEnabled, 1, tick))
+            if (RuntimeServiceScheduler.ShouldRun("combat-equipment-warning", settings.CombatEquipmentWarningEnabled, 1, tick))
             {
                 CombatEquipmentWarningService.Tick(gameState, State, settings);
                 RecordOperationTiming(context, "dispatch.combat-equipment-warning", operationStart);
@@ -438,7 +433,7 @@ namespace JueMingZ.Runtime
             RecordOperationTiming(context, "dispatch.first-world-load-prompt", operationStart);
             operationStart = Stopwatch.GetTimestamp();
 
-            if (ShouldRunService(
+            if (RuntimeServiceScheduler.ShouldRun(
                 "movement-safe-landing",
                 settings.MovementSafeLandingEnabled || MovementSafeLandingService.RequiresRuntimeTickWhenDisabled(),
                 1,
@@ -450,14 +445,14 @@ namespace JueMingZ.Runtime
 
             operationStart = Stopwatch.GetTimestamp();
 
-            if (ShouldRunService("movement-continuous-dash", settings.MovementContinuousDashEnabled, 1, tick))
+            if (RuntimeServiceScheduler.ShouldRun("movement-continuous-dash", settings.MovementContinuousDashEnabled, 1, tick))
             {
                 MovementContinuousDashService.Tick(ActionQueue, gameState, State, settings);
                 RecordOperationTiming(context, "dispatch.movement-continuous-dash", operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRunService("movement-simulated-jump", settings.MovementSimulatedMultiJumpEnabled, 1, tick))
+            if (RuntimeServiceScheduler.ShouldRun("movement-simulated-jump", settings.MovementSimulatedMultiJumpEnabled, 1, tick))
             {
                 MovementSimulatedJumpService.Tick(ActionQueue, gameState, State, settings);
                 RecordOperationTiming(context, "dispatch.movement-simulated-jump", operationStart);
@@ -812,57 +807,6 @@ namespace JueMingZ.Runtime
             };
         }
 
-        private static bool ShouldRunService(string serviceName, bool enabled, int cadenceTicks, long updateTick)
-        {
-            if (string.IsNullOrWhiteSpace(serviceName))
-            {
-                return enabled;
-            }
-
-            if (cadenceTicks <= 0)
-            {
-                cadenceTicks = 1;
-            }
-
-            lock (ServiceSchedulerSyncRoot)
-            {
-                bool wasEnabled;
-                ServiceSchedulerLastEnabled.TryGetValue(serviceName, out wasEnabled);
-
-                if (!enabled)
-                {
-                    ServiceSchedulerLastEnabled[serviceName] = false;
-                    if (wasEnabled)
-                    {
-                        ServiceSchedulerLastRunTick[serviceName] = updateTick;
-                        return true;
-                    }
-
-                    return false;
-                }
-
-                ServiceSchedulerLastEnabled[serviceName] = true;
-                if (!wasEnabled)
-                {
-                    ServiceSchedulerLastRunTick[serviceName] = updateTick;
-                    return true;
-                }
-
-                long lastRunTick;
-                if (!ServiceSchedulerLastRunTick.TryGetValue(serviceName, out lastRunTick) ||
-                    updateTick < lastRunTick ||
-                    updateTick - lastRunTick >= cadenceTicks)
-                {
-                    ServiceSchedulerLastRunTick[serviceName] = updateTick;
-                    return true;
-                }
-
-                return false;
-            }
-        }
-
-
-
         public static GameStateReadOptions BuildGameStateReadOptionsForTesting(
             object snapshot = null, bool diagnosticSnapshotDue = false,
             object extra1 = null, object extra2 = null)
@@ -880,7 +824,7 @@ namespace JueMingZ.Runtime
 
         public static bool ShouldRunServiceForTesting(string serviceName, bool enabled, int priority, int maxPriority)
         {
-            return ShouldRunService(serviceName, enabled, priority, maxPriority);
+            return RuntimeServiceScheduler.ShouldRun(serviceName, enabled, priority, maxPriority);
         }
 
         public static bool IsGameInputAvailableForTesting(GameStateSnapshot snapshot)
@@ -915,12 +859,9 @@ namespace JueMingZ.Runtime
 
         public static void ResetServiceSchedulerForTesting()
         {
-            lock (ServiceSchedulerSyncRoot)
-            {
-                ServiceSchedulerLastEnabled.Clear();
-                ServiceSchedulerLastRunTick.Clear();
-            }
+            RuntimeServiceScheduler.ResetForTesting();
         }
+
         public static void Shutdown()
         {
             lock (SyncRoot)
@@ -1878,7 +1819,7 @@ namespace JueMingZ.Runtime
             {
                 return FirstNonEmpty(
                     DiagnosticInteractionDiagnostics.LastButtonMessage,
-                    "�ѵ����ť��" + DiagnosticInteractionDiagnostics.LastButtonLabel + "���ȴ����������");
+                    "已点击按钮：" + DiagnosticInteractionDiagnostics.LastButtonLabel + "，等待队列处理。");
             }
 
             return FirstNonEmpty(actionSnapshot == null ? string.Empty : actionSnapshot.LastActionMessage, hotkeyMessage);
@@ -1999,10 +1940,18 @@ namespace JueMingZ.Runtime
                 _startupNoopQueued = true;
             }
 
-            // ACTION_QUEUE_DIRECT_ENQUEUE_EXCEPTION: one-shot startup health noop; owner=diagnostics; migrate_after=02 no-op unless startup diagnostics need admission testing.
-            ActionQueue.Enqueue(InputActionRequest.CreateDiagnosticNoop(
+            var request = InputActionRequest.CreateDiagnosticNoop(
                 "diagnostics.health_check",
-                "M5 queue startup check"));
+                "M5 queue startup check");
+            InputActionAdmissionResult admission;
+            if (!ActionQueue.TryEnqueue(request, out admission))
+            {
+                LogThrottle.WarnThrottled(
+                    "startup-diagnostic-noop-admission-denied",
+                    TimeSpan.FromSeconds(30),
+                    "JueMingZRuntime",
+                    "Startup diagnostic noop admission denied: " + (admission == null ? "unknown" : admission.Summary));
+            }
         }
 
         private static bool ShouldLogHeartbeat()

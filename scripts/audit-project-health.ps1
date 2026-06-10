@@ -34,6 +34,52 @@ function Read-TextIfExists {
     return [System.IO.File]::ReadAllText($Path, [System.Text.Encoding]::UTF8)
 }
 
+function Read-KeyValueManifest {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $text = Read-TextIfExists -Path $Path
+    if ($null -eq $text) {
+        return $null
+    }
+
+    $manifest = @{}
+    foreach ($line in ($text -split "\r?\n")) {
+        if ([string]::IsNullOrWhiteSpace($line)) {
+            continue
+        }
+
+        $separatorIndex = $line.IndexOf("=")
+        if ($separatorIndex -le 0) {
+            continue
+        }
+
+        $key = $line.Substring(0, $separatorIndex).Trim()
+        $value = $line.Substring($separatorIndex + 1).Trim()
+        if (-not [string]::IsNullOrWhiteSpace($key)) {
+            $manifest[$key] = $value
+        }
+    }
+
+    return $manifest
+}
+
+function Get-Sha256Hex {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+
+function Get-AssemblyInformationalVersion {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $versionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($Path)
+    if ([string]::IsNullOrWhiteSpace($versionInfo.ProductVersion)) {
+        return "Unknown"
+    }
+
+    return $versionInfo.ProductVersion
+}
+
 function ConvertFrom-CodePoints {
     param([Parameter(Mandatory = $true)][int[]]$CodePoints)
 
@@ -446,6 +492,126 @@ function Test-SourcePackageZip {
     }
 }
 
+function Test-TestPackageFreshness {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$RuntimeVersion,
+        [Parameter(Mandatory = $true)][string]$PackageDir
+    )
+
+    $versionPath = Join-Path $PackageDir "VERSION.txt"
+    $packageDllPath = Join-Path $PackageDir "JueMingZ.dll"
+    $buildOutputRelativePath = "src/JueMingZ/bin/x86/Release/net472/JueMingZ.dll"
+    $buildOutputDllPath = Join-Path $RepoRoot $buildOutputRelativePath
+    $manifest = Read-KeyValueManifest -Path $versionPath
+
+    if ($null -eq $manifest) {
+        Write-FailHealth "Test package VERSION.txt could not be read as a freshness manifest."
+        return
+    }
+
+    $requiredKeys = @(
+        "PackageManifestVersion",
+        "BuildTestPackageScriptVersion",
+        "RuntimeVersion",
+        "AssemblyVersion",
+        "AssemblyInformationalVersion",
+        "JueMingZDllSha256",
+        "BuildOutputRelativePath",
+        "BuildOutputLastWriteUtc",
+        "PackagedAtUtc"
+    )
+
+    $missingKeys = @()
+    foreach ($key in $requiredKeys) {
+        if (-not $manifest.ContainsKey($key) -or [string]::IsNullOrWhiteSpace([string]$manifest[$key])) {
+            $missingKeys += $key
+        }
+    }
+
+    if ($missingKeys.Count -gt 0) {
+        Write-FailHealth "Test package VERSION.txt lacks freshness manifest key(s): $($missingKeys -join ', ')"
+        return
+    }
+
+    $manifestVersion = [string]$manifest["PackageManifestVersion"]
+    $manifestRuntimeVersion = [string]$manifest["RuntimeVersion"]
+    $manifestAssemblyVersion = [string]$manifest["AssemblyVersion"]
+    $manifestInformationalVersion = [string]$manifest["AssemblyInformationalVersion"]
+    $manifestDllHash = ([string]$manifest["JueMingZDllSha256"]).ToLowerInvariant()
+    $manifestBuildOutputRelativePath = [string]$manifest["BuildOutputRelativePath"]
+
+    if ($manifestVersion -eq "1") {
+        Write-Pass "Test package VERSION.txt contains freshness manifest version 1."
+    }
+    else {
+        Write-FailHealth "Test package VERSION.txt has unsupported PackageManifestVersion=$manifestVersion."
+    }
+
+    if ($manifestRuntimeVersion -eq $RuntimeVersion) {
+        Write-Pass "Test package freshness manifest RuntimeVersion matches $RuntimeVersion."
+    }
+    else {
+        Write-FailHealth "Test package freshness manifest RuntimeVersion '$manifestRuntimeVersion' does not match '$RuntimeVersion'."
+    }
+
+    if ($manifestInformationalVersion -eq $RuntimeVersion) {
+        Write-Pass "Test package assembly informational version is captured in the freshness manifest."
+    }
+    else {
+        Write-FailHealth "Test package manifest AssemblyInformationalVersion '$manifestInformationalVersion' does not match RuntimeVersion '$RuntimeVersion'."
+    }
+
+    if ($manifestBuildOutputRelativePath -eq $buildOutputRelativePath) {
+        Write-Pass "Test package freshness manifest points at the standard Release x86 build output."
+    }
+    else {
+        Write-FailHealth "Test package freshness manifest uses unexpected BuildOutputRelativePath '$manifestBuildOutputRelativePath'."
+    }
+
+    if (-not (Test-Path -LiteralPath $packageDllPath)) {
+        Write-FailHealth "Test package freshness check cannot read JueMingZ.dll."
+        return
+    }
+
+    $packageHash = Get-Sha256Hex -Path $packageDllPath
+    if ($packageHash -eq $manifestDllHash) {
+        Write-Pass "Test package JueMingZ.dll hash matches VERSION.txt freshness manifest."
+    }
+    else {
+        Write-FailHealth "Test package JueMingZ.dll hash differs from VERSION.txt freshness manifest."
+    }
+
+    $packageAssemblyName = [System.Reflection.AssemblyName]::GetAssemblyName($packageDllPath)
+    $packageInformationalVersion = Get-AssemblyInformationalVersion -Path $packageDllPath
+    if ([string]$packageAssemblyName.Version -eq $manifestAssemblyVersion) {
+        Write-Pass "Test package assembly version matches VERSION.txt freshness manifest."
+    }
+    else {
+        Write-FailHealth "Test package assembly version '$($packageAssemblyName.Version)' differs from manifest '$manifestAssemblyVersion'."
+    }
+
+    if ($packageInformationalVersion -eq $manifestInformationalVersion) {
+        Write-Pass "Test package assembly informational version matches VERSION.txt freshness manifest."
+    }
+    else {
+        Write-FailHealth "Test package assembly informational version '$packageInformationalVersion' differs from manifest '$manifestInformationalVersion'."
+    }
+
+    if (-not (Test-Path -LiteralPath $buildOutputDllPath)) {
+        Write-FailHealth "Current Release x86 build output is missing; cannot prove test package freshness: $buildOutputRelativePath"
+        return
+    }
+
+    $buildOutputHash = Get-Sha256Hex -Path $buildOutputDllPath
+    if ($buildOutputHash -eq $packageHash) {
+        Write-Pass "Test package JueMingZ.dll matches the current Release x86 build output hash."
+    }
+    else {
+        Write-FailHealth "Test package JueMingZ.dll is stale or hand-edited; hash differs from current Release x86 build output."
+    }
+}
+
 function Test-TestPackage {
     param(
         [Parameter(Mandatory = $true)][string]$RepoRoot,
@@ -492,6 +658,8 @@ function Test-TestPackage {
             Write-Pass "Test package excludes compile-only dependency: $name"
         }
     }
+
+    Test-TestPackageFreshness -RepoRoot $RepoRoot -RuntimeVersion $RuntimeVersion -PackageDir $packageDir
 
     $readmeFileName = "README_" +
         ([string][char]0x6d4b) +
@@ -1184,6 +1352,251 @@ function Test-PhasebladeQuickSwitchDiagnosticsGovernance {
     }
 }
 
+function Test-ActionQueueDirectEnqueueGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $srcRoot = Join-Path $RepoRoot "src\JueMingZ"
+    if (-not (Test-Path -LiteralPath $srcRoot)) {
+        Write-FailHealth "JueMingZ source root missing while auditing ActionQueue direct enqueue governance."
+        return
+    }
+
+    $expectedExceptionCounts = @{
+        "src/JueMingZ/Input/DiagnosticActionDispatcher.cs" = 1
+    }
+    $expectedDirectCallCounts = @{
+        "src/JueMingZ/Input/DiagnosticActionDispatcher.cs" = 1
+    }
+
+    $tagCounts = @{}
+    $directCallCounts = @{}
+    $unexpectedStaticCalls = @()
+    $files = Get-ChildItem -LiteralPath $srcRoot -Recurse -Filter "*.cs" -File
+    foreach ($file in $files) {
+        $relative = $file.FullName.Substring($RepoRoot.Length).TrimStart('\', '/').Replace('\', '/')
+        $text = Read-TextIfExists -Path $file.FullName
+        if ($null -eq $text) {
+            continue
+        }
+
+        $tagCount = [System.Text.RegularExpressions.Regex]::Matches($text, 'ACTION_QUEUE_DIRECT_ENQUEUE_EXCEPTION').Count
+        if ($tagCount -gt 0) {
+            $tagCounts[$relative] = $tagCount
+        }
+
+        if ($relative -eq "src/JueMingZ/Actions/InputActionQueue.cs") {
+            continue
+        }
+
+        $hasInputQueueParameter = [System.Text.RegularExpressions.Regex]::IsMatch($text, '\bInputActionQueue\s+queue\b')
+        $lines = $text -split "\r?\n"
+        for ($index = 0; $index -lt $lines.Count; $index++) {
+            $line = $lines[$index]
+            $lineNumber = $index + 1
+            if ([System.Text.RegularExpressions.Regex]::IsMatch($line, '\bActionQueue\.Enqueue\s*\(')) {
+                $unexpectedStaticCalls += "${relative}:$lineNumber"
+            }
+
+            if ($hasInputQueueParameter -and
+                [System.Text.RegularExpressions.Regex]::IsMatch($line, '\bqueue\.Enqueue\s*\(')) {
+                if (-not $directCallCounts.ContainsKey($relative)) {
+                    $directCallCounts[$relative] = 0
+                }
+
+                $directCallCounts[$relative]++
+            }
+        }
+    }
+
+    $unexpectedTags = @()
+    foreach ($path in $tagCounts.Keys) {
+        if (-not $expectedExceptionCounts.ContainsKey($path) -or
+            $tagCounts[$path] -ne $expectedExceptionCounts[$path]) {
+            $unexpectedTags += "$path=$($tagCounts[$path])"
+        }
+    }
+
+    foreach ($path in $expectedExceptionCounts.Keys) {
+        $actual = 0
+        if ($tagCounts.ContainsKey($path)) {
+            $actual = $tagCounts[$path]
+        }
+
+        if ($actual -ne $expectedExceptionCounts[$path]) {
+            $unexpectedTags += "$path=$actual expected=$($expectedExceptionCounts[$path])"
+        }
+    }
+
+    if ($unexpectedTags.Count -gt 0) {
+        Write-FailHealth "ACTION_QUEUE_DIRECT_ENQUEUE_EXCEPTION allowlist changed: $($unexpectedTags -join ', ')"
+    }
+    else {
+        Write-Pass "ActionQueue direct enqueue exception comments remain frozen to the diagnostics allowlist."
+    }
+
+    $unexpectedDirectCalls = @()
+    foreach ($path in $directCallCounts.Keys) {
+        if (-not $expectedDirectCallCounts.ContainsKey($path) -or
+            $directCallCounts[$path] -ne $expectedDirectCallCounts[$path]) {
+            $unexpectedDirectCalls += "$path=$($directCallCounts[$path])"
+        }
+    }
+
+    foreach ($path in $expectedDirectCallCounts.Keys) {
+        $actual = 0
+        if ($directCallCounts.ContainsKey($path)) {
+            $actual = $directCallCounts[$path]
+        }
+
+        if ($actual -ne $expectedDirectCallCounts[$path]) {
+            $unexpectedDirectCalls += "$path=$actual expected=$($expectedDirectCallCounts[$path])"
+        }
+    }
+
+    if ($unexpectedStaticCalls.Count -gt 0) {
+        Write-FailHealth "Runtime/static ActionQueue.Enqueue calls must migrate to TryEnqueue or be explicitly evaluated: $($unexpectedStaticCalls -join ', ')"
+    }
+    else {
+        Write-Pass "No Runtime/static ActionQueue.Enqueue calls bypass admission."
+    }
+
+    if ($unexpectedDirectCalls.Count -gt 0) {
+        Write-FailHealth "InputActionQueue direct Enqueue call allowlist changed: $($unexpectedDirectCalls -join ', ')"
+    }
+    else {
+        Write-Pass "InputActionQueue direct Enqueue calls remain frozen to the diagnostics button path."
+    }
+}
+
+function Test-NewFeatureBoundaryGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $docs = @(
+        @{
+            Name = "AGENTS.md"
+            Path = Join-Path $RepoRoot "AGENTS.md"
+            Required = @(
+                "职责边界底线",
+                "新功能必须按职责 / 功能边界",
+                "FeatureDefinition",
+                "公共 Runtime / Compat / 巨型 Service"
+            )
+        },
+        @{
+            Name = "冷启动说明.md"
+            Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("冷启动说明.md")
+            Required = @(
+                "职责边界：新功能必须按职责 / 功能边界",
+                "公共 Runtime、Compat、巨型 Service"
+            )
+        },
+        @{
+            Name = "工程规则.md"
+            Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "工程规则.md")
+            Required = @(
+                "职责边界底线",
+                "新功能业务主体必须落在自己的 service",
+                "JueMingZRuntime",
+                "TerrariaInputCompat",
+                "MovementSafeLandingService"
+            )
+        },
+        @{
+            Name = "AI测试规则.md"
+            Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI测试规则.md")
+            Required = @(
+                "后续新增功能不得把业务判断塞进",
+                "TerrariaInputCompat 拆分回归关注",
+                "MovementSafeLandingCompat 拆分回归关注",
+                "MovementSafeLandingService 拆分回归关注"
+            )
+        }
+    )
+
+    foreach ($doc in $docs) {
+        $text = Read-TextIfExists -Path $doc.Path
+        if ($null -eq $text) {
+            Write-FailHealth "New feature boundary document missing: $($doc.Name)"
+            continue
+        }
+
+        $missing = @()
+        foreach ($required in $doc.Required) {
+            if (-not $text.Contains($required)) {
+                $missing += $required
+            }
+        }
+
+        if ($missing.Count -gt 0) {
+            Write-FailHealth "New feature boundary document $($doc.Name) lacks required anchor(s): $($missing -join ', ')"
+        }
+        else {
+            Write-Pass "New feature boundary document $($doc.Name) keeps the required anchors."
+        }
+    }
+
+    $srcRoot = Join-Path $RepoRoot "src\JueMingZ"
+    if (-not (Test-Path -LiteralPath $srcRoot)) {
+        Write-FailHealth "JueMingZ source root missing while auditing new feature boundary governance."
+        return
+    }
+
+    $featureRegistrationLeaks = @()
+    foreach ($file in Get-ChildItem -LiteralPath $srcRoot -Recurse -Filter "*.cs" -File) {
+        $relative = $file.FullName.Substring($RepoRoot.Length).TrimStart('\', '/').Replace('\', '/')
+        $text = Read-TextIfExists -Path $file.FullName
+        if ($null -eq $text -or -not $text.Contains("FeatureDefinitionBuilder.Create")) {
+            continue
+        }
+
+        if (-not ($relative -like "src/JueMingZ/Features/Catalog/*")) {
+            $featureRegistrationLeaks += $relative
+        }
+    }
+
+    if ($featureRegistrationLeaks.Count -gt 0) {
+        Write-FailHealth "FeatureDefinitionBuilder.Create must stay in feature catalog registrars: $($featureRegistrationLeaks -join ', ')"
+    }
+    else {
+        Write-Pass "Feature registration remains isolated to feature catalog registrars."
+    }
+
+    $requiredSourceFiles = @(
+        "src\JueMingZ\Runtime\RuntimeServiceScheduler.cs",
+        "src\JueMingZ\Compat\TerrariaInputCompat.Selection.cs",
+        "src\JueMingZ\Compat\TerrariaInputCompat.MouseTarget.cs",
+        "src\JueMingZ\Compat\TerrariaInputCompat.UseItem.cs",
+        "src\JueMingZ\Compat\TerrariaInputCompat.Movement.cs",
+        "src\JueMingZ\Compat\TerrariaInputCompat.UiInput.cs",
+        "src\JueMingZ\Compat\TerrariaInputCompat.TileInteraction.cs",
+        "src\JueMingZ\Compat\TerrariaInputCompat.Reflection.cs",
+        "src\JueMingZ\Compat\MovementSafeLandingCompat.Analysis.cs",
+        "src\JueMingZ\Compat\MovementSafeLandingCompat.AnalysisHelpers.cs",
+        "src\JueMingZ\Compat\MovementSafeLandingCompat.LandingProbe.cs",
+        "src\JueMingZ\Compat\MovementSafeLandingCompat.Reflection.cs",
+        "src\JueMingZ\Automation\Movement\MovementSafeLandingService.Diagnostics.cs",
+        "src\JueMingZ\Automation\Movement\MovementSafeLandingService.Requests.cs",
+        "src\JueMingZ\Automation\Movement\MovementSafeLandingService.Recovery.cs",
+        "src\JueMingZ\Automation\Movement\MovementSafeLandingService.DescentGuard.cs",
+        "tests\JueMingZ.Tests\Program.InputActionQueueTests.cs"
+    )
+
+    $missingSourceFiles = @()
+    foreach ($relative in $requiredSourceFiles) {
+        $path = Join-Path $RepoRoot $relative
+        if (-not (Test-Path -LiteralPath $path)) {
+            $missingSourceFiles += $relative
+        }
+    }
+
+    if ($missingSourceFiles.Count -gt 0) {
+        Write-FailHealth "Expected boundary-split source files are missing: $($missingSourceFiles -join ', ')"
+    }
+    else {
+        Write-Pass "Boundary-split source files for Runtime, Compat, SafeLanding, and queue tests exist."
+    }
+}
+
 function Test-IterationLogNumbers {
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
     $updatesDir = ConvertFrom-CodePoints @(0x66f4, 0x65b0, 0x8bb0, 0x5f55)
@@ -1257,6 +1670,8 @@ Test-InformationFishingFallbackCleanup -RepoRoot $repoRoot
 Test-LegacyUiOverlayGovernance -RepoRoot $repoRoot
 Test-CombatAimDiagnosticsGovernance -RepoRoot $repoRoot
 Test-PhasebladeQuickSwitchDiagnosticsGovernance -RepoRoot $repoRoot
+Test-ActionQueueDirectEnqueueGovernance -RepoRoot $repoRoot
+Test-NewFeatureBoundaryGovernance -RepoRoot $repoRoot
 Test-IterationLogNumbers -RepoRoot $repoRoot
 
 if ($script:FailCount -gt 0) {
