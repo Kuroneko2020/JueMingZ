@@ -46,6 +46,7 @@ namespace Terraria
         public static object hoverItem;
         public static object[,] tile;
         public static object[] projectile = new object[0];
+        public static object[] recipe = new object[0];
         public static object FishDropsDB;
         public static int[] anglerQuestItemNetIDs = new int[0];
         public static int anglerQuest;
@@ -118,6 +119,39 @@ namespace Terraria
         public bool magicQuiver;
         public bool hasMoltenQuiver;
         public bool archery;
+    }
+
+    internal sealed class TestRecipeItem
+    {
+        public int type;
+        public int stack = 1;
+    }
+
+    internal sealed class Recipe
+    {
+        public static int numRecipes;
+        public object createItem = new TestRecipeItem();
+        public object[] requiredItem = new object[0];
+        public int[] acceptedGroups = new int[] { -1 };
+    }
+
+    internal sealed class RecipeGroup
+    {
+        public static Dictionary<int, RecipeGroup> recipeGroups = new Dictionary<int, RecipeGroup>();
+        public List<int> ValidItems = new List<int>();
+        public List<int> Items = new List<int>();
+        public string Name = string.Empty;
+        public string Key = string.Empty;
+
+        public string GetText()
+        {
+            if (!string.IsNullOrWhiteSpace(Name))
+            {
+                return Name;
+            }
+
+            return Key ?? string.Empty;
+        }
     }
 
     internal sealed class Projectile
@@ -375,6 +409,8 @@ namespace Terraria.ID
             public static bool[] IsFishingCrateHardmode = new bool[6000];
             public static bool[] CanFishInLava = new bool[6000];
             public static bool[] IsLavaBait = new bool[6000];
+            public static bool[] IsAMaterial = new bool[6000];
+            public static int[] ShimmerTransformToItem = CreateDefaultShimmerTransforms();
             public static Terraria.DataStructures.PlacementDetails[] DerivedPlacementDetails =
                 CreateDefaultPlacementDetails();
 
@@ -394,6 +430,17 @@ namespace Terraria.ID
 
                 return details;
             }
+
+            private static int[] CreateDefaultShimmerTransforms()
+            {
+                var transforms = new int[6000];
+                for (var index = 0; index < transforms.Length; index++)
+                {
+                    transforms[index] = -1;
+                }
+
+                return transforms;
+            }
         }
     }
 
@@ -406,6 +453,10 @@ namespace Terraria.ID
     internal sealed class TestContentSampleItem
     {
         public int type;
+        public int maxStack = 1;
+        public int rare;
+        public int value;
+        public bool consumable;
         public int createTile = -1;
         public int createWall = -1;
         public int placeStyle;
@@ -755,6 +806,7 @@ namespace JueMingZ.Tests
             Run("feature catalog exposes auto capture critter", ref failed, FeatureCatalogExposesAutoCaptureCritter);
             Run("feature catalog exposes auto harvest", ref failed, FeatureCatalogExposesAutoHarvest);
             Run("feature catalog exposes map quick announcement config", ref failed, FeatureCatalogExposesMapQuickAnnouncementConfig);
+            Run("feature catalog exposes search query UI", ref failed, FeatureCatalogExposesSearchQueryUi);
             Run("map quick announcement capture rejects invalid mouse wheel and duplicates", ref failed, MapQuickAnnouncementCaptureRulesRejectInvalidMouseWheelAndDuplicates);
             Run("map quick announcement hotkey state fires once per chord hold", ref failed, MapQuickAnnouncementHotkeyStateMachineFiresOnTriggerEdgeOnceUntilRelease);
             Run("map quick announcement hotkey state supports mouse trigger", ref failed, MapQuickAnnouncementHotkeyStateMachineSupportsMouseTrigger);
@@ -1099,6 +1151,34 @@ namespace JueMingZ.Tests
             Run("information fishing search helpers keep stable semantics", ref failed, InformationFishingSearchHelpersKeepStableSemantics);
             Run("information fishing item name resolver keeps cache boundaries", ref failed, InformationFishingItemNameResolverKeepsCacheBoundaries);
             Run("information fishing global search keeps result semantics", ref failed, InformationFishingGlobalSearchKeepsResultSemantics);
+            Run("search query unknown item degrades cleanly", ref failed, SearchQueryUnknownItemDegradesCleanly);
+            Run("search query candidates match names and IDs", ref failed, SearchQueryCandidatesMatchNamesAndIds);
+            Run("search query builds crafting source summaries", ref failed, SearchQueryBuildsCraftingSourceSummaries);
+            Run("search query indexes direct and recipe group usages", ref failed, SearchQueryIndexesDirectAndRecipeGroupUsages);
+            Run("search query indexes direct shimmer relations", ref failed, SearchQueryIndexesDirectShimmerRelations);
+            Run("search query empty facts stay empty", ref failed, SearchQueryEmptyFactsStayEmpty);
+            Run("search query formats base value as coins", ref failed, SearchQueryFormatsBaseValueAsCoins);
+            Run("search query basic facts use Chinese labels and placement values", ref failed, SearchQueryBasicFactsUseChineseLabelsAndPlacementValues);
+            Run("search query basic panel height tracks column count", ref failed, SearchQueryBasicPanelHeightTracksColumnCount);
+            Run("search query recipe layout wraps ingredients and keeps all rows", ref failed, SearchQueryRecipeLayoutWrapsIngredientsAndKeepsAllRows);
+            Run("search query shimmer layout keeps all reverse sources", ref failed, SearchQueryShimmerLayoutKeepsAllReverseSources);
+            Run("search query UI state selects candidate and clears", ref failed, SearchQueryUiStateSelectsCandidateAndClears);
+            Run("search query UI candidate scroll keeps own viewport", ref failed, SearchQueryUiCandidateScrollKeepsOwnViewport);
+            Run("search query page layout tracks UI state", ref failed, SearchQueryPageLayoutTracksUiState);
+            Run("search query layout rhythm keeps sections consistent", ref failed, SearchQueryLayoutRhythmKeepsSectionsConsistent);
+            Run("search query layout cache tracks result detail changes", ref failed, SearchQueryLayoutCacheTracksResultDetailChanges);
+            Run("search query pick entry uses selection wording", ref failed, SearchQueryPickEntryUsesSelectionWording);
+            Run("search query pick command starts pending selection and hides window", ref failed, SearchQueryPickCommandStartsPendingSelectionAndHidesWindow);
+            Run("search query pick state waits release before arming", ref failed, SearchQueryPickStateWaitsReleaseBeforeArming);
+            Run("search query pick runtime consumes left click and selects item", ref failed, SearchQueryPickRuntimeConsumesLeftClickAndSelectsItem);
+            Run("search query pick target resolver uses UI item", ref failed, SearchQueryPickTargetResolverUsesUiItem);
+            Run("search query pick target resolver uses world item", ref failed, SearchQueryPickTargetResolverUsesWorldItem);
+            Run("search query pick target resolver uses tile item id", ref failed, SearchQueryPickTargetResolverUsesTileItemId);
+            Run("search query pick target resolver uses wall item id", ref failed, SearchQueryPickTargetResolverUsesWallItemId);
+            Run("search query pick runtime consumes failed target and restores", ref failed, SearchQueryPickRuntimeConsumesFailedTargetAndRestores);
+            Run("search query hover entry requires fresh hover snapshot", ref failed, SearchQueryHoverEntryRequiresFreshHoverSnapshot);
+            Run("search query hover command selects current hover item and closes candidates", ref failed, SearchQueryHoverCommandSelectsCurrentHoverItemAndClosesCandidates);
+            Run("search query related item command tracks history and closes candidates", ref failed, SearchQueryRelatedItemCommandTracksHistoryAndClosesCandidates);
             Run("information fishing diagnostics snapshot keeps stable field mapping", ref failed, InformationFishingDiagnosticsSnapshotKeepsStableFieldMapping);
             Run("information fishing bobber fresh inactive skips projectile fallback", ref failed, InformationFishingBobberFreshInactiveSkipsProjectileFallback);
             Run("legacy UI page layout cache ignores window position", ref failed, LegacyUiPageLayoutCacheIgnoresWindowPosition);
@@ -1160,6 +1240,7 @@ namespace JueMingZ.Tests
             Run("legacy movement safe landing overlay blocks lower hover and keeps option clickable", ref failed, LegacyMovementSafeLandingOverlayBlocksLowerHoverAndKeepsOptionClickable);
             Run("legacy fishing picker overlay blocks lower hover and keeps nested scroll", ref failed, LegacyFishingPickerOverlayBlocksLowerHoverAndKeepsNestedScroll);
             Run("legacy fishing preset overlay blocks lower hover and keeps rows clickable", ref failed, LegacyFishingPresetOverlayBlocksLowerHoverAndKeepsRowsClickable);
+            Run("legacy search candidate overlay blocks lower hover keeps rows clickable and consumes scroll", ref failed, LegacySearchCandidateOverlayBlocksLowerHoverKeepsRowsClickableAndConsumesScroll);
             Run("legacy UI action update gate skips idle frames", ref failed, LegacyUiActionUpdateGateSkipsIdleFrames);
             Run("legacy UI action update gate runs pending commands when hidden", ref failed, LegacyUiActionUpdateGateRunsPendingCommandsWhenHidden);
             Run("legacy UI action update gate skips drag dispatch without commands", ref failed, LegacyUiActionUpdateGateSkipsDragDispatchWithoutCommands);

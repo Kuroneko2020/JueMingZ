@@ -258,6 +258,11 @@ namespace JueMingZ.UI.Legacy
                 return CalculateMapEnhancementContentHeight();
             }
 
+            if (string.Equals(selectedPage, "search", StringComparison.Ordinal))
+            {
+                return CalculateSearchContentHeight(contentRect);
+            }
+
             return contentRect.Height - LegacyUiMetrics.ContentPadding * 2;
         }
 
@@ -296,6 +301,11 @@ namespace JueMingZ.UI.Legacy
                 {
                     AddHash(ref hash, _autoMiningHotkeyCaptureActive);
                     AddHash(ref hash, Count(GetQuickReforgePrefixes()));
+                }
+                else if (string.Equals(selectedPage, "search", StringComparison.Ordinal))
+                {
+                    AddHash(ref hash, SearchItemQueryUiState.BuildStateSignature());
+                    AddHash(ref hash, LegacyTextInput.IsFocused(SearchItemQueryUiState.InputId));
                 }
 
                 return hash;
@@ -503,6 +513,11 @@ namespace JueMingZ.UI.Legacy
                     AddHash(ref hash, settings.MapQuickAnnouncementHotkeySlot2);
                     AddHash(ref hash, settings.MapQuickAnnouncementTriggerKey);
                     AddHash(ref hash, _mapQuickAnnouncementHotkeyCaptureSlot);
+                }
+                else if (string.Equals(selectedPage, "search", StringComparison.Ordinal))
+                {
+                    AddHash(ref hash, SearchItemQueryUiState.BuildStateSignature());
+                    AddHash(ref hash, LegacyTextInput.IsFocused(SearchItemQueryUiState.InputId));
                 }
 
                 return hash;

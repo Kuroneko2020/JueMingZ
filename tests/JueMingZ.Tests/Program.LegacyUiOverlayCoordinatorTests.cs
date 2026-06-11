@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using JueMingZ.Automation.Fishing.Filtering;
 using JueMingZ.Automation.Information;
 using JueMingZ.Automation.Movement;
+using JueMingZ.Automation.Search;
 using JueMingZ.Config;
 using JueMingZ.UI.Legacy;
 
@@ -748,6 +749,92 @@ namespace JueMingZ.Tests
 
             coordinator.ResetForTesting();
             FishingFilterUiState.Reset();
+        }
+
+        private static void LegacySearchCandidateOverlayBlocksLowerHoverKeepsRowsClickableAndConsumesScroll()
+        {
+            var coordinator = LegacyUiOverlayCoordinator.Current;
+            coordinator.ResetForTesting();
+            WithSearchQueryFixture(() =>
+            {
+                for (var index = 0; index < 10; index++)
+                {
+                    AddSearchItem(500 + index, "探针物品" + index, "ProbeItem" + index, 999, 0, 0, true, false, -1, -1);
+                }
+
+                ItemQueryService.ResetForTesting();
+                SearchItemQueryUiState.UpdateDraft("Probe");
+                LegacyTextInput.Focus(SearchItemQueryUiState.InputId, "Probe");
+
+                var viewport = new LegacyUiRect(20, 20, 360, 240);
+                var area = LegacyScrollArea.Create(viewport, 620, 0);
+                var anchor = new LegacyUiRect(40, 34, 260, 28);
+                var elements = new List<LegacyUiElement>
+                {
+                    CreateLegacyUiElementForTesting("search-lower:button", "Lower", "button", viewport)
+                };
+                var mouse = new LegacyMouseSnapshot
+                {
+                    ReadAvailable = true,
+                    LeftPressed = true
+                };
+
+                coordinator.BeginFrame("search");
+                if (!LegacyMainWindow.RegisterSearchCandidateOverlayForTesting(area, anchor))
+                {
+                    throw new InvalidOperationException("Expected search candidate list to register as an overlay.");
+                }
+
+                coordinator.DrawOverlays(null, mouse, new LegacyUiRect(0, 0, 460, 320), "search", AppSettings.CreateDefault(), elements);
+                var blocker = FindLegacyUiElementForTesting(elements, "search-query-candidates:modal-blocker");
+                mouse.X = blocker.Rect.X + 12;
+                mouse.Y = blocker.Rect.Y + 8;
+                var hovered = LegacyUiElementFrame.ResolveHoveredElement(null, elements, mouse, coordinator);
+                bool blocked;
+                var clickId = LegacyMainWindow.ResolveClickableElementIdForTesting(elements, mouse, out blocked);
+                if (hovered == null || string.Equals(hovered.Id, "search-lower:button", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected search candidate overlay to own hover above lower page content.");
+                }
+
+                if (!blocked || clickId.Length != 0)
+                {
+                    throw new InvalidOperationException("Expected search candidate overlay blocker to stop lower page clicks.");
+                }
+
+                var candidate = FindLegacyUiElementWithPrefixForTesting(elements, "search-query:candidate:");
+                mouse.X = candidate.Rect.X + Math.Max(1, candidate.Rect.Width / 2);
+                mouse.Y = candidate.Rect.Y + Math.Max(1, candidate.Rect.Height / 2);
+                hovered = LegacyUiElementFrame.ResolveHoveredElement(null, elements, mouse, coordinator);
+                clickId = LegacyMainWindow.ResolveClickableElementIdForTesting(elements, mouse, out blocked);
+                if (hovered == null || hovered.Id != candidate.Id)
+                {
+                    throw new InvalidOperationException("Expected search candidate row to win hover over the overlay blocker.");
+                }
+
+                if (blocked || clickId != candidate.Id)
+                {
+                    throw new InvalidOperationException("Expected search candidate row to remain clickable inside the overlay.");
+                }
+
+                var beforeScroll = SearchItemQueryUiState.CandidateScrollOffset;
+                mouse.ScrollDelta = -120;
+                if (!coordinator.ShouldBlockMainScroll(mouse, mouse.ScrollDelta))
+                {
+                    throw new InvalidOperationException("Expected search candidate overlay to block main page wheel.");
+                }
+
+                if (SearchItemQueryUiState.CandidateScrollOffset <= beforeScroll)
+                {
+                    throw new InvalidOperationException("Expected search candidate overlay wheel to move its own list.");
+                }
+
+                coordinator.EndFrame();
+            });
+
+            coordinator.ResetForTesting();
+            SearchItemQueryUiState.ResetForTesting();
+            LegacyTextInput.ClearFocus();
         }
 
         private static LegacyUiElement FindLegacyUiElementForTesting(IList<LegacyUiElement> elements, string id)

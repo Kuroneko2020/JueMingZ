@@ -1492,6 +1492,7 @@ function Test-MapQuickAnnouncementGovernance {
     $srcRoot = Join-Path $RepoRoot "src\JueMingZ"
     $allowedConsumePaths = @(
         "src/JueMingZ/Automation/Information/MapQuickAnnouncementRuntimeService.cs",
+        "src/JueMingZ/Automation/Search/SearchItemPickRuntimeService.cs",
         "src/JueMingZ/Compat/TerrariaUiMouseCompat.cs"
     )
     $consumeCounts = @{}
@@ -1522,10 +1523,10 @@ function Test-MapQuickAnnouncementGovernance {
     }
 
     if ($unexpectedConsumePaths.Count -gt 0 -or $missingConsumePaths.Count -gt 0) {
-        Write-FailHealth "Map quick announcement mouse consume path changed; unexpected=$($unexpectedConsumePaths -join ', ') missing=$($missingConsumePaths -join ', ')"
+        Write-FailHealth "Controlled UI mouse consume path changed; unexpected=$($unexpectedConsumePaths -join ', ') missing=$($missingConsumePaths -join ', ')"
     }
     else {
-        Write-Pass "Map quick announcement mouse input consumption remains centralized in runtime service and Terraria UI compat."
+        Write-Pass "Controlled UI mouse input consumption remains centralized in approved runtime services and Terraria UI compat."
     }
 
     $actionsRoot = Join-Path $RepoRoot "src\JueMingZ\Actions"

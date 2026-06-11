@@ -1,0 +1,1205 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using JueMingZ.Automation.Search;
+using JueMingZ.Compat;
+using JueMingZ.Config;
+using JueMingZ.Input;
+using JueMingZ.UI.Legacy;
+using JueMingZ.UI.Legacy.Framework;
+
+namespace JueMingZ.Tests
+{
+    internal static partial class Program
+    {
+        private static void SearchQueryUnknownItemDegradesCleanly()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                var result = ItemQueryService.BuildQuery(9999);
+
+                if (result.Found || result.Item != null)
+                {
+                    throw new InvalidOperationException("Unknown search item must not produce a found query result.");
+                }
+
+                AssertStringEquals(result.Status, "unknownItem", "search unknown item status");
+                if (result.CraftingSources.Count != 0 ||
+                    result.CraftingUses.Count != 0 ||
+                    result.Shimmer.HasAnyRelation)
+                {
+                    throw new InvalidOperationException("Unknown search item must keep recipe and shimmer facts empty.");
+                }
+            });
+        }
+
+        private static void SearchQueryCandidatesMatchNamesAndIds()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                var localized = ItemQueryService.ResolveCandidates("铁", 10);
+                AssertSearchCandidate(localized, 100, "localized display name");
+
+                var internalName = ItemQueryService.ResolveCandidates("wood", 10);
+                AssertSearchCandidate(internalName, 104, "internal name");
+
+                var hashId = ItemQueryService.ResolveCandidates("#100", 10);
+                if (hashId.Count != 1 || hashId[0].ItemType != 100)
+                {
+                    throw new InvalidOperationException("Search #ID should resolve exactly one item candidate.");
+                }
+
+                var plainId = ItemQueryService.ResolveCandidates("104", 10);
+                if (plainId.Count != 1 || plainId[0].ItemType != 104)
+                {
+                    throw new InvalidOperationException("Search plain numeric ID should resolve exactly one item candidate.");
+                }
+
+                var limited = ItemQueryService.ResolveCandidates("块", 1);
+                if (limited.Count != 1)
+                {
+                    throw new InvalidOperationException("Search candidate maxResults should limit returned candidates.");
+                }
+            });
+        }
+
+        private static void SearchQueryBuildsCraftingSourceSummaries()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                var result = ItemQueryService.BuildQuery(200);
+                if (!result.Found || result.CraftingSources.Count != 1)
+                {
+                    throw new InvalidOperationException("Crafted item should expose one crafting source recipe.");
+                }
+
+                var recipe = result.CraftingSources[0];
+                AssertStringEquals(recipe.MatchKind, "source", "search source recipe match kind");
+                if (recipe.CreateItem == null || recipe.CreateItem.ItemType != 200 || recipe.CreateStack != 2)
+                {
+                    throw new InvalidOperationException("Crafting source summary must preserve create item and stack.");
+                }
+
+                var iron = recipe.Ingredients.FirstOrDefault(item => item.Item != null && item.Item.ItemType == 100);
+                if (iron == null || iron.Stack != 3)
+                {
+                    throw new InvalidOperationException("Crafting source summary must preserve direct ingredient stack.");
+                }
+            });
+        }
+
+        private static void SearchQueryIndexesDirectAndRecipeGroupUsages()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                var direct = ItemQueryService.BuildQuery(101);
+                if (direct.CraftingUses.Count != 1 ||
+                    direct.CraftingUses[0].CreateItem == null ||
+                    direct.CraftingUses[0].CreateItem.ItemType != 200)
+                {
+                    throw new InvalidOperationException("Direct material should be indexed as crafting usage.");
+                }
+
+                AssertStringEquals(direct.CraftingUses[0].MatchKind, "direct", "search direct usage match kind");
+
+                var grouped = ItemQueryService.BuildQuery(102);
+                if (grouped.CraftingUses.Count != 1 ||
+                    grouped.CraftingUses[0].CreateItem == null ||
+                    grouped.CraftingUses[0].CreateItem.ItemType != 300)
+                {
+                    throw new InvalidOperationException("RecipeGroup material should be indexed as crafting usage.");
+                }
+
+                var usage = grouped.CraftingUses[0];
+                AssertStringEquals(usage.MatchKind, "recipeGroup", "search recipe group usage match kind");
+                if (usage.MatchedRecipeGroupId != 7)
+                {
+                    throw new InvalidOperationException("RecipeGroup usage should preserve matched group id.");
+                }
+
+                var groupIngredient = usage.Ingredients.FirstOrDefault(item => item.IsRecipeGroup);
+                if (groupIngredient == null ||
+                    !groupIngredient.MatchesQueriedItem ||
+                    groupIngredient.AcceptedItems.Count < 2 ||
+                    groupIngredient.AcceptedItems.All(item => item.ItemType != 102))
+                {
+                    throw new InvalidOperationException("RecipeGroup ingredient summary should include accepted item references.");
+                }
+            });
+        }
+
+        private static void SearchQueryIndexesDirectShimmerRelations()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                var result = ItemQueryService.BuildQuery(100);
+                if (result.Shimmer.ForwardResult == null || result.Shimmer.ForwardResult.ItemType != 200)
+                {
+                    throw new InvalidOperationException("Search query should expose direct forward shimmer transform.");
+                }
+
+                if (result.Shimmer.ReverseSources.Count != 1 || result.Shimmer.ReverseSources[0].ItemType != 103)
+                {
+                    throw new InvalidOperationException("Search query should expose direct reverse shimmer sources.");
+                }
+            });
+        }
+
+        private static void SearchQueryEmptyFactsStayEmpty()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                var result = ItemQueryService.BuildQuery(105);
+                if (!result.Found)
+                {
+                    throw new InvalidOperationException("Known item without facts should still be a found query result.");
+                }
+
+                if (result.CraftingSources.Count != 0 ||
+                    result.CraftingUses.Count != 0 ||
+                    result.Shimmer.HasAnyRelation)
+                {
+                    throw new InvalidOperationException("Known item without recipe or shimmer facts should degrade to empty sections.");
+                }
+            });
+        }
+
+        private static void SearchQueryFormatsBaseValueAsCoins()
+        {
+            AssertStringEquals(ItemValueFormatter.FormatBaseValue(0), "无价值", "search base value zero");
+            AssertStringEquals(ItemValueFormatter.FormatBaseValue(1), "1铜币", "search base value copper");
+            AssertStringEquals(ItemValueFormatter.FormatBaseValue(100), "1银币", "search base value silver");
+            AssertStringEquals(ItemValueFormatter.FormatBaseValue(10000), "1金币", "search base value gold");
+            AssertStringEquals(ItemValueFormatter.FormatBaseValue(1000000), "1铂金币", "search base value platinum");
+            AssertStringEquals(ItemValueFormatter.FormatBaseValue(1020304), "1铂金币 2金币 3银币 4铜币", "search base value mixed coins");
+        }
+
+        private static void SearchQueryBasicFactsUseChineseLabelsAndPlacementValues()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                var result = ItemQueryService.BuildQuery(200);
+                if (result == null || !result.Found || result.Item == null)
+                {
+                    throw new InvalidOperationException("Expected search fixture item 200 to produce basic facts.");
+                }
+
+                var facts = LegacyMainWindow.GetSearchBasicFactLinesForTesting(result.Item);
+                var text = string.Join("|", facts);
+                AssertContains(text, "内部名：IronAnvil");
+                AssertContains(text, "基础价值：15银币");
+                AssertContains(text, "可放置方块：Tile#16");
+                AssertContains(text, "可放置背景墙：无");
+                if (text.IndexOf("createTile", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    text.IndexOf("createWall", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    throw new InvalidOperationException("Search basic facts must not expose raw createTile/createWall labels.");
+                }
+            });
+        }
+
+        private static void SearchQueryBasicPanelHeightTracksColumnCount()
+        {
+            var twoColumn = LegacyMainWindow.CalculateSearchBasicPanelHeightForTesting(600);
+            var oneColumn = LegacyMainWindow.CalculateSearchBasicPanelHeightForTesting(320);
+            if (oneColumn <= twoColumn)
+            {
+                throw new InvalidOperationException("Search basic info panel height must grow when facts collapse to one column.");
+            }
+
+            WithSearchQueryFixture(() =>
+            {
+                SearchItemQueryUiState.SelectItem(100);
+                var wide = LegacyMainWindow.CalculateSearchContentHeightForTesting(new LegacyUiRect(0, 0, 600, 360));
+                var narrow = LegacyMainWindow.CalculateSearchContentHeightForTesting(new LegacyUiRect(0, 0, 320, 360));
+                if (narrow <= wide)
+                {
+                    throw new InvalidOperationException("Search content height must reuse the dynamic basic panel height.");
+                }
+            });
+        }
+
+        private static void SearchQueryRecipeLayoutWrapsIngredientsAndKeepsAllRows()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                AddSearchQuerySourceRecipe(500, 100, 101, 102);
+                AddSearchQuerySourceRecipe(501, 100, 101, 102, 103, 104);
+                AddSearchQueryExtraUsageRecipes(100, 8);
+                ItemQueryService.ResetForTesting();
+
+                var threeIngredient = ItemQueryService.BuildQuery(500);
+                var fiveIngredient = ItemQueryService.BuildQuery(501);
+                if (threeIngredient.CraftingSources.Count != 1 || fiveIngredient.CraftingSources.Count != 1)
+                {
+                    throw new InvalidOperationException("Expected recipe layout fixture to expose one source recipe per product.");
+                }
+
+                var threeIngredientHeight = LegacyMainWindow.CalculateSearchRecipeRowHeightForTesting(threeIngredient.CraftingSources[0], 600);
+                var fiveIngredientHeight = LegacyMainWindow.CalculateSearchRecipeRowHeightForTesting(fiveIngredient.CraftingSources[0], 600);
+                if (fiveIngredientHeight <= threeIngredientHeight)
+                {
+                    throw new InvalidOperationException("Search recipe row height must grow when ingredient chips wrap beyond one row.");
+                }
+
+                var grid = LegacyMainWindow.GetSearchChipGridMetricsForTesting(320, 5);
+                if (grid[0] > 3 || grid[1] < 2 || grid[2] <= 0 || grid[3] <= 0)
+                {
+                    throw new InvalidOperationException("Search chip grid must cap at three columns and wrap five chips into multiple rows.");
+                }
+
+                var uses = ItemQueryService.BuildQuery(100).CraftingUses;
+                if (uses.Count <= 6)
+                {
+                    throw new InvalidOperationException("Expected search usage fixture to exceed the old six-row truncation limit.");
+                }
+
+                var fullHeight = LegacyMainWindow.CalculateSearchRecipeSectionHeightForTesting(uses, 600);
+                var firstSixHeight = LegacyMainWindow.CalculateSearchRecipeSectionHeightForTesting(uses.Take(6).ToList(), 600);
+                if (fullHeight <= firstSixHeight)
+                {
+                    throw new InvalidOperationException("Search recipe section height must account for every usage row, not only the first six.");
+                }
+            });
+        }
+
+        private static void SearchQueryShimmerLayoutKeepsAllReverseSources()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                AddSearchQueryExtraShimmerSources(100, 8);
+                ItemQueryService.ResetForTesting();
+
+                var shimmer = ItemQueryService.BuildQuery(100).Shimmer;
+                if (shimmer.ReverseSources.Count <= 6)
+                {
+                    throw new InvalidOperationException("Expected shimmer fixture to exceed the old reverse-source truncation limit.");
+                }
+
+                var firstSix = new ItemQueryShimmerSummary
+                {
+                    ForwardResult = shimmer.ForwardResult
+                };
+                for (var index = 0; index < 6; index++)
+                {
+                    firstSix.ReverseSources.Add(shimmer.ReverseSources[index]);
+                }
+
+                var fullHeight = LegacyMainWindow.CalculateSearchShimmerSectionHeightForTesting(shimmer);
+                var firstSixHeight = LegacyMainWindow.CalculateSearchShimmerSectionHeightForTesting(firstSix);
+                if (fullHeight <= firstSixHeight)
+                {
+                    throw new InvalidOperationException("Search shimmer section height must include every reverse source.");
+                }
+            });
+        }
+
+        private static void SearchQueryUiStateSelectsCandidateAndClears()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                SearchItemQueryUiState.ResetForTesting();
+                SearchItemQueryUiState.UpdateDraft("铁");
+                if (SearchItemQueryUiState.CandidateCount <= 0)
+                {
+                    throw new InvalidOperationException("Expected search UI state to resolve candidates from the draft query.");
+                }
+
+                if (!SearchItemQueryUiState.SelectItem(100))
+                {
+                    throw new InvalidOperationException("Expected selecting a known candidate to build a search result.");
+                }
+
+                var result = SearchItemQueryUiState.GetSelectedResult();
+                if (result == null || !result.Found || result.Item == null || result.Item.ItemType != 100)
+                {
+                    throw new InvalidOperationException("Expected search UI state to expose the selected item result.");
+                }
+
+                AssertStringEquals(SearchItemQueryUiState.QueryText, "铁锭", "search UI selected query text");
+                if (SearchItemQueryUiState.CandidateCount != 0)
+                {
+                    throw new InvalidOperationException("Expected selecting a candidate to close the candidate list.");
+                }
+
+                SearchItemQueryUiState.Clear();
+                if (SearchItemQueryUiState.HasSelectedResult ||
+                    SearchItemQueryUiState.CandidateCount != 0 ||
+                    !string.IsNullOrEmpty(SearchItemQueryUiState.QueryText))
+                {
+                    throw new InvalidOperationException("Expected clearing search UI state to reset query, candidates, and result.");
+                }
+            });
+        }
+
+        private static void SearchQueryUiCandidateScrollKeepsOwnViewport()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                SearchItemQueryUiState.ResetForTesting();
+                SearchItemQueryUiState.UpdateDraft("锭");
+                if (SearchItemQueryUiState.CandidateCount < 3)
+                {
+                    throw new InvalidOperationException("Expected the search fixture to expose multiple candidate rows.");
+                }
+
+                var mouse = new LegacyMouseSnapshot
+                {
+                    X = 20,
+                    Y = 20,
+                    ScrollDelta = -120
+                };
+                SearchItemQueryUiState.SetCandidateViewport(new LegacyUiRect(10, 10, 100, 50), SearchItemQueryUiState.CandidateCount * 30);
+                if (!SearchItemQueryUiState.TryConsumeCandidateScroll(mouse, mouse.ScrollDelta))
+                {
+                    throw new InvalidOperationException("Expected search candidate viewport to consume wheel while scrollable.");
+                }
+
+                if (SearchItemQueryUiState.CandidateScrollOffset <= 0)
+                {
+                    throw new InvalidOperationException("Expected search candidate scroll offset to move downward.");
+                }
+
+                mouse.X = 200;
+                mouse.Y = 200;
+                if (SearchItemQueryUiState.TryConsumeCandidateScroll(mouse, -120))
+                {
+                    throw new InvalidOperationException("Expected wheel outside the search candidate viewport to bubble.");
+                }
+            });
+        }
+
+        private static void SearchQueryPageLayoutTracksUiState()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                SearchItemQueryUiState.ResetForTesting();
+                LegacyMainWindow.ResetPageLayoutCacheForTesting();
+                var settings = AppSettings.CreateDefault();
+                var window = new LegacyUiRect(40, 50, LegacyUiMetrics.DefaultWidth, LegacyUiMetrics.DefaultHeight);
+                var shell = LegacyMainWindowShell.Create(window);
+                var content = shell.ContentRect;
+
+                var initial = LegacyMainWindow.BuildPageLayoutSnapshotForTesting("search", window, content, 0, settings);
+                SearchItemQueryUiState.UpdateDraft("铁");
+                var candidates = LegacyMainWindow.BuildPageLayoutSnapshotForTesting("search", window, content, 0, settings);
+                if (candidates.PageStateSignature == initial.PageStateSignature)
+                {
+                    throw new InvalidOperationException("Expected search draft candidates to dirty the F5 search page state signature.");
+                }
+
+                AddSearchQueryExtraUsageRecipes(100, 8);
+                ItemQueryService.ResetForTesting();
+                SearchItemQueryUiState.SelectItem(100);
+                var selected = LegacyMainWindow.BuildPageLayoutSnapshotForTesting("search", window, content, 99999, settings);
+                if (selected.ContentHeight <= initial.ContentHeight)
+                {
+                    throw new InvalidOperationException("Expected selected search result content height to exceed the empty search page.");
+                }
+
+                if (selected.MaxScroll <= 0)
+                {
+                    throw new InvalidOperationException("Expected populated search result page to be scrollable in the default F5 content area.");
+                }
+            });
+        }
+
+        private static void SearchQueryLayoutRhythmKeepsSectionsConsistent()
+        {
+            var rhythm = LegacyMainWindow.GetSearchLayoutRhythmForTesting();
+            if (rhythm.Length != 5 ||
+                rhythm[0] <= 0 ||
+                rhythm[1] <= 0 ||
+                rhythm[2] <= 0 ||
+                rhythm[3] <= 0 ||
+                rhythm[4] <= 0)
+            {
+                throw new InvalidOperationException("Expected search layout rhythm metrics to expose positive section, row, chip, and panel spacing.");
+            }
+
+            var emptyRecipe = LegacyMainWindow.CalculateSearchRecipeSectionHeightForTesting(new List<ItemQueryRecipeSummary>(), 600);
+            var emptyShimmer = LegacyMainWindow.CalculateSearchShimmerSectionHeightForTesting(new ItemQueryShimmerSummary());
+            if (emptyRecipe != emptyShimmer)
+            {
+                throw new InvalidOperationException("Expected empty search recipe and shimmer sections to use the same title-to-content rhythm.");
+            }
+        }
+
+        private static void SearchQueryLayoutCacheTracksResultDetailChanges()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                SearchItemQueryUiState.ResetForTesting();
+                LegacyMainWindow.ResetPageLayoutCacheForTesting();
+                var settings = AppSettings.CreateDefault();
+                var window = new LegacyUiRect(40, 50, LegacyUiMetrics.DefaultWidth, LegacyUiMetrics.DefaultHeight);
+                var shell = LegacyMainWindowShell.Create(window);
+                var content = shell.ContentRect;
+
+                ReplaceSearchQuerySourceRecipe(500, 100, 101, 102);
+                ItemQueryService.ResetForTesting();
+                SearchItemQueryUiState.SelectItem(500);
+                var compact = LegacyMainWindow.BuildPageLayoutSnapshotForTesting("search", window, content, 0, settings);
+
+                ReplaceSearchQuerySourceRecipe(500, 100, 101, 102, 103, 104, 105);
+                ItemQueryService.ResetForTesting();
+                SearchItemQueryUiState.SelectItem(500);
+                var expanded = LegacyMainWindow.BuildPageLayoutSnapshotForTesting("search", window, content, 0, settings);
+
+                if (expanded.PageStateSignature == compact.PageStateSignature)
+                {
+                    throw new InvalidOperationException("Expected search page layout signature to track recipe ingredient detail changes for the same item.");
+                }
+
+                if (expanded.RebuildCount <= compact.RebuildCount)
+                {
+                    throw new InvalidOperationException("Expected search page layout cache to rebuild after same-item result detail changes.");
+                }
+
+                if (expanded.ContentHeight <= compact.ContentHeight)
+                {
+                    throw new InvalidOperationException("Expected search content height cache to refresh when recipe chip wrapping grows.");
+                }
+            });
+        }
+
+        private static void SearchQueryPickEntryUsesSelectionWording()
+        {
+            var labels = LegacyMainWindow.GetSearchInputRowTextForTesting();
+            if (labels.Length < 2)
+            {
+                throw new InvalidOperationException("Expected search input row testing labels to include the input label and pick button.");
+            }
+
+            AssertStringEquals(labels[0], "查询物品", "search input label");
+            AssertStringEquals(labels[1], "选择物品", "search pick button label");
+        }
+
+        private static void SearchQueryPickCommandStartsPendingSelectionAndHidesWindow()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                ResetSearchQueryCommandState();
+                try
+                {
+                    TerrariaMainCompat.SetGameUpdateCountOverrideForTesting(345UL);
+                    var item = new Terraria.TestRecipeItem { type = 100, stack = 2 };
+                    if (!TerrariaUiMouseCompat.TryCaptureItemSlotHoverSnapshotForTesting(item, 8, 3, 344, 40, 50) ||
+                        !SearchItemQueryUiState.TryRefreshHoverItemFromFreshSnapshot(345, 40, 50))
+                    {
+                        throw new InvalidOperationException("Expected fresh hover item to be available before starting search pick mode.");
+                    }
+
+                    SearchItemQueryUiState.UpdateDraft("锭");
+                    if (SearchItemQueryUiState.CandidateCount <= 0)
+                    {
+                        throw new InvalidOperationException("Expected search pick command test to start with an open candidate list.");
+                    }
+
+                    LegacyTextInput.Focus(SearchItemQueryUiState.InputId, SearchItemQueryUiState.QueryText);
+                    LegacyMainUiState.SetVisible(true);
+                    EnqueueSearchQueryCommandForTesting(SearchItemQueryUiState.PickItemButtonId);
+                    LegacyUiActionService.Update(null, null);
+
+                    if (LegacyUiActionService.DispatchedCommandCountLast != 1)
+                    {
+                        throw new InvalidOperationException(
+                            "Expected search pick command to dispatch exactly one UI command, pending=" +
+                            LegacyUiActionService.PendingCommandCountLast.ToString(CultureInfo.InvariantCulture) +
+                            ", ran=" + LegacyUiActionService.ActionUpdateRanCount.ToString(CultureInfo.InvariantCulture) +
+                            ", skipped=" + LegacyUiActionService.ActionUpdateSkippedCount.ToString(CultureInfo.InvariantCulture) +
+                            ", dispatched=" + LegacyUiActionService.DispatchedCommandCountLast.ToString(CultureInfo.InvariantCulture) +
+                            ".");
+                    }
+
+                    if (LegacyMainUiState.Visible)
+                    {
+                        throw new InvalidOperationException("Expected search pick command to hide the F5 main window.");
+                    }
+
+                    if (!SearchItemQueryUiState.IsSelectionPending ||
+                        !SearchItemQueryUiState.SelectionWaitingForMouseRelease ||
+                        SearchItemQueryUiState.SelectionStartGameUpdateCount != 345UL)
+                    {
+                        throw new InvalidOperationException("Expected search pick command to enter pending selection and wait for mouse release.");
+                    }
+
+                    if (SearchItemQueryUiState.CandidateCount != 0 || LegacyTextInput.IsAnyFocused)
+                    {
+                        throw new InvalidOperationException("Expected search pick command to close candidates and clear text input focus.");
+                    }
+
+                    if (SearchItemQueryUiState.HasSelectedResult ||
+                        SearchItemQueryUiState.SelectedItemType != 0 ||
+                        SearchItemQueryUiState.RecentItemHistoryCount != 0)
+                    {
+                        throw new InvalidOperationException("Expected search pick command not to query or record the current hover item yet.");
+                    }
+
+                    var json = SearchItemQueryUiState.BuildUiStateJson();
+                    AssertContains(json, "\"selectionPending\":true");
+                    AssertContains(json, "\"selectionWaitingForMouseRelease\":true");
+                    AssertContains(json, "\"selectionSource\":\"legacyUiButton\"");
+                }
+                finally
+                {
+                    TerrariaMainCompat.SetGameUpdateCountOverrideForTesting(null);
+                    ResetSearchQueryCommandState();
+                    TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+                }
+            });
+        }
+
+        private static void SearchQueryPickStateWaitsReleaseBeforeArming()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                SearchItemQueryUiState.BeginPendingSelection(10, "test");
+                var probe = new RecordingSearchItemPickRuntimeProbe
+                {
+                    ResolveAttempt = SearchItemPickResolveAttempt.Failed("shouldNotResolve")
+                };
+
+                var held = SearchItemPickRuntimeService.TickForTesting(
+                    CreateSearchPickRuntimeInput(true, 11),
+                    probe.ToPorts());
+                if (held.SelectionArmed ||
+                    SearchItemQueryUiState.SelectionState != SearchItemPickSelectionState.WaitingButtonRelease ||
+                    !SearchItemQueryUiState.SelectionWaitingForMouseRelease ||
+                    probe.ResolveCount != 0 ||
+                    probe.ConsumeCount != 0)
+                {
+                    throw new InvalidOperationException("Search item pick must not arm or resolve while the original button click is still held.");
+                }
+
+                var released = SearchItemPickRuntimeService.TickForTesting(
+                    CreateSearchPickRuntimeInput(false, 12),
+                    probe.ToPorts());
+                if (!released.SelectionArmed ||
+                    SearchItemQueryUiState.SelectionState != SearchItemPickSelectionState.ArmedForNextLeftClick ||
+                    SearchItemQueryUiState.SelectionWaitingForMouseRelease ||
+                    probe.ResolveCount != 0 ||
+                    probe.ConsumeCount != 0)
+                {
+                    throw new InvalidOperationException("Search item pick must arm only after the button click is released.");
+                }
+            });
+        }
+
+        private static void SearchQueryPickRuntimeConsumesLeftClickAndSelectsItem()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                SearchItemQueryUiState.BeginPendingSelection(10, "test");
+                SearchItemQueryUiState.MarkSelectionArmedForNextLeftClick(11);
+                LegacyMainUiState.SetVisible(false);
+                var probe = new RecordingSearchItemPickRuntimeProbe
+                {
+                    ResolveAttempt = SearchItemPickResolveAttempt.Success(new SearchItemPickResolveResult
+                    {
+                        ItemType = 100,
+                        SourceKind = "uiItem",
+                        SourceSummary = "uiItem;source=ItemSlot"
+                    })
+                };
+
+                var result = SearchItemPickRuntimeService.TickForTesting(
+                    CreateSearchPickRuntimeInput(true, 12),
+                    probe.ToPorts());
+                var query = SearchItemQueryUiState.GetSelectedResult();
+                if (!string.Equals(result.ResultCode, "resolved", StringComparison.Ordinal) ||
+                    !result.InputConsumeAttempted ||
+                    !result.InputConsumed ||
+                    !result.ResolveAttempted ||
+                    probe.ConsumeCount != 1 ||
+                    !string.Equals(probe.LastConsumedToken, "MouseLeft", StringComparison.Ordinal) ||
+                    probe.ResolveCount != 1 ||
+                    probe.RestoreCount != 1 ||
+                    !LegacyMainUiState.Visible ||
+                    !string.Equals(LegacyMainUiState.SelectedPageId, "search", StringComparison.Ordinal) ||
+                    SearchItemQueryUiState.SelectionState != SearchItemPickSelectionState.Resolved ||
+                    SearchItemQueryUiState.IsSelectionPending ||
+                    query == null ||
+                    !query.Found ||
+                    query.Item == null ||
+                    query.Item.ItemType != 100)
+                {
+                    throw new InvalidOperationException("Search item pick runtime must consume MouseLeft, restore F5, and query the resolved item.");
+                }
+            });
+        }
+
+        private static void SearchQueryPickTargetResolverUsesUiItem()
+        {
+            var context = new SearchItemPickResolveContext
+            {
+                UiItemType = 100,
+                UiItemStack = 1,
+                UiItemSource = "ItemSlot:8:3",
+                MouseWorldX = 15f,
+                MouseWorldY = 15f,
+                Tile = new SearchItemPickTileTarget
+                {
+                    Active = true,
+                    PlacementItemType = 104
+                }
+            };
+            context.WorldItems.Add(new SearchItemPickWorldItemTarget
+            {
+                ItemType = 101,
+                Stack = 1,
+                HitboxX = 10f,
+                HitboxY = 10f,
+                HitboxWidth = 20f,
+                HitboxHeight = 20f
+            });
+
+            var result = SearchItemPickTargetResolver.Resolve(context);
+            if (!result.Succeeded ||
+                result.Result == null ||
+                result.Result.ItemType != 100 ||
+                !string.Equals(result.Result.SourceKind, "uiItem", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Search item pick target resolver must prioritize fresh UI hover item snapshots.");
+            }
+        }
+
+        private static void SearchQueryPickTargetResolverUsesWorldItem()
+        {
+            var context = new SearchItemPickResolveContext
+            {
+                MouseWorldX = 15f,
+                MouseWorldY = 15f
+            };
+            context.WorldItems.Add(new SearchItemPickWorldItemTarget
+            {
+                ItemType = 101,
+                Stack = 3,
+                HitboxX = 10f,
+                HitboxY = 10f,
+                HitboxWidth = 20f,
+                HitboxHeight = 20f
+            });
+
+            var result = SearchItemPickTargetResolver.Resolve(context);
+            if (!result.Succeeded ||
+                result.Result == null ||
+                result.Result.ItemType != 101 ||
+                !string.Equals(result.Result.SourceKind, "worldItem", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Search item pick target resolver must use world dropped item hitboxes.");
+            }
+        }
+
+        private static void SearchQueryPickTargetResolverUsesTileItemId()
+        {
+            var result = SearchItemPickTargetResolver.Resolve(new SearchItemPickResolveContext
+            {
+                Tile = new SearchItemPickTileTarget
+                {
+                    Active = true,
+                    TileType = 1,
+                    TileStyle = 0,
+                    PlacementItemType = 104
+                },
+                Wall = new SearchItemPickWallTarget
+                {
+                    Active = true,
+                    PlacementItemType = 105
+                }
+            });
+
+            if (!result.Succeeded ||
+                result.Result == null ||
+                result.Result.ItemType != 104 ||
+                !string.Equals(result.Result.SourceKind, "tile", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Search item pick target resolver must query Tile by placement item id before Wall.");
+            }
+        }
+
+        private static void SearchQueryPickTargetResolverUsesWallItemId()
+        {
+            var result = SearchItemPickTargetResolver.Resolve(new SearchItemPickResolveContext
+            {
+                Wall = new SearchItemPickWallTarget
+                {
+                    Active = true,
+                    WallType = 2,
+                    PlacementItemType = 105
+                }
+            });
+
+            if (!result.Succeeded ||
+                result.Result == null ||
+                result.Result.ItemType != 105 ||
+                !string.Equals(result.Result.SourceKind, "wall", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Search item pick target resolver must query Wall by placement item id.");
+            }
+        }
+
+        private static void SearchQueryPickRuntimeConsumesFailedTargetAndRestores()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                SearchItemQueryUiState.SelectItem(100);
+                SearchItemQueryUiState.BeginPendingSelection(20, "test");
+                SearchItemQueryUiState.MarkSelectionArmedForNextLeftClick(21);
+                LegacyMainUiState.SetVisible(false);
+                var probe = new RecordingSearchItemPickRuntimeProbe
+                {
+                    ResolveAttempt = SearchItemPickResolveAttempt.Failed("noSearchableItem")
+                };
+
+                var result = SearchItemPickRuntimeService.TickForTesting(
+                    CreateSearchPickRuntimeInput(true, 22),
+                    probe.ToPorts());
+                if (!string.Equals(result.ResultCode, "failed", StringComparison.Ordinal) ||
+                    !result.InputConsumeAttempted ||
+                    !result.InputConsumed ||
+                    probe.ConsumeCount != 1 ||
+                    probe.ResolveCount != 1 ||
+                    probe.RestoreCount != 1 ||
+                    !LegacyMainUiState.Visible ||
+                    SearchItemQueryUiState.SelectionState != SearchItemPickSelectionState.CancelledOrFailed ||
+                    SearchItemQueryUiState.IsSelectionPending ||
+                    SearchItemQueryUiState.HasSelectedResult ||
+                    SearchItemQueryUiState.SelectedItemType != 0 ||
+                    SearchItemQueryUiState.SelectionHintText.IndexOf("未识别", StringComparison.Ordinal) < 0)
+                {
+                    throw new InvalidOperationException("Search item pick runtime must consume failed target clicks, restore F5, and show a stable failure hint.");
+                }
+            });
+        }
+
+        private static void SearchQueryHoverEntryRequiresFreshHoverSnapshot()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+                SearchItemQueryUiState.ResetForTesting();
+
+                if (SearchItemQueryUiState.TryRefreshHoverItemFromFreshSnapshot(10, 20, 30))
+                {
+                    throw new InvalidOperationException("Expected search hover entry to stay unavailable without an ItemSlot hover snapshot.");
+                }
+
+                int itemType;
+                if (SearchItemQueryUiState.SelectHoverItem(out itemType) || itemType != 0)
+                {
+                    throw new InvalidOperationException("Expected search hover selection without a snapshot to be ignored.");
+                }
+
+                var item = new Terraria.TestRecipeItem { type = 100, stack = 7 };
+                if (!TerrariaUiMouseCompat.TryCaptureItemSlotHoverSnapshotForTesting(item, 10, 4, 100, 20, 30))
+                {
+                    throw new InvalidOperationException("Expected search test ItemSlot hover snapshot capture to succeed.");
+                }
+
+                if (SearchItemQueryUiState.TryRefreshHoverItemFromFreshSnapshot(102, 20, 30))
+                {
+                    throw new InvalidOperationException("Expected stale ItemSlot hover snapshots not to refresh search hover entry.");
+                }
+
+                if (SearchItemQueryUiState.TryRefreshHoverItemFromFreshSnapshot(101, 21, 30))
+                {
+                    throw new InvalidOperationException("Expected moved mouse coordinates not to refresh search hover entry.");
+                }
+
+                if (!SearchItemQueryUiState.TryRefreshHoverItemFromFreshSnapshot(101, 20, 30))
+                {
+                    throw new InvalidOperationException("Expected fresh ItemSlot hover snapshot to refresh search hover entry.");
+                }
+
+                if (!SearchItemQueryUiState.HasHoverItem ||
+                    SearchItemQueryUiState.HoverItemType != 100 ||
+                    SearchItemQueryUiState.GetHoverItemLabel().IndexOf("x7", StringComparison.Ordinal) < 0)
+                {
+                    throw new InvalidOperationException("Expected search hover entry to store only value facts from the fresh ItemSlot snapshot.");
+                }
+            });
+
+            TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+        }
+
+        private static void SearchQueryHoverCommandSelectsCurrentHoverItemAndClosesCandidates()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                ResetSearchQueryCommandState();
+                try
+                {
+                    var item = new Terraria.TestRecipeItem { type = 100, stack = 2 };
+                    if (!TerrariaUiMouseCompat.TryCaptureItemSlotHoverSnapshotForTesting(item, 8, 3, 200, 40, 50) ||
+                        !SearchItemQueryUiState.TryRefreshHoverItemFromFreshSnapshot(201, 40, 50))
+                    {
+                        throw new InvalidOperationException("Expected fresh hover item to be available for the search hover command.");
+                    }
+
+                    SearchItemQueryUiState.UpdateDraft("锭");
+                    if (SearchItemQueryUiState.CandidateCount <= 0)
+                    {
+                        throw new InvalidOperationException("Expected search hover command test to start with an open candidate list.");
+                    }
+
+                    LegacyTextInput.Focus(SearchItemQueryUiState.InputId, SearchItemQueryUiState.QueryText);
+                    EnqueueSearchQueryCommandForTesting("search-query:hover-item");
+                    LegacyUiActionService.Update(null, null);
+
+                    var result = SearchItemQueryUiState.GetSelectedResult();
+                    if (LegacyUiActionService.DispatchedCommandCountLast != 1 ||
+                        result == null ||
+                        !result.Found ||
+                        result.Item == null ||
+                        result.Item.ItemType != 100)
+                    {
+                        throw new InvalidOperationException("Expected search hover command to select the current hover item through UI action dispatch.");
+                    }
+
+                    if (SearchItemQueryUiState.CandidateCount != 0 || LegacyTextInput.IsAnyFocused)
+                    {
+                        throw new InvalidOperationException("Expected search hover command to close candidates and clear text input focus.");
+                    }
+
+                    var history = SearchItemQueryUiState.GetRecentItemTypes();
+                    if (history.Count != 1 || history[0] != 100)
+                    {
+                        throw new InvalidOperationException("Expected search hover command to record the recent queried item.");
+                    }
+                }
+                finally
+                {
+                    ResetSearchQueryCommandState();
+                    TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+                }
+            });
+        }
+
+        private static void SearchQueryRelatedItemCommandTracksHistoryAndClosesCandidates()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                ResetSearchQueryCommandState();
+                try
+                {
+                    if (!SearchItemQueryUiState.SelectItem(100))
+                    {
+                        throw new InvalidOperationException("Expected first search item selection to succeed.");
+                    }
+
+                    SearchItemQueryUiState.UpdateDraft("锭");
+                    if (SearchItemQueryUiState.CandidateCount <= 0)
+                    {
+                        throw new InvalidOperationException("Expected related item jump test to start with an open candidate list.");
+                    }
+
+                    LegacyTextInput.Focus(SearchItemQueryUiState.InputId, SearchItemQueryUiState.QueryText);
+                    EnqueueSearchQueryCommandForTesting("search-query:item:200:test-source");
+                    LegacyUiActionService.Update(null, null);
+
+                    var result = SearchItemQueryUiState.GetSelectedResult();
+                    if (LegacyUiActionService.DispatchedCommandCountLast != 1 ||
+                        result == null ||
+                        !result.Found ||
+                        result.Item == null ||
+                        result.Item.ItemType != 200)
+                    {
+                        throw new InvalidOperationException("Expected related item command to jump to the requested item.");
+                    }
+
+                    if (SearchItemQueryUiState.CandidateCount != 0 || LegacyTextInput.IsAnyFocused)
+                    {
+                        throw new InvalidOperationException("Expected related item jump to close candidates and clear text input focus.");
+                    }
+
+                    var history = SearchItemQueryUiState.GetRecentItemTypes();
+                    if (history.Count < 2 || history[0] != 200 || history[1] != 100)
+                    {
+                        throw new InvalidOperationException("Expected related item jump to keep most recent query history.");
+                    }
+                }
+                finally
+                {
+                    ResetSearchQueryCommandState();
+                }
+            });
+        }
+
+        private static void AddSearchQueryExtraUsageRecipes(int materialItemType, int count)
+        {
+            var recipes = new List<object>(Terraria.Main.recipe ?? new object[0]);
+            for (var index = 0; index < count; index++)
+            {
+                var itemType = 400 + index;
+                AddSearchItem(itemType, "滚动测试产物" + index, "SearchScrollProduct" + index, 99, 0, 100, false, false, -1, -1);
+                recipes.Add(new Terraria.Recipe
+                {
+                    createItem = new Terraria.TestRecipeItem { type = itemType, stack = 1 },
+                    requiredItem = new object[]
+                    {
+                        new Terraria.TestRecipeItem { type = materialItemType, stack = index + 1 },
+                        new Terraria.TestRecipeItem { type = 0, stack = 0 }
+                    },
+                    acceptedGroups = new[] { -1 }
+                });
+            }
+
+            Terraria.Main.recipe = recipes.ToArray();
+            Terraria.Recipe.numRecipes = recipes.Count;
+        }
+
+        private static void AddSearchQuerySourceRecipe(int productItemType, params int[] ingredientItemTypes)
+        {
+            AddSearchItem(productItemType, "布局测试产物" + productItemType.ToString(CultureInfo.InvariantCulture), "SearchLayoutProduct" + productItemType.ToString(CultureInfo.InvariantCulture), 99, 1, 0, false, false, -1, -1);
+            var recipes = new List<object>(Terraria.Main.recipe ?? new object[0])
+            {
+                CreateSearchQuerySourceRecipe(productItemType, ingredientItemTypes)
+            };
+            Terraria.Main.recipe = recipes.ToArray();
+            Terraria.Recipe.numRecipes = recipes.Count;
+        }
+
+        private static void ReplaceSearchQuerySourceRecipe(int productItemType, params int[] ingredientItemTypes)
+        {
+            AddSearchItem(productItemType, "布局测试产物" + productItemType.ToString(CultureInfo.InvariantCulture), "SearchLayoutProduct" + productItemType.ToString(CultureInfo.InvariantCulture), 99, 1, 0, false, false, -1, -1);
+            Terraria.Main.recipe = new object[] { CreateSearchQuerySourceRecipe(productItemType, ingredientItemTypes) };
+            Terraria.Recipe.numRecipes = 1;
+        }
+
+        private static Terraria.Recipe CreateSearchQuerySourceRecipe(int productItemType, params int[] ingredientItemTypes)
+        {
+            var requiredItems = new object[(ingredientItemTypes == null ? 0 : ingredientItemTypes.Length) + 1];
+            for (var index = 0; ingredientItemTypes != null && index < ingredientItemTypes.Length; index++)
+            {
+                requiredItems[index] = new Terraria.TestRecipeItem
+                {
+                    type = ingredientItemTypes[index],
+                    stack = index + 1
+                };
+            }
+
+            requiredItems[requiredItems.Length - 1] = new Terraria.TestRecipeItem { type = 0, stack = 0 };
+            return new Terraria.Recipe
+            {
+                createItem = new Terraria.TestRecipeItem { type = productItemType, stack = 1 },
+                requiredItem = requiredItems,
+                acceptedGroups = new[] { -1 }
+            };
+        }
+
+        private static void AddSearchQueryExtraShimmerSources(int targetItemType, int count)
+        {
+            for (var index = 0; index < count; index++)
+            {
+                var itemType = 500 + index;
+                AddSearchItem(itemType, "微光测试来源" + index.ToString(CultureInfo.InvariantCulture), "SearchShimmerSource" + index.ToString(CultureInfo.InvariantCulture), 99, 1, 0, false, false, -1, -1);
+                Terraria.ID.ItemID.Sets.ShimmerTransformToItem[itemType] = targetItemType;
+            }
+        }
+
+        private static void EnqueueSearchQueryCommandForTesting(string elementId)
+        {
+            LegacyUiInput.EnqueueClick(
+                new LegacyUiElement
+                {
+                    Id = elementId,
+                    Label = "Search query test",
+                    Kind = "button",
+                    Rect = new LegacyUiRect(10, 10, 120, 24),
+                    Enabled = true
+                },
+                new LegacyMouseSnapshot
+                {
+                    X = 20,
+                    Y = 20,
+                    LeftDown = true,
+                    LeftPressed = true,
+                    ReadAvailable = true,
+                    WindowHit = true
+                },
+                true);
+        }
+
+        private static void ResetSearchQueryCommandState()
+        {
+            LegacyMainUiState.SetVisible(false);
+            LegacyUiInput.ResetInteractionState();
+            LegacyUiInput.ResetActionUpdateGateStateForTesting();
+            LegacyUiActionService.ResetActionUpdateDiagnosticsForTesting();
+            LegacyTextInput.ClearFocus();
+        }
+
+        private static SearchItemPickRuntimeInput CreateSearchPickRuntimeInput(bool mouseLeftDown, ulong updateCount)
+        {
+            return new SearchItemPickRuntimeInput
+            {
+                IsInWorld = true,
+                GameInputAvailable = true,
+                MouseReadAvailable = true,
+                MouseLeftDown = mouseLeftDown,
+                CurrentGameUpdateCount = updateCount
+            };
+        }
+
+        private sealed class RecordingSearchItemPickRuntimeProbe
+        {
+            public SearchItemPickResolveAttempt ResolveAttempt = SearchItemPickResolveAttempt.Failed("notConfigured");
+            public bool ConsumeSucceeds = true;
+            public int ResolveCount;
+            public int ConsumeCount;
+            public int RestoreCount;
+            public string LastConsumedToken = string.Empty;
+
+            public SearchItemPickRuntimePorts ToPorts()
+            {
+                return new SearchItemPickRuntimePorts
+                {
+                    ResolveCurrent = () =>
+                    {
+                        ResolveCount++;
+                        return ResolveAttempt;
+                    },
+                    ConsumeMouseTriggerInput = token =>
+                    {
+                        ConsumeCount++;
+                        LastConsumedToken = token ?? string.Empty;
+                        return ConsumeSucceeds
+                            ? SearchItemPickInputConsumeResult.Success("consumed")
+                            : SearchItemPickInputConsumeResult.Failed("blocked");
+                    },
+                    RestoreSearchWindow = () =>
+                    {
+                        RestoreCount++;
+                        LegacyMainUiState.SelectPage("search");
+                        LegacyMainUiState.SetVisible(true);
+                    }
+                };
+            }
+        }
+
+        private static void WithSearchQueryFixture(Action test)
+        {
+            ResetSearchQueryFakes();
+            try
+            {
+                PopulateSearchQueryFakes();
+                ItemQueryService.ResetForTesting();
+                test();
+            }
+            finally
+            {
+                SearchItemQueryUiState.ResetForTesting();
+                LegacyTextInput.ClearFocus();
+                ResetSearchQueryFakes();
+                ItemQueryService.ResetForTesting();
+            }
+        }
+
+        private static void PopulateSearchQueryFakes()
+        {
+            AddSearchItem(100, "铁锭", "IronBar", 999, 1, 500, true, false, -1, -1);
+            AddSearchItem(101, "石块", "StoneBlock", 999, 0, 0, true, false, 1, -1);
+            AddSearchItem(102, "铅锭", "LeadBar", 999, 1, 450, true, false, -1, -1);
+            AddSearchItem(103, "旧铁锭", "OldIronBar", 999, 1, 100, true, false, -1, -1);
+            AddSearchItem(104, "木块", "Wood", 999, 0, 0, true, false, 5, -1);
+            AddSearchItem(105, "空白资料物品", "FactlessItem", 1, 0, 0, false, false, -1, -1);
+            AddSearchItem(200, "铁砧", "IronAnvil", 99, 0, 1500, false, false, 16, -1);
+            AddSearchItem(300, "高级铁砧", "AdvancedAnvil", 99, 2, 3000, false, false, 16, -1);
+
+            Terraria.RecipeGroup.recipeGroups[7] = new Terraria.RecipeGroup
+            {
+                Name = "任意铁锭",
+                ValidItems = new List<int> { 100, 102 }
+            };
+
+            Terraria.Main.recipe = new object[]
+            {
+                new Terraria.Recipe
+                {
+                    createItem = new Terraria.TestRecipeItem { type = 200, stack = 2 },
+                    requiredItem = new object[]
+                    {
+                        new Terraria.TestRecipeItem { type = 100, stack = 3 },
+                        new Terraria.TestRecipeItem { type = 101, stack = 5 },
+                        new Terraria.TestRecipeItem { type = 0, stack = 0 }
+                    },
+                    acceptedGroups = new[] { -1 }
+                },
+                new Terraria.Recipe
+                {
+                    createItem = new Terraria.TestRecipeItem { type = 300, stack = 1 },
+                    requiredItem = new object[]
+                    {
+                        new Terraria.TestRecipeItem { type = 104, stack = 12 },
+                        new Terraria.TestRecipeItem { type = 0, stack = 0 }
+                    },
+                    acceptedGroups = new[] { 7, -1 }
+                }
+            };
+            Terraria.Recipe.numRecipes = Terraria.Main.recipe.Length;
+
+            Terraria.ID.ItemID.Sets.ShimmerTransformToItem[100] = 200;
+            Terraria.ID.ItemID.Sets.ShimmerTransformToItem[103] = 100;
+        }
+
+        private static void AddSearchItem(
+            int itemType,
+            string displayName,
+            string internalName,
+            int maxStack,
+            int rare,
+            int value,
+            bool material,
+            bool consumable,
+            int createTile,
+            int createWall)
+        {
+            Terraria.ID.ContentSamples.ItemsByType[itemType] = new Terraria.ID.TestContentSampleItem
+            {
+                type = itemType,
+                maxStack = maxStack,
+                rare = rare,
+                value = value,
+                consumable = consumable,
+                createTile = createTile,
+                createWall = createWall
+            };
+            Terraria.Lang.ItemNames[itemType] = displayName;
+            Terraria.ID.ItemID.Search.SetName(itemType, internalName);
+            Terraria.ID.ItemID.Sets.IsAMaterial[itemType] = material;
+        }
+
+        private static void ResetSearchQueryFakes()
+        {
+            Terraria.ID.ContentSamples.ItemsByType.Clear();
+            Terraria.Lang.ItemNames.Clear();
+            Terraria.ID.ItemID.Search.Clear();
+            Terraria.Recipe.numRecipes = 0;
+            Terraria.Main.recipe = new object[0];
+            Terraria.RecipeGroup.recipeGroups.Clear();
+            Terraria.ID.ItemID.Sets.IsAMaterial = new bool[6000];
+            Terraria.ID.ItemID.Sets.ShimmerTransformToItem = CreateEmptySearchShimmerTransforms();
+        }
+
+        private static int[] CreateEmptySearchShimmerTransforms()
+        {
+            var transforms = new int[6000];
+            for (var index = 0; index < transforms.Length; index++)
+            {
+                transforms[index] = -1;
+            }
+
+            return transforms;
+        }
+
+        private static void AssertSearchCandidate(IList<ItemQueryCandidate> candidates, int itemType, string label)
+        {
+            if (candidates == null || candidates.All(candidate => candidate.ItemType != itemType))
+            {
+                throw new InvalidOperationException("Expected search candidate " + itemType + " for " + label + ".");
+            }
+        }
+    }
+}

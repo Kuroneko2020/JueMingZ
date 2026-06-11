@@ -12,10 +12,16 @@ namespace JueMingZ.Compat
         // Main wrappers expose read-mostly vanilla state; UI/input capture
         // writes stay in the dedicated Compat helpers.
         private static bool? _allowsInputProcessingOverrideForTesting;
+        private static ulong? _gameUpdateCountOverrideForTesting;
 
         internal static void SetAllowsInputProcessingOverrideForTesting(bool? value)
         {
             _allowsInputProcessingOverrideForTesting = value;
+        }
+
+        internal static void SetGameUpdateCountOverrideForTesting(ulong? value)
+        {
+            _gameUpdateCountOverrideForTesting = value;
         }
 
         public static bool IsInMainMenu
@@ -215,7 +221,38 @@ namespace JueMingZ.Compat
 
         public static uint GameUpdateCount
         {
-            get { return Main.GameUpdateCount; }
+            get
+            {
+                if (_gameUpdateCountOverrideForTesting.HasValue)
+                {
+                    var value = _gameUpdateCountOverrideForTesting.Value;
+                    return value > uint.MaxValue ? uint.MaxValue : (uint)value;
+                }
+
+                return Main.GameUpdateCount;
+            }
+        }
+
+        public static bool TryReadGameUpdateCount(out ulong gameUpdateCount)
+        {
+            if (_gameUpdateCountOverrideForTesting.HasValue)
+            {
+                gameUpdateCount = _gameUpdateCountOverrideForTesting.Value;
+                return true;
+            }
+
+            try
+            {
+                // Console tests can load Terraria refs without a fully initialized
+                // Main; UI-only callers should fail closed instead of crashing.
+                gameUpdateCount = Main.GameUpdateCount;
+                return true;
+            }
+            catch
+            {
+                gameUpdateCount = 0;
+                return false;
+            }
         }
 
         public static Player LocalPlayer

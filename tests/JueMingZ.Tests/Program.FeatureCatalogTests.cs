@@ -383,6 +383,34 @@ namespace JueMingZ.Tests
             AssertStringEquals(feature.Description, "按住右键快切快捷栏的光剑", "phaseblade quick switch description");
         }
 
+        private static void FeatureCatalogExposesSearchQueryUi()
+        {
+            var registry = FeatureRegistry.CreateDefault();
+            FeatureDefinition feature;
+            if (!registry.TryGet(FeatureIds.SearchMain, out feature) || feature == null)
+            {
+                throw new InvalidOperationException("Expected search query feature to be registered.");
+            }
+
+            if (!feature.VisibleInMainUi || !feature.IsImplemented)
+            {
+                throw new InvalidOperationException("Search query must be visible and implemented after the F5 UI stage.");
+            }
+
+            if (feature.CodeDomain != FeatureCodeDomain.Search ||
+                feature.UserCategory != FeatureUserCategory.Search)
+            {
+                throw new InvalidOperationException("Search query must stay in Search code-domain and Search UI category.");
+            }
+
+            if (feature.RequiredActions.Count != 1 || feature.RequiredActions[0] != InputActionKind.None)
+            {
+                throw new InvalidOperationException("Search query first UI stage must remain a read-only feature without gameplay actions.");
+            }
+
+            AssertStringEquals(feature.Description, "输入物品名或 #ID 查看只读物品资料", "search query description");
+        }
+
         private static void AssertPlannedFeatureHidden(FeatureRegistry registry, string featureId)
         {
             FeatureDefinition feature;

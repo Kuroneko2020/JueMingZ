@@ -171,6 +171,10 @@ namespace JueMingZ.UI.Legacy
                     {
                         hoveredElement = DrawMapEnhancementPage(spriteBatch, scrollArea, mouse, elements);
                     }
+                    else if (string.Equals(selectedPage, "search", StringComparison.Ordinal))
+                    {
+                        hoveredElement = DrawSearchPage(spriteBatch, scrollArea, mouse, elements);
+                    }
                     else
                     {
                         hoveredElement = DrawEmptyPage(spriteBatch, scrollArea, selectedPage, mouse);

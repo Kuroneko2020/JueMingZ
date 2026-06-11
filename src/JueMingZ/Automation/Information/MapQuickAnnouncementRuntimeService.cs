@@ -212,6 +212,12 @@ namespace JueMingZ.Automation.Information
                 return true;
             }
 
+            if (input.SearchItemSelectionPending)
+            {
+                reason = "searchItemSelection";
+                return true;
+            }
+
             if (input.TerrariaTextInputFocused)
             {
                 reason = string.IsNullOrWhiteSpace(input.TerrariaTextInputReason)
@@ -275,6 +281,7 @@ namespace JueMingZ.Automation.Information
                 LegacyUiVisible = LegacyMainUiState.Visible,
                 LegacyUiActiveInteraction = LegacyUiInput.IsActiveInteraction(),
                 LegacyTextInputFocused = LegacyTextInput.IsAnyFocused,
+                SearchItemSelectionPending = SearchItemQueryUiState.IsSelectionPending,
                 TerrariaTextInputFocused = textFocused,
                 TerrariaTextInputReason = textReason,
                 NpcChatOpen = !string.IsNullOrEmpty(TerrariaMainCompat.NpcChatText),
@@ -341,6 +348,7 @@ namespace JueMingZ.Automation.Information
         public bool LegacyUiVisible { get; set; }
         public bool LegacyUiActiveInteraction { get; set; }
         public bool LegacyTextInputFocused { get; set; }
+        public bool SearchItemSelectionPending { get; set; }
         public bool TerrariaTextInputFocused { get; set; }
         public string TerrariaTextInputReason { get; set; }
         public bool NpcChatOpen { get; set; }

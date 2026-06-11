@@ -35,7 +35,7 @@ namespace JueMingZ.Runtime
         private static long _lastRuntimeUpdateStartTimestamp;
         private static readonly RuntimeTickPipeline TickPipeline = CreateTickPipeline();
 
-        public const string Version = "1.7.561-map-more-features-placeholder";
+        public const string Version = "1.7.576-search-query-interaction-layout-closeout";
 
         public static RuntimeState State { get; private set; } = new RuntimeState();
         public static FeatureRegistry FeatureRegistry { get; private set; }

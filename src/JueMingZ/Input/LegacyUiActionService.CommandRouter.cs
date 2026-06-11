@@ -223,6 +223,12 @@ namespace JueMingZ.Input
                 return;
             }
 
+            if (command.ElementId.StartsWith("search-query:", StringComparison.Ordinal))
+            {
+                HandleSearchQueryCommand(command);
+                return;
+            }
+
             if (command.ElementId.StartsWith("information-toggle:", StringComparison.Ordinal))
             {
                 SetInformationFeatureEnabled(command, command.ElementId.Substring("information-toggle:".Length));

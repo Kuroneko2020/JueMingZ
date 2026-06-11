@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Threading;
 using JueMingZ.Automation.Combat;
 using JueMingZ.Automation.Information;
+using JueMingZ.Automation.Search;
 using JueMingZ.Diagnostics;
 using JueMingZ.Runtime;
 using JueMingZ.UI;
@@ -145,6 +146,7 @@ namespace JueMingZ.Bootstrap
                     UiInputFrameClock.BeginUpdateFrame("Main.Update.Prefix");
                     DiagnosticUiInteractionBridge.UpdatePrefixGuard();
                     LegacyUiInput.UpdatePrefixGuard();
+                    SearchItemPickRuntimeService.UpdatePrefixGuard();
                     MapQuickAnnouncementRuntimeService.UpdatePrefixGuard();
                     CombatPerfectRevolverService.UpdatePrefixGuard();
                     CombatAimPersistentCursorService.BeginFrame();
