@@ -152,11 +152,20 @@ namespace JueMingZ.Automation.Information
             }
 
             var source = string.IsNullOrWhiteSpace(tile.NameSource) ? "unknown" : tile.NameSource.Trim();
-            return "tile:" + source +
-                   ";type=" + tile.TileType.ToString(CultureInfo.InvariantCulture) +
-                   ";style=" + tile.TileStyle.ToString(CultureInfo.InvariantCulture) +
-                   ";frame=" + tile.FrameX.ToString(CultureInfo.InvariantCulture) +
-                   "," + tile.FrameY.ToString(CultureInfo.InvariantCulture);
+            var detail = "tile:" + source +
+                         ";type=" + tile.TileType.ToString(CultureInfo.InvariantCulture) +
+                         ";style=" + tile.TileStyle.ToString(CultureInfo.InvariantCulture) +
+                         ";frame=" + tile.FrameX.ToString(CultureInfo.InvariantCulture) +
+                         "," + tile.FrameY.ToString(CultureInfo.InvariantCulture);
+            if (tile.HasLiquid)
+            {
+                detail += ";liquid=" +
+                          MapQuickAnnouncementTextBuilder.BuildLiquidName(tile.LiquidType) +
+                          ":" +
+                          tile.LiquidAmount.ToString(CultureInfo.InvariantCulture);
+            }
+
+            return detail;
         }
 
         private static string BuildWallDetail(MapQuickAnnouncementWallTarget wall)
@@ -574,7 +583,9 @@ namespace JueMingZ.Automation.Information
                 BlueWire = TerrariaTileReadCompat.HasBlueWire(tile),
                 GreenWire = TerrariaTileReadCompat.HasGreenWire(tile),
                 YellowWire = TerrariaTileReadCompat.HasYellowWire(tile),
-                Actuator = TerrariaTileReadCompat.HasActuator(tile)
+                Actuator = TerrariaTileReadCompat.HasActuator(tile),
+                LiquidAmount = TerrariaTileReadCompat.LiquidAmount(tile),
+                LiquidType = TerrariaTileReadCompat.LiquidType(tile)
             };
 
             var wallType = TerrariaTileReadCompat.Wall(tile);

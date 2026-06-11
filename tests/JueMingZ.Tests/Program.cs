@@ -1122,6 +1122,7 @@ namespace JueMingZ.Tests
             Run("map quick announcement resolver lists players and NPCs at mouse", ref failed, MapQuickAnnouncementResolverListsPlayersAndNpcsAtMouse);
             Run("map quick announcement resolver aggregates nearby dropped items", ref failed, MapQuickAnnouncementResolverAggregatesNearbyDroppedItems);
             Run("map quick announcement resolver combines tile and circuit layers", ref failed, MapQuickAnnouncementResolverCombinesTileAndCircuitLayers);
+            Run("map quick announcement resolver treats liquid as tile layer", ref failed, MapQuickAnnouncementResolverTreatsLiquidAsTileLayer);
             Run("map quick announcement resolver uses wall before air", ref failed, MapQuickAnnouncementResolverUsesWallBeforeAir);
             Run("map quick announcement resolver falls back to air phrase", ref failed, MapQuickAnnouncementResolverFallsBackToAirPhrase);
             Run("map quick announcement text safety wraps color and blocks injection", ref failed, MapQuickAnnouncementTextSafetyWrapsColorAndBlocksInjection);
@@ -1134,6 +1135,7 @@ namespace JueMingZ.Tests
             Run("diagnostic snapshot writes map quick announcement state", ref failed, DiagnosticSnapshotWritesMapQuickAnnouncementState);
             Run("legacy UI hover layout token ignores window and content position", ref failed, LegacyUiHoverLayoutTokenIgnoresWindowAndContentPosition);
             Run("legacy UI hover layout token dirties on page size scroll settings and font", ref failed, LegacyUiHoverLayoutTokenDirtiesOnPageSizeScrollSettingsAndFont);
+            Run("legacy UI empty page prompt and item tab icon match current UI", ref failed, LegacyUiEmptyPagePromptAndItemTabIconMatchCurrentUi);
             Run("legacy UI tabs ignore content scroll clip", ref failed, LegacyUiTabsIgnoreContentScrollClip);
             Run("legacy UI selected button content offset requires enabled selection", ref failed, LegacyUiSelectedButtonContentOffsetRequiresEnabledSelection);
             Run("legacy UI retained frame model reuses window translation", ref failed, LegacyUiRetainedFrameModelReusesWindowTranslation);

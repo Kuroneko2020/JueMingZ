@@ -256,6 +256,20 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void LegacyUiEmptyPagePromptAndItemTabIconMatchCurrentUi()
+        {
+            if (!string.Equals(LegacyMainWindow.EmptyPagePromptText, "功能正在开发中", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected empty F5 placeholder pages to use the current development prompt.");
+            }
+
+            if (!string.Equals(LegacyTabBar.GetIconId("home"), "item_bag", StringComparison.Ordinal) ||
+                !string.Equals(LegacyTabBar.GetIconIdFromElementId("tab:home"), "item_bag", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected the F5 item page tab to use the item bag icon.");
+            }
+        }
+
         private static void LegacyUiTabsIgnoreContentScrollClip()
         {
             var settings = AppSettings.CreateDefault();

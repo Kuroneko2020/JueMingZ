@@ -244,12 +244,23 @@ namespace JueMingZ.Tests
             var window = new LegacyUiRect(40, 50, LegacyUiMetrics.DefaultWidth, LegacyUiMetrics.DefaultHeight);
             var content = new LegacyUiRect(58, 134, 520, 128);
             var expectedHeight =
-                LegacyUiMetrics.RowHeight +
+                LegacyUiMetrics.RowHeight * 2 +
+                LegacyUiMetrics.SettingRowGap +
                 24;
 
             if (LegacyMainWindow.CalculateMapEnhancementContentHeightForTesting() != expectedHeight)
             {
-                throw new InvalidOperationException("Map enhancement content height must include the inline quick announcement row.");
+                throw new InvalidOperationException("Map enhancement content height must include the inline quick announcement row and future placeholder.");
+            }
+
+            AssertStringEquals(
+                LegacyMainWindow.MapEnhancementFuturePlaceholderText,
+                "更多功能正在开发中",
+                "map enhancement future placeholder");
+
+            if (expectedHeight > content.Height)
+            {
+                throw new InvalidOperationException("Map enhancement placeholder should fit in the default content viewport without requiring scroll.");
             }
 
             var first = LegacyMainWindow.BuildPageLayoutSnapshotForTesting("map_enhancement", window, content, 0, settings);
@@ -513,10 +524,16 @@ namespace JueMingZ.Tests
                     new Terraria.DataStructures.PlacementDetails { tileType = 241, tileStyle = 0 };
                 Terraria.ID.ItemID.Sets.DerivedPlacementDetails[1474] =
                     new Terraria.DataStructures.PlacementDetails { tileType = 245, tileStyle = 0 };
+                Terraria.ID.ItemID.Sets.DerivedPlacementDetails[4934] =
+                    new Terraria.DataStructures.PlacementDetails { tileType = 617, tileStyle = 10 };
+                Terraria.ID.ItemID.Sets.DerivedPlacementDetails[4945] =
+                    new Terraria.DataStructures.PlacementDetails { tileType = 617, tileStyle = 21 };
 
                 Terraria.Lang.ItemNames[1366] = "毁灭者纪念章";
                 Terraria.Lang.ItemNames[2865] = "火星伯爵城";
                 Terraria.Lang.ItemNames[1474] = "小幅挂画";
+                Terraria.Lang.ItemNames[4934] = "世纪之花圣物";
+                Terraria.Lang.ItemNames[4945] = "圣诞坦克圣物";
                 Terraria.Map.MapHelper.TileLookups[Terraria.Map.MapHelper.BuildTileKey(240, 99)] = 2499;
                 Terraria.Lang.MapObjectNames[2499] = "纪念章";
                 MapQuickAnnouncementPlacementNameCache.ResetForTesting();
@@ -550,6 +567,20 @@ namespace JueMingZ.Tests
                     "小幅挂画",
                     "map quick announcement 2x3 painting placement item name");
                 AssertStringEquals(source, "placementItem", "map quick announcement 2x3 painting name source");
+
+                var relicStyleTopLeft = MapQuickAnnouncementTileStyleResolver.ResolveTileStyle(617, 10 * 54, 0);
+                var relicStyleRightFacingTop = MapQuickAnnouncementTileStyleResolver.ResolveTileStyle(617, 10 * 54, 72);
+                var relicStyleRightFacingMiddle = MapQuickAnnouncementTileStyleResolver.ResolveTileStyle(617, 10 * 54 + 18, 72 + 36);
+                if (relicStyleTopLeft != 10 || relicStyleRightFacingTop != 10 || relicStyleRightFacingMiddle != 10)
+                {
+                    throw new InvalidOperationException("Map quick announcement must divide master relic placement frames back to the item placeStyle.");
+                }
+
+                AssertStringEquals(
+                    MapQuickAnnouncementNameResolver.ResolveTileName(617, relicStyleRightFacingMiddle, string.Empty, out source),
+                    "世纪之花圣物",
+                    "map quick announcement master relic placement item name");
+                AssertStringEquals(source, "placementItem", "map quick announcement master relic name source");
 
                 AssertStringEquals(
                     MapQuickAnnouncementNameResolver.ResolveTileName(240, 99, string.Empty, out source),
@@ -696,6 +727,49 @@ namespace JueMingZ.Tests
             }
 
             AssertStringEquals(result.Body, "这里有 石块，红线、蓝线，执行器", "map quick announcement tile circuit text");
+        }
+
+        private static void MapQuickAnnouncementResolverTreatsLiquidAsTileLayer()
+        {
+            var context = CreateQuickAnnouncementContext(20f, 20f);
+            context.Tile = new MapQuickAnnouncementTileTarget
+            {
+                LiquidAmount = 255,
+                LiquidType = 0
+            };
+            context.Wall = new MapQuickAnnouncementWallTarget
+            {
+                Active = true,
+                WallName = "石墙"
+            };
+
+            var result = MapQuickAnnouncementTargetResolver.Resolve(context);
+            if (result.Kind != MapQuickAnnouncementTargetKind.Tile)
+            {
+                throw new InvalidOperationException("Map quick announcement must resolve liquid at tile priority before wall and air.");
+            }
+
+            AssertStringEquals(result.Body, "这里有 水", "map quick announcement water text");
+
+            context.Tile = new MapQuickAnnouncementTileTarget
+            {
+                Active = true,
+                TileName = "石块",
+                LiquidAmount = 128,
+                LiquidType = 1,
+                RedWire = true
+            };
+            result = MapQuickAnnouncementTargetResolver.Resolve(context);
+            AssertStringEquals(result.Body, "这里有 石块，熔岩，红线", "map quick announcement tile liquid wire text");
+
+            AssertStringEquals(
+                MapQuickAnnouncementTextBuilder.BuildTileText(new MapQuickAnnouncementTileTarget { LiquidAmount = 1, LiquidType = 2 }),
+                "这里有 蜂蜜",
+                "map quick announcement honey text");
+            AssertStringEquals(
+                MapQuickAnnouncementTextBuilder.BuildTileText(new MapQuickAnnouncementTileTarget { LiquidAmount = 1, LiquidType = 3 }),
+                "这里有 微光",
+                "map quick announcement shimmer text");
         }
 
         private static void MapQuickAnnouncementResolverUsesWallBeforeAir()
@@ -1475,6 +1549,8 @@ namespace JueMingZ.Tests
             Terraria.Lang.ItemNames.Remove(1366);
             Terraria.Lang.ItemNames.Remove(1474);
             Terraria.Lang.ItemNames.Remove(2865);
+            Terraria.Lang.ItemNames.Remove(4934);
+            Terraria.Lang.ItemNames.Remove(4945);
         }
 
         private sealed class RecordingQuickAnnouncementSink :

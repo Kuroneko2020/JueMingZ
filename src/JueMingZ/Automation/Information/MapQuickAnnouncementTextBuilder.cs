@@ -69,10 +69,15 @@ namespace JueMingZ.Automation.Information
                 return string.Empty;
             }
 
-            var parts = new List<string>(6);
+            var parts = new List<string>(7);
             if (tile.Active)
             {
                 parts.Add(NormalizeName(tile.TileName, "物块"));
+            }
+
+            if (tile.HasLiquid)
+            {
+                parts.Add(BuildLiquidName(tile.LiquidType));
             }
 
             var wires = new List<string>(4);
@@ -107,6 +112,23 @@ namespace JueMingZ.Automation.Information
             }
 
             return parts.Count == 0 ? string.Empty : "这里有 " + string.Join("，", parts.ToArray());
+        }
+
+        public static string BuildLiquidName(int liquidType)
+        {
+            switch (liquidType)
+            {
+                case 0:
+                    return "水";
+                case 1:
+                    return "熔岩";
+                case 2:
+                    return "蜂蜜";
+                case 3:
+                    return "微光";
+                default:
+                    return "液体";
+            }
         }
 
         public static string BuildWallText(MapQuickAnnouncementWallTarget wall)

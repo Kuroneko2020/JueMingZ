@@ -7,7 +7,7 @@ namespace JueMingZ.UI.Legacy
     {
         public static readonly LegacyTabDefinition[] Tabs = new[]
         {
-            new LegacyTabDefinition("home", "物品", "home", 0, 0),
+            new LegacyTabDefinition("home", "物品", "item_bag", 0, 0),
             new LegacyTabDefinition("misc", "杂项", "grid", 0, 1),
             new LegacyTabDefinition("map_enhancement", "地图", "map_pin", 0, 2),
             new LegacyTabDefinition("search", "查询", "search", 0, 3),

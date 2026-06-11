@@ -22,6 +22,7 @@ namespace JueMingZ.UI.Legacy
     public static partial class LegacyMainWindow
     {
         private const int HoverTooltipDiagnosticCadenceMs = 1000;
+        internal const string EmptyPagePromptText = "功能正在开发中";
         private static readonly object HoverTooltipCacheSyncRoot = new object();
         private static string _hoverTooltipCacheElementId = string.Empty;
         private static string _hoverTooltipCachePageId = string.Empty;
@@ -57,7 +58,7 @@ namespace JueMingZ.UI.Legacy
             var title = LegacyTabBar.GetDisplayName(pageId);
             var y = area.Viewport.Y;
             UiTextRenderer.DrawTextClipped(spriteBatch, title, area.Viewport.X + 4, y + 4, area.Viewport.Width - 8, 24, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 244, 238, 210, 255, 0.95f);
-            UiTextRenderer.DrawTextClipped(spriteBatch, "此页暂未接入功能。", area.Viewport.X + 4, y + 36, area.Viewport.Width - 8, 24, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 205, 218, 238, 255, 0.88f);
+            UiTextRenderer.DrawTextClipped(spriteBatch, EmptyPagePromptText, area.Viewport.X + 4, y + 36, area.Viewport.Width - 8, 24, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 205, 218, 238, 255, 0.88f);
             return null;
         }
 

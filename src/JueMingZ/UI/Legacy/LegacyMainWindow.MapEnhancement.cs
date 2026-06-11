@@ -12,6 +12,7 @@ namespace JueMingZ.UI.Legacy
         private const string MapQuickAnnouncementTriggerSlotTooltip = "双击进行改键，支持鼠标按键";
         private const string MapQuickAnnouncementOnTooltip = "按下快捷键对鼠标位置内容进行广播";
         private const string MapQuickAnnouncementOffTooltip = "";
+        internal const string MapEnhancementFuturePlaceholderText = "更多功能正在开发中";
 
         private static LegacyUiElement DrawMapEnhancementPage(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements)
         {
@@ -20,7 +21,36 @@ namespace JueMingZ.UI.Legacy
             UpdateMapQuickAnnouncementHotkeyCapture(settings);
 
             hovered = DrawMapQuickAnnouncementRow(spriteBatch, area, mouse, elements, 0, settings) ?? hovered;
+            DrawMapEnhancementFuturePlaceholder(spriteBatch, area, LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap);
             return hovered;
+        }
+
+        private static void DrawMapEnhancementFuturePlaceholder(object spriteBatch, LegacyScrollArea area, int contentY)
+        {
+            var row = new LegacyUiRect(area.Viewport.X, area.ToScreenY(contentY), area.Viewport.Width, LegacyUiMetrics.RowHeight);
+            if (!area.IsVisible(row))
+            {
+                return;
+            }
+
+            LegacyUiTheme.DrawRowClipped(spriteBatch, row, area.Viewport);
+            UiTextRenderer.DrawAlignedTextClipped(
+                spriteBatch,
+                MapEnhancementFuturePlaceholderText,
+                row.X + 10,
+                row.Y,
+                Math.Max(1, row.Width - 20),
+                row.Height,
+                UiTextHorizontalAlignment.Left,
+                area.Viewport.X,
+                area.Viewport.Y,
+                area.Viewport.Width,
+                area.Viewport.Height,
+                205,
+                218,
+                238,
+                235,
+                0.82f);
         }
 
         private static LegacyUiElement DrawMapQuickAnnouncementRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, AppSettings settings)

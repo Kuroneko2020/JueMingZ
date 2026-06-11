@@ -131,10 +131,17 @@ namespace JueMingZ.Automation.Information
         public bool GreenWire { get; set; }
         public bool YellowWire { get; set; }
         public bool Actuator { get; set; }
+        public int LiquidAmount { get; set; }
+        public int LiquidType { get; set; }
+
+        public bool HasLiquid
+        {
+            get { return LiquidAmount > 0; }
+        }
 
         public bool HasAnyLayer
         {
-            get { return Active || RedWire || BlueWire || GreenWire || YellowWire || Actuator; }
+            get { return Active || HasLiquid || RedWire || BlueWire || GreenWire || YellowWire || Actuator; }
         }
     }
 

@@ -20,6 +20,7 @@ namespace JueMingZ.Automation.Information
                     frameInfo.CoordinateFullHeight,
                     frameInfo.StyleHorizontal,
                     frameInfo.StyleWrapLimit,
+                    frameInfo.StyleMultiplier,
                     out style))
             {
                 return style;
@@ -45,6 +46,27 @@ namespace JueMingZ.Automation.Information
             int styleWrapLimit,
             out int style)
         {
+            return TryResolveTileStyleFromFrame(
+                frameX,
+                frameY,
+                coordinateFullWidth,
+                coordinateFullHeight,
+                styleHorizontal,
+                styleWrapLimit,
+                1,
+                out style);
+        }
+
+        internal static bool TryResolveTileStyleFromFrame(
+            int frameX,
+            int frameY,
+            int coordinateFullWidth,
+            int coordinateFullHeight,
+            bool styleHorizontal,
+            int styleWrapLimit,
+            int styleMultiplier,
+            out int style)
+        {
             style = 0;
             if (coordinateFullWidth <= 0 || coordinateFullHeight <= 0)
             {
@@ -54,9 +76,11 @@ namespace JueMingZ.Automation.Information
             var styleColumn = Math.Max(0, frameX) / coordinateFullWidth;
             var styleRow = Math.Max(0, frameY) / coordinateFullHeight;
             var wrapLimit = styleWrapLimit <= 0 ? 1 : styleWrapLimit;
-            style = styleHorizontal
+            var placementStyle = styleHorizontal
                 ? styleRow * wrapLimit + styleColumn
                 : styleColumn * wrapLimit + styleRow;
+            var multiplier = styleMultiplier <= 0 ? 1 : styleMultiplier;
+            style = placementStyle / multiplier;
             return style >= 0;
         }
 
@@ -102,6 +126,7 @@ namespace JueMingZ.Automation.Information
                 int coordinateFullHeight;
                 bool styleHorizontal;
                 int styleWrapLimit;
+                int styleMultiplier;
                 if (!InformationReflection.TryReadInt(data, "CoordinateFullWidth", out coordinateFullWidth) ||
                     !InformationReflection.TryReadInt(data, "CoordinateFullHeight", out coordinateFullHeight) ||
                     !InformationReflection.TryReadBool(data, "StyleHorizontal", out styleHorizontal))
@@ -114,7 +139,17 @@ namespace JueMingZ.Automation.Information
                     styleWrapLimit = 1;
                 }
 
-                return TileStyleFrameInfo.Create(coordinateFullWidth, coordinateFullHeight, styleHorizontal, styleWrapLimit);
+                if (!InformationReflection.TryReadInt(data, "StyleMultiplier", out styleMultiplier))
+                {
+                    styleMultiplier = 1;
+                }
+
+                return TileStyleFrameInfo.Create(
+                    coordinateFullWidth,
+                    coordinateFullHeight,
+                    styleHorizontal,
+                    styleWrapLimit,
+                    styleMultiplier);
             }
             catch
             {
@@ -141,7 +176,7 @@ namespace JueMingZ.Automation.Information
                 case 246:
                     return TryResolveTileStyleFromFrame(frameX, frameY, 54, 36, true, 36, out style);
                 case 617:
-                    return TryResolveTileStyleFromFrame(frameX, frameY, 54, 72, false, 2, out style);
+                    return TryResolveTileStyleFromFrame(frameX, frameY, 54, 72, false, 2, 2, out style);
                 default:
                     style = 0;
                     return false;
@@ -150,20 +185,22 @@ namespace JueMingZ.Automation.Information
 
         private sealed class TileStyleFrameInfo
         {
-            public static readonly TileStyleFrameInfo Unavailable = new TileStyleFrameInfo(false, 0, 0, true, 1);
+            public static readonly TileStyleFrameInfo Unavailable = new TileStyleFrameInfo(false, 0, 0, true, 1, 1);
 
             private TileStyleFrameInfo(
                 bool available,
                 int coordinateFullWidth,
                 int coordinateFullHeight,
                 bool styleHorizontal,
-                int styleWrapLimit)
+                int styleWrapLimit,
+                int styleMultiplier)
             {
                 Available = available;
                 CoordinateFullWidth = coordinateFullWidth;
                 CoordinateFullHeight = coordinateFullHeight;
                 StyleHorizontal = styleHorizontal;
                 StyleWrapLimit = styleWrapLimit;
+                StyleMultiplier = styleMultiplier <= 0 ? 1 : styleMultiplier;
             }
 
             public bool Available { get; private set; }
@@ -171,16 +208,24 @@ namespace JueMingZ.Automation.Information
             public int CoordinateFullHeight { get; private set; }
             public bool StyleHorizontal { get; private set; }
             public int StyleWrapLimit { get; private set; }
+            public int StyleMultiplier { get; private set; }
 
             public static TileStyleFrameInfo Create(
                 int coordinateFullWidth,
                 int coordinateFullHeight,
                 bool styleHorizontal,
-                int styleWrapLimit)
+                int styleWrapLimit,
+                int styleMultiplier)
             {
                 return coordinateFullWidth <= 0 || coordinateFullHeight <= 0
                     ? Unavailable
-                    : new TileStyleFrameInfo(true, coordinateFullWidth, coordinateFullHeight, styleHorizontal, styleWrapLimit);
+                    : new TileStyleFrameInfo(
+                        true,
+                        coordinateFullWidth,
+                        coordinateFullHeight,
+                        styleHorizontal,
+                        styleWrapLimit,
+                        styleMultiplier);
             }
         }
     }

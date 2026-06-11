@@ -336,6 +336,9 @@ namespace JueMingZ.UI.Legacy.Controls
                 case "home":
                     DrawHome(mask);
                     break;
+                case "item_bag":
+                    DrawItemBag(mask);
+                    break;
                 case "grid":
                     DrawGrid(mask);
                     break;
@@ -382,6 +385,15 @@ namespace JueMingZ.UI.Legacy.Controls
             AddPolyline(mask, DefaultStroke, false, 3.3, 9.0, 9.0, 3.5, 14.7, 9.0);
             AddPolyline(mask, DefaultStroke, false, 5.0, 8.4, 5.0, 14.2, 13.0, 14.2, 13.0, 8.4);
             AddPolyline(mask, 1.1d, false, 7.6, 14.1, 7.6, 10.5, 10.4, 10.5, 10.4, 14.1);
+        }
+
+        private static void DrawItemBag(double[] mask)
+        {
+            AddRoundedRectOutline(mask, 4.2, 6.3, 9.6, 8.0, 1.35, 1.2d);
+            AddPolyline(mask, 1.15d, false, 6.7, 6.5, 6.7, 5.4, 7.5, 4.5, 10.5, 4.5, 11.3, 5.4, 11.3, 6.5);
+            AddSegment(mask, 5.6, 7.8, 12.4, 7.8, 1.05d);
+            AddPolyline(mask, 1.05d, true, 7.1, 10.4, 8.9, 9.0, 10.7, 10.4, 8.9, 11.8);
+            AddFilledCircle(mask, 11.8, 12.1, 0.55);
         }
 
         private static void DrawGrid(double[] mask)
