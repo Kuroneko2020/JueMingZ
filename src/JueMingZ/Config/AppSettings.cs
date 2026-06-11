@@ -131,6 +131,27 @@ namespace JueMingZ.Config
         [DataMember(Order = 186)]
         public int CombatPhasebladeQuickSwitchIntervalTicks { get; set; } = CombatPhasebladeQuickSwitchSettings.DefaultIntervalTicks;
 
+        [DataMember(Order = 187)]
+        public bool MapQuickAnnouncementEnabled { get; set; }
+
+        [DataMember(Order = 188)]
+        public string MapQuickAnnouncementHotkeySlot1 { get; set; } = MapQuickAnnouncementSettings.DefaultHotkeySlot1;
+
+        [DataMember(Order = 189)]
+        public string MapQuickAnnouncementHotkeySlot2 { get; set; } = MapQuickAnnouncementSettings.DefaultHotkeySlot2;
+
+        [DataMember(Order = 190)]
+        public string MapQuickAnnouncementTriggerKey { get; set; } = MapQuickAnnouncementSettings.DefaultTriggerKey;
+
+        [DataMember(Order = 191)]
+        public string MapQuickAnnouncementColorHex { get; set; } = MapQuickAnnouncementSettings.DefaultAnnouncementColorHex;
+
+        [DataMember(Order = 192)]
+        public int MapQuickAnnouncementCooldownMilliseconds { get; set; } = MapQuickAnnouncementSettings.DefaultCooldownMilliseconds;
+
+        [DataMember(Order = 193)]
+        public int MapQuickAnnouncementAirCooldownMilliseconds { get; set; } = MapQuickAnnouncementSettings.DefaultAirCooldownMilliseconds;
+
         [DataMember(Order = 37)]
         public bool CombatPerfectRevolverEnabled { get; set; }
 
@@ -759,6 +780,13 @@ namespace JueMingZ.Config
                 CombatFlailComboEnabled = false,
                 CombatPhasebladeQuickSwitchEnabled = false,
                 CombatPhasebladeQuickSwitchIntervalTicks = CombatPhasebladeQuickSwitchSettings.DefaultIntervalTicks,
+                MapQuickAnnouncementEnabled = false,
+                MapQuickAnnouncementHotkeySlot1 = MapQuickAnnouncementSettings.DefaultHotkeySlot1,
+                MapQuickAnnouncementHotkeySlot2 = MapQuickAnnouncementSettings.DefaultHotkeySlot2,
+                MapQuickAnnouncementTriggerKey = MapQuickAnnouncementSettings.DefaultTriggerKey,
+                MapQuickAnnouncementColorHex = MapQuickAnnouncementSettings.DefaultAnnouncementColorHex,
+                MapQuickAnnouncementCooldownMilliseconds = MapQuickAnnouncementSettings.DefaultCooldownMilliseconds,
+                MapQuickAnnouncementAirCooldownMilliseconds = MapQuickAnnouncementSettings.DefaultAirCooldownMilliseconds,
                 CombatPerfectRevolverEnabled = false,
                 CombatMagicStringClickerEnabled = false,
                 CombatAutoFacingEnabled = false,

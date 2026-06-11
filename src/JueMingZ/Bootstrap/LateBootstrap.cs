@@ -92,6 +92,14 @@ namespace JueMingZ.Bootstrap
                     Logger.Warn("LateBootstrap", "Quick bag ItemSlot.RightClick hook did not install; quick bag opening will rely on runtime fallback only.");
                 }
 
+                Logger.Info("LateBootstrap", "Installing quick announcement ItemSlot.MouseHover hook...");
+                var quickAnnouncementItemSlotHoverHookResult = MapQuickAnnouncementItemSlotHoverHookInstaller.Install();
+                Logger.Info("LateBootstrap", "Quick announcement ItemSlot.MouseHover hook handoff result: " + quickAnnouncementItemSlotHoverHookResult.Message);
+                if (!quickAnnouncementItemSlotHoverHookResult.Succeeded)
+                {
+                    Logger.Warn("LateBootstrap", "Quick announcement ItemSlot.MouseHover hook did not install; UI hover item announcements will safely fall back to world target resolution.");
+                }
+
                 Logger.Info("LateBootstrap", "Installing auto mining PickTile hook...");
                 var autoMiningPickTileHookResult = AutoMiningPickTileHookInstaller.Install();
                 Logger.Info("LateBootstrap", "Auto mining PickTile hook handoff result: " + autoMiningPickTileHookResult.Message);

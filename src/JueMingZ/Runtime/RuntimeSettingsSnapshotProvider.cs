@@ -122,6 +122,13 @@ namespace JueMingZ.Runtime
             private bool _worldAutomationAutoCaptureCritterEmpressButterflyEnabled;
             private bool _worldAutomationAutoCaptureCritterOtherEnabled;
             private bool _worldAutomationAutoHarvestEnabled;
+            private bool _mapQuickAnnouncementEnabled;
+            private string _mapQuickAnnouncementHotkeySlot1;
+            private string _mapQuickAnnouncementHotkeySlot2;
+            private string _mapQuickAnnouncementTriggerKey;
+            private string _mapQuickAnnouncementColorHex;
+            private int _mapQuickAnnouncementCooldownMilliseconds;
+            private int _mapQuickAnnouncementAirCooldownMilliseconds;
             private bool _fishingAutoFishEnabled;
             private bool _fishingAutoLoadoutEnabled;
             private bool _fishingAutoEquipmentEnabled;
@@ -242,6 +249,13 @@ namespace JueMingZ.Runtime
                     _worldAutomationAutoCaptureCritterEmpressButterflyEnabled = settings.MiscAutoCaptureCritterEmpressButterflyEnabled,
                     _worldAutomationAutoCaptureCritterOtherEnabled = settings.MiscAutoCaptureCritterOtherEnabled,
                     _worldAutomationAutoHarvestEnabled = settings.WorldAutomationAutoHarvestEnabled,
+                    _mapQuickAnnouncementEnabled = settings.MapQuickAnnouncementEnabled,
+                    _mapQuickAnnouncementHotkeySlot1 = settings.MapQuickAnnouncementHotkeySlot1,
+                    _mapQuickAnnouncementHotkeySlot2 = settings.MapQuickAnnouncementHotkeySlot2,
+                    _mapQuickAnnouncementTriggerKey = settings.MapQuickAnnouncementTriggerKey,
+                    _mapQuickAnnouncementColorHex = settings.MapQuickAnnouncementColorHex,
+                    _mapQuickAnnouncementCooldownMilliseconds = settings.MapQuickAnnouncementCooldownMilliseconds,
+                    _mapQuickAnnouncementAirCooldownMilliseconds = settings.MapQuickAnnouncementAirCooldownMilliseconds,
                     _fishingAutoFishEnabled = settings.FishingAutoFishEnabled,
                     _fishingAutoLoadoutEnabled = settings.FishingAutoLoadoutEnabled,
                     _fishingAutoEquipmentEnabled = settings.FishingAutoEquipmentEnabled,
@@ -357,6 +371,13 @@ namespace JueMingZ.Runtime
                        _worldAutomationAutoCaptureCritterEmpressButterflyEnabled == other._worldAutomationAutoCaptureCritterEmpressButterflyEnabled &&
                        _worldAutomationAutoCaptureCritterOtherEnabled == other._worldAutomationAutoCaptureCritterOtherEnabled &&
                        _worldAutomationAutoHarvestEnabled == other._worldAutomationAutoHarvestEnabled &&
+                       _mapQuickAnnouncementEnabled == other._mapQuickAnnouncementEnabled &&
+                       Same(_mapQuickAnnouncementHotkeySlot1, other._mapQuickAnnouncementHotkeySlot1) &&
+                       Same(_mapQuickAnnouncementHotkeySlot2, other._mapQuickAnnouncementHotkeySlot2) &&
+                       Same(_mapQuickAnnouncementTriggerKey, other._mapQuickAnnouncementTriggerKey) &&
+                       Same(_mapQuickAnnouncementColorHex, other._mapQuickAnnouncementColorHex) &&
+                       _mapQuickAnnouncementCooldownMilliseconds == other._mapQuickAnnouncementCooldownMilliseconds &&
+                       _mapQuickAnnouncementAirCooldownMilliseconds == other._mapQuickAnnouncementAirCooldownMilliseconds &&
                        _fishingAutoFishEnabled == other._fishingAutoFishEnabled &&
                        _fishingAutoLoadoutEnabled == other._fishingAutoLoadoutEnabled &&
                        _fishingAutoEquipmentEnabled == other._fishingAutoEquipmentEnabled &&

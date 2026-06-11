@@ -253,6 +253,11 @@ namespace JueMingZ.UI.Legacy
                 return CalculateMovementContentHeight();
             }
 
+            if (string.Equals(selectedPage, "map_enhancement", StringComparison.Ordinal))
+            {
+                return CalculateMapEnhancementContentHeight();
+            }
+
             return contentRect.Height - LegacyUiMetrics.ContentPadding * 2;
         }
 
@@ -490,6 +495,14 @@ namespace JueMingZ.UI.Legacy
                             AddHash(ref hash, option != null && MovementSafeLandingOptionCatalog.GetEnabled(settings, option.Id));
                         }
                     }
+                }
+                else if (string.Equals(selectedPage, "map_enhancement", StringComparison.Ordinal))
+                {
+                    AddHash(ref hash, settings.MapQuickAnnouncementEnabled);
+                    AddHash(ref hash, settings.MapQuickAnnouncementHotkeySlot1);
+                    AddHash(ref hash, settings.MapQuickAnnouncementHotkeySlot2);
+                    AddHash(ref hash, settings.MapQuickAnnouncementTriggerKey);
+                    AddHash(ref hash, _mapQuickAnnouncementHotkeyCaptureSlot);
                 }
 
                 return hash;

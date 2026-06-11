@@ -179,6 +179,7 @@ namespace JueMingZ.Config
             SetFeatureEnabledLocked(FeatureIds.CombatAutoFacing, settings.CombatAutoFacingEnabled);
             SetFeatureEnabledLocked(FeatureIds.CombatEquipmentWarning, settings.CombatEquipmentWarningEnabled);
             SetFeatureEnabledLocked(FeatureIds.CombatGoblinExecution, settings.CombatGoblinExecutionEnabled);
+            SetFeatureEnabledLocked(FeatureIds.MapQuickAnnouncement, settings.MapQuickAnnouncementEnabled);
             SetFeatureEnabledLocked("information.enemy_name_labels", settings.InformationEnemyNameLabelsEnabled);
             SetFeatureEnabledLocked("information.critter_name_labels", settings.InformationCritterNameLabelsEnabled);
             SetFeatureEnabledLocked("information.npc_name_labels", !string.Equals(settings.InformationNpcNameLabelsMode, "Off", StringComparison.OrdinalIgnoreCase));
@@ -250,6 +251,7 @@ namespace JueMingZ.Config
             if (settings.CombatAutoFacingEnabled) count++;
             if (settings.CombatEquipmentWarningEnabled) count++;
             if (settings.CombatGoblinExecutionEnabled) count++;
+            if (settings.MapQuickAnnouncementEnabled) count++;
             if (settings.InformationEnemyNameLabelsEnabled) count++;
             if (settings.InformationCritterNameLabelsEnabled) count++;
             if (!string.Equals(settings.InformationNpcNameLabelsMode, "Off", StringComparison.OrdinalIgnoreCase)) count++;
@@ -582,6 +584,23 @@ namespace JueMingZ.Config
             settings.CombatAimAssistRadius = settings.CursorAimRadius;
             settings.CombatPhasebladeQuickSwitchIntervalTicks =
                 CombatPhasebladeQuickSwitchSettings.NormalizeIntervalTicks(settings.CombatPhasebladeQuickSwitchIntervalTicks);
+            var quickAnnouncementHotkey = MapQuickAnnouncementSettings.NormalizeHotkey(
+                settings.MapQuickAnnouncementHotkeySlot1,
+                settings.MapQuickAnnouncementHotkeySlot2,
+                settings.MapQuickAnnouncementTriggerKey);
+            settings.MapQuickAnnouncementHotkeySlot1 = quickAnnouncementHotkey.Slot1;
+            settings.MapQuickAnnouncementHotkeySlot2 = quickAnnouncementHotkey.Slot2;
+            settings.MapQuickAnnouncementTriggerKey = quickAnnouncementHotkey.TriggerKey;
+            settings.MapQuickAnnouncementColorHex =
+                MapQuickAnnouncementSettings.NormalizeColorHex(settings.MapQuickAnnouncementColorHex);
+            settings.MapQuickAnnouncementCooldownMilliseconds =
+                MapQuickAnnouncementSettings.NormalizeCooldownMilliseconds(
+                    settings.MapQuickAnnouncementCooldownMilliseconds,
+                    MapQuickAnnouncementSettings.DefaultCooldownMilliseconds);
+            settings.MapQuickAnnouncementAirCooldownMilliseconds =
+                MapQuickAnnouncementSettings.NormalizeCooldownMilliseconds(
+                    settings.MapQuickAnnouncementAirCooldownMilliseconds,
+                    MapQuickAnnouncementSettings.DefaultAirCooldownMilliseconds);
             settings.InformationNpcNameLabelsMode = NormalizeInformationNpcNameLabelsMode(settings.InformationNpcNameLabelsMode);
             settings.InformationChestNameLabelsMode = NormalizeInformationChestNameLabelsMode(settings.InformationChestNameLabelsMode, settings.InformationChestNameLabelsEnabled);
             settings.InformationChestNameLabelsEnabled = !string.Equals(settings.InformationChestNameLabelsMode, "Off", StringComparison.OrdinalIgnoreCase);

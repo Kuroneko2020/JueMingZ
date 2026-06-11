@@ -3,6 +3,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using JueMingZ.Automation.Combat;
+using JueMingZ.Automation.Information;
 using JueMingZ.Diagnostics;
 using JueMingZ.Runtime;
 using JueMingZ.UI;
@@ -144,6 +145,7 @@ namespace JueMingZ.Bootstrap
                     UiInputFrameClock.BeginUpdateFrame("Main.Update.Prefix");
                     DiagnosticUiInteractionBridge.UpdatePrefixGuard();
                     LegacyUiInput.UpdatePrefixGuard();
+                    MapQuickAnnouncementRuntimeService.UpdatePrefixGuard();
                     CombatPerfectRevolverService.UpdatePrefixGuard();
                     CombatAimPersistentCursorService.BeginFrame();
                 }

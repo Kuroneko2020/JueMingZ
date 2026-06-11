@@ -73,6 +73,31 @@ namespace JueMingZ.Compat
             return tile != null && tile.inActive();
         }
 
+        public static bool HasRedWire(Tile tile)
+        {
+            return tile != null && tile.wire();
+        }
+
+        public static bool HasBlueWire(Tile tile)
+        {
+            return tile != null && tile.wire2();
+        }
+
+        public static bool HasGreenWire(Tile tile)
+        {
+            return tile != null && tile.wire3();
+        }
+
+        public static bool HasYellowWire(Tile tile)
+        {
+            return tile != null && tile.wire4();
+        }
+
+        public static bool HasActuator(Tile tile)
+        {
+            return tile != null && tile.actuator();
+        }
+
         public static bool HasWater(Tile tile)
         {
             return tile != null && tile.water();

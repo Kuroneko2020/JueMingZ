@@ -325,6 +325,18 @@ namespace JueMingZ.Input
                 return;
             }
 
+            if (command.ElementId.StartsWith("map-quick-announcement-mode:", StringComparison.Ordinal))
+            {
+                HandleMapQuickAnnouncementMode(command, command.ElementId.Substring("map-quick-announcement-mode:".Length));
+                return;
+            }
+
+            if (command.ElementId.StartsWith("map-quick-announcement-key:", StringComparison.Ordinal))
+            {
+                HandleMapQuickAnnouncementKeySlot(command, command.ElementId.Substring("map-quick-announcement-key:".Length));
+                return;
+            }
+
             if (string.Equals(command.ElementId, "about-copy-feedback-group", StringComparison.Ordinal))
             {
                 HandleAboutCopyFeedbackGroup(command);

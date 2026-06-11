@@ -425,6 +425,26 @@ namespace JueMingZ.Diagnostics
         public long InformationFishingConditionsReadCount { get; set; }
         public long InformationFishingBobberObserverFreshInactiveSkipCount { get; set; }
         public long InformationFishingProjectileFallbackScanCount { get; set; }
+        public bool MapQuickAnnouncementLastTriggered { get; set; }
+        public string MapQuickAnnouncementLastResultCode { get; set; }
+        public string MapQuickAnnouncementLastTargetKind { get; set; }
+        public string MapQuickAnnouncementLastTargetName { get; set; }
+        public string MapQuickAnnouncementLastTargetSummary { get; set; }
+        public int MapQuickAnnouncementLastTargetCount { get; set; }
+        public string MapQuickAnnouncementLastResolveDetail { get; set; }
+        public string MapQuickAnnouncementLastTargetSource { get; set; }
+        public string MapQuickAnnouncementLastUiHoverSource { get; set; }
+        public int MapQuickAnnouncementLastHoverCacheAgeUpdates { get; set; }
+        public string MapQuickAnnouncementLastPlacementLookupSource { get; set; }
+        public string MapQuickAnnouncementLastFallbackReason { get; set; }
+        public bool MapQuickAnnouncementLastIsAir { get; set; }
+        public bool MapQuickAnnouncementLastCooldownBlocked { get; set; }
+        public bool MapQuickAnnouncementLastSendSucceeded { get; set; }
+        public string MapQuickAnnouncementLastFailureReason { get; set; }
+        public string MapQuickAnnouncementLastHotkeySummary { get; set; }
+        public bool MapQuickAnnouncementLastInputConsumed { get; set; }
+        public string MapQuickAnnouncementLastInputConsumeResult { get; set; }
+        public DateTime? MapQuickAnnouncementLastDecisionUtc { get; set; }
         public bool FishingAutomationNeedsTick { get; set; }
         public bool FishingDisplayNeedsCatchResolver { get; set; }
         public bool FishingHasResidualState { get; set; }
@@ -1035,6 +1055,19 @@ namespace JueMingZ.Diagnostics
             InformationChestAlwaysLastDirtyReason = string.Empty;
             InformationChestAlwaysTypedTileFastPathStatus = string.Empty;
             InformationWorldContextProfile = string.Empty;
+            MapQuickAnnouncementLastResultCode = string.Empty;
+            MapQuickAnnouncementLastTargetKind = string.Empty;
+            MapQuickAnnouncementLastTargetName = string.Empty;
+            MapQuickAnnouncementLastTargetSummary = string.Empty;
+            MapQuickAnnouncementLastResolveDetail = string.Empty;
+            MapQuickAnnouncementLastTargetSource = string.Empty;
+            MapQuickAnnouncementLastUiHoverSource = string.Empty;
+            MapQuickAnnouncementLastHoverCacheAgeUpdates = -1;
+            MapQuickAnnouncementLastPlacementLookupSource = string.Empty;
+            MapQuickAnnouncementLastFallbackReason = string.Empty;
+            MapQuickAnnouncementLastFailureReason = string.Empty;
+            MapQuickAnnouncementLastHotkeySummary = string.Empty;
+            MapQuickAnnouncementLastInputConsumeResult = string.Empty;
             FishingLastDecision = string.Empty;
             FishingLastSkipReason = string.Empty;
             FishingAutoEquipmentLastDecision = string.Empty;

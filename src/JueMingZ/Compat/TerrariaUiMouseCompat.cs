@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -41,8 +42,11 @@ namespace JueMingZ.Compat
         private static bool _lastPlayerInputCleared;
         private static bool _lastMainScrollSuppressed;
         private static bool _lastScrollHotbarHookSuppressed;
+        private const ulong MaxHoverSnapshotAgeUpdates = 1;
         private static readonly object UiMouseAccessorSyncRoot = new object();
+        private static readonly object HoverSnapshotSyncRoot = new object();
         private static readonly Dictionary<Type, object> EmptyHoverItemsByType = new Dictionary<Type, object>();
+        private static TerrariaUiHoverItemSnapshot _lastItemSlotHoverSnapshot;
         private static Type _uiMouseAccessorMainType;
         private static Type _uiMouseAccessorMainInstanceType;
         private static Type _localPlayerMouseInterfaceType;
@@ -117,6 +121,98 @@ namespace JueMingZ.Compat
             }
         }
 
+        public static bool TryReadHoverItemSnapshot(out TerrariaUiHoverItemSnapshot snapshot)
+        {
+            snapshot = null;
+            try
+            {
+                var mainType = TerrariaRuntimeTypes.MainType;
+                if (mainType == null)
+                {
+                    return false;
+                }
+
+                EnsureUiMouseAccessors(mainType);
+                object hoverItem;
+                if (!TryReadHoverItemObject(out hoverItem))
+                {
+                    return false;
+                }
+
+                return TryBuildHoverItemSnapshot(hoverItem, out snapshot);
+            }
+            catch (Exception error)
+            {
+                _mouseReadLastMessage = "Read UI hover item failed: " + error.Message;
+                LogThrottle.WarnThrottled(
+                    "ui-hover-item-read-failed",
+                    TimeSpan.FromSeconds(10),
+                    "TerrariaUiMouseCompat",
+                    _mouseReadLastMessage);
+                return false;
+            }
+        }
+
+        public static bool TryReadFreshHoverItemSnapshot(
+            ulong currentGameUpdateCount,
+            int mouseX,
+            int mouseY,
+            out TerrariaUiHoverItemSnapshot snapshot)
+        {
+            snapshot = null;
+
+            TerrariaUiHoverItemSnapshot cached;
+            lock (HoverSnapshotSyncRoot)
+            {
+                cached = CloneHoverItemSnapshot(_lastItemSlotHoverSnapshot);
+            }
+
+            if (!IsFreshHoverSnapshot(cached, currentGameUpdateCount, mouseX, mouseY))
+            {
+                return false;
+            }
+
+            snapshot = cached;
+            return true;
+        }
+
+        internal static bool TryCaptureItemSlotHoverSnapshot(object inventory, int context, int slot)
+        {
+            object item;
+            if (!TryGetInventoryItem(inventory, slot, out item))
+            {
+                return false;
+            }
+
+            return TryCaptureItemSlotHoverSnapshot(
+                item,
+                context,
+                slot,
+                TerrariaMainCompat.GameUpdateCount,
+                TerrariaMainCompat.MouseX,
+                TerrariaMainCompat.MouseY,
+                "ItemSlot");
+        }
+
+        internal static bool TryCaptureItemSlotHoverSnapshotForTesting(
+            object item,
+            int context,
+            int slot,
+            ulong gameUpdateCount,
+            int mouseX,
+            int mouseY)
+        {
+            return TryCaptureItemSlotHoverSnapshot(item, context, slot, gameUpdateCount, mouseX, mouseY, "ItemSlot");
+        }
+
+        internal static void ResetHoverItemSnapshotForTesting()
+        {
+            lock (HoverSnapshotSyncRoot)
+            {
+                _lastItemSlotHoverSnapshot = null;
+            }
+        }
+
         // UI capture may mark Terraria mouse flags only to prevent click-through;
         // it must not execute world, inventory, or item actions.
         public static bool TryMarkUiMouseCapture()
@@ -165,6 +261,74 @@ namespace JueMingZ.Compat
                 _mouseCaptureLastMessage = "UI mouse capture failed: " + error.Message;
                 LogThrottle.WarnThrottled(
                     "ui-mouse-capture-failed",
+                    TimeSpan.FromSeconds(10),
+                    "TerrariaUiMouseCompat",
+                    _mouseCaptureLastMessage);
+                return false;
+            }
+        }
+
+        // One-shot trigger consumption for quick, non-UI commands: mark this
+        // frame as mouse-captured and clear only the vanilla button pulse that
+        // matches the trigger. Do not use this as a generic gameplay input API.
+        public static bool TryConsumeMouseTriggerInput(string triggerToken, out string message)
+        {
+            message = string.Empty;
+            var normalizedToken = NormalizeMouseTriggerToken(triggerToken);
+            if (normalizedToken.Length <= 0)
+            {
+                message = "Unsupported mouse trigger token: " + (triggerToken ?? string.Empty);
+                UiMouseCaptureAvailable = false;
+                _mouseCaptureLastMessage = message;
+                return false;
+            }
+
+            try
+            {
+                object player;
+                var captured = false;
+                if (TerrariaInputCompat.TryGetLocalPlayer(out player))
+                {
+                    captured |= TrySetLocalPlayerMouseInterface(player, true);
+                }
+
+                var cleared = false;
+                var mainType = TerrariaRuntimeTypes.MainType;
+                if (mainType != null)
+                {
+                    EnsureUiMouseAccessors(mainType);
+                    captured |= _mainMouseInterfaceAccessor.TrySet(null, true);
+                    captured |= _mainBlockMouseAccessor.TrySet(null, true);
+
+                    if (string.Equals(normalizedToken, "MouseLeft", StringComparison.Ordinal))
+                    {
+                        cleared |= _mainMouseLeftAccessor.TrySet(null, false);
+                        cleared |= _mainMouseLeftReleaseAccessor.TrySet(null, false);
+                    }
+                    else if (string.Equals(normalizedToken, "MouseRight", StringComparison.Ordinal))
+                    {
+                        cleared |= _mainMouseRightAccessor.TrySet(null, false);
+                        cleared |= _mainMouseRightReleaseAccessor.TrySet(null, false);
+                    }
+                }
+
+                TrySuppressMouseText();
+
+                var consumed = captured || cleared;
+                UiMouseCaptureAvailable = consumed;
+                _mouseCaptureLastMessage = consumed
+                    ? "Mouse trigger input consumed for " + normalizedToken + "."
+                    : "Mouse trigger input consume unavailable for " + normalizedToken + ".";
+                message = _mouseCaptureLastMessage;
+                return consumed;
+            }
+            catch (Exception error)
+            {
+                UiMouseCaptureAvailable = false;
+                _mouseCaptureLastMessage = "Mouse trigger input consume failed: " + error.Message;
+                message = _mouseCaptureLastMessage;
+                LogThrottle.WarnThrottled(
+                    "ui-mouse-trigger-consume-failed",
                     TimeSpan.FromSeconds(10),
                     "TerrariaUiMouseCompat",
                     _mouseCaptureLastMessage);
@@ -480,6 +644,8 @@ namespace JueMingZ.Compat
                 _mainInstanceCurrentNpcShowingChatBubbleAccessor = IntegerMemberAccessor.Empty;
                 EmptyHoverItemsByType.Clear();
             }
+
+            ResetHoverItemSnapshotForTesting();
         }
 
         private static void EnsureUiMouseAccessors(Type mainType)
@@ -586,6 +752,53 @@ namespace JueMingZ.Compat
             }
         }
 
+        private static string NormalizeMouseTriggerToken(string token)
+        {
+            token = string.IsNullOrWhiteSpace(token) ? string.Empty : token.Trim();
+            if (token.Length <= 0)
+            {
+                return string.Empty;
+            }
+
+            if (string.Equals(token, "MouseLeft", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(token, "LeftMouse", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(token, "Mouse1", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(token, "LButton", StringComparison.OrdinalIgnoreCase))
+            {
+                return "MouseLeft";
+            }
+
+            if (string.Equals(token, "MouseRight", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(token, "RightMouse", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(token, "Mouse2", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(token, "RButton", StringComparison.OrdinalIgnoreCase))
+            {
+                return "MouseRight";
+            }
+
+            if (string.Equals(token, "MouseMiddle", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(token, "MiddleMouse", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(token, "Mouse3", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(token, "MButton", StringComparison.OrdinalIgnoreCase))
+            {
+                return "MouseMiddle";
+            }
+
+            if (string.Equals(token, "Mouse4", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(token, "XButton1", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Mouse4";
+            }
+
+            if (string.Equals(token, "Mouse5", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(token, "XButton2", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Mouse5";
+            }
+
+            return string.Empty;
+        }
+
         private static bool TryGetMainInstance(out object mainInstance)
         {
             mainInstance = null;
@@ -595,6 +808,269 @@ namespace JueMingZ.Compat
             }
 
             return _mainInstanceCapsAccessor.TryGet(null, out mainInstance) && mainInstance != null;
+        }
+
+        private static bool TryReadHoverItemObject(out object hoverItem)
+        {
+            hoverItem = null;
+            if (_mainHoverItemAccessor.TryGet(null, out hoverItem) && IsActiveHoverItem(hoverItem))
+            {
+                return true;
+            }
+
+            if (_mainHoverItemLowerAccessor.TryGet(null, out hoverItem) && IsActiveHoverItem(hoverItem))
+            {
+                return true;
+            }
+
+            object mainInstance;
+            if (TryGetMainInstance(out mainInstance))
+            {
+                EnsureUiMouseMainInstanceAccessors(mainInstance.GetType());
+                if (_mainInstanceHoverItemAccessor.TryGet(mainInstance, out hoverItem) && IsActiveHoverItem(hoverItem))
+                {
+                    return true;
+                }
+
+                if (_mainInstanceHoverItemLowerAccessor.TryGet(mainInstance, out hoverItem) && IsActiveHoverItem(hoverItem))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryBuildHoverItemSnapshot(object hoverItem, out TerrariaUiHoverItemSnapshot snapshot)
+        {
+            snapshot = null;
+            if (!IsActiveHoverItem(hoverItem))
+            {
+                return false;
+            }
+
+            int type;
+            int stack;
+            int prefix;
+            TryReadIntMember(hoverItem, "type", out type);
+            TryReadIntMember(hoverItem, "stack", out stack);
+            TryReadIntMember(hoverItem, "prefix", out prefix);
+            snapshot = new TerrariaUiHoverItemSnapshot
+            {
+                ItemType = type,
+                Stack = Math.Max(1, stack),
+                Prefix = Math.Max(0, prefix),
+                Name = FirstNonEmpty(
+                    TryReadStringMember(hoverItem, "Name"),
+                    TryReadStringMember(hoverItem, "HoverName"),
+                    TryReadStringMember(hoverItem, "name"))
+            };
+            return snapshot.ItemType > 0 && snapshot.Stack > 0;
+        }
+
+        private static bool TryCaptureItemSlotHoverSnapshot(
+            object item,
+            int context,
+            int slot,
+            ulong gameUpdateCount,
+            int mouseX,
+            int mouseY,
+            string source)
+        {
+            TerrariaUiHoverItemSnapshot snapshot;
+            if (!TryBuildHoverItemSnapshot(item, out snapshot))
+            {
+                return false;
+            }
+
+            snapshot.Context = context;
+            snapshot.Slot = slot;
+            snapshot.GameUpdateCount = gameUpdateCount;
+            snapshot.MouseX = mouseX;
+            snapshot.MouseY = mouseY;
+            snapshot.Source =
+                (string.IsNullOrWhiteSpace(source) ? "unknown" : source.Trim()) +
+                ":" +
+                context.ToString(CultureInfo.InvariantCulture) +
+                ":" +
+                slot.ToString(CultureInfo.InvariantCulture);
+
+            lock (HoverSnapshotSyncRoot)
+            {
+                _lastItemSlotHoverSnapshot = CloneHoverItemSnapshot(snapshot);
+            }
+
+            return true;
+        }
+
+        private static bool TryGetInventoryItem(object inventory, int slot, out object item)
+        {
+            item = null;
+            if (inventory == null || slot < 0)
+            {
+                return false;
+            }
+
+            var array = inventory as Array;
+            if (array != null)
+            {
+                if (array.Rank != 1 || slot >= array.GetLength(0))
+                {
+                    return false;
+                }
+
+                item = array.GetValue(slot);
+                return item != null;
+            }
+
+            var list = inventory as System.Collections.IList;
+            if (list == null || slot >= list.Count)
+            {
+                return false;
+            }
+
+            item = list[slot];
+            return item != null;
+        }
+
+        private static bool IsFreshHoverSnapshot(
+            TerrariaUiHoverItemSnapshot snapshot,
+            ulong currentGameUpdateCount,
+            int mouseX,
+            int mouseY)
+        {
+            if (snapshot == null ||
+                snapshot.ItemType <= 0 ||
+                snapshot.Stack <= 0 ||
+                snapshot.MouseX != mouseX ||
+                snapshot.MouseY != mouseY ||
+                currentGameUpdateCount < snapshot.GameUpdateCount)
+            {
+                return false;
+            }
+
+            return currentGameUpdateCount - snapshot.GameUpdateCount <= MaxHoverSnapshotAgeUpdates;
+        }
+
+        private static TerrariaUiHoverItemSnapshot CloneHoverItemSnapshot(TerrariaUiHoverItemSnapshot snapshot)
+        {
+            if (snapshot == null)
+            {
+                return null;
+            }
+
+            return new TerrariaUiHoverItemSnapshot
+            {
+                ItemType = snapshot.ItemType,
+                Stack = snapshot.Stack,
+                Prefix = snapshot.Prefix,
+                Name = snapshot.Name ?? string.Empty,
+                Source = snapshot.Source ?? string.Empty,
+                Context = snapshot.Context,
+                Slot = snapshot.Slot,
+                GameUpdateCount = snapshot.GameUpdateCount,
+                MouseX = snapshot.MouseX,
+                MouseY = snapshot.MouseY
+            };
+        }
+
+        private static bool IsActiveHoverItem(object hoverItem)
+        {
+            int type;
+            int stack;
+            return hoverItem != null &&
+                   TryReadIntMember(hoverItem, "type", out type) &&
+                   TryReadIntMember(hoverItem, "stack", out stack) &&
+                   type > 0 &&
+                   stack > 0;
+        }
+
+        private static bool TryReadIntMember(object instance, string name, out int value)
+        {
+            value = 0;
+            object raw;
+            if (!TryReadInstanceMember(instance, name, out raw) || raw == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                value = Convert.ToInt32(raw, CultureInfo.InvariantCulture);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static string TryReadStringMember(object instance, string name)
+        {
+            object raw;
+            if (!TryReadInstanceMember(instance, name, out raw) || raw == null)
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                return Convert.ToString(raw, CultureInfo.InvariantCulture) ?? string.Empty;
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        private static bool TryReadInstanceMember(object instance, string name, out object value)
+        {
+            value = null;
+            if (instance == null || string.IsNullOrWhiteSpace(name))
+            {
+                return false;
+            }
+
+            try
+            {
+                var type = instance.GetType();
+                FieldInfo field;
+                if (TerrariaMemberCache.TryGetField(type, name, false, out field))
+                {
+                    value = field.GetValue(instance);
+                    return true;
+                }
+
+                PropertyInfo property;
+                if (TerrariaMemberCache.TryGetProperty(type, name, false, out property) && property.CanRead)
+                {
+                    value = property.GetValue(instance, null);
+                    return true;
+                }
+            }
+            catch
+            {
+            }
+
+            return false;
+        }
+
+        private static string FirstNonEmpty(params string[] values)
+        {
+            if (values == null)
+            {
+                return string.Empty;
+            }
+
+            for (var index = 0; index < values.Length; index++)
+            {
+                if (!string.IsNullOrWhiteSpace(values[index]))
+                {
+                    return values[index].Trim();
+                }
+            }
+
+            return string.Empty;
         }
 
         private static object GetEmptyHoverItem(Type itemType)
@@ -1647,5 +2123,19 @@ namespace JueMingZ.Compat
         public int DiagnosticMainScrollDelta { get; set; }
         public int EffectiveScrollDelta { get; set; }
         public string CandidateSummary { get; set; }
+    }
+
+    public sealed class TerrariaUiHoverItemSnapshot
+    {
+        public int ItemType { get; set; }
+        public int Stack { get; set; }
+        public int Prefix { get; set; }
+        public string Name { get; set; }
+        public string Source { get; set; }
+        public int Context { get; set; }
+        public int Slot { get; set; }
+        public ulong GameUpdateCount { get; set; }
+        public int MouseX { get; set; }
+        public int MouseY { get; set; }
     }
 }

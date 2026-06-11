@@ -40,6 +40,7 @@ namespace JueMingZ.Runtime
             var keepFavorited = KeepFavoritedService.GetDiagnostics();
             var autoTaxCollect = AutoTaxCollectorService.GetDiagnostics();
             var information = InformationOverlayService.GetDiagnostics();
+            var quickAnnouncement = MapQuickAnnouncementDiagnostics.GetSnapshot();
             var fishing = FishingAutomationService.GetDiagnostics();
 
             snapshot.AutoStackLastDecision = autoStack == null ? string.Empty : autoStack.LastDecision;
@@ -154,6 +155,26 @@ namespace JueMingZ.Runtime
             snapshot.InformationFishingConditionsReadCount = information == null ? 0 : information.FishingConditionsReadCount;
             snapshot.InformationFishingBobberObserverFreshInactiveSkipCount = information == null ? 0 : information.FishingBobberObserverFreshInactiveSkipCount;
             snapshot.InformationFishingProjectileFallbackScanCount = information == null ? 0 : information.FishingProjectileFallbackScanCount;
+            snapshot.MapQuickAnnouncementLastTriggered = quickAnnouncement.LastTriggered;
+            snapshot.MapQuickAnnouncementLastResultCode = quickAnnouncement.LastResultCode;
+            snapshot.MapQuickAnnouncementLastTargetKind = quickAnnouncement.LastTargetKind;
+            snapshot.MapQuickAnnouncementLastTargetName = quickAnnouncement.LastTargetName;
+            snapshot.MapQuickAnnouncementLastTargetSummary = quickAnnouncement.LastTargetSummary;
+            snapshot.MapQuickAnnouncementLastTargetCount = quickAnnouncement.LastTargetCount;
+            snapshot.MapQuickAnnouncementLastResolveDetail = quickAnnouncement.LastResolveDetail;
+            snapshot.MapQuickAnnouncementLastTargetSource = quickAnnouncement.LastTargetSource;
+            snapshot.MapQuickAnnouncementLastUiHoverSource = quickAnnouncement.LastUiHoverSource;
+            snapshot.MapQuickAnnouncementLastHoverCacheAgeUpdates = quickAnnouncement.LastHoverCacheAgeUpdates;
+            snapshot.MapQuickAnnouncementLastPlacementLookupSource = quickAnnouncement.LastPlacementLookupSource;
+            snapshot.MapQuickAnnouncementLastFallbackReason = quickAnnouncement.LastFallbackReason;
+            snapshot.MapQuickAnnouncementLastIsAir = quickAnnouncement.LastIsAir;
+            snapshot.MapQuickAnnouncementLastCooldownBlocked = quickAnnouncement.LastCooldownBlocked;
+            snapshot.MapQuickAnnouncementLastSendSucceeded = quickAnnouncement.LastSendSucceeded;
+            snapshot.MapQuickAnnouncementLastFailureReason = quickAnnouncement.LastFailureReason;
+            snapshot.MapQuickAnnouncementLastHotkeySummary = quickAnnouncement.LastHotkeySummary;
+            snapshot.MapQuickAnnouncementLastInputConsumed = quickAnnouncement.LastInputConsumed;
+            snapshot.MapQuickAnnouncementLastInputConsumeResult = quickAnnouncement.LastInputConsumeResult;
+            snapshot.MapQuickAnnouncementLastDecisionUtc = quickAnnouncement.LastDecisionUtc;
             snapshot.FishingAutomationNeedsTick = settingsSnapshot.FishingAutomationNeedsTick;
             snapshot.FishingDisplayNeedsCatchResolver = settingsSnapshot.FishingDisplayNeedsCatchResolver;
             snapshot.FishingHasResidualState = fishingHasResidualState;

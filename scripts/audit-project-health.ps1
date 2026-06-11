@@ -1,6 +1,7 @@
 ﻿param(
     [switch]$IncludeSourcePackageZip,
-    [switch]$AllowTestPackageReadme
+    [switch]$AllowTestPackageReadme,
+    [switch]$RequireFreshTestPackage
 )
 
 $ErrorActionPreference = "Stop"
@@ -23,6 +24,20 @@ function Write-FailHealth {
     param([Parameter(Mandatory = $true)][string]$Message)
     $script:FailCount++
     Write-Host "FAIL $Message"
+}
+
+function Write-TestPackageIssue {
+    param(
+        [Parameter(Mandatory = $true)][string]$Message,
+        [switch]$Strict
+    )
+
+    if ($Strict) {
+        Write-FailHealth $Message
+    }
+    else {
+        Write-WarnHealth $Message
+    }
 }
 
 function Read-TextIfExists {
@@ -496,7 +511,8 @@ function Test-TestPackageFreshness {
     param(
         [Parameter(Mandatory = $true)][string]$RepoRoot,
         [Parameter(Mandatory = $true)][string]$RuntimeVersion,
-        [Parameter(Mandatory = $true)][string]$PackageDir
+        [Parameter(Mandatory = $true)][string]$PackageDir,
+        [switch]$RequireFreshPackage
     )
 
     $versionPath = Join-Path $PackageDir "VERSION.txt"
@@ -506,7 +522,7 @@ function Test-TestPackageFreshness {
     $manifest = Read-KeyValueManifest -Path $versionPath
 
     if ($null -eq $manifest) {
-        Write-FailHealth "Test package VERSION.txt could not be read as a freshness manifest."
+        Write-TestPackageIssue "Test package VERSION.txt could not be read as a freshness manifest." -Strict:$RequireFreshPackage
         return
     }
 
@@ -530,7 +546,7 @@ function Test-TestPackageFreshness {
     }
 
     if ($missingKeys.Count -gt 0) {
-        Write-FailHealth "Test package VERSION.txt lacks freshness manifest key(s): $($missingKeys -join ', ')"
+        Write-TestPackageIssue "Test package VERSION.txt lacks freshness manifest key(s): $($missingKeys -join ', ')" -Strict:$RequireFreshPackage
         return
     }
 
@@ -545,32 +561,32 @@ function Test-TestPackageFreshness {
         Write-Pass "Test package VERSION.txt contains freshness manifest version 1."
     }
     else {
-        Write-FailHealth "Test package VERSION.txt has unsupported PackageManifestVersion=$manifestVersion."
+        Write-TestPackageIssue "Test package VERSION.txt has unsupported PackageManifestVersion=$manifestVersion." -Strict:$RequireFreshPackage
     }
 
     if ($manifestRuntimeVersion -eq $RuntimeVersion) {
         Write-Pass "Test package freshness manifest RuntimeVersion matches $RuntimeVersion."
     }
     else {
-        Write-FailHealth "Test package freshness manifest RuntimeVersion '$manifestRuntimeVersion' does not match '$RuntimeVersion'."
+        Write-TestPackageIssue "Test package freshness manifest RuntimeVersion '$manifestRuntimeVersion' does not match '$RuntimeVersion'." -Strict:$RequireFreshPackage
     }
 
     if ($manifestInformationalVersion -eq $RuntimeVersion) {
         Write-Pass "Test package assembly informational version is captured in the freshness manifest."
     }
     else {
-        Write-FailHealth "Test package manifest AssemblyInformationalVersion '$manifestInformationalVersion' does not match RuntimeVersion '$RuntimeVersion'."
+        Write-TestPackageIssue "Test package manifest AssemblyInformationalVersion '$manifestInformationalVersion' does not match RuntimeVersion '$RuntimeVersion'." -Strict:$RequireFreshPackage
     }
 
     if ($manifestBuildOutputRelativePath -eq $buildOutputRelativePath) {
         Write-Pass "Test package freshness manifest points at the standard Release x86 build output."
     }
     else {
-        Write-FailHealth "Test package freshness manifest uses unexpected BuildOutputRelativePath '$manifestBuildOutputRelativePath'."
+        Write-TestPackageIssue "Test package freshness manifest uses unexpected BuildOutputRelativePath '$manifestBuildOutputRelativePath'." -Strict:$RequireFreshPackage
     }
 
     if (-not (Test-Path -LiteralPath $packageDllPath)) {
-        Write-FailHealth "Test package freshness check cannot read JueMingZ.dll."
+        Write-TestPackageIssue "Test package freshness check cannot read JueMingZ.dll." -Strict:$RequireFreshPackage
         return
     }
 
@@ -579,7 +595,7 @@ function Test-TestPackageFreshness {
         Write-Pass "Test package JueMingZ.dll hash matches VERSION.txt freshness manifest."
     }
     else {
-        Write-FailHealth "Test package JueMingZ.dll hash differs from VERSION.txt freshness manifest."
+        Write-TestPackageIssue "Test package JueMingZ.dll hash differs from VERSION.txt freshness manifest." -Strict:$RequireFreshPackage
     }
 
     $packageAssemblyName = [System.Reflection.AssemblyName]::GetAssemblyName($packageDllPath)
@@ -588,18 +604,18 @@ function Test-TestPackageFreshness {
         Write-Pass "Test package assembly version matches VERSION.txt freshness manifest."
     }
     else {
-        Write-FailHealth "Test package assembly version '$($packageAssemblyName.Version)' differs from manifest '$manifestAssemblyVersion'."
+        Write-TestPackageIssue "Test package assembly version '$($packageAssemblyName.Version)' differs from manifest '$manifestAssemblyVersion'." -Strict:$RequireFreshPackage
     }
 
     if ($packageInformationalVersion -eq $manifestInformationalVersion) {
         Write-Pass "Test package assembly informational version matches VERSION.txt freshness manifest."
     }
     else {
-        Write-FailHealth "Test package assembly informational version '$packageInformationalVersion' differs from manifest '$manifestInformationalVersion'."
+        Write-TestPackageIssue "Test package assembly informational version '$packageInformationalVersion' differs from manifest '$manifestInformationalVersion'." -Strict:$RequireFreshPackage
     }
 
     if (-not (Test-Path -LiteralPath $buildOutputDllPath)) {
-        Write-FailHealth "Current Release x86 build output is missing; cannot prove test package freshness: $buildOutputRelativePath"
+        Write-TestPackageIssue "Current Release x86 build output is missing; cannot prove test package freshness: $buildOutputRelativePath" -Strict:$RequireFreshPackage
         return
     }
 
@@ -608,7 +624,7 @@ function Test-TestPackageFreshness {
         Write-Pass "Test package JueMingZ.dll matches the current Release x86 build output hash."
     }
     else {
-        Write-FailHealth "Test package JueMingZ.dll is stale or hand-edited; hash differs from current Release x86 build output."
+        Write-TestPackageIssue "Test package JueMingZ.dll is stale or hand-edited; hash differs from current Release x86 build output." -Strict:$RequireFreshPackage
     }
 }
 
@@ -616,13 +632,14 @@ function Test-TestPackage {
     param(
         [Parameter(Mandatory = $true)][string]$RepoRoot,
         [Parameter(Mandatory = $true)][string]$RuntimeVersion,
-        [switch]$AllowReadme
+        [switch]$AllowReadme,
+        [switch]$RequireFreshPackage
     )
-    # Audit the user-facing package payload only; absence before packaging is
-    # allowed, but stale templates or extra runtime DLLs are failures afterward.
+    # Default health audits treat root test packages as optional local artifacts.
+    # Use -RequireFreshTestPackage when validating a package for delivery.
     $packageDir = Join-Path $RepoRoot "JueMingZ-TestPackage"
     if (-not (Test-Path -LiteralPath $packageDir)) {
-        Write-WarnHealth "JueMingZ-TestPackage is absent; root absence is allowed before packaging."
+        Write-TestPackageIssue "JueMingZ-TestPackage is absent; root absence is allowed before packaging." -Strict:$RequireFreshPackage
         return
     }
 
@@ -631,13 +648,13 @@ function Test-TestPackage {
             Write-Pass "Test package contains $name"
         }
         else {
-            Write-FailHealth "Test package missing first-level file: $name"
+            Write-TestPackageIssue "Test package missing first-level file: $name" -Strict:$RequireFreshPackage
         }
     }
 
     $harmonyPath = Join-Path $packageDir "0Harmony.dll"
     if (Test-Path -LiteralPath $harmonyPath) {
-        Write-FailHealth "Test package should not contain external 0Harmony.dll; Harmony is embedded in JueMingZ.dll."
+        Write-TestPackageIssue "Test package should not contain external 0Harmony.dll; Harmony is embedded in JueMingZ.dll." -Strict:$RequireFreshPackage
     }
     else {
         Write-Pass "Test package does not contain external 0Harmony.dll."
@@ -652,14 +669,14 @@ function Test-TestPackage {
             "Newtonsoft.Json.dll"
         )) {
         if (Test-Path -LiteralPath (Join-Path $packageDir $name)) {
-            Write-FailHealth "Test package should not contain compile-only Terraria/XNA/ReLogic dependency: $name"
+            Write-TestPackageIssue "Test package should not contain compile-only Terraria/XNA/ReLogic dependency: $name" -Strict:$RequireFreshPackage
         }
         else {
             Write-Pass "Test package excludes compile-only dependency: $name"
         }
     }
 
-    Test-TestPackageFreshness -RepoRoot $RepoRoot -RuntimeVersion $RuntimeVersion -PackageDir $packageDir
+    Test-TestPackageFreshness -RepoRoot $RepoRoot -RuntimeVersion $RuntimeVersion -PackageDir $packageDir -RequireFreshPackage:$RequireFreshPackage
 
     $readmeFileName = "README_" +
         ([string][char]0x6d4b) +
@@ -676,14 +693,14 @@ function Test-TestPackage {
 
     if (-not $AllowReadme) {
         if ($hasChineseReadme) {
-            Write-FailHealth "Default test package should not contain README_测试说明.txt; generate it only when the user explicitly asks."
+            Write-TestPackageIssue "Default test package should not contain README_测试说明.txt; generate it only when the user explicitly asks." -Strict:$RequireFreshPackage
         }
         else {
             Write-Pass "Default test package omits README_测试说明.txt."
         }
 
         if ($hasEncodedReadme) {
-            Write-FailHealth "Default test package should not contain encoded README_#U*.txt files."
+            Write-TestPackageIssue "Default test package should not contain encoded README_#U*.txt files." -Strict:$RequireFreshPackage
         }
         else {
             Write-Pass "No encoded README_#U*.txt file found in default test package."
@@ -701,12 +718,12 @@ function Test-TestPackage {
         Write-WarnHealth "Optional Chinese README file is absent, but README_#U*.txt was observed outside Windows; require Windows validation before treating this as user-facing failure."
     }
     else {
-        Write-FailHealth "Optional test package README was requested but is missing."
+        Write-TestPackageIssue "Optional test package README was requested but is missing." -Strict:$RequireFreshPackage
     }
 
     if ($encoded -and $encoded.Count -gt 0) {
         if ($isWindows) {
-            Write-FailHealth "Encoded README_#U*.txt exists in Windows test package."
+            Write-TestPackageIssue "Encoded README_#U*.txt exists in Windows test package." -Strict:$RequireFreshPackage
         }
         else {
             Write-WarnHealth "README_#U*.txt observed outside Windows; do not treat as user-facing failure without Windows validation."
@@ -719,13 +736,13 @@ function Test-TestPackage {
     if ($hasChineseReadme) {
         $readmeText = Read-TextIfExists -Path $readmePath
         if ($null -eq $readmeText) {
-            Write-FailHealth "Test package README could not be read."
+            Write-TestPackageIssue "Test package README could not be read." -Strict:$RequireFreshPackage
         }
         elseif ($readmeText.Contains($RuntimeVersion)) {
             Write-Pass "Test package README contains RuntimeVersion $RuntimeVersion"
         }
         else {
-            Write-FailHealth "Test package README does not contain RuntimeVersion $RuntimeVersion"
+            Write-TestPackageIssue "Test package README does not contain RuntimeVersion $RuntimeVersion" -Strict:$RequireFreshPackage
         }
 
         $projectRulesDir = ConvertFrom-CodePoints @(0x9879, 0x76ee, 0x89c4, 0x5219)
@@ -733,7 +750,7 @@ function Test-TestPackage {
         $templatePath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @($projectRulesDir, $testPackageReadmeTemplateFile)
         $templateText = Read-TextIfExists -Path $templatePath
         if ($null -eq $templateText) {
-            Write-FailHealth "Test package README template missing."
+            Write-TestPackageIssue "Test package README template missing." -Strict:$RequireFreshPackage
         }
         else {
             $stableTemplate = $templateText.Replace("{{RuntimeVersion}}", $RuntimeVersion)
@@ -749,7 +766,7 @@ function Test-TestPackage {
             }
 
             if ($missingTemplateLines.Count -gt 0) {
-                Write-FailHealth "Test package README is stale versus template; missing line(s): $($missingTemplateLines -join ' | ')"
+                Write-TestPackageIssue "Test package README is stale versus template; missing line(s): $($missingTemplateLines -join ' | ')" -Strict:$RequireFreshPackage
             }
             else {
                 Write-Pass "Test package README content matches current template lines."
@@ -778,7 +795,7 @@ function Test-TestPackage {
         }
 
         if ($staleHits.Count -gt 0) {
-            Write-FailHealth "Test package README contains stale testing wording: $($staleHits -join ', ')"
+            Write-TestPackageIssue "Test package README contains stale testing wording: $($staleHits -join ', ')" -Strict:$RequireFreshPackage
         }
         else {
             Write-Pass "Test package README has no known stale focused-test wording."
@@ -789,7 +806,8 @@ function Test-TestPackage {
 function Test-VersionConsistency {
     param(
         [Parameter(Mandatory = $true)][string]$RepoRoot,
-        [Parameter(Mandatory = $true)][string]$RuntimeVersion
+        [Parameter(Mandatory = $true)][string]$RuntimeVersion,
+        [switch]$RequireFreshPackage
     )
 
     $versionPath = Join-Path $RepoRoot "JueMingZ-TestPackage\VERSION.txt"
@@ -799,7 +817,7 @@ function Test-VersionConsistency {
             Write-Pass "VERSION.txt contains RuntimeVersion $RuntimeVersion"
         }
         else {
-            Write-FailHealth "VERSION.txt does not contain RuntimeVersion $RuntimeVersion"
+            Write-TestPackageIssue "VERSION.txt does not contain RuntimeVersion $RuntimeVersion" -Strict:$RequireFreshPackage
         }
     }
     else {
@@ -1349,6 +1367,181 @@ function Test-PhasebladeQuickSwitchDiagnosticsGovernance {
     }
     else {
         Write-FailHealth "Phaseblade quick switch action event call count changed; keep JSON construction off idle/runtime paths."
+    }
+}
+
+function Test-MapQuickAnnouncementGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $runtimePath = Join-Path $RepoRoot "src\JueMingZ\Automation\Information\MapQuickAnnouncementRuntimeService.cs"
+    $diagnosticsPath = Join-Path $RepoRoot "src\JueMingZ\Automation\Information\MapQuickAnnouncementDiagnostics.cs"
+    $runtimeText = Read-TextIfExists -Path $runtimePath
+    $diagnosticsText = Read-TextIfExists -Path $diagnosticsPath
+    if ($null -eq $runtimeText) {
+        Write-FailHealth "MapQuickAnnouncementRuntimeService.cs missing."
+        return
+    }
+
+    if ($runtimeText.Contains("InputActionQueue") -or $runtimeText.Contains("ItemCheck")) {
+        Write-FailHealth "Map quick announcement runtime must not backflow into ActionQueue or ItemCheck paths."
+    }
+    else {
+        Write-Pass "Map quick announcement runtime stays out of ActionQueue and ItemCheck paths."
+    }
+
+    $notTriggeredIndex = $runtimeText.IndexOf("if (!hotkeyState.Triggered)", [System.StringComparison]::Ordinal)
+    $resolveIndex = $runtimeText.IndexOf("ports.ResolveCurrent", [System.StringComparison]::Ordinal)
+    if ($notTriggeredIndex -ge 0 -and $resolveIndex -gt $notTriggeredIndex) {
+        Write-Pass "Map quick announcement target resolution remains behind the trigger edge."
+    }
+    else {
+        Write-FailHealth "Map quick announcement target resolution must stay behind the hotkey trigger edge."
+    }
+
+    if ($runtimeText.Contains("MapQuickAnnouncementDiagnostics.RecordRuntimeResult") -and
+        $null -ne $diagnosticsText -and
+        $diagnosticsText.Contains("GetSnapshot()")) {
+        Write-Pass "Map quick announcement diagnostics use a cached runtime snapshot path."
+    }
+    else {
+        Write-FailHealth "Map quick announcement diagnostics must publish through the cached runtime snapshot helper."
+    }
+
+    $snapshotPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\DiagnosticSnapshot.cs"
+    $snapshotWriterPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\DiagnosticSnapshotWriter.Json.cs"
+    $snapshotText = Read-TextIfExists -Path $snapshotPath
+    $snapshotWriterText = Read-TextIfExists -Path $snapshotWriterPath
+    $requiredDiagnosticFields = @(
+        "MapQuickAnnouncementLastResolveDetail",
+        "MapQuickAnnouncementLastTargetSource",
+        "MapQuickAnnouncementLastUiHoverSource",
+        "MapQuickAnnouncementLastHoverCacheAgeUpdates",
+        "MapQuickAnnouncementLastPlacementLookupSource",
+        "MapQuickAnnouncementLastFallbackReason"
+    )
+    $missingDiagnosticFields = @()
+    foreach ($field in $requiredDiagnosticFields) {
+        if ($null -eq $diagnosticsText -or
+            -not $diagnosticsText.Contains($field.Replace("MapQuickAnnouncement", "")) -or
+            $null -eq $snapshotText -or
+            -not $snapshotText.Contains($field) -or
+            $null -eq $snapshotWriterText -or
+            -not $snapshotWriterText.Contains($field)) {
+            $missingDiagnosticFields += $field
+        }
+    }
+
+    if ($missingDiagnosticFields.Count -gt 0) {
+        Write-FailHealth "Map quick announcement source/fallback diagnostic fields are incomplete: $($missingDiagnosticFields -join ', ')"
+    }
+    else {
+        Write-Pass "Map quick announcement source/fallback diagnostics reach the cached snapshot JSON."
+    }
+
+    $informationRoot = Join-Path $RepoRoot "src\JueMingZ\Automation\Information"
+    $actionEventLeaks = @()
+    foreach ($file in Get-ChildItem -LiteralPath $informationRoot -Filter "MapQuickAnnouncement*.cs" -File -ErrorAction SilentlyContinue) {
+        $text = Read-TextIfExists -Path $file.FullName
+        if ($null -ne $text -and $text.Contains("DiagnosticActionRecorder")) {
+            $actionEventLeaks += $file.FullName.Substring($RepoRoot.Length).TrimStart('\', '/').Replace('\', '/')
+        }
+    }
+
+    if ($actionEventLeaks.Count -gt 0) {
+        Write-FailHealth "Map quick announcement source must not append action events from runtime paths: $($actionEventLeaks -join ', ')"
+    }
+    else {
+        Write-Pass "Map quick announcement keeps action-event writes out of runtime source files."
+    }
+
+    $placementCachePath = "src/JueMingZ/Automation/Information/MapQuickAnnouncementPlacementNameCache.cs"
+    $placementCacheText = Read-TextIfExists -Path (Join-Path $RepoRoot $placementCachePath)
+    if ($null -ne $placementCacheText -and
+        $placementCacheText.Contains("EnsureInitialized()") -and
+        $placementCacheText.Contains("_initialized") -and
+        $placementCacheText.Contains("BuildLookupFromContentSamples")) {
+        Write-Pass "Map quick announcement placement item scan remains behind the one-time cache initializer."
+    }
+    else {
+        Write-FailHealth "Map quick announcement placement item lookup must stay behind the lazy one-time cache initializer."
+    }
+
+    $placementScanLeaks = @()
+    foreach ($file in Get-ChildItem -LiteralPath $informationRoot -Filter "MapQuickAnnouncement*.cs" -File -ErrorAction SilentlyContinue) {
+        $relative = $file.FullName.Substring($RepoRoot.Length).TrimStart('\', '/').Replace('\', '/')
+        if ($relative -eq $placementCachePath) {
+            continue
+        }
+
+        $text = Read-TextIfExists -Path $file.FullName
+        if ($null -ne $text -and
+            ($text.Contains("DerivedPlacementDetails") -or
+             $text.Contains("ContentSamples.ItemsByType") -or
+             $text.Contains("BuildLookupFromContentSamples"))) {
+            $placementScanLeaks += $relative
+        }
+    }
+
+    if ($placementScanLeaks.Count -gt 0) {
+        Write-FailHealth "Map quick announcement placement item scans must not move into runtime/resolve files: $($placementScanLeaks -join ', ')"
+    }
+    else {
+        Write-Pass "Map quick announcement runtime/resolve files do not scan all placement items per announcement."
+    }
+
+    $srcRoot = Join-Path $RepoRoot "src\JueMingZ"
+    $allowedConsumePaths = @(
+        "src/JueMingZ/Automation/Information/MapQuickAnnouncementRuntimeService.cs",
+        "src/JueMingZ/Compat/TerrariaUiMouseCompat.cs"
+    )
+    $consumeCounts = @{}
+    $unexpectedConsumePaths = @()
+    foreach ($file in Get-ChildItem -LiteralPath $srcRoot -Recurse -Filter "*.cs" -File) {
+        $relative = $file.FullName.Substring($RepoRoot.Length).TrimStart('\', '/').Replace('\', '/')
+        $text = Read-TextIfExists -Path $file.FullName
+        if ($null -eq $text) {
+            continue
+        }
+
+        $count = [System.Text.RegularExpressions.Regex]::Matches($text, '\bTryConsumeMouseTriggerInput\s*\(').Count
+        if ($count -le 0) {
+            continue
+        }
+
+        $consumeCounts[$relative] = $count
+        if ($allowedConsumePaths -notcontains $relative) {
+            $unexpectedConsumePaths += "$relative=$count"
+        }
+    }
+
+    $missingConsumePaths = @()
+    foreach ($allowedPath in $allowedConsumePaths) {
+        if (-not $consumeCounts.ContainsKey($allowedPath)) {
+            $missingConsumePaths += $allowedPath
+        }
+    }
+
+    if ($unexpectedConsumePaths.Count -gt 0 -or $missingConsumePaths.Count -gt 0) {
+        Write-FailHealth "Map quick announcement mouse consume path changed; unexpected=$($unexpectedConsumePaths -join ', ') missing=$($missingConsumePaths -join ', ')"
+    }
+    else {
+        Write-Pass "Map quick announcement mouse input consumption remains centralized in runtime service and Terraria UI compat."
+    }
+
+    $actionsRoot = Join-Path $RepoRoot "src\JueMingZ\Actions"
+    $actionBackflow = @()
+    foreach ($file in Get-ChildItem -LiteralPath $actionsRoot -Recurse -Filter "*.cs" -File -ErrorAction SilentlyContinue) {
+        $text = Read-TextIfExists -Path $file.FullName
+        if ($null -ne $text -and $text.Contains("MapQuickAnnouncement")) {
+            $actionBackflow += $file.FullName.Substring($RepoRoot.Length).TrimStart('\', '/').Replace('\', '/')
+        }
+    }
+
+    if ($actionBackflow.Count -gt 0) {
+        Write-FailHealth "Map quick announcement must not introduce ActionQueue action backflow: $($actionBackflow -join ', ')"
+    }
+    else {
+        Write-Pass "Map quick announcement has no ActionQueue action backflow."
     }
 }
 
@@ -2080,7 +2273,7 @@ Set-Location $repoRoot
 
 $runtimeVersion = Get-RuntimeVersion -RepoRoot $repoRoot
 if ($runtimeVersion) {
-    Test-VersionConsistency -RepoRoot $repoRoot -RuntimeVersion $runtimeVersion
+    Test-VersionConsistency -RepoRoot $repoRoot -RuntimeVersion $runtimeVersion -RequireFreshPackage:$RequireFreshTestPackage
     Test-DocsConsistency -RepoRoot $repoRoot -RuntimeVersion $runtimeVersion
 }
 
@@ -2092,15 +2285,16 @@ else {
     Write-Pass "Source package zip audit skipped by default; use -IncludeSourcePackageZip only when a source export was explicitly requested."
 }
 if ($runtimeVersion) {
-    Test-TestPackage -RepoRoot $repoRoot -RuntimeVersion $runtimeVersion -AllowReadme:$AllowTestPackageReadme
+    Test-TestPackage -RepoRoot $repoRoot -RuntimeVersion $runtimeVersion -AllowReadme:$AllowTestPackageReadme -RequireFreshPackage:$RequireFreshTestPackage
 }
 else {
-    Test-TestPackage -RepoRoot $repoRoot -RuntimeVersion "Unknown" -AllowReadme:$AllowTestPackageReadme
+    Test-TestPackage -RepoRoot $repoRoot -RuntimeVersion "Unknown" -AllowReadme:$AllowTestPackageReadme -RequireFreshPackage:$RequireFreshTestPackage
 }
 Test-InformationFishingFallbackCleanup -RepoRoot $repoRoot
 Test-LegacyUiOverlayGovernance -RepoRoot $repoRoot
 Test-CombatAimDiagnosticsGovernance -RepoRoot $repoRoot
 Test-PhasebladeQuickSwitchDiagnosticsGovernance -RepoRoot $repoRoot
+Test-MapQuickAnnouncementGovernance -RepoRoot $repoRoot
 Test-ActionQueueDirectEnqueueGovernance -RepoRoot $repoRoot
 Test-NewFeatureBoundaryGovernance -RepoRoot $repoRoot
 Test-DeepStructureBoundaryGovernance -RepoRoot $repoRoot

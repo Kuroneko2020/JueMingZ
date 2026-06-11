@@ -258,6 +258,7 @@ namespace Terraria
     {
         public static readonly Dictionary<int, string> ItemNames = new Dictionary<int, string>();
         public static readonly Dictionary<int, string> NpcNames = new Dictionary<int, string>();
+        public static readonly Dictionary<int, string> MapObjectNames = new Dictionary<int, string>();
 
         public static string GetItemNameValue(int itemId)
         {
@@ -270,11 +271,23 @@ namespace Terraria
             string name;
             return NpcNames.TryGetValue(npcId, out name) ? name : npcId.ToString(CultureInfo.InvariantCulture);
         }
+
+        public static string GetMapObjectName(int lookup)
+        {
+            string name;
+            return MapObjectNames.TryGetValue(lookup, out name) ? name : string.Empty;
+        }
     }
 }
 
 namespace Terraria.DataStructures
 {
+    internal struct PlacementDetails
+    {
+        public int tileType;
+        public short tileStyle;
+    }
+
     internal struct TileReachCheckSettings
     {
         public static TileReachCheckSettings Simple
@@ -362,7 +375,40 @@ namespace Terraria.ID
             public static bool[] IsFishingCrateHardmode = new bool[6000];
             public static bool[] CanFishInLava = new bool[6000];
             public static bool[] IsLavaBait = new bool[6000];
+            public static Terraria.DataStructures.PlacementDetails[] DerivedPlacementDetails =
+                CreateDefaultPlacementDetails();
+
+            public static void ResetPlacementDetailsForTesting()
+            {
+                DerivedPlacementDetails = CreateDefaultPlacementDetails();
+            }
+
+            private static Terraria.DataStructures.PlacementDetails[] CreateDefaultPlacementDetails()
+            {
+                var details = new Terraria.DataStructures.PlacementDetails[6000];
+                for (var index = 0; index < details.Length; index++)
+                {
+                    details[index].tileType = -1;
+                    details[index].tileStyle = 0;
+                }
+
+                return details;
+            }
         }
+    }
+
+    internal static class ContentSamples
+    {
+        public static Dictionary<int, TestContentSampleItem> ItemsByType =
+            new Dictionary<int, TestContentSampleItem>();
+    }
+
+    internal sealed class TestContentSampleItem
+    {
+        public int type;
+        public int createTile = -1;
+        public int createWall = -1;
+        public int placeStyle;
     }
 
     internal static class AmmoID
@@ -465,6 +511,34 @@ namespace Terraria.ID
         public void Clear()
         {
             _names.Clear();
+        }
+    }
+}
+
+namespace Terraria.Map
+{
+    internal static class MapHelper
+    {
+        public static ushort[] wallLookup = new ushort[1000];
+        public static readonly Dictionary<string, int> TileLookups = new Dictionary<string, int>();
+
+        public static int TileToLookup(int tileType, int option)
+        {
+            int lookup;
+            return TileLookups.TryGetValue(BuildTileKey(tileType, option), out lookup) ? lookup : -1;
+        }
+
+        public static void ResetForTesting()
+        {
+            wallLookup = new ushort[1000];
+            TileLookups.Clear();
+        }
+
+        public static string BuildTileKey(int tileType, int option)
+        {
+            return tileType.ToString(CultureInfo.InvariantCulture) +
+                   ":" +
+                   option.ToString(CultureInfo.InvariantCulture);
         }
     }
 }
@@ -680,6 +754,16 @@ namespace JueMingZ.Tests
             Run("feature catalog exposes auto mining", ref failed, FeatureCatalogExposesAutoMining);
             Run("feature catalog exposes auto capture critter", ref failed, FeatureCatalogExposesAutoCaptureCritter);
             Run("feature catalog exposes auto harvest", ref failed, FeatureCatalogExposesAutoHarvest);
+            Run("feature catalog exposes map quick announcement config", ref failed, FeatureCatalogExposesMapQuickAnnouncementConfig);
+            Run("map quick announcement capture rejects invalid mouse wheel and duplicates", ref failed, MapQuickAnnouncementCaptureRulesRejectInvalidMouseWheelAndDuplicates);
+            Run("map quick announcement hotkey state fires once per chord hold", ref failed, MapQuickAnnouncementHotkeyStateMachineFiresOnTriggerEdgeOnceUntilRelease);
+            Run("map quick announcement hotkey state supports mouse trigger", ref failed, MapQuickAnnouncementHotkeyStateMachineSupportsMouseTrigger);
+            Run("map quick announcement runtime skips disabled and blocked contexts", ref failed, MapQuickAnnouncementRuntimeSkipsDisabledAndBlockedContexts);
+            Run("map quick announcement runtime triggers consumes and delivers", ref failed, MapQuickAnnouncementRuntimeTriggersConsumesAndDelivers);
+            Run("map quick announcement runtime consumes before cooldown block", ref failed, MapQuickAnnouncementRuntimeConsumesBeforeCooldownBlock);
+            Run("map quick announcement runtime keyboard trigger does not consume mouse", ref failed, MapQuickAnnouncementRuntimeKeyboardTriggerDoesNotConsumeMouse);
+            Run("map quick announcement runtime consumes right and side mouse triggers", ref failed, MapQuickAnnouncementRuntimeConsumesRightAndSideMouseTriggers);
+            Run("map quick announcement mouse trigger compat clears matching main pulse", ref failed, MapQuickAnnouncementMouseTriggerCompatClearsMatchingMainPulse);
             Run("auto mining scanner links three-tile gaps", ref failed, AutoMiningScannerLinksThreeTileGaps);
             Run("auto mining scanner keeps inactive mined seed connectivity", ref failed, AutoMiningScannerKeepsInactiveMinedSeedConnectivity);
             Run("auto mining scanner groups gem cluster tiles", ref failed, AutoMiningScannerGroupsGemClusterTiles);
@@ -740,6 +824,7 @@ namespace JueMingZ.Tests
             Run("feature catalog exposes implemented items inventory automation", ref failed, FeatureCatalogExposesImplementedItemsInventoryAutomation);
             Run("feature catalog exposes goblin execution", ref failed, FeatureCatalogExposesGoblinExecution);
             Run("feature catalog exposes phaseblade quick switch config", ref failed, FeatureCatalogExposesPhasebladeQuickSwitchConfig);
+            Run("map quick announcement settings normalize slots and defaults", ref failed, MapQuickAnnouncementSettingsNormalizeSlotsAndDefaults);
             Run("first-run app settings defaults match requested UI baseline", ref failed, FirstRunAppSettingsDefaultsMatchRequestedUiBaseline);
             Run("auto capture critter mode aliases preserve legacy bool", ref failed, AutoCaptureCritterModeAliasesPreserveLegacyBool);
             Run("app settings code-domain aliases preserve misc storage", ref failed, AppSettingsCodeDomainAliasesPreserveMiscStorage);
@@ -749,6 +834,7 @@ namespace JueMingZ.Tests
             Run("game state read options keep diagnostics full profile", ref failed, GameStateReadOptionsKeepDiagnosticsFullProfile);
             Run("diagnostic snapshot writes game state read profiles", ref failed, DiagnosticSnapshotWritesGameStateReadProfiles);
             Run("runtime settings snapshot normalizes hot path fields", ref failed, RuntimeSettingsSnapshotNormalizesHotPathFields);
+            Run("runtime settings snapshot carries map quick announcement config", ref failed, RuntimeSettingsSnapshotCarriesMapQuickAnnouncementConfig);
             Run("runtime settings snapshot builds game state profile", ref failed, RuntimeSettingsSnapshotBuildsGameStateProfile);
             Run("runtime settings snapshot splits fishing dispatch layers", ref failed, RuntimeSettingsSnapshotSplitsFishingDispatchLayers);
             Run("runtime fishing dispatch skips filter-only settings", ref failed, RuntimeFishingDispatchSkipsFilterOnlySettings);
@@ -1025,6 +1111,27 @@ namespace JueMingZ.Tests
             Run("runtime settings snapshot carries recovery item filters", ref failed, RuntimeSettingsSnapshotCarriesRecoveryItemFilters);
             Run("feature catalog exposes recovery item config windows", ref failed, FeatureCatalogExposesRecoveryItemConfigWindows);
             Run("legacy items and misc content heights include bottom action rows", ref failed, LegacyItemsAndMiscContentHeightsIncludeBottomActionRows);
+            Run("legacy map enhancement page layout tracks quick announcement state", ref failed, LegacyMapEnhancementPageLayoutTracksQuickAnnouncementState);
+            Run("legacy map quick announcement button tooltips match requested wording", ref failed, LegacyMapQuickAnnouncementButtonTooltipsMatchRequestedWording);
+            Run("map quick announcement hover snapshot tracks item slot freshness", ref failed, MapQuickAnnouncementHoverSnapshotTracksItemSlotFreshness);
+            Run("map quick announcement resolver uses fresh UI hover snapshots", ref failed, MapQuickAnnouncementResolverUsesFreshUiHoverSnapshots);
+            Run("map quick announcement stale hover snapshot falls back to tile", ref failed, MapQuickAnnouncementStaleHoverSnapshotFallsBackToTile);
+            Run("map quick announcement placement names prefer item localization", ref failed, MapQuickAnnouncementPlacementNamesPreferItemLocalization);
+            Run("map quick announcement multi-tile furniture styles resolve consistently", ref failed, MapQuickAnnouncementMultiTileFurnitureStylesResolveConsistently);
+            Run("map quick announcement resolver prefers UI item over world targets", ref failed, MapQuickAnnouncementResolverPrefersUiItemOverWorldTargets);
+            Run("map quick announcement resolver lists players and NPCs at mouse", ref failed, MapQuickAnnouncementResolverListsPlayersAndNpcsAtMouse);
+            Run("map quick announcement resolver aggregates nearby dropped items", ref failed, MapQuickAnnouncementResolverAggregatesNearbyDroppedItems);
+            Run("map quick announcement resolver combines tile and circuit layers", ref failed, MapQuickAnnouncementResolverCombinesTileAndCircuitLayers);
+            Run("map quick announcement resolver uses wall before air", ref failed, MapQuickAnnouncementResolverUsesWallBeforeAir);
+            Run("map quick announcement resolver falls back to air phrase", ref failed, MapQuickAnnouncementResolverFallsBackToAirPhrase);
+            Run("map quick announcement text safety wraps color and blocks injection", ref failed, MapQuickAnnouncementTextSafetyWrapsColorAndBlocksInjection);
+            Run("map quick announcement delivery honors cooldowns and prompt throttle", ref failed, MapQuickAnnouncementDeliveryHonorsCooldownsAndPromptThrottle);
+            Run("map quick announcement delivery does not cooldown failed send", ref failed, MapQuickAnnouncementDeliveryDoesNotCooldownFailedSend);
+            Run("map quick announcement runtime records recent diagnostics", ref failed, MapQuickAnnouncementRuntimeRecordsRecentDiagnostics);
+            Run("map quick announcement runtime diagnostics explain target sources", ref failed, MapQuickAnnouncementRuntimeDiagnosticsExplainTargetSources);
+            Run("map quick announcement runtime idle path keeps diagnostics cheap", ref failed, MapQuickAnnouncementRuntimeIdlePathDoesNotResolveOrRecordDiagnostics);
+            Run("map quick announcement runtime records blocked trigger diagnostics", ref failed, MapQuickAnnouncementRuntimeRecordsBlockedTriggerDiagnostics);
+            Run("diagnostic snapshot writes map quick announcement state", ref failed, DiagnosticSnapshotWritesMapQuickAnnouncementState);
             Run("legacy UI hover layout token ignores window and content position", ref failed, LegacyUiHoverLayoutTokenIgnoresWindowAndContentPosition);
             Run("legacy UI hover layout token dirties on page size scroll settings and font", ref failed, LegacyUiHoverLayoutTokenDirtiesOnPageSizeScrollSettingsAndFont);
             Run("legacy UI tabs ignore content scroll clip", ref failed, LegacyUiTabsIgnoreContentScrollClip);

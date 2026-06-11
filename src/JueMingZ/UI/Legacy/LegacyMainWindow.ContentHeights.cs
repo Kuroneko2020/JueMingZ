@@ -141,5 +141,15 @@ namespace JueMingZ.UI.Legacy
         {
             return LegacyUiMetrics.RowHeight * 5 + LegacyUiMetrics.SettingRowGap * 4 + 24;
         }
+
+        private static int CalculateMapEnhancementContentHeight()
+        {
+            return LegacyUiMetrics.RowHeight + PageContentBottomPadding;
+        }
+
+        internal static int CalculateMapEnhancementContentHeightForTesting()
+        {
+            return CalculateMapEnhancementContentHeight();
+        }
     }
 }

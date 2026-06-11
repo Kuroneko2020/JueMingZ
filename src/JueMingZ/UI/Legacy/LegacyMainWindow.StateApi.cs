@@ -115,6 +115,7 @@ namespace JueMingZ.UI.Legacy
             CloseAutoSellPicker();
             CloseAutoDiscardPicker();
             StopAutoMiningHotkeyCapture();
+            StopMapQuickAnnouncementHotkeyCapture();
             _quickItemPickerBindingIndex = bindingIndex;
             _quickItemPickerOpen = true;
             _quickItemPickerCandidateCache = null;
@@ -141,6 +142,7 @@ namespace JueMingZ.UI.Legacy
             CloseAutoDiscardPicker();
             StopQuickItemHotkeyCapture();
             StopAutoMiningHotkeyCapture();
+            StopMapQuickAnnouncementHotkeyCapture();
             _autoSellPickerIndex = itemIndex;
             _autoSellPickerOpen = true;
             AutoSellPickerPendingItemTypes.Clear();
@@ -154,6 +156,7 @@ namespace JueMingZ.UI.Legacy
             CloseAutoDiscardPicker();
             StopQuickItemHotkeyCapture();
             StopAutoMiningHotkeyCapture();
+            StopMapQuickAnnouncementHotkeyCapture();
             _autoSellPickerIndex = -1;
             _autoSellPickerOpen = true;
             AutoSellPickerPendingItemTypes.Clear();
@@ -192,6 +195,7 @@ namespace JueMingZ.UI.Legacy
             CloseAutoSellPicker();
             StopQuickItemHotkeyCapture();
             StopAutoMiningHotkeyCapture();
+            StopMapQuickAnnouncementHotkeyCapture();
             _autoDiscardPickerIndex = itemIndex;
             _autoDiscardPickerOpen = true;
             AutoDiscardPickerPendingItemTypes.Clear();
@@ -205,6 +209,7 @@ namespace JueMingZ.UI.Legacy
             CloseAutoSellPicker();
             StopQuickItemHotkeyCapture();
             StopAutoMiningHotkeyCapture();
+            StopMapQuickAnnouncementHotkeyCapture();
             _autoDiscardPickerIndex = -1;
             _autoDiscardPickerOpen = true;
             AutoDiscardPickerPendingItemTypes.Clear();
@@ -252,8 +257,10 @@ namespace JueMingZ.UI.Legacy
             _quickItemHotkeyCaptureActive = true;
             _quickItemHotkeyCaptureBindingIndex = bindingIndex;
             _autoMiningHotkeyCaptureActive = false;
+            _mapQuickAnnouncementHotkeyCaptureSlot = string.Empty;
             AutoMiningCaptureWasDown.Clear();
             QuickItemCaptureWasDown.Clear();
+            MapQuickAnnouncementCaptureWasDown.Clear();
         }
 
         public static void StopQuickItemHotkeyCapture()
@@ -269,6 +276,7 @@ namespace JueMingZ.UI.Legacy
             CloseAutoSellPicker();
             CloseAutoDiscardPicker();
             StopQuickItemHotkeyCapture();
+            StopMapQuickAnnouncementHotkeyCapture();
             _autoMiningHotkeyCaptureActive = true;
             AutoMiningCaptureWasDown.Clear();
         }
@@ -277,6 +285,36 @@ namespace JueMingZ.UI.Legacy
         {
             _autoMiningHotkeyCaptureActive = false;
             AutoMiningCaptureWasDown.Clear();
+        }
+
+        public static void StartMapQuickAnnouncementHotkeyCapture(string slot)
+        {
+            var slotId = MapQuickAnnouncementSettings.NormalizeHotkeySlotId(slot);
+            if (slotId.Length <= 0)
+            {
+                StopMapQuickAnnouncementHotkeyCapture();
+                return;
+            }
+
+            CloseQuickItemPicker();
+            CloseAutoSellPicker();
+            CloseAutoDiscardPicker();
+            StopQuickItemHotkeyCapture();
+            StopAutoMiningHotkeyCapture();
+            _mapQuickAnnouncementHotkeyCaptureSlot = slotId;
+            // Seed held keys so the double-click that starts capture cannot become the captured trigger.
+            MapQuickAnnouncementHotkeyTokens.SeedCaptureState(MapQuickAnnouncementCaptureWasDown, IsKeyDown);
+        }
+
+        public static void StopMapQuickAnnouncementHotkeyCapture()
+        {
+            _mapQuickAnnouncementHotkeyCaptureSlot = string.Empty;
+            MapQuickAnnouncementCaptureWasDown.Clear();
+        }
+
+        internal static string GetMapQuickAnnouncementHotkeyCaptureSlotForTesting()
+        {
+            return _mapQuickAnnouncementHotkeyCaptureSlot;
         }
 
         private static bool TogglePendingItemType(List<int> itemTypes, int itemType)

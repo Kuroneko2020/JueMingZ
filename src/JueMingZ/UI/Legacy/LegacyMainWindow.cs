@@ -149,8 +149,10 @@ namespace JueMingZ.UI.Legacy
         private static bool _quickItemHotkeyCaptureActive;
         private static int _quickItemHotkeyCaptureBindingIndex = -1;
         private static bool _autoMiningHotkeyCaptureActive;
+        private static string _mapQuickAnnouncementHotkeyCaptureSlot = string.Empty;
         private static readonly Dictionary<int, bool> QuickItemCaptureWasDown = new Dictionary<int, bool>();
         private static readonly Dictionary<int, bool> AutoMiningCaptureWasDown = new Dictionary<int, bool>();
+        private static readonly Dictionary<int, bool> MapQuickAnnouncementCaptureWasDown = new Dictionary<int, bool>();
         private static readonly TimeSpan PickerCandidateCacheWindow = TimeSpan.FromMilliseconds(120);
         private static DateTime _quickItemPickerCandidateCacheUtc = DateTime.MinValue;
         private static List<QuickItemInventoryCandidate> _quickItemPickerCandidateCache;

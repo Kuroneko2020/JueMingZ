@@ -37,6 +37,7 @@ namespace JueMingZ.Common
         public const string FishingFilter = "fishing.filter";
         public const string FishingQuickRename = "fishing.quick_rename";
         public const string InformationHighlightDigtoise = "information.highlight_digtoise";
+        public const string MapQuickAnnouncement = "map.quick_announcement";
         public const string MovementSimulatedMultiJump = "movement.simulated_multi_jump";
         public const string MovementContinuousDash = "movement.continuous_dash";
         public const string MovementTeleportCorrection = "movement.teleport_correction";

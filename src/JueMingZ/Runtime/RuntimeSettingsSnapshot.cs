@@ -43,6 +43,10 @@ namespace JueMingZ.Runtime
             var combatAimAnyEnabled = cursorAimRadius > 0 ||
                                       playerAimRadius > 0 ||
                                       combatAimAssistRadius > 0;
+            var mapQuickAnnouncementHotkey = MapQuickAnnouncementSettings.NormalizeHotkey(
+                settings.MapQuickAnnouncementHotkeySlot1,
+                settings.MapQuickAnnouncementHotkeySlot2,
+                settings.MapQuickAnnouncementTriggerKey);
 
             return new RuntimeSettingsSnapshot
             {
@@ -112,6 +116,20 @@ namespace JueMingZ.Runtime
                 WorldAutomationAutoCaptureCritterEmpressButterflyEnabled = settings.MiscAutoCaptureCritterEmpressButterflyEnabled,
                 WorldAutomationAutoCaptureCritterOtherEnabled = settings.MiscAutoCaptureCritterOtherEnabled,
                 WorldAutomationAutoHarvestEnabled = settings.WorldAutomationAutoHarvestEnabled,
+                MapQuickAnnouncementEnabled = settings.MapQuickAnnouncementEnabled,
+                MapQuickAnnouncementHotkeySlot1 = mapQuickAnnouncementHotkey.Slot1,
+                MapQuickAnnouncementHotkeySlot2 = mapQuickAnnouncementHotkey.Slot2,
+                MapQuickAnnouncementTriggerKey = mapQuickAnnouncementHotkey.TriggerKey,
+                MapQuickAnnouncementColorHex =
+                    MapQuickAnnouncementSettings.NormalizeColorHex(settings.MapQuickAnnouncementColorHex),
+                MapQuickAnnouncementCooldownMilliseconds =
+                    MapQuickAnnouncementSettings.NormalizeCooldownMilliseconds(
+                        settings.MapQuickAnnouncementCooldownMilliseconds,
+                        MapQuickAnnouncementSettings.DefaultCooldownMilliseconds),
+                MapQuickAnnouncementAirCooldownMilliseconds =
+                    MapQuickAnnouncementSettings.NormalizeCooldownMilliseconds(
+                        settings.MapQuickAnnouncementAirCooldownMilliseconds,
+                        MapQuickAnnouncementSettings.DefaultAirCooldownMilliseconds),
                 FishingAutoFishEnabled = settings.FishingAutoFishEnabled,
                 FishingAutoLoadoutEnabled = settings.FishingAutoLoadoutEnabled,
                 FishingAutoEquipmentEnabled = settings.FishingAutoEquipmentEnabled,
@@ -217,6 +235,13 @@ namespace JueMingZ.Runtime
         public bool WorldAutomationAutoCaptureCritterEmpressButterflyEnabled { get; private set; }
         public bool WorldAutomationAutoCaptureCritterOtherEnabled { get; private set; }
         public bool WorldAutomationAutoHarvestEnabled { get; private set; }
+        public bool MapQuickAnnouncementEnabled { get; private set; }
+        public string MapQuickAnnouncementHotkeySlot1 { get; private set; }
+        public string MapQuickAnnouncementHotkeySlot2 { get; private set; }
+        public string MapQuickAnnouncementTriggerKey { get; private set; }
+        public string MapQuickAnnouncementColorHex { get; private set; }
+        public int MapQuickAnnouncementCooldownMilliseconds { get; private set; }
+        public int MapQuickAnnouncementAirCooldownMilliseconds { get; private set; }
         public bool FishingAutoFishEnabled { get; private set; }
         public bool FishingAutoLoadoutEnabled { get; private set; }
         public bool FishingAutoEquipmentEnabled { get; private set; }
