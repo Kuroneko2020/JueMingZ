@@ -304,6 +304,8 @@ namespace JueMingZ.UI.Legacy
                 }
                 else if (string.Equals(selectedPage, "search", StringComparison.Ordinal))
                 {
+                    AddHash(ref hash, SearchChestLocatorUiState.BuildStateSignature());
+                    AddHash(ref hash, LegacyTextInput.IsFocused(SearchChestLocatorUiState.InputId));
                     AddHash(ref hash, SearchItemQueryUiState.BuildStateSignature());
                     AddHash(ref hash, LegacyTextInput.IsFocused(SearchItemQueryUiState.InputId));
                 }
@@ -516,6 +518,8 @@ namespace JueMingZ.UI.Legacy
                 }
                 else if (string.Equals(selectedPage, "search", StringComparison.Ordinal))
                 {
+                    AddHash(ref hash, SearchChestLocatorUiState.BuildStateSignature());
+                    AddHash(ref hash, LegacyTextInput.IsFocused(SearchChestLocatorUiState.InputId));
                     AddHash(ref hash, SearchItemQueryUiState.BuildStateSignature());
                     AddHash(ref hash, LegacyTextInput.IsFocused(SearchItemQueryUiState.InputId));
                 }

@@ -89,6 +89,10 @@ namespace JueMingZ.UI.Legacy
         {
             var hovered = (LegacyUiElement)null;
             var y = 0;
+
+            hovered = DrawSearchChestLocatorBlock(spriteBatch, area, mouse, elements, y) ?? hovered;
+            y += CalculateSearchChestLocatorBlockHeight(area.Viewport.Width) + SearchSectionGap;
+
             LegacyUiRect inputRect;
             hovered = DrawSearchInputRow(spriteBatch, area, mouse, elements, y, out inputRect) ?? hovered;
             y += SearchInputRowHeight + SearchSectionGap;
@@ -728,7 +732,8 @@ namespace JueMingZ.UI.Legacy
 
         private static int CalculateSearchContentHeight(LegacyUiRect contentRect)
         {
-            var height = SearchInputRowHeight + SearchSectionGap;
+            var height = CalculateSearchChestLocatorBlockHeight(contentRect.Width) + SearchSectionGap;
+            height += SearchInputRowHeight + SearchSectionGap;
             var result = SearchItemQueryUiState.GetSelectedResult();
             if (result == null || !result.Found)
             {

@@ -425,6 +425,29 @@ namespace JueMingZ.Diagnostics
         public long InformationFishingConditionsReadCount { get; set; }
         public long InformationFishingBobberObserverFreshInactiveSkipCount { get; set; }
         public long InformationFishingProjectileFallbackScanCount { get; set; }
+        public bool SearchChestLocatorOverlayEnabled { get; set; }
+        public long SearchChestLocatorOverlayQueryVersion { get; set; }
+        public string SearchChestLocatorOverlaySnapshotStatus { get; set; }
+        public int SearchChestLocatorOverlayCandidateChestCount { get; set; }
+        public int SearchChestLocatorOverlayScannedChestCount { get; set; }
+        public int SearchChestLocatorOverlayHitCount { get; set; }
+        public int SearchChestLocatorOverlayDrawnHitCount { get; set; }
+        public string SearchChestLocatorOverlaySkipReason { get; set; }
+        public string SearchChestLocatorOverlayRecentElapsedBucket { get; set; }
+        public long SearchChestLocatorOverlaySnapshotAgeTicks { get; set; }
+        public bool SearchChestLocatorSectionRequestEnabled { get; set; }
+        public bool SearchChestLocatorSectionRequestMultiplayerClient { get; set; }
+        public bool SearchChestLocatorSectionRequestAttempted { get; set; }
+        public bool SearchChestLocatorSectionRequestSent { get; set; }
+        public bool SearchChestLocatorSectionRequestThrottled { get; set; }
+        public string SearchChestLocatorSectionRequestStatus { get; set; }
+        public string SearchChestLocatorSectionRequestFailureReason { get; set; }
+        public string SearchChestLocatorSectionRequestSectionKey { get; set; }
+        public int SearchChestLocatorSectionRequestSectionX { get; set; }
+        public int SearchChestLocatorSectionRequestSectionY { get; set; }
+        public long SearchChestLocatorSectionRequestQueryVersion { get; set; }
+        public long SearchChestLocatorSectionRequestTick { get; set; }
+        public long SearchChestLocatorSectionRequestCooldownRemainingTicks { get; set; }
         public bool MapQuickAnnouncementLastTriggered { get; set; }
         public string MapQuickAnnouncementLastResultCode { get; set; }
         public string MapQuickAnnouncementLastTargetKind { get; set; }
@@ -1058,6 +1081,12 @@ namespace JueMingZ.Diagnostics
             InformationChestAlwaysLastDirtyReason = string.Empty;
             InformationChestAlwaysTypedTileFastPathStatus = string.Empty;
             InformationWorldContextProfile = string.Empty;
+            SearchChestLocatorOverlaySnapshotStatus = string.Empty;
+            SearchChestLocatorOverlaySkipReason = string.Empty;
+            SearchChestLocatorOverlayRecentElapsedBucket = string.Empty;
+            SearchChestLocatorSectionRequestStatus = string.Empty;
+            SearchChestLocatorSectionRequestFailureReason = string.Empty;
+            SearchChestLocatorSectionRequestSectionKey = string.Empty;
             MapQuickAnnouncementLastResultCode = string.Empty;
             MapQuickAnnouncementLastTargetKind = string.Empty;
             MapQuickAnnouncementLastTargetName = string.Empty;

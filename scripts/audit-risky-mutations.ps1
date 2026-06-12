@@ -172,15 +172,20 @@ function Test-IsAllowedForbiddenDataReadPath {
     )
 
     $normalized = $RelativePath.Replace('/', '\')
-    if (-not $normalized.Equals("src\JueMingZ\Compat\TerrariaMainCompat.cs", [System.StringComparison]::OrdinalIgnoreCase)) {
-        return $false
+    if ($Line -match 'Main\.chest') {
+        if (-not $normalized.Equals("src\JueMingZ\Compat\TerrariaMainCompat.cs", [System.StringComparison]::OrdinalIgnoreCase)) {
+            return $false
+        }
+
+        return $Line -notmatch 'Main\.chest\s*(=|\[[^\]]+\]\s*=)'
     }
 
-    if ($Line -notmatch 'Main\.chest') {
-        return $false
+    if ($Line -match 'NetMessage\.(TrySendData|SendData)') {
+        return $normalized.Equals("src\JueMingZ\Compat\TerrariaNetworkCompat.cs", [System.StringComparison]::OrdinalIgnoreCase) -and
+               $Line -match '\b159\b'
     }
 
-    return $Line -notmatch 'Main\.chest\s*(=|\[[^\]]+\]\s*=)'
+    return $false
 }
 
 try {
@@ -197,7 +202,7 @@ try {
         Write-Host "Audit mode: PowerShell fallback"
     }
 
-    $forbiddenPattern = 'player\.inventory\[|player\.armor\[|Main\.chest|chest\.item|NetMessage\.SendData|player\.Teleport|statLife\s*(=|\+=|-=)|statMana\s*(=|\+=|-=)'
+    $forbiddenPattern = 'player\.inventory\[|player\.armor\[|Main\.chest|chest\.item|NetMessage\.(TrySendData|SendData)|player\.Teleport|statLife\s*(=|\+=|-=)|statMana\s*(=|\+=|-=)'
     $controlledBuffMutationPattern = 'AddBuff|TurnToAir|item\.stack\s*(--|=)|TrySetInt\s*\([^)]*"stack"'
     $directLocalBuffPotionLiteralPattern = 'DirectLocalBuffPotion'
     $controlledInputPattern = 'Main\.mouseX|Main\.mouseY|controlUseItem|releaseUseItem|controlUseTile|releaseUseTile|controlJump|releaseJump|controlUp|releaseUp|rocketRelease|controlMount|releaseMount|controlHook|releaseHook|mouseInterface|blockMouse|\.selectedItem\s*=|SetMember\s*\([^)]*"selectedItem"|selectedItem\s*=\s*target|SetMember\s*\([^)]*"controlDash"|SetMember\s*\([^)]*"releaseDash"|SetMember\s*\([^)]*"dashType"'

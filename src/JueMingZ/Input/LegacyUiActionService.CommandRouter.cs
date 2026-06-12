@@ -223,6 +223,12 @@ namespace JueMingZ.Input
                 return;
             }
 
+            if (command.ElementId.StartsWith("search-chest-locator:", StringComparison.Ordinal))
+            {
+                HandleSearchChestLocatorCommand(command);
+                return;
+            }
+
             if (command.ElementId.StartsWith("search-query:", StringComparison.Ordinal))
             {
                 HandleSearchQueryCommand(command);

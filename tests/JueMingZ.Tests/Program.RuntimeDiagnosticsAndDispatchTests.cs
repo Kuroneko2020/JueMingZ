@@ -1311,6 +1311,29 @@ namespace JueMingZ.Tests
                 InformationFishingConditionsReadCount = 7,
                 InformationFishingBobberObserverFreshInactiveSkipCount = 8,
                 InformationFishingProjectileFallbackScanCount = 9,
+                SearchChestLocatorOverlayEnabled = true,
+                SearchChestLocatorOverlayQueryVersion = 12,
+                SearchChestLocatorOverlaySnapshotStatus = "ok",
+                SearchChestLocatorOverlayCandidateChestCount = 4,
+                SearchChestLocatorOverlayScannedChestCount = 3,
+                SearchChestLocatorOverlayHitCount = 2,
+                SearchChestLocatorOverlayDrawnHitCount = 1,
+                SearchChestLocatorOverlaySkipReason = "offscreen",
+                SearchChestLocatorOverlayRecentElapsedBucket = "<1ms",
+                SearchChestLocatorOverlaySnapshotAgeTicks = 9,
+                SearchChestLocatorSectionRequestEnabled = true,
+                SearchChestLocatorSectionRequestMultiplayerClient = true,
+                SearchChestLocatorSectionRequestAttempted = true,
+                SearchChestLocatorSectionRequestSent = true,
+                SearchChestLocatorSectionRequestThrottled = false,
+                SearchChestLocatorSectionRequestStatus = "sent",
+                SearchChestLocatorSectionRequestFailureReason = "",
+                SearchChestLocatorSectionRequestSectionKey = "world-record-a:1:1",
+                SearchChestLocatorSectionRequestSectionX = 1,
+                SearchChestLocatorSectionRequestSectionY = 1,
+                SearchChestLocatorSectionRequestQueryVersion = 12,
+                SearchChestLocatorSectionRequestTick = 100,
+                SearchChestLocatorSectionRequestCooldownRemainingTicks = 0,
                 LegacyUiLayoutCacheHitCount = 13,
                 LegacyUiLayoutCacheMissCount = 6,
                 LegacyUiLastFrameVisibleElementCount = 42,
@@ -1398,6 +1421,28 @@ namespace JueMingZ.Tests
             AssertContains(json, "\"InformationFishingConditionsReadCount\": 7");
             AssertContains(json, "\"InformationFishingBobberObserverFreshInactiveSkipCount\": 8");
             AssertContains(json, "\"InformationFishingProjectileFallbackScanCount\": 9");
+            AssertContains(json, "\"SearchChestLocatorOverlayEnabled\": true");
+            AssertContains(json, "\"SearchChestLocatorOverlayQueryVersion\": 12");
+            AssertContains(json, "\"SearchChestLocatorOverlaySnapshotStatus\": \"ok\"");
+            AssertContains(json, "\"SearchChestLocatorOverlayCandidateChestCount\": 4");
+            AssertContains(json, "\"SearchChestLocatorOverlayScannedChestCount\": 3");
+            AssertContains(json, "\"SearchChestLocatorOverlayHitCount\": 2");
+            AssertContains(json, "\"SearchChestLocatorOverlayDrawnHitCount\": 1");
+            AssertContains(json, "\"SearchChestLocatorOverlaySkipReason\": \"offscreen\"");
+            AssertContains(json, "\"SearchChestLocatorOverlayRecentElapsedBucket\": \"<1ms\"");
+            AssertContains(json, "\"SearchChestLocatorOverlaySnapshotAgeTicks\": 9");
+            AssertContains(json, "\"SearchChestLocatorSectionRequestEnabled\": true");
+            AssertContains(json, "\"SearchChestLocatorSectionRequestMultiplayerClient\": true");
+            AssertContains(json, "\"SearchChestLocatorSectionRequestAttempted\": true");
+            AssertContains(json, "\"SearchChestLocatorSectionRequestSent\": true");
+            AssertContains(json, "\"SearchChestLocatorSectionRequestThrottled\": false");
+            AssertContains(json, "\"SearchChestLocatorSectionRequestStatus\": \"sent\"");
+            AssertContains(json, "\"SearchChestLocatorSectionRequestSectionKey\": \"world-record-a:1:1\"");
+            AssertContains(json, "\"SearchChestLocatorSectionRequestSectionX\": 1");
+            AssertContains(json, "\"SearchChestLocatorSectionRequestSectionY\": 1");
+            AssertContains(json, "\"SearchChestLocatorSectionRequestQueryVersion\": 12");
+            AssertContains(json, "\"SearchChestLocatorSectionRequestTick\": 100");
+            AssertContains(json, "\"SearchChestLocatorSectionRequestCooldownRemainingTicks\": 0");
             AssertContains(json, "\"LegacyUiLastFrameVisibleElementCount\": 42");
             AssertContains(json, "\"LegacyUiHoverReuseCount\": 8");
             AssertContains(json, "\"LegacyUiHoverTooltipCacheHitCount\": 9");

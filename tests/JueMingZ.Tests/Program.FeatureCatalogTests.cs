@@ -411,6 +411,40 @@ namespace JueMingZ.Tests
             AssertStringEquals(feature.Description, "输入物品名或 #ID 查看只读物品资料", "search query description");
         }
 
+        private static void FeatureCatalogExposesChestItemLocatorF5Entry()
+        {
+            var registry = FeatureRegistry.CreateDefault();
+            FeatureDefinition feature;
+            if (!registry.TryGet(FeatureIds.SearchChestItemLocator, out feature) || feature == null)
+            {
+                throw new InvalidOperationException("Expected search chest item locator feature to be registered.");
+            }
+
+            if (!feature.VisibleInMainUi || !feature.IsImplemented)
+            {
+                throw new InvalidOperationException("Chest item locator must be visible and implemented after the F5 UI command stage.");
+            }
+
+            if (feature.CodeDomain != FeatureCodeDomain.Search ||
+                feature.UserCategory != FeatureUserCategory.Search)
+            {
+                throw new InvalidOperationException("Chest item locator must stay in Search code-domain and Search UI category.");
+            }
+
+            if (feature.RequiredActions.Count != 1 || feature.RequiredActions[0] != InputActionKind.None)
+            {
+                throw new InvalidOperationException("Chest item locator query parsing must remain read-only without gameplay actions.");
+            }
+
+            if (feature.MultiplayerSupport != FeatureMultiplayerSupport.Unknown ||
+                feature.LifecycleStatus != FeatureLifecycleStatus.Implemented)
+            {
+                throw new InvalidOperationException("Chest item locator must remain unknown for multiplayer while exposing its F5 entry.");
+            }
+
+            AssertStringEquals(feature.Description, "输入物品名或 #ID 后定位附近含有该物品的箱子", "chest item locator description");
+        }
+
         private static void AssertPlannedFeatureHidden(FeatureRegistry registry, string featureId)
         {
             FeatureDefinition feature;

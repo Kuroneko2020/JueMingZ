@@ -26,7 +26,8 @@ namespace JueMingZ.Hooks
         private static readonly Dictionary<Type, LayerNameAccessor> LayerNameAccessorCache = new Dictionary<Type, LayerNameAccessor>();
         private static readonly Func<bool>[] InformationWorldUnderVanillaUiDispatcherDrawers =
         {
-            InformationWorldOverlay.DrawInformationInterfaceLayer
+            InformationWorldOverlay.DrawInformationInterfaceLayer,
+            SearchChestLocatorWorldOverlay.DrawInterfaceLayer
         };
 
         private static readonly Func<bool>[] InformationStatusPanelUnderVanillaUiDispatcherDrawers =
@@ -46,6 +47,7 @@ namespace JueMingZ.Hooks
         private static readonly Func<bool>[] GameOverlayFallbackDispatcherDrawers =
         {
             InformationWorldOverlay.DrawInformationInterfaceLayer,
+            SearchChestLocatorWorldOverlay.DrawInterfaceLayer,
             InformationWorldOverlay.DrawAutoMiningInterfaceLayer,
             FishingStatusPromptOverlay.DrawInterfaceLayer,
             FirstWorldLoadPromptOverlay.DrawInterfaceLayer,

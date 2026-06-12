@@ -2605,6 +2605,7 @@ namespace JueMingZ.Tests
         private static void WithSearchQueryFixture(Action test)
         {
             ResetSearchQueryFakes();
+            SearchChestLocatorUiState.ResetForTesting();
             try
             {
                 PopulateSearchQueryFakes();
@@ -2614,6 +2615,7 @@ namespace JueMingZ.Tests
             finally
             {
                 SearchItemQueryUiState.ResetForTesting();
+                SearchChestLocatorUiState.ResetForTesting();
                 LegacyTextInput.ClearFocus();
                 ResetSearchQueryFakes();
                 ItemQueryService.ResetForTesting();

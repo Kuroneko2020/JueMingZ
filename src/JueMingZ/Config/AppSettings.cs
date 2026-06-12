@@ -152,6 +152,9 @@ namespace JueMingZ.Config
         [DataMember(Order = 193)]
         public int MapQuickAnnouncementAirCooldownMilliseconds { get; set; } = MapQuickAnnouncementSettings.DefaultAirCooldownMilliseconds;
 
+        [DataMember(Order = 194)]
+        public bool SearchChestLocatorMultiplayerSectionRequestEnabled { get; set; } = true;
+
         [DataMember(Order = 37)]
         public bool CombatPerfectRevolverEnabled { get; set; }
 
@@ -787,6 +790,7 @@ namespace JueMingZ.Config
                 MapQuickAnnouncementColorHex = MapQuickAnnouncementSettings.DefaultAnnouncementColorHex,
                 MapQuickAnnouncementCooldownMilliseconds = MapQuickAnnouncementSettings.DefaultCooldownMilliseconds,
                 MapQuickAnnouncementAirCooldownMilliseconds = MapQuickAnnouncementSettings.DefaultAirCooldownMilliseconds,
+                SearchChestLocatorMultiplayerSectionRequestEnabled = true,
                 CombatPerfectRevolverEnabled = false,
                 CombatMagicStringClickerEnabled = false,
                 CombatAutoFacingEnabled = false,

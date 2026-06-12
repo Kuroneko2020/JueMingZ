@@ -118,7 +118,8 @@ namespace JueMingZ.Tests
                 InterfaceLayerHookCallbacks.GetInformationWorldUnderVanillaUiDispatcherRouteNamesForTesting(),
                 new[]
                 {
-                    "InformationWorldOverlay.DrawInformationInterfaceLayer"
+                    "InformationWorldOverlay.DrawInformationInterfaceLayer",
+                    "SearchChestLocatorWorldOverlay.DrawInterfaceLayer"
                 },
                 "information world under UI dispatcher routes");
 
@@ -139,6 +140,7 @@ namespace JueMingZ.Tests
                 new[]
                 {
                     "InformationWorldOverlay.DrawInformationInterfaceLayer",
+                    "SearchChestLocatorWorldOverlay.DrawInterfaceLayer",
                     "InformationWorldOverlay.DrawAutoMiningInterfaceLayer",
                     "FishingStatusPromptOverlay.DrawInterfaceLayer",
                     "FirstWorldLoadPromptOverlay.DrawInterfaceLayer",

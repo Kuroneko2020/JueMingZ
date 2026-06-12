@@ -370,6 +370,28 @@ namespace JueMingZ.Compat
             return chest != null;
         }
 
+        public static bool TryFindChestIndex(int tileX, int tileY, out int index)
+        {
+            index = -1;
+            if (tileX < 0 || tileY < 0)
+            {
+                return false;
+            }
+
+            try
+            {
+                // Chest.FindChest is Terraria's coordinate index for world chests; callers
+                // still read contents through TryGetChest so this remains a read-only lookup.
+                index = Chest.FindChest(tileX, tileY);
+                return index >= 0;
+            }
+            catch
+            {
+                index = -1;
+                return false;
+            }
+        }
+
         public static bool IsTileCoordinateInWorld(int tileX, int tileY)
         {
             return tileX >= 0 &&
