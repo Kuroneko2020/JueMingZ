@@ -16,7 +16,7 @@ namespace JueMingZ.Features.Catalog
                 .Multiplayer(FeatureMultiplayerSupport.Unknown)
                 .VisibleInMainUi(true)
                 .Implemented(true)
-                .Notes("第一版只读物品查询 UI 已接入 F5 搜索页，覆盖基础信息、合成来源 / 用途和直接微光关系；掉落、商店、decraft 和背包入口仍待后续阶段。")
+                .Notes("第一版只读物品查询 UI 已接入 F5 搜索页，覆盖基础信息、获取来源空区块、合成来源 / 用途和直接微光关系；获取来源真实数据由后续阶段逐类填充。")
                 .Build());
 
             registry.Register(FeatureDefinitionBuilder

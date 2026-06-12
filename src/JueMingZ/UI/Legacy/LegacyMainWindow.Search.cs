@@ -17,6 +17,7 @@ namespace JueMingZ.UI.Legacy
         private const int SearchInputControlGap = 6;
         private const string SearchInputLabelText = "查询物品";
         private const string SearchPickButtonText = "选择物品";
+        private const string SearchPickButtonTooltipText = "点击需要查询的物品";
         private const int SearchCandidatePopupMinHeight = 78;
         private const int SearchCandidatePopupMaxHeight = 226;
         private const int SearchCandidatePopupMinWidth = 220;
@@ -51,6 +52,9 @@ namespace JueMingZ.UI.Legacy
         private const int SearchResultChipGap = 6;
         private const int SearchResultChipMaxColumns = 3;
         private const int SearchResultChipMinWidth = 92;
+        private const int SearchAcquisitionSourceRowHeight = 52;
+        private const int SearchAcquisitionSourceRowVisualGap = 5;
+        private const int SearchAcquisitionSourceTypeWidth = 82;
         private const int SearchShimmerRowHeight = 36;
         private const int SearchReferenceRowVisualGap = 5;
         private const int SearchReferenceRowLabelWidth = 56;
@@ -210,7 +214,7 @@ namespace JueMingZ.UI.Legacy
                 "搜索查询:选择物品",
                 "button",
                 pickElementRect,
-                tooltipLines: new[] { "隐藏 F5，松开按钮后左键选择要查询的目标" });
+                tooltipLines: new[] { SearchPickButtonTooltipText });
             RecordFrameElementHover(pickElement, pickButtonHovered);
             if (pickButtonHovered)
             {
@@ -265,6 +269,8 @@ namespace JueMingZ.UI.Legacy
             DrawSearchBasicPanel(spriteBatch, area, mouse, elements, y, basicPanelHeight, result.Item);
             y += basicPanelHeight + SearchSectionGap;
 
+            DrawSearchAcquisitionSection(spriteBatch, area, y, result.AcquisitionSources);
+            y += CalculateSearchAcquisitionSectionHeight(result.AcquisitionSources) + SearchSectionGap;
             hovered = DrawSearchRecipeSection(spriteBatch, area, mouse, elements, y, "合成来源", result.CraftingSources, "source") ?? hovered;
             y += CalculateSearchRecipeSectionHeight(result.CraftingSources, area.Viewport.Width) + SearchSectionGap;
             hovered = DrawSearchRecipeSection(spriteBatch, area, mouse, elements, y, "合成用途", result.CraftingUses, "use") ?? hovered;
@@ -350,6 +356,88 @@ namespace JueMingZ.UI.Legacy
             var valueWidth = Math.Max(1, columnWidth - labelWidth);
             UiTextRenderer.DrawTextClipped(spriteBatch, (label ?? string.Empty) + "：", x, y + 3, labelWidth, 17, clip.X, clip.Y, clip.Width, clip.Height, 176, 198, 224, 230, 0.58f);
             UiTextRenderer.DrawTextClipped(spriteBatch, value ?? string.Empty, valueX, y + 3, valueWidth, 17, clip.X, clip.Y, clip.Width, clip.Height, 224, 232, 240, 240, 0.60f);
+        }
+
+        private static void DrawSearchAcquisitionSection(object spriteBatch, LegacyScrollArea area, int contentY, IList<ItemAcquisitionSourceSummary> sources)
+        {
+            var y = contentY;
+            DrawSection(spriteBatch, area, y, "获取来源");
+            y += SearchSectionBodyOffset;
+            var count = sources == null ? 0 : sources.Count;
+            if (count <= 0)
+            {
+                DrawSearchEmptySectionRow(spriteBatch, area, y, "暂无获取来源");
+                return;
+            }
+
+            for (var index = 0; index < count; index++)
+            {
+                DrawSearchAcquisitionSourceRow(spriteBatch, area, y, sources[index]);
+                y += SearchAcquisitionSourceRowHeight;
+            }
+        }
+
+        private static void DrawSearchAcquisitionSourceRow(object spriteBatch, LegacyScrollArea area, int contentY, ItemAcquisitionSourceSummary source)
+        {
+            var row = new LegacyUiRect(area.Viewport.X, area.ToScreenY(contentY), area.Viewport.Width, SearchAcquisitionSourceRowHeight - SearchAcquisitionSourceRowVisualGap);
+            if (!area.IsVisible(row) || source == null)
+            {
+                return;
+            }
+
+            LegacyUiTheme.DrawRowClipped(spriteBatch, row, area.Viewport);
+            UiTextRenderer.DrawAlignedTextClipped(
+                spriteBatch,
+                FormatSearchAcquisitionSourceType(source.SourceType),
+                row.X + 10,
+                row.Y + 4,
+                SearchAcquisitionSourceTypeWidth,
+                18,
+                UiTextHorizontalAlignment.Left,
+                area.Viewport.X,
+                area.Viewport.Y,
+                area.Viewport.Width,
+                area.Viewport.Height,
+                176,
+                198,
+                224,
+                230,
+                0.56f);
+
+            var detailX = row.X + SearchAcquisitionSourceTypeWidth + 16;
+            var detailWidth = Math.Max(1, row.Right - detailX - 10);
+            UiTextRenderer.DrawTextClipped(
+                spriteBatch,
+                BuildSearchAcquisitionSourceTitle(source),
+                detailX,
+                row.Y + 5,
+                detailWidth,
+                16,
+                area.Viewport.X,
+                area.Viewport.Y,
+                area.Viewport.Width,
+                area.Viewport.Height,
+                236,
+                236,
+                224,
+                248,
+                0.60f);
+            UiTextRenderer.DrawTextClipped(
+                spriteBatch,
+                BuildSearchAcquisitionSourceDetail(source),
+                detailX,
+                row.Y + 27,
+                detailWidth,
+                16,
+                area.Viewport.X,
+                area.Viewport.Y,
+                area.Viewport.Width,
+                area.Viewport.Height,
+                202,
+                214,
+                232,
+                230,
+                0.54f);
         }
 
         private static LegacyUiElement DrawSearchRecipeSection(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, string title, IList<ItemQueryRecipeSummary> recipes, string scope)
@@ -741,6 +829,7 @@ namespace JueMingZ.UI.Legacy
             }
 
             height += SearchSectionBodyOffset + CalculateSearchBasicPanelHeight(contentRect.Width) + SearchSectionGap;
+            height += CalculateSearchAcquisitionSectionHeight(result.AcquisitionSources) + SearchSectionGap;
             height += CalculateSearchRecipeSectionHeight(result.CraftingSources, contentRect.Width) + SearchSectionGap;
             height += CalculateSearchRecipeSectionHeight(result.CraftingUses, contentRect.Width) + SearchSectionGap;
             height += CalculateSearchShimmerSectionHeight(result.Shimmer) + PageContentBottomPadding;
@@ -816,6 +905,64 @@ namespace JueMingZ.UI.Legacy
         private static string FormatSearchPlacementValue(string prefix, int id)
         {
             return id >= 0 ? prefix + "#" + id.ToString(CultureInfo.InvariantCulture) : "无";
+        }
+
+        private static int CalculateSearchAcquisitionSectionHeight(IList<ItemAcquisitionSourceSummary> sources)
+        {
+            var count = sources == null ? 0 : sources.Count;
+            return SearchSectionBodyOffset + (count <= 0 ? SearchSectionTextRowHeight : count * SearchAcquisitionSourceRowHeight);
+        }
+
+        private static string FormatSearchAcquisitionSourceType(string sourceType)
+        {
+            switch (sourceType ?? string.Empty)
+            {
+                case ItemAcquisitionSourceTypes.NpcDrop:
+                    return "掉落";
+                case ItemAcquisitionSourceTypes.NpcShop:
+                    return "商店";
+                case ItemAcquisitionSourceTypes.MiningGatheringTag:
+                    return "采集";
+                default:
+                    return "来源";
+            }
+        }
+
+        private static string BuildSearchAcquisitionSourceTitle(ItemAcquisitionSourceSummary source)
+        {
+            if (source == null)
+            {
+                return "未知来源";
+            }
+
+            var title = FirstNonEmpty(source.Title, FormatSearchAcquisitionSourceType(source.SourceType));
+            var name = FirstNonEmpty(source.SourceName, string.Empty);
+            return string.IsNullOrWhiteSpace(name) ? title : title + "：" + name;
+        }
+
+        private static string BuildSearchAcquisitionSourceDetail(ItemAcquisitionSourceSummary source)
+        {
+            if (source == null)
+            {
+                return "条件待确认";
+            }
+
+            var parts = new List<string>(4);
+            AddSearchAcquisitionDetailPart(parts, source.QuantityText);
+            AddSearchAcquisitionDetailPart(parts, source.ProbabilityText);
+            AddSearchAcquisitionDetailPart(parts, source.ConditionText);
+            AddSearchAcquisitionDetailPart(parts, source.ContextText);
+            return parts.Count <= 0 ? "条件待确认" : string.Join(" / ", parts.ToArray());
+        }
+
+        private static void AddSearchAcquisitionDetailPart(List<string> parts, string text)
+        {
+            if (parts == null || string.IsNullOrWhiteSpace(text))
+            {
+                return;
+            }
+
+            parts.Add(text.Trim());
         }
 
         private static int CalculateSearchRecipeSectionHeight(IList<ItemQueryRecipeSummary> recipes, int viewportWidth)
@@ -980,6 +1127,11 @@ namespace JueMingZ.UI.Legacy
             return CalculateSearchBasicPanelHeight(panelWidth);
         }
 
+        internal static int CalculateSearchAcquisitionSectionHeightForTesting(IList<ItemAcquisitionSourceSummary> sources)
+        {
+            return CalculateSearchAcquisitionSectionHeight(sources);
+        }
+
         internal static int CalculateSearchRecipeSectionHeightForTesting(IList<ItemQueryRecipeSummary> recipes, int viewportWidth)
         {
             return CalculateSearchRecipeSectionHeight(recipes, viewportWidth);
@@ -1022,9 +1174,29 @@ namespace JueMingZ.UI.Legacy
             return lines.ToArray();
         }
 
+        internal static string[] GetSearchResultSectionOrderForTesting()
+        {
+            return new[] { "基础信息", "获取来源", "合成来源", "合成用途", "微光反应" };
+        }
+
+        internal static string GetSearchAcquisitionEmptyTextForTesting()
+        {
+            return "暂无获取来源";
+        }
+
+        internal static string[] FormatSearchAcquisitionSourceForTesting(ItemAcquisitionSourceSummary source)
+        {
+            return new[] { FormatSearchAcquisitionSourceType(source == null ? null : source.SourceType), BuildSearchAcquisitionSourceTitle(source), BuildSearchAcquisitionSourceDetail(source) };
+        }
+
         internal static string[] GetSearchInputRowTextForTesting()
         {
             return new[] { SearchInputLabelText, SearchPickButtonText, "清空" };
+        }
+
+        internal static string GetSearchPickButtonTooltipForTesting()
+        {
+            return SearchPickButtonTooltipText;
         }
     }
 }

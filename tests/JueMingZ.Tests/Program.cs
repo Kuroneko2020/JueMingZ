@@ -48,6 +48,8 @@ namespace Terraria
         public static object[] projectile = new object[0];
         public static object[] recipe = new object[0];
         public static object[] chest = new object[1000];
+        public static object[] npc = new object[200];
+        public static object ItemDropsDB;
         public static object FishDropsDB;
         public static int[] anglerQuestItemNetIDs = new int[0];
         public static int anglerQuest;
@@ -63,6 +65,7 @@ namespace Terraria
         public static bool drawingPlayerChat;
         public static string npcChatText = string.Empty;
         public static bool playerInventory;
+        public static int npcShop;
         public static bool ingameOptionsWindow;
         public static bool inFancyUI;
         public static bool gamePaused;
@@ -86,6 +89,12 @@ namespace Terraria
     internal sealed class MainInstance
     {
         public int invBottom = 258;
+        public object[] shop = new object[10];
+
+        public void OpenShop(int shopIndex)
+        {
+            throw new InvalidOperationException("Search query tests must not call Main.OpenShop.");
+        }
     }
 
     internal sealed class TestVector2
@@ -136,6 +145,7 @@ namespace Terraria
         public int statLifeMax2;
         public int statMana;
         public int statManaMax2;
+        public int talkNPC = -1;
         public int[] buffType = new int[22];
         public int[] buffTime = new int[22];
         public bool magicQuiver;
@@ -211,6 +221,17 @@ namespace Terraria
     {
         public object[] item = new object[40];
         public int maxItems = 40;
+
+        public void SetupShop(int shopIndex)
+        {
+            throw new InvalidOperationException("Search query tests must not call Chest.SetupShop.");
+        }
+    }
+
+    internal sealed class NPC
+    {
+        public int type;
+        public bool active = true;
     }
 
     internal sealed class Recipe
@@ -471,6 +492,145 @@ namespace Terraria.GameContent.FishDropRules
     }
 }
 
+namespace Terraria.GameContent.ItemDropRules
+{
+    internal struct DropRateInfo
+    {
+        public int itemId;
+        public int stackMin;
+        public int stackMax;
+        public float dropRate;
+        public List<IItemDropRuleCondition> conditions;
+
+        public DropRateInfo(int itemId, int stackMin, int stackMax, float dropRate, List<IItemDropRuleCondition> conditions)
+        {
+            this.itemId = itemId;
+            this.stackMin = stackMin;
+            this.stackMax = stackMax;
+            this.dropRate = dropRate;
+            this.conditions = conditions;
+        }
+    }
+
+    internal struct DropRateInfoChainFeed
+    {
+        public float parentDroprateChance;
+
+        public DropRateInfoChainFeed(float dropRate)
+        {
+            parentDroprateChance = dropRate;
+        }
+    }
+
+    internal interface IItemDropRuleCondition
+    {
+        bool CanShowItemDropInUI();
+
+        string GetConditionDescription();
+    }
+
+    internal sealed class TestItemDropRule
+    {
+        private readonly List<DropRateInfo> _drops;
+
+        public TestItemDropRule(params DropRateInfo[] drops)
+        {
+            _drops = new List<DropRateInfo>(drops ?? new DropRateInfo[0]);
+        }
+
+        public void ReportDroprates(List<DropRateInfo> drops, DropRateInfoChainFeed ratesInfo)
+        {
+            if (drops == null)
+            {
+                return;
+            }
+
+            for (var index = 0; index < _drops.Count; index++)
+            {
+                drops.Add(_drops[index]);
+            }
+        }
+    }
+
+    internal sealed class TestItemDropDatabase
+    {
+        private readonly Dictionary<int, List<object>> _rulesByNpc = new Dictionary<int, List<object>>();
+        private readonly List<object> _globalRules = new List<object>();
+
+        public int QueryCount;
+
+        public List<object> GetRulesForNPCID(int npcNetId, bool includeGlobalDrops)
+        {
+            QueryCount++;
+            var result = new List<object>();
+            if (includeGlobalDrops)
+            {
+                result.AddRange(_globalRules);
+            }
+
+            List<object> rules;
+            if (_rulesByNpc.TryGetValue(npcNetId, out rules))
+            {
+                result.AddRange(rules);
+            }
+
+            return result;
+        }
+
+        public void AddNpcRule(int npcNetId, object rule)
+        {
+            List<object> rules;
+            if (!_rulesByNpc.TryGetValue(npcNetId, out rules))
+            {
+                rules = new List<object>();
+                _rulesByNpc[npcNetId] = rules;
+            }
+
+            rules.Add(rule);
+        }
+
+        public void AddGlobalRule(object rule)
+        {
+            _globalRules.Add(rule);
+        }
+    }
+
+    internal sealed class TestItemDropCondition : IItemDropRuleCondition
+    {
+        private readonly string _description;
+        private readonly bool _canShow;
+
+        public TestItemDropCondition(string description, bool canShow)
+        {
+            _description = description;
+            _canShow = canShow;
+        }
+
+        public bool CanShowItemDropInUI()
+        {
+            return _canShow;
+        }
+
+        public string GetConditionDescription()
+        {
+            return _description;
+        }
+    }
+
+    internal sealed class TestUnnamedDropCondition : IItemDropRuleCondition
+    {
+        public bool CanShowItemDropInUI()
+        {
+            return true;
+        }
+
+        public string GetConditionDescription()
+        {
+            return null;
+        }
+    }
+}
+
 namespace Terraria.ID
 {
     internal static class ItemID
@@ -592,6 +752,9 @@ namespace Terraria.ID
 
     internal static class NPCID
     {
+        public static readonly short NegativeIDCount = -66;
+        public static readonly short Count = 700;
+
         public const short Bunny = 46;
         public const short Worm = 357;
         public const short TruffleWorm = 374;
@@ -1261,11 +1424,26 @@ namespace JueMingZ.Tests
             Run("search query indexes direct and recipe group usages", ref failed, SearchQueryIndexesDirectAndRecipeGroupUsages);
             Run("search query indexes direct shimmer relations", ref failed, SearchQueryIndexesDirectShimmerRelations);
             Run("search query empty facts stay empty", ref failed, SearchQueryEmptyFactsStayEmpty);
+            Run("search query acquisition sources default to empty", ref failed, SearchQueryAcquisitionSourcesDefaultToEmpty);
+            Run("search query indexes NPC drop sources", ref failed, SearchQueryIndexesNpcDropSources);
+            Run("search query NPC drop conditions degrade safely", ref failed, SearchQueryNpcDropConditionsDegradeSafely);
+            Run("search query NPC drop index handles global negative and cache", ref failed, SearchQueryNpcDropIndexHandlesGlobalNegativeAndCache);
+            Run("search query indexes current NPC shop sources", ref failed, SearchQueryIndexesCurrentNpcShopSources);
+            Run("search query NPC shop source requires open shop", ref failed, SearchQueryNpcShopSourceRequiresOpenShop);
+            Run("search query NPC shop source cache follows context", ref failed, SearchQueryNpcShopSourceCacheFollowsContext);
+            Run("search query indexes mining gathering tags", ref failed, SearchQueryIndexesMiningGatheringTags);
+            Run("search query mining gathering tags cover herbs and environment", ref failed, SearchQueryMiningGatheringTagsCoverHerbsAndEnvironment);
+            Run("search query mining gathering tags keep unknown items empty", ref failed, SearchQueryMiningGatheringTagsKeepUnknownItemsEmpty);
+            Run("search query acquisition sources keep drop shop tag order", ref failed, SearchQueryAcquisitionSourcesKeepDropShopTagOrder);
             Run("search query formats base value as coins", ref failed, SearchQueryFormatsBaseValueAsCoins);
             Run("search query basic facts use Chinese labels and placement values", ref failed, SearchQueryBasicFactsUseChineseLabelsAndPlacementValues);
             Run("search query basic panel height tracks column count", ref failed, SearchQueryBasicPanelHeightTracksColumnCount);
             Run("search query recipe layout wraps ingredients and keeps all rows", ref failed, SearchQueryRecipeLayoutWrapsIngredientsAndKeepsAllRows);
             Run("search query shimmer layout keeps all reverse sources", ref failed, SearchQueryShimmerLayoutKeepsAllReverseSources);
+            Run("search query acquisition model clones value facts", ref failed, SearchQueryAcquisitionModelClonesValueFacts);
+            Run("search query acquisition sources affect layout signature", ref failed, SearchQueryAcquisitionSourcesAffectLayoutSignature);
+            Run("search query acquisition section keeps order and height", ref failed, SearchQueryAcquisitionSectionKeepsOrderAndHeight);
+            Run("search query UI hot path avoids acquisition source reads", ref failed, SearchQueryUiHotPathAvoidsAcquisitionSourceReads);
             Run("search query UI state selects candidate and clears", ref failed, SearchQueryUiStateSelectsCandidateAndClears);
             Run("search query UI candidate scroll keeps own viewport", ref failed, SearchQueryUiCandidateScrollKeepsOwnViewport);
             Run("search query page layout tracks UI state", ref failed, SearchQueryPageLayoutTracksUiState);
@@ -1320,6 +1498,8 @@ namespace JueMingZ.Tests
             Run("search chest locator snapshot degrades unreadable chests", ref failed, SearchChestLocatorSnapshotDegradesUnreadableChests);
             Run("search chest locator snapshot does not retain mutable items", ref failed, SearchChestLocatorSnapshotDoesNotRetainMutableItems);
             Run("search chest locator UI state submits snapshot and clear removes highlight", ref failed, SearchChestLocatorUiStateSubmitsSnapshotAndClearRemovesHighlight);
+            Run("search chest locator no-result notice does not close window", ref failed, SearchChestLocatorNoResultNoticeDoesNotCloseWindow);
+            Run("search chest locator hit closes window and chest open clears highlight", ref failed, SearchChestLocatorHitClosesWindowAndChestOpenClearsHighlight);
             Run("search chest locator UI state rejects empty and too many without scanning", ref failed, SearchChestLocatorUiStateRejectsEmptyAndTooManyWithoutScanning);
             Run("search chest locator commands focus and clear dedicated state", ref failed, SearchChestLocatorCommandsFocusAndClearDedicatedState);
             Run("search chest locator layout stays above search query and tracks height", ref failed, SearchChestLocatorLayoutStaysAboveSearchQueryAndTracksHeight);

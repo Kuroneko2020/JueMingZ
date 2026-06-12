@@ -144,13 +144,32 @@ namespace JueMingZ.Input
             var snapshot = ChestItemLocatorService.GetSnapshot(queryResult, context, queryVersion);
             SearchChestLocatorUiState.ApplySnapshot(queryVersion, snapshot);
             SearchChestLocatorUiState.ApplySectionRequestResult(queryVersion, sectionRequest);
+            var windowClosed = ShouldCloseSearchChestLocatorWindow(snapshot);
+            if (windowClosed)
+            {
+                LegacyMainUiState.SetVisible(false);
+                SearchChestLocatorUiState.ClearVisibleStateAfterHitClose();
+            }
+
             RecordSearchChestLocatorCommand(
                 command,
                 "Ui.SearchChestLocator.Submit",
                 "Succeeded",
-                "箱内物品定位已刷新附近箱子快照。",
+                windowClosed ? "箱内物品定位已命中并关闭决明界面。" : "箱内物品定位已刷新附近箱子快照。",
                 before,
-                BuildSearchChestLocatorMetadata(action, itemType, queryVersion, true, string.Empty, snapshot, sectionRequest));
+                BuildSearchChestLocatorMetadata(action, itemType, queryVersion, true, string.Empty, snapshot, sectionRequest, windowClosed));
+        }
+
+        internal static bool ShouldCloseSearchChestLocatorWindowForTesting(ChestItemLocatorSnapshot snapshot)
+        {
+            return ShouldCloseSearchChestLocatorWindow(snapshot);
+        }
+
+        private static bool ShouldCloseSearchChestLocatorWindow(ChestItemLocatorSnapshot snapshot)
+        {
+            return snapshot != null &&
+                   string.Equals(snapshot.Status, ChestItemLocatorSnapshot.StatusOk, StringComparison.Ordinal) &&
+                   snapshot.HitCount > 0;
         }
 
         private static string BuildSearchChestLocatorMetadata(
@@ -161,7 +180,7 @@ namespace JueMingZ.Input
             string skipReason,
             ChestItemLocatorSnapshot snapshot)
         {
-            return BuildSearchChestLocatorMetadata(action, itemType, queryVersion, submitted, skipReason, snapshot, null);
+            return BuildSearchChestLocatorMetadata(action, itemType, queryVersion, submitted, skipReason, snapshot, null, false);
         }
 
         private static string BuildSearchChestLocatorMetadata(
@@ -171,11 +190,13 @@ namespace JueMingZ.Input
             bool submitted,
             string skipReason,
             ChestItemLocatorSnapshot snapshot,
-            ChestItemLocatorSectionRequestResult sectionRequest)
+            ChestItemLocatorSectionRequestResult sectionRequest,
+            bool windowClosed)
         {
             return "{" +
                    "\"action\":\"" + EscapeJson(action) + "\"," +
                    "\"submitted\":" + BoolRaw(submitted) + "," +
+                   "\"windowClosed\":" + BoolRaw(windowClosed) + "," +
                    "\"itemType\":" + itemType.ToString(CultureInfo.InvariantCulture) + "," +
                    "\"queryVersion\":" + queryVersion.ToString(CultureInfo.InvariantCulture) + "," +
                    "\"skipReason\":\"" + EscapeJson(skipReason) + "\"," +

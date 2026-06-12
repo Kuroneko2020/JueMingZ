@@ -4,7 +4,10 @@ using JueMingZ.Automation.Information;
 using JueMingZ.Automation.Search;
 using JueMingZ.Automation.Search.ChestLocator;
 using JueMingZ.Config;
+using JueMingZ.GameState;
+using JueMingZ.GameState.Ui;
 using JueMingZ.Input;
+using JueMingZ.Runtime;
 using JueMingZ.UI.Legacy;
 using JueMingZ.UI.Legacy.Framework;
 
@@ -397,9 +400,10 @@ namespace JueMingZ.Tests
                     SearchChestLocatorUiState.ApplySnapshot(queryVersion, snapshot);
                     var lines = SearchChestLocatorUiState.GetSummaryLinesForTesting();
                     if (SearchChestLocatorUiState.GetSnapshot().HitCount != 1 ||
-                        lines[0].IndexOf("命中 1 个箱子", StringComparison.Ordinal) < 0)
+                        lines[0].IndexOf("命中 1 个箱子", StringComparison.Ordinal) < 0 ||
+                        !string.IsNullOrWhiteSpace(SearchChestLocatorUiState.GetNoticeMessageForTesting()))
                     {
-                        throw new InvalidOperationException("Chest locator UI state should expose the submitted snapshot summary.");
+                        throw new InvalidOperationException("Chest locator UI state should keep a successful submitted snapshot without a no-result notice.");
                     }
 
                     SearchChestLocatorUiState.Clear();
@@ -408,6 +412,121 @@ namespace JueMingZ.Tests
                         SearchChestLocatorUiState.QueryVersion <= queryVersion)
                     {
                         throw new InvalidOperationException("Clearing chest locator UI state must remove query text and any highlight snapshot.");
+                    }
+                });
+            });
+        }
+
+        private static void SearchChestLocatorNoResultNoticeDoesNotCloseWindow()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                WithChestLocatorScanFixture(() =>
+                {
+                    var context = CreateChestLocatorContext(100);
+                    var ports = new ChestLocatorFakePorts();
+                    ConfigureChestLocatorChest(5, 6);
+                    ports.Add(0, CreateChestLocatorFakeChest(0, 5, 6, 40, CreateChestLocatorItem(104, 3)));
+
+                    SearchChestLocatorUiState.ResetForTesting();
+                    SearchChestLocatorUiState.UpdateDraft("铁锭");
+
+                    ChestItemLocatorQueryResult query;
+                    long queryVersion;
+                    string message;
+                    if (!SearchChestLocatorUiState.TryBeginSubmit(out query, out queryVersion, out message))
+                    {
+                        throw new InvalidOperationException("Expected chest locator no-result test to submit a valid query.");
+                    }
+
+                    var snapshot = ChestItemLocatorService.GetSnapshotForTesting(
+                        query,
+                        context,
+                        queryVersion,
+                        ChestItemLocatorScanOptions.Default,
+                        ports.ToPorts(),
+                        true);
+                    SearchChestLocatorUiState.ApplySnapshot(queryVersion, snapshot);
+
+                    AssertStringEquals(
+                        SearchChestLocatorUiState.GetNoticeMessageForTesting(),
+                        SearchChestLocatorUiState.SearchRangeNoResultMessage,
+                        "chest locator no-result notice");
+                    if (LegacyUiActionService.ShouldCloseSearchChestLocatorWindowForTesting(snapshot))
+                    {
+                        throw new InvalidOperationException("Chest locator submit must not close the F5 window when the scan has no hits.");
+                    }
+
+                    SearchChestLocatorUiState.ResetForTesting();
+                    if (SearchChestLocatorUiState.HasNotice)
+                    {
+                        throw new InvalidOperationException("Chest locator notice must not be a persistent summary panel.");
+                    }
+                });
+            });
+        }
+
+        private static void SearchChestLocatorHitClosesWindowAndChestOpenClearsHighlight()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                WithChestLocatorScanFixture(() =>
+                {
+                    var context = CreateChestLocatorContext(100);
+                    var ports = new ChestLocatorFakePorts();
+                    ConfigureChestLocatorChest(5, 6);
+                    ports.Add(0, CreateChestLocatorFakeChest(0, 5, 6, 40, CreateChestLocatorItem(100, 3)));
+
+                    SearchChestLocatorUiState.ResetForTesting();
+                    SearchChestLocatorUiState.UpdateDraft("铁锭");
+
+                    ChestItemLocatorQueryResult query;
+                    long queryVersion;
+                    string message;
+                    if (!SearchChestLocatorUiState.TryBeginSubmit(out query, out queryVersion, out message))
+                    {
+                        throw new InvalidOperationException("Expected chest locator hit test to submit a valid query.");
+                    }
+
+                    var snapshot = ChestItemLocatorService.GetSnapshotForTesting(
+                        query,
+                        context,
+                        queryVersion,
+                        ChestItemLocatorScanOptions.Default,
+                        ports.ToPorts(),
+                        true);
+                    SearchChestLocatorUiState.ApplySnapshot(queryVersion, snapshot);
+
+                    if (!LegacyUiActionService.ShouldCloseSearchChestLocatorWindowForTesting(snapshot))
+                    {
+                        throw new InvalidOperationException("Chest locator submit should close the F5 window only after a real hit.");
+                    }
+
+                    if (!SearchChestLocatorUiState.ClearVisibleStateAfterHitClose() ||
+                        SearchChestLocatorUiState.GetSnapshot().HitCount != 1 ||
+                        !string.IsNullOrWhiteSpace(SearchChestLocatorUiState.QueryText) ||
+                        SearchChestLocatorUiState.CandidateCount != 0 ||
+                        SearchChestLocatorUiState.SelectedItemType != 0)
+                    {
+                        throw new InvalidOperationException("Closing F5 after a hit should clear visible query state while keeping the world highlight snapshot.");
+                    }
+
+                    var beforeClearVersion = SearchChestLocatorUiState.QueryVersion;
+                    var cleared = JueMingZRuntime.ClearSearchChestLocatorHighlightIfChestOpenForTesting(
+                        new GameStateSnapshot { Ui = new UiStateSnapshot { ChestOpen = true } });
+                    if (!cleared ||
+                        SearchChestLocatorUiState.GetSnapshot().HitCount != 0 ||
+                        SearchChestLocatorUiState.QueryVersion <= beforeClearVersion ||
+                        !string.IsNullOrWhiteSpace(SearchChestLocatorUiState.QueryText))
+                    {
+                        throw new InvalidOperationException("Opening a chest should clear only the chest locator highlight snapshot.");
+                    }
+
+                    var closedChest = JueMingZRuntime.ClearSearchChestLocatorHighlightIfChestOpenForTesting(
+                        new GameStateSnapshot { Ui = new UiStateSnapshot { ChestOpen = false } });
+                    if (closedChest)
+                    {
+                        throw new InvalidOperationException("Chest locator highlight cleanup must only run while a chest is open.");
                     }
                 });
             });
@@ -426,7 +545,8 @@ namespace JueMingZ.Tests
                     queryVersion != 1 ||
                     query == null ||
                     !string.Equals(query.Status, ChestItemLocatorQueryResult.StatusEmptyInput, StringComparison.Ordinal) ||
-                    SearchChestLocatorUiState.GetSnapshot().HitCount != 0)
+                    SearchChestLocatorUiState.GetSnapshot().HitCount != 0 ||
+                    !string.Equals(SearchChestLocatorUiState.GetNoticeMessageForTesting(), SearchChestLocatorUiState.SearchRangeNoResultMessage, StringComparison.Ordinal))
                 {
                     throw new InvalidOperationException("Empty chest locator UI submit must fail before scanning and clear the snapshot.");
                 }
@@ -501,6 +621,10 @@ namespace JueMingZ.Tests
                 var labels = LegacyMainWindow.GetSearchChestLocatorInputRowTextForTesting();
                 AssertStringEquals(labels[0], "定位物品", "chest locator input label");
                 AssertStringEquals(labels[1], "定位", "chest locator submit button label");
+                if (LegacyMainWindow.CalculateSearchChestLocatorBlockHeightForTesting(540) != 36)
+                {
+                    throw new InvalidOperationException("Chest locator should not reserve an extra section title row above the input line.");
+                }
 
                 var settings = AppSettings.CreateDefault();
                 var window = new LegacyUiRect(40, 50, LegacyUiMetrics.DefaultWidth, LegacyUiMetrics.DefaultHeight);
@@ -508,6 +632,20 @@ namespace JueMingZ.Tests
                 var content = shell.ContentRect;
                 var initial = LegacyMainWindow.BuildPageLayoutSnapshotForTesting("search", window, content, 0, settings);
 
+                for (var index = 0; index < 10; index++)
+                {
+                    AddSearchItem(800 + index, "双列候选" + index, "ChestGridCandidate" + index, 999, 1, 0, true, false, -1, -1);
+                }
+
+                ItemQueryService.ResetForTesting();
+                SearchChestLocatorUiState.UpdateDraft("双列候选");
+                if (SearchChestLocatorUiState.CandidateCount != 10 ||
+                    LegacyMainWindow.GetSearchChestLocatorCandidateRowsForTesting() != 5)
+                {
+                    throw new InvalidOperationException("Chest locator candidates should render every candidate in a two-column grid without the old four-row cap.");
+                }
+
+                SearchChestLocatorUiState.ResetForTesting();
                 SearchChestLocatorUiState.UpdateDraft("铁");
                 var candidates = LegacyMainWindow.BuildPageLayoutSnapshotForTesting("search", window, content, 0, settings);
                 if (candidates.PageStateSignature == initial.PageStateSignature ||

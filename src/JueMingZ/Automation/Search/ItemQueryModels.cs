@@ -129,6 +129,8 @@ namespace JueMingZ.Automation.Search
 
         public ItemQueryReference Item { get; set; }
 
+        public IList<ItemAcquisitionSourceSummary> AcquisitionSources { get; private set; }
+
         public IList<ItemQueryRecipeSummary> CraftingSources { get; private set; }
 
         public IList<ItemQueryRecipeSummary> CraftingUses { get; private set; }
@@ -138,6 +140,7 @@ namespace JueMingZ.Automation.Search
         public ItemQueryResult()
         {
             Status = string.Empty;
+            AcquisitionSources = new List<ItemAcquisitionSourceSummary>();
             CraftingSources = new List<ItemQueryRecipeSummary>();
             CraftingUses = new List<ItemQueryRecipeSummary>();
             Shimmer = new ItemQueryShimmerSummary();

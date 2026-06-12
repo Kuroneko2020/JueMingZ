@@ -35,7 +35,7 @@ namespace JueMingZ.Runtime
         private static long _lastRuntimeUpdateStartTimestamp;
         private static readonly RuntimeTickPipeline TickPipeline = CreateTickPipeline();
 
-        public const string Version = "1.7.611-chest-locator-validation-closeout";
+        public const string Version = "1.7.624-search-source-completion-plan";
 
         public static RuntimeState State { get; private set; } = new RuntimeState();
         public static FeatureRegistry FeatureRegistry { get; private set; }
@@ -118,6 +118,7 @@ namespace JueMingZ.Runtime
                 new RuntimeTickStage("ui-text-resource-monitor", UpdateUiTextResources),
                 new RuntimeTickStage("post-terraria-input-guards", RunPostTerrariaInputGuards),
                 new RuntimeTickStage("game-state-read", ReadGameState),
+                new RuntimeTickStage("search-chest-locator-lifecycle", RunSearchChestLocatorLifecycleGuards),
                 new RuntimeTickStage("input-focus-guard", RunInputFocusGuard),
                 new RuntimeTickStage("targeting-and-ui-actions", RunTargetingAndUiActions),
                 new RuntimeTickStage("automation-request-dispatch", DispatchAutomationRequests),
@@ -172,6 +173,26 @@ namespace JueMingZ.Runtime
                 State.LateBootstrapCompleted,
                 RuntimeGameStateReadOptionsBuilder.Build(context.SettingsSnapshot, context.DiagnosticSnapshotDue)).Snapshot;
             context.GameStateReadMs = RuntimeTickContext.GetElapsedMilliseconds(gameStateStart, Stopwatch.GetTimestamp());
+        }
+
+        private static void RunSearchChestLocatorLifecycleGuards(RuntimeTickContext context)
+        {
+            ClearSearchChestLocatorHighlightIfChestOpen(context == null ? null : context.GameState);
+        }
+
+        internal static bool ClearSearchChestLocatorHighlightIfChestOpenForTesting(GameStateSnapshot snapshot)
+        {
+            return ClearSearchChestLocatorHighlightIfChestOpen(snapshot);
+        }
+
+        private static bool ClearSearchChestLocatorHighlightIfChestOpen(GameStateSnapshot snapshot)
+        {
+            if (snapshot == null || snapshot.Ui == null || !snapshot.Ui.ChestOpen)
+            {
+                return false;
+            }
+
+            return SearchChestLocatorUiState.ClearSnapshotAfterChestOpened();
         }
 
         private static void RunInputFocusGuard(RuntimeTickContext context)

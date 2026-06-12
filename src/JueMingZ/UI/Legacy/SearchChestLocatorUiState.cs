@@ -12,6 +12,7 @@ namespace JueMingZ.UI.Legacy
         public const string ClearButtonId = "search-chest-locator:clear";
         public const string CandidateElementPrefix = "search-chest-locator:candidate:";
         public const int CandidateMaxResults = ChestItemLocatorQueryResolver.DefaultCandidateLimit;
+        public const string SearchRangeNoResultMessage = "搜索范围内未找到物品";
 
         private static readonly object SyncRoot = new object();
         private static readonly List<ChestItemLocatorCandidate> Candidates = new List<ChestItemLocatorCandidate>();
@@ -20,6 +21,7 @@ namespace JueMingZ.UI.Legacy
         private static string _candidateMessage = string.Empty;
         private static string _statusMessage = "输入物品名、内部名或 #ID 后点击定位。";
         private static string _degradeMessage = string.Empty;
+        private static string _noticeMessage = string.Empty;
         private static ChestItemLocatorQueryResult _queryResult = ChestItemLocatorQueryResolver.Resolve(string.Empty);
         private static ChestItemLocatorSnapshot _lastSnapshot = ChestItemLocatorSnapshot.Empty;
         private static int _selectedItemType;
@@ -43,6 +45,16 @@ namespace JueMingZ.UI.Legacy
         public static string DegradeMessage
         {
             get { lock (SyncRoot) { return _degradeMessage ?? string.Empty; } }
+        }
+
+        public static string NoticeMessage
+        {
+            get { lock (SyncRoot) { return _noticeMessage ?? string.Empty; } }
+        }
+
+        public static bool HasNotice
+        {
+            get { lock (SyncRoot) { return !string.IsNullOrWhiteSpace(_noticeMessage); } }
         }
 
         public static int CandidateCount
@@ -92,6 +104,7 @@ namespace JueMingZ.UI.Legacy
                 _queryText = text;
                 _selectedItemType = 0;
                 _degradeMessage = string.Empty;
+                _noticeMessage = string.Empty;
                 RebuildCandidatesLocked();
             }
         }
@@ -139,6 +152,7 @@ namespace JueMingZ.UI.Legacy
                 _lastSnapshot = snapshot ?? ChestItemLocatorSnapshot.Empty;
                 _statusMessage = BuildSnapshotMessage(_lastSnapshot);
                 _degradeMessage = BuildSnapshotDegradeMessage(_lastSnapshot);
+                _noticeMessage = ShouldShowNoResultNotice(_lastSnapshot) ? SearchRangeNoResultMessage : string.Empty;
             }
         }
 
@@ -154,6 +168,7 @@ namespace JueMingZ.UI.Legacy
                 _lastSnapshot = ChestItemLocatorSnapshot.Empty;
                 _statusMessage = "无法读取世界上下文，暂不能扫描附近箱子。";
                 _degradeMessage = string.IsNullOrWhiteSpace(skipReason) ? string.Empty : "原因：" + skipReason.Trim();
+                _noticeMessage = "无法读取世界上下文";
             }
         }
 
@@ -184,6 +199,7 @@ namespace JueMingZ.UI.Legacy
                 _candidateMessage = string.Empty;
                 _statusMessage = "输入物品名、内部名或 #ID 后点击定位。";
                 _degradeMessage = string.Empty;
+                _noticeMessage = string.Empty;
                 _queryResult = ChestItemLocatorQueryResolver.Resolve(string.Empty);
                 Candidates.Clear();
                 _selectedItemType = 0;
@@ -208,6 +224,52 @@ namespace JueMingZ.UI.Legacy
             }
         }
 
+        public static bool ClearSnapshotAfterChestOpened()
+        {
+            lock (SyncRoot)
+            {
+                if (_lastSnapshot == null ||
+                    object.ReferenceEquals(_lastSnapshot, ChestItemLocatorSnapshot.Empty) ||
+                    _lastSnapshot.HitCount <= 0)
+                {
+                    return false;
+                }
+
+                _lastSnapshot = ChestItemLocatorSnapshot.Empty;
+                _statusMessage = "已打开箱子，定位提示已清除。";
+                _degradeMessage = string.Empty;
+                _noticeMessage = string.Empty;
+                _queryVersion++;
+                return true;
+            }
+        }
+
+        public static bool ClearVisibleStateAfterHitClose()
+        {
+            lock (SyncRoot)
+            {
+                if (_lastSnapshot == null ||
+                    object.ReferenceEquals(_lastSnapshot, ChestItemLocatorSnapshot.Empty) ||
+                    _lastSnapshot.HitCount <= 0)
+                {
+                    return false;
+                }
+
+                _queryText = string.Empty;
+                _candidateMessage = string.Empty;
+                _statusMessage = "输入物品名、内部名或 #ID 后点击定位。";
+                _degradeMessage = string.Empty;
+                _noticeMessage = string.Empty;
+                _queryResult = ChestItemLocatorQueryResolver.Resolve(string.Empty);
+                Candidates.Clear();
+                _selectedItemType = 0;
+                // Keep the active snapshot and query version so the world
+                // highlight survives reopening F5 until the player clears it,
+                // opens a chest, or the overlay expires it naturally.
+                return true;
+            }
+        }
+
         public static int BuildStateSignature()
         {
             unchecked
@@ -219,6 +281,7 @@ namespace JueMingZ.UI.Legacy
                     AddHash(ref hash, _candidateMessage);
                     AddHash(ref hash, _statusMessage);
                     AddHash(ref hash, _degradeMessage);
+                    AddHash(ref hash, _noticeMessage);
                     AddHash(ref hash, _selectedItemType);
                     AddHash(ref hash, (int)_queryVersion);
                     AddHash(ref hash, (int)(_queryVersion >> 32));
@@ -252,7 +315,8 @@ namespace JueMingZ.UI.Legacy
                        "\"matchedSlotCount\":" + snapshot.MatchedSlotCount.ToString(CultureInfo.InvariantCulture) + "," +
                        "\"totalStack\":" + snapshot.TotalStack.ToString(CultureInfo.InvariantCulture) + "," +
                        "\"status\":\"" + EscapeJson(_statusMessage) + "\"," +
-                       "\"degrade\":\"" + EscapeJson(_degradeMessage) + "\"" +
+                       "\"degrade\":\"" + EscapeJson(_degradeMessage) + "\"," +
+                       "\"notice\":\"" + EscapeJson(_noticeMessage) + "\"" +
                        "}";
             }
         }
@@ -262,6 +326,14 @@ namespace JueMingZ.UI.Legacy
             lock (SyncRoot)
             {
                 return new[] { _statusMessage ?? string.Empty, _degradeMessage ?? string.Empty };
+            }
+        }
+
+        internal static string GetNoticeMessageForTesting()
+        {
+            lock (SyncRoot)
+            {
+                return _noticeMessage ?? string.Empty;
             }
         }
 
@@ -292,6 +364,7 @@ namespace JueMingZ.UI.Legacy
             _lastSnapshot = ChestItemLocatorSnapshot.Empty;
             _statusMessage = "正在扫描附近已同步箱子。";
             _degradeMessage = string.Empty;
+            _noticeMessage = string.Empty;
             return true;
         }
 
@@ -335,6 +408,14 @@ namespace JueMingZ.UI.Legacy
             _lastSnapshot = ChestItemLocatorSnapshot.Empty;
             _statusMessage = string.IsNullOrWhiteSpace(message) ? "无法提交定位请求。" : message.Trim();
             _degradeMessage = string.Empty;
+            _noticeMessage = SearchRangeNoResultMessage;
+        }
+
+        private static bool ShouldShowNoResultNotice(ChestItemLocatorSnapshot snapshot)
+        {
+            return snapshot == null ||
+                   !string.Equals(snapshot.Status, ChestItemLocatorSnapshot.StatusOk, StringComparison.Ordinal) ||
+                   snapshot.HitCount <= 0;
         }
 
         private static string BuildQueryStatusMessage(ChestItemLocatorQueryResult result)

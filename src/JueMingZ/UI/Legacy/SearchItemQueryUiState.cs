@@ -404,6 +404,7 @@ namespace JueMingZ.UI.Legacy
 
             AddHash(ref hash, result.Status);
             AddItemReferenceHash(ref hash, result.Item);
+            AddAcquisitionSourceListHash(ref hash, result.AcquisitionSources);
             AddRecipeListHash(ref hash, result.CraftingSources);
             AddRecipeListHash(ref hash, result.CraftingUses);
             AddShimmerHash(ref hash, result.Shimmer);
@@ -420,6 +421,36 @@ namespace JueMingZ.UI.Legacy
             AddHash(ref hash, candidate.ItemType);
             AddHash(ref hash, candidate.DisplayName);
             AddHash(ref hash, candidate.InternalName);
+        }
+
+        private static void AddAcquisitionSourceListHash(ref int hash, IList<ItemAcquisitionSourceSummary> sources)
+        {
+            var count = sources == null ? 0 : sources.Count;
+            AddHash(ref hash, count);
+            for (var index = 0; index < count; index++)
+            {
+                AddAcquisitionSourceHash(ref hash, sources[index]);
+            }
+        }
+
+        private static void AddAcquisitionSourceHash(ref int hash, ItemAcquisitionSourceSummary source)
+        {
+            if (source == null)
+            {
+                AddHash(ref hash, 0);
+                return;
+            }
+
+            AddHash(ref hash, source.SourceType);
+            AddHash(ref hash, source.Title);
+            AddHash(ref hash, source.SourceName);
+            AddHash(ref hash, source.QuantityText);
+            AddHash(ref hash, source.ProbabilityText);
+            AddHash(ref hash, source.ConditionText);
+            AddHash(ref hash, source.ContextText);
+            AddHash(ref hash, source.ItemType);
+            AddHash(ref hash, source.NpcNetId);
+            AddHash(ref hash, source.RelatedItemType);
         }
 
         private static void AddRecipeListHash(ref int hash, IList<ItemQueryRecipeSummary> recipes)
@@ -553,6 +584,19 @@ namespace JueMingZ.UI.Legacy
                 _hoverItemSource = string.Empty;
                 _hoverItemGameUpdateCount = 0;
                 ClearPendingSelectionLocked();
+                ClearCandidateViewportLocked();
+            }
+        }
+
+        internal static void SetSelectedResultForTesting(ItemQueryResult result)
+        {
+            lock (SyncRoot)
+            {
+                _selectedResult = Clone(result);
+                _selectedItemType = result != null && result.Found ? result.ItemType : 0;
+                _queryText = BuildSelectedQueryText(result, result == null ? 0 : result.ItemType);
+                Candidates.Clear();
+                _candidateMessage = string.Empty;
                 ClearCandidateViewportLocked();
             }
         }
@@ -753,6 +797,7 @@ namespace JueMingZ.UI.Legacy
                 Item = Clone(result.Item),
                 Shimmer = Clone(result.Shimmer)
             };
+            AddAcquisitionSources(clone.AcquisitionSources, result.AcquisitionSources);
             AddRecipes(clone.CraftingSources, result.CraftingSources);
             AddRecipes(clone.CraftingUses, result.CraftingUses);
             return clone;
@@ -791,6 +836,36 @@ namespace JueMingZ.UI.Legacy
             }
 
             return clone;
+        }
+
+        private static void AddAcquisitionSources(IList<ItemAcquisitionSourceSummary> target, IList<ItemAcquisitionSourceSummary> source)
+        {
+            if (target == null || source == null)
+            {
+                return;
+            }
+
+            for (var index = 0; index < source.Count; index++)
+            {
+                target.Add(Clone(source[index]));
+            }
+        }
+
+        private static ItemAcquisitionSourceSummary Clone(ItemAcquisitionSourceSummary source)
+        {
+            return source == null ? null : new ItemAcquisitionSourceSummary
+            {
+                SourceType = source.SourceType,
+                Title = source.Title,
+                SourceName = source.SourceName,
+                QuantityText = source.QuantityText,
+                ProbabilityText = source.ProbabilityText,
+                ConditionText = source.ConditionText,
+                ContextText = source.ContextText,
+                ItemType = source.ItemType,
+                NpcNetId = source.NpcNetId,
+                RelatedItemType = source.RelatedItemType
+            };
         }
 
         private static void AddRecipes(IList<ItemQueryRecipeSummary> target, IList<ItemQueryRecipeSummary> source)

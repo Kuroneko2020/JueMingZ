@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
+using System.Text;
 using JueMingZ.Automation.Search;
 using JueMingZ.Compat;
 using JueMingZ.Config;
@@ -25,11 +27,12 @@ namespace JueMingZ.Tests
                 }
 
                 AssertStringEquals(result.Status, "unknownItem", "search unknown item status");
-                if (result.CraftingSources.Count != 0 ||
+                if (result.AcquisitionSources.Count != 0 ||
+                    result.CraftingSources.Count != 0 ||
                     result.CraftingUses.Count != 0 ||
                     result.Shimmer.HasAnyRelation)
                 {
-                    throw new InvalidOperationException("Unknown search item must keep recipe and shimmer facts empty.");
+                    throw new InvalidOperationException("Unknown search item must keep acquisition, recipe, and shimmer facts empty.");
                 }
             });
         }
@@ -156,11 +159,310 @@ namespace JueMingZ.Tests
                     throw new InvalidOperationException("Known item without facts should still be a found query result.");
                 }
 
-                if (result.CraftingSources.Count != 0 ||
+                if (result.AcquisitionSources.Count != 0 ||
+                    result.CraftingSources.Count != 0 ||
                     result.CraftingUses.Count != 0 ||
                     result.Shimmer.HasAnyRelation)
                 {
-                    throw new InvalidOperationException("Known item without recipe or shimmer facts should degrade to empty sections.");
+                    throw new InvalidOperationException("Known item without acquisition, recipe, or shimmer facts should degrade to empty sections.");
+                }
+            });
+        }
+
+        private static void SearchQueryAcquisitionSourcesDefaultToEmpty()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                var result = ItemQueryService.BuildQuery(100);
+                if (!result.Found || result.AcquisitionSources == null || result.AcquisitionSources.Count != 0)
+                {
+                    throw new InvalidOperationException("Stage 02 acquisition source hook should return a stable empty source list.");
+                }
+            });
+        }
+
+        private static void SearchQueryIndexesNpcDropSources()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                var dropDb = new Terraria.GameContent.ItemDropRules.TestItemDropDatabase();
+                Terraria.Main.ItemDropsDB = dropDb;
+                Terraria.Lang.NpcNames[10] = "僵尸";
+                dropDb.AddNpcRule(
+                    10,
+                    new Terraria.GameContent.ItemDropRules.TestItemDropRule(
+                        new Terraria.GameContent.ItemDropRules.DropRateInfo(100, 1, 2, 0.25f, null)));
+
+                ItemQueryService.ResetForTesting();
+                var result = ItemQueryService.BuildQuery(100);
+                if (!result.Found || result.AcquisitionSources.Count != 1)
+                {
+                    throw new InvalidOperationException("Expected item query to expose one NPC drop acquisition source.");
+                }
+
+                var source = result.AcquisitionSources[0];
+                AssertStringEquals(source.SourceType, ItemAcquisitionSourceTypes.NpcDrop, "NPC drop source type");
+                AssertStringEquals(source.Title, "NPC掉落", "NPC drop title");
+                AssertStringEquals(source.SourceName, "僵尸", "NPC drop source name");
+                AssertStringEquals(source.QuantityText, "1-2个", "NPC drop quantity");
+                AssertStringEquals(source.ProbabilityText, "25%", "NPC drop probability");
+                if (source.NpcNetId != 10 || source.ItemType != 100 || source.RelatedItemType != 100)
+                {
+                    throw new InvalidOperationException("NPC drop source must preserve item and NPC ids.");
+                }
+            });
+        }
+
+        private static void SearchQueryNpcDropConditionsDegradeSafely()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                var dropDb = new Terraria.GameContent.ItemDropRules.TestItemDropDatabase();
+                Terraria.Main.ItemDropsDB = dropDb;
+                Terraria.Lang.NpcNames[20] = "测试 Boss";
+
+                dropDb.AddNpcRule(
+                    20,
+                    new Terraria.GameContent.ItemDropRules.TestItemDropRule(
+                        new Terraria.GameContent.ItemDropRules.DropRateInfo(
+                            102,
+                            1,
+                            1,
+                            0.3333f,
+                            new List<Terraria.GameContent.ItemDropRules.IItemDropRuleCondition>
+                            {
+                                new Terraria.GameContent.ItemDropRules.TestItemDropCondition("专家模式", true),
+                                new Terraria.GameContent.ItemDropRules.TestUnnamedDropCondition()
+                            }),
+                        new Terraria.GameContent.ItemDropRules.DropRateInfo(
+                            103,
+                            1,
+                            1,
+                            0.1f,
+                            new List<Terraria.GameContent.ItemDropRules.IItemDropRuleCondition>
+                            {
+                                new Terraria.GameContent.ItemDropRules.TestItemDropCondition(string.Empty, false)
+                            })));
+
+                ItemQueryService.ResetForTesting();
+                var expert = ItemQueryService.BuildQuery(102).AcquisitionSources;
+                if (expert.Count != 1 ||
+                    expert[0].ConditionText.IndexOf("专家模式", StringComparison.Ordinal) < 0 ||
+                    expert[0].ConditionText.IndexOf("TestUnnamedDropCondition", StringComparison.Ordinal) < 0 ||
+                    !string.Equals(expert[0].ProbabilityText, "33.33%", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("NPC drop source should keep readable conditions and type-name fallback.");
+                }
+
+                var hidden = ItemQueryService.BuildQuery(103).AcquisitionSources;
+                if (hidden.Count != 1 || !string.Equals(hidden[0].ConditionText, "特殊条件", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("NPC drop source should degrade hidden conditions to a safe summary.");
+                }
+            });
+        }
+
+        private static void SearchQueryNpcDropIndexHandlesGlobalNegativeAndCache()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                var dropDb = new Terraria.GameContent.ItemDropRules.TestItemDropDatabase();
+                Terraria.Main.ItemDropsDB = dropDb;
+                Terraria.Lang.NpcNames[-65] = "大型黄蜂";
+                dropDb.AddGlobalRule(
+                    new Terraria.GameContent.ItemDropRules.TestItemDropRule(
+                        new Terraria.GameContent.ItemDropRules.DropRateInfo(101, 1, 1, 0.01f, null)));
+                dropDb.AddNpcRule(
+                    -65,
+                    new Terraria.GameContent.ItemDropRules.TestItemDropRule(
+                        new Terraria.GameContent.ItemDropRules.DropRateInfo(102, 2, 4, 0.5f, null)));
+
+                ItemQueryService.ResetForTesting();
+                var global = ItemQueryService.BuildQuery(101).AcquisitionSources;
+                var firstQueryCount = dropDb.QueryCount;
+                var negative = ItemQueryService.BuildQuery(102).AcquisitionSources;
+                var secondQueryCount = dropDb.QueryCount;
+                ItemQueryService.BuildQuery(101);
+                var thirdQueryCount = dropDb.QueryCount;
+
+                if (global.Count != 1 ||
+                    !string.Equals(global[0].SourceName, "任意 NPC", StringComparison.Ordinal) ||
+                    !string.Equals(global[0].ContextText, "全局掉落规则", StringComparison.Ordinal) ||
+                    global[0].NpcNetId != 0)
+                {
+                    throw new InvalidOperationException("Global NPC drops should be exposed once as a broad source.");
+                }
+
+                if (negative.Count != 1 ||
+                    negative[0].NpcNetId != -65 ||
+                    !string.Equals(negative[0].SourceName, "大型黄蜂", StringComparison.Ordinal) ||
+                    !string.Equals(negative[0].QuantityText, "2-4个", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Negative NPC net id drops should be scanned and named.");
+                }
+
+                if (firstQueryCount <= 0 || secondQueryCount != firstQueryCount || thirdQueryCount != firstQueryCount)
+                {
+                    throw new InvalidOperationException("NPC drop index should be cached after the first lazy build.");
+                }
+            });
+        }
+
+        private static void SearchQueryIndexesCurrentNpcShopSources()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                AddOpenSearchShop(1, 5, 40, new Terraria.TestRecipeItem { type = 104, stack = 3 });
+                Terraria.Lang.NpcNames[40] = "商人";
+
+                ItemQueryService.ResetForTesting();
+                var result = ItemQueryService.BuildQuery(104);
+                if (!result.Found || result.AcquisitionSources.Count != 1)
+                {
+                    throw new InvalidOperationException("Expected current open NPC shop item to appear as an acquisition source.");
+                }
+
+                var source = result.AcquisitionSources[0];
+                AssertStringEquals(source.SourceType, ItemAcquisitionSourceTypes.NpcShop, "NPC shop source type");
+                AssertStringEquals(source.Title, "NPC出售", "NPC shop source title");
+                AssertStringEquals(source.SourceName, "商人", "NPC shop source name");
+                AssertStringEquals(source.QuantityText, "可购买", "NPC shop quantity");
+                AssertStringEquals(source.ConditionText, "当前上下文可售卖", "NPC shop condition");
+                AssertContains(source.ContextText, "当前已打开 NPC 商店快照");
+                AssertContains(source.ContextText, "Shop #1");
+                if (source.NpcNetId != 40 || source.ItemType != 104 || source.RelatedItemType != 104)
+                {
+                    throw new InvalidOperationException("NPC shop source must preserve item type, related item, and source NPC type.");
+                }
+            });
+        }
+
+        private static void SearchQueryNpcShopSourceRequiresOpenShop()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                AddOpenSearchShop(1, 5, 40, new Terraria.TestRecipeItem { type = 104, stack = 3 });
+                Terraria.Main.npcShop = 0;
+
+                ItemQueryService.ResetForTesting();
+                var result = ItemQueryService.BuildQuery(104);
+                if (!result.Found || result.AcquisitionSources.Count != 0)
+                {
+                    throw new InvalidOperationException("NPC shop acquisition source should stay empty when no NPC shop is currently open.");
+                }
+            });
+        }
+
+        private static void SearchQueryNpcShopSourceCacheFollowsContext()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                AddOpenSearchShop(1, 5, 40, new Terraria.TestRecipeItem { type = 104, stack = 1 });
+
+                ItemQueryService.ResetForTesting();
+                var first = ItemQueryService.BuildQuery(104).AcquisitionSources;
+                var empty = ItemQueryService.BuildQuery(100).AcquisitionSources;
+
+                var shop = (Terraria.Chest)((Terraria.MainInstance)Terraria.Main.instance).shop[1];
+                shop.item[0] = new Terraria.TestRecipeItem { type = 100, stack = 1 };
+                Terraria.Main.GameUpdateCount++;
+
+                var refreshed = ItemQueryService.BuildQuery(100).AcquisitionSources;
+                if (first.Count != 1 || empty.Count != 0 || refreshed.Count != 1 || refreshed[0].ItemType != 100)
+                {
+                    throw new InvalidOperationException("NPC shop acquisition source cache should rebuild when the current context key changes.");
+                }
+            });
+        }
+
+        private static void SearchQueryIndexesMiningGatheringTags()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                AddSearchItem(12, "铜矿", "CopperOre", 999, 0, 0, true, false, -1, -1);
+
+                ItemQueryService.ResetForTesting();
+                var result = ItemQueryService.BuildQuery(12);
+                if (!result.Found || result.AcquisitionSources.Count != 1)
+                {
+                    throw new InvalidOperationException("Expected copper ore to expose one mining/gathering acquisition tag.");
+                }
+
+                var source = result.AcquisitionSources[0];
+                AssertStringEquals(source.SourceType, ItemAcquisitionSourceTypes.MiningGatheringTag, "mining tag source type");
+                AssertStringEquals(source.Title, "常见挖掘", "mining tag title");
+                AssertStringEquals(source.SourceName, "基础矿脉", "mining tag source name");
+                AssertStringEquals(source.QuantityText, "常见来源", "mining tag quantity label");
+                AssertContains(source.ConditionText, "地下/洞穴层");
+                AssertContains(source.ContextText, "非完整百科");
+                if (source.ItemType != 12 || source.RelatedItemType != 12 || source.NpcNetId != -1)
+                {
+                    throw new InvalidOperationException("Mining/gathering tags should preserve item ids without NPC ownership.");
+                }
+            });
+        }
+
+        private static void SearchQueryMiningGatheringTagsCoverHerbsAndEnvironment()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                AddSearchItem(313, "太阳花", "Daybloom", 999, 0, 0, true, true, -1, -1);
+                AddSearchItem(3, "石块", "StoneBlock", 999, 0, 0, true, false, 1, -1);
+
+                ItemQueryService.ResetForTesting();
+                var herb = ItemQueryService.BuildQuery(313).AcquisitionSources;
+                var block = ItemQueryService.BuildQuery(3).AcquisitionSources;
+                if (herb.Count != 1 ||
+                    !string.Equals(herb[0].Title, "常见采集", StringComparison.Ordinal) ||
+                    herb[0].ConditionText.IndexOf("森林", StringComparison.Ordinal) < 0)
+                {
+                    throw new InvalidOperationException("Mining/gathering tags should cover representative herbs with biome or timing text.");
+                }
+
+                if (block.Count != 1 ||
+                    !string.Equals(block[0].Title, "常见挖掘", StringComparison.Ordinal) ||
+                    block[0].ConditionText.IndexOf("环境块", StringComparison.Ordinal) < 0)
+                {
+                    throw new InvalidOperationException("Mining/gathering tags should cover representative natural environment blocks.");
+                }
+            });
+        }
+
+        private static void SearchQueryMiningGatheringTagsKeepUnknownItemsEmpty()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                var result = ItemQueryService.BuildQuery(105);
+                if (!result.Found || result.AcquisitionSources.Count != 0)
+                {
+                    throw new InvalidOperationException("Unregistered mining/gathering items should not receive guessed acquisition tags.");
+                }
+            });
+        }
+
+        private static void SearchQueryAcquisitionSourcesKeepDropShopTagOrder()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                AddSearchItem(12, "铜矿", "CopperOre", 999, 0, 0, true, false, -1, -1);
+                var dropDb = new Terraria.GameContent.ItemDropRules.TestItemDropDatabase();
+                Terraria.Main.ItemDropsDB = dropDb;
+                Terraria.Lang.NpcNames[10] = "测试史莱姆";
+                dropDb.AddNpcRule(
+                    10,
+                    new Terraria.GameContent.ItemDropRules.TestItemDropRule(
+                        new Terraria.GameContent.ItemDropRules.DropRateInfo(12, 1, 1, 0.25f, null)));
+                AddOpenSearchShop(1, 5, 40, new Terraria.TestRecipeItem { type = 12, stack = 1 });
+                Terraria.Lang.NpcNames[40] = "商人";
+
+                ItemQueryService.ResetForTesting();
+                var sources = ItemQueryService.BuildQuery(12).AcquisitionSources;
+                if (sources.Count != 3 ||
+                    !string.Equals(sources[0].SourceType, ItemAcquisitionSourceTypes.NpcDrop, StringComparison.Ordinal) ||
+                    !string.Equals(sources[1].SourceType, ItemAcquisitionSourceTypes.NpcShop, StringComparison.Ordinal) ||
+                    !string.Equals(sources[2].SourceType, ItemAcquisitionSourceTypes.MiningGatheringTag, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Acquisition sources should keep NPC drop, current shop, then mining/gathering tag order.");
                 }
             });
         }
@@ -293,6 +595,114 @@ namespace JueMingZ.Tests
                     throw new InvalidOperationException("Search shimmer section height must include every reverse source.");
                 }
             });
+        }
+
+        private static void SearchQueryAcquisitionModelClonesValueFacts()
+        {
+            var result = CreateSearchQueryResultWithAcquisitionSource("npcDrop", "掉落来源", "史莱姆", "1-2个", "25%", "白天", "测试上下文");
+            SearchItemQueryUiState.ResetForTesting();
+            SearchItemQueryUiState.SetSelectedResultForTesting(result);
+            result.AcquisitionSources[0].SourceName = "已变更";
+
+            var snapshot = SearchItemQueryUiState.GetSelectedResult();
+            if (snapshot == null ||
+                snapshot.AcquisitionSources.Count != 1 ||
+                !string.Equals(snapshot.AcquisitionSources[0].SourceName, "史莱姆", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Search UI state must clone acquisition source value facts instead of sharing mutable test objects.");
+            }
+
+            var formatted = LegacyMainWindow.FormatSearchAcquisitionSourceForTesting(snapshot.AcquisitionSources[0]);
+            AssertStringEquals(formatted[0], "掉落", "search acquisition source type label");
+            AssertStringEquals(formatted[1], "掉落来源：史莱姆", "search acquisition source title");
+            AssertStringEquals(formatted[2], "1-2个 / 25% / 白天 / 测试上下文", "search acquisition source detail");
+        }
+
+        private static void SearchQueryAcquisitionSourcesAffectLayoutSignature()
+        {
+            SearchItemQueryUiState.ResetForTesting();
+            SearchItemQueryUiState.SetSelectedResultForTesting(CreateSearchQueryResultWithAcquisitionSource("npcDrop", "掉落来源", "史莱姆", "1个", "25%", "白天", string.Empty));
+            var first = SearchItemQueryUiState.BuildStateSignature();
+
+            SearchItemQueryUiState.SetSelectedResultForTesting(CreateSearchQueryResultWithAcquisitionSource("npcDrop", "掉落来源", "史莱姆", "1个", "50%", "白天", string.Empty));
+            var second = SearchItemQueryUiState.BuildStateSignature();
+            if (first == second)
+            {
+                throw new InvalidOperationException("Search page layout signature must track acquisition source field changes.");
+            }
+        }
+
+        private static void SearchQueryAcquisitionSectionKeepsOrderAndHeight()
+        {
+            var order = LegacyMainWindow.GetSearchResultSectionOrderForTesting();
+            var expected = new[] { "基础信息", "获取来源", "合成来源", "合成用途", "微光反应" };
+            if (order.Length != expected.Length)
+            {
+                throw new InvalidOperationException("Search result section order test helper returned an unexpected length.");
+            }
+
+            for (var index = 0; index < expected.Length; index++)
+            {
+                AssertStringEquals(order[index], expected[index], "search result section order " + index.ToString(CultureInfo.InvariantCulture));
+            }
+
+            AssertStringEquals(LegacyMainWindow.GetSearchAcquisitionEmptyTextForTesting(), "暂无获取来源", "search acquisition empty text");
+            var emptyHeight = LegacyMainWindow.CalculateSearchAcquisitionSectionHeightForTesting(new List<ItemAcquisitionSourceSummary>());
+            var oneSource = new List<ItemAcquisitionSourceSummary>
+            {
+                CreateSearchAcquisitionSource("npcShop", "NPC出售", "商人", "1个", string.Empty, "当前上下文", "测试商店")
+            };
+            var twoSources = new List<ItemAcquisitionSourceSummary>(oneSource)
+            {
+                CreateSearchAcquisitionSource("miningGatheringTag", "常见采集", "地表草药", string.Empty, string.Empty, "森林", string.Empty)
+            };
+
+            if (LegacyMainWindow.CalculateSearchAcquisitionSectionHeightForTesting(oneSource) <= emptyHeight ||
+                LegacyMainWindow.CalculateSearchAcquisitionSectionHeightForTesting(twoSources) <= LegacyMainWindow.CalculateSearchAcquisitionSectionHeightForTesting(oneSource))
+            {
+                throw new InvalidOperationException("Search acquisition section height must grow with source rows.");
+            }
+        }
+
+        private static void SearchQueryUiHotPathAvoidsAcquisitionSourceReads()
+        {
+            var repoRoot = ResolveSearchQueryRepoRoot();
+            var hotPathFiles = new[]
+            {
+                Path.Combine(repoRoot, "src", "JueMingZ", "UI", "Legacy", "LegacyMainWindow.Search.cs")
+            };
+            var forbiddenTerms = new[]
+            {
+                "ItemDropsDB",
+                "FishDropsDB",
+                "OpenShop(",
+                "SetupShop(",
+                "WorldGen",
+                "Main.instance.shop",
+                "Main.npcShop",
+                "OpenFishingCrate",
+                "RollExtractinatorDrop",
+                "TryDroppingItem",
+                "ItemNpcDropSourceIndex",
+                "ItemNpcShopSourceIndex",
+                "ItemAcquisitionTagIndex"
+            };
+
+            for (var fileIndex = 0; fileIndex < hotPathFiles.Length; fileIndex++)
+            {
+                var path = hotPathFiles[fileIndex];
+                var text = File.ReadAllText(path, Encoding.UTF8);
+                for (var termIndex = 0; termIndex < forbiddenTerms.Length; termIndex++)
+                {
+                    var term = forbiddenTerms[termIndex];
+                    if (text.IndexOf(term, StringComparison.Ordinal) >= 0)
+                    {
+                        throw new InvalidOperationException(
+                            "Search query UI hot path must consume ItemQueryResult.AcquisitionSources snapshots, not source indexes or vanilla source APIs: " +
+                            Path.GetFileName(path) + " contains " + term + ".");
+                    }
+                }
+            }
         }
 
         private static void SearchQueryUiStateSelectsCandidateAndClears()
@@ -474,6 +884,10 @@ namespace JueMingZ.Tests
 
             AssertStringEquals(labels[0], "查询物品", "search input label");
             AssertStringEquals(labels[1], "选择物品", "search pick button label");
+            AssertStringEquals(
+                LegacyMainWindow.GetSearchPickButtonTooltipForTesting(),
+                "点击需要查询的物品",
+                "search pick button tooltip");
         }
 
         private static void SearchQueryPickCommandStartsPendingSelectionAndHidesWindow()
@@ -2188,6 +2602,63 @@ namespace JueMingZ.Tests
             });
         }
 
+        private static ItemQueryResult CreateSearchQueryResultWithAcquisitionSource(
+            string sourceType,
+            string title,
+            string sourceName,
+            string quantityText,
+            string probabilityText,
+            string conditionText,
+            string contextText)
+        {
+            var result = new ItemQueryResult
+            {
+                ItemType = 100,
+                Found = true,
+                Status = "ok",
+                Item = new ItemQueryReference
+                {
+                    ItemType = 100,
+                    DisplayName = "铁锭",
+                    InternalName = "IronBar",
+                    Stack = 1,
+                    MaxStack = 999,
+                    Rare = 0,
+                    Value = 0,
+                    IsMaterial = true,
+                    IsConsumable = false,
+                    CreateTile = -1,
+                    CreateWall = -1
+                }
+            };
+            result.AcquisitionSources.Add(CreateSearchAcquisitionSource(sourceType, title, sourceName, quantityText, probabilityText, conditionText, contextText));
+            return result;
+        }
+
+        private static ItemAcquisitionSourceSummary CreateSearchAcquisitionSource(
+            string sourceType,
+            string title,
+            string sourceName,
+            string quantityText,
+            string probabilityText,
+            string conditionText,
+            string contextText)
+        {
+            return new ItemAcquisitionSourceSummary
+            {
+                SourceType = sourceType,
+                Title = title,
+                SourceName = sourceName,
+                QuantityText = quantityText,
+                ProbabilityText = probabilityText,
+                ConditionText = conditionText,
+                ContextText = contextText,
+                ItemType = 100,
+                NpcNetId = 1,
+                RelatedItemType = -1
+            };
+        }
+
         private static void AddSearchQueryExtraUsageRecipes(int materialItemType, int count)
         {
             var recipes = new List<object>(Terraria.Main.recipe ?? new object[0]);
@@ -2669,6 +3140,27 @@ namespace JueMingZ.Tests
             Terraria.ID.ItemID.Sets.ShimmerTransformToItem[103] = 100;
         }
 
+        private static void AddOpenSearchShop(int shopIndex, int talkNpcIndex, int npcType, params object[] items)
+        {
+            var instance = (Terraria.MainInstance)Terraria.Main.instance;
+            if (shopIndex >= instance.shop.Length)
+            {
+                Array.Resize(ref instance.shop, shopIndex + 1);
+            }
+
+            var shop = new Terraria.Chest();
+            for (var index = 0; items != null && index < items.Length && index < shop.item.Length; index++)
+            {
+                shop.item[index] = items[index];
+            }
+
+            instance.shop[shopIndex] = shop;
+            Terraria.Main.npcShop = shopIndex;
+            Terraria.Main.LocalPlayer = new Terraria.Player { talkNPC = talkNpcIndex };
+            Terraria.Main.player[Terraria.Main.myPlayer] = Terraria.Main.LocalPlayer;
+            Terraria.Main.npc[talkNpcIndex] = new Terraria.NPC { type = npcType };
+        }
+
         private static void AddSearchItem(
             int itemType,
             string displayName,
@@ -2700,9 +3192,18 @@ namespace JueMingZ.Tests
         {
             Terraria.ID.ContentSamples.ItemsByType.Clear();
             Terraria.Lang.ItemNames.Clear();
+            Terraria.Lang.NpcNames.Clear();
             Terraria.ID.ItemID.Search.Clear();
+            Terraria.ID.NPCID.Search.Clear();
             Terraria.Recipe.numRecipes = 0;
             Terraria.Main.recipe = new object[0];
+            Terraria.Main.ItemDropsDB = null;
+            Terraria.Main.npcShop = 0;
+            Terraria.Main.npc = new object[200];
+            Terraria.Main.player = new object[256];
+            Terraria.Main.LocalPlayer = null;
+            Terraria.Main.GameUpdateCount = 0;
+            Terraria.Main.instance = new Terraria.MainInstance();
             Terraria.RecipeGroup.recipeGroups.Clear();
             Terraria.ID.ItemID.Sets.IsAMaterial = new bool[6000];
             Terraria.ID.ItemID.Sets.ShimmerTransformToItem = CreateEmptySearchShimmerTransforms();
@@ -2717,6 +3218,30 @@ namespace JueMingZ.Tests
             }
 
             return transforms;
+        }
+
+        private static string ResolveSearchQueryRepoRoot()
+        {
+            var candidates = new[]
+            {
+                Directory.GetCurrentDirectory(),
+                AppDomain.CurrentDomain.BaseDirectory
+            };
+            for (var index = 0; index < candidates.Length; index++)
+            {
+                var directory = new DirectoryInfo(candidates[index]);
+                while (directory != null)
+                {
+                    if (File.Exists(Path.Combine(directory.FullName, "JueMingZ.sln")))
+                    {
+                        return directory.FullName;
+                    }
+
+                    directory = directory.Parent;
+                }
+            }
+
+            throw new InvalidOperationException("Unable to locate JueMingZ.sln for search query source-boundary audit.");
         }
 
         private static void AssertSearchCandidate(IList<ItemQueryCandidate> candidates, int itemType, string label)

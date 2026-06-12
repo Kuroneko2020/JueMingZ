@@ -22,6 +22,7 @@ namespace JueMingZ.Automation.Search
             result.Status = "ok";
             result.Item = item;
 
+            AddRange(result.AcquisitionSources, GetAcquisitionSources(itemType));
             AddRange(result.CraftingSources, ItemRecipeIndex.GetCraftingSources(itemType));
             AddRange(result.CraftingUses, ItemRecipeIndex.GetCraftingUses(itemType));
             result.Shimmer = ItemShimmerIndex.BuildSummary(itemType);
@@ -38,6 +39,27 @@ namespace JueMingZ.Automation.Search
             ItemCatalogIndex.ResetForTesting();
             ItemRecipeIndex.ResetForTesting();
             ItemShimmerIndex.ResetForTesting();
+            ItemNpcDropSourceIndex.ResetForTesting();
+            ItemNpcShopSourceIndex.ResetForTesting();
+            ItemAcquisitionTagIndex.ResetForTesting();
+        }
+
+        private static IEnumerable<ItemAcquisitionSourceSummary> GetAcquisitionSources(int itemType)
+        {
+            foreach (var source in ItemNpcDropSourceIndex.GetSources(itemType))
+            {
+                yield return source;
+            }
+
+            foreach (var source in ItemNpcShopSourceIndex.GetSources(itemType))
+            {
+                yield return source;
+            }
+
+            foreach (var source in ItemAcquisitionTagIndex.GetSources(itemType))
+            {
+                yield return source;
+            }
         }
 
         private static void AddRange<T>(IList<T> target, IEnumerable<T> source)
