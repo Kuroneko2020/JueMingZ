@@ -23,34 +23,10 @@ namespace JueMingZ.Bootstrap
             {
                 JueMingZBootstrap.Start();
 
-                Assembly harmonyAssembly;
-                DependencyResolver.TryLoadAssemblyBySimpleName("0Harmony", out harmonyAssembly);
-
-                var harmonyType = DependencyChecker.FindType("HarmonyLib.Harmony", "0Harmony");
-                if (harmonyType == null)
-                {
-                    const string message = "Harmony not found; safe bootstrap hook skipped.";
-                    HookDiagnostics.MarkSkipped(message);
-                    Logger.Warn("SafeBootstrapInstaller", message);
-                    return HookInstallResult.Skipped(message);
-                }
-
-                Logger.Info("SafeBootstrapInstaller", "Harmony found / loaded: " + harmonyType.Assembly.FullName);
-
                 var mainType = GameMode.FindTerrariaMainType();
                 if (mainType == null)
                 {
                     const string message = "Terraria.Main type not found; safe bootstrap hook skipped.";
-                    HookDiagnostics.MarkSkipped(message);
-                    Logger.Warn("SafeBootstrapInstaller", message);
-                    return HookInstallResult.Skipped(message);
-                }
-
-                var harmonyMethodType = DependencyChecker.FindType("HarmonyLib.HarmonyMethod", "0Harmony") ??
-                                        harmonyType.Assembly.GetType("HarmonyLib.HarmonyMethod", false);
-                if (harmonyMethodType == null)
-                {
-                    const string message = "HarmonyMethod not found; safe bootstrap hook skipped.";
                     HookDiagnostics.MarkSkipped(message);
                     Logger.Warn("SafeBootstrapInstaller", message);
                     return HookInstallResult.Skipped(message);
@@ -75,11 +51,53 @@ namespace JueMingZ.Bootstrap
                     throw new MissingMethodException("SafeBootstrapPostfix.Postfix");
                 }
 
+                string typedHarmonyAssembly;
+                Exception typedBridgeError;
+                // The embedded Harmony path must use the typed bridge first; reflection
+                // remains only as a compatibility fallback for older package shapes.
+                if (TryPatchWithTypedBridge(targetMethod, postfixMethod, out typedHarmonyAssembly, out typedBridgeError))
+                {
+                    Logger.Info("SafeBootstrapInstaller", "Harmony typed bridge found / loaded: " + typedHarmonyAssembly);
+                    var typedSuccessMessage = "safe bootstrap installed via typed bridge: " + signature;
+                    HookDiagnostics.MarkSafeBootstrapInstalled(signature, typedSuccessMessage);
+                    Logger.Info("SafeBootstrapInstaller", typedSuccessMessage);
+                    return HookInstallResult.Success(typedSuccessMessage, signature);
+                }
+
+                Logger.Warn(
+                    "SafeBootstrapInstaller",
+                    "Typed Harmony bridge failed; falling back to reflection path: " +
+                    (typedBridgeError == null ? "Unknown" : typedBridgeError.GetType().FullName + ": " + typedBridgeError.Message));
+
+                Assembly harmonyAssembly;
+                DependencyResolver.TryLoadAssemblyBySimpleName("0Harmony", out harmonyAssembly);
+
+                var harmonyType = DependencyChecker.FindType("HarmonyLib.Harmony", "0Harmony");
+                if (harmonyType == null)
+                {
+                    const string message = "Harmony not found; safe bootstrap hook skipped.";
+                    HookDiagnostics.MarkSkipped(message);
+                    Logger.Warn("SafeBootstrapInstaller", message);
+                    return HookInstallResult.Skipped(message);
+                }
+
+                Logger.Info("SafeBootstrapInstaller", "Harmony found / loaded: " + harmonyType.Assembly.FullName);
+
+                var harmonyMethodType = DependencyChecker.FindType("HarmonyLib.HarmonyMethod", "0Harmony") ??
+                                        harmonyType.Assembly.GetType("HarmonyLib.HarmonyMethod", false);
+                if (harmonyMethodType == null)
+                {
+                    const string message = "HarmonyMethod not found; safe bootstrap hook skipped.";
+                    HookDiagnostics.MarkSkipped(message);
+                    Logger.Warn("SafeBootstrapInstaller", message);
+                    return HookInstallResult.Skipped(message);
+                }
+
                 var harmony = CreateHarmonyInstance(harmonyType, HarmonyId);
                 var postfix = CreateHarmonyMethod(harmonyMethodType, postfixMethod);
                 PatchWithHarmony(harmonyType, harmony, targetMethod, postfix);
 
-                var successMessage = "safe bootstrap installed: " + signature;
+                var successMessage = "safe bootstrap installed via reflection fallback: " + signature;
                 HookDiagnostics.MarkSafeBootstrapInstalled(signature, successMessage);
                 Logger.Info("SafeBootstrapInstaller", successMessage);
                 return HookInstallResult.Success(successMessage, signature);
@@ -90,6 +108,27 @@ namespace JueMingZ.Bootstrap
                 HookDiagnostics.MarkFailed(message, error);
                 Logger.Error("SafeBootstrapInstaller", message, error);
                 return HookInstallResult.Failed(message, error);
+            }
+        }
+
+        private static bool TryPatchWithTypedBridge(
+            MethodInfo targetMethod,
+            MethodInfo postfixMethod,
+            out string harmonyAssembly,
+            out Exception error)
+        {
+            harmonyAssembly = string.Empty;
+            error = null;
+
+            try
+            {
+                harmonyAssembly = HarmonyBridge.Patch(HarmonyId, targetMethod, null, postfixMethod, null);
+                return true;
+            }
+            catch (Exception patchError)
+            {
+                error = patchError;
+                return false;
             }
         }
 
