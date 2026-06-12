@@ -7,10 +7,24 @@ namespace JueMingZ.Automation.Search
 {
     internal static class SearchItemPickRuntimeService
     {
+        private const ulong PickUiHoverPendingTtlUpdates = 6;
+        private static SearchItemPickPendingClick PendingClick;
+
         public static void UpdatePrefixGuard()
+        {
+            UpdateGuard("SearchItemPickRuntimeService.UpdatePrefixGuard");
+        }
+
+        public static void UpdateAfterPlayerInputGuard()
+        {
+            UpdateGuard("SearchItemPickRuntimeService.UpdateAfterPlayerInputGuard");
+        }
+
+        private static void UpdateGuard(string diagnosticSource)
         {
             if (!SearchItemQueryUiState.IsSelectionPending)
             {
+                PendingClick = null;
                 return;
             }
 
@@ -31,7 +45,7 @@ namespace JueMingZ.Automation.Search
             }
             catch (Exception error)
             {
-                RuntimeDiagnostics.RecordError("SearchItemPickRuntimeService.UpdatePrefixGuard", error);
+                RuntimeDiagnostics.RecordError(diagnosticSource ?? "SearchItemPickRuntimeService.UpdateGuard", error);
                 LogThrottle.ErrorThrottled(
                     "search-item-pick-runtime-error",
                     TimeSpan.FromSeconds(10),
@@ -61,11 +75,13 @@ namespace JueMingZ.Automation.Search
 
             if (!SearchItemQueryUiState.IsSelectionPending)
             {
+                PendingClick = null;
                 return result.Skip("idle");
             }
 
             if (!input.IsInWorld)
             {
+                PendingClick = null;
                 FailAndRestore("选择物品已取消：当前不在世界中。", "notInWorld", ports);
                 return result.Fail("notInWorld");
             }
@@ -77,6 +93,7 @@ namespace JueMingZ.Automation.Search
 
             if (!input.MouseReadAvailable)
             {
+                PendingClick = null;
                 FailAndRestore("选择物品失败：无法读取鼠标状态。", "mouseReadUnavailable", ports);
                 return result.Fail("mouseReadUnavailable");
             }
@@ -84,6 +101,7 @@ namespace JueMingZ.Automation.Search
             var state = SearchItemQueryUiState.SelectionState;
             if (state == SearchItemPickSelectionState.WaitingButtonRelease)
             {
+                PendingClick = null;
                 if (input.MouseLeftDown)
                 {
                     return result.Skip("waitingButtonRelease");
@@ -95,8 +113,14 @@ namespace JueMingZ.Automation.Search
                 return result.Skip("armedForNextLeftClick");
             }
 
+            if (PendingClick != null)
+            {
+                return ContinuePendingClick(input, ports, result);
+            }
+
             if (state != SearchItemPickSelectionState.ArmedForNextLeftClick)
             {
+                PendingClick = null;
                 return result.Skip("state:" + state);
             }
 
@@ -105,29 +129,156 @@ namespace JueMingZ.Automation.Search
                 return result.Skip("waitingNextLeftClick");
             }
 
+            PendingClick = SearchItemPickPendingClick.Create(input, CaptureClickContext(input, ports));
+
+            // Resolve the cached ItemSlot proof before consuming the click: the
+            // consume path must still run, but its UI-capture flags can stop
+            // vanilla from producing fresh slot hover evidence for this press.
+            var resolve = ResolvePendingUi(PendingClick, input.CurrentGameUpdateCount, ports);
+            result.ResolveAttempted = true;
+            ConsumeTargetClick(ports, result);
+
+            if (TryCompleteResolvedSelection(resolve, ports, result))
+            {
+                PendingClick = null;
+                return result;
+            }
+
+            if (TryFailFreshUiEmptySlot(resolve, ports, result))
+            {
+                PendingClick = null;
+                return result;
+            }
+
+            PendingClick.LastFailureReason = NormalizeFailureReason(resolve);
+            return result.Skip("pendingUiHover");
+        }
+
+        private static SearchItemPickRuntimeResult ContinuePendingClick(
+            SearchItemPickRuntimeInput input,
+            SearchItemPickRuntimePorts ports,
+            SearchItemPickRuntimeResult result)
+        {
+            var pending = PendingClick;
+            if (pending == null)
+            {
+                return result.Skip("pendingUnavailable");
+            }
+
+            var resolve = ResolvePendingUi(pending, input.CurrentGameUpdateCount, ports);
+            result.ResolveAttempted = true;
+            if (input.MouseLeftDown)
+            {
+                ConsumeTargetClick(ports, result);
+            }
+
+            if (TryCompleteResolvedSelection(resolve, ports, result))
+            {
+                PendingClick = null;
+                return result;
+            }
+
+            if (TryFailFreshUiEmptySlot(resolve, ports, result))
+            {
+                PendingClick = null;
+                return result;
+            }
+
+            pending.LastFailureReason = NormalizeFailureReason(resolve);
+            if (!IsPendingExpired(pending, input.CurrentGameUpdateCount))
+            {
+                return result.Skip("pendingUiHover");
+            }
+
+            var fallback = ResolvePendingFallback(pending, input.CurrentGameUpdateCount, ports);
+            if (TryCompleteResolvedSelection(fallback, ports, result))
+            {
+                PendingClick = null;
+                return result;
+            }
+
+            var reason = NormalizeFailureReason(fallback);
+            SearchItemQueryUiState.CompletePendingSelectionFailed(
+                "未识别到可查询物品，请点击“选择物品”重试。",
+                reason);
+            RestoreSearchWindow(ports);
+            PendingClick = null;
+            return result.Fail(reason);
+        }
+
+        private static SearchItemPickClickContext CaptureClickContext(
+            SearchItemPickRuntimeInput input,
+            SearchItemPickRuntimePorts ports)
+        {
+            input = input ?? new SearchItemPickRuntimeInput();
+            if (ports == null || ports.CaptureClickContext == null)
+            {
+                return SearchItemPickClickContext.Failed(
+                    "click context port unavailable",
+                    input.MouseX,
+                    input.MouseY,
+                    input.CurrentGameUpdateCount);
+            }
+
+            var context = ports.CaptureClickContext(input);
+            return context ?? SearchItemPickClickContext.Failed(
+                "click context unavailable",
+                input.MouseX,
+                input.MouseY,
+                input.CurrentGameUpdateCount);
+        }
+
+        private static SearchItemPickResolveAttempt ResolvePendingUi(
+            SearchItemPickPendingClick pending,
+            ulong currentGameUpdateCount,
+            SearchItemPickRuntimePorts ports)
+        {
+            return ports == null || ports.ResolvePendingUi == null
+                ? SearchItemPickResolveAttempt.Failed("ui hover resolve port unavailable")
+                : ports.ResolvePendingUi(pending, currentGameUpdateCount) ??
+                  SearchItemPickResolveAttempt.Failed("ui hover resolve result unavailable");
+        }
+
+        private static SearchItemPickResolveAttempt ResolvePendingFallback(
+            SearchItemPickPendingClick pending,
+            ulong currentGameUpdateCount,
+            SearchItemPickRuntimePorts ports)
+        {
+            return ports == null || ports.ResolvePendingFallback == null
+                ? SearchItemPickResolveAttempt.Failed("pending fallback resolve port unavailable")
+                : ports.ResolvePendingFallback(pending, currentGameUpdateCount) ??
+                  SearchItemPickResolveAttempt.Failed("pending fallback resolve result unavailable");
+        }
+
+        private static void ConsumeTargetClick(
+            SearchItemPickRuntimePorts ports,
+            SearchItemPickRuntimeResult result)
+        {
+            if (result == null)
+            {
+                return;
+            }
+
             result.InputConsumeAttempted = true;
-            var consume = ports.ConsumeMouseTriggerInput == null
+            var consume = ports == null || ports.ConsumeMouseTriggerInput == null
                 ? SearchItemPickInputConsumeResult.Failed("consume port unavailable")
                 : ports.ConsumeMouseTriggerInput("MouseLeft");
             consume = consume ?? SearchItemPickInputConsumeResult.Failed("consume result unavailable");
             result.InputConsumed = consume.Succeeded;
             result.InputConsumeMessage = consume.Message ?? string.Empty;
+        }
 
-            var resolve = ports.ResolveCurrent == null
-                ? SearchItemPickResolveAttempt.Failed("resolve port unavailable")
-                : ports.ResolveCurrent();
-            resolve = resolve ?? SearchItemPickResolveAttempt.Failed("resolve result unavailable");
-            result.ResolveAttempted = true;
-            if (!resolve.Succeeded || resolve.Result == null || resolve.Result.ItemType <= 0)
+        private static bool TryCompleteResolvedSelection(
+            SearchItemPickResolveAttempt resolve,
+            SearchItemPickRuntimePorts ports,
+            SearchItemPickRuntimeResult result)
+        {
+            if (resolve == null ||
+                !resolve.Succeeded ||
+                resolve.Result == null ||
+                resolve.Result.ItemType <= 0)
             {
-                var reason = string.IsNullOrWhiteSpace(resolve.FailureReason)
-                    ? "noSearchableItem"
-                    : resolve.FailureReason;
-                SearchItemQueryUiState.CompletePendingSelectionFailed(
-                    "未识别到可查询物品，请点击“选择物品”重试。",
-                    reason);
-                RestoreSearchWindow(ports);
-                return result.Fail(reason);
+                return false;
             }
 
             result.ItemType = resolve.Result.ItemType;
@@ -137,9 +288,60 @@ namespace JueMingZ.Automation.Search
                 resolve.Result.SourceSummary);
             RestoreSearchWindow(ports);
             result.SelectionStateAfter = SearchItemQueryUiState.SelectionState.ToString();
-            return found
-                ? result.Resolve()
-                : result.Fail("queryNotFound");
+            if (found)
+            {
+                result.Resolve();
+            }
+            else
+            {
+                result.Fail("queryNotFound");
+            }
+
+            return true;
+        }
+
+        private static bool TryFailFreshUiEmptySlot(
+            SearchItemPickResolveAttempt resolve,
+            SearchItemPickRuntimePorts ports,
+            SearchItemPickRuntimeResult result)
+        {
+            if (resolve == null ||
+                !string.Equals(resolve.FailureReason, "uiEmptySlot", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            SearchItemQueryUiState.CompletePendingSelectionFailed(
+                "未识别到可查询物品，请点击“选择物品”重试。",
+                "uiEmptySlot");
+            RestoreSearchWindow(ports);
+            result.Fail("uiEmptySlot");
+            return true;
+        }
+
+        private static bool IsPendingExpired(SearchItemPickPendingClick pending, ulong currentGameUpdateCount)
+        {
+            if (pending == null)
+            {
+                return true;
+            }
+
+            if (currentGameUpdateCount < pending.StartGameUpdateCount)
+            {
+                currentGameUpdateCount = pending.StartGameUpdateCount;
+            }
+
+            return currentGameUpdateCount - pending.StartGameUpdateCount > PickUiHoverPendingTtlUpdates;
+        }
+
+        private static string NormalizeFailureReason(SearchItemPickResolveAttempt resolve)
+        {
+            if (resolve == null || string.IsNullOrWhiteSpace(resolve.FailureReason))
+            {
+                return "noSearchableItem";
+            }
+
+            return resolve.FailureReason;
         }
 
         private static SearchItemPickRuntimeInput BuildCurrentInput()
@@ -166,17 +368,54 @@ namespace JueMingZ.Automation.Search
         {
             return new SearchItemPickRuntimePorts
             {
-                ResolveCurrent = ResolveCurrent,
+                CaptureClickContext = CaptureClickContext,
+                ResolvePendingUi = ResolvePendingUi,
+                ResolvePendingFallback = ResolvePendingFallback,
                 ConsumeMouseTriggerInput = ConsumeMouseTriggerInput,
                 RestoreSearchWindow = RestoreSearchWindow
             };
         }
 
-        private static SearchItemPickResolveAttempt ResolveCurrent()
+        private static SearchItemPickClickContext CaptureClickContext(SearchItemPickRuntimeInput input)
+        {
+            input = input ?? new SearchItemPickRuntimeInput();
+            SearchItemPickClickContext context;
+            string skipReason;
+            if (SearchItemPickTargetResolver.TryCaptureCurrentClickContext(
+                    input.MouseX,
+                    input.MouseY,
+                    input.CurrentGameUpdateCount,
+                    out context,
+                    out skipReason))
+            {
+                return context;
+            }
+
+            return context ?? SearchItemPickClickContext.Failed(
+                skipReason,
+                input.MouseX,
+                input.MouseY,
+                input.CurrentGameUpdateCount);
+        }
+
+        private static SearchItemPickResolveAttempt ResolvePendingUi(
+            SearchItemPickPendingClick pending,
+            ulong currentGameUpdateCount)
+        {
+            return SearchItemPickTargetResolver.ResolveUiHoverFromPending(pending, currentGameUpdateCount);
+        }
+
+        private static SearchItemPickResolveAttempt ResolvePendingFallback(
+            SearchItemPickPendingClick pending,
+            ulong currentGameUpdateCount)
         {
             SearchItemPickResolveResult result;
             string skipReason;
-            if (!SearchItemPickTargetResolver.TryResolveCurrent(out result, out skipReason))
+            if (!SearchItemPickTargetResolver.TryResolvePendingFallback(
+                    pending,
+                    currentGameUpdateCount,
+                    out result,
+                    out skipReason))
             {
                 return SearchItemPickResolveAttempt.Failed(skipReason);
             }
@@ -233,9 +472,42 @@ namespace JueMingZ.Automation.Search
         public ulong CurrentGameUpdateCount { get; set; }
     }
 
+    internal sealed class SearchItemPickPendingClick
+    {
+        public ulong StartGameUpdateCount { get; set; }
+        public int MouseX { get; set; }
+        public int MouseY { get; set; }
+        public string LastFailureReason { get; set; }
+        public SearchItemPickClickContext ClickContext { get; set; }
+
+        public static SearchItemPickPendingClick Create(
+            SearchItemPickRuntimeInput input,
+            SearchItemPickClickContext clickContext)
+        {
+            input = input ?? new SearchItemPickRuntimeInput();
+            clickContext = clickContext ?? SearchItemPickClickContext.Failed(
+                "clickContextUnavailable",
+                input.MouseX,
+                input.MouseY,
+                input.CurrentGameUpdateCount);
+            return new SearchItemPickPendingClick
+            {
+                StartGameUpdateCount = clickContext.Succeeded
+                    ? clickContext.GameUpdateCount
+                    : input.CurrentGameUpdateCount,
+                MouseX = clickContext.MouseScreenX,
+                MouseY = clickContext.MouseScreenY,
+                ClickContext = clickContext,
+                LastFailureReason = string.Empty
+            };
+        }
+    }
+
     internal sealed class SearchItemPickRuntimePorts
     {
-        public Func<SearchItemPickResolveAttempt> ResolveCurrent { get; set; }
+        public Func<SearchItemPickRuntimeInput, SearchItemPickClickContext> CaptureClickContext { get; set; }
+        public Func<SearchItemPickPendingClick, ulong, SearchItemPickResolveAttempt> ResolvePendingUi { get; set; }
+        public Func<SearchItemPickPendingClick, ulong, SearchItemPickResolveAttempt> ResolvePendingFallback { get; set; }
         public Func<string, SearchItemPickInputConsumeResult> ConsumeMouseTriggerInput { get; set; }
         public Action RestoreSearchWindow { get; set; }
     }

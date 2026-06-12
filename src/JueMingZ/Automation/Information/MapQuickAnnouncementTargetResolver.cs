@@ -22,6 +22,11 @@ namespace JueMingZ.Automation.Information
                     context.UiItem.Stack);
             }
 
+            if (context.UiSlot != null && context.UiSlot.IsKnown && !context.UiSlot.HasActiveItem)
+            {
+                return BuildUiEmptySlotResult(context.UiSlot);
+            }
+
             var actors = ResolveActorsAtMouse(context);
             if (actors.Count > 0)
             {
@@ -86,6 +91,76 @@ namespace JueMingZ.Automation.Information
             }
 
             result = Resolve(context);
+            return result != null && (result.SuppressDelivery || !string.IsNullOrWhiteSpace(result.Body));
+        }
+
+        internal static bool TryCaptureCurrentTriggerContext(out MapQuickAnnouncementTriggerContext context, out string skipReason)
+        {
+            context = null;
+            skipReason = string.Empty;
+
+            InformationWorldContext worldContext;
+            if (!InformationWorldContextProvider.TryBuild(InformationWorldContextProfile.Status, out worldContext, out skipReason))
+            {
+                return false;
+            }
+
+            var mouseScreenX = TerrariaMainCompat.MouseX;
+            var mouseScreenY = TerrariaMainCompat.MouseY;
+            var mouseWorldX = worldContext.ScreenX + mouseScreenX;
+            var mouseWorldY = worldContext.ScreenY + mouseScreenY;
+            context = new MapQuickAnnouncementTriggerContext
+            {
+                MouseWorldX = mouseWorldX,
+                MouseWorldY = mouseWorldY,
+                MouseScreenX = mouseScreenX,
+                MouseScreenY = mouseScreenY,
+                MouseTileX = (int)Math.Floor(mouseWorldX / TerrariaTileReadCompat.TileSize),
+                MouseTileY = (int)Math.Floor(mouseWorldY / TerrariaTileReadCompat.TileSize),
+                GameUpdateCount = worldContext.GameUpdateCount
+            };
+            return true;
+        }
+
+        internal static MapQuickAnnouncementResolveAttempt ResolveUiHoverFromPending(
+            MapQuickAnnouncementPendingRequest pending,
+            ulong currentGameUpdateCount)
+        {
+            if (pending == null || pending.TriggerContext == null || !pending.TriggerContext.Succeeded)
+            {
+                return MapQuickAnnouncementResolveAttempt.Failed("pendingTriggerContextUnavailable");
+            }
+
+            var context = CreateContextFromTrigger(pending.TriggerContext, currentGameUpdateCount);
+            string uiHoverReadStatus;
+            if (!AddUiHoverItem(context, out uiHoverReadStatus))
+            {
+                return MapQuickAnnouncementResolveAttempt.Failed("uiHoverPending", uiHoverReadStatus);
+            }
+
+            return MapQuickAnnouncementResolveAttempt.Success(Resolve(context), uiHoverReadStatus);
+        }
+
+        internal static bool TryResolvePendingFallback(
+            MapQuickAnnouncementPendingRequest pending,
+            ulong currentGameUpdateCount,
+            out MapQuickAnnouncementResolveResult result,
+            out string skipReason)
+        {
+            result = null;
+            skipReason = string.Empty;
+            if (pending == null || pending.TriggerContext == null || !pending.TriggerContext.Succeeded)
+            {
+                skipReason = "pendingTriggerContextUnavailable";
+                return false;
+            }
+
+            var context = CreateContextFromTrigger(pending.TriggerContext, currentGameUpdateCount);
+            AddPlayers(context);
+            AddNpcs(context);
+            AddWorldItems(context);
+            AddTileAndWall(context);
+            result = Resolve(context);
             return result != null && !string.IsNullOrWhiteSpace(result.Body);
         }
 
@@ -110,6 +185,20 @@ namespace JueMingZ.Automation.Information
                 Detail = detail ?? string.Empty,
                 TargetName = string.IsNullOrWhiteSpace(targetName) ? resolvedBody : targetName,
                 TargetCount = Math.Max(0, targetCount)
+            };
+        }
+
+        private static MapQuickAnnouncementResolveResult BuildUiEmptySlotResult(MapQuickAnnouncementUiSlotTarget slot)
+        {
+            return new MapQuickAnnouncementResolveResult
+            {
+                Kind = MapQuickAnnouncementTargetKind.None,
+                Body = string.Empty,
+                Detail = BuildUiSlotDetail(slot),
+                TargetName = "UI空槽",
+                TargetCount = 0,
+                SuppressDelivery = true,
+                FailureReason = "uiEmptySlot"
             };
         }
 
@@ -142,6 +231,22 @@ namespace JueMingZ.Automation.Information
                    ";context=" + item.HoverContext.ToString(CultureInfo.InvariantCulture) +
                    ";slot=" + item.HoverSlot.ToString(CultureInfo.InvariantCulture) +
                    ";ageUpdates=" + Math.Max(0, item.HoverAgeUpdates).ToString(CultureInfo.InvariantCulture);
+        }
+
+        private static string BuildUiSlotDetail(MapQuickAnnouncementUiSlotTarget slot)
+        {
+            if (slot == null)
+            {
+                return "uiSlot:empty";
+            }
+
+            var source = string.IsNullOrWhiteSpace(slot.HoverSource)
+                ? "unknown"
+                : slot.HoverSource.Trim();
+            return "uiSlot:empty;source=" + source +
+                   ";context=" + slot.HoverContext.ToString(CultureInfo.InvariantCulture) +
+                   ";slot=" + slot.HoverSlot.ToString(CultureInfo.InvariantCulture) +
+                   ";ageUpdates=" + Math.Max(0, slot.HoverAgeUpdates).ToString(CultureInfo.InvariantCulture);
         }
 
         private static string BuildTileDetail(MapQuickAnnouncementTileTarget tile)
@@ -288,26 +393,13 @@ namespace JueMingZ.Automation.Information
             context = null;
             skipReason = string.Empty;
 
-            InformationWorldContext worldContext;
-            if (!InformationWorldContextProvider.TryBuild(InformationWorldContextProfile.Status, out worldContext, out skipReason))
+            MapQuickAnnouncementTriggerContext triggerContext;
+            if (!TryCaptureCurrentTriggerContext(out triggerContext, out skipReason))
             {
                 return false;
             }
 
-            var mouseScreenX = TerrariaMainCompat.MouseX;
-            var mouseScreenY = TerrariaMainCompat.MouseY;
-            var mouseWorldX = worldContext.ScreenX + mouseScreenX;
-            var mouseWorldY = worldContext.ScreenY + mouseScreenY;
-            context = new MapQuickAnnouncementResolveContext
-            {
-                MouseWorldX = mouseWorldX,
-                MouseWorldY = mouseWorldY,
-                MouseScreenX = mouseScreenX,
-                MouseScreenY = mouseScreenY,
-                MouseTileX = (int)Math.Floor(mouseWorldX / TerrariaTileReadCompat.TileSize),
-                MouseTileY = (int)Math.Floor(mouseWorldY / TerrariaTileReadCompat.TileSize),
-                GameUpdateCount = worldContext.GameUpdateCount
-            };
+            context = CreateContextFromTrigger(triggerContext, triggerContext.GameUpdateCount);
 
             AddUiHoverItem(context);
             AddPlayers(context);
@@ -317,6 +409,23 @@ namespace JueMingZ.Automation.Information
             return true;
         }
 
+        private static MapQuickAnnouncementResolveContext CreateContextFromTrigger(
+            MapQuickAnnouncementTriggerContext triggerContext,
+            ulong gameUpdateCount)
+        {
+            triggerContext = triggerContext ?? new MapQuickAnnouncementTriggerContext();
+            return new MapQuickAnnouncementResolveContext
+            {
+                MouseWorldX = triggerContext.MouseWorldX,
+                MouseWorldY = triggerContext.MouseWorldY,
+                MouseScreenX = triggerContext.MouseScreenX,
+                MouseScreenY = triggerContext.MouseScreenY,
+                MouseTileX = triggerContext.MouseTileX,
+                MouseTileY = triggerContext.MouseTileY,
+                GameUpdateCount = gameUpdateCount
+            };
+        }
+
         internal static bool TryAddUiHoverItemForTesting(MapQuickAnnouncementResolveContext context)
         {
             return AddUiHoverItem(context);
@@ -324,16 +433,43 @@ namespace JueMingZ.Automation.Information
 
         private static bool AddUiHoverItem(MapQuickAnnouncementResolveContext context)
         {
-            TerrariaUiHoverItemSnapshot snapshot;
+            string uiHoverReadStatus;
+            return AddUiHoverItem(context, out uiHoverReadStatus);
+        }
+
+        private static bool AddUiHoverItem(MapQuickAnnouncementResolveContext context, out string uiHoverReadStatus)
+        {
+            TerrariaUiHoverSlotSnapshot slotSnapshot;
+            TerrariaUiHoverSlotReadResult readResult = null;
+            uiHoverReadStatus = string.Empty;
             if (context == null ||
-                !TerrariaUiMouseCompat.TryReadFreshHoverItemSnapshot(
+                !TerrariaUiMouseCompat.TryReadFreshHoverSlotSnapshot(
                     context.GameUpdateCount,
                     context.MouseScreenX,
                     context.MouseScreenY,
-                    out snapshot) ||
-                snapshot == null)
+                    out slotSnapshot,
+                    out readResult) ||
+                slotSnapshot == null)
             {
+                uiHoverReadStatus = BuildUiHoverReadStatus(readResult);
                 return false;
+            }
+
+            uiHoverReadStatus = BuildUiHoverReadStatus(readResult);
+            context.UiSlot = new MapQuickAnnouncementUiSlotTarget
+            {
+                IsKnown = true,
+                HasActiveItem = slotSnapshot.HasActiveItem,
+                HoverSource = NormalizeHoverSource(slotSnapshot.Source),
+                HoverContext = slotSnapshot.Context,
+                HoverSlot = slotSnapshot.Slot,
+                HoverAgeUpdates = ResolveHoverAgeUpdates(context.GameUpdateCount, slotSnapshot.GameUpdateCount)
+            };
+
+            var snapshot = slotSnapshot.ItemSnapshot;
+            if (!slotSnapshot.HasActiveItem || snapshot == null)
+            {
+                return true;
             }
 
             context.UiItem = new MapQuickAnnouncementItemTarget
@@ -347,6 +483,22 @@ namespace JueMingZ.Automation.Information
                 HoverAgeUpdates = ResolveHoverAgeUpdates(context.GameUpdateCount, snapshot.GameUpdateCount)
             };
             return true;
+        }
+
+        private static string BuildUiHoverReadStatus(TerrariaUiHoverSlotReadResult readResult)
+        {
+            if (readResult == null || string.IsNullOrWhiteSpace(readResult.Status))
+            {
+                return TerrariaUiMouseCompat.ItemSlotHoverHookInstalled ? "unknown" : "hookNotInstalled";
+            }
+
+            if (!TerrariaUiMouseCompat.ItemSlotHoverHookInstalled &&
+                string.Equals(readResult.Status, "noSnapshot", StringComparison.Ordinal))
+            {
+                return "hookNotInstalled";
+            }
+
+            return readResult.Status.Trim();
         }
 
         private static string NormalizeHoverSource(string source)

@@ -449,6 +449,9 @@ namespace JueMingZ.Diagnostics
             Append(builder, "MapQuickAnnouncementLastResolveDetail", snapshot.MapQuickAnnouncementLastResolveDetail, true);
             Append(builder, "MapQuickAnnouncementLastTargetSource", snapshot.MapQuickAnnouncementLastTargetSource, true);
             Append(builder, "MapQuickAnnouncementLastUiHoverSource", snapshot.MapQuickAnnouncementLastUiHoverSource, true);
+            Append(builder, "MapQuickAnnouncementLastUiHoverState", snapshot.MapQuickAnnouncementLastUiHoverState, true);
+            Append(builder, "MapQuickAnnouncementLastUiHoverHookStatus", snapshot.MapQuickAnnouncementLastUiHoverHookStatus, true);
+            Append(builder, "MapQuickAnnouncementLastPendingState", snapshot.MapQuickAnnouncementLastPendingState, true);
             Append(builder, "MapQuickAnnouncementLastHoverCacheAgeUpdates", snapshot.MapQuickAnnouncementLastHoverCacheAgeUpdates, true);
             Append(builder, "MapQuickAnnouncementLastPlacementLookupSource", snapshot.MapQuickAnnouncementLastPlacementLookupSource, true);
             Append(builder, "MapQuickAnnouncementLastFallbackReason", snapshot.MapQuickAnnouncementLastFallbackReason, true);

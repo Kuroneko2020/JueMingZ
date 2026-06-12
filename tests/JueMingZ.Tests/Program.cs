@@ -636,7 +636,21 @@ namespace JueMingZ.Tests
 
         private static int Main()
         {
+            InstallProcessConfigDirectoryIsolation();
             var failed = 0;
+            Run("test process config directory is isolated from user Documents", ref failed, TestProcessConfigDirectoryIsolatedFromUserDocuments);
+            Run("test config isolation guard rejects real Documents directory", ref failed, TestConfigIsolationGuardRejectsRealDocumentsDirectory);
+            Run("config service SaveAll writes only test config directory", ref failed, ConfigServiceSaveAllWritesOnlyTestConfigDirectory);
+            Run("config service Initialize writes only test config directory", ref failed, ConfigServiceInitializeWritesOnlyTestConfigDirectory);
+            Run("operation window state save writes only test config directory", ref failed, OperationWindowStateSaveWritesOnlyTestConfigDirectory);
+            Run("legacy UI feature toggle save writes only test config directory", ref failed, LegacyUiFeatureToggleSaveWritesOnlyTestConfigDirectory);
+            Run("config service Initialize saves migrated config after read stream closes", ref failed, ConfigServiceInitializeMigratesExistingConfigAfterReadStreamCloses);
+            Run("config service bad JSON keeps original and protects features", ref failed, ConfigServiceInitializeBadJsonKeepsOriginalAndProtectsFeatures);
+            Run("config service busy config keeps original and protects features", ref failed, ConfigServiceInitializeBusyConfigKeepsOriginalAndProtectsFeatures);
+            Run("config service missing appsettings does not clear existing features", ref failed, ConfigServiceInitializeMissingAppSettingsDoesNotClearExistingFeatures);
+            Run("config service SaveAll busy target does not break original", ref failed, ConfigServiceSaveAllBusyTargetDoesNotBreakOriginal);
+            Run("config service SaveAll temp write failure does not break original", ref failed, ConfigServiceSaveAllTempWriteFailureDoesNotBreakOriginal);
+            Run("config service load failure does not pollute next temporary directory", ref failed, ConfigServiceLoadFailureDoesNotPolluteNextTemporaryDirectory);
             Run("dependency resolver loads compressed embedded Harmony", ref failed, DependencyResolverLoadsCompressedEmbeddedHarmony);
             Run("temporary double jump requires a real air jump flag", ref failed, TemporaryDoubleJumpRequiresAirJump);
             Run("temporary rocket boots require rocket ability after equip", ref failed, TemporaryRocketBootsRequireCapability);
@@ -812,6 +826,9 @@ namespace JueMingZ.Tests
             Run("map quick announcement hotkey state supports mouse trigger", ref failed, MapQuickAnnouncementHotkeyStateMachineSupportsMouseTrigger);
             Run("map quick announcement runtime skips disabled and blocked contexts", ref failed, MapQuickAnnouncementRuntimeSkipsDisabledAndBlockedContexts);
             Run("map quick announcement runtime triggers consumes and delivers", ref failed, MapQuickAnnouncementRuntimeTriggersConsumesAndDelivers);
+            Run("map quick announcement mouse pending waits for next UI hover snapshot", ref failed, MapQuickAnnouncementRuntimeMousePendingWaitsForNextUiHoverSnapshot);
+            Run("map quick announcement mouse pending empty UI slot does not fall through", ref failed, MapQuickAnnouncementRuntimeMousePendingEmptyUiSlotDoesNotFallThrough);
+            Run("map quick announcement mouse pending expires then falls back to world", ref failed, MapQuickAnnouncementRuntimeMousePendingExpiresThenFallsBackToWorld);
             Run("map quick announcement runtime consumes before cooldown block", ref failed, MapQuickAnnouncementRuntimeConsumesBeforeCooldownBlock);
             Run("map quick announcement runtime keyboard trigger does not consume mouse", ref failed, MapQuickAnnouncementRuntimeKeyboardTriggerDoesNotConsumeMouse);
             Run("map quick announcement runtime consumes right and side mouse triggers", ref failed, MapQuickAnnouncementRuntimeConsumesRightAndSideMouseTriggers);
@@ -1171,12 +1188,20 @@ namespace JueMingZ.Tests
             Run("search query pick command starts pending selection and hides window", ref failed, SearchQueryPickCommandStartsPendingSelectionAndHidesWindow);
             Run("search query pick state waits release before arming", ref failed, SearchQueryPickStateWaitsReleaseBeforeArming);
             Run("search query pick runtime consumes left click and selects item", ref failed, SearchQueryPickRuntimeConsumesLeftClickAndSelectsItem);
+            Run("search query pick runtime consumes after PlayerInput rewrite", ref failed, SearchQueryPickRuntimeConsumesAfterPlayerInputRewrite);
+            Run("search query pick runtime uses pre-consume UI slot snapshot", ref failed, SearchQueryPickRuntimeUsesPreConsumeUiSlotSnapshot);
+            Run("search query pick runtime blocks pre-consume empty UI slot", ref failed, SearchQueryPickRuntimeBlocksPreConsumeEmptyUiSlot);
             Run("search query pick target resolver uses UI item", ref failed, SearchQueryPickTargetResolverUsesUiItem);
             Run("search query pick target resolver uses world item", ref failed, SearchQueryPickTargetResolverUsesWorldItem);
             Run("search query pick target resolver uses tile item id", ref failed, SearchQueryPickTargetResolverUsesTileItemId);
             Run("search query pick target resolver uses wall item id", ref failed, SearchQueryPickTargetResolverUsesWallItemId);
             Run("search query pick runtime consumes failed target and restores", ref failed, SearchQueryPickRuntimeConsumesFailedTargetAndRestores);
+            Run("search query pick runtime does not let world fallback race UI pending", ref failed, SearchQueryPickRuntimeDoesNotLetWorldFallbackRaceUiPending);
+            Run("search query pick runtime uses frozen click for fallback", ref failed, SearchQueryPickRuntimeUsesFrozenClickForFallback);
+            Run("search query pick runtime blocks world fallback on UI empty slot", ref failed, SearchQueryPickRuntimeBlocksWorldFallbackOnUiEmptySlot);
+            Run("search query pick runtime waits delayed UI item", ref failed, SearchQueryPickRuntimeWaitsDelayedUiItem);
             Run("search query hover entry requires fresh hover snapshot", ref failed, SearchQueryHoverEntryRequiresFreshHoverSnapshot);
+            Run("search query hover entry ignores fresh empty UI slot snapshot", ref failed, SearchQueryHoverEntryIgnoresFreshEmptyUiSlotSnapshot);
             Run("search query hover command selects current hover item and closes candidates", ref failed, SearchQueryHoverCommandSelectsCurrentHoverItemAndClosesCandidates);
             Run("search query related item command tracks history and closes candidates", ref failed, SearchQueryRelatedItemCommandTracksHistoryAndClosesCandidates);
             Run("information fishing diagnostics snapshot keeps stable field mapping", ref failed, InformationFishingDiagnosticsSnapshotKeepsStableFieldMapping);
@@ -1194,6 +1219,8 @@ namespace JueMingZ.Tests
             Run("legacy map enhancement page layout tracks quick announcement state", ref failed, LegacyMapEnhancementPageLayoutTracksQuickAnnouncementState);
             Run("legacy map quick announcement button tooltips match requested wording", ref failed, LegacyMapQuickAnnouncementButtonTooltipsMatchRequestedWording);
             Run("map quick announcement hover snapshot tracks item slot freshness", ref failed, MapQuickAnnouncementHoverSnapshotTracksItemSlotFreshness);
+            Run("map quick announcement item slot hook candidate summary covers forwarding overloads", ref failed, MapQuickAnnouncementItemSlotHookCandidateSummaryCoversForwardingOverloads);
+            Run("map quick announcement hover snapshot read status distinguishes failure modes", ref failed, MapQuickAnnouncementHoverSnapshotReadStatusDistinguishesFailureModes);
             Run("map quick announcement resolver uses fresh UI hover snapshots", ref failed, MapQuickAnnouncementResolverUsesFreshUiHoverSnapshots);
             Run("map quick announcement stale hover snapshot falls back to tile", ref failed, MapQuickAnnouncementStaleHoverSnapshotFallsBackToTile);
             Run("map quick announcement placement names prefer item localization", ref failed, MapQuickAnnouncementPlacementNamesPreferItemLocalization);

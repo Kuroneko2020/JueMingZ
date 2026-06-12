@@ -1,4 +1,5 @@
 using System;
+using JueMingZ.Compat;
 
 namespace JueMingZ.Automation.Information
 {
@@ -13,6 +14,9 @@ namespace JueMingZ.Automation.Information
             LastResolveDetail = string.Empty;
             LastTargetSource = string.Empty;
             LastUiHoverSource = string.Empty;
+            LastUiHoverState = string.Empty;
+            LastUiHoverHookStatus = string.Empty;
+            LastPendingState = string.Empty;
             LastPlacementLookupSource = string.Empty;
             LastFallbackReason = string.Empty;
             LastFailureReason = string.Empty;
@@ -30,6 +34,9 @@ namespace JueMingZ.Automation.Information
         public string LastResolveDetail { get; set; }
         public string LastTargetSource { get; set; }
         public string LastUiHoverSource { get; set; }
+        public string LastUiHoverState { get; set; }
+        public string LastUiHoverHookStatus { get; set; }
+        public string LastPendingState { get; set; }
         public int LastHoverCacheAgeUpdates { get; set; }
         public string LastPlacementLookupSource { get; set; }
         public string LastFallbackReason { get; set; }
@@ -55,6 +62,9 @@ namespace JueMingZ.Automation.Information
                 LastResolveDetail = LastResolveDetail,
                 LastTargetSource = LastTargetSource,
                 LastUiHoverSource = LastUiHoverSource,
+                LastUiHoverState = LastUiHoverState,
+                LastUiHoverHookStatus = LastUiHoverHookStatus,
+                LastPendingState = LastPendingState,
                 LastHoverCacheAgeUpdates = LastHoverCacheAgeUpdates,
                 LastPlacementLookupSource = LastPlacementLookupSource,
                 LastFallbackReason = LastFallbackReason,
@@ -113,6 +123,9 @@ namespace JueMingZ.Automation.Information
                 LastResolveDetail = resolveDetail,
                 LastTargetSource = detailSummary.TargetSource,
                 LastUiHoverSource = detailSummary.UiHoverSource,
+                LastUiHoverState = Summarize(FirstNonEmpty(detailSummary.UiHoverState, result.UiHoverReadStatus)),
+                LastUiHoverHookStatus = Summarize(TerrariaUiMouseCompat.ItemSlotHoverHookStatus),
+                LastPendingState = Summarize(result.PendingState),
                 LastHoverCacheAgeUpdates = detailSummary.HoverCacheAgeUpdates,
                 LastPlacementLookupSource = detailSummary.PlacementLookupSource,
                 LastFallbackReason = detailSummary.FallbackReason,
@@ -186,6 +199,7 @@ namespace JueMingZ.Automation.Information
             {
                 TargetSource = string.Empty;
                 UiHoverSource = string.Empty;
+                UiHoverState = string.Empty;
                 PlacementLookupSource = string.Empty;
                 FallbackReason = string.Empty;
                 HoverCacheAgeUpdates = -1;
@@ -193,6 +207,7 @@ namespace JueMingZ.Automation.Information
 
             public string TargetSource { get; private set; }
             public string UiHoverSource { get; private set; }
+            public string UiHoverState { get; private set; }
             public int HoverCacheAgeUpdates { get; private set; }
             public string PlacementLookupSource { get; private set; }
             public string FallbackReason { get; private set; }
@@ -213,6 +228,16 @@ namespace JueMingZ.Automation.Information
                 if (headParts.Length > 1)
                 {
                     summary.PlacementLookupSource = headParts[1].Trim();
+                }
+
+                if (string.Equals(summary.TargetSource, "uiItem", StringComparison.Ordinal))
+                {
+                    summary.UiHoverState = "freshItem";
+                }
+                else if (string.Equals(summary.TargetSource, "uiSlot", StringComparison.Ordinal) &&
+                         string.Equals(summary.PlacementLookupSource, "empty", StringComparison.Ordinal))
+                {
+                    summary.UiHoverState = "freshEmptySlot";
                 }
 
                 for (var index = 1; index < segments.Length; index++)

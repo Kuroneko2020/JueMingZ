@@ -630,6 +630,252 @@ namespace JueMingZ.Tests
             });
         }
 
+        private static void SearchQueryPickRuntimeConsumesAfterPlayerInputRewrite()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                var restoreRuntimeTypes = PushFakeTerrariaMainType();
+                var previousLocalPlayer = Terraria.Main.LocalPlayer;
+                var previousPlayers = Terraria.Main.player;
+                var previousMyPlayer = Terraria.Main.myPlayer;
+                try
+                {
+                    TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(true);
+                    TerrariaMainCompat.SetGameUpdateCountOverrideForTesting(120);
+                    TerrariaUiMouseCompat.ResetUiMouseCaptureAccessorsForTesting();
+
+                    var player = new Terraria.Player();
+                    Terraria.Main.LocalPlayer = player;
+                    Terraria.Main.player = new object[256];
+                    Terraria.Main.player[0] = player;
+                    Terraria.Main.myPlayer = 0;
+                    SearchItemQueryUiState.BeginPendingSelection(118, "test");
+                    SearchItemQueryUiState.MarkSelectionArmedForNextLeftClick(119);
+                    LegacyMainUiState.SetVisible(false);
+
+                    var prefix = SearchItemPickRuntimeService.TickForTesting(
+                        CreateSearchPickRuntimeInput(false, 120),
+                        new RecordingSearchItemPickRuntimeProbe().ToPorts());
+                    if (!string.Equals(prefix.ResultCode, "skipped", StringComparison.Ordinal) ||
+                        !string.Equals(prefix.SkipReason, "waitingNextLeftClick", StringComparison.Ordinal))
+                    {
+                        throw new InvalidOperationException("Search item pick prefix guard must not consume before PlayerInput rewrites MouseLeft.");
+                    }
+
+                    Terraria.Main.mouseLeft = true;
+                    Terraria.Main.mouseLeftRelease = true;
+                    Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft = true;
+                    Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft = true;
+                    player.controlUseItem = true;
+                    player.releaseUseItem = false;
+                    player.channel = true;
+
+                    var consumeCount = 0;
+                    var restoreCount = 0;
+                    var afterPlayerInput = SearchItemPickRuntimeService.TickForTesting(
+                        CreateSearchPickRuntimeInput(true, 120),
+                        new SearchItemPickRuntimePorts
+                        {
+                            CaptureClickContext = input => CreateSearchPickClickContext(input),
+                            ResolvePendingUi = (pending, currentGameUpdateCount) => SearchItemPickResolveAttempt.Success(new SearchItemPickResolveResult
+                            {
+                                ItemType = 100,
+                                SourceKind = "uiItem",
+                                SourceSummary = "uiItem;source=ItemSlot"
+                            }),
+                            ResolvePendingFallback = (pending, currentGameUpdateCount) => SearchItemPickResolveAttempt.Failed("shouldNotFallback"),
+                            ConsumeMouseTriggerInput = token =>
+                            {
+                                consumeCount++;
+                                string message;
+                                return TerrariaUiMouseCompat.TryConsumeMouseTriggerInput(token, out message)
+                                    ? SearchItemPickInputConsumeResult.Success(message)
+                                    : SearchItemPickInputConsumeResult.Failed(message);
+                            },
+                            RestoreSearchWindow = () =>
+                            {
+                                restoreCount++;
+                                LegacyMainUiState.SelectPage("search");
+                                LegacyMainUiState.SetVisible(true);
+                            }
+                        });
+
+                    if (!string.Equals(afterPlayerInput.ResultCode, "resolved", StringComparison.Ordinal) ||
+                        consumeCount != 1 ||
+                        restoreCount != 1 ||
+                        Terraria.Main.mouseLeft ||
+                        Terraria.Main.mouseLeftRelease ||
+                        !Terraria.Main.mouseInterface ||
+                        !Terraria.Main.blockMouse ||
+                        !player.mouseInterface ||
+                        player.controlUseItem ||
+                        !player.releaseUseItem ||
+                        player.channel ||
+                        Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft ||
+                        Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft)
+                    {
+                        throw new InvalidOperationException("Search item pick after-PlayerInput guard must consume the rewritten MouseLeft before ItemCheck can use it.");
+                    }
+                }
+                finally
+                {
+                    TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(null);
+                    TerrariaMainCompat.SetGameUpdateCountOverrideForTesting(null);
+                    TerrariaUiMouseCompat.ResetUiMouseCaptureAccessorsForTesting();
+                    Terraria.Main.LocalPlayer = previousLocalPlayer;
+                    Terraria.Main.player = previousPlayers;
+                    Terraria.Main.myPlayer = previousMyPlayer;
+                    restoreRuntimeTypes();
+                }
+            });
+        }
+
+        private static void SearchQueryPickRuntimeUsesPreConsumeUiSlotSnapshot()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+                try
+                {
+                    SearchItemQueryUiState.BeginPendingSelection(20, "test");
+                    SearchItemQueryUiState.MarkSelectionArmedForNextLeftClick(21);
+                    LegacyMainUiState.SetVisible(false);
+
+                    var hoverItem = new Terraria.TestRecipeItem { type = 101, stack = 5 };
+                    if (!TerrariaUiMouseCompat.TryCaptureItemSlotHoverSnapshotForTesting(hoverItem, 8, 3, 21, 40, 50))
+                    {
+                        throw new InvalidOperationException("Expected a fresh ItemSlot hover snapshot before the target click is consumed.");
+                    }
+
+                    var resolveCount = 0;
+                    var fallbackCount = 0;
+                    var consumeCount = 0;
+                    var restoreCount = 0;
+                    var result = SearchItemPickRuntimeService.TickForTesting(
+                        CreateSearchPickRuntimeInput(true, 22, 40, 50),
+                        new SearchItemPickRuntimePorts
+                        {
+                            CaptureClickContext = input => CreateSearchPickClickContext(input),
+                            ResolvePendingUi = (pending, currentGameUpdateCount) =>
+                            {
+                                resolveCount++;
+                                return SearchItemPickTargetResolver.ResolveUiHoverFromPending(pending, currentGameUpdateCount);
+                            },
+                            ResolvePendingFallback = (pending, currentGameUpdateCount) =>
+                            {
+                                fallbackCount++;
+                                return SearchItemPickResolveAttempt.Success(new SearchItemPickResolveResult
+                                {
+                                    ItemType = 104,
+                                    SourceKind = "tile",
+                                    SourceSummary = "tile;type=5;style=0"
+                                });
+                            },
+                            ConsumeMouseTriggerInput = token =>
+                            {
+                                consumeCount++;
+                                TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+                                return SearchItemPickInputConsumeResult.Success("consumed and cleared post-consume UI cache");
+                            },
+                            RestoreSearchWindow = () =>
+                            {
+                                restoreCount++;
+                                LegacyMainUiState.SelectPage("search");
+                                LegacyMainUiState.SetVisible(true);
+                            }
+                        });
+
+                    var query = SearchItemQueryUiState.GetSelectedResult();
+                    if (!string.Equals(result.ResultCode, "resolved", StringComparison.Ordinal) ||
+                        !result.InputConsumeAttempted ||
+                        !result.InputConsumed ||
+                        resolveCount != 1 ||
+                        consumeCount != 1 ||
+                        fallbackCount != 0 ||
+                        restoreCount != 1 ||
+                        query == null ||
+                        !query.Found ||
+                        query.Item == null ||
+                        query.Item.ItemType != 101)
+                    {
+                        throw new InvalidOperationException("Search item pick must resolve the fresh UI slot snapshot before target-click consumption can make later UI evidence unavailable.");
+                    }
+                }
+                finally
+                {
+                    TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+                }
+            });
+        }
+
+        private static void SearchQueryPickRuntimeBlocksPreConsumeEmptyUiSlot()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+                try
+                {
+                    SearchItemQueryUiState.BeginPendingSelection(30, "test");
+                    SearchItemQueryUiState.MarkSelectionArmedForNextLeftClick(31);
+                    LegacyMainUiState.SetVisible(false);
+
+                    var emptyItem = new Terraria.TestRecipeItem { type = 0, stack = 0 };
+                    if (TerrariaUiMouseCompat.TryCaptureItemSlotHoverSnapshotForTesting(emptyItem, 8, 7, 31, 40, 50))
+                    {
+                        throw new InvalidOperationException("Expected empty ItemSlot capture not to report an active item.");
+                    }
+
+                    var fallbackCount = 0;
+                    var consumeCount = 0;
+                    var result = SearchItemPickRuntimeService.TickForTesting(
+                        CreateSearchPickRuntimeInput(true, 32, 40, 50),
+                        new SearchItemPickRuntimePorts
+                        {
+                            CaptureClickContext = input => CreateSearchPickClickContext(input),
+                            ResolvePendingUi = (pending, currentGameUpdateCount) =>
+                                SearchItemPickTargetResolver.ResolveUiHoverFromPending(pending, currentGameUpdateCount),
+                            ResolvePendingFallback = (pending, currentGameUpdateCount) =>
+                            {
+                                fallbackCount++;
+                                return SearchItemPickResolveAttempt.Success(new SearchItemPickResolveResult
+                                {
+                                    ItemType = 104,
+                                    SourceKind = "tile",
+                                    SourceSummary = "tile;type=5;style=0"
+                                });
+                            },
+                            ConsumeMouseTriggerInput = token =>
+                            {
+                                consumeCount++;
+                                TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+                                return SearchItemPickInputConsumeResult.Success("consumed and cleared post-consume UI cache");
+                            },
+                            RestoreSearchWindow = () =>
+                            {
+                                LegacyMainUiState.SelectPage("search");
+                                LegacyMainUiState.SetVisible(true);
+                            }
+                        });
+
+                    if (!string.Equals(result.ResultCode, "failed", StringComparison.Ordinal) ||
+                        !string.Equals(result.FailureReason, "uiEmptySlot", StringComparison.Ordinal) ||
+                        !result.InputConsumeAttempted ||
+                        !result.InputConsumed ||
+                        consumeCount != 1 ||
+                        fallbackCount != 0 ||
+                        SearchItemQueryUiState.SelectionState != SearchItemPickSelectionState.CancelledOrFailed ||
+                        SearchItemQueryUiState.IsSelectionPending)
+                    {
+                        throw new InvalidOperationException("Search item pick must treat a pre-consume empty UI slot as a real UI hit and block world fallback.");
+                    }
+                }
+                finally
+                {
+                    TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+                }
+            });
+        }
+
         private static void SearchQueryPickTargetResolverUsesUiItem()
         {
             var context = new SearchItemPickResolveContext
@@ -756,11 +1002,27 @@ namespace JueMingZ.Tests
                 var result = SearchItemPickRuntimeService.TickForTesting(
                     CreateSearchPickRuntimeInput(true, 22),
                     probe.ToPorts());
-                if (!string.Equals(result.ResultCode, "failed", StringComparison.Ordinal) ||
+                if (!string.Equals(result.ResultCode, "skipped", StringComparison.Ordinal) ||
+                    !string.Equals(result.SkipReason, "pendingUiHover", StringComparison.Ordinal) ||
                     !result.InputConsumeAttempted ||
                     !result.InputConsumed ||
                     probe.ConsumeCount != 1 ||
                     probe.ResolveCount != 1 ||
+                    probe.RestoreCount != 0 ||
+                    LegacyMainUiState.Visible ||
+                    SearchItemQueryUiState.SelectionState != SearchItemPickSelectionState.ArmedForNextLeftClick ||
+                    !SearchItemQueryUiState.IsSelectionPending ||
+                    !SearchItemQueryUiState.HasSelectedResult ||
+                    SearchItemQueryUiState.SelectedItemType != 100)
+                {
+                    throw new InvalidOperationException("Search item pick runtime must keep failed target clicks pending for delayed UI hover evidence.");
+                }
+
+                var expired = SearchItemPickRuntimeService.TickForTesting(
+                    CreateSearchPickRuntimeInput(false, 30),
+                    probe.ToPorts());
+                if (!string.Equals(expired.ResultCode, "failed", StringComparison.Ordinal) ||
+                    probe.ResolveCount != 3 ||
                     probe.RestoreCount != 1 ||
                     !LegacyMainUiState.Visible ||
                     SearchItemQueryUiState.SelectionState != SearchItemPickSelectionState.CancelledOrFailed ||
@@ -769,7 +1031,193 @@ namespace JueMingZ.Tests
                     SearchItemQueryUiState.SelectedItemType != 0 ||
                     SearchItemQueryUiState.SelectionHintText.IndexOf("未识别", StringComparison.Ordinal) < 0)
                 {
-                    throw new InvalidOperationException("Search item pick runtime must consume failed target clicks, restore F5, and show a stable failure hint.");
+                    throw new InvalidOperationException("Search item pick runtime must restore F5 and fail only after the delayed UI hover window expires.");
+                }
+            });
+        }
+
+        private static void SearchQueryPickRuntimeDoesNotLetWorldFallbackRaceUiPending()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                SearchItemQueryUiState.BeginPendingSelection(20, "test");
+                SearchItemQueryUiState.MarkSelectionArmedForNextLeftClick(21);
+                LegacyMainUiState.SetVisible(false);
+                var probe = new RecordingSearchItemPickRuntimeProbe
+                {
+                    ResolvePendingFallbackAttempt = SearchItemPickResolveAttempt.Success(new SearchItemPickResolveResult
+                    {
+                        ItemType = 104,
+                        SourceKind = "tile",
+                        SourceSummary = "tile;type=5;style=0"
+                    })
+                };
+                probe.ResolveAttempts.Enqueue(SearchItemPickResolveAttempt.Failed("uiHoverPending"));
+                probe.ResolveAttempts.Enqueue(SearchItemPickResolveAttempt.Success(new SearchItemPickResolveResult
+                {
+                    ItemType = 101,
+                    SourceKind = "uiItem",
+                    SourceSummary = "uiItem;source=ItemSlot:8:3"
+                }));
+
+                var pending = SearchItemPickRuntimeService.TickForTesting(
+                    CreateSearchPickRuntimeInput(true, 22),
+                    probe.ToPorts());
+                if (!string.Equals(pending.ResultCode, "skipped", StringComparison.Ordinal) ||
+                    !string.Equals(pending.SkipReason, "pendingUiHover", StringComparison.Ordinal) ||
+                    probe.ResolveCount != 1 ||
+                    probe.FallbackResolveCount != 0 ||
+                    probe.RestoreCount != 0 ||
+                    !SearchItemQueryUiState.IsSelectionPending)
+                {
+                    throw new InvalidOperationException("Search item pick must not let a world target resolve before the UI hover pending window expires.");
+                }
+
+                var resolved = SearchItemPickRuntimeService.TickForTesting(
+                    CreateSearchPickRuntimeInput(true, 23),
+                    probe.ToPorts());
+                var query = SearchItemQueryUiState.GetSelectedResult();
+                if (!string.Equals(resolved.ResultCode, "resolved", StringComparison.Ordinal) ||
+                    probe.ResolveCount != 2 ||
+                    probe.FallbackResolveCount != 0 ||
+                    SearchItemQueryUiState.IsSelectionPending ||
+                    query == null ||
+                    !query.Found ||
+                    query.Item == null ||
+                    query.Item.ItemType != 101)
+                {
+                    throw new InvalidOperationException("Search item pick must keep waiting for the UI item instead of selecting the world target underneath.");
+                }
+            });
+        }
+
+        private static void SearchQueryPickRuntimeUsesFrozenClickForFallback()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                SearchItemQueryUiState.BeginPendingSelection(40, "test");
+                SearchItemQueryUiState.MarkSelectionArmedForNextLeftClick(41);
+                LegacyMainUiState.SetVisible(false);
+                var probe = new RecordingSearchItemPickRuntimeProbe
+                {
+                    ResolveAttempt = SearchItemPickResolveAttempt.Failed("uiHoverPending"),
+                    ResolvePendingFallbackOverride = (pending, currentGameUpdateCount) =>
+                    {
+                        return pending != null && pending.MouseX == 40 && pending.MouseY == 50
+                            ? SearchItemPickResolveAttempt.Success(new SearchItemPickResolveResult
+                            {
+                                ItemType = 104,
+                                SourceKind = "tile",
+                                SourceSummary = "tile;type=5;style=0"
+                            })
+                            : SearchItemPickResolveAttempt.Failed("usedCurrentMouse");
+                    }
+                };
+
+                var pendingResult = SearchItemPickRuntimeService.TickForTesting(
+                    CreateSearchPickRuntimeInput(true, 42, 40, 50),
+                    probe.ToPorts());
+                if (!string.Equals(pendingResult.ResultCode, "skipped", StringComparison.Ordinal) ||
+                    !SearchItemQueryUiState.IsSelectionPending)
+                {
+                    throw new InvalidOperationException("Expected first search pick click to enter UI pending before fallback.");
+                }
+
+                var resolved = SearchItemPickRuntimeService.TickForTesting(
+                    CreateSearchPickRuntimeInput(false, 50, 300, 350),
+                    probe.ToPorts());
+                var query = SearchItemQueryUiState.GetSelectedResult();
+                if (!string.Equals(resolved.ResultCode, "resolved", StringComparison.Ordinal) ||
+                    resolved.ItemType != 104 ||
+                    query == null ||
+                    !query.Found ||
+                    query.Item == null ||
+                    query.Item.ItemType != 104)
+                {
+                    throw new InvalidOperationException("Search item pick fallback must use the frozen click coordinates, not the current mouse position after the click.");
+                }
+            });
+        }
+
+        private static void SearchQueryPickRuntimeBlocksWorldFallbackOnUiEmptySlot()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                SearchItemQueryUiState.BeginPendingSelection(60, "test");
+                SearchItemQueryUiState.MarkSelectionArmedForNextLeftClick(61);
+                LegacyMainUiState.SetVisible(false);
+                var probe = new RecordingSearchItemPickRuntimeProbe
+                {
+                    ResolveAttempt = SearchItemPickResolveAttempt.Failed("uiEmptySlot"),
+                    ResolvePendingFallbackAttempt = SearchItemPickResolveAttempt.Success(new SearchItemPickResolveResult
+                    {
+                        ItemType = 104,
+                        SourceKind = "tile",
+                        SourceSummary = "tile;type=5;style=0"
+                    })
+                };
+
+                var result = SearchItemPickRuntimeService.TickForTesting(
+                    CreateSearchPickRuntimeInput(true, 62),
+                    probe.ToPorts());
+                if (!string.Equals(result.ResultCode, "failed", StringComparison.Ordinal) ||
+                    !string.Equals(result.FailureReason, "uiEmptySlot", StringComparison.Ordinal) ||
+                    probe.FallbackResolveCount != 0 ||
+                    !LegacyMainUiState.Visible ||
+                    SearchItemQueryUiState.SelectionState != SearchItemPickSelectionState.CancelledOrFailed ||
+                    SearchItemQueryUiState.IsSelectionPending)
+                {
+                    throw new InvalidOperationException("Search item pick must treat a fresh empty UI slot as a UI hit and block world fallback.");
+                }
+            });
+        }
+
+        private static void SearchQueryPickRuntimeWaitsDelayedUiItem()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                SearchItemQueryUiState.BeginPendingSelection(20, "test");
+                SearchItemQueryUiState.MarkSelectionArmedForNextLeftClick(21);
+                LegacyMainUiState.SetVisible(false);
+                var probe = new RecordingSearchItemPickRuntimeProbe();
+                probe.ResolveAttempts.Enqueue(SearchItemPickResolveAttempt.Failed("noSearchableItem"));
+                probe.ResolveAttempts.Enqueue(SearchItemPickResolveAttempt.Success(new SearchItemPickResolveResult
+                {
+                    ItemType = 101,
+                    SourceKind = "uiItem",
+                    SourceSummary = "uiItem;source=ItemSlot:8:3"
+                }));
+
+                var pending = SearchItemPickRuntimeService.TickForTesting(
+                    CreateSearchPickRuntimeInput(true, 22),
+                    probe.ToPorts());
+                if (!string.Equals(pending.ResultCode, "skipped", StringComparison.Ordinal) ||
+                    !string.Equals(pending.SkipReason, "pendingUiHover", StringComparison.Ordinal) ||
+                    probe.ResolveCount != 1 ||
+                    probe.RestoreCount != 0 ||
+                    !SearchItemQueryUiState.IsSelectionPending)
+                {
+                    throw new InvalidOperationException("Search item pick runtime must wait when the first target read has no UI item.");
+                }
+
+                var resolved = SearchItemPickRuntimeService.TickForTesting(
+                    CreateSearchPickRuntimeInput(true, 23),
+                    probe.ToPorts());
+                var query = SearchItemQueryUiState.GetSelectedResult();
+                if (!string.Equals(resolved.ResultCode, "resolved", StringComparison.Ordinal) ||
+                    !resolved.InputConsumeAttempted ||
+                    !resolved.InputConsumed ||
+                    probe.ConsumeCount != 2 ||
+                    probe.ResolveCount != 2 ||
+                    probe.RestoreCount != 1 ||
+                    SearchItemQueryUiState.IsSelectionPending ||
+                    SearchItemQueryUiState.SelectionState != SearchItemPickSelectionState.Resolved ||
+                    query == null ||
+                    !query.Found ||
+                    query.Item == null ||
+                    query.Item.ItemType != 101)
+                {
+                    throw new InvalidOperationException("Search item pick runtime must resolve a delayed UI item before failing or falling through to the world.");
                 }
             });
         }
@@ -798,12 +1246,12 @@ namespace JueMingZ.Tests
                     throw new InvalidOperationException("Expected search test ItemSlot hover snapshot capture to succeed.");
                 }
 
-                if (SearchItemQueryUiState.TryRefreshHoverItemFromFreshSnapshot(102, 20, 30))
+                if (SearchItemQueryUiState.TryRefreshHoverItemFromFreshSnapshot(107, 20, 30))
                 {
                     throw new InvalidOperationException("Expected stale ItemSlot hover snapshots not to refresh search hover entry.");
                 }
 
-                if (SearchItemQueryUiState.TryRefreshHoverItemFromFreshSnapshot(101, 21, 30))
+                if (SearchItemQueryUiState.TryRefreshHoverItemFromFreshSnapshot(101, 26, 30))
                 {
                     throw new InvalidOperationException("Expected moved mouse coordinates not to refresh search hover entry.");
                 }
@@ -818,6 +1266,37 @@ namespace JueMingZ.Tests
                     SearchItemQueryUiState.GetHoverItemLabel().IndexOf("x7", StringComparison.Ordinal) < 0)
                 {
                     throw new InvalidOperationException("Expected search hover entry to store only value facts from the fresh ItemSlot snapshot.");
+                }
+            });
+
+            TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+        }
+
+        private static void SearchQueryHoverEntryIgnoresFreshEmptyUiSlotSnapshot()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+                SearchItemQueryUiState.ResetForTesting();
+
+                var emptyItem = new Terraria.TestRecipeItem { type = 0, stack = 0 };
+                if (TerrariaUiMouseCompat.TryCaptureItemSlotHoverSnapshotForTesting(emptyItem, 8, 5, 200, 40, 50))
+                {
+                    throw new InvalidOperationException("Expected empty UI slot capture not to report an active item.");
+                }
+
+                TerrariaUiHoverSlotSnapshot slotSnapshot;
+                if (!TerrariaUiMouseCompat.TryReadFreshHoverSlotSnapshot(201, 40, 50, out slotSnapshot) ||
+                    slotSnapshot == null ||
+                    slotSnapshot.HasActiveItem)
+                {
+                    throw new InvalidOperationException("Expected fresh empty UI slot proof to remain readable for quick announcement.");
+                }
+
+                if (SearchItemQueryUiState.TryRefreshHoverItemFromFreshSnapshot(201, 40, 50) ||
+                    SearchItemQueryUiState.HasHoverItem)
+                {
+                    throw new InvalidOperationException("Search query hover entry must ignore fresh empty UI slot proof and keep no hover item.");
                 }
             });
 
@@ -1031,7 +1510,11 @@ namespace JueMingZ.Tests
             LegacyTextInput.ClearFocus();
         }
 
-        private static SearchItemPickRuntimeInput CreateSearchPickRuntimeInput(bool mouseLeftDown, ulong updateCount)
+        private static SearchItemPickRuntimeInput CreateSearchPickRuntimeInput(
+            bool mouseLeftDown,
+            ulong updateCount,
+            int mouseX = 40,
+            int mouseY = 50)
         {
             return new SearchItemPickRuntimeInput
             {
@@ -1039,27 +1522,88 @@ namespace JueMingZ.Tests
                 GameInputAvailable = true,
                 MouseReadAvailable = true,
                 MouseLeftDown = mouseLeftDown,
+                MouseX = mouseX,
+                MouseY = mouseY,
                 CurrentGameUpdateCount = updateCount
             };
         }
 
+        private static SearchItemPickClickContext CreateSearchPickClickContext(SearchItemPickRuntimeInput input)
+        {
+            input = input ?? new SearchItemPickRuntimeInput();
+            return SearchItemPickClickContext.Success(
+                input.MouseX,
+                input.MouseY,
+                input.MouseX,
+                input.MouseY,
+                input.MouseX / TerrariaTileReadCompat.TileSize,
+                input.MouseY / TerrariaTileReadCompat.TileSize,
+                input.CurrentGameUpdateCount);
+        }
+
         private sealed class RecordingSearchItemPickRuntimeProbe
         {
-            public SearchItemPickResolveAttempt ResolveAttempt = SearchItemPickResolveAttempt.Failed("notConfigured");
+            public SearchItemPickResolveAttempt ResolveAttempt = SearchItemPickResolveAttempt.Failed("uiHoverPending");
+            public SearchItemPickResolveAttempt ResolvePendingFallbackAttempt = SearchItemPickResolveAttempt.Failed("noSearchableItem");
+            public readonly Queue<SearchItemPickResolveAttempt> ResolveAttempts = new Queue<SearchItemPickResolveAttempt>();
+            public readonly Queue<SearchItemPickResolveAttempt> ResolvePendingFallbackAttempts = new Queue<SearchItemPickResolveAttempt>();
             public bool ConsumeSucceeds = true;
             public int ResolveCount;
+            public int UiResolveCount;
+            public int FallbackResolveCount;
+            public int CaptureCount;
             public int ConsumeCount;
             public int RestoreCount;
             public string LastConsumedToken = string.Empty;
+            public Func<SearchItemPickRuntimeInput, SearchItemPickClickContext> CaptureClickContextOverride;
+            public Func<SearchItemPickPendingClick, ulong, SearchItemPickResolveAttempt> ResolvePendingUiOverride;
+            public Func<SearchItemPickPendingClick, ulong, SearchItemPickResolveAttempt> ResolvePendingFallbackOverride;
 
             public SearchItemPickRuntimePorts ToPorts()
             {
                 return new SearchItemPickRuntimePorts
                 {
-                    ResolveCurrent = () =>
+                    CaptureClickContext = input =>
+                    {
+                        CaptureCount++;
+                        if (CaptureClickContextOverride != null)
+                        {
+                            return CaptureClickContextOverride(input);
+                        }
+
+                        return CreateSearchPickClickContext(input);
+                    },
+                    ResolvePendingUi = (pending, currentGameUpdateCount) =>
                     {
                         ResolveCount++;
+                        UiResolveCount++;
+                        if (ResolvePendingUiOverride != null)
+                        {
+                            return ResolvePendingUiOverride(pending, currentGameUpdateCount);
+                        }
+
+                        if (ResolveAttempts.Count > 0)
+                        {
+                            return ResolveAttempts.Dequeue();
+                        }
+
                         return ResolveAttempt;
+                    },
+                    ResolvePendingFallback = (pending, currentGameUpdateCount) =>
+                    {
+                        ResolveCount++;
+                        FallbackResolveCount++;
+                        if (ResolvePendingFallbackOverride != null)
+                        {
+                            return ResolvePendingFallbackOverride(pending, currentGameUpdateCount);
+                        }
+
+                        if (ResolvePendingFallbackAttempts.Count > 0)
+                        {
+                            return ResolvePendingFallbackAttempts.Dequeue();
+                        }
+
+                        return ResolvePendingFallbackAttempt;
                     },
                     ConsumeMouseTriggerInput = token =>
                     {

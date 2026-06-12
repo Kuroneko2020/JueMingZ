@@ -800,38 +800,6 @@ namespace JueMingZ.Tests
             };
         }
 
-        private static Action PushTemporaryConfigDirectory(string prefix)
-        {
-            var configDirectoryField = typeof(ConfigService).GetField("<ConfigDirectory>k__BackingField", BindingFlags.Static | BindingFlags.NonPublic);
-            var appSettingsPathField = typeof(ConfigService).GetField("<AppSettingsPath>k__BackingField", BindingFlags.Static | BindingFlags.NonPublic);
-            var featureSettingsPathField = typeof(ConfigService).GetField("<FeatureSettingsPath>k__BackingField", BindingFlags.Static | BindingFlags.NonPublic);
-            var hotkeySettingsPathField = typeof(ConfigService).GetField("<HotkeySettingsPath>k__BackingField", BindingFlags.Static | BindingFlags.NonPublic);
-            if (configDirectoryField == null || appSettingsPathField == null || featureSettingsPathField == null || hotkeySettingsPathField == null)
-            {
-                throw new InvalidOperationException("ConfigService path backing fields missing.");
-            }
-
-            var previousConfigDirectory = (string)configDirectoryField.GetValue(null);
-            var previousAppSettingsPath = (string)appSettingsPathField.GetValue(null);
-            var previousFeatureSettingsPath = (string)featureSettingsPathField.GetValue(null);
-            var previousHotkeySettingsPath = (string)hotkeySettingsPathField.GetValue(null);
-            var root = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".test-config", prefix + "-" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(root);
-            configDirectoryField.SetValue(null, root);
-            appSettingsPathField.SetValue(null, Path.Combine(root, "appsettings.json"));
-            featureSettingsPathField.SetValue(null, Path.Combine(root, "features.json"));
-            hotkeySettingsPathField.SetValue(null, Path.Combine(root, "hotkeys.json"));
-
-            return () =>
-            {
-                configDirectoryField.SetValue(null, previousConfigDirectory);
-                appSettingsPathField.SetValue(null, previousAppSettingsPath);
-                featureSettingsPathField.SetValue(null, previousFeatureSettingsPath);
-                hotkeySettingsPathField.SetValue(null, previousHotkeySettingsPath);
-                TryDeleteTemporaryConfigDirectory(root);
-            };
-        }
-
         private static void ResetTravelMenuStateStoreCache()
         {
             var stateField = typeof(TravelMenuStateStore).GetField("_state", BindingFlags.Static | BindingFlags.NonPublic);
@@ -841,23 +809,6 @@ namespace JueMingZ.Tests
             }
 
             stateField.SetValue(null, null);
-        }
-
-        private static void TryDeleteTemporaryConfigDirectory(string path)
-        {
-            try
-            {
-                var basePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".test-config");
-                var fullPath = Path.GetFullPath(path);
-                var fullBasePath = Path.GetFullPath(basePath);
-                if (fullPath.StartsWith(fullBasePath, StringComparison.OrdinalIgnoreCase) && Directory.Exists(fullPath))
-                {
-                    Directory.Delete(fullPath, true);
-                }
-            }
-            catch
-            {
-            }
         }
 
     }

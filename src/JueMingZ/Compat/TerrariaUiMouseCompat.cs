@@ -13,6 +13,11 @@ namespace JueMingZ.Compat
         // UI mouse helpers may mark capture flags to stop click-through;
         // gameplay actions remain outside this layer.
         private const int VkLeftButton = 0x01;
+        private const int VkRightButton = 0x02;
+        private const int VkMiddleButton = 0x04;
+        private const int VkXButton1 = 0x05;
+        private const int VkXButton2 = 0x06;
+        private const ulong MaxActiveTriggerSuppressionUpdates = 90;
         private static bool _mainMouseResolved;
         private static FieldInfo _mouseXField;
         private static FieldInfo _mouseYField;
@@ -42,11 +47,18 @@ namespace JueMingZ.Compat
         private static bool _lastPlayerInputCleared;
         private static bool _lastMainScrollSuppressed;
         private static bool _lastScrollHotbarHookSuppressed;
-        private const ulong MaxHoverSnapshotAgeUpdates = 1;
+        private const ulong MaxHoverSnapshotAgeUpdates = 6;
+        private const int HoverSnapshotMouseTolerancePixels = 4;
         private static readonly object UiMouseAccessorSyncRoot = new object();
         private static readonly object HoverSnapshotSyncRoot = new object();
+        private static readonly object ActiveTriggerSuppressionSyncRoot = new object();
         private static readonly Dictionary<Type, object> EmptyHoverItemsByType = new Dictionary<Type, object>();
-        private static TerrariaUiHoverItemSnapshot _lastItemSlotHoverSnapshot;
+        private static TerrariaUiHoverSlotSnapshot _lastItemSlotHoverSlotSnapshot;
+        private static string _activeTriggerSuppressionToken = string.Empty;
+        private static ulong _activeTriggerSuppressionStartUpdateCount;
+        private static bool _itemSlotHoverHookInstalled;
+        private static string _itemSlotHoverHookStatus = "notAttempted";
+        private static string _itemSlotHoverHookCandidateSummary = string.Empty;
         private static Type _uiMouseAccessorMainType;
         private static Type _uiMouseAccessorMainInstanceType;
         private static Type _localPlayerMouseInterfaceType;
@@ -161,19 +173,90 @@ namespace JueMingZ.Compat
         {
             snapshot = null;
 
-            TerrariaUiHoverItemSnapshot cached;
-            lock (HoverSnapshotSyncRoot)
+            TerrariaUiHoverSlotSnapshot slotSnapshot;
+            if (!TryReadFreshHoverSlotSnapshot(currentGameUpdateCount, mouseX, mouseY, out slotSnapshot) ||
+                slotSnapshot == null ||
+                !slotSnapshot.HasActiveItem ||
+                slotSnapshot.ItemSnapshot == null)
             {
-                cached = CloneHoverItemSnapshot(_lastItemSlotHoverSnapshot);
+                return false;
             }
 
-            if (!IsFreshHoverSnapshot(cached, currentGameUpdateCount, mouseX, mouseY))
+            snapshot = CloneHoverItemSnapshot(slotSnapshot.ItemSnapshot);
+            return true;
+        }
+
+        public static bool TryReadFreshHoverSlotSnapshot(
+            ulong currentGameUpdateCount,
+            int mouseX,
+            int mouseY,
+            out TerrariaUiHoverSlotSnapshot snapshot)
+        {
+            TerrariaUiHoverSlotReadResult readResult;
+            return TryReadFreshHoverSlotSnapshot(
+                currentGameUpdateCount,
+                mouseX,
+                mouseY,
+                out snapshot,
+                out readResult);
+        }
+
+        public static bool TryReadFreshHoverSlotSnapshot(
+            ulong currentGameUpdateCount,
+            int mouseX,
+            int mouseY,
+            out TerrariaUiHoverSlotSnapshot snapshot,
+            out TerrariaUiHoverSlotReadResult readResult)
+        {
+            snapshot = null;
+
+            TerrariaUiHoverSlotSnapshot cached;
+            lock (HoverSnapshotSyncRoot)
+            {
+                cached = CloneHoverSlotSnapshot(_lastItemSlotHoverSlotSnapshot);
+            }
+
+            readResult = EvaluateHoverSlotSnapshot(cached, currentGameUpdateCount, mouseX, mouseY);
+            if (readResult == null || !readResult.IsFresh)
             {
                 return false;
             }
 
             snapshot = cached;
             return true;
+        }
+
+        public static bool ItemSlotHoverHookInstalled
+        {
+            get
+            {
+                lock (HoverSnapshotSyncRoot)
+                {
+                    return _itemSlotHoverHookInstalled;
+                }
+            }
+        }
+
+        public static string ItemSlotHoverHookStatus
+        {
+            get
+            {
+                lock (HoverSnapshotSyncRoot)
+                {
+                    return _itemSlotHoverHookStatus ?? string.Empty;
+                }
+            }
+        }
+
+        public static string ItemSlotHoverHookCandidateSummary
+        {
+            get
+            {
+                lock (HoverSnapshotSyncRoot)
+                {
+                    return _itemSlotHoverHookCandidateSummary ?? string.Empty;
+                }
+            }
         }
 
         internal static bool TryCaptureItemSlotHoverSnapshot(object inventory, int context, int slot)
@@ -209,7 +292,22 @@ namespace JueMingZ.Compat
         {
             lock (HoverSnapshotSyncRoot)
             {
-                _lastItemSlotHoverSnapshot = null;
+                _lastItemSlotHoverSlotSnapshot = null;
+            }
+        }
+
+        internal static void RecordItemSlotHoverHookInstallResult(
+            bool installed,
+            string status,
+            string candidateSummary)
+        {
+            lock (HoverSnapshotSyncRoot)
+            {
+                _itemSlotHoverHookInstalled = installed;
+                _itemSlotHoverHookStatus = string.IsNullOrWhiteSpace(status)
+                    ? (installed ? "installed" : "notInstalled")
+                    : status.Trim();
+                _itemSlotHoverHookCandidateSummary = candidateSummary ?? string.Empty;
             }
         }
 
@@ -268,9 +366,74 @@ namespace JueMingZ.Compat
             }
         }
 
+        public static void UpdateActiveTriggerSuppressionPrefixGuard()
+        {
+            UpdateActiveTriggerSuppressionGuard("Main.Update.Prefix");
+        }
+
+        public static void UpdateActiveTriggerSuppressionAfterPlayerInputGuard()
+        {
+            UpdateActiveTriggerSuppressionGuard("PlayerInput.Postfix");
+        }
+
+        private static void UpdateActiveTriggerSuppressionGuard(string source)
+        {
+            try
+            {
+                string token;
+                ulong startUpdateCount;
+                lock (ActiveTriggerSuppressionSyncRoot)
+                {
+                    token = _activeTriggerSuppressionToken;
+                    startUpdateCount = _activeTriggerSuppressionStartUpdateCount;
+                }
+
+                if (string.IsNullOrWhiteSpace(token))
+                {
+                    return;
+                }
+
+                ulong currentUpdateCount;
+                if (!TerrariaMainCompat.TryReadGameUpdateCount(out currentUpdateCount))
+                {
+                    currentUpdateCount = startUpdateCount;
+                }
+
+                if (currentUpdateCount >= startUpdateCount &&
+                    currentUpdateCount - startUpdateCount > MaxActiveTriggerSuppressionUpdates)
+                {
+                    ClearActiveTriggerSuppression("expired");
+                    return;
+                }
+
+                if (!IsMouseTriggerStillDown(token))
+                {
+                    ClearActiveTriggerSuppression("released");
+                    return;
+                }
+
+                string message;
+                ApplyMouseTriggerInputSuppression(token, out message);
+            }
+            catch (Exception error)
+            {
+                ClearActiveTriggerSuppression("error");
+                _mouseCaptureLastMessage = "Active trigger suppression failed at " +
+                                           (source ?? string.Empty) +
+                                           ": " +
+                                           error.Message;
+                LogThrottle.WarnThrottled(
+                    "ui-active-trigger-suppression-failed",
+                    TimeSpan.FromSeconds(10),
+                    "TerrariaUiMouseCompat",
+                    _mouseCaptureLastMessage);
+            }
+        }
+
         // One-shot trigger consumption for quick, non-UI commands: mark this
-        // frame as mouse-captured and clear only the vanilla button pulse that
-        // matches the trigger. Do not use this as a generic gameplay input API.
+        // click as mouse-captured and clear only the vanilla button pulse that
+        // matches the trigger until the physical button is released. Do not use
+        // this as a generic gameplay input API.
         public static bool TryConsumeMouseTriggerInput(string triggerToken, out string message)
         {
             message = string.Empty;
@@ -285,40 +448,14 @@ namespace JueMingZ.Compat
 
             try
             {
-                object player;
-                var captured = false;
-                if (TerrariaInputCompat.TryGetLocalPlayer(out player))
+                var consumed = ApplyMouseTriggerInputSuppression(normalizedToken, out message);
+                if (consumed)
                 {
-                    captured |= TrySetLocalPlayerMouseInterface(player, true);
+                    StartActiveTriggerSuppression(normalizedToken);
                 }
 
-                var cleared = false;
-                var mainType = TerrariaRuntimeTypes.MainType;
-                if (mainType != null)
-                {
-                    EnsureUiMouseAccessors(mainType);
-                    captured |= _mainMouseInterfaceAccessor.TrySet(null, true);
-                    captured |= _mainBlockMouseAccessor.TrySet(null, true);
-
-                    if (string.Equals(normalizedToken, "MouseLeft", StringComparison.Ordinal))
-                    {
-                        cleared |= _mainMouseLeftAccessor.TrySet(null, false);
-                        cleared |= _mainMouseLeftReleaseAccessor.TrySet(null, false);
-                    }
-                    else if (string.Equals(normalizedToken, "MouseRight", StringComparison.Ordinal))
-                    {
-                        cleared |= _mainMouseRightAccessor.TrySet(null, false);
-                        cleared |= _mainMouseRightReleaseAccessor.TrySet(null, false);
-                    }
-                }
-
-                TrySuppressMouseText();
-
-                var consumed = captured || cleared;
                 UiMouseCaptureAvailable = consumed;
-                _mouseCaptureLastMessage = consumed
-                    ? "Mouse trigger input consumed for " + normalizedToken + "."
-                    : "Mouse trigger input consume unavailable for " + normalizedToken + ".";
+                _mouseCaptureLastMessage = message;
                 message = _mouseCaptureLastMessage;
                 return consumed;
             }
@@ -371,6 +508,103 @@ namespace JueMingZ.Compat
                     "TerrariaUiMouseCompat",
                     _mouseCaptureLastMessage);
                 return false;
+            }
+        }
+
+        private static bool ApplyMouseTriggerInputSuppression(string normalizedToken, out string message)
+        {
+            message = string.Empty;
+            object player;
+            var captured = false;
+            var cleared = false;
+            var playerUseSuppressed = false;
+            if (TerrariaInputCompat.TryGetLocalPlayer(out player))
+            {
+                captured |= TrySetLocalPlayerMouseInterface(player, true);
+                playerUseSuppressed |= SuppressPlayerUseInputForTrigger(player, normalizedToken);
+            }
+
+            var mainType = TerrariaRuntimeTypes.MainType;
+            if (mainType != null)
+            {
+                EnsureUiMouseAccessors(mainType);
+                captured |= _mainMouseInterfaceAccessor.TrySet(null, true);
+                captured |= _mainBlockMouseAccessor.TrySet(null, true);
+
+                if (string.Equals(normalizedToken, "MouseLeft", StringComparison.Ordinal))
+                {
+                    cleared |= _mainMouseLeftAccessor.TrySet(null, false);
+                    cleared |= _mainMouseLeftReleaseAccessor.TrySet(null, false);
+                }
+                else if (string.Equals(normalizedToken, "MouseRight", StringComparison.Ordinal))
+                {
+                    cleared |= _mainMouseRightAccessor.TrySet(null, false);
+                    cleared |= _mainMouseRightReleaseAccessor.TrySet(null, false);
+                }
+            }
+
+            cleared |= TrySetPlayerInputTriggerForMouseToken("Current", normalizedToken, false);
+            cleared |= TrySetPlayerInputTriggerForMouseToken("JustPressed", normalizedToken, false);
+
+            TrySuppressMouseText();
+
+            var consumed = captured || cleared || playerUseSuppressed;
+            message = consumed
+                ? "Mouse trigger input consumed for " + normalizedToken +
+                  " (captured=" + captured +
+                  ", cleared=" + cleared +
+                  ", playerUseSuppressed=" + playerUseSuppressed + ")."
+                : "Mouse trigger input consume unavailable for " + normalizedToken + ".";
+            return consumed;
+        }
+
+        private static bool SuppressPlayerUseInputForTrigger(object player, string normalizedToken)
+        {
+            if (player == null)
+            {
+                return false;
+            }
+
+            var changed = false;
+            if (string.Equals(normalizedToken, "MouseLeft", StringComparison.Ordinal))
+            {
+                changed |= TrySetMember(player, "controlUseItem", false);
+                changed |= TrySetMember(player, "releaseUseItem", true);
+                // Channel is an input-held use state; clearing it only for the
+                // consumed click lets vanilla ItemSlot hover run without keeping
+                // a held item in "using" mode.
+                TrySetMember(player, "channel", false);
+            }
+
+            return changed;
+        }
+
+        private static void StartActiveTriggerSuppression(string normalizedToken)
+        {
+            ulong updateCount;
+            if (!TerrariaMainCompat.TryReadGameUpdateCount(out updateCount))
+            {
+                updateCount = 0;
+            }
+
+            lock (ActiveTriggerSuppressionSyncRoot)
+            {
+                _activeTriggerSuppressionToken = normalizedToken ?? string.Empty;
+                _activeTriggerSuppressionStartUpdateCount = updateCount;
+            }
+        }
+
+        private static void ClearActiveTriggerSuppression(string reason)
+        {
+            lock (ActiveTriggerSuppressionSyncRoot)
+            {
+                _activeTriggerSuppressionToken = string.Empty;
+                _activeTriggerSuppressionStartUpdateCount = 0;
+            }
+
+            if (!string.IsNullOrWhiteSpace(reason))
+            {
+                _mouseCaptureLastMessage = "Active trigger suppression ended: " + reason + ".";
             }
         }
 
@@ -616,6 +850,7 @@ namespace JueMingZ.Compat
 
         internal static void ResetUiMouseCaptureAccessorsForTesting()
         {
+            ClearActiveTriggerSuppression("testReset");
             lock (UiMouseAccessorSyncRoot)
             {
                 _uiMouseAccessorMainType = null;
@@ -799,6 +1034,171 @@ namespace JueMingZ.Compat
             return string.Empty;
         }
 
+        private static bool IsMouseTriggerStillDown(string normalizedToken)
+        {
+            if (string.Equals(normalizedToken, "MouseLeft", StringComparison.Ordinal))
+            {
+                bool mainValue;
+                if (_mainMouseLeftAccessor.TryGet(null, out mainValue) && mainValue)
+                {
+                    return true;
+                }
+
+                bool triggerValue;
+                if (TryReadPlayerInputTriggerForMouseToken("Current", normalizedToken, out triggerValue) && triggerValue)
+                {
+                    return true;
+                }
+
+                return IsMouseButtonDownFallback(VkLeftButton);
+            }
+
+            if (string.Equals(normalizedToken, "MouseRight", StringComparison.Ordinal))
+            {
+                bool mainValue;
+                if (_mainMouseRightAccessor.TryGet(null, out mainValue) && mainValue)
+                {
+                    return true;
+                }
+
+                bool triggerValue;
+                if (TryReadPlayerInputTriggerForMouseToken("Current", normalizedToken, out triggerValue) && triggerValue)
+                {
+                    return true;
+                }
+
+                return IsMouseButtonDownFallback(VkRightButton);
+            }
+
+            bool value;
+            if (TryReadPlayerInputTriggerForMouseToken("Current", normalizedToken, out value) && value)
+            {
+                return true;
+            }
+
+            var virtualKey = GetMouseTriggerVirtualKey(normalizedToken);
+            return virtualKey > 0 && IsMouseButtonDownFallback(virtualKey);
+        }
+
+        private static bool TryReadPlayerInputTriggerForMouseToken(string packName, string normalizedToken, out bool value)
+        {
+            value = false;
+            var triggerName = GetPlayerInputTriggerName(normalizedToken);
+            if (triggerName.Length <= 0)
+            {
+                return false;
+            }
+
+            object triggerSet;
+            if (!TryGetPlayerInputTriggerSet(packName, out triggerSet) || triggerSet == null)
+            {
+                return false;
+            }
+
+            return TryReadBoolMember(triggerSet, triggerName, out value);
+        }
+
+        private static bool TrySetPlayerInputTriggerForMouseToken(string packName, string normalizedToken, bool value)
+        {
+            var triggerName = GetPlayerInputTriggerName(normalizedToken);
+            if (triggerName.Length <= 0)
+            {
+                return false;
+            }
+
+            object triggerSet;
+            return TryGetPlayerInputTriggerSet(packName, out triggerSet) &&
+                   triggerSet != null &&
+                   TrySetMember(triggerSet, triggerName, value);
+        }
+
+        private static bool TryGetPlayerInputTriggerSet(string packName, out object triggerSet)
+        {
+            triggerSet = null;
+            if (string.IsNullOrWhiteSpace(packName))
+            {
+                return false;
+            }
+
+            try
+            {
+                var mainType = TerrariaRuntimeTypes.MainType;
+                var assembly = mainType == null ? null : mainType.Assembly;
+                var playerInputType = assembly == null ? null : assembly.GetType("Terraria.GameInput.PlayerInput", false);
+                object triggersPack;
+                if (!TryGetStaticObject(playerInputType, "Triggers", out triggersPack) || triggersPack == null)
+                {
+                    return false;
+                }
+
+                return TryGetObjectMember(triggersPack, packName, out triggerSet) && triggerSet != null;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static string GetPlayerInputTriggerName(string normalizedToken)
+        {
+            if (string.Equals(normalizedToken, "MouseLeft", StringComparison.Ordinal))
+            {
+                return "MouseLeft";
+            }
+
+            if (string.Equals(normalizedToken, "MouseRight", StringComparison.Ordinal))
+            {
+                return "MouseRight";
+            }
+
+            if (string.Equals(normalizedToken, "MouseMiddle", StringComparison.Ordinal))
+            {
+                return "MouseMiddle";
+            }
+
+            if (string.Equals(normalizedToken, "Mouse4", StringComparison.Ordinal))
+            {
+                return "Mouse4";
+            }
+
+            if (string.Equals(normalizedToken, "Mouse5", StringComparison.Ordinal))
+            {
+                return "Mouse5";
+            }
+
+            return string.Empty;
+        }
+
+        private static int GetMouseTriggerVirtualKey(string normalizedToken)
+        {
+            if (string.Equals(normalizedToken, "MouseLeft", StringComparison.Ordinal))
+            {
+                return VkLeftButton;
+            }
+
+            if (string.Equals(normalizedToken, "MouseRight", StringComparison.Ordinal))
+            {
+                return VkRightButton;
+            }
+
+            if (string.Equals(normalizedToken, "MouseMiddle", StringComparison.Ordinal))
+            {
+                return VkMiddleButton;
+            }
+
+            if (string.Equals(normalizedToken, "Mouse4", StringComparison.Ordinal))
+            {
+                return VkXButton1;
+            }
+
+            if (string.Equals(normalizedToken, "Mouse5", StringComparison.Ordinal))
+            {
+                return VkXButton2;
+            }
+
+            return 0;
+        }
+
         private static bool TryGetMainInstance(out object mainInstance)
         {
             mainInstance = null;
@@ -877,29 +1277,66 @@ namespace JueMingZ.Compat
             int mouseY,
             string source)
         {
-            TerrariaUiHoverItemSnapshot snapshot;
-            if (!TryBuildHoverItemSnapshot(item, out snapshot))
+            TerrariaUiHoverSlotSnapshot slotSnapshot;
+            if (!TryBuildHoverSlotSnapshot(item, context, slot, gameUpdateCount, mouseX, mouseY, source, out slotSnapshot))
             {
                 return false;
             }
 
-            snapshot.Context = context;
-            snapshot.Slot = slot;
-            snapshot.GameUpdateCount = gameUpdateCount;
-            snapshot.MouseX = mouseX;
-            snapshot.MouseY = mouseY;
-            snapshot.Source =
+            lock (HoverSnapshotSyncRoot)
+            {
+                _lastItemSlotHoverSlotSnapshot = CloneHoverSlotSnapshot(slotSnapshot);
+            }
+
+            return slotSnapshot.HasActiveItem;
+        }
+
+        private static bool TryBuildHoverSlotSnapshot(
+            object item,
+            int context,
+            int slot,
+            ulong gameUpdateCount,
+            int mouseX,
+            int mouseY,
+            string source,
+            out TerrariaUiHoverSlotSnapshot slotSnapshot)
+        {
+            slotSnapshot = null;
+            if (item == null)
+            {
+                return false;
+            }
+
+            TerrariaUiHoverItemSnapshot itemSnapshot;
+            var hasActiveItem = TryBuildHoverItemSnapshot(item, out itemSnapshot);
+            var resolvedSource =
                 (string.IsNullOrWhiteSpace(source) ? "unknown" : source.Trim()) +
                 ":" +
                 context.ToString(CultureInfo.InvariantCulture) +
                 ":" +
                 slot.ToString(CultureInfo.InvariantCulture);
 
-            lock (HoverSnapshotSyncRoot)
+            if (hasActiveItem)
             {
-                _lastItemSlotHoverSnapshot = CloneHoverItemSnapshot(snapshot);
+                itemSnapshot.Context = context;
+                itemSnapshot.Slot = slot;
+                itemSnapshot.GameUpdateCount = gameUpdateCount;
+                itemSnapshot.MouseX = mouseX;
+                itemSnapshot.MouseY = mouseY;
+                itemSnapshot.Source = resolvedSource;
             }
 
+            slotSnapshot = new TerrariaUiHoverSlotSnapshot
+            {
+                HasActiveItem = hasActiveItem,
+                ItemSnapshot = hasActiveItem ? CloneHoverItemSnapshot(itemSnapshot) : null,
+                Source = resolvedSource,
+                Context = context,
+                Slot = slot,
+                GameUpdateCount = gameUpdateCount,
+                MouseX = mouseX,
+                MouseY = mouseY
+            };
             return true;
         }
 
@@ -933,23 +1370,66 @@ namespace JueMingZ.Compat
             return item != null;
         }
 
-        private static bool IsFreshHoverSnapshot(
-            TerrariaUiHoverItemSnapshot snapshot,
+        private static bool IsFreshHoverSlotSnapshot(
+            TerrariaUiHoverSlotSnapshot snapshot,
             ulong currentGameUpdateCount,
             int mouseX,
             int mouseY)
         {
-            if (snapshot == null ||
-                snapshot.ItemType <= 0 ||
-                snapshot.Stack <= 0 ||
-                snapshot.MouseX != mouseX ||
-                snapshot.MouseY != mouseY ||
-                currentGameUpdateCount < snapshot.GameUpdateCount)
+            var result = EvaluateHoverSlotSnapshot(snapshot, currentGameUpdateCount, mouseX, mouseY);
+            return result != null && result.IsFresh;
+        }
+
+        private static TerrariaUiHoverSlotReadResult EvaluateHoverSlotSnapshot(
+            TerrariaUiHoverSlotSnapshot snapshot,
+            ulong currentGameUpdateCount,
+            int mouseX,
+            int mouseY)
+        {
+            var result = new TerrariaUiHoverSlotReadResult
             {
-                return false;
+                Status = "noSnapshot",
+                AgeUpdates = -1
+            };
+            if (snapshot == null)
+            {
+                return result;
             }
 
-            return currentGameUpdateCount - snapshot.GameUpdateCount <= MaxHoverSnapshotAgeUpdates;
+            result.HasSnapshot = true;
+            result.HasActiveItem = snapshot.HasActiveItem;
+            result.Source = snapshot.Source ?? string.Empty;
+            result.Context = snapshot.Context;
+            result.Slot = snapshot.Slot;
+
+            if (currentGameUpdateCount < snapshot.GameUpdateCount)
+            {
+                result.Status = "futureSnapshot";
+                return result;
+            }
+
+            var age = currentGameUpdateCount - snapshot.GameUpdateCount;
+            result.AgeUpdates = age > int.MaxValue ? int.MaxValue : (int)age;
+
+            // Empty UI slots are real ItemSlot hits too. Keeping their short-lived
+            // proof prevents quick announcement from treating an empty slot click as
+            // permission to announce the world tile behind the UI.
+            if (Math.Abs(snapshot.MouseX - mouseX) > HoverSnapshotMouseTolerancePixels ||
+                Math.Abs(snapshot.MouseY - mouseY) > HoverSnapshotMouseTolerancePixels)
+            {
+                result.Status = "mouseLeft";
+                return result;
+            }
+
+            if (age > MaxHoverSnapshotAgeUpdates)
+            {
+                result.Status = "expired";
+                return result;
+            }
+
+            result.IsFresh = true;
+            result.Status = snapshot.HasActiveItem ? "freshItem" : "freshEmptySlot";
+            return result;
         }
 
         private static TerrariaUiHoverItemSnapshot CloneHoverItemSnapshot(TerrariaUiHoverItemSnapshot snapshot)
@@ -965,6 +1445,26 @@ namespace JueMingZ.Compat
                 Stack = snapshot.Stack,
                 Prefix = snapshot.Prefix,
                 Name = snapshot.Name ?? string.Empty,
+                Source = snapshot.Source ?? string.Empty,
+                Context = snapshot.Context,
+                Slot = snapshot.Slot,
+                GameUpdateCount = snapshot.GameUpdateCount,
+                MouseX = snapshot.MouseX,
+                MouseY = snapshot.MouseY
+            };
+        }
+
+        private static TerrariaUiHoverSlotSnapshot CloneHoverSlotSnapshot(TerrariaUiHoverSlotSnapshot snapshot)
+        {
+            if (snapshot == null)
+            {
+                return null;
+            }
+
+            return new TerrariaUiHoverSlotSnapshot
+            {
+                HasActiveItem = snapshot.HasActiveItem,
+                ItemSnapshot = CloneHoverItemSnapshot(snapshot.ItemSnapshot),
                 Source = snapshot.Source ?? string.Empty,
                 Context = snapshot.Context,
                 Slot = snapshot.Slot,
@@ -1464,6 +1964,103 @@ namespace JueMingZ.Compat
             return false;
         }
 
+        private static bool TryReadBoolMember(object instance, string name, out bool value)
+        {
+            value = false;
+            if (instance == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                var type = instance.GetType();
+                FieldInfo field;
+                if (TerrariaMemberCache.TryGetField(type, name, false, out field) && field.FieldType == typeof(bool))
+                {
+                    value = Convert.ToBoolean(field.GetValue(instance), CultureInfo.InvariantCulture);
+                    return true;
+                }
+
+                PropertyInfo property;
+                if (TerrariaMemberCache.TryGetProperty(type, name, false, out property) &&
+                    property.CanRead &&
+                    property.PropertyType == typeof(bool))
+                {
+                    value = Convert.ToBoolean(property.GetValue(instance, null), CultureInfo.InvariantCulture);
+                    return true;
+                }
+            }
+            catch
+            {
+            }
+
+            return false;
+        }
+
+        private static bool TryGetStaticObject(Type type, string name, out object value)
+        {
+            value = null;
+            if (type == null || string.IsNullOrWhiteSpace(name))
+            {
+                return false;
+            }
+
+            try
+            {
+                FieldInfo field;
+                if (TerrariaMemberCache.TryGetField(type, name, true, out field))
+                {
+                    value = field.GetValue(null);
+                    return true;
+                }
+
+                PropertyInfo property;
+                if (TerrariaMemberCache.TryGetProperty(type, name, true, out property) && property.CanRead)
+                {
+                    value = property.GetValue(null, null);
+                    return true;
+                }
+            }
+            catch
+            {
+            }
+
+            return false;
+        }
+
+        private static bool TryGetObjectMember(object instance, string name, out object value)
+        {
+            value = null;
+            if (instance == null || string.IsNullOrWhiteSpace(name))
+            {
+                return false;
+            }
+
+            try
+            {
+                var type = instance.GetType();
+                FieldInfo field;
+                if (TerrariaMemberCache.TryGetField(type, name, false, out field))
+                {
+                    value = field.GetValue(instance);
+                    return true;
+                }
+
+                PropertyInfo property;
+                if (TerrariaMemberCache.TryGetProperty(type, name, false, out property) && property.CanRead)
+                {
+                    value = property.GetValue(instance, null);
+                    return true;
+                }
+            }
+            catch
+            {
+            }
+
+            return false;
+        }
+
         private static bool TrySetStatic(Type type, string name, bool value)
         {
             if (type == null)
@@ -1765,12 +2362,17 @@ namespace JueMingZ.Compat
 
         private static bool IsLeftButtonDownFallback()
         {
+            return IsMouseButtonDownFallback(VkLeftButton);
+        }
+
+        private static bool IsMouseButtonDownFallback(int virtualKey)
+        {
             if (!TerrariaMainCompat.AllowsInputProcessing)
             {
                 return false;
             }
 
-            return (GetAsyncKeyState(VkLeftButton) & 0x8000) != 0;
+            return virtualKey > 0 && (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
         }
 
         private static Type FindType(string fullName)
@@ -1857,6 +2459,30 @@ namespace JueMingZ.Compat
                 catch (Exception error)
                 {
                     _mouseCaptureLastMessage = "Set UI mouse bool failed: " + error.Message;
+                }
+
+                return false;
+            }
+
+            public bool TryGet(object instance, out bool value)
+            {
+                value = false;
+                try
+                {
+                    if (_field != null)
+                    {
+                        value = Convert.ToBoolean(_field.GetValue(instance), CultureInfo.InvariantCulture);
+                        return true;
+                    }
+
+                    if (_property != null && _property.CanRead)
+                    {
+                        value = Convert.ToBoolean(_property.GetValue(instance, null), CultureInfo.InvariantCulture);
+                        return true;
+                    }
+                }
+                catch
+                {
                 }
 
                 return false;
@@ -2137,5 +2763,36 @@ namespace JueMingZ.Compat
         public ulong GameUpdateCount { get; set; }
         public int MouseX { get; set; }
         public int MouseY { get; set; }
+    }
+
+    public sealed class TerrariaUiHoverSlotSnapshot
+    {
+        public bool HasActiveItem { get; set; }
+        public TerrariaUiHoverItemSnapshot ItemSnapshot { get; set; }
+        public string Source { get; set; }
+        public int Context { get; set; }
+        public int Slot { get; set; }
+        public ulong GameUpdateCount { get; set; }
+        public int MouseX { get; set; }
+        public int MouseY { get; set; }
+    }
+
+    public sealed class TerrariaUiHoverSlotReadResult
+    {
+        public TerrariaUiHoverSlotReadResult()
+        {
+            Status = string.Empty;
+            Source = string.Empty;
+            AgeUpdates = -1;
+        }
+
+        public bool IsFresh { get; set; }
+        public bool HasSnapshot { get; set; }
+        public bool HasActiveItem { get; set; }
+        public string Status { get; set; }
+        public string Source { get; set; }
+        public int Context { get; set; }
+        public int Slot { get; set; }
+        public int AgeUpdates { get; set; }
     }
 }

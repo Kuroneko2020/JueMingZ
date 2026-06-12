@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace JueMingZ.Automation.Information
@@ -31,6 +32,7 @@ namespace JueMingZ.Automation.Information
         public ulong GameUpdateCount { get; set; }
         public int AirPhraseIndex { get; set; }
         public MapQuickAnnouncementItemTarget UiItem { get; set; }
+        public MapQuickAnnouncementUiSlotTarget UiSlot { get; set; }
         public IList<MapQuickAnnouncementActorTarget> Actors { get; private set; }
         public IList<MapQuickAnnouncementWorldItemTarget> WorldItems { get; private set; }
         public MapQuickAnnouncementTileTarget Tile { get; set; }
@@ -44,6 +46,8 @@ namespace JueMingZ.Automation.Information
         public string Detail { get; set; }
         public string TargetName { get; set; }
         public int TargetCount { get; set; }
+        public bool SuppressDelivery { get; set; }
+        public string FailureReason { get; set; }
 
         public MapQuickAnnouncementResolveResult()
         {
@@ -51,6 +55,7 @@ namespace JueMingZ.Automation.Information
             Body = string.Empty;
             Detail = string.Empty;
             TargetName = string.Empty;
+            FailureReason = string.Empty;
         }
     }
 
@@ -67,6 +72,44 @@ namespace JueMingZ.Automation.Information
         public bool IsActive
         {
             get { return ItemType > 0 && Stack > 0; }
+        }
+    }
+
+    internal sealed class MapQuickAnnouncementUiSlotTarget
+    {
+        public bool IsKnown { get; set; }
+        public bool HasActiveItem { get; set; }
+        public string HoverSource { get; set; }
+        public int HoverContext { get; set; }
+        public int HoverSlot { get; set; }
+        public int HoverAgeUpdates { get; set; }
+    }
+
+    internal sealed class MapQuickAnnouncementTriggerContext
+    {
+        public MapQuickAnnouncementTriggerContext()
+        {
+            Succeeded = true;
+            FailureReason = string.Empty;
+        }
+
+        public bool Succeeded { get; set; }
+        public string FailureReason { get; set; }
+        public float MouseWorldX { get; set; }
+        public float MouseWorldY { get; set; }
+        public int MouseScreenX { get; set; }
+        public int MouseScreenY { get; set; }
+        public int MouseTileX { get; set; }
+        public int MouseTileY { get; set; }
+        public ulong GameUpdateCount { get; set; }
+
+        public static MapQuickAnnouncementTriggerContext Failed(string reason)
+        {
+            return new MapQuickAnnouncementTriggerContext
+            {
+                Succeeded = false,
+                FailureReason = string.IsNullOrWhiteSpace(reason) ? "triggerContextUnavailable" : reason
+            };
         }
     }
 

@@ -1415,6 +1415,9 @@ function Test-MapQuickAnnouncementGovernance {
         "MapQuickAnnouncementLastResolveDetail",
         "MapQuickAnnouncementLastTargetSource",
         "MapQuickAnnouncementLastUiHoverSource",
+        "MapQuickAnnouncementLastUiHoverState",
+        "MapQuickAnnouncementLastUiHoverHookStatus",
+        "MapQuickAnnouncementLastPendingState",
         "MapQuickAnnouncementLastHoverCacheAgeUpdates",
         "MapQuickAnnouncementLastPlacementLookupSource",
         "MapQuickAnnouncementLastFallbackReason"
@@ -1436,6 +1439,31 @@ function Test-MapQuickAnnouncementGovernance {
     }
     else {
         Write-Pass "Map quick announcement source/fallback diagnostics reach the cached snapshot JSON."
+    }
+
+    $uiMouseCompatPath = Join-Path $RepoRoot "src\JueMingZ\Compat\TerrariaUiMouseCompat.cs"
+    $uiMouseCompatText = Read-TextIfExists -Path $uiMouseCompatPath
+    if ($null -ne $uiMouseCompatText -and
+        $uiMouseCompatText.Contains("TerrariaUiHoverSlotReadResult") -and
+        $uiMouseCompatText.Contains("freshEmptySlot") -and
+        $uiMouseCompatText.Contains("mouseLeft") -and
+        $uiMouseCompatText.Contains("expired")) {
+        Write-Pass "Map quick announcement UI hover read status distinguishes empty, moved, and expired slot evidence."
+    }
+    else {
+        Write-FailHealth "Map quick announcement UI hover diagnostics must keep explicit empty/moved/expired read statuses."
+    }
+
+    $itemSlotHoverHookPath = Join-Path $RepoRoot "src\JueMingZ\Hooks\MapQuickAnnouncementItemSlotHoverHookInstaller.cs"
+    $itemSlotHoverHookText = Read-TextIfExists -Path $itemSlotHoverHookPath
+    if ($null -ne $itemSlotHoverHookText -and
+        $itemSlotHoverHookText.Contains("GetMouseHoverCandidateSummaryForTesting") -and
+        $itemSlotHoverHookText.Contains("GetSelectedMouseHoverSignatureForTesting") -and
+        $itemSlotHoverHookText.Contains("RecordItemSlotHoverHookInstallResult")) {
+        Write-Pass "Map quick announcement ItemSlot hover hook keeps candidate diagnostics and install status reporting."
+    }
+    else {
+        Write-FailHealth "Map quick announcement ItemSlot hover hook must keep candidate summary and install status diagnostics."
     }
 
     $informationRoot = Join-Path $RepoRoot "src\JueMingZ\Automation\Information"
@@ -1986,6 +2014,7 @@ function Test-DeepStructureBoundaryGovernance {
         "tests\JueMingZ.Tests\Program.RuntimeDiagnosticsAndDispatchTests.cs",
         "tests\JueMingZ.Tests\Program.FeatureCatalogTests.cs",
         "tests\JueMingZ.Tests\Program.AppSettingsDefaultTests.cs",
+        "tests\JueMingZ.Tests\Program.ConfigIsolationTests.cs",
         "tests\JueMingZ.Tests\Program.ActionCatalogSharedHelpers.cs",
         "tests\JueMingZ.Tests\Program.SafeLandingTests.cs",
         "tests\JueMingZ.Tests\Program.SafeLandingEquipmentTests.cs",
@@ -2101,6 +2130,18 @@ function Test-DeepStructureBoundaryGovernance {
         @{
             Path = "tests\JueMingZ.Tests\Program.FishingInformationUiTests.cs"
             Required = @("Fishing, information overlay, chest labels, and legacy UI interaction tests are split")
+        },
+        @{
+            Path = "tests\JueMingZ.Tests\Program.cs"
+            Required = @("InstallProcessConfigDirectoryIsolation();", "TestProcessConfigDirectoryIsolatedFromUserDocuments")
+        },
+        @{
+            Path = "tests\JueMingZ.Tests\Program.TestSupport.cs"
+            Required = @("User config is real data", "RealUserConfigDirectory", "SetConfigDirectoryForTesting")
+        },
+        @{
+            Path = "tests\JueMingZ.Tests\Program.ConfigIsolationTests.cs"
+            Required = @("TestConfigIsolationGuardRejectsRealDocumentsDirectory", "ConfigServiceSaveAllWritesOnlyTestConfigDirectory", "ConfigServiceInitializeWritesOnlyTestConfigDirectory", "LegacyUiFeatureToggleSaveWritesOnlyTestConfigDirectory")
         }
     )
 

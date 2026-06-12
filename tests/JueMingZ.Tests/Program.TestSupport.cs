@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Reflection;
 using JueMingZ.Actions;
 using JueMingZ.Actions.Channels;
@@ -25,6 +26,176 @@ namespace JueMingZ.Tests
 {
     internal static partial class Program
     {
+        private static readonly string RealUserConfigDirectory = Path.GetFullPath(Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+            "My Games",
+            "Terraria",
+            "JueMing-Z",
+            "config"));
+
+        private static string _processTestConfigDirectory;
+
+        private static void InstallProcessConfigDirectoryIsolation()
+        {
+            if (!string.IsNullOrEmpty(_processTestConfigDirectory))
+            {
+                return;
+            }
+
+            var root = BuildTestConfigDirectory("process");
+            Directory.CreateDirectory(root);
+
+            // User config is real data. The console test process must install this
+            // before any test can call ConfigService.Initialize() or SaveAll().
+            SetConfigDirectoryForTesting(root);
+            _processTestConfigDirectory = root;
+        }
+
+        private static string ProcessTestConfigDirectory
+        {
+            get { return _processTestConfigDirectory ?? string.Empty; }
+        }
+
+        private static Action PushTemporaryConfigDirectory(string prefix)
+        {
+            var previousConfigDirectory = ConfigService.ConfigDirectory;
+            var previousAppSettingsPath = ConfigService.AppSettingsPath;
+            var previousFeatureSettingsPath = ConfigService.FeatureSettingsPath;
+            var previousHotkeySettingsPath = ConfigService.HotkeySettingsPath;
+            var root = BuildTestConfigDirectory(prefix);
+            Directory.CreateDirectory(root);
+            SetConfigDirectoryForTesting(root);
+
+            return () =>
+            {
+                SetConfigDirectoryForTesting(
+                    previousConfigDirectory,
+                    previousAppSettingsPath,
+                    previousFeatureSettingsPath,
+                    previousHotkeySettingsPath);
+                TryDeleteTemporaryConfigDirectory(root);
+            };
+        }
+
+        private static string BuildTestConfigDirectory(string prefix)
+        {
+            return Path.GetFullPath(Path.Combine(
+                AppDomain.CurrentDomain.BaseDirectory,
+                ".test-config",
+                (string.IsNullOrWhiteSpace(prefix) ? "scope" : prefix) + "-" + Guid.NewGuid().ToString("N")));
+        }
+
+        private static void SetConfigDirectoryForTesting(string directory)
+        {
+            SetConfigDirectoryForTesting(
+                directory,
+                Path.Combine(directory, "appsettings.json"),
+                Path.Combine(directory, "features.json"),
+                Path.Combine(directory, "hotkeys.json"));
+        }
+
+        private static void SetConfigDirectoryForTesting(
+            string configDirectory,
+            string appSettingsPath,
+            string featureSettingsPath,
+            string hotkeySettingsPath)
+        {
+            SetConfigServicePathBackingField("<ConfigDirectory>k__BackingField", configDirectory);
+            SetConfigServicePathBackingField("<AppSettingsPath>k__BackingField", appSettingsPath);
+            SetConfigServicePathBackingField("<FeatureSettingsPath>k__BackingField", featureSettingsPath);
+            SetConfigServicePathBackingField("<HotkeySettingsPath>k__BackingField", hotkeySettingsPath);
+            ConfigService.ResetLoadStateForTesting();
+        }
+
+        private static void SetConfigServicePathBackingField(string fieldName, string value)
+        {
+            var field = typeof(ConfigService).GetField(fieldName, BindingFlags.Static | BindingFlags.NonPublic);
+            if (field == null)
+            {
+                throw new InvalidOperationException("ConfigService path backing field missing: " + fieldName);
+            }
+
+            field.SetValue(null, value);
+        }
+
+        private static bool IsUnderDirectory(string path, string directory)
+        {
+            if (string.IsNullOrWhiteSpace(path) || string.IsNullOrWhiteSpace(directory))
+            {
+                return false;
+            }
+
+            var fullPath = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var fullDirectory = Path.GetFullPath(directory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            return string.Equals(fullPath, fullDirectory, StringComparison.OrdinalIgnoreCase) ||
+                   fullPath.StartsWith(fullDirectory + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
+                   fullPath.StartsWith(fullDirectory + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static void AssertConfigServiceUsesTestDirectory(string label)
+        {
+            var configDirectory = Path.GetFullPath(ConfigService.ConfigDirectory);
+            if (string.Equals(configDirectory, RealUserConfigDirectory, StringComparison.OrdinalIgnoreCase) ||
+                !IsUnderDirectory(configDirectory, Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".test-config")))
+            {
+                throw new InvalidOperationException(label + " must use the process .test-config directory, got " + configDirectory);
+            }
+
+            AssertPathUnderConfigDirectory(ConfigService.AppSettingsPath, label + " appsettings path");
+            AssertPathUnderConfigDirectory(ConfigService.FeatureSettingsPath, label + " features path");
+            AssertPathUnderConfigDirectory(ConfigService.HotkeySettingsPath, label + " hotkeys path");
+        }
+
+        private static void AssertPathUnderConfigDirectory(string path, string label)
+        {
+            if (!IsUnderDirectory(path, ConfigService.ConfigDirectory))
+            {
+                throw new InvalidOperationException(label + " escaped config directory: " + path);
+            }
+        }
+
+        private static void AssertSaveSummaryUsesTestDirectory(ConfigSaveSummary summary, string label)
+        {
+            if (summary == null)
+            {
+                throw new InvalidOperationException(label + " did not return a save summary.");
+            }
+
+            AssertSaveResultUsesTestDirectory(summary.AppSettings, label + " appsettings");
+            AssertSaveResultUsesTestDirectory(summary.FeatureSettings, label + " features");
+            AssertSaveResultUsesTestDirectory(summary.HotkeySettings, label + " hotkeys");
+        }
+
+        private static void AssertSaveResultUsesTestDirectory(ConfigFileSaveResult result, string label)
+        {
+            if (result == null)
+            {
+                throw new InvalidOperationException(label + " save result missing.");
+            }
+
+            AssertPathUnderConfigDirectory(result.Path, label + " save path");
+            if (string.Equals(Path.GetFullPath(result.Path), RealUserConfigDirectory, StringComparison.OrdinalIgnoreCase) ||
+                IsUnderDirectory(result.Path, RealUserConfigDirectory))
+            {
+                throw new InvalidOperationException(label + " attempted to write real user config: " + result.Path);
+            }
+        }
+
+        private static void TryDeleteTemporaryConfigDirectory(string path)
+        {
+            try
+            {
+                var basePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".test-config");
+                if (IsUnderDirectory(path, basePath) && Directory.Exists(path))
+                {
+                    Directory.Delete(path, true);
+                }
+            }
+            catch
+            {
+            }
+        }
+
         private static void DependencyResolverLoadsCompressedEmbeddedHarmony()
         {
             Assembly assembly;

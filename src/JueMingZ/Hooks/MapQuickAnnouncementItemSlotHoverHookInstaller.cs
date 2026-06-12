@@ -18,6 +18,7 @@ namespace JueMingZ.Hooks
         {
             if (_installed == 1)
             {
+                TerrariaUiMouseCompat.RecordItemSlotHoverHookInstallResult(true, "installed", "alreadyInstalled");
                 return HookInstallResult.Success("Quick announcement ItemSlot.MouseHover hook already installed.", string.Empty);
             }
 
@@ -36,6 +37,7 @@ namespace JueMingZ.Hooks
                 {
                     const string message = "Harmony not found; quick announcement ItemSlot.MouseHover hook cannot install.";
                     Logger.Warn("MapQuickAnnouncementItemSlotHoverHookInstaller", message);
+                    TerrariaUiMouseCompat.RecordItemSlotHoverHookInstallResult(false, "hookNotInstalled:harmonyMissing", string.Empty);
                     return HookInstallResult.Skipped(message);
                 }
 
@@ -45,6 +47,7 @@ namespace JueMingZ.Hooks
                 {
                     const string message = "HarmonyMethod not found; quick announcement ItemSlot.MouseHover hook cannot install.";
                     Logger.Warn("MapQuickAnnouncementItemSlotHoverHookInstaller", message);
+                    TerrariaUiMouseCompat.RecordItemSlotHoverHookInstallResult(false, "hookNotInstalled:harmonyMethodMissing", string.Empty);
                     return HookInstallResult.Skipped(message);
                 }
 
@@ -52,6 +55,7 @@ namespace JueMingZ.Hooks
                 {
                     var message = "Terraria runtime types unavailable; quick announcement ItemSlot.MouseHover hook cannot install: " + TerrariaRuntimeTypes.LastError;
                     Logger.Warn("MapQuickAnnouncementItemSlotHoverHookInstaller", message);
+                    TerrariaUiMouseCompat.RecordItemSlotHoverHookInstallResult(false, "hookNotInstalled:terrariaTypesUnavailable", string.Empty);
                     return HookInstallResult.Skipped(message);
                 }
 
@@ -60,14 +64,17 @@ namespace JueMingZ.Hooks
                 {
                     const string message = "Terraria.UI.ItemSlot type not found; quick announcement ItemSlot.MouseHover hook cannot install.";
                     Logger.Warn("MapQuickAnnouncementItemSlotHoverHookInstaller", message);
+                    TerrariaUiMouseCompat.RecordItemSlotHoverHookInstallResult(false, "hookNotInstalled:itemSlotMissing", string.Empty);
                     return HookInstallResult.Skipped(message);
                 }
 
+                var candidateSummary = FormatMouseHoverCandidates(itemSlotType);
                 var target = FindMouseHoverMethod(itemSlotType);
                 if (target == null)
                 {
-                    var message = "No Terraria.UI.ItemSlot.MouseHover(Item[],int,int) hook candidate found. Candidates: " + FormatMouseHoverCandidates(itemSlotType);
+                    var message = "No Terraria.UI.ItemSlot.MouseHover(Item[],int,int) hook candidate found. Candidates: " + candidateSummary;
                     Logger.Warn("MapQuickAnnouncementItemSlotHoverHookInstaller", message);
+                    TerrariaUiMouseCompat.RecordItemSlotHoverHookInstallResult(false, "hookNotInstalled:noInventoryMouseHover", candidateSummary);
                     return HookInstallResult.Skipped(message);
                 }
 
@@ -85,12 +92,14 @@ namespace JueMingZ.Hooks
                 var signature = SafeBootstrapInstaller.FormatMethodSignature(target);
                 var successMessage = "Quick announcement ItemSlot.MouseHover hook installed: " + signature;
                 Logger.Info("MapQuickAnnouncementItemSlotHoverHookInstaller", successMessage);
+                TerrariaUiMouseCompat.RecordItemSlotHoverHookInstallResult(true, "installed", candidateSummary);
                 return HookInstallResult.Success(successMessage, signature);
             }
             catch (Exception error)
             {
                 const string message = "Quick announcement ItemSlot.MouseHover hook installation failed.";
                 Logger.Error("MapQuickAnnouncementItemSlotHoverHookInstaller", message, error);
+                TerrariaUiMouseCompat.RecordItemSlotHoverHookInstallResult(false, "hookNotInstalled:installFailed", error.Message);
                 return HookInstallResult.Failed(message, error);
             }
             finally
@@ -143,6 +152,16 @@ namespace JueMingZ.Hooks
             {
                 return "<failed to list candidates: " + error.Message + ">";
             }
+        }
+
+        internal static string GetMouseHoverCandidateSummaryForTesting(Type itemSlotType)
+        {
+            return FormatMouseHoverCandidates(itemSlotType);
+        }
+
+        internal static string GetSelectedMouseHoverSignatureForTesting(Type itemSlotType)
+        {
+            return SafeBootstrapInstaller.FormatMethodSignature(FindMouseHoverMethod(itemSlotType));
         }
     }
 }

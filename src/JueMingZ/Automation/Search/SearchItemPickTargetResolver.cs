@@ -80,6 +80,103 @@ namespace JueMingZ.Automation.Search
             return result.ItemType > 0;
         }
 
+        internal static bool TryCaptureCurrentClickContext(
+            int mouseScreenX,
+            int mouseScreenY,
+            ulong fallbackGameUpdateCount,
+            out SearchItemPickClickContext clickContext,
+            out string skipReason)
+        {
+            clickContext = null;
+            skipReason = string.Empty;
+
+            InformationWorldContext worldContext;
+            if (!InformationWorldContextProvider.TryBuild(InformationWorldContextProfile.Status, out worldContext, out skipReason))
+            {
+                clickContext = SearchItemPickClickContext.Failed(
+                    skipReason,
+                    mouseScreenX,
+                    mouseScreenY,
+                    fallbackGameUpdateCount);
+                return false;
+            }
+
+            var mouseWorldX = worldContext.ScreenX + mouseScreenX;
+            var mouseWorldY = worldContext.ScreenY + mouseScreenY;
+            clickContext = SearchItemPickClickContext.Success(
+                mouseScreenX,
+                mouseScreenY,
+                mouseWorldX,
+                mouseWorldY,
+                (int)Math.Floor(mouseWorldX / TerrariaTileReadCompat.TileSize),
+                (int)Math.Floor(mouseWorldY / TerrariaTileReadCompat.TileSize),
+                worldContext.GameUpdateCount);
+            return true;
+        }
+
+        internal static SearchItemPickResolveAttempt ResolveUiHoverFromPending(
+            SearchItemPickPendingClick pending,
+            ulong currentGameUpdateCount)
+        {
+            if (pending == null || pending.ClickContext == null || !pending.ClickContext.Succeeded)
+            {
+                return SearchItemPickResolveAttempt.Failed("pendingClickContextUnavailable");
+            }
+
+            var context = CreateContextFromClick(pending.ClickContext, currentGameUpdateCount);
+            TerrariaUiHoverSlotSnapshot slotSnapshot;
+            if (!TerrariaUiMouseCompat.TryReadFreshHoverSlotSnapshot(
+                    context.GameUpdateCount,
+                    context.MouseScreenX,
+                    context.MouseScreenY,
+                    out slotSnapshot) ||
+                slotSnapshot == null)
+            {
+                return SearchItemPickResolveAttempt.Failed("uiHoverPending");
+            }
+
+            if (!slotSnapshot.HasActiveItem ||
+                slotSnapshot.ItemSnapshot == null ||
+                slotSnapshot.ItemSnapshot.ItemType <= 0 ||
+                slotSnapshot.ItemSnapshot.Stack <= 0)
+            {
+                return SearchItemPickResolveAttempt.Failed("uiEmptySlot");
+            }
+
+            context.UiItemType = slotSnapshot.ItemSnapshot.ItemType;
+            context.UiItemStack = slotSnapshot.ItemSnapshot.Stack;
+            context.UiItemSource = slotSnapshot.ItemSnapshot.Source ?? string.Empty;
+            return Resolve(context);
+        }
+
+        internal static bool TryResolvePendingFallback(
+            SearchItemPickPendingClick pending,
+            ulong currentGameUpdateCount,
+            out SearchItemPickResolveResult result,
+            out string skipReason)
+        {
+            result = null;
+            skipReason = string.Empty;
+            if (pending == null || pending.ClickContext == null || !pending.ClickContext.Succeeded)
+            {
+                skipReason = "pendingClickContextUnavailable";
+                return false;
+            }
+
+            var context = CreateContextFromClick(pending.ClickContext, currentGameUpdateCount);
+            AddWorldItems(context);
+            AddTileAndWall(context);
+            var attempt = Resolve(context);
+            if (attempt == null || !attempt.Succeeded || attempt.Result == null)
+            {
+                skipReason = attempt == null ? "resolveUnavailable" : attempt.FailureReason;
+                return false;
+            }
+
+            result = attempt.Result;
+            return result.ItemType > 0;
+        }
+
         private static SearchItemPickWorldItemTarget ResolveHitWorldItem(SearchItemPickResolveContext context)
         {
             if (context == null || context.WorldItems == null)
@@ -129,6 +226,28 @@ namespace JueMingZ.Automation.Search
             AddWorldItems(context);
             AddTileAndWall(context);
             return true;
+        }
+
+        private static SearchItemPickResolveContext CreateContextFromClick(
+            SearchItemPickClickContext clickContext,
+            ulong gameUpdateCount)
+        {
+            clickContext = clickContext ?? SearchItemPickClickContext.Failed("clickContextUnavailable", 0, 0, gameUpdateCount);
+            if (gameUpdateCount < clickContext.GameUpdateCount)
+            {
+                gameUpdateCount = clickContext.GameUpdateCount;
+            }
+
+            return new SearchItemPickResolveContext
+            {
+                MouseWorldX = clickContext.MouseWorldX,
+                MouseWorldY = clickContext.MouseWorldY,
+                MouseScreenX = clickContext.MouseScreenX,
+                MouseScreenY = clickContext.MouseScreenY,
+                MouseTileX = clickContext.MouseTileX,
+                MouseTileY = clickContext.MouseTileY,
+                GameUpdateCount = gameUpdateCount
+            };
         }
 
         private static bool AddUiHoverItem(SearchItemPickResolveContext context)

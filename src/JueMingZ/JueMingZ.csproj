@@ -7,10 +7,10 @@
     <Platforms>AnyCPU;x86</Platforms>
     <PlatformTarget>x86</PlatformTarget>
     <LangVersion>7.3</LangVersion>
-    <Version>1.7.576</Version>
-    <AssemblyVersion>1.7.576.0</AssemblyVersion>
-    <FileVersion>1.7.576.0</FileVersion>
-    <InformationalVersion>1.7.576-search-query-interaction-layout-closeout</InformationalVersion>
+    <Version>1.7.588</Version>
+    <AssemblyVersion>1.7.588.0</AssemblyVersion>
+    <FileVersion>1.7.588.0</FileVersion>
+    <InformationalVersion>1.7.588-search-pick-preconsume-ui-slot</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Deterministic>true</Deterministic>
     <RestoreConfigFile>$(MSBuildThisFileDirectory)..\..\NuGet.Config</RestoreConfigFile>

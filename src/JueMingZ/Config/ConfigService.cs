@@ -32,6 +32,46 @@ namespace JueMingZ.Config
         public static HotkeySettings HotkeySettings { get; private set; } = HotkeySettings.CreateDefault();
         public static ConfigSaveSummary LastSaveSummary { get; private set; }
 
+        private static bool _appSettingsSaveAllowed = true;
+        private static bool _featureSettingsSaveAllowed = true;
+        private static bool _hotkeySettingsSaveAllowed = true;
+        private static Func<string, string> _saveTempPathFactoryForTesting;
+
+        internal static void ResetLoadStateForTesting()
+        {
+            lock (SyncRoot)
+            {
+                _appSettingsSaveAllowed = true;
+                _featureSettingsSaveAllowed = true;
+                _hotkeySettingsSaveAllowed = true;
+                _saveTempPathFactoryForTesting = null;
+                LastSaveSummary = null;
+            }
+        }
+
+        internal static void ResetSettingsForTesting()
+        {
+            lock (SyncRoot)
+            {
+                AppSettings = AppSettings.CreateDefault();
+                FeatureSettings = FeatureSettings.CreateDefault();
+                HotkeySettings = HotkeySettings.CreateDefault();
+                _appSettingsSaveAllowed = true;
+                _featureSettingsSaveAllowed = true;
+                _hotkeySettingsSaveAllowed = true;
+                _saveTempPathFactoryForTesting = null;
+                LastSaveSummary = null;
+            }
+        }
+
+        internal static void SetSaveTempPathFactoryForTesting(Func<string, string> factory)
+        {
+            lock (SyncRoot)
+            {
+                _saveTempPathFactoryForTesting = factory;
+            }
+        }
+
         public static void Initialize()
         {
             // Load and migrate all config files under one lock; hot paths read RuntimeSettingsSnapshot instead.
@@ -40,12 +80,39 @@ namespace JueMingZ.Config
                 try
                 {
                     Directory.CreateDirectory(ConfigDirectory);
-                    AppSettings = LoadOrCreate(AppSettingsPath, AppSettings.CreateDefault, MigrateAppSettings);
-                    FeatureSettings = LoadOrCreate(FeatureSettingsPath, FeatureSettings.CreateDefault, MigrateFeatureSettings);
-                    SynchronizeFeatureSettingsFromAppSettingsLocked();
-                    HotkeySettings = LoadOrCreate(HotkeySettingsPath, HotkeySettings.CreateDefault, MigrateHotkeySettings);
-                    Save("features.json", FeatureSettingsPath, FeatureSettings);
+                    var appSettingsLoad = LoadOrCreate(AppSettingsPath, AppSettings.CreateDefault, MigrateAppSettings);
+                    AppSettings = appSettingsLoad.Value;
+                    _appSettingsSaveAllowed = appSettingsLoad.FutureSaveAllowed;
+
+                    var featureSettingsLoad = LoadOrCreate(FeatureSettingsPath, FeatureSettings.CreateDefault, MigrateFeatureSettings);
+                    FeatureSettings = featureSettingsLoad.Value;
+                    _featureSettingsSaveAllowed = featureSettingsLoad.FutureSaveAllowed;
+
+                    var featureSettingsSave = featureSettingsLoad.SaveResult;
+                    if (ShouldSynchronizeFeatureSettingsFromAppSettings(appSettingsLoad, featureSettingsLoad))
+                    {
+                        SynchronizeFeatureSettingsFromAppSettingsLocked();
+                        featureSettingsSave = SaveIfAllowed(
+                            "features.json",
+                            FeatureSettingsPath,
+                            FeatureSettings,
+                            _featureSettingsSaveAllowed,
+                            "feature settings load failed; refusing to overwrite existing features.json");
+                    }
+                    else
+                    {
+                        Logger.Warn(
+                            "ConfigService",
+                            "Feature settings sync skipped because appsettings.json was not a trusted existing read or features.json was not safely loaded.");
+                    }
+
+                    var hotkeySettingsLoad = LoadOrCreate(HotkeySettingsPath, HotkeySettings.CreateDefault, MigrateHotkeySettings);
+                    HotkeySettings = hotkeySettingsLoad.Value;
+                    _hotkeySettingsSaveAllowed = hotkeySettingsLoad.FutureSaveAllowed;
+
+                    LastSaveSummary = BuildSaveSummary(appSettingsLoad.SaveResult, featureSettingsSave, hotkeySettingsLoad.SaveResult);
                     Logger.Configure(AppSettings.LogLevel, AppSettings.EnableTraceLog);
+                    LogSaveSummary(LastSaveSummary);
                     Logger.Info("ConfigService", "Config loaded: " + ConfigDirectory);
                 }
                 catch (Exception error)
@@ -53,6 +120,13 @@ namespace JueMingZ.Config
                     AppSettings = AppSettings.CreateDefault();
                     FeatureSettings = FeatureSettings.CreateDefault();
                     HotkeySettings = HotkeySettings.CreateDefault();
+                    _appSettingsSaveAllowed = false;
+                    _featureSettingsSaveAllowed = false;
+                    _hotkeySettingsSaveAllowed = false;
+                    LastSaveSummary = BuildSaveSummary(
+                        ConfigFileSaveResult.Failure("appsettings.json", AppSettingsPath, "initialize failed: " + error.Message),
+                        ConfigFileSaveResult.Failure("features.json", FeatureSettingsPath, "initialize failed: " + error.Message),
+                        ConfigFileSaveResult.Failure("hotkeys.json", HotkeySettingsPath, "initialize failed: " + error.Message));
                     Logger.Warn("ConfigService", "Config initialization failed; using defaults.");
                     Logger.Debug("ConfigService", error.ToString());
                 }
@@ -63,24 +137,37 @@ namespace JueMingZ.Config
         {
             lock (SyncRoot)
             {
-                SynchronizeFeatureSettingsFromAppSettingsLocked();
-                var appSettings = Save("appsettings.json", AppSettingsPath, AppSettings);
-                var featureSettings = Save("features.json", FeatureSettingsPath, FeatureSettings);
-                var hotkeySettings = Save("hotkeys.json", HotkeySettingsPath, HotkeySettings);
-                var summary = BuildSaveSummary(appSettings, featureSettings, hotkeySettings);
-                LastSaveSummary = summary;
-
-                if (summary.Succeeded)
+                if (_appSettingsSaveAllowed && _featureSettingsSaveAllowed)
                 {
-                    Logger.Info("ConfigService", summary.Summary);
+                    SynchronizeFeatureSettingsFromAppSettingsLocked();
                 }
                 else
                 {
-                    Logger.Warn("ConfigService", summary.Summary);
-                    LogFailedSave(appSettings);
-                    LogFailedSave(featureSettings);
-                    LogFailedSave(hotkeySettings);
+                    Logger.Warn("ConfigService", "Feature settings sync skipped because one or more config files failed to load safely.");
                 }
+
+                var appSettings = SaveIfAllowed(
+                    "appsettings.json",
+                    AppSettingsPath,
+                    AppSettings,
+                    _appSettingsSaveAllowed,
+                    "appsettings.json load failed; refusing to overwrite existing file with in-memory defaults");
+                var featureSettings = SaveIfAllowed(
+                    "features.json",
+                    FeatureSettingsPath,
+                    FeatureSettings,
+                    _featureSettingsSaveAllowed,
+                    "features.json load failed; refusing to overwrite existing file with in-memory defaults");
+                var hotkeySettings = SaveIfAllowed(
+                    "hotkeys.json",
+                    HotkeySettingsPath,
+                    HotkeySettings,
+                    _hotkeySettingsSaveAllowed,
+                    "hotkeys.json load failed; refusing to overwrite existing file with in-memory defaults");
+                var summary = BuildSaveSummary(appSettings, featureSettings, hotkeySettings);
+                LastSaveSummary = summary;
+
+                LogSaveSummary(summary);
 
                 return summary;
             }
@@ -281,43 +368,81 @@ namespace JueMingZ.Config
             return count;
         }
 
-        private static T LoadOrCreate<T>(string path, Func<T> createDefault, Action<T> migrate) where T : class
+        private static ConfigLoadResult<T> LoadOrCreate<T>(string path, Func<T> createDefault, Action<T> migrate) where T : class
         {
+            var name = GetFileName(path);
             if (!File.Exists(path))
             {
                 var defaultValue = createDefault();
                 migrate(defaultValue);
-                Save(GetFileName(path), path, defaultValue);
-                return defaultValue;
+                var saveResult = Save(name, path, defaultValue);
+                return ConfigLoadResult<T>.Missing(defaultValue, saveResult);
             }
 
             try
             {
+                T value;
                 using (var stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                 {
                     var serializer = CreateSerializer(typeof(T));
-                    var value = serializer.ReadObject(stream) as T;
+                    value = serializer.ReadObject(stream) as T;
                     if (value == null)
                     {
                         throw new InvalidDataException("JSON content was empty or did not match the expected type.");
                     }
-
-                    migrate(value);
-                    Save(GetFileName(path), path, value);
-                    return value;
                 }
+
+                // Save migrations only after the read stream is closed; otherwise Windows can block our own replace.
+                migrate(value);
+                var saveResult = Save(name, path, value);
+                return ConfigLoadResult<T>.Existing(value, saveResult);
             }
             catch (Exception error)
             {
                 BackupBadConfig(path);
-                Logger.Warn("ConfigService", "Config read failed; bad file was backed up and defaults will be used: " + path);
+                Logger.Warn("ConfigService", "Config read failed; defaults are memory-only and the original file will not be overwritten: " + path);
                 Logger.Debug("ConfigService", error.ToString());
 
                 var defaultValue = createDefault();
                 migrate(defaultValue);
-                Save(GetFileName(path), path, defaultValue);
-                return defaultValue;
+                return ConfigLoadResult<T>.ReadFailed(
+                    defaultValue,
+                    ConfigFileSaveResult.Failure(name, path, "read failed; in-memory defaults were not saved: " + error.GetType().Name + ": " + error.Message));
             }
+        }
+
+        private static bool ShouldSynchronizeFeatureSettingsFromAppSettings(
+            ConfigLoadResult<AppSettings> appSettingsLoad,
+            ConfigLoadResult<FeatureSettings> featureSettingsLoad)
+        {
+            if (appSettingsLoad == null || featureSettingsLoad == null)
+            {
+                return false;
+            }
+
+            if (!appSettingsLoad.ReadSucceeded || !featureSettingsLoad.FutureSaveAllowed)
+            {
+                return false;
+            }
+
+            // A default AppSettings created because appsettings.json is missing must not clear an existing features.json.
+            return appSettingsLoad.LoadedFromExisting || !featureSettingsLoad.LoadedFromExisting;
+        }
+
+        private static ConfigFileSaveResult SaveIfAllowed<T>(
+            string name,
+            string path,
+            T value,
+            bool allowed,
+            string blockedReason) where T : class
+        {
+            if (!allowed)
+            {
+                Logger.Warn("ConfigService", "Config save skipped: " + path + " reason=" + blockedReason);
+                return ConfigFileSaveResult.Failure(name, path, blockedReason);
+            }
+
+            return Save(name, path, value);
         }
 
         private static ConfigFileSaveResult Save<T>(string name, string path, T value) where T : class
@@ -331,7 +456,7 @@ namespace JueMingZ.Config
                     Directory.CreateDirectory(directory);
                 }
 
-                tempPath = path + ".tmp-" + GetProcessIdSafe() + "-" + Guid.NewGuid().ToString("N");
+                tempPath = CreateTempPath(path);
 
                 using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
                 {
@@ -422,6 +547,26 @@ namespace JueMingZ.Config
             };
         }
 
+        private static void LogSaveSummary(ConfigSaveSummary summary)
+        {
+            if (summary == null)
+            {
+                return;
+            }
+
+            if (summary.Succeeded)
+            {
+                Logger.Info("ConfigService", summary.Summary);
+            }
+            else
+            {
+                Logger.Warn("ConfigService", summary.Summary);
+                LogFailedSave(summary.AppSettings);
+                LogFailedSave(summary.FeatureSettings);
+                LogFailedSave(summary.HotkeySettings);
+            }
+        }
+
         private static bool IsSaveSucceeded(ConfigFileSaveResult result)
         {
             return result != null && result.Succeeded;
@@ -476,6 +621,17 @@ namespace JueMingZ.Config
             }
         }
 
+        private static string CreateTempPath(string path)
+        {
+            var factory = _saveTempPathFactoryForTesting;
+            if (factory != null)
+            {
+                return factory(path);
+            }
+
+            return path + ".tmp-" + GetProcessIdSafe() + "-" + Guid.NewGuid().ToString("N");
+        }
+
         private static DataContractJsonSerializer CreateSerializer(Type type)
         {
             return new DataContractJsonSerializer(type, new DataContractJsonSerializerSettings
@@ -523,6 +679,51 @@ namespace JueMingZ.Config
             }
 
             return value > max ? max : value;
+        }
+
+        private sealed class ConfigLoadResult<T> where T : class
+        {
+            public T Value { get; private set; }
+            public ConfigFileSaveResult SaveResult { get; private set; }
+            public bool LoadedFromExisting { get; private set; }
+            public bool ReadSucceeded { get; private set; }
+            public bool FutureSaveAllowed { get; private set; }
+
+            public static ConfigLoadResult<T> Missing(T value, ConfigFileSaveResult saveResult)
+            {
+                return new ConfigLoadResult<T>
+                {
+                    Value = value,
+                    SaveResult = saveResult,
+                    LoadedFromExisting = false,
+                    ReadSucceeded = true,
+                    FutureSaveAllowed = true
+                };
+            }
+
+            public static ConfigLoadResult<T> Existing(T value, ConfigFileSaveResult saveResult)
+            {
+                return new ConfigLoadResult<T>
+                {
+                    Value = value,
+                    SaveResult = saveResult,
+                    LoadedFromExisting = true,
+                    ReadSucceeded = true,
+                    FutureSaveAllowed = true
+                };
+            }
+
+            public static ConfigLoadResult<T> ReadFailed(T value, ConfigFileSaveResult saveResult)
+            {
+                return new ConfigLoadResult<T>
+                {
+                    Value = value,
+                    SaveResult = saveResult,
+                    LoadedFromExisting = true,
+                    ReadSucceeded = false,
+                    FutureSaveAllowed = false
+                };
+            }
         }
 
         private static void MigrateAppSettings(AppSettings settings)

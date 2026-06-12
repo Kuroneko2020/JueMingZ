@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
+using JueMingZ.Automation.Search;
 using JueMingZ.Bootstrap;
 using JueMingZ.Compat;
 using JueMingZ.Diagnostics;
@@ -182,6 +183,8 @@ namespace JueMingZ.Hooks
         {
             private static void Postfix(MethodBase __originalMethod)
             {
+                TerrariaUiMouseCompat.UpdateActiveTriggerSuppressionAfterPlayerInputGuard();
+                SearchItemPickRuntimeService.UpdateAfterPlayerInputGuard();
                 LegacyUiInput.UpdateAfterPlayerInputGuard("PlayerInputScrollHook.Postfix");
             }
         }

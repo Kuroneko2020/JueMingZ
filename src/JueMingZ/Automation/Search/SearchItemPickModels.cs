@@ -34,6 +34,62 @@ namespace JueMingZ.Automation.Search
         public SearchItemPickWallTarget Wall { get; set; }
     }
 
+    internal sealed class SearchItemPickClickContext
+    {
+        private SearchItemPickClickContext()
+        {
+            FailureReason = string.Empty;
+        }
+
+        public bool Succeeded { get; private set; }
+        public string FailureReason { get; private set; }
+        public float MouseWorldX { get; private set; }
+        public float MouseWorldY { get; private set; }
+        public int MouseScreenX { get; private set; }
+        public int MouseScreenY { get; private set; }
+        public int MouseTileX { get; private set; }
+        public int MouseTileY { get; private set; }
+        public ulong GameUpdateCount { get; private set; }
+
+        public static SearchItemPickClickContext Success(
+            int mouseScreenX,
+            int mouseScreenY,
+            float mouseWorldX,
+            float mouseWorldY,
+            int mouseTileX,
+            int mouseTileY,
+            ulong gameUpdateCount)
+        {
+            return new SearchItemPickClickContext
+            {
+                Succeeded = true,
+                MouseScreenX = mouseScreenX,
+                MouseScreenY = mouseScreenY,
+                MouseWorldX = mouseWorldX,
+                MouseWorldY = mouseWorldY,
+                MouseTileX = mouseTileX,
+                MouseTileY = mouseTileY,
+                GameUpdateCount = gameUpdateCount
+            };
+        }
+
+        public static SearchItemPickClickContext Failed(
+            string reason,
+            int mouseScreenX,
+            int mouseScreenY,
+            ulong gameUpdateCount)
+        {
+            return new SearchItemPickClickContext
+            {
+                Succeeded = false,
+                FailureReason = string.IsNullOrWhiteSpace(reason) ? "clickContextUnavailable" : reason,
+                MouseScreenX = mouseScreenX,
+                MouseScreenY = mouseScreenY,
+                GameUpdateCount = gameUpdateCount
+            };
+        }
+    }
+
     internal sealed class SearchItemPickWorldItemTarget
     {
         public int ItemType { get; set; }

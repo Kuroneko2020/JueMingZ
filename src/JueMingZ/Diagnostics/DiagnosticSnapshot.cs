@@ -434,6 +434,9 @@ namespace JueMingZ.Diagnostics
         public string MapQuickAnnouncementLastResolveDetail { get; set; }
         public string MapQuickAnnouncementLastTargetSource { get; set; }
         public string MapQuickAnnouncementLastUiHoverSource { get; set; }
+        public string MapQuickAnnouncementLastUiHoverState { get; set; }
+        public string MapQuickAnnouncementLastUiHoverHookStatus { get; set; }
+        public string MapQuickAnnouncementLastPendingState { get; set; }
         public int MapQuickAnnouncementLastHoverCacheAgeUpdates { get; set; }
         public string MapQuickAnnouncementLastPlacementLookupSource { get; set; }
         public string MapQuickAnnouncementLastFallbackReason { get; set; }
@@ -1062,6 +1065,9 @@ namespace JueMingZ.Diagnostics
             MapQuickAnnouncementLastResolveDetail = string.Empty;
             MapQuickAnnouncementLastTargetSource = string.Empty;
             MapQuickAnnouncementLastUiHoverSource = string.Empty;
+            MapQuickAnnouncementLastUiHoverState = string.Empty;
+            MapQuickAnnouncementLastUiHoverHookStatus = string.Empty;
+            MapQuickAnnouncementLastPendingState = string.Empty;
             MapQuickAnnouncementLastHoverCacheAgeUpdates = -1;
             MapQuickAnnouncementLastPlacementLookupSource = string.Empty;
             MapQuickAnnouncementLastFallbackReason = string.Empty;

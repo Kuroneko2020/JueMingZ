@@ -8,6 +8,7 @@ using JueMingZ.Compat;
 using JueMingZ.Config;
 using JueMingZ.Diagnostics;
 using JueMingZ.Features;
+using JueMingZ.Hooks;
 using JueMingZ.Runtime;
 using JueMingZ.UI.Legacy;
 
@@ -337,14 +338,96 @@ namespace JueMingZ.Tests
                     throw new InvalidOperationException("Expected previous UI draw hover snapshot to remain fresh for the next update prefix.");
                 }
 
-                if (TerrariaUiMouseCompat.TryReadFreshHoverItemSnapshot(125, 64, 96, out snapshot))
+                if (!TerrariaUiMouseCompat.TryReadFreshHoverItemSnapshot(129, 67, 99, out snapshot))
                 {
-                    throw new InvalidOperationException("ItemSlot hover snapshot must expire after the one-frame bridge window.");
+                    throw new InvalidOperationException("Expected ItemSlot hover snapshot to bridge short draw/update jitter and tiny mouse drift.");
                 }
 
-                if (TerrariaUiMouseCompat.TryReadFreshHoverItemSnapshot(123, 65, 96, out snapshot))
+                if (TerrariaUiMouseCompat.TryReadFreshHoverItemSnapshot(130, 64, 96, out snapshot))
+                {
+                    throw new InvalidOperationException("ItemSlot hover snapshot must expire after the short bridge window.");
+                }
+
+                if (TerrariaUiMouseCompat.TryReadFreshHoverItemSnapshot(123, 70, 96, out snapshot))
                 {
                     throw new InvalidOperationException("ItemSlot hover snapshot must not match after the mouse leaves the recorded position.");
+                }
+            }
+            finally
+            {
+                TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+            }
+        }
+
+        private static void MapQuickAnnouncementItemSlotHookCandidateSummaryCoversForwardingOverloads()
+        {
+            var summary = MapQuickAnnouncementItemSlotHoverHookInstaller.GetMouseHoverCandidateSummaryForTesting(
+                typeof(TestItemSlotMouseHoverOverloads));
+            AssertContains(summary, "MouseHover(System.Int32 context)");
+            AssertContains(summary, "MouseHover(JueMingZ.Tests.Program+TestQuickAnnouncementHoverItem item, System.Int32 context)");
+            AssertContains(summary, "MouseHover(JueMingZ.Tests.Program+TestQuickAnnouncementHoverItem[] inv, System.Int32 context, System.Int32 slot)");
+
+            var selected = MapQuickAnnouncementItemSlotHoverHookInstaller.GetSelectedMouseHoverSignatureForTesting(
+                typeof(TestItemSlotMouseHoverOverloads));
+            AssertContains(selected, "MouseHover(JueMingZ.Tests.Program+TestQuickAnnouncementHoverItem[] inv, System.Int32 context, System.Int32 slot)");
+        }
+
+        private static void MapQuickAnnouncementHoverSnapshotReadStatusDistinguishesFailureModes()
+        {
+            TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+            try
+            {
+                TerrariaUiHoverSlotSnapshot slotSnapshot;
+                TerrariaUiHoverSlotReadResult readResult;
+                if (TerrariaUiMouseCompat.TryReadFreshHoverSlotSnapshot(100, 30, 40, out slotSnapshot, out readResult) ||
+                    readResult == null ||
+                    !string.Equals(readResult.Status, "noSnapshot", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected hover slot read status to report noSnapshot before any ItemSlot hit.");
+                }
+
+                var item = new TestQuickAnnouncementHoverItem
+                {
+                    type = 9,
+                    stack = 1,
+                    Name = "木材"
+                };
+                if (!TerrariaUiMouseCompat.TryCaptureItemSlotHoverSnapshotForTesting(item, 8, 3, 200, 30, 40) ||
+                    !TerrariaUiMouseCompat.TryReadFreshHoverSlotSnapshot(201, 30, 40, out slotSnapshot, out readResult) ||
+                    readResult == null ||
+                    !string.Equals(readResult.Status, "freshItem", StringComparison.Ordinal) ||
+                    !readResult.HasActiveItem ||
+                    readResult.AgeUpdates != 1)
+                {
+                    throw new InvalidOperationException("Expected hover slot read status to report a fresh active item.");
+                }
+
+                var emptyItem = new TestQuickAnnouncementHoverItem();
+                if (TerrariaUiMouseCompat.TryCaptureItemSlotHoverSnapshotForTesting(emptyItem, 8, 5, 300, 30, 40))
+                {
+                    throw new InvalidOperationException("Empty slot capture should save slot proof without returning an active item.");
+                }
+
+                if (!TerrariaUiMouseCompat.TryReadFreshHoverSlotSnapshot(301, 30, 40, out slotSnapshot, out readResult) ||
+                    readResult == null ||
+                    !string.Equals(readResult.Status, "freshEmptySlot", StringComparison.Ordinal) ||
+                    readResult.HasActiveItem)
+                {
+                    throw new InvalidOperationException("Expected hover slot read status to report a fresh empty UI slot.");
+                }
+
+                if (TerrariaUiMouseCompat.TryReadFreshHoverSlotSnapshot(301, 40, 40, out slotSnapshot, out readResult) ||
+                    readResult == null ||
+                    !string.Equals(readResult.Status, "mouseLeft", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected hover slot read status to report mouseLeft when the pointer leaves the recorded slot.");
+                }
+
+                if (TerrariaUiMouseCompat.TryReadFreshHoverSlotSnapshot(307, 30, 40, out slotSnapshot, out readResult) ||
+                    readResult == null ||
+                    !string.Equals(readResult.Status, "expired", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected hover slot read status to report expired after the bridge window.");
                 }
             }
             finally
@@ -419,7 +502,7 @@ namespace JueMingZ.Tests
                 }
 
                 var context = CreateQuickAnnouncementContext(20f, 20f);
-                context.GameUpdateCount = 202;
+                context.GameUpdateCount = 207;
                 context.MouseScreenX = 30;
                 context.MouseScreenY = 40;
                 context.Tile = new MapQuickAnnouncementTileTarget
@@ -993,6 +1076,196 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void MapQuickAnnouncementRuntimeMousePendingWaitsForNextUiHoverSnapshot()
+        {
+            MapQuickAnnouncementDiagnostics.ResetForTesting();
+            TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+            try
+            {
+                var input = CreateQuickAnnouncementRuntimeInput("MouseLeft");
+                input.GameUpdateCount = 200;
+                var state = new MapQuickAnnouncementRuntimeState();
+                var probe = new RecordingQuickAnnouncementRuntimeProbe
+                {
+                    TriggerContext = CreateQuickAnnouncementTriggerContext(30, 40, 200),
+                    ResolvePendingUiOverride = (pending, currentGameUpdateCount) =>
+                        MapQuickAnnouncementTargetResolver.ResolveUiHoverFromPending(pending, currentGameUpdateCount),
+                    ResolvePendingFallbackOverride = (pending, currentGameUpdateCount) =>
+                        MapQuickAnnouncementResolveAttempt.Failed("fallbackShouldNotRun")
+                };
+                var ports = probe.ToPorts();
+
+                var first = MapQuickAnnouncementRuntimeService.TickForTesting(input, state, ports);
+                if (!first.Triggered ||
+                    !first.InputConsumed ||
+                    !first.PendingRequestActive ||
+                    first.ResolveAttempted ||
+                    probe.DeliverCount != 0 ||
+                    state.PendingRequest == null)
+                {
+                    throw new InvalidOperationException("Mouse trigger must consume input and wait when UI hover has not been produced yet.");
+                }
+
+                var pendingSnapshot = MapQuickAnnouncementDiagnostics.GetSnapshot();
+                AssertStringEquals(pendingSnapshot.LastResultCode, "pendingUiHover", "map quick announcement pending diagnostic result");
+                AssertStringEquals(pendingSnapshot.LastPendingState, "waitingForUiHover", "map quick announcement pending diagnostic state");
+                AssertStringEquals(pendingSnapshot.LastUiHoverState, "hookNotInstalled", "map quick announcement pending diagnostic hover state");
+
+                var hoverItem = new TestQuickAnnouncementHoverItem
+                {
+                    type = 9,
+                    stack = 7,
+                    Name = "木材"
+                };
+                if (!TerrariaUiMouseCompat.TryCaptureItemSlotHoverSnapshotForTesting(hoverItem, 8, 3, 200, 30, 40))
+                {
+                    throw new InvalidOperationException("Expected delayed UI hover snapshot capture to succeed.");
+                }
+
+                input.GameUpdateCount = 201;
+                var second = MapQuickAnnouncementRuntimeService.TickForTesting(input, state, ports);
+                if (!second.Triggered ||
+                    !second.ResolveAttempted ||
+                    !second.Delivered ||
+                    !string.Equals(second.TargetKind, MapQuickAnnouncementTargetKind.UiItem.ToString(), StringComparison.Ordinal) ||
+                    probe.DeliverCount != 1 ||
+                    state.PendingRequest != null)
+                {
+                    throw new InvalidOperationException("Pending mouse trigger must resolve to the delayed UI item and then clear.");
+                }
+
+                AssertContains(second.ResolveDetail, "uiItem;source=ItemSlot");
+                var resolvedSnapshot = MapQuickAnnouncementDiagnostics.GetSnapshot();
+                AssertStringEquals(resolvedSnapshot.LastPendingState, "resolvedUiHover", "map quick announcement resolved pending diagnostic state");
+                AssertStringEquals(resolvedSnapshot.LastUiHoverState, "freshItem", "map quick announcement resolved hover state");
+            }
+            finally
+            {
+                TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+            }
+        }
+
+        private static void MapQuickAnnouncementRuntimeMousePendingEmptyUiSlotDoesNotFallThrough()
+        {
+            MapQuickAnnouncementDiagnostics.ResetForTesting();
+            TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+            try
+            {
+                var input = CreateQuickAnnouncementRuntimeInput("MouseLeft");
+                input.GameUpdateCount = 300;
+                var fallbackCalled = false;
+                var state = new MapQuickAnnouncementRuntimeState();
+                var probe = new RecordingQuickAnnouncementRuntimeProbe
+                {
+                    TriggerContext = CreateQuickAnnouncementTriggerContext(30, 40, 300),
+                    ResolvePendingUiOverride = (pending, currentGameUpdateCount) =>
+                        MapQuickAnnouncementTargetResolver.ResolveUiHoverFromPending(pending, currentGameUpdateCount),
+                    ResolvePendingFallbackOverride = (pending, currentGameUpdateCount) =>
+                    {
+                        fallbackCalled = true;
+                        return MapQuickAnnouncementResolveAttempt.Success(
+                            CreateQuickAnnouncementResult(MapQuickAnnouncementTargetKind.Tile, "这里有 石块"));
+                    }
+                };
+                var ports = probe.ToPorts();
+
+                var first = MapQuickAnnouncementRuntimeService.TickForTesting(input, state, ports);
+                if (!first.PendingRequestActive || state.PendingRequest == null)
+                {
+                    throw new InvalidOperationException("Expected empty-slot scenario to start as a pending mouse trigger.");
+                }
+
+                var emptyItem = new TestQuickAnnouncementHoverItem
+                {
+                    type = 0,
+                    stack = 0,
+                    Name = string.Empty
+                };
+                TerrariaUiMouseCompat.TryCaptureItemSlotHoverSnapshotForTesting(emptyItem, 8, 5, 300, 30, 40);
+                TerrariaUiHoverSlotSnapshot slotSnapshot;
+                if (!TerrariaUiMouseCompat.TryReadFreshHoverSlotSnapshot(301, 30, 40, out slotSnapshot) ||
+                    slotSnapshot == null ||
+                    slotSnapshot.HasActiveItem)
+                {
+                    throw new InvalidOperationException("Expected empty ItemSlot hover proof to be readable.");
+                }
+
+                input.GameUpdateCount = 301;
+                var second = MapQuickAnnouncementRuntimeService.TickForTesting(input, state, ports);
+                if (!second.Triggered ||
+                    !second.ResolveAttempted ||
+                    second.Delivered ||
+                    probe.DeliverCount != 0 ||
+                    fallbackCalled ||
+                    state.PendingRequest != null ||
+                    !string.Equals(second.ResultCode, "uiEmptySlot", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Confirmed empty UI slot must suppress delivery and must not fall through to world targets.");
+                }
+
+                AssertContains(second.ResolveDetail, "uiSlot:empty;source=ItemSlot");
+                var snapshot = MapQuickAnnouncementDiagnostics.GetSnapshot();
+                AssertStringEquals(snapshot.LastPendingState, "uiEmptySlot", "map quick announcement empty slot pending state");
+                AssertStringEquals(snapshot.LastUiHoverState, "freshEmptySlot", "map quick announcement empty slot hover state");
+            }
+            finally
+            {
+                TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+            }
+        }
+
+        private static void MapQuickAnnouncementRuntimeMousePendingExpiresThenFallsBackToWorld()
+        {
+            MapQuickAnnouncementDiagnostics.ResetForTesting();
+            TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+            try
+            {
+                var input = CreateQuickAnnouncementRuntimeInput("MouseLeft");
+                input.GameUpdateCount = 400;
+                var state = new MapQuickAnnouncementRuntimeState();
+                var fallbackCount = 0;
+                var probe = new RecordingQuickAnnouncementRuntimeProbe
+                {
+                    TriggerContext = CreateQuickAnnouncementTriggerContext(64, 96, 400),
+                    ResolvePendingUiOverride = (pending, currentGameUpdateCount) =>
+                        MapQuickAnnouncementTargetResolver.ResolveUiHoverFromPending(pending, currentGameUpdateCount),
+                    ResolvePendingFallbackOverride = (pending, currentGameUpdateCount) =>
+                    {
+                        fallbackCount++;
+                        return MapQuickAnnouncementResolveAttempt.Success(
+                            CreateQuickAnnouncementResult(MapQuickAnnouncementTargetKind.Tile, "这里有 石块"));
+                    }
+                };
+                var ports = probe.ToPorts();
+
+                var first = MapQuickAnnouncementRuntimeService.TickForTesting(input, state, ports);
+                if (!first.PendingRequestActive || first.ResolveAttempted || fallbackCount != 0 || state.PendingRequest == null)
+                {
+                    throw new InvalidOperationException("Mouse pending must not resolve world target before the UI hover wait expires.");
+                }
+
+                input.GameUpdateCount = 406;
+                var expired = MapQuickAnnouncementRuntimeService.TickForTesting(input, state, ports);
+                if (!expired.Triggered ||
+                    !expired.ResolveAttempted ||
+                    !expired.Delivered ||
+                    fallbackCount != 1 ||
+                    state.PendingRequest != null ||
+                    !string.Equals(expired.TargetKind, MapQuickAnnouncementTargetKind.Tile.ToString(), StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expired mouse pending request must fall back to the captured world target and clear.");
+                }
+
+                var snapshot = MapQuickAnnouncementDiagnostics.GetSnapshot();
+                AssertStringEquals(snapshot.LastPendingState, "expiredFallback", "map quick announcement expired pending state");
+                AssertStringEquals(snapshot.LastUiHoverState, "hookNotInstalled", "map quick announcement expired hover state");
+            }
+            finally
+            {
+                TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+            }
+        }
+
         private static void MapQuickAnnouncementRuntimeConsumesBeforeCooldownBlock()
         {
             var input = CreateQuickAnnouncementRuntimeInput("MouseRight");
@@ -1211,6 +1484,9 @@ namespace JueMingZ.Tests
                 MapQuickAnnouncementLastResolveDetail = "air",
                 MapQuickAnnouncementLastTargetSource = "air",
                 MapQuickAnnouncementLastUiHoverSource = string.Empty,
+                MapQuickAnnouncementLastUiHoverState = "hookNotInstalled",
+                MapQuickAnnouncementLastUiHoverHookStatus = "hookNotInstalled:harmonyMissing",
+                MapQuickAnnouncementLastPendingState = "expiredFallback",
                 MapQuickAnnouncementLastHoverCacheAgeUpdates = -1,
                 MapQuickAnnouncementLastPlacementLookupSource = string.Empty,
                 MapQuickAnnouncementLastFallbackReason = "noTarget:air",
@@ -1234,6 +1510,9 @@ namespace JueMingZ.Tests
             AssertContains(json, "\"MapQuickAnnouncementLastResolveDetail\": \"air\"");
             AssertContains(json, "\"MapQuickAnnouncementLastTargetSource\": \"air\"");
             AssertContains(json, "\"MapQuickAnnouncementLastUiHoverSource\": \"\"");
+            AssertContains(json, "\"MapQuickAnnouncementLastUiHoverState\": \"hookNotInstalled\"");
+            AssertContains(json, "\"MapQuickAnnouncementLastUiHoverHookStatus\": \"hookNotInstalled:harmonyMissing\"");
+            AssertContains(json, "\"MapQuickAnnouncementLastPendingState\": \"expiredFallback\"");
             AssertContains(json, "\"MapQuickAnnouncementLastHoverCacheAgeUpdates\": -1");
             AssertContains(json, "\"MapQuickAnnouncementLastPlacementLookupSource\": \"\"");
             AssertContains(json, "\"MapQuickAnnouncementLastFallbackReason\": \"noTarget:air\"");
@@ -1290,9 +1569,34 @@ namespace JueMingZ.Tests
                     !Terraria.Main.mouseRightRelease ||
                     !Terraria.Main.mouseInterface ||
                     !Terraria.Main.blockMouse ||
-                    !player.mouseInterface)
+                    !player.mouseInterface ||
+                    player.controlUseItem ||
+                    !player.releaseUseItem ||
+                    player.channel ||
+                    Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft ||
+                    Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft ||
+                    !Terraria.GameInput.PlayerInput.Triggers.Current.MouseRight)
                 {
-                    throw new InvalidOperationException("MouseLeft trigger consume must clear only the left pulse and mark Terraria UI mouse capture.");
+                    throw new InvalidOperationException("MouseLeft trigger consume must clear left UI/player input and mark Terraria UI mouse capture.");
+                }
+
+                Terraria.Main.mouseLeft = true;
+                Terraria.Main.mouseLeftRelease = true;
+                player.controlUseItem = true;
+                player.releaseUseItem = false;
+                player.channel = true;
+                Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft = true;
+                Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft = true;
+                TerrariaUiMouseCompat.UpdateActiveTriggerSuppressionPrefixGuard();
+                if (Terraria.Main.mouseLeft ||
+                    Terraria.Main.mouseLeftRelease ||
+                    player.controlUseItem ||
+                    !player.releaseUseItem ||
+                    player.channel ||
+                    Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft ||
+                    Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft)
+                {
+                    throw new InvalidOperationException("Active MouseLeft trigger suppression must keep the consumed click blocked until release.");
                 }
 
                 ResetQuickAnnouncementMouseInputState();
@@ -1308,7 +1612,10 @@ namespace JueMingZ.Tests
                     Terraria.Main.mouseRightRelease ||
                     !Terraria.Main.mouseInterface ||
                     !Terraria.Main.blockMouse ||
-                    !player.mouseInterface)
+                    !player.mouseInterface ||
+                    !Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft ||
+                    Terraria.GameInput.PlayerInput.Triggers.Current.MouseRight ||
+                    Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseRight)
                 {
                     throw new InvalidOperationException("MouseRight trigger consume must clear only the right pulse and mark Terraria UI mouse capture.");
                 }
@@ -1350,6 +1657,23 @@ namespace JueMingZ.Tests
                 MouseTileX = (int)Math.Floor(mouseWorldX / 16f),
                 MouseTileY = (int)Math.Floor(mouseWorldY / 16f),
                 GameUpdateCount = 123
+            };
+        }
+
+        private static MapQuickAnnouncementTriggerContext CreateQuickAnnouncementTriggerContext(
+            int mouseScreenX,
+            int mouseScreenY,
+            ulong gameUpdateCount)
+        {
+            return new MapQuickAnnouncementTriggerContext
+            {
+                MouseWorldX = mouseScreenX,
+                MouseWorldY = mouseScreenY,
+                MouseScreenX = mouseScreenX,
+                MouseScreenY = mouseScreenY,
+                MouseTileX = (int)Math.Floor(mouseScreenX / 16f),
+                MouseTileY = (int)Math.Floor(mouseScreenY / 16f),
+                GameUpdateCount = gameUpdateCount
             };
         }
 
@@ -1477,7 +1801,8 @@ namespace JueMingZ.Tests
                     triggerKey),
                 ColorHex = "#FFD966",
                 CooldownMilliseconds = 500,
-                AirCooldownMilliseconds = 2000
+                AirCooldownMilliseconds = 2000,
+                GameUpdateCount = 100
             };
         }
 
@@ -1533,6 +1858,13 @@ namespace JueMingZ.Tests
             Terraria.Main.hoverItemName = "vanilla";
             Terraria.Main.hoverItemName2 = "vanilla";
             player.mouseInterface = false;
+            player.controlUseItem = true;
+            player.releaseUseItem = false;
+            player.channel = true;
+            Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft = true;
+            Terraria.GameInput.PlayerInput.Triggers.Current.MouseRight = true;
+            Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft = true;
+            Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseRight = true;
         }
 
         private static void ResetQuickAnnouncementPlacementNameFakes()
@@ -1592,6 +1924,21 @@ namespace JueMingZ.Tests
             public string HoverName = string.Empty;
         }
 
+        private static class TestItemSlotMouseHoverOverloads
+        {
+            public static void MouseHover(int context)
+            {
+            }
+
+            public static void MouseHover(TestQuickAnnouncementHoverItem item, int context)
+            {
+            }
+
+            public static void MouseHover(TestQuickAnnouncementHoverItem[] inv, int context, int slot)
+            {
+            }
+        }
+
         private sealed class RecordingQuickAnnouncementRuntimeProbe
         {
             public int ResolveCount;
@@ -1601,6 +1948,19 @@ namespace JueMingZ.Tests
             public bool ConsumeSucceeded = true;
             public bool ResolveSucceeded = true;
             public string ResolveFailureReason = string.Empty;
+            public Func<MapQuickAnnouncementPendingRequest, ulong, MapQuickAnnouncementResolveAttempt> ResolvePendingUiOverride;
+            public Func<MapQuickAnnouncementPendingRequest, ulong, MapQuickAnnouncementResolveAttempt> ResolvePendingFallbackOverride;
+            public MapQuickAnnouncementTriggerContext TriggerContext =
+                new MapQuickAnnouncementTriggerContext
+                {
+                    MouseWorldX = 64f,
+                    MouseWorldY = 96f,
+                    MouseScreenX = 64,
+                    MouseScreenY = 96,
+                    MouseTileX = 4,
+                    MouseTileY = 6,
+                    GameUpdateCount = 100
+                };
             public MapQuickAnnouncementResolveResult ResolveResult =
                 CreateQuickAnnouncementResult(MapQuickAnnouncementTargetKind.Tile, "这里有 石块");
             public MapQuickAnnouncementDeliveryResult DeliveryResult =
@@ -1617,6 +1977,31 @@ namespace JueMingZ.Tests
                 {
                     UtcNow = new DateTime(2026, 6, 11, 2, 0, 0, DateTimeKind.Utc),
                     IsTokenDown = token => true,
+                    CaptureTriggerContext = () => TriggerContext,
+                    ResolvePendingUi = (pending, currentGameUpdateCount) =>
+                    {
+                        ResolveCount++;
+                        if (ResolvePendingUiOverride != null)
+                        {
+                            return ResolvePendingUiOverride(pending, currentGameUpdateCount);
+                        }
+
+                        return ResolveSucceeded
+                            ? MapQuickAnnouncementResolveAttempt.Success(ResolveResult)
+                            : MapQuickAnnouncementResolveAttempt.Failed(ResolveFailureReason);
+                    },
+                    ResolvePendingFallback = (pending, currentGameUpdateCount) =>
+                    {
+                        ResolveCount++;
+                        if (ResolvePendingFallbackOverride != null)
+                        {
+                            return ResolvePendingFallbackOverride(pending, currentGameUpdateCount);
+                        }
+
+                        return ResolveSucceeded
+                            ? MapQuickAnnouncementResolveAttempt.Success(ResolveResult)
+                            : MapQuickAnnouncementResolveAttempt.Failed(ResolveFailureReason);
+                    },
                     ConsumeTriggerInput = token =>
                     {
                         ConsumeCount++;

@@ -164,6 +164,9 @@ namespace JueMingZ.Runtime
             snapshot.MapQuickAnnouncementLastResolveDetail = quickAnnouncement.LastResolveDetail;
             snapshot.MapQuickAnnouncementLastTargetSource = quickAnnouncement.LastTargetSource;
             snapshot.MapQuickAnnouncementLastUiHoverSource = quickAnnouncement.LastUiHoverSource;
+            snapshot.MapQuickAnnouncementLastUiHoverState = quickAnnouncement.LastUiHoverState;
+            snapshot.MapQuickAnnouncementLastUiHoverHookStatus = quickAnnouncement.LastUiHoverHookStatus;
+            snapshot.MapQuickAnnouncementLastPendingState = quickAnnouncement.LastPendingState;
             snapshot.MapQuickAnnouncementLastHoverCacheAgeUpdates = quickAnnouncement.LastHoverCacheAgeUpdates;
             snapshot.MapQuickAnnouncementLastPlacementLookupSource = quickAnnouncement.LastPlacementLookupSource;
             snapshot.MapQuickAnnouncementLastFallbackReason = quickAnnouncement.LastFallbackReason;
