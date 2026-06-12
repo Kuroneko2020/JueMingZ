@@ -876,6 +876,683 @@ namespace JueMingZ.Tests
             });
         }
 
+        private static void SearchQueryPickRuntimeFreezesLayeredClickBeforeConsume()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                SearchItemQueryUiState.BeginPendingSelection(40, "test");
+                SearchItemQueryUiState.MarkSelectionArmedForNextLeftClick(41);
+                LegacyMainUiState.SetVisible(false);
+
+                var callOrder = new List<string>();
+                var consumeCalled = false;
+                SearchItemPickPendingClick observedPending = null;
+                var result = SearchItemPickRuntimeService.TickForTesting(
+                    CreateSearchPickRuntimeInput(true, 42, 640, 800),
+                    new SearchItemPickRuntimePorts
+                    {
+                        CaptureClickContext = input =>
+                        {
+                            callOrder.Add("capture");
+                            return CreateSearchPickClickContext(input, 512, 640, 960.5f, 1280.25f);
+                        },
+                        ResolvePendingUi = (pending, currentGameUpdateCount) =>
+                        {
+                            callOrder.Add("resolve");
+                            if (consumeCalled)
+                            {
+                                throw new InvalidOperationException("Search item pick must resolve frozen target evidence before consuming MouseLeft.");
+                            }
+
+                            observedPending = pending;
+                            if (pending == null ||
+                                pending.ClickContext == null ||
+                                pending.MouseX != 640 ||
+                                pending.MouseY != 800 ||
+                                pending.UiMouseX != 512 ||
+                                pending.UiMouseY != 640 ||
+                                Math.Abs(pending.ClickContext.MouseWorldX - 960.5f) > 0.001f ||
+                                Math.Abs(pending.ClickContext.MouseWorldY - 1280.25f) > 0.001f ||
+                                pending.ClickContext.MouseTileX != 60 ||
+                                pending.ClickContext.MouseTileY != 80 ||
+                                pending.CoordinateSourceSummary.IndexOf("ui=testUi", StringComparison.Ordinal) < 0)
+                            {
+                                throw new InvalidOperationException("Search item pick must freeze raw/UI/world click evidence before input consumption.");
+                            }
+
+                            return SearchItemPickResolveAttempt.Success(new SearchItemPickResolveResult
+                            {
+                                ItemType = 100,
+                                SourceKind = "uiItem",
+                                SourceSummary = "uiItem;source=layered-click"
+                            });
+                        },
+                        ResolvePendingFallback = (pending, currentGameUpdateCount) =>
+                            SearchItemPickResolveAttempt.Failed("shouldNotFallback"),
+                        ConsumeMouseTriggerInput = token =>
+                        {
+                            callOrder.Add("consume");
+                            consumeCalled = true;
+                            if (observedPending == null ||
+                                observedPending.UiMouseX != 512 ||
+                                Math.Abs(observedPending.ClickContext.MouseWorldX - 960.5f) > 0.001f)
+                            {
+                                throw new InvalidOperationException("Search item pick consumption must not be the first step that creates layered click evidence.");
+                            }
+
+                            return SearchItemPickInputConsumeResult.Success("consumed");
+                        },
+                        RestoreSearchWindow = () =>
+                        {
+                            callOrder.Add("restore");
+                            LegacyMainUiState.SelectPage("search");
+                            LegacyMainUiState.SetVisible(true);
+                        }
+                    });
+
+                var query = SearchItemQueryUiState.GetSelectedResult();
+                var order = string.Join(">", callOrder);
+                if (!string.Equals(order, "capture>resolve>consume>restore", StringComparison.Ordinal) ||
+                    !string.Equals(result.ResultCode, "resolved", StringComparison.Ordinal) ||
+                    !result.InputConsumeAttempted ||
+                    !result.InputConsumed ||
+                    query == null ||
+                    !query.Found ||
+                    query.Item == null ||
+                    query.Item.ItemType != 100)
+                {
+                    throw new InvalidOperationException("Search item pick must keep capture -> UI resolve -> consume -> restore ordering after coordinate layering.");
+                }
+            });
+        }
+
+        private static void SearchQueryPickRuntimeUsesVisibleInventorySlotWhenHoverStale()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                var restoreRuntimeTypes = PushFakeTerrariaMainType();
+                var restoreUiState = CaptureSearchPickFakeUiState();
+                TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+                try
+                {
+                    var player = CreateSearchPickFakePlayer();
+                    player.inventory[0] = new Terraria.TestRecipeItem { type = 101, stack = 4 };
+                    ResetSearchPickFakeUiState(player);
+
+                    var staleHoverItem = new Terraria.TestRecipeItem { type = 100, stack = 1 };
+                    TerrariaUiMouseCompat.TryCaptureItemSlotHoverSnapshotForTesting(staleHoverItem, 8, 3, 1, 700, 700);
+
+                    SearchItemQueryUiState.BeginPendingSelection(90, "test");
+                    SearchItemQueryUiState.MarkSelectionArmedForNextLeftClick(91);
+                    LegacyMainUiState.SetVisible(false);
+
+                    var fallbackCount = 0;
+                    var consumeCount = 0;
+                    var result = SearchItemPickRuntimeService.TickForTesting(
+                        CreateSearchPickRuntimeInput(true, 100, 22, 22),
+                        new SearchItemPickRuntimePorts
+                        {
+                            CaptureClickContext = input => CreateSearchPickClickContext(input),
+                            ResolvePendingUi = (pending, currentGameUpdateCount) =>
+                                SearchItemPickTargetResolver.ResolveUiHoverFromPending(pending, currentGameUpdateCount),
+                            ResolvePendingFallback = (pending, currentGameUpdateCount) =>
+                            {
+                                fallbackCount++;
+                                return SearchItemPickResolveAttempt.Success(new SearchItemPickResolveResult
+                                {
+                                    ItemType = 104,
+                                    SourceKind = "tile",
+                                    SourceSummary = "tile;type=5;style=0"
+                                });
+                            },
+                            ConsumeMouseTriggerInput = token =>
+                            {
+                                consumeCount++;
+                                return SearchItemPickInputConsumeResult.Success("consumed");
+                            },
+                            RestoreSearchWindow = () =>
+                            {
+                                LegacyMainUiState.SelectPage("search");
+                                LegacyMainUiState.SetVisible(true);
+                            }
+                        });
+
+                    var query = SearchItemQueryUiState.GetSelectedResult();
+                    if (!string.Equals(result.ResultCode, "resolved", StringComparison.Ordinal) ||
+                        !result.InputConsumeAttempted ||
+                        !result.InputConsumed ||
+                        consumeCount != 1 ||
+                        fallbackCount != 0 ||
+                        query == null ||
+                        !query.Found ||
+                        query.Item == null ||
+                        query.Item.ItemType != 101)
+                    {
+                        throw new InvalidOperationException("Search pick must use the directly hit visible inventory slot when the ItemSlot hover cache is stale.");
+                    }
+                }
+                finally
+                {
+                    TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+                    restoreUiState();
+                    restoreRuntimeTypes();
+                }
+            });
+        }
+
+        private static void SearchQueryPickRuntimeUsesLayeredUiCoordinateForVisibleSlots()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                var restoreRuntimeTypes = PushFakeTerrariaMainType();
+                var restoreUiState = CaptureSearchPickFakeUiState();
+                TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+                try
+                {
+                    var player = CreateSearchPickFakePlayer();
+                    player.inventory[0] = new Terraria.TestRecipeItem { type = 101, stack = 4 };
+                    player.inventory[1] = new Terraria.TestRecipeItem { type = 102, stack = 5 };
+                    ResetSearchPickFakeUiState(player);
+
+                    SearchItemQueryUiState.BeginPendingSelection(90, "test");
+                    SearchItemQueryUiState.MarkSelectionArmedForNextLeftClick(91);
+                    LegacyMainUiState.SetVisible(false);
+
+                    var result = SearchItemPickRuntimeService.TickForTesting(
+                        CreateSearchPickRuntimeInput(true, 100, 22, 22),
+                        new SearchItemPickRuntimePorts
+                        {
+                            CaptureClickContext = input => CreateSearchPickClickContext(input, 75, 22, 640f, 512f),
+                            ResolvePendingUi = (pending, currentGameUpdateCount) =>
+                                SearchItemPickTargetResolver.ResolveUiHoverFromPending(pending, currentGameUpdateCount),
+                            ResolvePendingFallback = (pending, currentGameUpdateCount) =>
+                                SearchItemPickResolveAttempt.Failed("shouldNotFallback"),
+                            ConsumeMouseTriggerInput = token => SearchItemPickInputConsumeResult.Success("consumed"),
+                            RestoreSearchWindow = () =>
+                            {
+                                LegacyMainUiState.SelectPage("search");
+                                LegacyMainUiState.SetVisible(true);
+                            }
+                        });
+
+                    var query = SearchItemQueryUiState.GetSelectedResult();
+                    if (!string.Equals(result.ResultCode, "resolved", StringComparison.Ordinal) ||
+                        query == null ||
+                        !query.Found ||
+                        query.Item == null ||
+                        query.Item.ItemType != 102)
+                    {
+                        throw new InvalidOperationException("Search pick visible slot hit-test must use the layered UI coordinate, not the raw mouse coordinate.");
+                    }
+                }
+                finally
+                {
+                    TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+                    restoreUiState();
+                    restoreRuntimeTypes();
+                }
+            });
+        }
+
+        private static void SearchQueryPickRuntimeUsesScaledVisibleInventoryFirstSlot()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                var restoreRuntimeTypes = PushFakeTerrariaMainType();
+                var restoreUiState = CaptureSearchPickFakeUiState();
+                TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+                try
+                {
+                    var player = CreateSearchPickFakePlayer();
+                    player.inventory[0] = new Terraria.TestRecipeItem { type = 101, stack = 4 };
+                    ResetSearchPickFakeUiState(player);
+                    ArmSearchPickSelectionForTesting();
+
+                    var uiX = SearchPickInventorySlotCenterX(0);
+                    var uiY = SearchPickInventorySlotCenterY(0);
+                    int fallbackCount;
+                    var result = RunSearchPickVisibleSlotSelection(
+                        100,
+                        ScaleSearchPickUiCoordinate(uiX),
+                        ScaleSearchPickUiCoordinate(uiY),
+                        uiX,
+                        uiY,
+                        out fallbackCount);
+
+                    AssertSearchPickResolvedVisibleSlot(
+                        result,
+                        101,
+                        fallbackCount,
+                        "Search pick must keep scaled UI slot 0 clicks on inventory slot 0.");
+                }
+                finally
+                {
+                    TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+                    restoreUiState();
+                    restoreRuntimeTypes();
+                }
+            });
+        }
+
+        private static void SearchQueryPickRuntimeUsesScaledVisibleInventoryNonFirstSlot()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                var restoreRuntimeTypes = PushFakeTerrariaMainType();
+                var restoreUiState = CaptureSearchPickFakeUiState();
+                TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+                try
+                {
+                    var player = CreateSearchPickFakePlayer();
+                    player.inventory[2] = new Terraria.TestRecipeItem { type = 102, stack = 5 };
+                    player.inventory[3] = new Terraria.TestRecipeItem { type = 104, stack = 1 };
+                    ResetSearchPickFakeUiState(player);
+                    ArmSearchPickSelectionForTesting();
+
+                    var uiX = SearchPickInventorySlotCenterX(2);
+                    var uiY = SearchPickInventorySlotCenterY(0);
+                    int fallbackCount;
+                    var result = RunSearchPickVisibleSlotSelection(
+                        100,
+                        ScaleSearchPickUiCoordinate(uiX),
+                        ScaleSearchPickUiCoordinate(uiY),
+                        uiX,
+                        uiY,
+                        out fallbackCount);
+
+                    AssertSearchPickResolvedVisibleSlot(
+                        result,
+                        102,
+                        fallbackCount,
+                        "Search pick must use UI logical coordinates for scaled non-first inventory slots.");
+                }
+                finally
+                {
+                    TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+                    restoreUiState();
+                    restoreRuntimeTypes();
+                }
+            });
+        }
+
+        private static void SearchQueryPickRuntimeUsesScaledVisibleChestNonFirstSlot()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                var restoreRuntimeTypes = PushFakeTerrariaMainType();
+                var restoreUiState = CaptureSearchPickFakeUiState();
+                TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+                try
+                {
+                    var player = CreateSearchPickFakePlayer();
+                    var chest = CreateSearchPickFakeChest(40);
+                    chest.item[12] = new Terraria.TestRecipeItem { type = 103, stack = 6 };
+                    chest.item[33] = new Terraria.TestRecipeItem { type = 104, stack = 1 };
+                    player.chest = 0;
+                    ResetSearchPickFakeUiState(player);
+                    Terraria.Main.chest[0] = chest;
+                    ArmSearchPickSelectionForTesting();
+
+                    var uiX = SearchPickChestSlotCenterX(2);
+                    var uiY = SearchPickChestSlotCenterY(1);
+                    int fallbackCount;
+                    var result = RunSearchPickVisibleSlotSelection(
+                        100,
+                        ScaleSearchPickUiCoordinate(uiX),
+                        ScaleSearchPickUiCoordinate(uiY),
+                        uiX,
+                        uiY,
+                        out fallbackCount);
+
+                    AssertSearchPickResolvedVisibleSlot(
+                        result,
+                        103,
+                        fallbackCount,
+                        "Search pick must use UI logical coordinates for scaled non-first chest slots.");
+                }
+                finally
+                {
+                    TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+                    restoreUiState();
+                    restoreRuntimeTypes();
+                }
+            });
+        }
+
+        private static void SearchQueryPickRuntimeBlocksScaledVisibleEmptyInventorySlot()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                var restoreRuntimeTypes = PushFakeTerrariaMainType();
+                var restoreUiState = CaptureSearchPickFakeUiState();
+                TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+                try
+                {
+                    var player = CreateSearchPickFakePlayer();
+                    player.inventory[2] = new Terraria.TestRecipeItem { type = 0, stack = 0 };
+                    player.inventory[3] = new Terraria.TestRecipeItem { type = 104, stack = 1 };
+                    ResetSearchPickFakeUiState(player);
+                    ArmSearchPickSelectionForTesting();
+
+                    var uiX = SearchPickInventorySlotCenterX(2);
+                    var uiY = SearchPickInventorySlotCenterY(0);
+                    int fallbackCount;
+                    var result = RunSearchPickVisibleSlotSelection(
+                        100,
+                        ScaleSearchPickUiCoordinate(uiX),
+                        ScaleSearchPickUiCoordinate(uiY),
+                        uiX,
+                        uiY,
+                        out fallbackCount);
+
+                    if (!string.Equals(result.ResultCode, "failed", StringComparison.Ordinal) ||
+                        !string.Equals(result.FailureReason, "uiEmptySlot", StringComparison.Ordinal) ||
+                        fallbackCount != 0 ||
+                        SearchItemQueryUiState.SelectionState != SearchItemPickSelectionState.CancelledOrFailed ||
+                        SearchItemQueryUiState.IsSelectionPending)
+                    {
+                        throw new InvalidOperationException("Search pick must treat a scaled visible empty inventory slot as UI proof and block world fallback.");
+                    }
+                }
+                finally
+                {
+                    TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+                    restoreUiState();
+                    restoreRuntimeTypes();
+                }
+            });
+        }
+
+        private static void SearchQueryPickRuntimePrefersScaledVisibleSlotOverOldHoverSlot()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                var restoreRuntimeTypes = PushFakeTerrariaMainType();
+                var restoreUiState = CaptureSearchPickFakeUiState();
+                TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+                try
+                {
+                    var player = CreateSearchPickFakePlayer();
+                    player.inventory[0] = new Terraria.TestRecipeItem { type = 100, stack = 1 };
+                    player.inventory[2] = new Terraria.TestRecipeItem { type = 102, stack = 5 };
+                    ResetSearchPickFakeUiState(player);
+
+                    var oldHoverItem = new Terraria.TestRecipeItem { type = 100, stack = 1 };
+                    TerrariaUiMouseCompat.TryCaptureItemSlotHoverSnapshotForTesting(
+                        oldHoverItem,
+                        0,
+                        0,
+                        99,
+                        SearchPickInventorySlotCenterX(0),
+                        SearchPickInventorySlotCenterY(0));
+
+                    ArmSearchPickSelectionForTesting();
+                    var uiX = SearchPickInventorySlotCenterX(2);
+                    var uiY = SearchPickInventorySlotCenterY(0);
+                    int fallbackCount;
+                    var result = RunSearchPickVisibleSlotSelection(
+                        100,
+                        ScaleSearchPickUiCoordinate(uiX),
+                        ScaleSearchPickUiCoordinate(uiY),
+                        uiX,
+                        uiY,
+                        out fallbackCount);
+
+                    AssertSearchPickResolvedVisibleSlot(
+                        result,
+                        102,
+                        fallbackCount,
+                        "Search pick must prefer the current visible UI click slot over an old ItemSlot hover proof.");
+                }
+                finally
+                {
+                    TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+                    restoreUiState();
+                    restoreRuntimeTypes();
+                }
+            });
+        }
+
+        private static void SearchQueryPickRuntimeUsesVisibleChestSlotWhenHoverStale()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                var restoreRuntimeTypes = PushFakeTerrariaMainType();
+                var restoreUiState = CaptureSearchPickFakeUiState();
+                TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+                try
+                {
+                    var player = CreateSearchPickFakePlayer();
+                    var chest = CreateSearchPickFakeChest(40);
+                    chest.item[0] = new Terraria.TestRecipeItem { type = 102, stack = 6 };
+                    player.chest = 0;
+                    ResetSearchPickFakeUiState(player);
+                    Terraria.Main.chest[0] = chest;
+
+                    var staleHoverItem = new Terraria.TestRecipeItem { type = 100, stack = 1 };
+                    TerrariaUiMouseCompat.TryCaptureItemSlotHoverSnapshotForTesting(staleHoverItem, 8, 3, 1, 700, 700);
+
+                    SearchItemQueryUiState.BeginPendingSelection(90, "test");
+                    SearchItemQueryUiState.MarkSelectionArmedForNextLeftClick(91);
+                    LegacyMainUiState.SetVisible(false);
+
+                    var fallbackCount = 0;
+                    var result = SearchItemPickRuntimeService.TickForTesting(
+                        CreateSearchPickRuntimeInput(true, 100, 75, 260),
+                        new SearchItemPickRuntimePorts
+                        {
+                            CaptureClickContext = input => CreateSearchPickClickContext(input),
+                            ResolvePendingUi = (pending, currentGameUpdateCount) =>
+                                SearchItemPickTargetResolver.ResolveUiHoverFromPending(pending, currentGameUpdateCount),
+                            ResolvePendingFallback = (pending, currentGameUpdateCount) =>
+                            {
+                                fallbackCount++;
+                                return SearchItemPickResolveAttempt.Success(new SearchItemPickResolveResult
+                                {
+                                    ItemType = 104,
+                                    SourceKind = "tile",
+                                    SourceSummary = "tile;type=5;style=0"
+                                });
+                            },
+                            ConsumeMouseTriggerInput = token => SearchItemPickInputConsumeResult.Success("consumed"),
+                            RestoreSearchWindow = () =>
+                            {
+                                LegacyMainUiState.SelectPage("search");
+                                LegacyMainUiState.SetVisible(true);
+                            }
+                        });
+
+                    var query = SearchItemQueryUiState.GetSelectedResult();
+                    if (!string.Equals(result.ResultCode, "resolved", StringComparison.Ordinal) ||
+                        fallbackCount != 0 ||
+                        query == null ||
+                        !query.Found ||
+                        query.Item == null ||
+                        query.Item.ItemType != 102)
+                    {
+                        throw new InvalidOperationException("Search pick must use the directly hit visible chest slot when the ItemSlot hover cache is stale.");
+                    }
+                }
+                finally
+                {
+                    TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+                    restoreUiState();
+                    restoreRuntimeTypes();
+                }
+            });
+        }
+
+        private static void SearchQueryPickRuntimeBlocksVisibleEmptyInventorySlotWhenHoverStale()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                var restoreRuntimeTypes = PushFakeTerrariaMainType();
+                var restoreUiState = CaptureSearchPickFakeUiState();
+                TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+                try
+                {
+                    var player = CreateSearchPickFakePlayer();
+                    player.inventory[0] = new Terraria.TestRecipeItem { type = 0, stack = 0 };
+                    ResetSearchPickFakeUiState(player);
+
+                    var staleHoverItem = new Terraria.TestRecipeItem { type = 100, stack = 1 };
+                    TerrariaUiMouseCompat.TryCaptureItemSlotHoverSnapshotForTesting(staleHoverItem, 8, 3, 1, 700, 700);
+
+                    SearchItemQueryUiState.BeginPendingSelection(90, "test");
+                    SearchItemQueryUiState.MarkSelectionArmedForNextLeftClick(91);
+                    LegacyMainUiState.SetVisible(false);
+
+                    var fallbackCount = 0;
+                    var result = SearchItemPickRuntimeService.TickForTesting(
+                        CreateSearchPickRuntimeInput(true, 100, 22, 22),
+                        new SearchItemPickRuntimePorts
+                        {
+                            CaptureClickContext = input => CreateSearchPickClickContext(input),
+                            ResolvePendingUi = (pending, currentGameUpdateCount) =>
+                                SearchItemPickTargetResolver.ResolveUiHoverFromPending(pending, currentGameUpdateCount),
+                            ResolvePendingFallback = (pending, currentGameUpdateCount) =>
+                            {
+                                fallbackCount++;
+                                return SearchItemPickResolveAttempt.Success(new SearchItemPickResolveResult
+                                {
+                                    ItemType = 104,
+                                    SourceKind = "tile",
+                                    SourceSummary = "tile;type=5;style=0"
+                                });
+                            },
+                            ConsumeMouseTriggerInput = token => SearchItemPickInputConsumeResult.Success("consumed"),
+                            RestoreSearchWindow = () =>
+                            {
+                                LegacyMainUiState.SelectPage("search");
+                                LegacyMainUiState.SetVisible(true);
+                            }
+                        });
+
+                    if (!string.Equals(result.ResultCode, "failed", StringComparison.Ordinal) ||
+                        !string.Equals(result.FailureReason, "uiEmptySlot", StringComparison.Ordinal) ||
+                        fallbackCount != 0 ||
+                        SearchItemQueryUiState.SelectionState != SearchItemPickSelectionState.CancelledOrFailed ||
+                        SearchItemQueryUiState.IsSelectionPending)
+                    {
+                        throw new InvalidOperationException("Search pick must treat a directly hit visible empty inventory slot as UI proof and block world fallback.");
+                    }
+                }
+                finally
+                {
+                    TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+                    restoreUiState();
+                    restoreRuntimeTypes();
+                }
+            });
+        }
+
+        private static void SearchQueryPickCoordinateResolverSeparatesScaledUiCoordinates()
+        {
+            var snapshot = SearchItemPickMouseCoordinateResolver.CaptureForTesting(new SearchItemPickMouseCoordinateInput
+            {
+                TerrariaReadAvailable = true,
+                TerrariaMouseX = 125,
+                TerrariaMouseY = 250,
+                OsReadAvailable = true,
+                OsClientMouseX = 125,
+                OsClientMouseY = 250,
+                UiScaleAvailable = true,
+                UiScale = 1.25d,
+                UiScaleX = 1.25d,
+                UiScaleY = 1.25d,
+                ReadMode = "Terraria+OsClient",
+                UiScaleSource = "UIScaleMatrix",
+                ScreenX = 1000f,
+                ScreenY = 2000f,
+                GameUpdateCount = 77
+            });
+
+            if (snapshot.RawMouseX != 125 ||
+                snapshot.RawMouseY != 250 ||
+                snapshot.UiMouseX != 100 ||
+                snapshot.UiMouseY != 200 ||
+                snapshot.WorldMouseX != 1125f ||
+                snapshot.WorldMouseY != 2250f ||
+                snapshot.TileX != 70 ||
+                snapshot.TileY != 140 ||
+                snapshot.UiMouseSource.IndexOf("TerrariaScreenToUi", StringComparison.Ordinal) < 0)
+            {
+                throw new InvalidOperationException("Search pick coordinate resolver must split raw screen and UI logical coordinates when UI scale proves Terraria mouse is raw screen space.");
+            }
+        }
+
+        private static void SearchQueryPickCoordinateResolverUsesMouseWorldSeparately()
+        {
+            var snapshot = SearchItemPickMouseCoordinateResolver.CaptureForTesting(new SearchItemPickMouseCoordinateInput
+            {
+                TerrariaReadAvailable = true,
+                TerrariaMouseX = 40,
+                TerrariaMouseY = 50,
+                UiScaleAvailable = true,
+                UiScale = 1d,
+                WorldMouseAvailable = true,
+                WorldMouseX = 640.5f,
+                WorldMouseY = 512.25f,
+                WorldMouseSource = "Main.MouseWorld",
+                ScreenX = 1000f,
+                ScreenY = 2000f,
+                GameUpdateCount = 88
+            });
+
+            if (snapshot.RawMouseX != 40 ||
+                snapshot.UiMouseX != 40 ||
+                Math.Abs(snapshot.WorldMouseX - 640.5f) > 0.001f ||
+                Math.Abs(snapshot.WorldMouseY - 512.25f) > 0.001f ||
+                snapshot.TileX != 40 ||
+                snapshot.TileY != 32 ||
+                snapshot.SourceSummary.IndexOf("worldSource=Main.MouseWorld", StringComparison.Ordinal) < 0)
+            {
+                throw new InvalidOperationException("Search pick coordinate resolver must keep world mouse coordinates separate from raw/UI coordinates.");
+            }
+        }
+
+        private static void SearchQueryPickClickContextDerivesTileFromWorldCoordinates()
+        {
+            var context = SearchItemPickClickContext.Success(
+                40,
+                50,
+                400,
+                500,
+                640.5f,
+                512.25f,
+                2,
+                3,
+                88,
+                "raw=testRaw;ui=testUi;world=Main.MouseWorld");
+
+            if (context.MouseTileX != 40 ||
+                context.MouseTileY != 32 ||
+                context.MouseTileX == 2 ||
+                context.MouseTileY == 3 ||
+                context.MouseTileX == context.UiMouseX ||
+                context.MouseTileY == context.UiMouseY)
+            {
+                throw new InvalidOperationException("Search pick click context must derive tile coordinates from final world coordinates, not raw/UI or caller-provided tile values.");
+            }
+        }
+
+        private static void SearchQueryPickClickContextKeepsLayeredCoordinates()
+        {
+            var input = CreateSearchPickRuntimeInput(true, 90, 40, 50);
+            var context = CreateSearchPickClickContext(input);
+            var pending = SearchItemPickPendingClick.Create(input, context);
+            if (context.RawMouseX != 40 ||
+                context.UiMouseX != 40 ||
+                Math.Abs(context.MouseWorldX - 200f) > 0.001f ||
+                context.MouseWorldX == context.UiMouseX ||
+                pending.MouseX != 40 ||
+                pending.UiMouseX != 40 ||
+                string.IsNullOrWhiteSpace(pending.CoordinateSourceSummary))
+            {
+                throw new InvalidOperationException("Search pick click context must preserve layered raw/UI/world coordinates instead of forcing every helper coordinate to the same value.");
+            }
+        }
+
         private static void SearchQueryPickTargetResolverUsesUiItem()
         {
             var context = new SearchItemPickResolveContext
@@ -908,6 +1585,46 @@ namespace JueMingZ.Tests
                 !string.Equals(result.Result.SourceKind, "uiItem", StringComparison.Ordinal))
             {
                 throw new InvalidOperationException("Search item pick target resolver must prioritize fresh UI hover item snapshots.");
+            }
+        }
+
+        private static void SearchQueryPickTargetResolverUsesWorldItemCoordinateWhenUiDiffers()
+        {
+            var context = new SearchItemPickResolveContext
+            {
+                RawMouseX = 40,
+                RawMouseY = 50,
+                UiMouseX = 15,
+                UiMouseY = 15,
+                MouseWorldX = 640f,
+                MouseWorldY = 512f
+            };
+            context.WorldItems.Add(new SearchItemPickWorldItemTarget
+            {
+                ItemType = 100,
+                Stack = 1,
+                HitboxX = 10f,
+                HitboxY = 10f,
+                HitboxWidth = 20f,
+                HitboxHeight = 20f
+            });
+            context.WorldItems.Add(new SearchItemPickWorldItemTarget
+            {
+                ItemType = 104,
+                Stack = 1,
+                HitboxX = 636f,
+                HitboxY = 508f,
+                HitboxWidth = 16f,
+                HitboxHeight = 16f
+            });
+
+            var result = SearchItemPickTargetResolver.Resolve(context);
+            if (!result.Succeeded ||
+                result.Result == null ||
+                result.Result.ItemType != 104 ||
+                !string.Equals(result.Result.SourceKind, "worldItem", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Search item pick world fallback must hit dropped items by MouseWorld coordinates, not raw/UI mouse coordinates.");
             }
         }
 
@@ -1135,6 +1852,71 @@ namespace JueMingZ.Tests
                     query.Item.ItemType != 104)
                 {
                     throw new InvalidOperationException("Search item pick fallback must use the frozen click coordinates, not the current mouse position after the click.");
+                }
+            });
+        }
+
+        private static void SearchQueryPickRuntimeUsesFrozenWorldForFallback()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                SearchItemQueryUiState.BeginPendingSelection(70, "test");
+                SearchItemQueryUiState.MarkSelectionArmedForNextLeftClick(71);
+                LegacyMainUiState.SetVisible(false);
+                var probe = new RecordingSearchItemPickRuntimeProbe
+                {
+                    ResolveAttempt = SearchItemPickResolveAttempt.Failed("uiHoverPending"),
+                    CaptureClickContextOverride = input => SearchItemPickClickContext.Success(
+                        input.MouseX,
+                        input.MouseY,
+                        100,
+                        125,
+                        640f,
+                        512f,
+                        1,
+                        2,
+                        input.CurrentGameUpdateCount,
+                        "raw=testRaw;ui=testUi;world=Main.MouseWorld"),
+                    ResolvePendingFallbackOverride = (pending, currentGameUpdateCount) =>
+                    {
+                        var click = pending == null ? null : pending.ClickContext;
+                        return click != null &&
+                               Math.Abs(click.MouseWorldX - 640f) < 0.001f &&
+                               Math.Abs(click.MouseWorldY - 512f) < 0.001f &&
+                               click.MouseTileX == 40 &&
+                               click.MouseTileY == 32 &&
+                               click.UiMouseX == 100
+                            ? SearchItemPickResolveAttempt.Success(new SearchItemPickResolveResult
+                            {
+                                ItemType = 104,
+                                SourceKind = "tile",
+                                SourceSummary = "tile;type=5;style=0"
+                            })
+                            : SearchItemPickResolveAttempt.Failed("usedNonFrozenWorldCoordinates");
+                    }
+                };
+
+                var pendingResult = SearchItemPickRuntimeService.TickForTesting(
+                    CreateSearchPickRuntimeInput(true, 72, 40, 50),
+                    probe.ToPorts());
+                if (!string.Equals(pendingResult.ResultCode, "skipped", StringComparison.Ordinal) ||
+                    !SearchItemQueryUiState.IsSelectionPending)
+                {
+                    throw new InvalidOperationException("Expected search pick to wait for UI proof before world fallback.");
+                }
+
+                var resolved = SearchItemPickRuntimeService.TickForTesting(
+                    CreateSearchPickRuntimeInput(false, 80, 900, 950),
+                    probe.ToPorts());
+                var query = SearchItemQueryUiState.GetSelectedResult();
+                if (!string.Equals(resolved.ResultCode, "resolved", StringComparison.Ordinal) ||
+                    resolved.ItemType != 104 ||
+                    query == null ||
+                    !query.Found ||
+                    query.Item == null ||
+                    query.Item.ItemType != 104)
+                {
+                    throw new InvalidOperationException("Search item pick fallback must keep the frozen world coordinate even after the mouse moves.");
                 }
             });
         }
@@ -1510,6 +2292,104 @@ namespace JueMingZ.Tests
             LegacyTextInput.ClearFocus();
         }
 
+        private const double SearchPickScaledUiTestScale = 1.25d;
+
+        private static void ArmSearchPickSelectionForTesting()
+        {
+            SearchItemQueryUiState.BeginPendingSelection(90, "test");
+            SearchItemQueryUiState.MarkSelectionArmedForNextLeftClick(91);
+            LegacyMainUiState.SetVisible(false);
+        }
+
+        private static int SearchPickInventorySlotCenterX(int column)
+        {
+            return SearchPickSlotCenter(20d, column, 0.85d);
+        }
+
+        private static int SearchPickInventorySlotCenterY(int row)
+        {
+            return SearchPickSlotCenter(20d, row, 0.85d);
+        }
+
+        private static int SearchPickChestSlotCenterX(int column)
+        {
+            return SearchPickSlotCenter(73d, column, 0.755d);
+        }
+
+        private static int SearchPickChestSlotCenterY(int row)
+        {
+            return SearchPickSlotCenter(258d, row, 0.755d);
+        }
+
+        private static int SearchPickSlotCenter(double start, int index, double inventoryScale)
+        {
+            return (int)Math.Round(
+                start + index * 56d * inventoryScale + 52d * inventoryScale * 0.5d,
+                MidpointRounding.AwayFromZero);
+        }
+
+        private static int ScaleSearchPickUiCoordinate(int uiCoordinate)
+        {
+            return (int)Math.Round(uiCoordinate * SearchPickScaledUiTestScale, MidpointRounding.AwayFromZero);
+        }
+
+        private static SearchItemPickRuntimeResult RunSearchPickVisibleSlotSelection(
+            ulong updateCount,
+            int rawMouseX,
+            int rawMouseY,
+            int uiMouseX,
+            int uiMouseY,
+            out int fallbackCount)
+        {
+            var localFallbackCount = 0;
+            var result = SearchItemPickRuntimeService.TickForTesting(
+                CreateSearchPickRuntimeInput(true, updateCount, rawMouseX, rawMouseY),
+                new SearchItemPickRuntimePorts
+                {
+                    CaptureClickContext = input => CreateSearchPickClickContext(input, uiMouseX, uiMouseY, 640f, 512f),
+                    ResolvePendingUi = (pending, currentGameUpdateCount) =>
+                        SearchItemPickTargetResolver.ResolveUiHoverFromPending(pending, currentGameUpdateCount),
+                    ResolvePendingFallback = (pending, currentGameUpdateCount) =>
+                    {
+                        localFallbackCount++;
+                        return SearchItemPickResolveAttempt.Success(new SearchItemPickResolveResult
+                        {
+                            ItemType = 104,
+                            SourceKind = "tile",
+                            SourceSummary = "tile;type=5;style=0"
+                        });
+                    },
+                    ConsumeMouseTriggerInput = token => SearchItemPickInputConsumeResult.Success("consumed"),
+                    RestoreSearchWindow = () =>
+                    {
+                        LegacyMainUiState.SelectPage("search");
+                        LegacyMainUiState.SetVisible(true);
+                    }
+                });
+            fallbackCount = localFallbackCount;
+            return result;
+        }
+
+        private static void AssertSearchPickResolvedVisibleSlot(
+            SearchItemPickRuntimeResult result,
+            int expectedItemType,
+            int fallbackCount,
+            string message)
+        {
+            var query = SearchItemQueryUiState.GetSelectedResult();
+            if (!string.Equals(result.ResultCode, "resolved", StringComparison.Ordinal) ||
+                !result.InputConsumeAttempted ||
+                !result.InputConsumed ||
+                fallbackCount != 0 ||
+                query == null ||
+                !query.Found ||
+                query.Item == null ||
+                query.Item.ItemType != expectedItemType)
+            {
+                throw new InvalidOperationException(message);
+            }
+        }
+
         private static SearchItemPickRuntimeInput CreateSearchPickRuntimeInput(
             bool mouseLeftDown,
             ulong updateCount,
@@ -1531,14 +2411,113 @@ namespace JueMingZ.Tests
         private static SearchItemPickClickContext CreateSearchPickClickContext(SearchItemPickRuntimeInput input)
         {
             input = input ?? new SearchItemPickRuntimeInput();
+            var worldX = input.MouseX + 160f;
+            var worldY = input.MouseY + 320f;
+            return CreateSearchPickClickContext(input, input.MouseX, input.MouseY, worldX, worldY);
+        }
+
+        private static SearchItemPickClickContext CreateSearchPickClickContext(
+            SearchItemPickRuntimeInput input,
+            int uiMouseX,
+            int uiMouseY,
+            float worldX,
+            float worldY)
+        {
+            input = input ?? new SearchItemPickRuntimeInput();
             return SearchItemPickClickContext.Success(
                 input.MouseX,
                 input.MouseY,
-                input.MouseX,
-                input.MouseY,
-                input.MouseX / TerrariaTileReadCompat.TileSize,
-                input.MouseY / TerrariaTileReadCompat.TileSize,
-                input.CurrentGameUpdateCount);
+                uiMouseX,
+                uiMouseY,
+                worldX,
+                worldY,
+                (int)Math.Floor(worldX / TerrariaTileReadCompat.TileSize),
+                (int)Math.Floor(worldY / TerrariaTileReadCompat.TileSize),
+                input.CurrentGameUpdateCount,
+                "raw=testMouse;ui=testUi;world=testWorld");
+        }
+
+        private static Terraria.Player CreateSearchPickFakePlayer()
+        {
+            var player = new Terraria.Player
+            {
+                inventory = CreateSearchPickFakeItems(59),
+                armor = CreateSearchPickFakeItems(20),
+                dye = CreateSearchPickFakeItems(10),
+                miscEquips = CreateSearchPickFakeItems(5),
+                miscDyes = CreateSearchPickFakeItems(5),
+                bank = CreateSearchPickFakeChest(40),
+                bank2 = CreateSearchPickFakeChest(40),
+                bank3 = CreateSearchPickFakeChest(40),
+                bank4 = CreateSearchPickFakeChest(40),
+                chest = -1
+            };
+            return player;
+        }
+
+        private static object[] CreateSearchPickFakeItems(int count)
+        {
+            var items = new object[count];
+            for (var index = 0; index < items.Length; index++)
+            {
+                items[index] = new Terraria.TestRecipeItem { type = 0, stack = 0 };
+            }
+
+            return items;
+        }
+
+        private static Terraria.Chest CreateSearchPickFakeChest(int count)
+        {
+            return new Terraria.Chest
+            {
+                item = CreateSearchPickFakeItems(count),
+                maxItems = count
+            };
+        }
+
+        private static void ResetSearchPickFakeUiState(Terraria.Player player)
+        {
+            Terraria.Main.playerInventory = true;
+            Terraria.Main.gameMenu = false;
+            Terraria.Main.myPlayer = 0;
+            Terraria.Main.LocalPlayer = player;
+            Terraria.Main.player = new object[256];
+            Terraria.Main.player[0] = player;
+            Terraria.Main.chest = new object[1000];
+            Terraria.Main.screenWidth = 1280;
+            Terraria.Main.screenHeight = 800;
+            Terraria.Main.mH = 0;
+            Terraria.Main.EquipPage = 0;
+            Terraria.Main.instance = new Terraria.MainInstance { invBottom = 258 };
+        }
+
+        private static Action CaptureSearchPickFakeUiState()
+        {
+            var previousPlayerInventory = Terraria.Main.playerInventory;
+            var previousGameMenu = Terraria.Main.gameMenu;
+            var previousMyPlayer = Terraria.Main.myPlayer;
+            var previousLocalPlayer = Terraria.Main.LocalPlayer;
+            var previousPlayers = Terraria.Main.player;
+            var previousChests = Terraria.Main.chest;
+            var previousScreenWidth = Terraria.Main.screenWidth;
+            var previousScreenHeight = Terraria.Main.screenHeight;
+            var previousMH = Terraria.Main.mH;
+            var previousEquipPage = Terraria.Main.EquipPage;
+            var previousInstance = Terraria.Main.instance;
+            return () =>
+            {
+                Terraria.Main.playerInventory = previousPlayerInventory;
+                Terraria.Main.gameMenu = previousGameMenu;
+                Terraria.Main.myPlayer = previousMyPlayer;
+                Terraria.Main.LocalPlayer = previousLocalPlayer;
+                Terraria.Main.player = previousPlayers;
+                Terraria.Main.chest = previousChests;
+                Terraria.Main.screenWidth = previousScreenWidth;
+                Terraria.Main.screenHeight = previousScreenHeight;
+                Terraria.Main.mH = previousMH;
+                Terraria.Main.EquipPage = previousEquipPage;
+                Terraria.Main.instance = previousInstance;
+            };
         }
 
         private sealed class RecordingSearchItemPickRuntimeProbe

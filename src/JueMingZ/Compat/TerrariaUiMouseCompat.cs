@@ -8,7 +8,7 @@ using JueMingZ.Diagnostics;
 
 namespace JueMingZ.Compat
 {
-    public static class TerrariaUiMouseCompat
+    public static partial class TerrariaUiMouseCompat
     {
         // UI mouse helpers may mark capture flags to stop click-through;
         // gameplay actions remain outside this layer.

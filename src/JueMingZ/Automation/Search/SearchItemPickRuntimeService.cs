@@ -477,6 +477,9 @@ namespace JueMingZ.Automation.Search
         public ulong StartGameUpdateCount { get; set; }
         public int MouseX { get; set; }
         public int MouseY { get; set; }
+        public int UiMouseX { get; set; }
+        public int UiMouseY { get; set; }
+        public string CoordinateSourceSummary { get; set; }
         public string LastFailureReason { get; set; }
         public SearchItemPickClickContext ClickContext { get; set; }
 
@@ -497,6 +500,9 @@ namespace JueMingZ.Automation.Search
                     : input.CurrentGameUpdateCount,
                 MouseX = clickContext.MouseScreenX,
                 MouseY = clickContext.MouseScreenY,
+                UiMouseX = clickContext.UiMouseX,
+                UiMouseY = clickContext.UiMouseY,
+                CoordinateSourceSummary = clickContext.CoordinateSourceSummary ?? string.Empty,
                 ClickContext = clickContext,
                 LastFailureReason = string.Empty
             };

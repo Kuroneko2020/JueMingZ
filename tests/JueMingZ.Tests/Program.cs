@@ -47,6 +47,7 @@ namespace Terraria
         public static object[,] tile;
         public static object[] projectile = new object[0];
         public static object[] recipe = new object[0];
+        public static object[] chest = new object[1000];
         public static object FishDropsDB;
         public static int[] anglerQuestItemNetIDs = new int[0];
         public static int anglerQuest;
@@ -71,12 +72,20 @@ namespace Terraria
         public static bool dedServ;
         public static int screenWidth = 1280;
         public static int screenHeight = 800;
+        public static int mH;
+        public static int EquipPage;
         public static float inventoryScale = 1f;
         public static long GameUpdateCount;
         public static TestVector2 screenPosition = new TestVector2();
         public static int myPlayer;
         public static object LocalPlayer;
         public static object[] player = new object[256];
+        public static object instance = new MainInstance();
+    }
+
+    internal sealed class MainInstance
+    {
+        public int invBottom = 258;
     }
 
     internal sealed class TestVector2
@@ -97,7 +106,20 @@ namespace Terraria
         public int width = 20;
         public int height = 42;
         public object[] inventory = new object[59];
+        public object[] armor = new object[20];
+        public object[] dye = new object[10];
+        public object[] miscEquips = new object[5];
+        public object[] miscDyes = new object[5];
+        public object trashItem = new TestRecipeItem { type = 0, stack = 0 };
+        public bool[] hideVisibleAccessory = new bool[10];
+        public bool[] hideMisc = new bool[2];
+        public object bank = new Chest();
+        public object bank2 = new Chest();
+        public object bank3 = new Chest();
+        public object bank4 = new Chest();
         public int selectedItem;
+        public int chest = -1;
+        public bool extraAccessory = true;
         public bool controlUseItem;
         public bool releaseUseItem = true;
         public bool channel;
@@ -119,12 +141,76 @@ namespace Terraria
         public bool magicQuiver;
         public bool hasMoltenQuiver;
         public bool archery;
+
+        public bool CanDemonHeartAccessoryBeShown()
+        {
+            return IsItemSlotUnlockedAndUsable(8) ||
+                   HasActiveItem(armor, 8) ||
+                   HasActiveItem(armor, 18) ||
+                   HasActiveItem(dye, 8);
+        }
+
+        public bool CanMasterModeAccessoryBeShown()
+        {
+            return IsItemSlotUnlockedAndUsable(9) ||
+                   HasActiveItem(armor, 9) ||
+                   HasActiveItem(armor, 19) ||
+                   HasActiveItem(dye, 9);
+        }
+
+        public int GetAmountOfExtraAccessorySlotsToShow()
+        {
+            var count = 0;
+            if (CanDemonHeartAccessoryBeShown())
+            {
+                count++;
+            }
+
+            if (CanMasterModeAccessoryBeShown())
+            {
+                count++;
+            }
+
+            return count;
+        }
+
+        public bool IsItemSlotUnlockedAndUsable(int slot)
+        {
+            if (slot == 8)
+            {
+                return extraAccessory;
+            }
+
+            if (slot == 9)
+            {
+                return true;
+            }
+
+            return slot >= 0 && slot < 8;
+        }
+
+        private static bool HasActiveItem(object[] items, int slot)
+        {
+            if (items == null || slot < 0 || slot >= items.Length)
+            {
+                return false;
+            }
+
+            var item = items[slot] as TestRecipeItem;
+            return item != null && item.type > 0 && item.stack > 0;
+        }
     }
 
     internal sealed class TestRecipeItem
     {
         public int type;
         public int stack = 1;
+    }
+
+    internal sealed class Chest
+    {
+        public object[] item = new object[40];
+        public int maxItems = 40;
     }
 
     internal sealed class Recipe
@@ -1191,13 +1277,29 @@ namespace JueMingZ.Tests
             Run("search query pick runtime consumes after PlayerInput rewrite", ref failed, SearchQueryPickRuntimeConsumesAfterPlayerInputRewrite);
             Run("search query pick runtime uses pre-consume UI slot snapshot", ref failed, SearchQueryPickRuntimeUsesPreConsumeUiSlotSnapshot);
             Run("search query pick runtime blocks pre-consume empty UI slot", ref failed, SearchQueryPickRuntimeBlocksPreConsumeEmptyUiSlot);
+            Run("search query pick runtime freezes layered click before consume", ref failed, SearchQueryPickRuntimeFreezesLayeredClickBeforeConsume);
+            Run("search query pick runtime uses visible inventory slot when hover stale", ref failed, SearchQueryPickRuntimeUsesVisibleInventorySlotWhenHoverStale);
+            Run("search query pick runtime uses layered UI coordinate for visible slots", ref failed, SearchQueryPickRuntimeUsesLayeredUiCoordinateForVisibleSlots);
+            Run("search query pick runtime uses scaled visible inventory first slot", ref failed, SearchQueryPickRuntimeUsesScaledVisibleInventoryFirstSlot);
+            Run("search query pick runtime uses scaled visible inventory non-first slot", ref failed, SearchQueryPickRuntimeUsesScaledVisibleInventoryNonFirstSlot);
+            Run("search query pick runtime uses scaled visible chest non-first slot", ref failed, SearchQueryPickRuntimeUsesScaledVisibleChestNonFirstSlot);
+            Run("search query pick runtime blocks scaled visible empty inventory slot", ref failed, SearchQueryPickRuntimeBlocksScaledVisibleEmptyInventorySlot);
+            Run("search query pick runtime prefers scaled visible slot over old hover slot", ref failed, SearchQueryPickRuntimePrefersScaledVisibleSlotOverOldHoverSlot);
+            Run("search query pick runtime uses visible chest slot when hover stale", ref failed, SearchQueryPickRuntimeUsesVisibleChestSlotWhenHoverStale);
+            Run("search query pick runtime blocks visible empty inventory slot when hover stale", ref failed, SearchQueryPickRuntimeBlocksVisibleEmptyInventorySlotWhenHoverStale);
+            Run("search query pick coordinate resolver separates scaled UI coordinates", ref failed, SearchQueryPickCoordinateResolverSeparatesScaledUiCoordinates);
+            Run("search query pick coordinate resolver uses mouse world separately", ref failed, SearchQueryPickCoordinateResolverUsesMouseWorldSeparately);
+            Run("search query pick click context derives tile from world coordinates", ref failed, SearchQueryPickClickContextDerivesTileFromWorldCoordinates);
+            Run("search query pick click context keeps layered coordinates", ref failed, SearchQueryPickClickContextKeepsLayeredCoordinates);
             Run("search query pick target resolver uses UI item", ref failed, SearchQueryPickTargetResolverUsesUiItem);
+            Run("search query pick target resolver uses world item coordinate when UI differs", ref failed, SearchQueryPickTargetResolverUsesWorldItemCoordinateWhenUiDiffers);
             Run("search query pick target resolver uses world item", ref failed, SearchQueryPickTargetResolverUsesWorldItem);
             Run("search query pick target resolver uses tile item id", ref failed, SearchQueryPickTargetResolverUsesTileItemId);
             Run("search query pick target resolver uses wall item id", ref failed, SearchQueryPickTargetResolverUsesWallItemId);
             Run("search query pick runtime consumes failed target and restores", ref failed, SearchQueryPickRuntimeConsumesFailedTargetAndRestores);
             Run("search query pick runtime does not let world fallback race UI pending", ref failed, SearchQueryPickRuntimeDoesNotLetWorldFallbackRaceUiPending);
             Run("search query pick runtime uses frozen click for fallback", ref failed, SearchQueryPickRuntimeUsesFrozenClickForFallback);
+            Run("search query pick runtime uses frozen world for fallback", ref failed, SearchQueryPickRuntimeUsesFrozenWorldForFallback);
             Run("search query pick runtime blocks world fallback on UI empty slot", ref failed, SearchQueryPickRuntimeBlocksWorldFallbackOnUiEmptySlot);
             Run("search query pick runtime waits delayed UI item", ref failed, SearchQueryPickRuntimeWaitsDelayedUiItem);
             Run("search query hover entry requires fresh hover snapshot", ref failed, SearchQueryHoverEntryRequiresFreshHoverSnapshot);
@@ -1223,6 +1325,7 @@ namespace JueMingZ.Tests
             Run("map quick announcement hover snapshot read status distinguishes failure modes", ref failed, MapQuickAnnouncementHoverSnapshotReadStatusDistinguishesFailureModes);
             Run("map quick announcement resolver uses fresh UI hover snapshots", ref failed, MapQuickAnnouncementResolverUsesFreshUiHoverSnapshots);
             Run("map quick announcement stale hover snapshot falls back to tile", ref failed, MapQuickAnnouncementStaleHoverSnapshotFallsBackToTile);
+            Run("map quick announcement resolver ignores search visible-slot fallback", ref failed, MapQuickAnnouncementResolverIgnoresSearchVisibleSlotFallback);
             Run("map quick announcement placement names prefer item localization", ref failed, MapQuickAnnouncementPlacementNamesPreferItemLocalization);
             Run("map quick announcement multi-tile furniture styles resolve consistently", ref failed, MapQuickAnnouncementMultiTileFurnitureStylesResolveConsistently);
             Run("map quick announcement resolver prefers UI item over world targets", ref failed, MapQuickAnnouncementResolverPrefersUiItemOverWorldTargets);

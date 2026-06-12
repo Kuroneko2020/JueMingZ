@@ -101,16 +101,12 @@ namespace JueMingZ.Automation.Search
                 return false;
             }
 
-            var mouseWorldX = worldContext.ScreenX + mouseScreenX;
-            var mouseWorldY = worldContext.ScreenY + mouseScreenY;
-            clickContext = SearchItemPickClickContext.Success(
+            var coordinates = SearchItemPickMouseCoordinateResolver.Capture(
                 mouseScreenX,
                 mouseScreenY,
-                mouseWorldX,
-                mouseWorldY,
-                (int)Math.Floor(mouseWorldX / TerrariaTileReadCompat.TileSize),
-                (int)Math.Floor(mouseWorldY / TerrariaTileReadCompat.TileSize),
-                worldContext.GameUpdateCount);
+                fallbackGameUpdateCount,
+                worldContext);
+            clickContext = SearchItemPickClickContext.Success(coordinates);
             return true;
         }
 
@@ -125,16 +121,34 @@ namespace JueMingZ.Automation.Search
 
             var context = CreateContextFromClick(pending.ClickContext, currentGameUpdateCount);
             TerrariaUiHoverSlotSnapshot slotSnapshot;
+            if (TerrariaUiMouseCompat.TryReadVisibleItemSlotSnapshot(
+                    context.UiMouseX,
+                    context.UiMouseY,
+                    context.GameUpdateCount,
+                    out slotSnapshot) &&
+                slotSnapshot != null)
+            {
+                return ResolveUiSlotSnapshot(context, slotSnapshot);
+            }
+
             if (!TerrariaUiMouseCompat.TryReadFreshHoverSlotSnapshot(
                     context.GameUpdateCount,
-                    context.MouseScreenX,
-                    context.MouseScreenY,
+                    context.UiMouseX,
+                    context.UiMouseY,
                     out slotSnapshot) ||
                 slotSnapshot == null)
             {
                 return SearchItemPickResolveAttempt.Failed("uiHoverPending");
             }
 
+            return ResolveUiSlotSnapshot(context, slotSnapshot);
+        }
+
+        private static SearchItemPickResolveAttempt ResolveUiSlotSnapshot(
+            SearchItemPickResolveContext context,
+            TerrariaUiHoverSlotSnapshot slotSnapshot)
+        {
+            context = context ?? new SearchItemPickResolveContext();
             if (!slotSnapshot.HasActiveItem ||
                 slotSnapshot.ItemSnapshot == null ||
                 slotSnapshot.ItemSnapshot.ItemType <= 0 ||
@@ -209,16 +223,26 @@ namespace JueMingZ.Automation.Search
 
             var mouseScreenX = TerrariaMainCompat.MouseX;
             var mouseScreenY = TerrariaMainCompat.MouseY;
-            var mouseWorldX = worldContext.ScreenX + mouseScreenX;
-            var mouseWorldY = worldContext.ScreenY + mouseScreenY;
+            var coordinates = SearchItemPickMouseCoordinateResolver.Capture(
+                mouseScreenX,
+                mouseScreenY,
+                worldContext.GameUpdateCount,
+                worldContext);
             context = new SearchItemPickResolveContext
             {
-                MouseWorldX = mouseWorldX,
-                MouseWorldY = mouseWorldY,
-                MouseScreenX = mouseScreenX,
-                MouseScreenY = mouseScreenY,
-                MouseTileX = (int)Math.Floor(mouseWorldX / TerrariaTileReadCompat.TileSize),
-                MouseTileY = (int)Math.Floor(mouseWorldY / TerrariaTileReadCompat.TileSize),
+                RawMouseX = coordinates.RawMouseX,
+                RawMouseY = coordinates.RawMouseY,
+                UiMouseX = coordinates.UiMouseX,
+                UiMouseY = coordinates.UiMouseY,
+                MouseWorldX = coordinates.WorldMouseX,
+                MouseWorldY = coordinates.WorldMouseY,
+                MouseScreenX = coordinates.RawMouseX,
+                MouseScreenY = coordinates.RawMouseY,
+                MouseTileX = WorldToTile(coordinates.WorldMouseX),
+                MouseTileY = WorldToTile(coordinates.WorldMouseY),
+                UiMouseSource = coordinates.UiMouseSource,
+                WorldMouseSource = coordinates.WorldMouseSource,
+                CoordinateSourceSummary = coordinates.SourceSummary,
                 GameUpdateCount = worldContext.GameUpdateCount
             };
 
@@ -238,14 +262,23 @@ namespace JueMingZ.Automation.Search
                 gameUpdateCount = clickContext.GameUpdateCount;
             }
 
+            var tileX = WorldToTile(clickContext.MouseWorldX);
+            var tileY = WorldToTile(clickContext.MouseWorldY);
             return new SearchItemPickResolveContext
             {
+                RawMouseX = clickContext.RawMouseX,
+                RawMouseY = clickContext.RawMouseY,
+                UiMouseX = clickContext.UiMouseX,
+                UiMouseY = clickContext.UiMouseY,
                 MouseWorldX = clickContext.MouseWorldX,
                 MouseWorldY = clickContext.MouseWorldY,
                 MouseScreenX = clickContext.MouseScreenX,
                 MouseScreenY = clickContext.MouseScreenY,
-                MouseTileX = clickContext.MouseTileX,
-                MouseTileY = clickContext.MouseTileY,
+                MouseTileX = tileX,
+                MouseTileY = tileY,
+                UiMouseSource = clickContext.UiMouseSource,
+                WorldMouseSource = clickContext.WorldMouseSource,
+                CoordinateSourceSummary = clickContext.CoordinateSourceSummary,
                 GameUpdateCount = gameUpdateCount
             };
         }
@@ -256,8 +289,8 @@ namespace JueMingZ.Automation.Search
             if (context == null ||
                 !TerrariaUiMouseCompat.TryReadFreshHoverItemSnapshot(
                     context.GameUpdateCount,
-                    context.MouseScreenX,
-                    context.MouseScreenY,
+                    context.UiMouseX,
+                    context.UiMouseY,
                     out snapshot) ||
                 snapshot == null ||
                 snapshot.ItemType <= 0 ||
@@ -343,14 +376,24 @@ namespace JueMingZ.Automation.Search
 
         private static void AddTileAndWall(SearchItemPickResolveContext context)
         {
-            if (context == null ||
-                !TerrariaMainCompat.IsTileCoordinateInWorld(context.MouseTileX, context.MouseTileY))
+            if (context == null)
+            {
+                return;
+            }
+
+            // World fallback must derive tile targets from the frozen world
+            // coordinate; raw and UI mouse coordinates can legitimately differ.
+            var tileX = WorldToTile(context.MouseWorldX);
+            var tileY = WorldToTile(context.MouseWorldY);
+            context.MouseTileX = tileX;
+            context.MouseTileY = tileY;
+            if (!TerrariaMainCompat.IsTileCoordinateInWorld(tileX, tileY))
             {
                 return;
             }
 
             Tile tile;
-            if (!TerrariaTileReadCompat.TryGetTile(context.MouseTileX, context.MouseTileY, out tile))
+            if (!TerrariaTileReadCompat.TryGetTile(tileX, tileY, out tile))
             {
                 return;
             }
@@ -417,6 +460,11 @@ namespace JueMingZ.Automation.Search
             var trimmed = source.Trim();
             var separator = trimmed.IndexOf(':');
             return separator > 0 ? trimmed.Substring(0, separator) : trimmed;
+        }
+
+        private static int WorldToTile(float worldCoordinate)
+        {
+            return (int)Math.Floor(worldCoordinate / TerrariaTileReadCompat.TileSize);
         }
     }
 }

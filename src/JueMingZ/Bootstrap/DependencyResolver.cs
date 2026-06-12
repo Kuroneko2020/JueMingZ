@@ -104,10 +104,28 @@ namespace JueMingZ.Bootstrap
                 }
             }
 
+            if (ShouldPreferExternalAssembly(simpleName) &&
+                TryLoadProbedAssemblyBySimpleName(simpleName, out assembly))
+            {
+                return true;
+            }
+
             if (TryLoadEmbeddedAssemblyBySimpleName(simpleName, out assembly))
             {
                 return true;
             }
+
+            if (TryLoadProbedAssemblyBySimpleName(simpleName, out assembly))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryLoadProbedAssemblyBySimpleName(string simpleName, out Assembly assembly)
+        {
+            assembly = null;
 
             var fileName = simpleName + ".dll";
             foreach (var directory in GetProbeDirectories())
@@ -144,6 +162,13 @@ namespace JueMingZ.Bootstrap
             }
 
             return false;
+        }
+
+        private static bool ShouldPreferExternalAssembly(string simpleName)
+        {
+            // Some machines fail MonoMod dynamic IL generation when Harmony is loaded from bytes;
+            // a packaged 0Harmony.dll keeps that compatibility path available.
+            return string.Equals(simpleName, "0Harmony", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool TryLoadEmbeddedAssemblyBySimpleName(string simpleName, out Assembly assembly)

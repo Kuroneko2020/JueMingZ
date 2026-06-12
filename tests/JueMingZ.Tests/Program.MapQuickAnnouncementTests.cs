@@ -530,6 +530,55 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void MapQuickAnnouncementResolverIgnoresSearchVisibleSlotFallback()
+        {
+            var restoreRuntimeTypes = PushFakeTerrariaMainType();
+            var restoreUiState = CaptureSearchPickFakeUiState();
+            TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+            try
+            {
+                var player = CreateSearchPickFakePlayer();
+                player.inventory[0] = new Terraria.TestRecipeItem { type = 101, stack = 4 };
+                ResetSearchPickFakeUiState(player);
+
+                var context = new MapQuickAnnouncementResolveContext
+                {
+                    MouseScreenX = SearchPickInventorySlotCenterX(0),
+                    MouseScreenY = SearchPickInventorySlotCenterY(0),
+                    MouseWorldX = 160f,
+                    MouseWorldY = 160f,
+                    MouseTileX = 10,
+                    MouseTileY = 10,
+                    GameUpdateCount = 500
+                };
+
+                TerrariaUiHoverSlotSnapshot visibleSlot;
+                if (!TerrariaUiMouseCompat.TryReadVisibleItemSlotSnapshot(
+                        context.MouseScreenX,
+                        context.MouseScreenY,
+                        context.GameUpdateCount,
+                        out visibleSlot) ||
+                    visibleSlot == null ||
+                    !visibleSlot.HasActiveItem)
+                {
+                    throw new InvalidOperationException("Expected search visible-slot test setup to expose an inventory item.");
+                }
+
+                if (MapQuickAnnouncementTargetResolver.TryAddUiHoverItemForTesting(context) ||
+                    context.UiItem != null ||
+                    context.UiSlot != null)
+                {
+                    throw new InvalidOperationException("Map quick announcement must keep using ItemSlot hover snapshots and must not adopt search visible-slot fallback.");
+                }
+            }
+            finally
+            {
+                TerrariaUiMouseCompat.ResetHoverItemSnapshotForTesting();
+                restoreUiState();
+                restoreRuntimeTypes();
+            }
+        }
+
         private static void MapQuickAnnouncementPlacementNamesPreferItemLocalization()
         {
             ResetQuickAnnouncementPlacementNameFakes();
