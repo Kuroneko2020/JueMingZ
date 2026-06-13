@@ -5,7 +5,7 @@ namespace JueMingZ.Automation.Search
 {
     internal static class ItemAcquisitionTagIndex
     {
-        private const string StaticTagContext = "本地标签，非完整百科";
+        private const string StaticTagContext = "整理采集线索，不扫描当前世界";
 
         private static readonly object SyncRoot = new object();
         private static bool _initialized;
@@ -107,7 +107,8 @@ namespace JueMingZ.Automation.Search
                 Ore("AdamantiteOre", 366, "困难模式矿脉", "困难模式祭坛/世界转换后出现；同级矿物可能由替代矿生成"),
                 Ore("TitaniumOre", 1106, "困难模式矿脉", "困难模式祭坛/世界转换后出现；同级矿物可能由替代矿生成"),
                 Ore("ChlorophyteOre", 947, "叶绿矿脉", "困难模式地下丛林会扩散生成，需要合适镐力采集"),
-                Ore("FossilOre", 3347, "沙漠化石", "地下沙漠常见，可挖掘采集；提炼产物不在本阶段展示"),
+                Ore("DesertFossil", 3347, "沙漠化石块", "地下沙漠常见，可挖掘采集；可作为提炼机输入材料"),
+                Ore("FossilOre", 3380, "坚固化石材料链", "通常来自沙漠化石提炼；沙漠化石块本身在地下沙漠可采集，不承诺当前世界一定存在"),
 
                 Gem("Amethyst", 181, "紫晶", "地下宝石脉或宝石洞常见，可用镐采集"),
                 Gem("Topaz", 180, "黄玉", "地下宝石脉或宝石洞常见，可用镐采集"),
@@ -115,7 +116,7 @@ namespace JueMingZ.Automation.Search
                 Gem("Emerald", 179, "翡翠", "地下宝石脉或宝石洞常见，可用镐采集"),
                 Gem("Ruby", 178, "红玉", "地下宝石脉或宝石洞常见，可用镐采集"),
                 Gem("Diamond", 182, "钻石", "地下宝石脉或宝石洞常见，可用镐采集"),
-                Gem("Amber", 999, "琥珀", "地下沙漠/沙漠相关来源常见；不展示完整概率"),
+                Gem("Amber", 999, "琥珀", "地下沙漠/沙漠相关来源常见；也可能由提炼机处理泥沙、雪泥或沙漠化石获得"),
 
                 Herb("Daybloom", 313, "太阳花", "森林/草地白天开花，可自然采集"),
                 Herb("Moonglow", 314, "月光草", "丛林夜晚开花，可自然采集"),
@@ -130,8 +131,8 @@ namespace JueMingZ.Automation.Search
                 Block("ClayBlock", 124, "黏土", "地表浅层和水边常见环境块，可挖掘"),
                 Block("MudBlock", 176, "泥块", "丛林/地下丛林常见环境块，可挖掘"),
                 Block("SandBlock", 169, "沙块", "沙漠/海滩常见环境块，可挖掘"),
-                Block("SiltBlock", 424, "泥沙块", "地下常见重力块，可挖掘；提炼产物不在本阶段展示"),
-                Block("SlushBlock", 1103, "雪泥块", "雪地地下常见重力块，可挖掘；提炼产物不在本阶段展示"),
+                Block("SiltBlock", 424, "泥沙块", "地下常见重力块，可挖掘；可作为提炼机输入材料"),
+                Block("SlushBlock", 1103, "雪泥块", "雪地地下常见重力块，可挖掘；可作为提炼机输入材料"),
                 Block("SnowBlock", 593, "雪块", "雪地常见环境块，可挖掘"),
                 Block("IceBlock", 664, "冰雪块", "雪地/地下雪地常见环境块，可挖掘")
             };
@@ -179,7 +180,8 @@ namespace JueMingZ.Automation.Search
 
             sources.Add(new ItemAcquisitionSourceSummary
             {
-                SourceType = ItemAcquisitionSourceTypes.MiningGatheringTag,
+                SourceType = ItemAcquisitionSourceTypes.Other,
+                SourceTag = ItemAcquisitionSourceTags.MiningGathering,
                 Title = definition.Title,
                 SourceName = definition.SourceName,
                 QuantityText = definition.QuantityText,
@@ -231,6 +233,7 @@ namespace JueMingZ.Automation.Search
             return new ItemAcquisitionSourceSummary
             {
                 SourceType = source.SourceType,
+                SourceTag = source.SourceTag,
                 Title = source.Title,
                 SourceName = source.SourceName,
                 QuantityText = source.QuantityText,

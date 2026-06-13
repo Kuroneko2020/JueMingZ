@@ -219,12 +219,33 @@ namespace Terraria
 
     internal sealed class Chest
     {
+        private static readonly Dictionary<int, object[]> TestShopItems = new Dictionary<int, object[]>();
         public object[] item = new object[40];
         public int maxItems = 40;
 
+        public static void RegisterShopForTesting(int shopIndex, params object[] items)
+        {
+            TestShopItems[shopIndex] = items ?? new object[0];
+        }
+
+        public static void ClearRegisteredShopsForTesting()
+        {
+            TestShopItems.Clear();
+        }
+
         public void SetupShop(int shopIndex)
         {
-            throw new InvalidOperationException("Search query tests must not call Chest.SetupShop.");
+            item = new object[40];
+            object[] items;
+            if (!TestShopItems.TryGetValue(shopIndex, out items) || items == null)
+            {
+                return;
+            }
+
+            for (var index = 0; index < items.Length && index < item.Length; index++)
+            {
+                item[index] = items[index];
+            }
         }
     }
 
@@ -627,6 +648,101 @@ namespace Terraria.GameContent.ItemDropRules
         public string GetConditionDescription()
         {
             return null;
+        }
+    }
+
+    internal abstract class TestNamedDropCondition : IItemDropRuleCondition
+    {
+        private readonly bool _canShow;
+
+        protected TestNamedDropCondition(bool canShow)
+        {
+            _canShow = canShow;
+        }
+
+        public bool CanShowItemDropInUI()
+        {
+            return _canShow;
+        }
+
+        public string GetConditionDescription()
+        {
+            return null;
+        }
+    }
+
+    internal sealed class IsExpert : TestNamedDropCondition
+    {
+        public IsExpert(bool canShow)
+            : base(canShow)
+        {
+        }
+    }
+
+    internal sealed class IsMasterMode : TestNamedDropCondition
+    {
+        public IsMasterMode(bool canShow)
+            : base(canShow)
+        {
+        }
+    }
+
+    internal sealed class NotExpert : TestNamedDropCondition
+    {
+        public NotExpert(bool canShow)
+            : base(canShow)
+        {
+        }
+    }
+
+    internal sealed class IsCrimson : TestNamedDropCondition
+    {
+        public IsCrimson(bool canShow)
+            : base(canShow)
+        {
+        }
+    }
+
+    internal sealed class IsCorruption : TestNamedDropCondition
+    {
+        public IsCorruption(bool canShow)
+            : base(canShow)
+        {
+        }
+    }
+
+    internal sealed class IsHardmode : TestNamedDropCondition
+    {
+        public IsHardmode(bool canShow)
+            : base(canShow)
+        {
+        }
+    }
+
+    internal sealed class RemixSeed : TestNamedDropCondition
+    {
+        public RemixSeed(bool canShow)
+            : base(canShow)
+        {
+        }
+    }
+
+    internal sealed class FromCertainWaveAndAbove : TestNamedDropCondition
+    {
+        public readonly int neededWave;
+
+        public FromCertainWaveAndAbove(int neededWave, bool canShow)
+            : base(canShow)
+        {
+            this.neededWave = neededWave;
+        }
+    }
+
+    internal sealed class UnknownHiddenDropCondition : TestNamedDropCondition
+    {
+        public UnknownHiddenDropCondition()
+            : base(false)
+        {
         }
     }
 }
@@ -1429,11 +1545,29 @@ namespace JueMingZ.Tests
             Run("search query NPC drop conditions degrade safely", ref failed, SearchQueryNpcDropConditionsDegradeSafely);
             Run("search query NPC drop index handles global negative and cache", ref failed, SearchQueryNpcDropIndexHandlesGlobalNegativeAndCache);
             Run("search query indexes current NPC shop sources", ref failed, SearchQueryIndexesCurrentNpcShopSources);
-            Run("search query NPC shop source requires open shop", ref failed, SearchQueryNpcShopSourceRequiresOpenShop);
+            Run("search query NPC shop source does not require open shop", ref failed, SearchQueryNpcShopSourceDoesNotRequireOpenShop);
             Run("search query NPC shop source cache follows context", ref failed, SearchQueryNpcShopSourceCacheFollowsContext);
+            Run("search query NPC shop conditional hints stay conditional", ref failed, SearchQueryNpcShopConditionalHintsStayConditional);
+            Run("search query NPC shop painter multi-entry uses readable entry name", ref failed, SearchQueryNpcShopPainterMultiEntryUsesReadableEntryName);
+            Run("search query NPC shop skeleton merchant sample indexes", ref failed, SearchQueryNpcShopSkeletonMerchantSampleIndexes);
+            Run("search query NPC shop known possible sources cover user samples", ref failed, SearchQueryNpcShopKnownPossibleSourcesCoverUserSamples);
+            Run("search query NPC shop known possible sources avoid forbidden live shop entrypoints", ref failed, SearchQueryNpcShopKnownPossibleSourcesAvoidForbiddenLiveShopEntrypoints);
             Run("search query indexes mining gathering tags", ref failed, SearchQueryIndexesMiningGatheringTags);
             Run("search query mining gathering tags cover herbs and environment", ref failed, SearchQueryMiningGatheringTagsCoverHerbsAndEnvironment);
             Run("search query mining gathering tags keep unknown items empty", ref failed, SearchQueryMiningGatheringTagsKeepUnknownItemsEmpty);
+            Run("search query indexes treasure bag sources", ref failed, SearchQueryIndexesTreasureBagSources);
+            Run("search query keeps NPC drop and treasure bag sources", ref failed, SearchQueryKeepsNpcDropAndTreasureBagSources);
+            Run("search query indexes Moon Lord treasure bag weapon pool", ref failed, SearchQueryIndexesMoonLordTreasureBagWeaponPool);
+            Run("search query indexes general open container sources", ref failed, SearchQueryIndexesGeneralOpenContainerSources);
+            Run("search query indexes fishing crate open contents", ref failed, SearchQueryIndexesFishingCrateOpenContents);
+            Run("search query open container sources keep unknown items empty", ref failed, SearchQueryOpenContainerSourcesKeepUnknownItemsEmpty);
+            Run("search query fishing sources cover fish crates and Angler rewards", ref failed, SearchQueryFishingSourcesCoverFishCratesAndAnglerRewards);
+            Run("search query curated other sources cover chest world and extractinator", ref failed, SearchQueryCuratedOtherSourcesCoverChestWorldAndExtractinator);
+            Run("search query extractinator and gathering sources stay parallel", ref failed, SearchQueryExtractinatorAndGatheringSourcesStayParallel);
+            Run("search query curated other sources keep unknown items empty", ref failed, SearchQueryCuratedOtherSourcesKeepUnknownItemsEmpty);
+            Run("search query curated other source uses readonly tables", ref failed, SearchQueryCuratedOtherSourceUsesReadonlyTables);
+            Run("search query fishing source uses readonly tables", ref failed, SearchQueryFishingSourceUsesReadonlyTables);
+            Run("search query container open source uses readonly tables", ref failed, SearchQueryContainerOpenSourceUsesReadonlyTables);
             Run("search query acquisition sources keep drop shop tag order", ref failed, SearchQueryAcquisitionSourcesKeepDropShopTagOrder);
             Run("search query formats base value as coins", ref failed, SearchQueryFormatsBaseValueAsCoins);
             Run("search query basic facts use Chinese labels and placement values", ref failed, SearchQueryBasicFactsUseChineseLabelsAndPlacementValues);
@@ -1443,6 +1577,9 @@ namespace JueMingZ.Tests
             Run("search query acquisition model clones value facts", ref failed, SearchQueryAcquisitionModelClonesValueFacts);
             Run("search query acquisition sources affect layout signature", ref failed, SearchQueryAcquisitionSourcesAffectLayoutSignature);
             Run("search query acquisition section keeps order and height", ref failed, SearchQueryAcquisitionSectionKeepsOrderAndHeight);
+            Run("search query acquisition details wrap long text", ref failed, SearchQueryAcquisitionDetailsWrapLongText);
+            Run("search query acquisition details hide internal context words", ref failed, SearchQueryAcquisitionDetailsHideInternalContextWords);
+            Run("search query other sources format short tags and avoid crafting uses", ref failed, SearchQueryOtherSourcesFormatShortTagsAndAvoidCraftingUses);
             Run("search query UI hot path avoids acquisition source reads", ref failed, SearchQueryUiHotPathAvoidsAcquisitionSourceReads);
             Run("search query UI state selects candidate and clears", ref failed, SearchQueryUiStateSelectsCandidateAndClears);
             Run("search query UI candidate scroll keeps own viewport", ref failed, SearchQueryUiCandidateScrollKeepsOwnViewport);

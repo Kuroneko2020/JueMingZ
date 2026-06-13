@@ -387,14 +387,22 @@ namespace JueMingZ.Automation.Search
                 return string.Empty;
             }
 
+            var typeName = condition.GetType().Name;
             object raw;
+            bool canShow = true;
             if (SearchReflection.TryInvokeInstance(condition, "CanShowItemDropInUI", new object[0], out raw))
             {
-                bool canShow;
-                if (SearchReflection.TryConvertBool(raw, out canShow) && !canShow)
+                bool resolvedCanShow;
+                if (SearchReflection.TryConvertBool(raw, out resolvedCanShow))
                 {
-                    return "特殊条件";
+                    canShow = resolvedCanShow;
                 }
+            }
+
+            string knownText;
+            if (TryResolveKnownConditionText(condition, typeName, out knownText))
+            {
+                return AppendCurrentMismatch(knownText, canShow);
             }
 
             if (SearchReflection.TryInvokeInstance(condition, "GetConditionDescription", new object[0], out raw) && raw != null)
@@ -402,12 +410,158 @@ namespace JueMingZ.Automation.Search
                 var description = Convert.ToString(raw, CultureInfo.InvariantCulture);
                 if (!string.IsNullOrWhiteSpace(description))
                 {
-                    return description.Trim();
+                    return AppendCurrentMismatch(description.Trim(), canShow);
                 }
             }
 
-            var typeName = condition.GetType().Name;
-            return string.IsNullOrWhiteSpace(typeName) ? "特殊条件" : typeName;
+            var fallback = string.IsNullOrWhiteSpace(typeName) ? "特殊条件" : "特殊条件：" + typeName;
+            return AppendCurrentMismatch(fallback, canShow);
+        }
+
+        private static bool TryResolveKnownConditionText(object condition, string typeName, out string text)
+        {
+            text = null;
+            switch (typeName)
+            {
+                case "NotExpert":
+                    text = "普通模式";
+                    return true;
+                case "LegacyHack_IsBossAndNotExpert":
+                    text = "普通模式 Boss 掉落";
+                    return true;
+                case "IsExpert":
+                    text = "专家模式";
+                    return true;
+                case "LegacyHack_IsBossAndExpert":
+                    text = "专家模式 Boss 掉落";
+                    return true;
+                case "IsMasterMode":
+                    text = "大师模式";
+                    return true;
+                case "NotMasterMode":
+                    text = "非大师模式";
+                    return true;
+                case "IsCrimson":
+                    text = "猩红世界";
+                    return true;
+                case "IsCorruption":
+                    text = "腐化世界";
+                    return true;
+                case "IsCrimsonAndNotExpert":
+                    text = "猩红世界且普通模式";
+                    return true;
+                case "IsCorruptionAndNotExpert":
+                    text = "腐化世界且普通模式";
+                    return true;
+                case "IsHardmode":
+                    text = "困难模式";
+                    return true;
+                case "Easymode":
+                    text = "困难模式前";
+                    return true;
+                case "DownedAllMechBosses":
+                    text = "已击败全部机械 Boss";
+                    return true;
+                case "DownedPlantera":
+                    text = "已击败世纪之花";
+                    return true;
+                case "FirstTimeKillingPlantera":
+                    text = "首次击败世纪之花";
+                    return true;
+                case "BeatAnyMechBoss":
+                    text = "已击败任意机械 Boss";
+                    return true;
+                case "FrostMoonDropGatingChance":
+                    text = "霜月波次进度";
+                    return true;
+                case "PumpkinMoonDropGatingChance":
+                    text = "南瓜月波次进度";
+                    return true;
+                case "FrostMoonDropGateForTrophies":
+                    text = "霜月奖杯波次";
+                    return true;
+                case "PumpkinMoonDropGateForTrophies":
+                    text = "南瓜月奖杯波次";
+                    return true;
+                case "IsPumpkinMoon":
+                    text = "南瓜月事件";
+                    return true;
+                case "FromCertainWaveAndAbove":
+                    int neededWave;
+                    text = SearchReflection.TryReadInt(condition, "neededWave", out neededWave) && neededWave > 0
+                        ? "第 " + neededWave.ToString(CultureInfo.InvariantCulture) + " 波及以后"
+                        : "事件波次达到要求";
+                    return true;
+                case "IsBloodMoonAndNotFromStatue":
+                    text = "血月且非雕像生成";
+                    return true;
+                case "NotFromStatue":
+                    text = "非雕像生成";
+                    return true;
+                case "DropExtraGel":
+                    text = "特殊种子额外凝胶";
+                    return true;
+                case "NotDropExtraGel":
+                    text = "非特殊种子额外凝胶";
+                    return true;
+                case "RemixSeed":
+                    text = "颠倒世界种子";
+                    return true;
+                case "NotRemixSeed":
+                    text = "非颠倒世界种子";
+                    return true;
+                case "RemixSeedEasymode":
+                    text = "颠倒世界种子且困难模式前";
+                    return true;
+                case "RemixSeedHardmode":
+                    text = "颠倒世界种子且困难模式";
+                    return true;
+                case "NotRemixSeedEasymode":
+                    text = "非颠倒世界种子且困难模式前";
+                    return true;
+                case "NotRemixSeedHardmode":
+                    text = "非颠倒世界种子且困难模式";
+                    return true;
+                case "TenthAnniversaryIsUp":
+                    text = "十周年世界种子";
+                    return true;
+                case "TenthAnniversaryIsNotUp":
+                    text = "非十周年世界种子";
+                    return true;
+                case "DontStarveIsUp":
+                    text = "永恒领域世界种子";
+                    return true;
+                case "DontStarveIsNotUp":
+                    text = "非永恒领域世界种子";
+                    return true;
+                case "SkyblockIsUp":
+                    text = "天顶 / 空岛特殊世界种子";
+                    return true;
+                case "SkyblockIsNotUp":
+                    text = "非天顶 / 空岛特殊世界种子";
+                    return true;
+                case "SkyblockIsUpNoSickle":
+                    text = "天顶 / 空岛特殊世界种子且未持有镰刀";
+                    return true;
+                case "MechdusaKill":
+                    text = "特殊种子机械混合 Boss 击杀";
+                    return true;
+                case "RedHatSkeletron":
+                    text = "传奇难度特殊骷髅王条件";
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private static string AppendCurrentMismatch(string text, bool canShow)
+        {
+            if (string.IsNullOrWhiteSpace(text) || canShow)
+            {
+                return text;
+            }
+
+            return text + "（当前不满足）";
         }
 
         private static bool ContainsEquivalent(IList<ItemAcquisitionSourceSummary> sources, ItemAcquisitionSourceSummary candidate)

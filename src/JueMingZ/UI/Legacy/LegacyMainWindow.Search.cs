@@ -52,9 +52,13 @@ namespace JueMingZ.UI.Legacy
         private const int SearchResultChipGap = 6;
         private const int SearchResultChipMaxColumns = 3;
         private const int SearchResultChipMinWidth = 92;
-        private const int SearchAcquisitionSourceRowHeight = 52;
+        private const int SearchAcquisitionSourceRowMinHeight = 52;
         private const int SearchAcquisitionSourceRowVisualGap = 5;
         private const int SearchAcquisitionSourceTypeWidth = 82;
+        private const int SearchAcquisitionSourceDetailTop = 27;
+        private const int SearchAcquisitionSourceDetailLineHeight = 16;
+        private const int SearchAcquisitionSourceDetailBottomPadding = 6;
+        private const float SearchAcquisitionSourceDetailScale = 0.54f;
         private const int SearchShimmerRowHeight = 36;
         private const int SearchReferenceRowVisualGap = 5;
         private const int SearchReferenceRowLabelWidth = 56;
@@ -270,7 +274,7 @@ namespace JueMingZ.UI.Legacy
             y += basicPanelHeight + SearchSectionGap;
 
             DrawSearchAcquisitionSection(spriteBatch, area, y, result.AcquisitionSources);
-            y += CalculateSearchAcquisitionSectionHeight(result.AcquisitionSources) + SearchSectionGap;
+            y += CalculateSearchAcquisitionSectionHeight(result.AcquisitionSources, area.Viewport.Width) + SearchSectionGap;
             hovered = DrawSearchRecipeSection(spriteBatch, area, mouse, elements, y, "合成来源", result.CraftingSources, "source") ?? hovered;
             y += CalculateSearchRecipeSectionHeight(result.CraftingSources, area.Viewport.Width) + SearchSectionGap;
             hovered = DrawSearchRecipeSection(spriteBatch, area, mouse, elements, y, "合成用途", result.CraftingUses, "use") ?? hovered;
@@ -372,14 +376,16 @@ namespace JueMingZ.UI.Legacy
 
             for (var index = 0; index < count; index++)
             {
-                DrawSearchAcquisitionSourceRow(spriteBatch, area, y, sources[index]);
-                y += SearchAcquisitionSourceRowHeight;
+                var rowHeight = CalculateSearchAcquisitionSourceRowHeight(sources[index], area.Viewport.Width);
+                DrawSearchAcquisitionSourceRow(spriteBatch, area, y, rowHeight, sources[index]);
+                y += rowHeight;
             }
         }
 
-        private static void DrawSearchAcquisitionSourceRow(object spriteBatch, LegacyScrollArea area, int contentY, ItemAcquisitionSourceSummary source)
+        private static void DrawSearchAcquisitionSourceRow(object spriteBatch, LegacyScrollArea area, int contentY, int rowHeight, ItemAcquisitionSourceSummary source)
         {
-            var row = new LegacyUiRect(area.Viewport.X, area.ToScreenY(contentY), area.Viewport.Width, SearchAcquisitionSourceRowHeight - SearchAcquisitionSourceRowVisualGap);
+            var visualHeight = Math.Max(1, rowHeight - SearchAcquisitionSourceRowVisualGap);
+            var row = new LegacyUiRect(area.Viewport.X, area.ToScreenY(contentY), area.Viewport.Width, visualHeight);
             if (!area.IsVisible(row) || source == null)
             {
                 return;
@@ -422,22 +428,27 @@ namespace JueMingZ.UI.Legacy
                 224,
                 248,
                 0.60f);
-            UiTextRenderer.DrawTextClipped(
-                spriteBatch,
-                BuildSearchAcquisitionSourceDetail(source),
-                detailX,
-                row.Y + 27,
-                detailWidth,
-                16,
-                area.Viewport.X,
-                area.Viewport.Y,
-                area.Viewport.Width,
-                area.Viewport.Height,
-                202,
-                214,
-                232,
-                230,
-                0.54f);
+            var detailLines = BuildSearchAcquisitionSourceDetailLines(source, detailWidth);
+            var detailY = row.Y + SearchAcquisitionSourceDetailTop;
+            for (var index = 0; index < detailLines.Length; index++)
+            {
+                UiTextRenderer.DrawTextClipped(
+                    spriteBatch,
+                    detailLines[index],
+                    detailX,
+                    detailY + index * SearchAcquisitionSourceDetailLineHeight,
+                    detailWidth,
+                    SearchAcquisitionSourceDetailLineHeight,
+                    area.Viewport.X,
+                    area.Viewport.Y,
+                    area.Viewport.Width,
+                    area.Viewport.Height,
+                    202,
+                    214,
+                    232,
+                    230,
+                    SearchAcquisitionSourceDetailScale);
+            }
         }
 
         private static LegacyUiElement DrawSearchRecipeSection(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, string title, IList<ItemQueryRecipeSummary> recipes, string scope)
@@ -829,7 +840,7 @@ namespace JueMingZ.UI.Legacy
             }
 
             height += SearchSectionBodyOffset + CalculateSearchBasicPanelHeight(contentRect.Width) + SearchSectionGap;
-            height += CalculateSearchAcquisitionSectionHeight(result.AcquisitionSources) + SearchSectionGap;
+            height += CalculateSearchAcquisitionSectionHeight(result.AcquisitionSources, contentRect.Width) + SearchSectionGap;
             height += CalculateSearchRecipeSectionHeight(result.CraftingSources, contentRect.Width) + SearchSectionGap;
             height += CalculateSearchRecipeSectionHeight(result.CraftingUses, contentRect.Width) + SearchSectionGap;
             height += CalculateSearchShimmerSectionHeight(result.Shimmer) + PageContentBottomPadding;
@@ -907,10 +918,31 @@ namespace JueMingZ.UI.Legacy
             return id >= 0 ? prefix + "#" + id.ToString(CultureInfo.InvariantCulture) : "无";
         }
 
-        private static int CalculateSearchAcquisitionSectionHeight(IList<ItemAcquisitionSourceSummary> sources)
+        private static int CalculateSearchAcquisitionSectionHeight(IList<ItemAcquisitionSourceSummary> sources, int viewportWidth)
         {
             var count = sources == null ? 0 : sources.Count;
-            return SearchSectionBodyOffset + (count <= 0 ? SearchSectionTextRowHeight : count * SearchAcquisitionSourceRowHeight);
+            if (count <= 0)
+            {
+                return SearchSectionBodyOffset + SearchSectionTextRowHeight;
+            }
+
+            var height = SearchSectionBodyOffset;
+            for (var index = 0; index < count; index++)
+            {
+                height += CalculateSearchAcquisitionSourceRowHeight(sources[index], viewportWidth);
+            }
+
+            return height;
+        }
+
+        private static int CalculateSearchAcquisitionSourceRowHeight(ItemAcquisitionSourceSummary source, int viewportWidth)
+        {
+            var detailWidth = CalculateSearchAcquisitionDetailWidth(viewportWidth);
+            var detailLines = BuildSearchAcquisitionSourceDetailLines(source, detailWidth);
+            var visualHeight = SearchAcquisitionSourceDetailTop +
+                Math.Max(1, detailLines.Length) * SearchAcquisitionSourceDetailLineHeight +
+                SearchAcquisitionSourceDetailBottomPadding;
+            return Math.Max(SearchAcquisitionSourceRowMinHeight, visualHeight + SearchAcquisitionSourceRowVisualGap);
         }
 
         private static string FormatSearchAcquisitionSourceType(string sourceType)
@@ -918,11 +950,11 @@ namespace JueMingZ.UI.Legacy
             switch (sourceType ?? string.Empty)
             {
                 case ItemAcquisitionSourceTypes.NpcDrop:
-                    return "掉落";
+                    return "NPC掉落";
                 case ItemAcquisitionSourceTypes.NpcShop:
-                    return "商店";
-                case ItemAcquisitionSourceTypes.MiningGatheringTag:
-                    return "采集";
+                    return "NPC出售";
+                case ItemAcquisitionSourceTypes.Other:
+                    return "其他来源";
                 default:
                     return "来源";
             }
@@ -937,7 +969,20 @@ namespace JueMingZ.UI.Legacy
 
             var title = FirstNonEmpty(source.Title, FormatSearchAcquisitionSourceType(source.SourceType));
             var name = FirstNonEmpty(source.SourceName, string.Empty);
+            title = PrefixOtherSourceTag(source, title);
             return string.IsNullOrWhiteSpace(name) ? title : title + "：" + name;
+        }
+
+        private static string PrefixOtherSourceTag(ItemAcquisitionSourceSummary source, string title)
+        {
+            if (source == null ||
+                !string.Equals(source.SourceType, ItemAcquisitionSourceTypes.Other, StringComparison.Ordinal) ||
+                string.IsNullOrWhiteSpace(source.SourceTag))
+            {
+                return title ?? string.Empty;
+            }
+
+            return "[" + source.SourceTag.Trim() + "] " + (title ?? string.Empty);
         }
 
         private static string BuildSearchAcquisitionSourceDetail(ItemAcquisitionSourceSummary source)
@@ -947,12 +992,47 @@ namespace JueMingZ.UI.Legacy
                 return "条件待确认";
             }
 
+            var parts = BuildSearchAcquisitionSourceDetailParts(source);
+            return parts.Count <= 0 ? "条件待确认" : string.Join(" / ", parts.ToArray());
+        }
+
+        private static string[] BuildSearchAcquisitionSourceDetailLines(ItemAcquisitionSourceSummary source, int detailWidth)
+        {
+            var parts = source == null ? new List<string>() : BuildSearchAcquisitionSourceDetailParts(source);
+            if (parts.Count <= 0)
+            {
+                parts.Add("条件待确认");
+            }
+
+            var lines = new List<string>();
+            var current = string.Empty;
+            var safeWidth = Math.Max(48, detailWidth);
+            for (var index = 0; index < parts.Count; index++)
+            {
+                AddSearchAcquisitionDetailWrappedPart(lines, ref current, parts[index], safeWidth);
+            }
+
+            if (!string.IsNullOrWhiteSpace(current))
+            {
+                lines.Add(current);
+            }
+
+            return lines.ToArray();
+        }
+
+        private static List<string> BuildSearchAcquisitionSourceDetailParts(ItemAcquisitionSourceSummary source)
+        {
             var parts = new List<string>(4);
+            if (source == null)
+            {
+                return parts;
+            }
+
             AddSearchAcquisitionDetailPart(parts, source.QuantityText);
             AddSearchAcquisitionDetailPart(parts, source.ProbabilityText);
             AddSearchAcquisitionDetailPart(parts, source.ConditionText);
             AddSearchAcquisitionDetailPart(parts, source.ContextText);
-            return parts.Count <= 0 ? "条件待确认" : string.Join(" / ", parts.ToArray());
+            return parts;
         }
 
         private static void AddSearchAcquisitionDetailPart(List<string> parts, string text)
@@ -962,7 +1042,112 @@ namespace JueMingZ.UI.Legacy
                 return;
             }
 
-            parts.Add(text.Trim());
+            var display = NormalizeSearchAcquisitionDetailPart(text);
+            if (!string.IsNullOrWhiteSpace(display))
+            {
+                parts.Add(display);
+            }
+        }
+
+        private static string NormalizeSearchAcquisitionDetailPart(string text)
+        {
+            var display = (text ?? string.Empty).Trim();
+            if (display.Length <= 0)
+            {
+                return string.Empty;
+            }
+
+            display = display.Replace("原版商店低频索引", "原版商店资料");
+            display = display.Replace("当前世界和玩家上下文", "当前条件");
+            display = display.Replace("商店入口：", "店铺：");
+            display = display.Replace("curated ", string.Empty);
+            display = display.Replace("curated", string.Empty);
+            display = display.Replace("非完整概率百科", "来源线索");
+            display = display.Replace("非完整百科", "来源线索");
+            display = display.Replace("低频索引", "资料");
+            display = display.Replace("只读表", "整理表");
+            display = display.Replace("只读来源表", "整理来源表");
+            return display.Trim();
+        }
+
+        private static void AddSearchAcquisitionDetailWrappedPart(List<string> lines, ref string current, string part, int detailWidth)
+        {
+            if (string.IsNullOrWhiteSpace(part))
+            {
+                return;
+            }
+
+            var candidate = string.IsNullOrWhiteSpace(current) ? part : current + " / " + part;
+            if (EstimateSearchAcquisitionTextWidth(candidate) <= detailWidth)
+            {
+                current = candidate;
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(current))
+            {
+                lines.Add(current);
+                current = string.Empty;
+            }
+
+            AddSearchAcquisitionDetailFragment(lines, ref current, part, detailWidth);
+        }
+
+        private static void AddSearchAcquisitionDetailFragment(List<string> lines, ref string current, string text, int detailWidth)
+        {
+            var segment = string.Empty;
+            for (var index = 0; index < text.Length; index++)
+            {
+                var next = segment + text[index];
+                if (segment.Length > 0 && EstimateSearchAcquisitionTextWidth(next) > detailWidth)
+                {
+                    lines.Add(segment);
+                    segment = text[index].ToString();
+                    continue;
+                }
+
+                segment = next;
+            }
+
+            current = segment;
+        }
+
+        private static int CalculateSearchAcquisitionDetailWidth(int viewportWidth)
+        {
+            var detailXOffset = SearchAcquisitionSourceTypeWidth + 16;
+            return Math.Max(1, viewportWidth - detailXOffset - 10);
+        }
+
+        private static int EstimateSearchAcquisitionTextWidth(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return 0;
+            }
+
+            var width = 0f;
+            for (var index = 0; index < text.Length; index++)
+            {
+                var ch = text[index];
+                if (char.IsWhiteSpace(ch))
+                {
+                    width += 4f;
+                }
+                else if (ch <= 0x007F)
+                {
+                    width += 7f;
+                }
+                else if (char.IsPunctuation(ch))
+                {
+                    width += 10f;
+                }
+                else
+                {
+                    width += 15f;
+                }
+            }
+
+            return (int)Math.Ceiling(width * SearchAcquisitionSourceDetailScale);
         }
 
         private static int CalculateSearchRecipeSectionHeight(IList<ItemQueryRecipeSummary> recipes, int viewportWidth)
@@ -1129,7 +1314,17 @@ namespace JueMingZ.UI.Legacy
 
         internal static int CalculateSearchAcquisitionSectionHeightForTesting(IList<ItemAcquisitionSourceSummary> sources)
         {
-            return CalculateSearchAcquisitionSectionHeight(sources);
+            return CalculateSearchAcquisitionSectionHeight(sources, 520);
+        }
+
+        internal static int CalculateSearchAcquisitionSectionHeightForTesting(IList<ItemAcquisitionSourceSummary> sources, int viewportWidth)
+        {
+            return CalculateSearchAcquisitionSectionHeight(sources, viewportWidth);
+        }
+
+        internal static string[] BuildSearchAcquisitionDetailLinesForTesting(ItemAcquisitionSourceSummary source, int detailWidth)
+        {
+            return BuildSearchAcquisitionSourceDetailLines(source, detailWidth);
         }
 
         internal static int CalculateSearchRecipeSectionHeightForTesting(IList<ItemQueryRecipeSummary> recipes, int viewportWidth)

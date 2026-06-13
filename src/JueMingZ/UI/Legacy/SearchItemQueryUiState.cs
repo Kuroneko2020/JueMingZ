@@ -442,6 +442,7 @@ namespace JueMingZ.UI.Legacy
             }
 
             AddHash(ref hash, source.SourceType);
+            AddHash(ref hash, source.SourceTag);
             AddHash(ref hash, source.Title);
             AddHash(ref hash, source.SourceName);
             AddHash(ref hash, source.QuantityText);
@@ -856,6 +857,7 @@ namespace JueMingZ.UI.Legacy
             return source == null ? null : new ItemAcquisitionSourceSummary
             {
                 SourceType = source.SourceType,
+                SourceTag = source.SourceTag,
                 Title = source.Title,
                 SourceName = source.SourceName,
                 QuantityText = source.QuantityText,

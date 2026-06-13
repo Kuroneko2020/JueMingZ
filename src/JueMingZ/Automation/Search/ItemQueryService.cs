@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace JueMingZ.Automation.Search
@@ -22,7 +23,7 @@ namespace JueMingZ.Automation.Search
             result.Status = "ok";
             result.Item = item;
 
-            AddRange(result.AcquisitionSources, GetAcquisitionSources(itemType));
+            AddDistinctRange(result.AcquisitionSources, GetAcquisitionSources(itemType));
             AddRange(result.CraftingSources, ItemRecipeIndex.GetCraftingSources(itemType));
             AddRange(result.CraftingUses, ItemRecipeIndex.GetCraftingUses(itemType));
             result.Shimmer = ItemShimmerIndex.BuildSummary(itemType);
@@ -41,6 +42,9 @@ namespace JueMingZ.Automation.Search
             ItemShimmerIndex.ResetForTesting();
             ItemNpcDropSourceIndex.ResetForTesting();
             ItemNpcShopSourceIndex.ResetForTesting();
+            ItemContainerOpenSourceIndex.ResetForTesting();
+            ItemFishingSourceIndex.ResetForTesting();
+            ItemCuratedOtherSourceIndex.ResetForTesting();
             ItemAcquisitionTagIndex.ResetForTesting();
         }
 
@@ -56,10 +60,66 @@ namespace JueMingZ.Automation.Search
                 yield return source;
             }
 
+            foreach (var source in ItemContainerOpenSourceIndex.GetSources(itemType))
+            {
+                yield return source;
+            }
+
+            foreach (var source in ItemFishingSourceIndex.GetSources(itemType))
+            {
+                yield return source;
+            }
+
+            foreach (var source in ItemCuratedOtherSourceIndex.GetSources(itemType))
+            {
+                yield return source;
+            }
+
             foreach (var source in ItemAcquisitionTagIndex.GetSources(itemType))
             {
                 yield return source;
             }
+        }
+
+        private static void AddDistinctRange(
+            IList<ItemAcquisitionSourceSummary> target,
+            IEnumerable<ItemAcquisitionSourceSummary> source)
+        {
+            if (target == null || source == null)
+            {
+                return;
+            }
+
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var item in source)
+            {
+                if (item == null)
+                {
+                    continue;
+                }
+
+                if (seen.Add(BuildAcquisitionSourceKey(item)))
+                {
+                    target.Add(item);
+                }
+            }
+        }
+
+        private static string BuildAcquisitionSourceKey(ItemAcquisitionSourceSummary source)
+        {
+            return string.Join(
+                "\u001f",
+                source.SourceType ?? string.Empty,
+                source.SourceTag ?? string.Empty,
+                source.Title ?? string.Empty,
+                source.SourceName ?? string.Empty,
+                source.QuantityText ?? string.Empty,
+                source.ProbabilityText ?? string.Empty,
+                source.ConditionText ?? string.Empty,
+                source.ContextText ?? string.Empty,
+                source.ItemType.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                source.NpcNetId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                source.RelatedItemType.ToString(System.Globalization.CultureInfo.InvariantCulture));
         }
 
         private static void AddRange<T>(IList<T> target, IEnumerable<T> source)
