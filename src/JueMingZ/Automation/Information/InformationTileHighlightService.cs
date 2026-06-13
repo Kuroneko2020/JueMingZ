@@ -20,6 +20,7 @@ namespace JueMingZ.Automation.Information
         private static readonly object SyncRoot = new object();
         private static readonly TileHighlight[] EmptyHighlights = new TileHighlight[0];
         private static readonly List<TileHighlight> BuildBuffer = new List<TileHighlight>();
+        private static readonly List<TileHighlight> CurrentHighlightFilterBuffer = new List<TileHighlight>();
 
         private static TileHighlight[] _cachedHighlights = EmptyHighlights;
         private static ulong _lastScanTick;
@@ -63,6 +64,7 @@ namespace JueMingZ.Automation.Information
             lock (SyncRoot)
             {
                 BuildBuffer.Clear();
+                CurrentHighlightFilterBuffer.Clear();
                 _cachedHighlights = EmptyHighlights;
                 _lastScanTick = 0;
                 _lastSignatureHash = 0;
@@ -79,7 +81,7 @@ namespace JueMingZ.Automation.Information
                 // this with unconditional per-frame tile scans.
                 if (!ShouldRefresh(context, signature.Hash))
                 {
-                    return _cachedHighlights;
+                    return FilterCurrentHighlights(context, _cachedHighlights);
                 }
 
                 BuildBuffer.Clear();
@@ -87,7 +89,54 @@ namespace JueMingZ.Automation.Information
                 _cachedHighlights = BuildBuffer.Count == 0 ? EmptyHighlights : BuildBuffer.ToArray();
                 _lastScanTick = context == null ? 0 : context.GameUpdateCount;
                 _lastSignatureHash = signature.Hash;
-                return _cachedHighlights;
+                return FilterCurrentHighlights(context, _cachedHighlights);
+            }
+        }
+
+        private static TileHighlight[] FilterCurrentHighlights(InformationWorldContext context, TileHighlight[] highlights)
+        {
+            if (highlights == null || highlights.Length == 0)
+            {
+                return EmptyHighlights;
+            }
+
+            CurrentHighlightFilterBuffer.Clear();
+            var changed = false;
+            for (var index = 0; index < highlights.Length; index++)
+            {
+                var highlight = highlights[index];
+                // Cached highlight groups are draw candidates only; the bounded
+                // rectangle must still contain at least one matching active tile.
+                if (!InformationTileHighlightScanner.ContainsActiveTileType(context, highlight))
+                {
+                    if (!changed)
+                    {
+                        CopyHighlightsToFilterBuffer(highlights, index);
+                        changed = true;
+                    }
+
+                    continue;
+                }
+
+                if (changed)
+                {
+                    CurrentHighlightFilterBuffer.Add(highlight);
+                }
+            }
+
+            if (!changed)
+            {
+                return highlights;
+            }
+
+            return CurrentHighlightFilterBuffer.Count == 0 ? EmptyHighlights : CurrentHighlightFilterBuffer.ToArray();
+        }
+
+        private static void CopyHighlightsToFilterBuffer(TileHighlight[] highlights, int count)
+        {
+            for (var index = 0; index < count; index++)
+            {
+                CurrentHighlightFilterBuffer.Add(highlights[index]);
             }
         }
 

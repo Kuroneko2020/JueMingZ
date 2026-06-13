@@ -267,6 +267,17 @@ namespace JueMingZ.Automation.Information
                 return false;
             }
 
+            int chestX;
+            int chestY;
+            if (!TryNormalizeOriginFromFrame(tileType, tileX, tileY, frameX, frameY, out chestX, out chestY) ||
+                chestX != tileX ||
+                chestY != tileY)
+            {
+                tileType = TileTypeContainers;
+                tileStyle = 0;
+                return false;
+            }
+
             tileStyle = BuildTileStyle(tileType, frameX);
             return true;
         }

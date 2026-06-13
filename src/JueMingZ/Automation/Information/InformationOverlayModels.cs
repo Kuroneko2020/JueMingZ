@@ -131,6 +131,8 @@ namespace JueMingZ.Automation.Information
     {
         public int TileX;
         public int TileY;
+        public int TileType;
+        public int TileStyle;
         public float WorldX;
         public float WorldY;
         public string Name;
@@ -407,16 +409,18 @@ namespace JueMingZ.Automation.Information
         public int TileY { get; private set; }
         public int Width { get; private set; }
         public int Height { get; private set; }
+        public int TileType { get; private set; }
         public int PixelWidth { get; private set; }
         public int PixelHeight { get; private set; }
         public InformationColor Color { get; private set; }
 
-        public TileHighlight(int tileX, int tileY, int width, int height, InformationColor color)
+        public TileHighlight(int tileX, int tileY, int width, int height, int tileType, InformationColor color)
         {
             TileX = tileX;
             TileY = tileY;
             Width = Math.Max(1, width);
             Height = Math.Max(1, height);
+            TileType = tileType;
             PixelWidth = Width * TileSize;
             PixelHeight = Height * TileSize;
             Color = color;

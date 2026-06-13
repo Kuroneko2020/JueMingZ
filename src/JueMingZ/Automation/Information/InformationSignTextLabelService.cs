@@ -33,7 +33,7 @@ namespace JueMingZ.Automation.Information
             {
                 if (CanReuseCache(context, _lastSignScanTick))
                 {
-                    return _cachedSignLabels;
+                    return FilterCurrentLabels(context, _cachedSignLabels, false);
                 }
 
                 LabelBuildBuffer.Clear();
@@ -50,7 +50,7 @@ namespace JueMingZ.Automation.Information
             {
                 if (CanReuseCache(context, _lastTombstoneScanTick))
                 {
-                    return _cachedTombstoneLabels;
+                    return FilterCurrentLabels(context, _cachedTombstoneLabels, true);
                 }
 
                 LabelBuildBuffer.Clear();
@@ -66,6 +66,18 @@ namespace JueMingZ.Automation.Information
             return IsTombstoneTileType(tileType);
         }
 
+        internal static void ResetForTesting()
+        {
+            lock (SyncRoot)
+            {
+                LabelBuildBuffer.Clear();
+                _cachedSignLabels = EmptyLabels;
+                _cachedTombstoneLabels = EmptyLabels;
+                _lastSignScanTick = 0;
+                _lastTombstoneScanTick = 0;
+            }
+        }
+
         private static bool CanReuseCache(InformationWorldContext context, ulong lastScanTick)
         {
             return context != null &&
@@ -73,6 +85,53 @@ namespace JueMingZ.Automation.Information
                    lastScanTick != 0 &&
                    context.GameUpdateCount >= lastScanTick &&
                    context.GameUpdateCount - lastScanTick < ScanIntervalTicks;
+        }
+
+        private static SignTextLabel[] FilterCurrentLabels(InformationWorldContext context, SignTextLabel[] labels, bool tombstoneLabels)
+        {
+            if (labels == null || labels.Length == 0)
+            {
+                return EmptyLabels;
+            }
+
+            LabelBuildBuffer.Clear();
+            var changed = false;
+            for (var index = 0; index < labels.Length; index++)
+            {
+                var label = labels[index];
+                // Cached text labels are only draw candidates. The current tile
+                // must still be a sign and still match the sign/tombstone split.
+                if (label == null || !IsValidSignTile(context, label.TileX, label.TileY, tombstoneLabels))
+                {
+                    if (!changed)
+                    {
+                        CopyLabelsToBuildBuffer(labels, index);
+                        changed = true;
+                    }
+
+                    continue;
+                }
+
+                if (changed)
+                {
+                    LabelBuildBuffer.Add(label);
+                }
+            }
+
+            if (!changed)
+            {
+                return labels;
+            }
+
+            return LabelBuildBuffer.Count == 0 ? EmptyLabels : LabelBuildBuffer.ToArray();
+        }
+
+        private static void CopyLabelsToBuildBuffer(SignTextLabel[] labels, int count)
+        {
+            for (var index = 0; index < count; index++)
+            {
+                LabelBuildBuffer.Add(labels[index]);
+            }
         }
 
         private static void AddAllLabels(InformationWorldContext context, IList<SignTextLabel> labels, bool tombstoneLabels)

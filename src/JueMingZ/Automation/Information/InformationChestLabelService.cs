@@ -25,6 +25,7 @@ namespace JueMingZ.Automation.Information
         private static readonly object SyncRoot = new object();
         private static readonly ChestLabel[] EmptyLabels = new ChestLabel[0];
         private static readonly List<ChestLabel> LabelBuildBuffer = new List<ChestLabel>();
+        private static readonly List<ChestLabel> CurrentLabelFilterBuffer = new List<ChestLabel>();
         private static readonly List<ChestScanCandidate> ScanCandidateBuffer = new List<ChestScanCandidate>();
         private static readonly List<ChestScanCandidate> AlwaysPartialScanCandidateBuffer = new List<ChestScanCandidate>();
         private static readonly HashSet<long> AlwaysPartialScanAdded = new HashSet<long>();
@@ -364,9 +365,10 @@ namespace JueMingZ.Automation.Information
 
         private static ChestLabel[] GetLabels(InformationWorldContext context, AppSettings settings, string mode, out uint sourceSignatureHash)
         {
-            return string.Equals(mode, ModeAlways, StringComparison.OrdinalIgnoreCase)
+            var labels = string.Equals(mode, ModeAlways, StringComparison.OrdinalIgnoreCase)
                 ? GetAlwaysLabels(context, settings, mode, out sourceSignatureHash)
                 : GetOpenedLabels(context, settings, mode, out sourceSignatureHash);
+            return FilterCurrentContainerLabels(context, labels);
         }
 
         private static ChestLabel[] GetAlwaysLabels(InformationWorldContext context, AppSettings settings, string mode, out uint sourceSignatureHash)
@@ -465,29 +467,36 @@ namespace JueMingZ.Automation.Information
                 int openedTileStyle;
                 var hasOpenedTileInfo = InformationChestTileScanner.TryResolveTileInfoAt(context, opened.X, opened.Y, out openedTileType, out openedTileStyle);
 
-                string name;
-                if (!chestNames.TryGetValue(InformationChestNameResolver.BuildPositionKey(opened.X, opened.Y), out name) ||
-                    string.IsNullOrWhiteSpace(name))
-                {
-                    name = hasOpenedTileInfo
-                        ? InformationChestNameResolver.ResolveTileDisplayName(context == null ? null : context.MainType, openedTileType, openedTileStyle)
-                        : InformationChestNameResolver.DefaultLabelName(InformationChestTileScanner.TileTypeContainers);
-                }
-
-                var worldX = InformationChestTileScanner.BuildLabelWorldX(opened.X, openedTileType);
-                var worldY = InformationChestTileScanner.BuildLabelWorldY(opened.Y, openedTileType);
+                var worldX = InformationChestTileScanner.BuildLabelWorldX(
+                    opened.X,
+                    hasOpenedTileInfo ? openedTileType : InformationChestTileScanner.TileTypeContainers);
+                var worldY = InformationChestTileScanner.BuildLabelWorldY(
+                    opened.Y,
+                    hasOpenedTileInfo ? openedTileType : InformationChestTileScanner.TileTypeContainers);
                 if (!InformationChestTileScanner.CanCacheLabel(context, worldX, worldY))
                 {
                     continue;
+                }
+
+                string name = string.Empty;
+                if (hasOpenedTileInfo &&
+                    (!chestNames.TryGetValue(InformationChestNameResolver.BuildPositionKey(opened.X, opened.Y), out name) ||
+                     string.IsNullOrWhiteSpace(name)))
+                {
+                    name = InformationChestNameResolver.ResolveTileDisplayName(context == null ? null : context.MainType, openedTileType, openedTileStyle);
                 }
 
                 LabelBuildBuffer.Add(new ChestLabel
                 {
                     TileX = opened.X,
                     TileY = opened.Y,
+                    TileType = hasOpenedTileInfo ? openedTileType : -1,
+                    TileStyle = hasOpenedTileInfo ? openedTileStyle : 0,
                     WorldX = worldX,
                     WorldY = worldY,
-                    Name = string.IsNullOrWhiteSpace(name) ? InformationChestNameResolver.DefaultLabelName(openedTileType) : name
+                    Name = hasOpenedTileInfo && string.IsNullOrWhiteSpace(name)
+                        ? InformationChestNameResolver.DefaultLabelName(openedTileType)
+                        : name
                 });
             }
 
@@ -501,6 +510,141 @@ namespace JueMingZ.Automation.Information
             }
 
             return _cachedOpenedLabels;
+        }
+
+        private static ChestLabel[] FilterCurrentContainerLabels(InformationWorldContext context, ChestLabel[] labels)
+        {
+            if (labels == null || labels.Length == 0)
+            {
+                return EmptyLabels;
+            }
+
+            CurrentLabelFilterBuffer.Clear();
+            var changed = false;
+            Dictionary<long, string> currentChestNames = null;
+            for (var index = 0; index < labels.Length; index++)
+            {
+                var label = labels[index];
+                ChestLabel currentLabel;
+                if (!TryBuildCurrentContainerLabel(context, label, ref currentChestNames, out currentLabel))
+                {
+                    if (!changed)
+                    {
+                        CopyLabelsToFilterBuffer(labels, index);
+                        changed = true;
+                    }
+
+                    continue;
+                }
+
+                if (ReferenceEquals(currentLabel, label))
+                {
+                    if (changed)
+                    {
+                        CurrentLabelFilterBuffer.Add(label);
+                    }
+
+                    continue;
+                }
+
+                if (!changed)
+                {
+                    CopyLabelsToFilterBuffer(labels, index);
+                    changed = true;
+                }
+
+                CurrentLabelFilterBuffer.Add(currentLabel);
+            }
+
+            if (!changed)
+            {
+                return labels;
+            }
+
+            return CurrentLabelFilterBuffer.Count == 0 ? EmptyLabels : CurrentLabelFilterBuffer.ToArray();
+        }
+
+        private static void CopyLabelsToFilterBuffer(ChestLabel[] labels, int count)
+        {
+            for (var index = 0; index < count; index++)
+            {
+                CurrentLabelFilterBuffer.Add(labels[index]);
+            }
+        }
+
+        private static bool TryBuildCurrentContainerLabel(
+            InformationWorldContext context,
+            ChestLabel label,
+            ref Dictionary<long, string> currentChestNames,
+            out ChestLabel currentLabel)
+        {
+            currentLabel = null;
+            if (label == null)
+            {
+                return false;
+            }
+
+            int tileType;
+            int tileStyle;
+            // Cached labels are only draw candidates. The current tile must still
+            // be a valid container origin before an old snapshot is allowed to draw.
+            if (!InformationChestTileScanner.TryResolveTileInfoAt(context, label.TileX, label.TileY, out tileType, out tileStyle))
+            {
+                return false;
+            }
+
+            var worldX = InformationChestTileScanner.BuildLabelWorldX(label.TileX, tileType);
+            var worldY = InformationChestTileScanner.BuildLabelWorldY(label.TileY, tileType);
+            if (!InformationChestTileScanner.CanCacheLabel(context, worldX, worldY))
+            {
+                return false;
+            }
+
+            if (label.TileType == tileType &&
+                label.TileStyle == tileStyle &&
+                NearlyEqual(label.WorldX, worldX) &&
+                NearlyEqual(label.WorldY, worldY) &&
+                !string.IsNullOrWhiteSpace(label.Name))
+            {
+                currentLabel = label;
+                return true;
+            }
+
+            currentLabel = new ChestLabel
+            {
+                TileX = label.TileX,
+                TileY = label.TileY,
+                TileType = tileType,
+                TileStyle = tileStyle,
+                WorldX = worldX,
+                WorldY = worldY,
+                Name = ResolveCurrentContainerName(context, label.TileX, label.TileY, tileType, tileStyle, ref currentChestNames)
+            };
+            return true;
+        }
+
+        private static string ResolveCurrentContainerName(
+            InformationWorldContext context,
+            int tileX,
+            int tileY,
+            int tileType,
+            int tileStyle,
+            ref Dictionary<long, string> currentChestNames)
+        {
+            if (currentChestNames == null)
+            {
+                currentChestNames = InformationChestNameResolver.BuildNameLookup(context == null ? null : context.MainType);
+            }
+
+            string name;
+            if (currentChestNames.TryGetValue(InformationChestNameResolver.BuildPositionKey(tileX, tileY), out name) &&
+                !string.IsNullOrWhiteSpace(name))
+            {
+                return name;
+            }
+
+            name = InformationChestNameResolver.ResolveTileDisplayName(context == null ? null : context.MainType, tileType, tileStyle);
+            return string.IsNullOrWhiteSpace(name) ? InformationChestNameResolver.DefaultLabelName(tileType) : name;
         }
 
         private static string GetOpenedChestsHashCached(InformationWorldContext context)
@@ -1103,6 +1247,8 @@ namespace JueMingZ.Automation.Information
                 {
                     TileX = candidate.ChestX,
                     TileY = candidate.ChestY,
+                    TileType = candidate.TileType,
+                    TileStyle = candidate.TileStyle,
                     WorldX = candidate.WorldX,
                     WorldY = candidate.WorldY,
                     Name = string.IsNullOrWhiteSpace(name) ? InformationChestNameResolver.DefaultLabelName(candidate.TileType) : name
@@ -1281,6 +1427,11 @@ namespace JueMingZ.Automation.Information
             var dx = leftX - rightX;
             var dy = leftY - rightY;
             return dx * dx + dy * dy;
+        }
+
+        private static bool NearlyEqual(float left, float right)
+        {
+            return Math.Abs(left - right) < 0.01f;
         }
 
         private static int FloorDiv(int value, int divisor)

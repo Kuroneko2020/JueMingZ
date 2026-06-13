@@ -131,6 +131,7 @@ namespace JueMingZ.Automation.Search.ChestLocator
             }
 
             var hits = new List<ChestItemLocatorOverlayHitView>();
+            var skippedInvalidContainer = false;
             for (var index = 0; index < snapshot.Hits.Count && hits.Count < MaxOverlayHitsPerFrame; index++)
             {
                 var hit = snapshot.Hits[index];
@@ -139,8 +140,18 @@ namespace JueMingZ.Automation.Search.ChestLocator
                     continue;
                 }
 
-                var width = Math.Max(1, InformationChestTileScanner.GetFrameColumns(hit.TileType)) * InformationChestTileScanner.TileSize;
-                var height = Math.Max(1, InformationChestTileScanner.GetFrameRows(hit.TileType)) * InformationChestTileScanner.TileSize;
+                int currentTileType;
+                // Snapshot hits are search results, not proof that the container
+                // still exists. Validate only the origin tile before drawing; the
+                // overlay must not rescan chest contents here.
+                if (!TryResolveCurrentHitTileType(context, hit, out currentTileType))
+                {
+                    skippedInvalidContainer = true;
+                    continue;
+                }
+
+                var width = Math.Max(1, InformationChestTileScanner.GetFrameColumns(currentTileType)) * InformationChestTileScanner.TileSize;
+                var height = Math.Max(1, InformationChestTileScanner.GetFrameRows(currentTileType)) * InformationChestTileScanner.TileSize;
                 var screenX = (int)Math.Round((hit.ChestX * InformationChestTileScanner.TileSize) - context.ScreenX);
                 var screenY = (int)Math.Round((hit.ChestY * InformationChestTileScanner.TileSize) - context.ScreenY);
                 if (!IsVisible(context, screenX, screenY, width, height))
@@ -159,7 +170,7 @@ namespace JueMingZ.Automation.Search.ChestLocator
                     hit.TotalStack));
             }
 
-            var skipReason = hits.Count <= 0 ? "offscreen" : string.Empty;
+            var skipReason = hits.Count <= 0 ? (skippedInvalidContainer ? "invalidContainer" : "offscreen") : string.Empty;
             return new ChestItemLocatorOverlayView(
                 hits.Count > 0,
                 skipReason,
@@ -171,6 +182,13 @@ namespace JueMingZ.Automation.Search.ChestLocator
                 hits.Count,
                 age,
                 hits);
+        }
+
+        private static bool TryResolveCurrentHitTileType(InformationWorldContext context, ChestItemLocatorHit hit, out int tileType)
+        {
+            tileType = InformationChestTileScanner.TileTypeContainers;
+            return hit != null &&
+                   InformationChestTileScanner.TryResolveTileInfoAt(context, hit.ChestX, hit.ChestY, out tileType, out _);
         }
 
         private static ChestItemLocatorOverlayView BuildSnapshotSkipView(ChestItemLocatorSnapshot snapshot, string skipReason)

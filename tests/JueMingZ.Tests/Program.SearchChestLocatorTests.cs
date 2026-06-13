@@ -678,9 +678,8 @@ namespace JueMingZ.Tests
                         ports.ToPorts(),
                         true);
 
-                    ChestLocatorFakeMain.Reset();
+                    chest.item[0] = CreateChestLocatorItem(104, 99);
                     var drawContext = CreateChestLocatorContext(108);
-                    drawContext.MainType = null;
                     var view = ChestItemLocatorOverlayService.BuildViewForTesting(snapshot, drawContext);
                     if (!view.Enabled ||
                         view.QueryVersion != 7 ||
@@ -701,7 +700,75 @@ namespace JueMingZ.Tests
                         hit.PixelHeight != 32 ||
                         hit.TotalStack != 3)
                     {
-                        throw new InvalidOperationException("Chest locator overlay should use snapshot hit coordinates and stable frame dimensions only.");
+                        throw new InvalidOperationException("Chest locator overlay should use snapshot hit facts while only validating the current container tile.");
+                    }
+                });
+            });
+        }
+
+        private static void SearchChestLocatorOverlayFiltersRemovedContainer()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                WithChestLocatorScanFixture(() =>
+                {
+                    var context = CreateChestLocatorContext(100);
+                    var ports = new ChestLocatorFakePorts();
+                    ConfigureChestLocatorChest(5, 6);
+                    ports.Add(0, CreateChestLocatorFakeChest(0, 5, 6, 40, CreateChestLocatorItem(100, 3)));
+
+                    var snapshot = ChestItemLocatorService.GetSnapshotForTesting(
+                        ChestItemLocatorQueryResolver.Resolve("铁锭", 10),
+                        context,
+                        8,
+                        ChestItemLocatorScanOptions.Default,
+                        ports.ToPorts(),
+                        true);
+
+                    ChestLocatorFakeMain.ClearChest(5, 6);
+                    var view = ChestItemLocatorOverlayService.BuildViewForTesting(snapshot, CreateChestLocatorContext(101));
+                    if (view.Enabled ||
+                        view.Hits.Count != 0 ||
+                        view.HitCount != 1 ||
+                        !string.Equals(view.SkipReason, "invalidContainer", StringComparison.Ordinal))
+                    {
+                        throw new InvalidOperationException("Chest locator overlay should hide a cached hit when its current container tile is gone.");
+                    }
+                });
+            });
+        }
+
+        private static void SearchChestLocatorOverlayKeepsValidHitsWhenOneContainerRemoved()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                WithChestLocatorScanFixture(() =>
+                {
+                    var context = CreateChestLocatorContext(100);
+                    var ports = new ChestLocatorFakePorts();
+                    ConfigureChestLocatorChest(5, 6);
+                    ConfigureChestLocatorChest(8, 6);
+                    ports.Add(0, CreateChestLocatorFakeChest(0, 5, 6, 40, CreateChestLocatorItem(100, 3)));
+                    ports.Add(1, CreateChestLocatorFakeChest(1, 8, 6, 40, CreateChestLocatorItem(100, 5)));
+
+                    var snapshot = ChestItemLocatorService.GetSnapshotForTesting(
+                        ChestItemLocatorQueryResolver.Resolve("铁锭", 10),
+                        context,
+                        9,
+                        ChestItemLocatorScanOptions.Default,
+                        ports.ToPorts(),
+                        true);
+
+                    ChestLocatorFakeMain.ClearChest(5, 6);
+                    var view = ChestItemLocatorOverlayService.BuildViewForTesting(snapshot, CreateChestLocatorContext(101));
+                    if (!view.Enabled ||
+                        view.HitCount != 2 ||
+                        view.Hits.Count != 1 ||
+                        view.Hits[0].ChestX != 8 ||
+                        view.Hits[0].ChestY != 6 ||
+                        view.Hits[0].TotalStack != 5)
+                    {
+                        throw new InvalidOperationException("Chest locator overlay should skip only the removed container and keep other valid hits visible.");
                     }
                 });
             });
@@ -959,6 +1026,18 @@ namespace JueMingZ.Tests
                 SetTile(chestX + 1, chestY, tileType, style * 36 + 18, 0);
                 SetTile(chestX, chestY + 1, tileType, style * 36, 18);
                 SetTile(chestX + 1, chestY + 1, tileType, style * 36 + 18, 18);
+            }
+
+            public static void ClearChest(int chestX, int chestY)
+            {
+                EnsureSize(chestX + 3, chestY + 3);
+                for (var x = chestX; x < chestX + 2; x++)
+                {
+                    for (var y = chestY; y < chestY + 2; y++)
+                    {
+                        tile[x, y] = null;
+                    }
+                }
             }
 
             private static void EnsureSize(int width, int height)

@@ -374,6 +374,139 @@ namespace JueMingZ.Tests
             });
         }
 
+        private static void InformationChestOpenedLabelsFollowCurrentContainerExistence()
+        {
+            WithTemporaryBehaviorStore(() =>
+            {
+                InformationOverlayService.ResetChestLabelCacheForTesting();
+                FakeChestMain.ConfigureEmptyWorld(24, 24);
+                try
+                {
+                    var settings = AppSettings.CreateDefault();
+                    var context = CreateInformationChestCacheContext(0f, 0f, 320, 240, 96f, 112f, "fake-world#1", "fake-world-record", "player-a", 100);
+                    context.MainType = typeof(FakeChestMain);
+                    RecordOpenedChestForTesting(context, 5, 6);
+
+                    var missingCount = InformationOverlayService.GetChestLabelCountForTesting(context, settings, "Opened");
+                    if (missingCount != 0)
+                    {
+                        throw new InvalidOperationException("Expected opened chest record with no current container tile to draw no labels.");
+                    }
+
+                    FakeChestMain.ConfigureChest(5, 6, 21, 10);
+                    context.GameUpdateCount++;
+                    var restoredCount = InformationOverlayService.GetChestLabelCountForTesting(context, settings, "Opened");
+                    if (restoredCount != 1)
+                    {
+                        throw new InvalidOperationException("Expected opened chest label to reappear when the current container returns on the same coordinate.");
+                    }
+
+                    FakeChestMain.ConfigureEmptyWorld(24, 24);
+                    context.GameUpdateCount++;
+                    var removedCount = InformationOverlayService.GetChestLabelCountForTesting(context, settings, "Opened");
+                    if (removedCount != 0)
+                    {
+                        throw new InvalidOperationException("Expected cached opened chest label to hide after the current container tile is removed.");
+                    }
+
+                    FakeChestMain.ConfigureChest(5, 6, 21, 10);
+                    context.GameUpdateCount++;
+                    var secondRestoredCount = InformationOverlayService.GetChestLabelCountForTesting(context, settings, "Opened");
+                    if (secondRestoredCount != 1)
+                    {
+                        throw new InvalidOperationException("Expected cached opened chest label to follow the current tile when a valid container is placed back.");
+                    }
+                }
+                finally
+                {
+                    FakeChestMain.Reset();
+                    InformationOverlayService.ResetChestLabelCacheForTesting();
+                }
+            });
+        }
+
+        private static void InformationChestAlwaysCachedLabelsFollowCurrentContainerExistence()
+        {
+            WithTemporaryBehaviorStore(() =>
+            {
+                InformationOverlayService.ResetChestLabelCacheForTesting();
+                FakeChestMain.ConfigureChest(5, 6, 21, 10);
+                try
+                {
+                    var settings = AppSettings.CreateDefault();
+                    var context = CreateInformationChestCacheContext(0f, 0f, 320, 240, 96f, 112f, "fake-world#1", "fake-world-record", "player-a", 100);
+                    context.MainType = typeof(FakeChestMain);
+
+                    var initialCount = InformationOverlayService.GetChestLabelCountForTesting(context, settings, "Always");
+                    if (initialCount != 1)
+                    {
+                        throw new InvalidOperationException("Expected Always chest scan to cache one visible container.");
+                    }
+
+                    FakeChestMain.ConfigureEmptyWorld(24, 24);
+                    context.GameUpdateCount++;
+                    var removedCount = InformationOverlayService.GetChestLabelCountForTesting(context, settings, "Always");
+                    if (removedCount != 0)
+                    {
+                        throw new InvalidOperationException("Expected Always cache hit to hide the label after the current container tile is removed.");
+                    }
+
+                    FakeChestMain.ConfigureChest(5, 6, 21, 10);
+                    context.GameUpdateCount++;
+                    var restoredCount = InformationOverlayService.GetChestLabelCountForTesting(context, settings, "Always");
+                    if (restoredCount != 1)
+                    {
+                        throw new InvalidOperationException("Expected Always cache hit to show the label again when the current container returns.");
+                    }
+                }
+                finally
+                {
+                    FakeChestMain.Reset();
+                    InformationOverlayService.ResetChestLabelCacheForTesting();
+                }
+            });
+        }
+
+        private static void InformationChestAlwaysPartialPendingFiltersInvalidStableSnapshot()
+        {
+            WithTemporaryBehaviorStore(() =>
+            {
+                InformationOverlayService.SetChestAlwaysPartialScanBudgetForTesting(10);
+                FakeChestMain.ConfigureChest(5, 6, 21, 0);
+                try
+                {
+                    var settings = AppSettings.CreateDefault();
+                    var context = CreateInformationChestCacheContext(0f, 0f, 320, 240, 96f, 112f, "fake-world#1", "fake-world-record", "player-a", 100);
+                    context.MainType = typeof(FakeChestMain);
+
+                    InformationOverlayService.GetChestLabelCountForTesting(context, settings, "Always");
+                    var completedCount = CompleteAlwaysChestPartialScanForTesting(context, settings, 1, 1);
+                    if (completedCount != 1)
+                    {
+                        throw new InvalidOperationException("Expected partial Always scan setup to publish one stable label.");
+                    }
+
+                    FakeChestMain.ConfigureEmptyWorld(24, 24);
+                    var moved = CreateInformationChestCacheContext(64f, 0f, 320, 240, 96f, 112f, "fake-world#1", "fake-world-record", "player-a", context.GameUpdateCount + 1);
+                    moved.MainType = typeof(FakeChestMain);
+                    var pendingCount = InformationOverlayService.GetChestLabelCountForTesting(moved, settings, "Always");
+                    var diagnostics = InformationOverlayService.GetDiagnostics();
+                    if (pendingCount != 0 ||
+                        diagnostics.ChestAlwaysPartialScanPendingCount <= 0 ||
+                        diagnostics.ChestAlwaysStableSnapshotId != 1)
+                    {
+                        throw new InvalidOperationException("Expected dirty partial Always scan to filter an invalid previous stable chest label while pending.");
+                    }
+                }
+                finally
+                {
+                    InformationOverlayService.SetChestAlwaysPartialScanBudgetForTesting(0);
+                    FakeChestMain.Reset();
+                    InformationOverlayService.ResetChestLabelCacheForTesting();
+                }
+            });
+        }
+
         private static int CompleteAlwaysChestPartialScanForTesting(InformationWorldContext context, AppSettings settings, long expectedStableSnapshotId, int expectedCount)
         {
             var count = 0;
@@ -490,6 +623,52 @@ namespace JueMingZ.Tests
             });
         }
 
+        private static void InformationChestLabelsKeepSupportedContainerFamiliesVisible()
+        {
+            WithTemporaryBehaviorStore(() =>
+            {
+                try
+                {
+                    var settings = AppSettings.CreateDefault();
+                    var tileTypes = new[]
+                    {
+                        21,
+                        467,
+                        441,
+                        468
+                    };
+
+                    for (var index = 0; index < tileTypes.Length; index++)
+                    {
+                        InformationOverlayService.ResetChestLabelCacheForTesting();
+                        FakeChestMain.ConfigureChest(5, 6, tileTypes[index], 0);
+                        var context = CreateInformationChestCacheContext(0f, 0f, 320, 240, 96f, 112f, "fake-world#1", "fake-world-record", "player-a", (ulong)(100 + index));
+                        context.MainType = typeof(FakeChestMain);
+                        var count = InformationOverlayService.GetChestLabelCountForTesting(context, settings, "Always");
+                        if (count != 1)
+                        {
+                            throw new InvalidOperationException("Expected supported container tile type " + tileTypes[index].ToString(CultureInfo.InvariantCulture) + " to remain visible.");
+                        }
+                    }
+
+                    InformationOverlayService.ResetChestLabelCacheForTesting();
+                    FakeChestMain.ConfigureDresser(5, 6, 88, 1);
+                    var dresserContext = CreateInformationChestCacheContext(0f, 0f, 320, 240, 112f, 112f, "fake-world#1", "fake-world-record", "player-a", 200);
+                    dresserContext.MainType = typeof(FakeChestMain);
+                    var dresserCount = InformationOverlayService.GetChestLabelCountForTesting(dresserContext, settings, "Always");
+                    if (dresserCount != 1)
+                    {
+                        throw new InvalidOperationException("Expected supported dresser container tile to remain visible.");
+                    }
+                }
+                finally
+                {
+                    FakeChestMain.Reset();
+                    InformationOverlayService.ResetChestLabelCacheForTesting();
+                }
+            });
+        }
+
         private static InformationWorldContext CreateInformationChestRecordContext(string playerKey, string worldKey, string legacyWorldKey)
         {
             return new InformationWorldContext
@@ -536,12 +715,37 @@ namespace JueMingZ.Tests
             };
         }
 
+        private static void RecordOpenedChestForTesting(InformationWorldContext context, int chestX, int chestY)
+        {
+            bool added;
+            string message;
+            if (!PlayerWorldBehaviorStore.TryRecordOpenedChest(
+                    new PlayerWorldBehaviorContext { PlayerKey = context.PlayerRecordKey, WorldKey = context.WorldRecordKey },
+                    chestX,
+                    chestY,
+                    "test",
+                    out added,
+                    out message) ||
+                !added)
+            {
+                throw new InvalidOperationException("Expected opened chest record to be stored: " + message);
+            }
+        }
+
         private static class FakeChestMain
         {
             public static FakeChestTile[,] tile = new FakeChestTile[1, 1];
             public static bool[] tileContainer = new bool[1024];
             public static int maxTilesX = 1;
             public static int maxTilesY = 1;
+
+            public static void ConfigureEmptyWorld(int width, int height)
+            {
+                maxTilesX = Math.Max(1, width);
+                maxTilesY = Math.Max(1, height);
+                tile = new FakeChestTile[maxTilesX, maxTilesY];
+                tileContainer = new bool[1024];
+            }
 
             public static void ConfigureChest(int chestX, int chestY, int tileType, int style)
             {
@@ -921,6 +1125,48 @@ namespace JueMingZ.Tests
                     false))
             {
                 throw new InvalidOperationException("Expected friendly-state changes to dirty the NPC label cache.");
+            }
+
+            if (InformationOverlayService.CanReuseNpcLabelSnapshotForTesting(
+                    7,
+                    42,
+                    80,
+                    100,
+                    false,
+                    false,
+                    false,
+                    false,
+                    7,
+                    42,
+                    80,
+                    100,
+                    false,
+                    false,
+                    true,
+                    false))
+            {
+                throw new InvalidOperationException("Expected hidden-state changes to dirty the NPC label cache.");
+            }
+
+            if (InformationOverlayService.CanReuseNpcLabelSnapshotForTesting(
+                    7,
+                    42,
+                    80,
+                    100,
+                    false,
+                    false,
+                    false,
+                    false,
+                    7,
+                    42,
+                    80,
+                    100,
+                    false,
+                    false,
+                    false,
+                    true))
+            {
+                throw new InvalidOperationException("Expected critter classification changes to dirty the NPC label cache.");
             }
 
             if (InformationOverlayService.CanReuseNpcLabelSnapshotForTesting(

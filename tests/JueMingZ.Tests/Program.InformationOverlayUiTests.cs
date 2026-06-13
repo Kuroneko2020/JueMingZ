@@ -704,6 +704,98 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void InformationSignTextCachedLabelsFollowCurrentTileExistence()
+        {
+            try
+            {
+                InformationSignTextLabelService.ResetForTesting();
+                FakeSignTextMain.ConfigureSign(4, 5, 55, "cached sign text");
+                var context = CreateInformationSignTextContext(100);
+
+                if (InformationSignTextLabelService.GetSignLabels(context).Length != 1)
+                {
+                    throw new InvalidOperationException("Expected a valid sign tile to produce one sign text label.");
+                }
+
+                if (InformationSignTextLabelService.GetTombstoneLabels(context).Length != 0)
+                {
+                    throw new InvalidOperationException("Expected an ordinary sign tile to stay out of tombstone labels.");
+                }
+
+                FakeSignTextMain.ClearTile(4, 5);
+                context.GameUpdateCount = 101;
+                if (InformationSignTextLabelService.GetSignLabels(context).Length != 0)
+                {
+                    throw new InvalidOperationException("Expected cached sign text label to hide when the current sign tile is removed.");
+                }
+
+                FakeSignTextMain.SetTile(4, 5, 55);
+                context.GameUpdateCount = 102;
+                if (InformationSignTextLabelService.GetSignLabels(context).Length != 1)
+                {
+                    throw new InvalidOperationException("Expected cached sign text label to reappear when a valid sign tile returns.");
+                }
+
+                FakeSignTextMain.SetTile(4, 5, 85);
+                context.GameUpdateCount = 103;
+                if (InformationSignTextLabelService.GetSignLabels(context).Length != 0)
+                {
+                    throw new InvalidOperationException("Expected cached sign text label to hide when the current tile becomes a tombstone.");
+                }
+            }
+            finally
+            {
+                FakeSignTextMain.Reset();
+                InformationSignTextLabelService.ResetForTesting();
+            }
+        }
+
+        private static void InformationTombstoneTextCachedLabelsFollowCurrentTileExistence()
+        {
+            try
+            {
+                InformationSignTextLabelService.ResetForTesting();
+                FakeSignTextMain.ConfigureSign(6, 7, 85, "cached tombstone text");
+                var context = CreateInformationSignTextContext(100);
+
+                if (InformationSignTextLabelService.GetTombstoneLabels(context).Length != 1)
+                {
+                    throw new InvalidOperationException("Expected a valid tombstone tile to produce one tombstone text label.");
+                }
+
+                if (InformationSignTextLabelService.GetSignLabels(context).Length != 0)
+                {
+                    throw new InvalidOperationException("Expected a tombstone tile to stay out of ordinary sign labels.");
+                }
+
+                FakeSignTextMain.ClearTile(6, 7);
+                context.GameUpdateCount = 101;
+                if (InformationSignTextLabelService.GetTombstoneLabels(context).Length != 0)
+                {
+                    throw new InvalidOperationException("Expected cached tombstone text label to hide when the current tombstone tile is removed.");
+                }
+
+                FakeSignTextMain.SetTile(6, 7, 85);
+                context.GameUpdateCount = 102;
+                if (InformationSignTextLabelService.GetTombstoneLabels(context).Length != 1)
+                {
+                    throw new InvalidOperationException("Expected cached tombstone text label to reappear when a valid tombstone tile returns.");
+                }
+
+                FakeSignTextMain.SetTile(6, 7, 55);
+                context.GameUpdateCount = 103;
+                if (InformationSignTextLabelService.GetTombstoneLabels(context).Length != 0)
+                {
+                    throw new InvalidOperationException("Expected cached tombstone text label to hide when the current tile becomes an ordinary sign.");
+                }
+            }
+            finally
+            {
+                FakeSignTextMain.Reset();
+                InformationSignTextLabelService.ResetForTesting();
+            }
+        }
+
         private static void InformationManaCrystalHighlightDefaultsToOffAndUsesTileId()
         {
             var settings = AppSettings.CreateDefault();
@@ -906,6 +998,57 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void InformationTileHighlightCachedHighlightsFollowCurrentTileExistence()
+        {
+            try
+            {
+                FakeTileHighlightValidityMain.ConfigureLifeAndManaTargets();
+                var context = CreateInformationTileHighlightContext(0f, 0f, 320, 320, 80f, 80f, "tile-highlight-world", "tile-highlight-record");
+                context.MainType = typeof(FakeTileHighlightValidityMain);
+                context.GameUpdateCount = 100;
+
+                var settings = AppSettings.CreateDefault();
+                settings.InformationHighlightLifeCrystalEnabled = true;
+                settings.InformationHighlightManaCrystalEnabled = true;
+                InformationOverlayService.ResetTileHighlightCacheForTesting();
+
+                var initialCount = InformationOverlayService.GetTileHighlightCountForTesting(context, settings);
+                if (initialCount != 2)
+                {
+                    throw new InvalidOperationException("Expected life and mana crystal highlights to build two cached groups, got " + initialCount + ".");
+                }
+
+                FakeTileHighlightValidityMain.ClearTilesOfType(12);
+                context.GameUpdateCount = 101;
+                var lifeRemovedCount = InformationOverlayService.GetTileHighlightCountForTesting(context, settings);
+                if (lifeRemovedCount != 1)
+                {
+                    throw new InvalidOperationException("Expected cached life crystal highlight to hide while mana remains visible, got " + lifeRemovedCount + ".");
+                }
+
+                FakeTileHighlightValidityMain.ClearTilesOfType(639);
+                context.GameUpdateCount = 102;
+                var allRemovedCount = InformationOverlayService.GetTileHighlightCountForTesting(context, settings);
+                if (allRemovedCount != 0)
+                {
+                    throw new InvalidOperationException("Expected cached tile highlights to hide when matching current tiles are removed.");
+                }
+
+                FakeTileHighlightValidityMain.SetTile(4, 4, 12);
+                context.GameUpdateCount = 103;
+                var restoredCount = InformationOverlayService.GetTileHighlightCountForTesting(context, settings);
+                if (restoredCount != 1)
+                {
+                    throw new InvalidOperationException("Expected cached highlight to reappear when a matching current tile returns inside its bounds.");
+                }
+            }
+            finally
+            {
+                FakeTileHighlightValidityMain.Reset();
+                InformationOverlayService.ResetTileHighlightCacheForTesting();
+            }
+        }
+
         private static InformationWorldContext CreateInformationTileHighlightContext(float screenX, float screenY, int screenWidth, int screenHeight, float playerCenterX, float playerCenterY, string worldKey, string worldRecordKey)
         {
             return new InformationWorldContext
@@ -919,6 +1062,174 @@ namespace JueMingZ.Tests
                 WorldKey = worldKey,
                 WorldRecordKey = worldRecordKey
             };
+        }
+
+        private static InformationWorldContext CreateInformationSignTextContext(ulong updateCount)
+        {
+            return new InformationWorldContext
+            {
+                MainType = typeof(FakeSignTextMain),
+                LocalPlayer = new object(),
+                ScreenX = 0f,
+                ScreenY = 0f,
+                ScreenWidth = 320,
+                ScreenHeight = 240,
+                PlayerCenterX = 96f,
+                PlayerCenterY = 112f,
+                GameUpdateCount = updateCount,
+                WorldKey = "sign-text-world",
+                WorldRecordKey = "sign-text-record"
+            };
+        }
+
+        private static class FakeSignTextMain
+        {
+            public static FakeSignRecord[] sign = new FakeSignRecord[0];
+            public static FakeInformationOverlayTile[,] tile = new FakeInformationOverlayTile[1, 1];
+            public static bool[] tileSign = new bool[1024];
+
+            public static void ConfigureSign(int x, int y, int tileType, string text)
+            {
+                EnsureWorld(x + 4, y + 4);
+                sign = new[]
+                {
+                    new FakeSignRecord
+                    {
+                        x = x,
+                        y = y,
+                        text = text
+                    }
+                };
+                SetTile(x, y, tileType);
+            }
+
+            public static void SetTile(int x, int y, int tileType)
+            {
+                EnsureWorld(x + 4, y + 4);
+                if (tileType >= 0 && tileType < tileSign.Length)
+                {
+                    tileSign[tileType] = true;
+                }
+
+                tile[x, y] = new FakeInformationOverlayTile
+                {
+                    IsActive = true,
+                    type = tileType
+                };
+            }
+
+            public static void ClearTile(int x, int y)
+            {
+                EnsureWorld(x + 4, y + 4);
+                tile[x, y] = null;
+            }
+
+            public static void Reset()
+            {
+                sign = new FakeSignRecord[0];
+                tile = new FakeInformationOverlayTile[1, 1];
+                tileSign = new bool[1024];
+            }
+
+            private static void EnsureWorld(int width, int height)
+            {
+                width = Math.Max(1, width);
+                height = Math.Max(1, height);
+                if (tile.GetLength(0) >= width && tile.GetLength(1) >= height)
+                {
+                    return;
+                }
+
+                var next = new FakeInformationOverlayTile[width, height];
+                for (var x = 0; x < tile.GetLength(0); x++)
+                {
+                    for (var y = 0; y < tile.GetLength(1); y++)
+                    {
+                        next[x, y] = tile[x, y];
+                    }
+                }
+
+                tile = next;
+            }
+        }
+
+        private sealed class FakeSignRecord
+        {
+            public int x;
+            public int y;
+            public string text;
+        }
+
+        private static class FakeTileHighlightValidityMain
+        {
+            public static FakeInformationOverlayTile[,] tile = new FakeInformationOverlayTile[1, 1];
+
+            public static void ConfigureLifeAndManaTargets()
+            {
+                tile = new FakeInformationOverlayTile[32, 32];
+                SetTile(4, 4, 12);
+                SetTile(5, 4, 12);
+                SetTile(4, 5, 12);
+                SetTile(5, 5, 12);
+                SetTile(10, 10, 639);
+            }
+
+            public static void SetTile(int x, int y, int tileType)
+            {
+                EnsureWorld(x + 1, y + 1);
+                tile[x, y] = new FakeInformationOverlayTile
+                {
+                    IsActive = true,
+                    type = tileType
+                };
+            }
+
+            public static void ClearTilesOfType(int tileType)
+            {
+                for (var x = 0; x < tile.GetLength(0); x++)
+                {
+                    for (var y = 0; y < tile.GetLength(1); y++)
+                    {
+                        var current = tile[x, y];
+                        if (current != null && current.type == tileType)
+                        {
+                            tile[x, y] = null;
+                        }
+                    }
+                }
+            }
+
+            public static void Reset()
+            {
+                tile = new FakeInformationOverlayTile[1, 1];
+            }
+
+            private static void EnsureWorld(int width, int height)
+            {
+                width = Math.Max(1, width);
+                height = Math.Max(1, height);
+                if (tile.GetLength(0) >= width && tile.GetLength(1) >= height)
+                {
+                    return;
+                }
+
+                var next = new FakeInformationOverlayTile[width, height];
+                for (var x = 0; x < tile.GetLength(0); x++)
+                {
+                    for (var y = 0; y < tile.GetLength(1); y++)
+                    {
+                        next[x, y] = tile[x, y];
+                    }
+                }
+
+                tile = next;
+            }
+        }
+
+        private sealed class FakeInformationOverlayTile
+        {
+            public bool IsActive { get; set; }
+            public int type;
         }
 
 

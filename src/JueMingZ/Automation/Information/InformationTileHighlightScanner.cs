@@ -109,6 +109,40 @@ namespace JueMingZ.Automation.Information
             return tileType == _manaCrystalTileType;
         }
 
+        internal static bool ContainsActiveTileType(InformationWorldContext context, TileHighlight highlight)
+        {
+            if (context == null || context.MainType == null || highlight.TileType < 0)
+            {
+                return false;
+            }
+
+            var tiles = InformationReflection.GetStaticMember(context.MainType, "tile");
+            if (tiles == null)
+            {
+                return false;
+            }
+
+            var allowTypedTileRead = CanUseTypedTileRead(tiles);
+            var maxX = highlight.TileX + Math.Max(1, highlight.Width) - 1;
+            var maxY = highlight.TileY + Math.Max(1, highlight.Height) - 1;
+            for (var x = highlight.TileX; x <= maxX; x++)
+            {
+                for (var y = highlight.TileY; y <= maxY; y++)
+                {
+                    bool active;
+                    int tileType;
+                    if (TryReadTileActiveType(tiles, x, y, allowTypedTileRead, out active, out tileType) &&
+                        active &&
+                        tileType == highlight.TileType)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
         internal static void ResetForTesting()
         {
             Visited.Clear();
@@ -187,6 +221,7 @@ namespace JueMingZ.Automation.Information
                 groupMinY,
                 groupMaxX - groupMinX + 1,
                 groupMaxY - groupMinY + 1,
+                tileType,
                 color));
         }
 

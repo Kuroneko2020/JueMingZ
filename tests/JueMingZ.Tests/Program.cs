@@ -1500,6 +1500,8 @@ namespace JueMingZ.Tests
             Run("UI text renderer fast path keeps safe fallbacks", ref failed, UiTextRendererFastPathKeepsSafeFallbacks);
             Run("UI text renderer font signature change clears caches", ref failed, UiTextRendererFontSignatureChangeClearsCaches);
             Run("information tombstone text defaults to red and splits tile type", ref failed, InformationTombstoneTextDefaultsToRedAndSplitsTileType);
+            Run("information sign text cached labels follow current tile existence", ref failed, InformationSignTextCachedLabelsFollowCurrentTileExistence);
+            Run("information tombstone text cached labels follow current tile existence", ref failed, InformationTombstoneTextCachedLabelsFollowCurrentTileExistence);
             Run("information mana crystal highlight defaults to off and uses tile id", ref failed, InformationManaCrystalHighlightDefaultsToOffAndUsesTileId);
             Run("information tile access reads cached tile members", ref failed, InformationTileAccessReadsCachedTileMembers);
             Run("auto station buff cooldown fast skip avoids scan", ref failed, AutoStationBuffCooldownFastSkipAvoidsScan);
@@ -1510,6 +1512,7 @@ namespace JueMingZ.Tests
             Run("information tile highlight cache signature tracks bounds settings and world", ref failed, InformationTileHighlightCacheSignatureTracksBoundsSettingsAndWorld);
             Run("information tile highlight cache keeps safety refresh", ref failed, InformationTileHighlightCacheKeepsSafetyRefresh);
             Run("information tile highlight scanner groups adjacent enabled tiles", ref failed, InformationTileHighlightScannerGroupsAdjacentEnabledTiles);
+            Run("information tile highlight cached highlights follow current tile existence", ref failed, InformationTileHighlightCachedHighlightsFollowCurrentTileExistence);
             Run("information fishing catch query key tracks environment", ref failed, InformationFishingCatchQueryKeyTracksEnvironment);
             Run("information fishing catch query key tracks full baseline fields", ref failed, InformationFishingCatchQueryKeyTracksFullBaselineFields);
             Run("information fishing catch early key tracks environment", ref failed, InformationFishingCatchEarlyKeyTracksEnvironment);
@@ -1651,6 +1654,8 @@ namespace JueMingZ.Tests
             Run("search chest locator commands focus and clear dedicated state", ref failed, SearchChestLocatorCommandsFocusAndClearDedicatedState);
             Run("search chest locator layout stays above search query and tracks height", ref failed, SearchChestLocatorLayoutStaysAboveSearchQueryAndTracksHeight);
             Run("search chest locator overlay builds view from snapshot only", ref failed, SearchChestLocatorOverlayBuildsViewFromSnapshotOnly);
+            Run("search chest locator overlay filters removed container", ref failed, SearchChestLocatorOverlayFiltersRemovedContainer);
+            Run("search chest locator overlay keeps valid hits when one container removed", ref failed, SearchChestLocatorOverlayKeepsValidHitsWhenOneContainerRemoved);
             Run("search chest locator overlay skips stale foreign and offscreen snapshots", ref failed, SearchChestLocatorOverlaySkipsStaleForeignAndOffscreenSnapshots);
             Run("search chest locator section request sends current player section", ref failed, SearchChestLocatorSectionRequestSendsCurrentPlayerSection);
             Run("search chest locator section request throttles section key", ref failed, SearchChestLocatorSectionRequestThrottlesSectionKey);
@@ -1749,12 +1754,16 @@ namespace JueMingZ.Tests
             Run("information chest always typed scan diagnostics track fallback tiles", ref failed, InformationChestAlwaysTypedScanDiagnosticsTrackFallbackTiles);
             Run("information chest always name cache reuses across dirty scans", ref failed, InformationChestAlwaysNameCacheReusesAcrossDirtyScans);
             Run("information chest always partial scan publishes stable snapshots", ref failed, InformationChestAlwaysPartialScanPublishesStableSnapshots);
+            Run("information chest opened labels follow current container existence", ref failed, InformationChestOpenedLabelsFollowCurrentContainerExistence);
+            Run("information chest always cached labels follow current container existence", ref failed, InformationChestAlwaysCachedLabelsFollowCurrentContainerExistence);
+            Run("information chest always partial pending filters invalid stable snapshot", ref failed, InformationChestAlwaysPartialPendingFiltersInvalidStableSnapshot);
             Run("player-world behavior records isolate opened chests", ref failed, PlayerWorldBehaviorRecordsIsolateOpenedChests);
             Run("legacy opened chest keys migrate to current player-world only", ref failed, LegacyOpenedChestKeysMigrateToCurrentPlayerWorldOnly);
             Run("information chest key parsing survives world rename with same id", ref failed, InformationChestKeyParsingSurvivesWorldRenameWithSameId);
             Run("information chest tile fallback detects basic container ids", ref failed, InformationChestTileFallbackDetectsBasicContainerIds);
             Run("information chest tile fallback includes dressers and excludes display containers", ref failed, InformationChestTileFallbackIncludesDressersAndExcludesDisplayContainers);
             Run("information chest tile fallback normalizes two by two frame origin", ref failed, InformationChestTileFallbackNormalizesTwoByTwoFrameOrigin);
+            Run("information chest labels keep supported container families visible", ref failed, InformationChestLabelsKeepSupportedContainerFamiliesVisible);
             Run("information dresser chest labels use three by two frame rules", ref failed, InformationDresserChestLabelsUseThreeByTwoFrameRules);
             Run("information dresser display name avoids map object option bleed", ref failed, InformationDresserDisplayNameAvoidsMapObjectOptionBleed);
             Run("information chest display name avoids map object option bleed", ref failed, InformationChestDisplayNameAvoidsMapObjectOptionBleed);
