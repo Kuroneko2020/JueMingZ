@@ -1015,7 +1015,7 @@ function Test-DocsConsistency {
             Write-Pass "New cold-start handoff stays below adaptive size guard ($handoffLength <= $($handoffGuard.Limit) bytes; registeredFeatures=$($handoffGuard.FeatureCount))."
         }
 
-        if ($handoff.Contains("RuntimeVersion") -or $handoff -match "1\.7\.\d+") {
+        if ($handoff.Contains("RuntimeVersion") -or $handoff -match "(?<![\d.])(?:1\.7\.\d+|0\.\d+)(?:-[A-Za-z0-9][A-Za-z0-9-]*)?(?![\d.])") {
             Write-FailHealth "Cold-start handoff contains concrete version handoff content; keep version details in update records."
         }
         else {
