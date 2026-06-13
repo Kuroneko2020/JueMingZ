@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using JueMingZ.Automation.Search;
 using JueMingZ.Compat;
 using JueMingZ.Config;
+using JueMingZ.Runtime;
 using JueMingZ.Input;
 using JueMingZ.UI.Legacy;
 using JueMingZ.UI.Legacy.Framework;
@@ -15,6 +17,8 @@ namespace JueMingZ.Tests
 {
     internal static partial class Program
     {
+        private const float NativeImePanelAnchorVerticalOffsetForTesting = 32f;
+
         private static void SearchQueryUnknownItemDegradesCleanly()
         {
             WithSearchQueryFixture(() =>
@@ -149,16 +153,7 @@ namespace JueMingZ.Tests
 
         private static void SearchQueryLegacyTextInputShowsImeCompositionForAllKnownInputs()
         {
-            var inputIds = new[]
-            {
-                SearchItemQueryUiState.InputId,
-                SearchChestLocatorUiState.InputId,
-                FishingFilterUiState.KeywordInputId,
-                FishingFilterUiState.GlobalSearchInputId,
-                FishingFilterUiState.PresetNameInputId,
-                "fishing-quick-rename:name",
-                "misc-quick-reforge:prefix"
-            };
+            var inputIds = CreateKnownLegacyTextInputIdsForTesting();
 
             try
             {
@@ -195,24 +190,358 @@ namespace JueMingZ.Tests
         private static void SearchQueryLegacyTextInputAvoidsNativeImePanelDraw()
         {
             var repoRoot = ResolveSearchQueryRepoRoot();
-            var sourceFiles = new[]
+            var allowedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
                 Path.Combine(repoRoot, "src", "JueMingZ", "UI", "Legacy", "LegacyTextInput.cs"),
-                Path.Combine(repoRoot, "src", "JueMingZ", "Compat", "TerrariaTextInputCompat.cs")
+                Path.Combine(repoRoot, "src", "JueMingZ", "Compat", "TerrariaTextInputCompat.ImePanel.cs")
             };
 
-            var forbidden = new[] { "DrawIMEPanel", "SetIMEPanelAnchor" };
+            var sourceFiles = Directory.GetFiles(Path.Combine(repoRoot, "src", "JueMingZ", "UI", "Legacy"), "*.cs")
+                .Concat(Directory.GetFiles(Path.Combine(repoRoot, "src", "JueMingZ", "Automation", "Search"), "*.cs"))
+                .Concat(new[]
+                {
+                    Path.Combine(repoRoot, "src", "JueMingZ", "Compat", "TerrariaTextInputCompat.cs"),
+                    Path.Combine(repoRoot, "src", "JueMingZ", "Compat", "TerrariaTextInputCompat.ImePanel.cs")
+                })
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            var nativeImePanelTerms = new[] { "DrawIMEPanel", "SetIMEPanelAnchor" };
             for (var fileIndex = 0; fileIndex < sourceFiles.Length; fileIndex++)
             {
-                var text = File.ReadAllText(sourceFiles[fileIndex]);
-                for (var forbiddenIndex = 0; forbiddenIndex < forbidden.Length; forbiddenIndex++)
+                var path = sourceFiles[fileIndex];
+                var text = File.ReadAllText(path, Encoding.UTF8);
+                for (var termIndex = 0; termIndex < nativeImePanelTerms.Length; termIndex++)
                 {
-                    if (text.IndexOf(forbidden[forbiddenIndex], StringComparison.Ordinal) >= 0)
+                    var term = nativeImePanelTerms[termIndex];
+                    if (text.IndexOf(term, StringComparison.Ordinal) >= 0 && !allowedFiles.Contains(path))
                     {
                         throw new InvalidOperationException(
-                            "Legacy text input IME preview must not call native IME panel drawing before SpriteBatch stage is verified: " + sourceFiles[fileIndex]);
+                            "Native IME panel APIs must stay in shared LegacyTextInput/Compat entrypoints, not page or search-source files: " +
+                            Path.GetFileName(path) + " contains " + term + ".");
                     }
                 }
+            }
+
+            var compatText = File.ReadAllText(Path.Combine(repoRoot, "src", "JueMingZ", "Compat", "TerrariaTextInputCompat.ImePanel.cs"), Encoding.UTF8);
+            AssertContains(compatText, "TrySetImePanelAnchor");
+            AssertContains(compatText, "TryDrawImePanelAfterSpriteBatchEnded");
+            AssertContains(compatText, "spriteBatchBegun");
+        }
+
+        private static void SearchQueryLegacyTextInputImePanelAllUserFilesUseSharedWindowHook()
+        {
+            var repoRoot = ResolveSearchQueryRepoRoot();
+            var sourceChecks = new[]
+            {
+                new[] { Path.Combine(repoRoot, "src", "JueMingZ", "UI", "Legacy", "LegacyMainWindow.Search.cs"), "SearchItemQueryUiState.InputId" },
+                new[] { Path.Combine(repoRoot, "src", "JueMingZ", "UI", "Legacy", "LegacyMainWindow.Search.ChestLocator.cs"), "SearchChestLocatorUiState.InputId" },
+                new[] { Path.Combine(repoRoot, "src", "JueMingZ", "UI", "Legacy", "LegacyMainWindow.Fishing.FilterKeywords.cs"), "FishingFilterUiState.KeywordInputId" },
+                new[] { Path.Combine(repoRoot, "src", "JueMingZ", "UI", "Legacy", "LegacyMainWindow.Fishing.FilterSearch.cs"), "FishingFilterUiState.GlobalSearchInputId" },
+                new[] { Path.Combine(repoRoot, "src", "JueMingZ", "UI", "Legacy", "LegacyMainWindow.Fishing.FilterPresets.cs"), "FishingFilterUiState.PresetNameInputId" },
+                new[] { Path.Combine(repoRoot, "src", "JueMingZ", "UI", "Legacy", "LegacyMainWindow.Fishing.cs"), "FishingQuickRenameTextInputId" },
+                new[] { Path.Combine(repoRoot, "src", "JueMingZ", "UI", "Legacy", "LegacyMainWindow.Misc.QuickReforge.cs"), "MiscQuickReforgeTextInputId" }
+            };
+
+            for (var index = 0; index < sourceChecks.Length; index++)
+            {
+                var path = sourceChecks[index][0];
+                var marker = sourceChecks[index][1];
+                var text = File.ReadAllText(path, Encoding.UTF8);
+                AssertContains(text, marker);
+                AssertContains(text, "TryAttachLegacyTextInputImePanel(");
+            }
+
+            var helperText = File.ReadAllText(Path.Combine(repoRoot, "src", "JueMingZ", "UI", "Legacy", "LegacyMainWindow.ImePanel.cs"), Encoding.UTF8);
+            AssertContains(helperText, "LegacyTextInput.TryAttachImeCompositionPanel");
+            AssertContains(helperText, "TryResolveLegacyTextInputImeAnchor");
+        }
+
+        private static void SearchQueryLegacyTextInputImePanelAnchorUsesSharedCompat()
+        {
+            var restoreMainType = PushTextInputImePanelMainTypeForTesting(typeof(FakeImePanelMain));
+            try
+            {
+                FakeImePanelMain.Reset();
+                LegacyTextInput.Focus("ime-anchor-test", "草稿");
+                LegacyTextInput.BeginImeCompositionPanelFrame();
+
+                if (!LegacyTextInput.TryAttachImeCompositionPanel("ime-anchor-test", new LegacyUiRect(10, 20, 120, 24)))
+                {
+                    throw new InvalidOperationException("Focused LegacyTextInput should attach the native IME panel anchor through the shared Compat path: " + LegacyTextInput.DiagnosticMessage);
+                }
+
+                if (FakeImePanelMain.instance.SetAnchorCount != 1 ||
+                    Math.Abs(FakeImePanelMain.instance.LastAnchorX - 10f) > 0.001f ||
+                    Math.Abs(FakeImePanelMain.instance.LastAnchorY - (44f + NativeImePanelAnchorVerticalOffsetForTesting)) > 0.001f ||
+                    Math.Abs(FakeImePanelMain.instance.LastXAnchor) > 0.001f)
+                {
+                    throw new InvalidOperationException("LegacyTextInput IME panel anchor should be set below the input bottom-left once per attach.");
+                }
+
+                if (!TerrariaTextInputCompat.ImePanelAnchorAttachedForTesting)
+                {
+                    throw new InvalidOperationException("Compat should remember that a LegacyTextInput IME anchor was attached in this draw frame.");
+                }
+
+                if (LegacyTextInput.TryAttachImeCompositionPanel("other-input", new LegacyUiRect(30, 40, 100, 20)))
+                {
+                    throw new InvalidOperationException("Unfocused LegacyTextInput ids must not attach native IME panel anchors.");
+                }
+            }
+            finally
+            {
+                LegacyTextInput.ClearFocus();
+                restoreMainType();
+            }
+        }
+
+        private static void SearchQueryLegacyTextInputImePanelAllKnownInputsAttachThroughSharedWindowHook()
+        {
+            var restoreMainType = PushTextInputImePanelMainTypeForTesting(typeof(FakeImePanelMain));
+            var inputIds = CreateKnownLegacyTextInputIdsForTesting();
+            try
+            {
+                for (var index = 0; index < inputIds.Length; index++)
+                {
+                    var inputId = inputIds[index];
+                    var rect = new LegacyUiRect(10 + index * 3, 20 + index * 2, 120, 24);
+                    var clip = new LegacyUiRect(0, 0, 400, 300);
+                    FakeImePanelMain.Reset();
+                    LegacyTextInput.Focus(inputId, "草稿");
+                    LegacyTextInput.BeginImeCompositionPanelFrame();
+
+                    if (!LegacyMainWindow.TryAttachLegacyTextInputImePanelForTesting(inputId, rect, clip))
+                    {
+                        throw new InvalidOperationException("Known LegacyTextInput user should attach IME panel through shared window hook: " + inputId + " " + LegacyTextInput.DiagnosticMessage);
+                    }
+
+                    if (FakeImePanelMain.instance.SetAnchorCount != 1 ||
+                        Math.Abs(FakeImePanelMain.instance.LastAnchorX - rect.X) > 0.001f ||
+                        Math.Abs(FakeImePanelMain.instance.LastAnchorY - (rect.Bottom + NativeImePanelAnchorVerticalOffsetForTesting)) > 0.001f)
+                    {
+                        throw new InvalidOperationException("Shared window hook should attach the IME panel below the visible input rect bottom-left for " + inputId + ".");
+                    }
+
+                    LegacyTextInput.BeginImeCompositionPanelFrame();
+                    var offscreenClip = new LegacyUiRect(rect.Right + 10, rect.Bottom + 10, 20, 20);
+                    if (LegacyMainWindow.TryAttachLegacyTextInputImePanelForTesting(inputId, rect, offscreenClip))
+                    {
+                        throw new InvalidOperationException("Shared window hook must skip IME panel anchors for invisible input rects: " + inputId + ".");
+                    }
+
+                    if (FakeImePanelMain.instance.SetAnchorCount != 1)
+                    {
+                        throw new InvalidOperationException("Invisible input rects must not call the native IME panel anchor for " + inputId + ".");
+                    }
+
+                    LegacyTextInput.ClearFocus();
+                }
+            }
+            finally
+            {
+                LegacyTextInput.ClearFocus();
+                restoreMainType();
+            }
+        }
+
+        private static void SearchQueryLegacyTextInputImePanelTailRequiresEndedSpriteBatch()
+        {
+            var restoreMainType = PushTextInputImePanelMainTypeForTesting(typeof(FakeImePanelMain));
+            try
+            {
+                FakeImePanelMain.Reset();
+                LegacyTextInput.Focus("ime-tail-test", "草稿");
+                LegacyTextInput.BeginImeCompositionPanelFrame();
+                if (!LegacyTextInput.TryAttachImeCompositionPanel("ime-tail-test", new LegacyUiRect(5, 8, 100, 18)))
+                {
+                    throw new InvalidOperationException("Expected test IME panel anchor attach to succeed.");
+                }
+
+                if (LegacyTextInput.TryDrawImeCompositionPanelTail(true))
+                {
+                    throw new InvalidOperationException("Native IME panel draw must be rejected while Terraria interface SpriteBatch is active.");
+                }
+
+                if (FakeImePanelMain.instance.DrawPanelCount != 0 ||
+                    TerrariaTextInputCompat.ImePanelDrawnForTesting)
+                {
+                    throw new InvalidOperationException("Illegal SpriteBatch phase must not invoke DrawIMEPanel.");
+                }
+
+                if (!LegacyTextInput.TryDrawImeCompositionPanelTail(false))
+                {
+                    throw new InvalidOperationException("Native IME panel draw should be allowed after SpriteBatch.End: " + LegacyTextInput.DiagnosticMessage);
+                }
+
+                if (FakeImePanelMain.instance.DrawPanelCount != 1 ||
+                    !TerrariaTextInputCompat.ImePanelDrawnForTesting)
+                {
+                    throw new InvalidOperationException("Legal tail phase should invoke DrawIMEPanel exactly once.");
+                }
+            }
+            finally
+            {
+                LegacyTextInput.ClearFocus();
+                restoreMainType();
+            }
+        }
+
+        private static void SearchQueryLegacyTextInputImePanelReflectionCacheResolvesOnce()
+        {
+            var restoreMainType = PushTextInputImePanelMainTypeForTesting(typeof(FakeImePanelMain));
+            try
+            {
+                FakeImePanelMain.Reset();
+                LegacyTextInput.Focus("ime-cache-test", "草稿");
+
+                for (var index = 0; index < 1000; index++)
+                {
+                    LegacyTextInput.BeginImeCompositionPanelFrame();
+                    if (!LegacyTextInput.TryAttachImeCompositionPanel("ime-cache-test", new LegacyUiRect(1 + index, 2, 80, 16)))
+                    {
+                        throw new InvalidOperationException("Expected IME panel anchor attach to succeed at iteration " + index + ".");
+                    }
+                }
+
+                if (TerrariaTextInputCompat.ImePanelReflectionResolveCountForTesting != 1)
+                {
+                    throw new InvalidOperationException("IME panel reflection methods should be resolved once and cached, not looked up per frame.");
+                }
+
+                if (FakeImePanelMain.instance.SetAnchorCount != 1000)
+                {
+                    throw new InvalidOperationException("Reflection cache should not block subsequent anchor attaches.");
+                }
+
+                var diagnostics = TerrariaTextInputCompat.GetImePanelDiagnosticsForSnapshot();
+                if (diagnostics.InvokeFallbackCount != 0 ||
+                    diagnostics.AnchorAttachAttemptCount != 1000 ||
+                    diagnostics.AnchorAttachSuccessCount != 1000 ||
+                    !diagnostics.SetAnchorDelegateReady)
+                {
+                    throw new InvalidOperationException("IME panel anchor attach should use the cached delegate path without MethodInfo.Invoke fallback.");
+                }
+            }
+            finally
+            {
+                LegacyTextInput.ClearFocus();
+                restoreMainType();
+            }
+        }
+
+        private static void SearchQueryLegacyTextInputImePanelTailSkipsWithoutAnchor()
+        {
+            var restoreMainType = PushTextInputImePanelMainTypeForTesting(typeof(FakeImePanelMain));
+            try
+            {
+                FakeImePanelMain.Reset();
+                LegacyTextInput.Focus("ime-no-anchor-test", "草稿");
+                LegacyTextInput.BeginImeCompositionPanelFrame();
+
+                if (!LegacyTextInput.TryDrawImeCompositionPanelTail(false))
+                {
+                    throw new InvalidOperationException("IME panel tail should treat no-anchor frames as a cheap successful skip.");
+                }
+
+                if (FakeImePanelMain.instance.DrawPanelCount != 0)
+                {
+                    throw new InvalidOperationException("No-anchor frames must not call DrawIMEPanel.");
+                }
+
+                var diagnostics = TerrariaTextInputCompat.GetImePanelDiagnosticsForSnapshot();
+                if (diagnostics.DrawAttemptCount != 1 ||
+                    diagnostics.DrawSkippedNoAnchorCount != 1 ||
+                    diagnostics.ReflectionResolveCount != 0 ||
+                    diagnostics.InvokeFallbackCount != 0 ||
+                    !string.Equals(diagnostics.LastStatus, "drawSkippedNoAnchor", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("No-anchor IME panel tail skip must remain cheap and diagnosable.");
+                }
+            }
+            finally
+            {
+                LegacyTextInput.ClearFocus();
+                restoreMainType();
+            }
+        }
+
+        private static void SearchQueryLegacyTextInputImePanelDiagnosticsSnapshotFields()
+        {
+            var restoreMainType = PushTextInputImePanelMainTypeForTesting(typeof(FakeImePanelMain));
+            try
+            {
+                FakeImePanelMain.Reset();
+                LegacyTextInput.Focus("ime-snapshot-test", "草稿");
+                LegacyTextInput.BeginImeCompositionPanelFrame();
+                if (!LegacyTextInput.TryAttachImeCompositionPanel("ime-snapshot-test", new LegacyUiRect(5, 6, 90, 18)))
+                {
+                    throw new InvalidOperationException("Expected IME panel attach to succeed before snapshot diagnostics.");
+                }
+
+                if (!LegacyTextInput.TryDrawImeCompositionPanelTail(false))
+                {
+                    throw new InvalidOperationException("Expected IME panel draw to succeed before snapshot diagnostics.");
+                }
+
+                var snapshot = RuntimeDiagnosticSnapshotBuilder.Build(new RuntimeDiagnosticSnapshotContext
+                {
+                    Initialized = true,
+                    Version = "test-ime-panel-diagnostics"
+                });
+                var json = InvokeDiagnosticSnapshotJson(snapshot);
+                AssertContains(json, "\"LegacyImePanelFocused\": true");
+                AssertContains(json, "\"LegacyImePanelAnchorAttachedThisFrame\": true");
+                AssertContains(json, "\"LegacyImePanelDrawnThisFrame\": true");
+                AssertContains(json, "\"LegacyImePanelReflectionResolveCount\": 1");
+                AssertContains(json, "\"LegacyImePanelLastStatus\": \"drawn\"");
+                AssertContains(json, "\"LegacyImePanelCadenceSummary\": \"frameReset=1; anchor=1/1; draw=1/1;");
+                AssertContains(json, "invokeFallback=0");
+                AssertContains(json, "delegates=setAnchor:true,draw:true");
+            }
+            finally
+            {
+                LegacyTextInput.ClearFocus();
+                restoreMainType();
+            }
+        }
+
+        private static void SearchQueryLegacyTextInputImePanelPerformanceGuards()
+        {
+            var repoRoot = ResolveSearchQueryRepoRoot();
+            var compatText = File.ReadAllText(
+                Path.Combine(repoRoot, "src", "JueMingZ", "Compat", "TerrariaTextInputCompat.ImePanel.cs"),
+                Encoding.UTF8);
+
+            AssertContains(compatText, "Delegate.CreateDelegate");
+            AssertContains(compatText, "TimeSpan.FromSeconds(10)");
+            AssertContains(compatText, "InvokeFallbackCount");
+            if (compatText.IndexOf("Console.WriteLine", StringComparison.Ordinal) >= 0 ||
+                compatText.IndexOf("Logger.Error", StringComparison.Ordinal) >= 0)
+            {
+                throw new InvalidOperationException("IME panel diagnostics must use throttled logging instead of synchronous console/error spam.");
+            }
+        }
+
+        private static void SearchQueryLegacyTextInputImePanelMissingApiWritesDiagnostic()
+        {
+            var restoreMainType = PushTextInputImePanelMainTypeForTesting(typeof(FakeImePanelMissingMain));
+            try
+            {
+                LegacyTextInput.Focus("ime-missing-api-test", "草稿");
+                LegacyTextInput.BeginImeCompositionPanelFrame();
+
+                if (LegacyTextInput.TryAttachImeCompositionPanel("ime-missing-api-test", new LegacyUiRect(1, 2, 80, 16)))
+                {
+                    throw new InvalidOperationException("Missing SetIMEPanelAnchor should fail closed.");
+                }
+
+                AssertContains(LegacyTextInput.DiagnosticMessage, "SetIMEPanelAnchor");
+            }
+            finally
+            {
+                LegacyTextInput.ClearFocus();
+                restoreMainType();
             }
         }
 
@@ -266,6 +595,20 @@ namespace JueMingZ.Tests
             });
         }
 
+        private static string[] CreateKnownLegacyTextInputIdsForTesting()
+        {
+            return new[]
+            {
+                SearchItemQueryUiState.InputId,
+                SearchChestLocatorUiState.InputId,
+                FishingFilterUiState.KeywordInputId,
+                FishingFilterUiState.GlobalSearchInputId,
+                FishingFilterUiState.PresetNameInputId,
+                "fishing-quick-rename:name",
+                "misc-quick-reforge:prefix"
+            };
+        }
+
         private static void SearchQueryDynamicSourceBoundaryProtectsProductionPaths()
         {
             var repoRoot = ResolveSearchQueryRepoRoot();
@@ -301,9 +644,7 @@ namespace JueMingZ.Tests
                 "SetupTravelShop",
                 "NPC.AnyNPCs",
                 "ExtractinatorHelper",
-                "RollExtractinatorDrop",
-                "DrawIMEPanel",
-                "SetIMEPanelAnchor"
+                "RollExtractinatorDrop"
             };
 
             for (var fileIndex = 0; fileIndex < sourceFiles.Count; fileIndex++)
@@ -4868,6 +5209,58 @@ namespace JueMingZ.Tests
             }
 
             throw new InvalidOperationException("Unable to locate JueMingZ.sln for search query source-boundary audit.");
+        }
+
+        private static Action PushTextInputImePanelMainTypeForTesting(Type mainType)
+        {
+            var runtimeMainField = typeof(TerrariaRuntimeTypes).GetField("_mainType", BindingFlags.Static | BindingFlags.NonPublic);
+            if (runtimeMainField == null)
+            {
+                throw new InvalidOperationException("Terraria runtime main type cache field missing.");
+            }
+
+            var previousRuntimeMain = runtimeMainField.GetValue(null);
+            runtimeMainField.SetValue(null, mainType);
+            TerrariaTextInputCompat.ResetImePanelReflectionCacheForTesting();
+            return () =>
+            {
+                TerrariaTextInputCompat.ResetImePanelReflectionCacheForTesting();
+                runtimeMainField.SetValue(null, previousRuntimeMain);
+            };
+        }
+
+        private sealed class FakeImePanelMain
+        {
+            public static FakeImePanelMain instance = new FakeImePanelMain();
+
+            public int SetAnchorCount { get; private set; }
+            public int DrawPanelCount { get; private set; }
+            public float LastAnchorX { get; private set; }
+            public float LastAnchorY { get; private set; }
+            public float LastXAnchor { get; private set; }
+
+            public static void Reset()
+            {
+                instance = new FakeImePanelMain();
+            }
+
+            public void SetIMEPanelAnchor(Microsoft.Xna.Framework.Vector2 position, float xAnchor)
+            {
+                SetAnchorCount++;
+                LastAnchorX = position.X;
+                LastAnchorY = position.Y;
+                LastXAnchor = xAnchor;
+            }
+
+            public void DrawIMEPanel()
+            {
+                DrawPanelCount++;
+            }
+        }
+
+        private sealed class FakeImePanelMissingMain
+        {
+            public static FakeImePanelMissingMain instance = new FakeImePanelMissingMain();
         }
 
         private static void AssertSearchCandidate(IList<ItemQueryCandidate> candidates, int itemType, string label)

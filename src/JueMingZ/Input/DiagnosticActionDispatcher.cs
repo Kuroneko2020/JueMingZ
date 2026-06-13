@@ -13,6 +13,8 @@ namespace JueMingZ.Input
     {
         // Diagnostic UI/hotkeys either update local diagnostics/config or enqueue requests;
         // they must not execute Terraria input or state mutations directly.
+        private static readonly TimeSpan DiagnosticQueueTimeout = TimeSpan.FromMilliseconds(250);
+
         public static void ToggleDiagnosticInput(DiagnosticActionSource source)
         {
             ConfigService.AppSettings.EnableDiagnosticInputTests = !ConfigService.AppSettings.EnableDiagnosticInputTests;
@@ -103,7 +105,7 @@ namespace JueMingZ.Input
                 return;
             }
 
-            var request = InputActionRequest.CreateDiagnosticNoop("diagnostics." + GetSourceKind(source).ToLowerInvariant(), "DiagnosticNoop test");
+            var request = CreateDiagnosticNoopRequest(source);
             AddSourceMetadata(request, source, IsButton(source) ? "Button.DiagnosticNoop" : "CtrlAltJ.DiagnosticNoop");
             Enqueue(queue, request, source, "空动作", "已点击按钮：空动作，已提交 DiagnosticNoop 动作。");
         }
@@ -447,13 +449,24 @@ namespace JueMingZ.Input
                 return;
             }
 
-            // ACTION_QUEUE_DIRECT_ENQUEUE_EXCEPTION: diagnostic button/hotkey test path; owner=diagnostics; migrate_after=diagnostic UI can report admission denied/supersede results explicitly.
-            var requestId = queue.Enqueue(request);
+            InputActionAdmissionResult admission;
+            var accepted = queue.TryEnqueue(request, out admission);
             MarkSource(source);
-            Logger.Info("DiagnosticActionDispatcher", GetSourceLabel(source) + ": enqueued " + request.Kind + ".");
+            var resultCode = ResolveAdmissionResultCode(admission);
+            var message = BuildAdmissionFeedback(label, request, admission, accepted, IsButton(source), buttonMessage);
+            RecordAdmissionEvent(request, source, resultCode, message, accepted, admission);
+            if (accepted)
+            {
+                Logger.Info("DiagnosticActionDispatcher", GetSourceLabel(source) + ": admission " + (admission == null ? "Accepted" : admission.Decision.ToString()) + " for " + request.Kind + ".");
+            }
+            else
+            {
+                Logger.Warn("DiagnosticActionDispatcher", GetSourceLabel(source) + ": admission denied for " + request.Kind + ": " + (admission == null ? "unknown" : admission.Summary));
+            }
+
             if (IsButton(source))
             {
-                RecordClick(source, DiagnosticResultCode.Queued, buttonMessage, true, requestId);
+                RecordClick(source, resultCode, message, accepted, ResolveAdmissionRequestId(request, admission));
             }
         }
 
@@ -465,8 +478,160 @@ namespace JueMingZ.Input
                 Priority = InputActionPriority.Normal,
                 SourceFeatureId = "diagnostics.ui",
                 Description = description ?? string.Empty,
+                DuplicatePolicy = InputActionDuplicatePolicy.CoalescePending,
+                QueueTimeout = DiagnosticQueueTimeout,
                 Timeout = TimeSpan.FromSeconds(3)
             };
+        }
+
+        private static InputActionRequest CreateDiagnosticNoopRequest(DiagnosticActionSource source)
+        {
+            var request = InputActionRequest.CreateDiagnosticNoop("diagnostics." + GetSourceKind(source).ToLowerInvariant(), "DiagnosticNoop test");
+            ApplyDiagnosticAdmissionDefaults(request);
+            request.Timeout = TimeSpan.FromSeconds(3);
+            return request;
+        }
+
+        internal static InputActionRequest CreateDiagnosticRequestForTesting(InputActionKind kind, string scenario, DiagnosticActionSource source)
+        {
+            var request = kind == InputActionKind.DiagnosticNoop
+                ? CreateDiagnosticNoopRequest(source)
+                : CreateRequest(kind, kind + " test");
+            AddSourceMetadata(request, source, scenario);
+            return request;
+        }
+
+        internal static string BuildAdmissionFeedbackForTesting(string label, InputActionRequest request, InputActionAdmissionResult admission, bool accepted)
+        {
+            return BuildAdmissionFeedback(label, request, admission, accepted, false, string.Empty);
+        }
+
+        private static void ApplyDiagnosticAdmissionDefaults(InputActionRequest request)
+        {
+            if (request == null)
+            {
+                return;
+            }
+
+            request.DuplicatePolicy = InputActionDuplicatePolicy.CoalescePending;
+            request.QueueTimeout = DiagnosticQueueTimeout;
+        }
+
+        private static DiagnosticResultCode ResolveAdmissionResultCode(InputActionAdmissionResult admission)
+        {
+            return admission != null && admission.Accepted
+                ? DiagnosticResultCode.Queued
+                : DiagnosticResultCode.Failed;
+        }
+
+        private static Guid ResolveAdmissionRequestId(InputActionRequest request, InputActionAdmissionResult admission)
+        {
+            if (admission != null && admission.RequestId != Guid.Empty)
+            {
+                return admission.RequestId;
+            }
+
+            return request == null ? Guid.Empty : request.RequestId;
+        }
+
+        private static string BuildAdmissionFeedback(
+            string label,
+            InputActionRequest request,
+            InputActionAdmissionResult admission,
+            bool accepted,
+            bool isButton,
+            string buttonAcceptedMessage)
+        {
+            var safeLabel = string.IsNullOrWhiteSpace(label)
+                ? (request == null ? "诊断动作" : request.Kind.ToString())
+                : label;
+            if (admission == null)
+            {
+                return "动作未提交：" + safeLabel + "，队列未返回准入结果。";
+            }
+
+            if (!accepted || !admission.Accepted)
+            {
+                return "动作未提交：" + safeLabel + "，" + admission.Summary + "。";
+            }
+
+            if (admission.Decision == InputActionAdmissionDecision.CoalescedPending)
+            {
+                return "诊断动作已合并待执行请求：" + safeLabel + "，" + admission.Summary + "。";
+            }
+
+            if (admission.Decision == InputActionAdmissionDecision.SupersededPending)
+            {
+                return "诊断动作已替换待执行请求：" + safeLabel + "，" + admission.Summary + "。";
+            }
+
+            if (isButton && !string.IsNullOrWhiteSpace(buttonAcceptedMessage))
+            {
+                return buttonAcceptedMessage;
+            }
+
+            return safeLabel + " 已提交 " + (request == null ? "Diagnostic" : request.Kind.ToString()) + " 动作。";
+        }
+
+        private static void RecordAdmissionEvent(
+            InputActionRequest request,
+            DiagnosticActionSource source,
+            DiagnosticResultCode resultCode,
+            string message,
+            bool submitted,
+            InputActionAdmissionResult admission)
+        {
+            DiagnosticActionRecorder.RecordCustomEvent(
+                ResolveAdmissionRequestId(request, admission),
+                GetRequestScenario(request),
+                request == null ? "Diagnostic" : request.Kind.ToString(),
+                GetHotkey(source),
+                admission == null ? "Denied" : admission.Status,
+                resultCode.ToString(),
+                message,
+                0,
+                "{}",
+                "{}",
+                BuildAdmissionVerificationJson(request, submitted, admission),
+                GetSourceKind(source),
+                GetSourceUi(source),
+                GetButtonId(source),
+                GetButtonLabel(source));
+        }
+
+        private static string BuildAdmissionVerificationJson(InputActionRequest request, bool submitted, InputActionAdmissionResult admission)
+        {
+            return "{" +
+                   "\"submitted\":" + (submitted ? "true" : "false") + "," +
+                   "\"admissionStatus\":\"" + EscapeJson(admission == null ? "Denied" : admission.Status) + "\"," +
+                   "\"admissionDecision\":\"" + EscapeJson(admission == null ? string.Empty : admission.Decision.ToString()) + "\"," +
+                   "\"admissionReason\":\"" + EscapeJson(admission == null ? string.Empty : admission.Reason) + "\"," +
+                   "\"admissionKey\":\"" + EscapeJson(admission == null ? (request == null ? string.Empty : request.AdmissionKey) : admission.AdmissionKey) + "\"," +
+                   "\"admissionSummary\":\"" + EscapeJson(admission == null ? string.Empty : admission.Summary) + "\"," +
+                   "\"queueTimeoutMs\":" + FormatMilliseconds(request == null ? TimeSpan.Zero : request.QueueTimeout) + "," +
+                   "\"duplicatePolicy\":\"" + EscapeJson(request == null ? string.Empty : request.DuplicatePolicy.ToString()) + "\"," +
+                   "\"supersededRequestId\":\"" + EscapeJson(admission == null || admission.SupersededRequestId == Guid.Empty ? string.Empty : admission.SupersededRequestId.ToString()) + "\"," +
+                   "\"coalescedRequestId\":\"" + EscapeJson(admission == null || admission.CoalescedRequestId == Guid.Empty ? string.Empty : admission.CoalescedRequestId.ToString()) + "\"," +
+                   "\"coalescedCount\":" + (admission == null ? "0" : admission.CoalescedCount.ToString(CultureInfo.InvariantCulture)) +
+                   "}";
+        }
+
+        private static string FormatMilliseconds(TimeSpan value)
+        {
+            return ((long)Math.Round(value.TotalMilliseconds)).ToString(CultureInfo.InvariantCulture);
+        }
+
+        private static string GetRequestScenario(InputActionRequest request)
+        {
+            if (request == null || request.Metadata == null)
+            {
+                return "Diagnostic.ActionAdmission";
+            }
+
+            string scenario;
+            return request.Metadata.TryGetValue("Scenario", out scenario) && !string.IsNullOrWhiteSpace(scenario)
+                ? scenario
+                : "Diagnostic.ActionAdmission";
         }
 
         private static bool EnsureDiagnosticEnabled(DiagnosticActionSource source)
@@ -611,6 +776,8 @@ namespace JueMingZ.Input
                 return;
             }
 
+            ApplyDiagnosticAdmissionDefaults(request);
+            request.AdmissionKey = BuildDiagnosticAdmissionKey(request, source, scenario);
             request.Metadata["Scenario"] = scenario ?? string.Empty;
             request.Metadata["SourceKind"] = GetSourceKind(source);
             request.Metadata["SourceUi"] = GetSourceUi(source);
@@ -634,6 +801,35 @@ namespace JueMingZ.Input
             request.Metadata["UiWindow"] = GetUiWindow(source);
             request.Metadata["UiElementId"] = GetUiElementId(source);
             request.Metadata["MouseCaptured"] = GetMouseCaptured(source) ? "true" : "false";
+        }
+
+        private static string BuildDiagnosticAdmissionKey(InputActionRequest request, DiagnosticActionSource source, string scenario)
+        {
+            var identity = string.IsNullOrWhiteSpace(scenario) ? GetButtonId(source) : scenario;
+            if (string.IsNullOrWhiteSpace(identity))
+            {
+                identity = GetHotkey(source);
+            }
+
+            if (string.IsNullOrWhiteSpace(identity))
+            {
+                identity = request == null ? "unknown" : request.Kind.ToString();
+            }
+
+            return "diagnostics|" +
+                   SanitizeAdmissionKeyPart(GetSourceKind(source)) +
+                   "|" + (request == null ? "None" : request.Kind.ToString()) +
+                   "|" + SanitizeAdmissionKeyPart(identity);
+        }
+
+        private static string SanitizeAdmissionKeyPart(string value)
+        {
+            var safe = (value ?? string.Empty)
+                .Trim()
+                .Replace('|', '/')
+                .Replace('\r', ' ')
+                .Replace('\n', ' ');
+            return safe.Length <= 96 ? safe : safe.Substring(0, 96);
         }
 
         private static void MarkSource(DiagnosticActionSource source)

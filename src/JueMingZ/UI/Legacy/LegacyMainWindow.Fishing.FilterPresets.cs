@@ -35,6 +35,7 @@ namespace JueMingZ.UI.Legacy
             }
 
             UiTextRenderer.DrawTextClipped(spriteBatch, text, rect.X + 8, rect.Y + 7, rect.Width - 16, 18, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 238, 226, 255, 0.64f);
+            TryAttachLegacyTextInputImePanel(FishingFilterUiState.PresetNameInputId, rect, area.Viewport);
             var message = LegacyTextInput.DiagnosticMessage;
             var tooltip = string.IsNullOrWhiteSpace(message)
                 ? "输入预设名称。应用预设会覆盖当前名单，不会合并。"

@@ -74,6 +74,7 @@ namespace JueMingZ.UI.Legacy
                 selected ? LegacyUiTheme.SelectedTextB : 224,
                 255,
                 0.72f);
+            TryAttachLegacyTextInputImePanel(MiscQuickReforgeTextInputId, rect, clip);
             if (selected)
             {
                 LegacyUiTheme.DrawSelectedTextMarkersClipped(spriteBatch, new LegacyUiRect(rect.X + 8, contentRect.Y + 3, rect.Width - 16, Math.Max(1, contentRect.Height - 6)), clip, text ?? string.Empty, 0.72f);

@@ -40,14 +40,7 @@ namespace JueMingZ.Diagnostics
                 Directory.CreateDirectory(DiagnosticSnapshotWriter.DiagnosticsDirectory);
                 var tempPath = FeatureCatalogPath + ".tmp-" + Guid.NewGuid().ToString("N");
                 File.WriteAllText(tempPath, ToJson(registry.GetAll()), Encoding.UTF8);
-                File.Copy(tempPath, FeatureCatalogPath, true);
-                try
-                {
-                    File.Delete(tempPath);
-                }
-                catch
-                {
-                }
+                DiagnosticArtifactFileReplacer.ReplaceCompletedTempFile(tempPath, FeatureCatalogPath);
 
                 Logger.Info("FeatureCatalogWriter", "feature catalog written: " + FeatureCatalogPath);
             }

@@ -406,18 +406,39 @@ namespace JueMingZ.Records
                     stream.Flush(true);
                 }
 
-                if (File.Exists(path))
-                {
-                    File.Delete(path);
-                }
-
-                File.Move(tempPath, path);
+                ReplaceBehaviorFile(tempPath, path);
                 Cache[fileName] = file;
             }
             catch (Exception error)
             {
                 Logger.Warn("PlayerWorldBehaviorStore", "Behavior record save failed: " + error.Message);
                 TryDeleteTemp(tempPath);
+            }
+        }
+
+        private static void ReplaceBehaviorFile(string tempPath, string targetPath)
+        {
+            if (!File.Exists(targetPath))
+            {
+                File.Move(tempPath, targetPath);
+                return;
+            }
+
+            try
+            {
+                // Existing behavior records are player/world memory. If atomic replace is unavailable
+                // or the target is busy, the caller must keep the old file and only clean the temp.
+                File.Replace(tempPath, targetPath, null);
+            }
+            catch (FileNotFoundException)
+            {
+                if (!File.Exists(targetPath))
+                {
+                    File.Move(tempPath, targetPath);
+                    return;
+                }
+
+                throw;
             }
         }
 

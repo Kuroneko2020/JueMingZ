@@ -11,6 +11,10 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\JueMingZ\JueMingZ.csproj" />
+    <Reference Include="Microsoft.Xna.Framework">
+      <HintPath>$(JueMingZTerrariaRefsDir)\Microsoft.Xna.Framework.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <JueMingZRuntimeTestDependency Include="$(JueMingZTerrariaRefsDir)\Terraria.exe" />

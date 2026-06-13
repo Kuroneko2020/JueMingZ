@@ -179,6 +179,7 @@ namespace JueMingZ.UI.Legacy
                 muted ? 208 : 218,
                 255,
                 0.70f);
+            TryAttachLegacyTextInputImePanel(SearchItemQueryUiState.InputId, inputRect, area.Viewport);
             var inputElement = AddFrameElement(
                 elements,
                 SearchItemQueryUiState.InputId,

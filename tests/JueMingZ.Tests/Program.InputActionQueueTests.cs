@@ -7,6 +7,7 @@ using JueMingZ.Automation.Combat;
 using JueMingZ.Automation.Movement;
 using JueMingZ.Common;
 using JueMingZ.Config;
+using JueMingZ.Input;
 
 namespace JueMingZ.Tests
 {
@@ -941,6 +942,112 @@ namespace JueMingZ.Tests
             AssertPositiveQueueTimeout(request, "auto facing");
         }
 
+        private static void DiagnosticActionRequestHasAdmissionContract()
+        {
+            var request = DiagnosticActionDispatcher.CreateDiagnosticRequestForTesting(
+                InputActionKind.QuickHeal,
+                "Button.QuickHeal",
+                DiagnosticActionSource.ForButton("diagnostics.quick_heal", "QuickHeal 回血"));
+
+            AssertPositiveQueueTimeout(request, "diagnostic action");
+            if (request.QueueTimeout > TimeSpan.FromMilliseconds(500) ||
+                request.DuplicatePolicy != InputActionDuplicatePolicy.CoalescePending ||
+                string.IsNullOrWhiteSpace(request.AdmissionKey) ||
+                !string.Equals(request.Metadata[ActionMetadataKeys.SourceKind], "Button", StringComparison.Ordinal) ||
+                !string.Equals(request.Metadata[ActionMetadataKeys.Scenario], "Button.QuickHeal", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected diagnostic action request to carry a short queue timeout, coalesce policy, stable key, and source metadata.");
+            }
+        }
+
+        private static void RepeatedDiagnosticActionCoalescesPending()
+        {
+            var queue = new InputActionQueue();
+            var source = DiagnosticActionSource.ForButton("diagnostics.quick_heal", "QuickHeal 回血");
+            var first = DiagnosticActionDispatcher.CreateDiagnosticRequestForTesting(InputActionKind.QuickHeal, "Button.QuickHeal", source);
+            var second = DiagnosticActionDispatcher.CreateDiagnosticRequestForTesting(InputActionKind.QuickHeal, "Button.QuickHeal", source);
+
+            InputActionAdmissionResult admission;
+            if (!queue.TryEnqueue(first, out admission))
+            {
+                throw new InvalidOperationException("Expected first diagnostic action to be admitted.");
+            }
+
+            if (!queue.TryEnqueue(second, out admission))
+            {
+                throw new InvalidOperationException("Expected repeated diagnostic action to coalesce pending request: " + (admission == null ? "null" : admission.Reason));
+            }
+
+            var pending = queue.GetPendingRequestsForTesting();
+            var snapshot = queue.GetSnapshot();
+            if (admission == null ||
+                admission.Decision != InputActionAdmissionDecision.CoalescedPending ||
+                pending.Count != 1 ||
+                pending[0].RequestId != first.RequestId ||
+                !string.Equals(pending[0].Metadata["AdmissionCoalescedCount"], "1", StringComparison.Ordinal) ||
+                !string.Equals(snapshot.ActionQueueLastAdmissionStatus, "Coalesced", StringComparison.Ordinal) ||
+                snapshot.ActionQueueCoalescedPendingCount != 1)
+            {
+                throw new InvalidOperationException("Expected repeated diagnostic action to update one pending request and expose coalesced admission diagnostics.");
+            }
+        }
+
+        private static void DiagnosticAdmissionDeniedFeedbackIncludesSummary()
+        {
+            var request = DiagnosticActionDispatcher.CreateDiagnosticRequestForTesting(
+                InputActionKind.ItemUse,
+                "Button.UseSelectedItem",
+                DiagnosticActionSource.ForButton("diagnostics.use_selected", "使用手上物品"));
+            var admission = new InputActionAdmissionResult
+            {
+                Accepted = false,
+                Decision = InputActionAdmissionDecision.DeniedDuplicatePendingOrRunning,
+                Kind = request.Kind,
+                SourceFeatureId = request.SourceFeatureId,
+                AdmissionKey = request.AdmissionKey,
+                RequiredChannels = InputActionChannel.UseItem,
+                BlockingChannels = InputActionChannel.UseItem,
+                Reason = "duplicateRunning:test"
+            };
+
+            var feedback = DiagnosticActionDispatcher.BuildAdmissionFeedbackForTesting("使用手上物品", request, admission, false);
+            if (feedback.IndexOf("动作未提交", StringComparison.Ordinal) < 0 ||
+                feedback.IndexOf("Denied", StringComparison.Ordinal) < 0 ||
+                feedback.IndexOf("DeniedDuplicatePendingOrRunning", StringComparison.Ordinal) < 0 ||
+                feedback.IndexOf("duplicateRunning:test", StringComparison.Ordinal) < 0)
+            {
+                throw new InvalidOperationException("Expected denied diagnostic admission feedback to include the admission summary.");
+            }
+        }
+
+        private static void SchedulerTreatsDiagnosticButtonAsUserCommand()
+        {
+            var earlyBackground = new InputActionRequest
+            {
+                Kind = InputActionKind.RawInput,
+                Priority = InputActionPriority.Normal,
+                SourceFeatureId = FeatureIds.WorldAutomationAutoHarvest,
+                CreatedUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                Metadata =
+                {
+                    { ActionMetadataKeys.SourceKind, "Automation" },
+                    { ActionMetadataKeys.Scenario, ScenarioNames.WorldAutomationAutoHarvest }
+                }
+            };
+            var laterButton = DiagnosticActionDispatcher.CreateDiagnosticRequestForTesting(
+                InputActionKind.QuickHeal,
+                "Button.QuickHeal",
+                DiagnosticActionSource.ForButton("diagnostics.quick_heal", "QuickHeal 回血"));
+            laterButton.CreatedUtc = new DateTime(2026, 1, 1, 0, 0, 1, DateTimeKind.Utc);
+
+            var selected = InputActionScheduler.SelectNext(new[] { earlyBackground, laterButton });
+            if (!object.ReferenceEquals(selected, laterButton) ||
+                !string.Equals(InputActionScheduler.ResolveBucketName(laterButton), "P2:UserExplicitCommand", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected diagnostic button actions to be treated as explicit user commands.");
+            }
+        }
+
         private static void AssertPositiveQueueTimeout(InputActionRequest request, string label)
         {
             if (request == null || request.QueueTimeout <= TimeSpan.Zero)
@@ -990,6 +1097,59 @@ namespace JueMingZ.Tests
                 snapshot.LastResult.Status != InputActionStatus.Failed)
             {
                 throw new InvalidOperationException("Expected start exception path to release channel lease and record failed result.");
+            }
+        }
+
+        private static void InputActionQueueReleasesChannelAfterUpdateException()
+        {
+            var executors = new Dictionary<InputActionKind, IInputActionExecutor>();
+            executors[InputActionKind.MouseTarget] = new ThrowingUpdateFakeExecutor(InputActionKind.MouseTarget);
+            executors[InputActionKind.Jump] = new TerminalFakeExecutor(
+                InputActionKind.Jump,
+                InputActionStatus.Succeeded,
+                "next action completed");
+            var queue = new InputActionQueue(executors);
+            var throwingRequest = new InputActionRequest
+            {
+                Kind = InputActionKind.MouseTarget,
+                SourceFeatureId = "test.update_exception",
+                Description = "throwing update action"
+            };
+            var nextRequest = new InputActionRequest
+            {
+                Kind = InputActionKind.Jump,
+                SourceFeatureId = "test.update_exception.next",
+                Description = "next action after update exception"
+            };
+            queue.Enqueue(throwingRequest);
+            queue.Enqueue(nextRequest);
+
+            queue.Update(null);
+            var snapshot = queue.GetSnapshot();
+            if (snapshot.ActionQueueChannelLeaseCount != 0 ||
+                !string.IsNullOrWhiteSpace(snapshot.RunningActionKind) ||
+                snapshot.PendingCount != 1 ||
+                snapshot.LastResult == null ||
+                snapshot.LastResult.Status != InputActionStatus.Failed ||
+                snapshot.LastResult.Error == null ||
+                snapshot.LastResult.Message.IndexOf("Action update failed", StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                throw new InvalidOperationException("Expected update exception path to fail, release channel lease, clear running action, and keep pending work.");
+            }
+
+            queue.Update(null);
+            snapshot = queue.GetSnapshot();
+            InputActionResult failedResult;
+            if (!queue.TryGetResultByRequestId(throwingRequest.RequestId, out failedResult) ||
+                failedResult.Status != InputActionStatus.Failed ||
+                failedResult.Error == null ||
+                snapshot.ActionQueueChannelLeaseCount != 0 ||
+                !string.IsNullOrWhiteSpace(snapshot.RunningActionKind) ||
+                snapshot.LastResult == null ||
+                snapshot.LastResult.RequestId != nextRequest.RequestId ||
+                snapshot.LastResult.Status != InputActionStatus.Succeeded)
+            {
+                throw new InvalidOperationException("Expected queue to preserve failed update result and continue with the next action.");
             }
         }
 
@@ -1058,8 +1218,18 @@ namespace JueMingZ.Tests
         private static void DiagnosticNoopDoesNotAcquireChannelLease()
         {
             var queue = new InputActionQueue();
+            var request = DiagnosticActionDispatcher.CreateDiagnosticRequestForTesting(
+                InputActionKind.DiagnosticNoop,
+                "Button.DiagnosticNoop",
+                DiagnosticActionSource.ForButton("diagnostics.noop", "空动作"));
+            AssertPositiveQueueTimeout(request, "diagnostic noop");
+            if (request.DuplicatePolicy != InputActionDuplicatePolicy.CoalescePending)
+            {
+                throw new InvalidOperationException("Expected DiagnosticNoop diagnostic request to use coalescing admission policy.");
+            }
+
             InputActionAdmissionResult admission;
-            if (!queue.TryEnqueue(InputActionRequest.CreateDiagnosticNoop("test.noop", "diagnostic noop"), out admission))
+            if (!queue.TryEnqueue(request, out admission))
             {
                 throw new InvalidOperationException("Expected DiagnosticNoop admission to succeed: " + (admission == null ? "null" : admission.Reason));
             }

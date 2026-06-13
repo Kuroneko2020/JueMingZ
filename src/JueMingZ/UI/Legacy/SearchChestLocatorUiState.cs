@@ -12,6 +12,7 @@ namespace JueMingZ.UI.Legacy
         public const string ClearButtonId = "search-chest-locator:clear";
         public const string CandidateElementPrefix = "search-chest-locator:candidate:";
         public const int CandidateMaxResults = ChestItemLocatorQueryResolver.DefaultCandidateLimit;
+        public const string MoreCandidatesMessage = "还有更多，继续输入缩小范围";
         public const string SearchRangeNoResultMessage = "搜索范围内未找到物品";
 
         private static readonly object SyncRoot = new object();
@@ -19,6 +20,7 @@ namespace JueMingZ.UI.Legacy
 
         private static string _queryText = string.Empty;
         private static string _candidateMessage = string.Empty;
+        private static bool _hasMoreCandidates;
         private static string _statusMessage = "输入物品名、内部名或 #ID 后点击定位。";
         private static string _degradeMessage = string.Empty;
         private static string _noticeMessage = string.Empty;
@@ -35,6 +37,11 @@ namespace JueMingZ.UI.Legacy
         public static string CandidateMessage
         {
             get { lock (SyncRoot) { return _candidateMessage; } }
+        }
+
+        public static bool HasMoreCandidates
+        {
+            get { lock (SyncRoot) { return _hasMoreCandidates; } }
         }
 
         public static string StatusMessage
@@ -85,6 +92,7 @@ namespace JueMingZ.UI.Legacy
                 {
                     return !string.IsNullOrWhiteSpace(_queryText) ||
                            Candidates.Count > 0 ||
+                           _hasMoreCandidates ||
                            _selectedItemType > 0 ||
                            (_lastSnapshot != null && _lastSnapshot != ChestItemLocatorSnapshot.Empty);
                 }
@@ -197,6 +205,7 @@ namespace JueMingZ.UI.Legacy
             {
                 _queryText = string.Empty;
                 _candidateMessage = string.Empty;
+                _hasMoreCandidates = false;
                 _statusMessage = "输入物品名、内部名或 #ID 后点击定位。";
                 _degradeMessage = string.Empty;
                 _noticeMessage = string.Empty;
@@ -257,6 +266,7 @@ namespace JueMingZ.UI.Legacy
 
                 _queryText = string.Empty;
                 _candidateMessage = string.Empty;
+                _hasMoreCandidates = false;
                 _statusMessage = "输入物品名、内部名或 #ID 后点击定位。";
                 _degradeMessage = string.Empty;
                 _noticeMessage = string.Empty;
@@ -282,6 +292,7 @@ namespace JueMingZ.UI.Legacy
                     AddHash(ref hash, _statusMessage);
                     AddHash(ref hash, _degradeMessage);
                     AddHash(ref hash, _noticeMessage);
+                    AddHash(ref hash, _hasMoreCandidates);
                     AddHash(ref hash, _selectedItemType);
                     AddHash(ref hash, (int)_queryVersion);
                     AddHash(ref hash, (int)(_queryVersion >> 32));
@@ -308,6 +319,8 @@ namespace JueMingZ.UI.Legacy
                 return "{" +
                        "\"query\":\"" + EscapeJson(_queryText) + "\"," +
                        "\"candidateCount\":" + Candidates.Count.ToString(CultureInfo.InvariantCulture) + "," +
+                       "\"hasMoreCandidates\":" + (_hasMoreCandidates ? "true" : "false") + "," +
+                       "\"candidateMessage\":\"" + EscapeJson(_candidateMessage) + "\"," +
                        "\"selectedItemType\":" + _selectedItemType.ToString(CultureInfo.InvariantCulture) + "," +
                        "\"queryVersion\":" + _queryVersion.ToString(CultureInfo.InvariantCulture) + "," +
                        "\"snapshotStatus\":\"" + EscapeJson(snapshot.Status) + "\"," +
@@ -372,10 +385,17 @@ namespace JueMingZ.UI.Legacy
         {
             _queryResult = ChestItemLocatorQueryResolver.Resolve(_queryText, CandidateMaxResults);
             CopyCandidatesLocked(_queryResult);
+            _hasMoreCandidates = _queryResult != null && _queryResult.IsTruncated;
             _candidateMessage = BuildQueryStatusMessage(_queryResult);
             if (_queryResult != null && _queryResult.Succeeded)
             {
                 _statusMessage = "候选 " + _queryResult.CandidateCount.ToString(CultureInfo.InvariantCulture) + " 个，点击定位扫描附近箱子。";
+                return;
+            }
+
+            if (_hasMoreCandidates)
+            {
+                _statusMessage = "候选 " + Candidates.Count.ToString(CultureInfo.InvariantCulture) + " 个，继续输入缩小范围。";
                 return;
             }
 

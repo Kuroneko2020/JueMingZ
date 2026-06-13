@@ -58,6 +58,10 @@ namespace JueMingZ.Diagnostics
         public bool IsInMainMenu { get; set; }
         public bool IsInWorld { get; set; }
         public bool GameInputAvailable { get; set; }
+        public bool DiagnosticInputSkipped { get; set; }
+        public string DiagnosticInputGateStatus { get; set; }
+        public string DiagnosticInputSkipReason { get; set; }
+        public DateTime? DiagnosticInputSkipUtc { get; set; }
         public int PlayerLife { get; set; }
         public int PlayerLifeMax { get; set; }
         public int PlayerMana { get; set; }
@@ -238,6 +242,14 @@ namespace JueMingZ.Diagnostics
         public double LegacyUiDispatchElapsedMsLast { get; set; }
         public long LegacyUiCommandCoalescedCount { get; set; }
         public long LegacyUiDragFrameActionSkipCount { get; set; }
+        public bool LegacyImePanelFocused { get; set; }
+        public string LegacyImePanelDiagnosticMessage { get; set; }
+        public string LegacyImePanelLastStatus { get; set; }
+        public string LegacyImePanelLastMessage { get; set; }
+        public bool LegacyImePanelAnchorAttachedThisFrame { get; set; }
+        public bool LegacyImePanelDrawnThisFrame { get; set; }
+        public int LegacyImePanelReflectionResolveCount { get; set; }
+        public string LegacyImePanelCadenceSummary { get; set; }
         public string LastDiagnosticHotkey { get; set; }
         public DateTime? LastDiagnosticHotkeyUtc { get; set; }
         public string LastDiagnosticHotkeyMessage { get; set; }
@@ -897,6 +909,8 @@ namespace JueMingZ.Diagnostics
             WorldGenDebugStatus = string.Empty;
             WorldGenDebugMessage = string.Empty;
             WorldGenDebugFieldOwner = string.Empty;
+            DiagnosticInputGateStatus = string.Empty;
+            DiagnosticInputSkipReason = string.Empty;
             LastGameStateReadError = string.Empty;
             ItemCheckHookMethod = string.Empty;
             RunningActionKind = string.Empty;
@@ -997,6 +1011,10 @@ namespace JueMingZ.Diagnostics
             HoveredButtonVisualY = -1;
             HoveredButtonHitX = -1;
             HoveredButtonHitY = -1;
+            LegacyImePanelDiagnosticMessage = string.Empty;
+            LegacyImePanelLastStatus = string.Empty;
+            LegacyImePanelLastMessage = string.Empty;
+            LegacyImePanelCadenceSummary = string.Empty;
             DiagnosticTestSlotItemName = string.Empty;
             DiagnosticTestSlotSuitability = string.Empty;
             DiagnosticTestSlotHint = string.Empty;

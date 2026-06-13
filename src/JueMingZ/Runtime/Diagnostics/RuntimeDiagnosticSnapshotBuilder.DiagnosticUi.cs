@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using JueMingZ.Actions;
 using JueMingZ.Automation.AutoRecovery;
 using JueMingZ.Automation.Combat;
@@ -115,6 +116,15 @@ namespace JueMingZ.Runtime
             snapshot.LegacyUiDispatchElapsedMsLast = LegacyUiActionService.DispatchElapsedMsLast;
             snapshot.LegacyUiCommandCoalescedCount = LegacyUiActionService.CommandCoalescedCount;
             snapshot.LegacyUiDragFrameActionSkipCount = LegacyUiActionService.DragFrameActionSkipCount;
+            var imePanel = TerrariaTextInputCompat.GetImePanelDiagnosticsForSnapshot();
+            snapshot.LegacyImePanelFocused = LegacyTextInput.IsAnyFocused;
+            snapshot.LegacyImePanelDiagnosticMessage = LegacyTextInput.DiagnosticMessage;
+            snapshot.LegacyImePanelLastStatus = imePanel.LastStatus ?? string.Empty;
+            snapshot.LegacyImePanelLastMessage = imePanel.LastMessage ?? string.Empty;
+            snapshot.LegacyImePanelAnchorAttachedThisFrame = imePanel.AnchorAttachedThisFrame;
+            snapshot.LegacyImePanelDrawnThisFrame = imePanel.DrawnThisFrame;
+            snapshot.LegacyImePanelReflectionResolveCount = imePanel.ReflectionResolveCount;
+            snapshot.LegacyImePanelCadenceSummary = BuildLegacyImePanelCadenceSummary(imePanel);
             snapshot.LastDiagnosticHotkey = DiagnosticActionHotkeyService.LastDiagnosticHotkey;
             snapshot.LastDiagnosticHotkeyUtc = DiagnosticActionHotkeyService.LastDiagnosticHotkeyUtc;
             snapshot.LastDiagnosticHotkeyMessage = DiagnosticActionHotkeyService.LastDiagnosticHotkeyMessage;
@@ -125,6 +135,26 @@ namespace JueMingZ.Runtime
             snapshot.MouseTargetLastStatus = MouseTargetDiagnostics.LastStatus;
             snapshot.MouseTargetLastResultCode = MouseTargetDiagnostics.LastResultCode;
             snapshot.MouseTargetLastMessage = MouseTargetDiagnostics.LastMessage;
+        }
+
+        private static string BuildLegacyImePanelCadenceSummary(TextInputImePanelDiagnostics diagnostics)
+        {
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "frameReset={0}; anchor={1}/{2}; draw={3}/{4}; skippedNoAnchor={5}; rejectedActiveSpriteBatch={6}; invokeFallback={7}; delegates=setAnchor:{8},draw:{9}; apis=setAnchor:{10},draw:{11}; reflectionResolved={12}",
+                diagnostics.FrameResetCount,
+                diagnostics.AnchorAttachSuccessCount,
+                diagnostics.AnchorAttachAttemptCount,
+                diagnostics.DrawSuccessCount,
+                diagnostics.DrawAttemptCount,
+                diagnostics.DrawSkippedNoAnchorCount,
+                diagnostics.DrawRejectedActiveSpriteBatchCount,
+                diagnostics.InvokeFallbackCount,
+                diagnostics.SetAnchorDelegateReady ? "true" : "false",
+                diagnostics.DrawDelegateReady ? "true" : "false",
+                diagnostics.SetAnchorApiAvailable ? "true" : "false",
+                diagnostics.DrawApiAvailable ? "true" : "false",
+                diagnostics.ReflectionResolved ? "true" : "false");
         }
     }
 }

@@ -92,6 +92,10 @@ namespace JueMingZ.Runtime
             snapshot.IsInMainMenu = gameState.IsInMainMenu;
             snapshot.IsInWorld = gameState.IsInWorld;
             snapshot.GameInputAvailable = IsGameInputAvailable(gameState);
+            snapshot.DiagnosticInputSkipped = RuntimeTargetingDiagnostics.DiagnosticInputSkipped;
+            snapshot.DiagnosticInputGateStatus = RuntimeTargetingDiagnostics.DiagnosticInputGateStatus;
+            snapshot.DiagnosticInputSkipReason = RuntimeTargetingDiagnostics.DiagnosticInputSkipReason;
+            snapshot.DiagnosticInputSkipUtc = RuntimeTargetingDiagnostics.DiagnosticInputSkipUtc;
             snapshot.PlayerLife = gameState.Player == null ? 0 : gameState.Player.Life;
             snapshot.PlayerLifeMax = gameState.Player == null ? 0 : gameState.Player.LifeMax;
             snapshot.PlayerMana = gameState.Player == null ? 0 : gameState.Player.Mana;

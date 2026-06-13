@@ -88,6 +88,7 @@ namespace JueMingZ.Actions
 
             var sourceKind = GetMetadata(request, ActionMetadataKeys.SourceKind);
             if (string.Equals(sourceKind, "Hotkey", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(sourceKind, "Button", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(sourceKind, "User", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(sourceKind, "Ui", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(sourceKind, "Diagnostic", StringComparison.OrdinalIgnoreCase))

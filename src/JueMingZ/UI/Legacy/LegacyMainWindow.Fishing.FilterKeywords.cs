@@ -107,6 +107,7 @@ namespace JueMingZ.UI.Legacy
             }
 
             UiTextRenderer.DrawTextClipped(spriteBatch, text, rect.X + 8, rect.Y + 7, rect.Width - 16, 18, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 238, 226, 255, 0.68f);
+            TryAttachLegacyTextInputImePanel(FishingFilterUiState.KeywordInputId, rect, area.Viewport);
             var message = LegacyTextInput.DiagnosticMessage;
             var tooltip = string.IsNullOrWhiteSpace(message)
                 ? "关键词按当前显示名匹配，会受语言和材质包影响。"

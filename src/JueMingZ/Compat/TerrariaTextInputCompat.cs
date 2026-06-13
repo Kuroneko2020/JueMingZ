@@ -4,7 +4,7 @@ using JueMingZ.Diagnostics;
 
 namespace JueMingZ.Compat
 {
-    public static class TerrariaTextInputCompat
+    public static partial class TerrariaTextInputCompat
     {
         // Native text input capture must be explicitly released; unresolved APIs
         // leave IME handling unavailable rather than guessed.

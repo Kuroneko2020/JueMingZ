@@ -23,6 +23,7 @@ namespace JueMingZ.UI.Legacy
         public static bool DrawInterfaceLayer()
         {
             UiInputFrameClock.BeginDrawFrame("LegacyMainWindow.Draw");
+            LegacyTextInput.BeginImeCompositionPanelFrame();
             var elementFrameStarted = false;
             var overlayFrameStarted = false;
             var overlayFrameCompleted = false;

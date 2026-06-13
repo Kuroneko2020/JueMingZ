@@ -69,6 +69,10 @@ namespace JueMingZ.Diagnostics
             Append(builder, "IsInMainMenu", snapshot.IsInMainMenu, true);
             Append(builder, "IsInWorld", snapshot.IsInWorld, true);
             Append(builder, "GameInputAvailable", snapshot.GameInputAvailable, true);
+            Append(builder, "DiagnosticInputSkipped", snapshot.DiagnosticInputSkipped, true);
+            Append(builder, "DiagnosticInputGateStatus", snapshot.DiagnosticInputGateStatus, true);
+            Append(builder, "DiagnosticInputSkipReason", snapshot.DiagnosticInputSkipReason, true);
+            Append(builder, "DiagnosticInputSkipUtc", FormatDate(snapshot.DiagnosticInputSkipUtc), true);
             Append(builder, "PlayerLife", snapshot.PlayerLife, true);
             Append(builder, "PlayerLifeMax", snapshot.PlayerLifeMax, true);
             Append(builder, "PlayerMana", snapshot.PlayerMana, true);
@@ -253,6 +257,14 @@ namespace JueMingZ.Diagnostics
             Append(builder, "LegacyUiDispatchElapsedMsLast", snapshot.LegacyUiDispatchElapsedMsLast, true);
             Append(builder, "LegacyUiCommandCoalescedCount", snapshot.LegacyUiCommandCoalescedCount, true);
             Append(builder, "LegacyUiDragFrameActionSkipCount", snapshot.LegacyUiDragFrameActionSkipCount, true);
+            Append(builder, "LegacyImePanelFocused", snapshot.LegacyImePanelFocused, true);
+            Append(builder, "LegacyImePanelDiagnosticMessage", snapshot.LegacyImePanelDiagnosticMessage, true);
+            Append(builder, "LegacyImePanelLastStatus", snapshot.LegacyImePanelLastStatus, true);
+            Append(builder, "LegacyImePanelLastMessage", snapshot.LegacyImePanelLastMessage, true);
+            Append(builder, "LegacyImePanelAnchorAttachedThisFrame", snapshot.LegacyImePanelAnchorAttachedThisFrame, true);
+            Append(builder, "LegacyImePanelDrawnThisFrame", snapshot.LegacyImePanelDrawnThisFrame, true);
+            Append(builder, "LegacyImePanelReflectionResolveCount", snapshot.LegacyImePanelReflectionResolveCount, true);
+            Append(builder, "LegacyImePanelCadenceSummary", snapshot.LegacyImePanelCadenceSummary, true);
             Append(builder, "LastDiagnosticHotkey", snapshot.LastDiagnosticHotkey, true);
             Append(builder, "LastDiagnosticHotkeyUtc", FormatDate(snapshot.LastDiagnosticHotkeyUtc), true);
             Append(builder, "LastDiagnosticHotkeyMessage", snapshot.LastDiagnosticHotkeyMessage, true);

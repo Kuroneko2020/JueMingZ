@@ -107,7 +107,20 @@ namespace JueMingZ.Actions
             }
 
             var executor = GetExecutor(_running.Request.Kind);
-            var step = executor.Update(_running, snapshot);
+            InputActionExecutionStepResult step;
+            try
+            {
+                step = executor.Update(_running, snapshot);
+            }
+            catch (Exception error)
+            {
+                _running.Status = InputActionStatus.Failed;
+                _running.Message = "Action update failed: " + error.Message;
+                _running.Error = error;
+                Logger.Error("InputActionQueue", "Input action update failed: " + _running.Request.Kind, error);
+                return InputActionResult.FromExecution(_running, InputActionStatus.Failed, _running.Message, error);
+            }
+
             _running.Status = step.Status;
             _running.Message = step.Message ?? string.Empty;
             _running.Error = step.Error;

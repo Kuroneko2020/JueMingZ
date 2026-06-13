@@ -131,7 +131,7 @@ namespace JueMingZ.UI
             var lines = new[]
             {
                 "决明-Z 测试面板 " + (string.IsNullOrWhiteSpace(model.Version) ? "unknown" : model.Version),
-                "诊断输入：" + (model.EnableDiagnosticInputTests ? "开启" : "关闭"),
+                "诊断输入：" + (model.EnableDiagnosticInputTests ? "开启" : "关闭") + GetDiagnosticInputGateLine(model),
                 "测试快捷栏：第 " + model.DiagnosticInputTestSlotDisplay + " 格（内部 slot=" + model.DiagnosticInputTestSlot + "）",
                 "测试物品：" + GetTestItemLine(model),
                 "测试建议：" + model.DiagnosticTestSlotSuitability,
@@ -288,6 +288,26 @@ namespace JueMingZ.UI
                 ? "未命名物品"
                 : model.DiagnosticTestSlotItemName;
             return name + " x" + model.DiagnosticTestSlotItemStack;
+        }
+
+        private static string GetDiagnosticInputGateLine(DiagnosticsOverlayModel model)
+        {
+            if (model == null || string.IsNullOrWhiteSpace(model.DiagnosticInputGateStatus))
+            {
+                return string.Empty;
+            }
+
+            if (string.Equals(model.DiagnosticInputGateStatus, "skipped", StringComparison.Ordinal))
+            {
+                return "，输入门禁：跳过(" + Shorten(model.DiagnosticInputSkipReason, 48) + ")";
+            }
+
+            if (string.Equals(model.DiagnosticInputGateStatus, "available", StringComparison.Ordinal))
+            {
+                return "，输入门禁：可用";
+            }
+
+            return string.Empty;
         }
 
         private static string GetActionLabel(DiagnosticsOverlayModel model)

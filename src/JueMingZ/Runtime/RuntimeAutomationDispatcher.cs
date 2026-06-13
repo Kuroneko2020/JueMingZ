@@ -36,9 +36,17 @@ namespace JueMingZ.Runtime
             new RuntimeDispatchStep("targeting.diagnostic-hotkeys", "targeting.diagnostic-hotkeys", 1);
 
         private static readonly RuntimeDispatchStep DispatchTravelMenu =
-            new RuntimeDispatchStep("travel-menu", "dispatch.travel-menu", 1);
+            new RuntimeDispatchStep(
+                "travel-menu",
+                "dispatch.travel-menu",
+                1,
+                RuntimeDispatchLane.AlwaysMaintenance);
         private static readonly RuntimeDispatchStep DispatchTravelMenuPauseAutomation =
-            new RuntimeDispatchStep("travel-menu-pause-automation", "dispatch.travel-menu-pause-automation", 0);
+            new RuntimeDispatchStep(
+                "travel-menu-pause-automation",
+                "dispatch.travel-menu-pause-automation",
+                0,
+                RuntimeDispatchLane.AlwaysMaintenance);
         private static readonly RuntimeDispatchStep DispatchAutoRecovery =
             new RuntimeDispatchStep("auto-recovery", "dispatch.auto-recovery", 1);
         private static readonly RuntimeDispatchStep DispatchFishingAutomation =
@@ -78,9 +86,17 @@ namespace JueMingZ.Runtime
         private static readonly RuntimeDispatchStep DispatchCombatPhasebladeQuickSwitch =
             new RuntimeDispatchStep("combat-phaseblade-quick-switch", "dispatch.combat-phaseblade-quick-switch", 1);
         private static readonly RuntimeDispatchStep DispatchCombatEquipmentWarning =
-            new RuntimeDispatchStep("combat-equipment-warning", "dispatch.combat-equipment-warning", 1);
+            new RuntimeDispatchStep(
+                "combat-equipment-warning",
+                "dispatch.combat-equipment-warning",
+                1,
+                RuntimeDispatchLane.ReadOnlyDisplay);
         private static readonly RuntimeDispatchStep DispatchFirstWorldLoadPrompt =
-            new RuntimeDispatchStep("first-world-load-prompt", "dispatch.first-world-load-prompt", 0);
+            new RuntimeDispatchStep(
+                "first-world-load-prompt",
+                "dispatch.first-world-load-prompt",
+                0,
+                RuntimeDispatchLane.AlwaysMaintenance);
         private static readonly RuntimeDispatchStep DispatchMovementSafeLanding =
             new RuntimeDispatchStep("movement-safe-landing", "dispatch.movement-safe-landing", 1);
         private static readonly RuntimeDispatchStep DispatchMovementContinuousDash =
@@ -135,11 +151,21 @@ namespace JueMingZ.Runtime
             InputActionQueue actionQueue,
             bool gameInputAvailable)
         {
-            if (context == null || !gameInputAvailable)
+            if (context == null)
             {
+                RuntimeTargetingDiagnostics.RecordDiagnosticInputSkipped("context=null");
                 return;
             }
 
+            if (!gameInputAvailable)
+            {
+                // Keep the input gate fail-closed: diagnostics record why the
+                // user-facing input services were skipped, but no action drains.
+                RuntimeTargetingDiagnostics.RecordDiagnosticInputSkipped("gameInputAvailable=false");
+                return;
+            }
+
+            RuntimeTargetingDiagnostics.RecordDiagnosticInputAvailable();
             var gameState = context.GameState;
             var settings = context.SettingsSnapshot ?? RuntimeSettingsSnapshotProvider.GetCurrent();
             var operationStart = Stopwatch.GetTimestamp();
@@ -194,6 +220,7 @@ namespace JueMingZ.Runtime
             if (ShouldRun(
                 DispatchTravelMenu,
                 settings.WorldAutomationTravelMenuEnabled || TravelMenuService.RequiresRuntimeTickWhenDisabled(),
+                gameState,
                 tick))
             {
                 TravelMenuService.Tick(gameState, state);
@@ -208,7 +235,7 @@ namespace JueMingZ.Runtime
                 return;
             }
 
-            if (ShouldRun(DispatchAutoRecovery, settings.RecoveryAnyEnabled, tick))
+            if (ShouldRun(DispatchAutoRecovery, settings.RecoveryAnyEnabled, gameState, tick))
             {
                 AutoRecoveryService.Tick(actionQueue, gameState, state, settings);
                 RecordOperationTiming(context, DispatchAutoRecovery, operationStart);
@@ -218,10 +245,11 @@ namespace JueMingZ.Runtime
             var fishingHasResidualState = FishingAutomationService.HasResidualState;
             var fishingDispatch = GetFishingAutomationDispatchDecision(settings, fishingHasResidualState, tick);
             FishingAutomationService.RecordDispatchState(fishingDispatch.Reason, fishingDispatch.CadenceTicks);
-            if (RuntimeServiceScheduler.ShouldRun(
-                DispatchFishingAutomation.ServiceName,
+            if (ShouldRun(
+                DispatchFishingAutomation,
                 fishingDispatch.Enabled,
                 fishingDispatch.CadenceTicks,
+                gameState,
                 tick))
             {
                 FishingAutomationService.Tick(actionQueue, gameState, state, settings);
@@ -229,84 +257,84 @@ namespace JueMingZ.Runtime
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRun(DispatchQuickItemHotkeys, settings.InventoryQuickItemHotkeysEnabled, tick))
+            if (ShouldRun(DispatchQuickItemHotkeys, settings.InventoryQuickItemHotkeysEnabled, gameState, tick))
             {
                 QuickItemHotkeyService.Tick(actionQueue, gameState, state, settings);
                 RecordOperationTiming(context, DispatchQuickItemHotkeys, operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRun(DispatchAutoCaptureCritter, settings.WorldAutomationAutoCaptureCritterEnabled, tick))
+            if (ShouldRun(DispatchAutoCaptureCritter, settings.WorldAutomationAutoCaptureCritterEnabled, gameState, tick))
             {
                 AutoCaptureCritterService.Tick(actionQueue, gameState, state, settings);
                 RecordOperationTiming(context, DispatchAutoCaptureCritter, operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRun(DispatchAutoHarvest, settings.WorldAutomationAutoHarvestEnabled, tick))
+            if (ShouldRun(DispatchAutoHarvest, settings.WorldAutomationAutoHarvestEnabled, gameState, tick))
             {
                 AutoHarvestService.Tick(actionQueue, gameState, state, settings);
                 RecordOperationTiming(context, DispatchAutoHarvest, operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRun(DispatchAutoMining, settings.WorldAutomationAutoMiningEnabled, tick))
+            if (ShouldRun(DispatchAutoMining, settings.WorldAutomationAutoMiningEnabled, gameState, tick))
             {
                 AutoMiningService.Tick(actionQueue, gameState, state, settings);
                 RecordOperationTiming(context, DispatchAutoMining, operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRun(DispatchAutoStack, settings.InventoryAutoStackEnabled, tick))
+            if (ShouldRun(DispatchAutoStack, settings.InventoryAutoStackEnabled, gameState, tick))
             {
                 AutoStackService.Tick(actionQueue, gameState, state, settings);
                 RecordOperationTiming(context, DispatchAutoStack, operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRun(DispatchAutoSell, settings.InventoryAutoSellEnabled, tick))
+            if (ShouldRun(DispatchAutoSell, settings.InventoryAutoSellEnabled, gameState, tick))
             {
                 AutoSellService.Tick(actionQueue, gameState, state, settings);
                 RecordOperationTiming(context, DispatchAutoSell, operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRun(DispatchAutoDiscard, settings.InventoryAutoDiscardEnabled, tick))
+            if (ShouldRun(DispatchAutoDiscard, settings.InventoryAutoDiscardEnabled, gameState, tick))
             {
                 AutoDiscardService.Tick(actionQueue, gameState, state, settings);
                 RecordOperationTiming(context, DispatchAutoDiscard, operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRun(DispatchQuickBagOpen, settings.InventoryQuickBagOpenEnabled, tick))
+            if (ShouldRun(DispatchQuickBagOpen, settings.InventoryQuickBagOpenEnabled, gameState, tick))
             {
                 QuickBagOpenService.Tick(actionQueue, gameState, state, settings);
                 RecordOperationTiming(context, DispatchQuickBagOpen, operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRun(DispatchAutoDepositCoins, settings.InventoryAutoDepositCoinsEnabled, tick))
+            if (ShouldRun(DispatchAutoDepositCoins, settings.InventoryAutoDepositCoinsEnabled, gameState, tick))
             {
                 AutoDepositCoinsService.Tick(actionQueue, gameState, state, settings);
                 RecordOperationTiming(context, DispatchAutoDepositCoins, operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRun(DispatchAutoExtractinator, settings.InventoryAutoExtractinatorEnabled, tick))
+            if (ShouldRun(DispatchAutoExtractinator, settings.InventoryAutoExtractinatorEnabled, gameState, tick))
             {
                 AutoExtractinatorService.Tick(actionQueue, gameState, state, settings);
                 RecordOperationTiming(context, DispatchAutoExtractinator, operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRun(DispatchKeepFavorited, settings.InventoryKeepFavoritedEnabled, tick))
+            if (ShouldRun(DispatchKeepFavorited, settings.InventoryKeepFavoritedEnabled, gameState, tick))
             {
                 KeepFavoritedService.Tick(actionQueue, gameState, state, settings);
                 RecordOperationTiming(context, DispatchKeepFavorited, operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRun(DispatchQuickReforge, settings.NpcAutoReforgeEnabled, tick))
+            if (ShouldRun(DispatchQuickReforge, settings.NpcAutoReforgeEnabled, gameState, tick))
             {
                 QuickReforgeService.Tick(actionQueue, gameState, state, settings);
                 RecordOperationTiming(context, DispatchQuickReforge, operationStart);
@@ -314,28 +342,28 @@ namespace JueMingZ.Runtime
             }
 
             operationStart = Stopwatch.GetTimestamp();
-            if (ShouldRun(DispatchAutoTaxCollect, settings.NpcAutoTaxCollectEnabled, tick))
+            if (ShouldRun(DispatchAutoTaxCollect, settings.NpcAutoTaxCollectEnabled, gameState, tick))
             {
                 AutoTaxCollectorService.Tick(actionQueue, gameState, state, settings);
                 RecordOperationTiming(context, DispatchAutoTaxCollect, operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRun(DispatchCombatPerfectRevolver, settings.CombatPerfectRevolverEnabled, tick))
+            if (ShouldRun(DispatchCombatPerfectRevolver, settings.CombatPerfectRevolverEnabled, gameState, tick))
             {
                 CombatPerfectRevolverService.Tick(actionQueue, gameState, state);
                 RecordOperationTiming(context, DispatchCombatPerfectRevolver, operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRun(DispatchCombatMagicString, settings.CombatMagicStringClickerEnabled, tick))
+            if (ShouldRun(DispatchCombatMagicString, settings.CombatMagicStringClickerEnabled, gameState, tick))
             {
                 CombatMagicStringClickerService.Tick(actionQueue, gameState, state);
                 RecordOperationTiming(context, DispatchCombatMagicString, operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRun(DispatchCombatAutoFacing, settings.CombatAutoFacingEnabled, tick))
+            if (ShouldRun(DispatchCombatAutoFacing, settings.CombatAutoFacingEnabled, gameState, tick))
             {
                 CombatAutoFacingService.Tick(actionQueue, gameState, state, settings);
                 RecordOperationTiming(context, DispatchCombatAutoFacing, operationStart);
@@ -347,6 +375,7 @@ namespace JueMingZ.Runtime
                 settings.CombatPhasebladeQuickSwitchEnabled ||
                     PhasebladeQuickSwitchBridge.HasActiveUse ||
                     (actionQueue != null && actionQueue.IsSourcePendingOrRunning(FeatureIds.CombatPhasebladeQuickSwitch)),
+                gameState,
                 tick))
             {
                 CombatPhasebladeQuickSwitchRuntimeService.Tick(actionQueue, gameState, state, settings);
@@ -354,7 +383,7 @@ namespace JueMingZ.Runtime
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRun(DispatchCombatEquipmentWarning, settings.CombatEquipmentWarningEnabled, tick))
+            if (ShouldRun(DispatchCombatEquipmentWarning, settings.CombatEquipmentWarningEnabled, gameState, tick))
             {
                 CombatEquipmentWarningService.Tick(gameState, state, settings);
                 RecordOperationTiming(context, DispatchCombatEquipmentWarning, operationStart);
@@ -368,6 +397,7 @@ namespace JueMingZ.Runtime
             if (ShouldRun(
                 DispatchMovementSafeLanding,
                 settings.MovementSafeLandingEnabled || MovementSafeLandingService.RequiresRuntimeTickWhenDisabled(),
+                gameState,
                 tick))
             {
                 MovementSafeLandingService.Tick(actionQueue, gameState, state);
@@ -376,14 +406,14 @@ namespace JueMingZ.Runtime
 
             operationStart = Stopwatch.GetTimestamp();
 
-            if (ShouldRun(DispatchMovementContinuousDash, settings.MovementContinuousDashEnabled, tick))
+            if (ShouldRun(DispatchMovementContinuousDash, settings.MovementContinuousDashEnabled, gameState, tick))
             {
                 MovementContinuousDashService.Tick(actionQueue, gameState, state, settings);
                 RecordOperationTiming(context, DispatchMovementContinuousDash, operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 
-            if (ShouldRun(DispatchMovementSimulatedJump, settings.MovementSimulatedMultiJumpEnabled, tick))
+            if (ShouldRun(DispatchMovementSimulatedJump, settings.MovementSimulatedMultiJumpEnabled, gameState, tick))
             {
                 MovementSimulatedJumpService.Tick(actionQueue, gameState, state, settings);
                 RecordOperationTiming(context, DispatchMovementSimulatedJump, operationStart);
@@ -392,8 +422,11 @@ namespace JueMingZ.Runtime
 
         public static bool ShouldDispatchAutomation(GameStateSnapshot snapshot)
         {
-            // Window focus gates physical/user input only; background automation keeps its own safety checks.
-            return true;
+            // The automation stage stays alive for maintenance even when user
+            // input is unavailable; per-step lanes below gate action submitters.
+            return ShouldDispatchLane(RuntimeDispatchLane.AlwaysMaintenance, snapshot) ||
+                   ShouldDispatchLane(RuntimeDispatchLane.ReadOnlyDisplay, snapshot) ||
+                   ShouldDispatchLane(RuntimeDispatchLane.ActionSubmitting, snapshot);
         }
 
         internal static bool ShouldDispatchFishingAutomation(RuntimeSettingsSnapshot settings, bool hasResidualState, long tick)
@@ -421,9 +454,78 @@ namespace JueMingZ.Runtime
             return CloneContract(AutomationDispatchContract);
         }
 
+        internal static bool ShouldRunAutomationDispatchStepForTesting(
+            string serviceName,
+            bool enabled,
+            GameStateSnapshot gameState,
+            long tick)
+        {
+            var step = FindAutomationDispatchStep(serviceName);
+            return step != null && ShouldRun(step, enabled, gameState, tick);
+        }
+
         private static bool ShouldRun(RuntimeDispatchStep step, bool enabled, long tick)
         {
             return RuntimeServiceScheduler.ShouldRun(step.ServiceName, enabled, step.CadenceTicks, tick);
+        }
+
+        private static bool ShouldRun(
+            RuntimeDispatchStep step,
+            bool enabled,
+            GameStateSnapshot gameState,
+            long tick)
+        {
+            return ShouldRun(step, enabled, step.CadenceTicks, gameState, tick);
+        }
+
+        private static bool ShouldRun(
+            RuntimeDispatchStep step,
+            bool enabled,
+            int cadenceTicks,
+            GameStateSnapshot gameState,
+            long tick)
+        {
+            var laneAllowed = ShouldDispatchLane(step.Lane, gameState);
+            var schedulerRun = RuntimeServiceScheduler.ShouldRun(
+                step.ServiceName,
+                enabled && laneAllowed,
+                cadenceTicks,
+                tick);
+
+            return laneAllowed && schedulerRun;
+        }
+
+        private static bool ShouldDispatchLane(RuntimeDispatchLane lane, GameStateSnapshot gameState)
+        {
+            switch (lane)
+            {
+                case RuntimeDispatchLane.AlwaysMaintenance:
+                    return true;
+                case RuntimeDispatchLane.ReadOnlyDisplay:
+                    return gameState != null && gameState.IsInWorld && !gameState.IsInMainMenu;
+                case RuntimeDispatchLane.ActionSubmitting:
+                    return CanSubmitAutomationAction(gameState);
+                default:
+                    return false;
+            }
+        }
+
+        private static bool CanSubmitAutomationAction(GameStateSnapshot gameState)
+        {
+            if (gameState == null || !gameState.IsInWorld || gameState.IsInMainMenu)
+            {
+                return false;
+            }
+
+            var ui = gameState.Ui;
+            if (ui == null || !ui.GameInputAvailable || ui.IsInMainMenu || ui.ChatOpen)
+            {
+                return false;
+            }
+
+            // Chest and NPC dialogs are service-specific contexts for inventory
+            // and NPC actions, so they remain inside each service's business gate.
+            return true;
         }
 
         private static void ClearActionQueueForTravelMenu(InputActionQueue actionQueue)
@@ -494,6 +596,25 @@ namespace JueMingZ.Runtime
             var copy = new RuntimeDispatchStep[source.Length];
             Array.Copy(source, copy, source.Length);
             return copy;
+        }
+
+        private static RuntimeDispatchStep FindAutomationDispatchStep(string serviceName)
+        {
+            if (string.IsNullOrWhiteSpace(serviceName))
+            {
+                return null;
+            }
+
+            for (var index = 0; index < AutomationDispatchContract.Length; index++)
+            {
+                var step = AutomationDispatchContract[index];
+                if (step != null && string.Equals(step.ServiceName, serviceName, StringComparison.Ordinal))
+                {
+                    return step;
+                }
+            }
+
+            return null;
         }
 
         private struct FishingDispatchDecision

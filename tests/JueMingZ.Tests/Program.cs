@@ -1242,6 +1242,9 @@ namespace JueMingZ.Tests
             Run("auto mining overlay uses low alpha green red style", ref failed, AutoMiningOverlayUsesLowAlphaGreenRedStyle);
             Run("worldgen debug viewer and developer menu are always available", ref failed, WorldGenDebugViewerAndDeveloperMenuAlwaysAvailable);
             Run("diagnostic snapshot writes worldgen debug state", ref failed, DiagnosticSnapshotWritesWorldGenDebugState);
+            Run("diagnostic artifact replacement creates missing target", ref failed, DiagnosticArtifactReplacementCreatesMissingTarget);
+            Run("diagnostic artifact replacement replaces existing target", ref failed, DiagnosticArtifactReplacementReplacesExistingTarget);
+            Run("diagnostic artifact replacement failure keeps existing and deletes temp", ref failed, DiagnosticArtifactReplacementFailureKeepsExistingAndDeletesTemp);
             Run("diagnostic snapshot writes action queue admission state", ref failed, DiagnosticSnapshotWritesActionQueueAdmissionState);
             Run("diagnostic snapshot writes ItemCheck writer state", ref failed, DiagnosticSnapshotWritesItemCheckWriterState);
             Run("diagnostic snapshot writes auto stack state", ref failed, DiagnosticSnapshotWritesAutoStackState);
@@ -1281,7 +1284,10 @@ namespace JueMingZ.Tests
             Run("runtime settings snapshot provider skips disabled list hashes", ref failed, RuntimeSettingsSnapshotProviderSkipsDisabledListHashes);
             Run("runtime service scheduler honors cadence and disabled cleanup", ref failed, RuntimeServiceSchedulerHonorsCadenceAndDisabledCleanup);
             Run("runtime automation dispatcher preserves dispatch contract", ref failed, RuntimeAutomationDispatcherPreservesDispatchContract);
+            Run("runtime automation dispatcher preserves lane contract", ref failed, RuntimeAutomationDispatcherPreservesLaneContract);
             Run("runtime input focus guard uses game state focus", ref failed, RuntimeInputFocusGuardUsesGameStateFocus);
+            Run("runtime dispatch lane gate keeps maintenance and blocks action submitters", ref failed, RuntimeDispatchLaneGateKeepsMaintenanceAndBlocksActionSubmitters);
+            Run("runtime targeting input gate records skip without submitting diagnostic command", ref failed, RuntimeTargetingInputGateRecordsSkipWithoutSubmittingDiagnosticCommand);
             Run("movement teleport correction requires vanilla use frame", ref failed, MovementTeleportCorrectionRequiresVanillaUseFrame);
             Run("combat perfect revolver ItemCheck takeover mirrors helper cadence", ref failed, CombatPerfectRevolverItemCheckTakeoverMirrorsHelperCadence);
             Run("combat perfect revolver schedules only in fire window", ref failed, CombatPerfectRevolverSchedulesOnlyInFireWindow);
@@ -1365,6 +1371,10 @@ namespace JueMingZ.Tests
             Run("simulated jump request has queue timeout", ref failed, SimulatedJumpRequestHasQueueTimeout);
             Run("continuous dash request has queue timeout", ref failed, ContinuousDashRequestHasQueueTimeout);
             Run("auto facing request has queue timeout", ref failed, AutoFacingRequestHasQueueTimeout);
+            Run("diagnostic action request has admission contract", ref failed, DiagnosticActionRequestHasAdmissionContract);
+            Run("repeated diagnostic action coalesces pending", ref failed, RepeatedDiagnosticActionCoalescesPending);
+            Run("diagnostic admission denied feedback includes summary", ref failed, DiagnosticAdmissionDeniedFeedbackIncludesSummary);
+            Run("scheduler treats diagnostic button as user command", ref failed, SchedulerTreatsDiagnosticButtonAsUserCommand);
             Run("combat aim diagnostics metadata keeps stable field names", ref failed, CombatAimDiagnosticsMetadataKeepsStableFieldNames);
             Run("combat aim projectile profile resolves bow and arrow", ref failed, CombatAimProjectileProfileResolvesBowAndArrow);
             Run("combat aim projectile profile applies quiver and archery speed", ref failed, CombatAimProjectileProfileAppliesQuiverAndArcherySpeed);
@@ -1444,6 +1454,7 @@ namespace JueMingZ.Tests
             Run("release hold target dummy validation respects track dummy", ref failed, ReleaseHoldTargetDummyValidationRespectsTrackDummy);
             Run("input action queue releases channel after terminal start", ref failed, InputActionQueueReleasesChannelAfterTerminalStart);
             Run("input action queue releases channel after start exception", ref failed, InputActionQueueReleasesChannelAfterStartException);
+            Run("input action queue releases channel after update exception", ref failed, InputActionQueueReleasesChannelAfterUpdateException);
             Run("input action queue releases channel after cancel", ref failed, InputActionQueueReleasesChannelAfterCancel);
             Run("input action queue clear releases pending and running leases", ref failed, InputActionQueueClearReleasesPendingAndRunningLeases);
             Run("diagnostic noop does not acquire channel lease", ref failed, DiagnosticNoopDoesNotAcquireChannelLease);
@@ -1543,6 +1554,15 @@ namespace JueMingZ.Tests
             Run("search query UI state shows more prompt and signature", ref failed, SearchQueryUiStateShowsMorePromptAndSignature);
             Run("search query legacy text input shows IME composition for all known inputs", ref failed, SearchQueryLegacyTextInputShowsImeCompositionForAllKnownInputs);
             Run("search query legacy text input avoids native IME panel draw", ref failed, SearchQueryLegacyTextInputAvoidsNativeImePanelDraw);
+            Run("search query legacy text input IME panel all user files use shared window hook", ref failed, SearchQueryLegacyTextInputImePanelAllUserFilesUseSharedWindowHook);
+            Run("search query legacy text input IME panel anchor uses shared Compat", ref failed, SearchQueryLegacyTextInputImePanelAnchorUsesSharedCompat);
+            Run("search query legacy text input IME panel all known inputs attach through shared window hook", ref failed, SearchQueryLegacyTextInputImePanelAllKnownInputsAttachThroughSharedWindowHook);
+            Run("search query legacy text input IME panel tail requires ended SpriteBatch", ref failed, SearchQueryLegacyTextInputImePanelTailRequiresEndedSpriteBatch);
+            Run("search query legacy text input IME panel reflection cache resolves once", ref failed, SearchQueryLegacyTextInputImePanelReflectionCacheResolvesOnce);
+            Run("search query legacy text input IME panel missing API writes diagnostic", ref failed, SearchQueryLegacyTextInputImePanelMissingApiWritesDiagnostic);
+            Run("search query legacy text input IME panel tail skips without anchor", ref failed, SearchQueryLegacyTextInputImePanelTailSkipsWithoutAnchor);
+            Run("search query legacy text input IME panel diagnostics snapshot fields", ref failed, SearchQueryLegacyTextInputImePanelDiagnosticsSnapshotFields);
+            Run("search query legacy text input IME panel performance guards", ref failed, SearchQueryLegacyTextInputImePanelPerformanceGuards);
             Run("search query dynamic coverage matrix covers stage samples", ref failed, SearchQueryDynamicCoverageMatrixCoversStageSamples);
             Run("search query dynamic source boundary protects production paths", ref failed, SearchQueryDynamicSourceBoundaryProtectsProductionPaths);
             Run("search query builds crafting source summaries", ref failed, SearchQueryBuildsCraftingSourceSummaries);
@@ -1641,6 +1661,7 @@ namespace JueMingZ.Tests
             Run("search chest locator caps candidates before scanning", ref failed, SearchChestLocatorCapsCandidatesBeforeScanning);
             Run("search chest locator match set uses item types only", ref failed, SearchChestLocatorMatchSetUsesItemTypesOnly);
             Run("search chest locator candidate limit is clamped", ref failed, SearchChestLocatorCandidateLimitIsClamped);
+            Run("search chest locator UI state shows more prompt for truncated candidates", ref failed, SearchChestLocatorUiStateShowsMorePromptForTruncatedCandidates);
             Run("search chest locator snapshot handles empty and no match chests", ref failed, SearchChestLocatorSnapshotHandlesEmptyAndNoMatchChests);
             Run("search chest locator snapshot accumulates matched slots", ref failed, SearchChestLocatorSnapshotAccumulatesMatchedSlots);
             Run("search chest locator snapshot limits candidate chests", ref failed, SearchChestLocatorSnapshotLimitsCandidateChests);
@@ -1758,6 +1779,7 @@ namespace JueMingZ.Tests
             Run("information chest always cached labels follow current container existence", ref failed, InformationChestAlwaysCachedLabelsFollowCurrentContainerExistence);
             Run("information chest always partial pending filters invalid stable snapshot", ref failed, InformationChestAlwaysPartialPendingFiltersInvalidStableSnapshot);
             Run("player-world behavior records isolate opened chests", ref failed, PlayerWorldBehaviorRecordsIsolateOpenedChests);
+            Run("player-world behavior save failure keeps existing record file", ref failed, PlayerWorldBehaviorSaveFailureKeepsExistingRecordFile);
             Run("legacy opened chest keys migrate to current player-world only", ref failed, LegacyOpenedChestKeysMigrateToCurrentPlayerWorldOnly);
             Run("information chest key parsing survives world rename with same id", ref failed, InformationChestKeyParsingSurvivesWorldRenameWithSameId);
             Run("information chest tile fallback detects basic container ids", ref failed, InformationChestTileFallbackDetectsBasicContainerIds);

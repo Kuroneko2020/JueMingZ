@@ -44,6 +44,9 @@ namespace JueMingZ.UI
         public string ItemUseBridgeLastStatus { get; set; }
         public string ItemUseBridgeLastMessage { get; set; }
         public bool EnableDiagnosticInputTests { get; set; }
+        public bool DiagnosticInputSkipped { get; set; }
+        public string DiagnosticInputGateStatus { get; set; }
+        public string DiagnosticInputSkipReason { get; set; }
         public int DiagnosticInputTestSlot { get; set; }
         public int DiagnosticInputTestSlotDisplay { get; set; }
         public int DiagnosticTestSlotItemType { get; set; }
@@ -195,6 +198,9 @@ namespace JueMingZ.UI
                 ItemUseBridgeLastStatus = string.IsNullOrWhiteSpace(snapshot.ItemUseBridgeLastStatus) ? "none" : snapshot.ItemUseBridgeLastStatus,
                 ItemUseBridgeLastMessage = string.IsNullOrWhiteSpace(snapshot.ItemUseBridgeLastMessage) ? "none" : snapshot.ItemUseBridgeLastMessage,
                 EnableDiagnosticInputTests = snapshot.EnableDiagnosticInputTests,
+                DiagnosticInputSkipped = snapshot.DiagnosticInputSkipped,
+                DiagnosticInputGateStatus = string.IsNullOrWhiteSpace(snapshot.DiagnosticInputGateStatus) ? "unknown" : snapshot.DiagnosticInputGateStatus,
+                DiagnosticInputSkipReason = string.IsNullOrWhiteSpace(snapshot.DiagnosticInputSkipReason) ? "none" : snapshot.DiagnosticInputSkipReason,
                 DiagnosticInputTestSlot = snapshot.DiagnosticInputTestSlot,
                 DiagnosticInputTestSlotDisplay = snapshot.DiagnosticInputTestSlotDisplay,
                 DiagnosticTestSlotItemType = snapshot.DiagnosticTestSlotItemType,

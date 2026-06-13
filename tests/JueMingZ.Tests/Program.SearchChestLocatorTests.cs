@@ -123,6 +123,56 @@ namespace JueMingZ.Tests
             });
         }
 
+        private static void SearchChestLocatorUiStateShowsMorePromptForTruncatedCandidates()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                AddSearchCandidateBatch(4100, "箱定位状态候选", ChestItemLocatorQueryResolver.MaxCandidateLimit);
+                ItemQueryService.ResetForTesting();
+                SearchChestLocatorUiState.ResetForTesting();
+                SearchChestLocatorUiState.UpdateDraft("箱定位状态候选");
+
+                if (SearchChestLocatorUiState.CandidateCount != ChestItemLocatorQueryResolver.MaxCandidateLimit ||
+                    SearchChestLocatorUiState.HasMoreCandidates ||
+                    !string.IsNullOrEmpty(SearchChestLocatorUiState.CandidateMessage))
+                {
+                    throw new InvalidOperationException("Chest locator UI should not show a more prompt when candidates exactly fit the bounded list.");
+                }
+
+                var signatureWithoutMore = SearchChestLocatorUiState.BuildStateSignature();
+                var heightWithoutMore = LegacyMainWindow.CalculateSearchChestLocatorBlockHeightForTesting(540);
+                AddSearchItem(4199, "箱定位状态候选99", "ChestLocatorStateCandidate99", 1, 0, 0, false, false, -1, -1);
+                ItemQueryService.ResetForTesting();
+                SearchChestLocatorUiState.ResetForTesting();
+                SearchChestLocatorUiState.UpdateDraft("箱定位状态候选");
+
+                if (SearchChestLocatorUiState.CandidateCount != ChestItemLocatorQueryResolver.MaxCandidateLimit ||
+                    !SearchChestLocatorUiState.HasMoreCandidates)
+                {
+                    throw new InvalidOperationException("Chest locator UI should keep the bounded candidate list while preserving has-more state.");
+                }
+
+                var signatureWithMore = SearchChestLocatorUiState.BuildStateSignature();
+                if (signatureWithMore == signatureWithoutMore)
+                {
+                    throw new InvalidOperationException("Chest locator UI signature must change when the same visible candidates gain a more-results prompt.");
+                }
+
+                var heightWithMore = LegacyMainWindow.CalculateSearchChestLocatorBlockHeightForTesting(540);
+                if (heightWithMore <= heightWithoutMore)
+                {
+                    throw new InvalidOperationException("Chest locator layout height must include the more-results prompt row below candidates.");
+                }
+
+                var json = SearchChestLocatorUiState.BuildUiStateJson();
+                AssertContains(json, "\"hasMoreCandidates\":true");
+                AssertStringEquals(
+                    SearchChestLocatorUiState.MoreCandidatesMessage,
+                    "还有更多，继续输入缩小范围",
+                    "chest locator more candidates prompt text");
+            });
+        }
+
         private static void SearchChestLocatorSnapshotHandlesEmptyAndNoMatchChests()
         {
             WithSearchQueryFixture(() =>

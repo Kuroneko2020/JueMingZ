@@ -80,6 +80,7 @@ namespace JueMingZ.UI.Legacy
             }
 
             UiTextRenderer.DrawTextClipped(spriteBatch, text, rect.X + 8, rect.Y + 7, rect.Width - 16, 18, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 238, 226, 255, 0.62f);
+            TryAttachLegacyTextInputImePanel(FishingFilterUiState.GlobalSearchInputId, rect, area.Viewport);
             var message = LegacyTextInput.DiagnosticMessage;
             var tooltip = string.IsNullOrWhiteSpace(message)
                 ? "输入当前显示名、内部英文名或 #ID，搜索全游戏可钓鱼获。"

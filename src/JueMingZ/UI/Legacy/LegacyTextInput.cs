@@ -6,6 +6,7 @@ namespace JueMingZ.UI.Legacy
     internal static class LegacyTextInput
     {
         private const int MaxTextLength = 48;
+        private const float ImePanelAnchorVerticalOffset = 32f;
         private static readonly object SyncRoot = new object();
         private static string _activeId = string.Empty;
         private static string _draft = string.Empty;
@@ -49,6 +50,7 @@ namespace JueMingZ.UI.Legacy
             }
 
             TerrariaTextInputCompat.EndTextInput();
+            TerrariaTextInputCompat.BeginImePanelFrame();
         }
 
         public static bool IsFocused(string id)
@@ -112,11 +114,73 @@ namespace JueMingZ.UI.Legacy
             }
         }
 
+        public static void BeginImeCompositionPanelFrame()
+        {
+            TerrariaTextInputCompat.BeginImePanelFrame();
+        }
+
+        public static bool TryDetachImeCompositionPanel()
+        {
+            TerrariaTextInputCompat.BeginImePanelFrame();
+            return true;
+        }
+
+        public static bool TryAttachImeCompositionPanel(string id, LegacyUiRect anchor)
+        {
+            if (anchor.Width <= 0 || anchor.Height <= 0)
+            {
+                return false;
+            }
+
+            lock (SyncRoot)
+            {
+                if (!IsFocusedLocked(id))
+                {
+                    return false;
+                }
+            }
+
+            string message;
+            // Terraria draws the native IME candidate strip 32 px above the anchor.
+            // Anchoring at the input bottom would overlap the text box itself.
+            var attached = TerrariaTextInputCompat.TrySetImePanelAnchor(
+                anchor.X,
+                anchor.Bottom + ImePanelAnchorVerticalOffset,
+                0f,
+                out message);
+            if (!attached)
+            {
+                SetDiagnosticMessage("原生 IME 候选面板不可用。 " + message);
+            }
+
+            return attached;
+        }
+
+        public static bool TryDrawImeCompositionPanelTail(bool spriteBatchBegun)
+        {
+            string message;
+            var drawn = TerrariaTextInputCompat.TryDrawImePanelAfterSpriteBatchEnded(spriteBatchBegun, out message);
+            if (!drawn)
+            {
+                SetDiagnosticMessage("原生 IME 候选面板不可用。 " + message);
+            }
+
+            return drawn;
+        }
+
         internal static string GetCompositionPreviewForTesting(string id)
         {
             lock (SyncRoot)
             {
                 return IsFocusedLocked(id) ? _compositionPreview ?? string.Empty : string.Empty;
+            }
+        }
+
+        private static void SetDiagnosticMessage(string message)
+        {
+            lock (SyncRoot)
+            {
+                _diagnosticMessage = message ?? string.Empty;
             }
         }
 

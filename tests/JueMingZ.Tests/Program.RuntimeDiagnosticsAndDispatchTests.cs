@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
 using JueMingZ.Actions;
@@ -1220,6 +1221,41 @@ namespace JueMingZ.Tests
                 });
         }
 
+        private static void RuntimeAutomationDispatcherPreservesLaneContract()
+        {
+            AssertAutomationDispatchLaneContract(
+                JueMingZRuntime.GetAutomationDispatchContractForTesting(),
+                new[]
+                {
+                    "travel-menu|AlwaysMaintenance",
+                    "travel-menu-pause-automation|AlwaysMaintenance",
+                    "auto-recovery|ActionSubmitting",
+                    "fishing-automation|ActionSubmitting",
+                    "quick-item-hotkeys|ActionSubmitting",
+                    "auto-capture-critter|ActionSubmitting",
+                    "auto-harvest|ActionSubmitting",
+                    "auto-mining|ActionSubmitting",
+                    "auto-stack|ActionSubmitting",
+                    "auto-sell|ActionSubmitting",
+                    "auto-discard|ActionSubmitting",
+                    "quick-bag-open|ActionSubmitting",
+                    "auto-deposit-coins|ActionSubmitting",
+                    "auto-extractinator|ActionSubmitting",
+                    "keep-favorited|ActionSubmitting",
+                    "quick-reforge|ActionSubmitting",
+                    "auto-tax-collect|ActionSubmitting",
+                    "combat-perfect-revolver|ActionSubmitting",
+                    "combat-magic-string|ActionSubmitting",
+                    "combat-auto-facing|ActionSubmitting",
+                    "combat-phaseblade-quick-switch|ActionSubmitting",
+                    "combat-equipment-warning|ReadOnlyDisplay",
+                    "first-world-load-prompt|AlwaysMaintenance",
+                    "movement-safe-landing|ActionSubmitting",
+                    "movement-continuous-dash|ActionSubmitting",
+                    "movement-simulated-jump|ActionSubmitting"
+                });
+        }
+
         private static void AssertDispatchContract(RuntimeDispatchStep[] actual, string[] expected)
         {
             if (actual.Length != expected.Length)
@@ -1235,6 +1271,25 @@ namespace JueMingZ.Tests
                 {
                     throw new InvalidOperationException(
                         "Runtime dispatch contract changed at index " + index + ". Expected " + expected[index] + ", got " + row + ".");
+                }
+            }
+        }
+
+        private static void AssertAutomationDispatchLaneContract(RuntimeDispatchStep[] actual, string[] expected)
+        {
+            if (actual.Length != expected.Length)
+            {
+                throw new InvalidOperationException(
+                    "Runtime dispatch lane contract length changed. Expected " + expected.Length + ", got " + actual.Length + ".");
+            }
+
+            for (var index = 0; index < expected.Length; index++)
+            {
+                var row = actual[index].ServiceName + "|" + actual[index].Lane.ToString();
+                if (!string.Equals(row, expected[index], StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        "Runtime dispatch lane contract changed at index " + index + ". Expected " + expected[index] + ", got " + row + ".");
                 }
             }
         }
@@ -1262,6 +1317,256 @@ namespace JueMingZ.Tests
             if (!JueMingZRuntime.ShouldDispatchAutomationForTesting(unfocused))
             {
                 throw new InvalidOperationException("Unfocused game state must still allow background automation dispatch.");
+            }
+        }
+
+        private static void RuntimeDispatchLaneGateKeepsMaintenanceAndBlocksActionSubmitters()
+        {
+            JueMingZRuntime.ResetServiceSchedulerForTesting();
+
+            try
+            {
+                var unfocused = new GameStateSnapshot
+                {
+                    IsInWorld = true,
+                    Ui = new UiStateSnapshot { GameInputAvailable = false }
+                };
+
+                if (!JueMingZRuntime.ShouldDispatchAutomationForTesting(unfocused))
+                {
+                    throw new InvalidOperationException("Unfocused snapshots must keep the maintenance lane alive.");
+                }
+
+                if (!JueMingZRuntime.ShouldRunAutomationDispatchStepForTesting("travel-menu", true, unfocused, 1))
+                {
+                    throw new InvalidOperationException("AlwaysMaintenance lane must still dispatch while input is unavailable.");
+                }
+
+                if (!JueMingZRuntime.ShouldRunAutomationDispatchStepForTesting("combat-equipment-warning", true, unfocused, 1))
+                {
+                    throw new InvalidOperationException("ReadOnlyDisplay lane must not depend on user input focus.");
+                }
+
+                if (JueMingZRuntime.ShouldRunAutomationDispatchStepForTesting("auto-recovery", true, unfocused, 1))
+                {
+                    throw new InvalidOperationException("ActionSubmitting lane must not dispatch when game input is unavailable.");
+                }
+
+                var chatBlocked = new GameStateSnapshot
+                {
+                    IsInWorld = true,
+                    Ui = new UiStateSnapshot
+                    {
+                        GameInputAvailable = true,
+                        ChatOpen = true,
+                        HasBlockingUi = true
+                    }
+                };
+
+                if (JueMingZRuntime.ShouldRunAutomationDispatchStepForTesting("auto-recovery", true, chatBlocked, 2))
+                {
+                    throw new InvalidOperationException("ActionSubmitting lane must not dispatch while chat owns input.");
+                }
+
+                var available = new GameStateSnapshot
+                {
+                    IsInWorld = true,
+                    Ui = new UiStateSnapshot { GameInputAvailable = true }
+                };
+
+                if (!JueMingZRuntime.ShouldRunAutomationDispatchStepForTesting("auto-recovery", true, available, 3))
+                {
+                    throw new InvalidOperationException("ActionSubmitting lane must resume as soon as the base gate is available.");
+                }
+
+                var chestUi = new GameStateSnapshot
+                {
+                    IsInWorld = true,
+                    Ui = new UiStateSnapshot
+                    {
+                        GameInputAvailable = true,
+                        ChestOpen = true,
+                        HasBlockingUi = true
+                    }
+                };
+
+                if (!JueMingZRuntime.ShouldRunAutomationDispatchStepForTesting("auto-stack", true, chestUi, 4))
+                {
+                    throw new InvalidOperationException("Chest UI is a service-specific action context, not a global lane blocker.");
+                }
+
+                var mainMenu = new GameStateSnapshot
+                {
+                    IsInWorld = false,
+                    IsInMainMenu = true,
+                    Ui = new UiStateSnapshot
+                    {
+                        GameInputAvailable = true,
+                        IsInMainMenu = true
+                    }
+                };
+
+                if (JueMingZRuntime.ShouldRunAutomationDispatchStepForTesting("quick-item-hotkeys", true, mainMenu, 5))
+                {
+                    throw new InvalidOperationException("ActionSubmitting lane must not dispatch outside the world.");
+                }
+
+                if (JueMingZRuntime.ShouldRunAutomationDispatchStepForTesting("combat-equipment-warning", true, mainMenu, 5))
+                {
+                    throw new InvalidOperationException("ReadOnlyDisplay lane must not scan while outside the world.");
+                }
+            }
+            finally
+            {
+                JueMingZRuntime.ResetServiceSchedulerForTesting();
+            }
+        }
+
+        private static void RuntimeTargetingInputGateRecordsSkipWithoutSubmittingDiagnosticCommand()
+        {
+            RuntimeTargetingDiagnostics.ResetForTesting();
+            DrainDiagnosticButtonCommandsForTesting();
+            JueMingZRuntime.ResetServiceSchedulerForTesting();
+
+            try
+            {
+                var queue = new InputActionQueue();
+                var state = new RuntimeState();
+                var blockedGameState = new GameStateSnapshot
+                {
+                    IsInWorld = true,
+                    Ui = new UiStateSnapshot { GameInputAvailable = false }
+                };
+                QueueDiagnosticNoopButtonCommandForTesting();
+
+                var blockedContext = new RuntimeTickContext(Stopwatch.GetTimestamp())
+                {
+                    GameState = blockedGameState,
+                    SettingsSnapshot = RuntimeSettingsSnapshot.FromSettings(AppSettings.CreateDefault()),
+                    UpdateTick = 10
+                };
+
+                RuntimeAutomationDispatcher.RunTargetingAndUiActions(blockedContext, state, queue, false);
+
+                if (!RuntimeTargetingDiagnostics.DiagnosticInputSkipped ||
+                    !string.Equals(RuntimeTargetingDiagnostics.DiagnosticInputGateStatus, "skipped", StringComparison.Ordinal) ||
+                    !string.Equals(RuntimeTargetingDiagnostics.DiagnosticInputSkipReason, "gameInputAvailable=false", StringComparison.Ordinal) ||
+                    !RuntimeTargetingDiagnostics.DiagnosticInputSkipUtc.HasValue)
+                {
+                    throw new InvalidOperationException("Expected diagnostic input skip state when game input is unavailable.");
+                }
+
+                if (queue.GetFastState().PendingCount != 0)
+                {
+                    throw new InvalidOperationException("gameInputAvailable=false must not drain diagnostic commands or submit actions.");
+                }
+
+                var skippedSnapshot = RuntimeDiagnosticSnapshotBuilder.Build(new RuntimeDiagnosticSnapshotContext
+                {
+                    Version = "test-runtime-targeting-diagnostics"
+                });
+                if (!skippedSnapshot.DiagnosticInputSkipped ||
+                    !string.Equals(skippedSnapshot.DiagnosticInputGateStatus, "skipped", StringComparison.Ordinal) ||
+                    !string.Equals(skippedSnapshot.DiagnosticInputSkipReason, "gameInputAvailable=false", StringComparison.Ordinal) ||
+                    !skippedSnapshot.DiagnosticInputSkipUtc.HasValue)
+                {
+                    throw new InvalidOperationException("Runtime snapshot must expose diagnostic input skip state.");
+                }
+
+                var json = InvokeDiagnosticSnapshotJson(skippedSnapshot);
+                AssertContains(json, "\"DiagnosticInputSkipped\": true");
+                AssertContains(json, "\"DiagnosticInputGateStatus\": \"skipped\"");
+                AssertContains(json, "\"DiagnosticInputSkipReason\": \"gameInputAvailable=false\"");
+
+                var availableGameState = new GameStateSnapshot
+                {
+                    IsInWorld = true,
+                    Ui = new UiStateSnapshot { GameInputAvailable = true }
+                };
+                var availableContext = new RuntimeTickContext(Stopwatch.GetTimestamp())
+                {
+                    GameState = availableGameState,
+                    SettingsSnapshot = RuntimeSettingsSnapshot.FromSettings(AppSettings.CreateDefault()),
+                    UpdateTick = 11
+                };
+
+                RuntimeAutomationDispatcher.RunTargetingAndUiActions(availableContext, state, queue, true);
+
+                if (RuntimeTargetingDiagnostics.DiagnosticInputSkipped ||
+                    !string.Equals(RuntimeTargetingDiagnostics.DiagnosticInputGateStatus, "available", StringComparison.Ordinal) ||
+                    !string.IsNullOrEmpty(RuntimeTargetingDiagnostics.DiagnosticInputSkipReason) ||
+                    RuntimeTargetingDiagnostics.DiagnosticInputSkipUtc.HasValue)
+                {
+                    throw new InvalidOperationException("Diagnostic input skip state must clear after input becomes available.");
+                }
+
+                if (queue.GetFastState().PendingCount <= 0)
+                {
+                    throw new InvalidOperationException("Available game input should allow the pending diagnostic noop command to submit.");
+                }
+            }
+            finally
+            {
+                DrainDiagnosticButtonCommandsForTesting();
+                RuntimeTargetingDiagnostics.ResetForTesting();
+                JueMingZRuntime.ResetServiceSchedulerForTesting();
+            }
+        }
+
+        private static void QueueDiagnosticNoopButtonCommandForTesting()
+        {
+            var button = new DiagnosticTestButton
+            {
+                Id = "noop",
+                Label = "空动作",
+                Hint = "test",
+                X = 10,
+                Y = 10,
+                Width = 80,
+                Height = 24,
+                Enabled = true
+            };
+            var hit = new DiagnosticButtonHitTestResult
+            {
+                Button = button,
+                HitTestMode = "Test",
+                HitTestX = 12,
+                HitTestY = 14,
+                CandidateSummary = "T=noop",
+                VisualRectX = button.X,
+                VisualRectY = button.Y,
+                VisualRectWidth = button.Width,
+                VisualRectHeight = button.Height,
+                HitRectX = button.HitX,
+                HitRectY = button.HitY,
+                HitRectWidth = button.HitWidth,
+                HitRectHeight = button.HitHeight
+            };
+            var mouse = new DiagnosticMouseState
+            {
+                TerrariaReadAvailable = true,
+                TerrariaMouseX = 12,
+                TerrariaMouseY = 14,
+                TerrariaLeftDown = true,
+                GameInputAvailable = true,
+                ReadMode = "Test"
+            };
+            var method = typeof(DiagnosticUiInteractionBridge).GetMethod(
+                "EnqueueCommand",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            if (method == null)
+            {
+                throw new InvalidOperationException("DiagnosticUiInteractionBridge.EnqueueCommand reflection hook missing.");
+            }
+
+            method.Invoke(null, new object[] { hit, mouse, "Test", true });
+        }
+
+        private static void DrainDiagnosticButtonCommandsForTesting()
+        {
+            DiagnosticButtonCommand command;
+            while (DiagnosticUiInteractionBridge.TryDrainButtonCommand(out command))
+            {
             }
         }
 

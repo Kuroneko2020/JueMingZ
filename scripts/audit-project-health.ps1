@@ -1583,12 +1583,8 @@ function Test-ActionQueueDirectEnqueueGovernance {
         return
     }
 
-    $expectedExceptionCounts = @{
-        "src/JueMingZ/Input/DiagnosticActionDispatcher.cs" = 1
-    }
-    $expectedDirectCallCounts = @{
-        "src/JueMingZ/Input/DiagnosticActionDispatcher.cs" = 1
-    }
+    $expectedExceptionCounts = @{}
+    $expectedDirectCallCounts = @{}
 
     $tagCounts = @{}
     $directCallCounts = @{}
@@ -1650,10 +1646,10 @@ function Test-ActionQueueDirectEnqueueGovernance {
     }
 
     if ($unexpectedTags.Count -gt 0) {
-        Write-FailHealth "ACTION_QUEUE_DIRECT_ENQUEUE_EXCEPTION allowlist changed: $($unexpectedTags -join ', ')"
+        Write-FailHealth "ACTION_QUEUE_DIRECT_ENQUEUE_EXCEPTION comments are no longer allowed in production source: $($unexpectedTags -join ', ')"
     }
     else {
-        Write-Pass "ActionQueue direct enqueue exception comments remain frozen to the diagnostics allowlist."
+        Write-Pass "No ActionQueue direct enqueue exception comments remain in production source."
     }
 
     $unexpectedDirectCalls = @()
@@ -1683,10 +1679,10 @@ function Test-ActionQueueDirectEnqueueGovernance {
     }
 
     if ($unexpectedDirectCalls.Count -gt 0) {
-        Write-FailHealth "InputActionQueue direct Enqueue call allowlist changed: $($unexpectedDirectCalls -join ', ')"
+        Write-FailHealth "InputActionQueue direct Enqueue calls are no longer allowed in production source: $($unexpectedDirectCalls -join ', ')"
     }
     else {
-        Write-Pass "InputActionQueue direct Enqueue calls remain frozen to the diagnostics button path."
+        Write-Pass "No InputActionQueue direct Enqueue calls bypass admission in production source."
     }
 }
 

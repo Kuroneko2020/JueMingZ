@@ -1037,5 +1037,35 @@ namespace JueMingZ.Tests
                 return InputActionExecutionStepResult.Complete(InputActionStatus.Cancelled, reason ?? "throwing fake cancelled");
             }
         }
+
+        private sealed class ThrowingUpdateFakeExecutor : IInputActionExecutor
+        {
+            private readonly InputActionKind _kind;
+
+            public ThrowingUpdateFakeExecutor(InputActionKind kind)
+            {
+                _kind = kind;
+            }
+
+            public InputActionKind Kind
+            {
+                get { return _kind; }
+            }
+
+            public InputActionExecutionStepResult Start(InputActionExecution execution, GameStateSnapshot snapshot)
+            {
+                return InputActionExecutionStepResult.Running("throwing update fake running");
+            }
+
+            public InputActionExecutionStepResult Update(InputActionExecution execution, GameStateSnapshot snapshot)
+            {
+                throw new InvalidOperationException("throwing update fake");
+            }
+
+            public InputActionExecutionStepResult Cancel(InputActionExecution execution, string reason)
+            {
+                return InputActionExecutionStepResult.Complete(InputActionStatus.Cancelled, reason ?? "throwing update fake cancelled");
+            }
+        }
     }
 }

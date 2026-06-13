@@ -78,14 +78,7 @@ namespace JueMingZ.Diagnostics
                     Directory.CreateDirectory(DiagnosticsDirectory);
                     var tempPath = RuntimeSnapshotPath + ".tmp-" + Guid.NewGuid().ToString("N");
                     File.WriteAllText(tempPath, ToJson(snapshot), Encoding.UTF8);
-                    File.Copy(tempPath, RuntimeSnapshotPath, true);
-                    try
-                    {
-                        File.Delete(tempPath);
-                    }
-                    catch
-                    {
-                    }
+                    DiagnosticArtifactFileReplacer.ReplaceCompletedTempFile(tempPath, RuntimeSnapshotPath);
                 }
 
                 LogThrottle.InfoThrottled(

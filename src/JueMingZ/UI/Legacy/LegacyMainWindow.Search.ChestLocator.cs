@@ -15,6 +15,7 @@ namespace JueMingZ.UI.Legacy
         private const int SearchChestLocatorControlGap = 6;
         private const int SearchChestLocatorInnerGap = 6;
         private const int SearchChestLocatorNoticeHeight = 22;
+        private const int SearchChestLocatorMoreMessageHeight = 22;
         private const int SearchChestLocatorCandidateRowHeight = 28;
         private const int SearchChestLocatorCandidateRowVisualGap = 3;
         private const int SearchChestLocatorCandidateColumns = 2;
@@ -121,6 +122,7 @@ namespace JueMingZ.UI.Legacy
                 muted ? 208 : 218,
                 255,
                 0.70f);
+            TryAttachLegacyTextInputImePanel(SearchChestLocatorUiState.InputId, inputRect, area.Viewport);
             var inputElement = AddFrameElement(
                 elements,
                 SearchChestLocatorUiState.InputId,
@@ -237,6 +239,16 @@ namespace JueMingZ.UI.Legacy
                 hovered = DrawSearchChestLocatorCandidateRow(spriteBatch, area, mouse, elements, row, candidates[index]) ?? hovered;
             }
 
+            if (SearchChestLocatorUiState.HasMoreCandidates)
+            {
+                var moreRow = new LegacyUiRect(
+                    area.Viewport.X,
+                    area.ToScreenY(contentY + CalculateSearchChestLocatorCandidateRows() * SearchChestLocatorCandidateRowHeight),
+                    area.Viewport.Width,
+                    SearchChestLocatorMoreMessageHeight);
+                DrawSearchChestLocatorMoreMessage(spriteBatch, area, moreRow);
+            }
+
             return hovered;
         }
 
@@ -332,6 +344,32 @@ namespace JueMingZ.UI.Legacy
                 0.62f);
         }
 
+        private static void DrawSearchChestLocatorMoreMessage(object spriteBatch, LegacyScrollArea area, LegacyUiRect row)
+        {
+            if (!area.IsVisible(row))
+            {
+                return;
+            }
+
+            LegacyUiTheme.DrawRowClipped(spriteBatch, row, area.Viewport);
+            UiTextRenderer.DrawTextClipped(
+                spriteBatch,
+                SearchChestLocatorUiState.MoreCandidatesMessage,
+                row.X + 8,
+                row.Y + 4,
+                row.Width - 16,
+                16,
+                area.Viewport.X,
+                area.Viewport.Y,
+                area.Viewport.Width,
+                area.Viewport.Height,
+                210,
+                222,
+                238,
+                235,
+                0.56f);
+        }
+
         private static int CalculateSearchChestLocatorBlockHeight(int viewportWidth)
         {
             var candidateHeight = CalculateSearchChestLocatorCandidateListHeight();
@@ -351,9 +389,15 @@ namespace JueMingZ.UI.Legacy
 
         private static int CalculateSearchChestLocatorCandidateListHeight()
         {
+            var rows = CalculateSearchChestLocatorCandidateRows();
+            return rows * SearchChestLocatorCandidateRowHeight +
+                   (SearchChestLocatorUiState.HasMoreCandidates ? SearchChestLocatorMoreMessageHeight : 0);
+        }
+
+        private static int CalculateSearchChestLocatorCandidateRows()
+        {
             var columns = Math.Max(1, SearchChestLocatorCandidateColumns);
-            var rows = (SearchChestLocatorUiState.CandidateCount + columns - 1) / columns;
-            return rows * SearchChestLocatorCandidateRowHeight;
+            return (SearchChestLocatorUiState.CandidateCount + columns - 1) / columns;
         }
 
         internal static int CalculateSearchChestLocatorBlockHeightForTesting(int viewportWidth)
@@ -368,8 +412,7 @@ namespace JueMingZ.UI.Legacy
 
         internal static int GetSearchChestLocatorCandidateRowsForTesting()
         {
-            var columns = Math.Max(1, SearchChestLocatorCandidateColumns);
-            return (SearchChestLocatorUiState.CandidateCount + columns - 1) / columns;
+            return CalculateSearchChestLocatorCandidateRows();
         }
 
         internal static string[] GetSearchPageBlockOrderForTesting()

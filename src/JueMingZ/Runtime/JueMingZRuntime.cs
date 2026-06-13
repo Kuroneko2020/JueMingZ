@@ -35,7 +35,7 @@ namespace JueMingZ.Runtime
         private static long _lastRuntimeUpdateStartTimestamp;
         private static readonly RuntimeTickPipeline TickPipeline = CreateTickPipeline();
 
-        public const string Version = "0.660-version-number-rule";
+        public const string Version = "0.678-chest-locator-more-candidates";
 
         public static RuntimeState State { get; private set; } = new RuntimeState();
         public static FeatureRegistry FeatureRegistry { get; private set; }
@@ -454,6 +454,19 @@ namespace JueMingZ.Runtime
         internal static RuntimeDispatchStep[] GetAutomationDispatchContractForTesting()
         {
             return RuntimeAutomationDispatcher.GetAutomationDispatchContractForTesting();
+        }
+
+        internal static bool ShouldRunAutomationDispatchStepForTesting(
+            string serviceName,
+            bool enabled,
+            GameStateSnapshot snapshot,
+            long tick)
+        {
+            return RuntimeAutomationDispatcher.ShouldRunAutomationDispatchStepForTesting(
+                serviceName,
+                enabled,
+                snapshot,
+                tick);
         }
 
         public static void ResetServiceSchedulerForTesting()

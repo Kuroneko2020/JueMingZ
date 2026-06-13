@@ -587,6 +587,51 @@ namespace JueMingZ.Tests
             });
         }
 
+        private static void PlayerWorldBehaviorSaveFailureKeepsExistingRecordFile()
+        {
+            WithTemporaryBehaviorStore(() =>
+            {
+                var context = new PlayerWorldBehaviorContext
+                {
+                    PlayerKey = "player:save-failure",
+                    WorldKey = "world:save-failure",
+                    PlayerName = "Save Failure",
+                    WorldName = "Save Failure World"
+                };
+
+                bool added;
+                string message;
+                if (!PlayerWorldBehaviorStore.TryRecordOpenedChest(context, 10, 20, "initial", out added, out message) || !added)
+                {
+                    throw new InvalidOperationException("Expected initial behavior record to be stored: " + message);
+                }
+
+                var fileName = PlayerWorldBehaviorStore.BuildScopedFileNameForTesting(context.PlayerKey, context.WorldKey);
+                var path = Path.Combine(PlayerWorldBehaviorStore.BehaviorDirectory, fileName);
+                var originalJson = File.ReadAllText(path);
+
+                using (var holdTargetOpen = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None))
+                {
+                    if (!PlayerWorldBehaviorStore.TryRecordOpenedChest(context, 12, 20, "locked-save", out added, out message) || !added)
+                    {
+                        throw new InvalidOperationException("Expected in-memory behavior record update even when disk save fails: " + message);
+                    }
+                }
+
+                var afterFailureJson = File.ReadAllText(path);
+                if (!string.Equals(originalJson, afterFailureJson, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected failed behavior record replacement to preserve the existing file bytes.");
+                }
+
+                var tempFiles = Directory.GetFiles(PlayerWorldBehaviorStore.BehaviorDirectory, fileName + ".tmp-*");
+                if (tempFiles.Length != 0)
+                {
+                    throw new InvalidOperationException("Expected failed behavior record replacement to clean temporary files.");
+                }
+            });
+        }
+
         private static void LegacyOpenedChestKeysMigrateToCurrentPlayerWorldOnly()
         {
             WithTemporaryBehaviorStore(() =>
