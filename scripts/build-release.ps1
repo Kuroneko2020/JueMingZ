@@ -16,7 +16,10 @@ if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
     Write-Error "dotnet CLI was not found. Install .NET SDK, or build JueMingZ.sln with Visual Studio / MSBuild."
 }
 
-dotnet build .\JueMingZ.sln -c Release -p:Platform=x86
+# Release packaging only needs the injected DLL. Build the main project
+# directly so SDK solution-restore quirks in mixed-platform test projects do
+# not block package creation; tests are run by the dedicated test command.
+dotnet build .\src\JueMingZ\JueMingZ.csproj -c Release -p:Platform=x86
 $exitCode = $LASTEXITCODE
 if ($exitCode -ne 0) {
     exit $exitCode

@@ -616,6 +616,17 @@ namespace JueMingZ.Automation.Search
                 new KnownShopSource(1, 4063, "可能出售 / Boss 进度或困难模式条件后出售", true),
                 new KnownShopSource(2, 98, "常驻商品", false),
                 new KnownShopSource(2, 324, "可能出售 / 夜晚出售", true),
+                // Witch Doctor context stock is a static clue for closed-shop queries;
+                // do not gate it on live NPC presence or mutate the currently open shop.
+                new KnownShopSource(16, 2999, "可能出售 / 巫师在场时出售", true),
+                new KnownShopSource(16, 1158, "可能出售 / 夜晚出售", true),
+                new KnownShopSource(16, 1159, "可能出售 / 困难模式击败世纪之花后出售", true),
+                new KnownShopSource(16, 1160, "可能出售 / 困难模式击败世纪之花后出售", true),
+                new KnownShopSource(16, 1161, "可能出售 / 困难模式击败世纪之花后出售", true),
+                new KnownShopSource(16, 1167, "可能出售 / 困难模式击败世纪之花且位于丛林时出售", true),
+                new KnownShopSource(16, 1339, "可能出售 / 困难模式击败世纪之花后出售", true),
+                new KnownShopSource(16, 1171, "可能出售 / 困难模式且位于丛林时出售", true),
+                new KnownShopSource(16, 1162, "可能出售 / 夜晚、击败世纪之花且位于丛林时出售", true),
                 // Travel-shop and Skeleton Merchant random/context stock are static encyclopedia clues only.
                 // They must not read or refresh the live random inventory, because that would mutate shop state.
                 new KnownShopSource(19, 2260, "可能出售 / 游商随机出售 / 不代表本次到货", true),

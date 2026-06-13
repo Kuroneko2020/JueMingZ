@@ -58,9 +58,17 @@ namespace JueMingZ.Automation.Search
 
         public static IList<ItemQueryCandidate> ResolveCandidates(string query, int maxResults)
         {
+            return ResolveCandidateQuery(query, maxResults).Candidates;
+        }
+
+        public static ItemQueryCandidateResult ResolveCandidateQuery(string query, int maxResults)
+        {
             EnsureInitialized();
 
-            var result = new List<ItemQueryCandidate>();
+            var result = new ItemQueryCandidateResult
+            {
+                MaxResults = maxResults
+            };
             var text = NormalizeQuery(query);
             if (text.Length <= 0)
             {
@@ -73,7 +81,7 @@ namespace JueMingZ.Automation.Search
                 ItemQueryReference reference;
                 if (TryGet(itemType, out reference))
                 {
-                    result.Add(ToCandidate(reference));
+                    result.Candidates.Add(ToCandidate(reference));
                 }
 
                 return result;
@@ -94,13 +102,22 @@ namespace JueMingZ.Automation.Search
                     continue;
                 }
 
-                result.Add(ToCandidate(CreateReference(entry, 0, displayName)));
+                result.Candidates.Add(ToCandidate(CreateReference(entry, 0, displayName)));
             }
 
-            result.Sort(CompareCandidates);
-            if (maxResults > 0 && result.Count > maxResults)
+            var candidates = result.Candidates as List<ItemQueryCandidate>;
+            if (candidates != null)
             {
-                result.RemoveRange(maxResults, result.Count - maxResults);
+                candidates.Sort(CompareCandidates);
+            }
+
+            if (maxResults > 0 && result.Candidates.Count > maxResults)
+            {
+                result.HasMore = true;
+                for (var index = result.Candidates.Count - 1; index >= maxResults; index--)
+                {
+                    result.Candidates.RemoveAt(index);
+                }
             }
 
             return result;

@@ -24,6 +24,20 @@ namespace JueMingZ.Automation.Search
         }
     }
 
+    internal sealed class ItemQueryCandidateResult
+    {
+        public IList<ItemQueryCandidate> Candidates { get; private set; }
+
+        public bool HasMore { get; set; }
+
+        public int MaxResults { get; set; }
+
+        public ItemQueryCandidateResult()
+        {
+            Candidates = new List<ItemQueryCandidate>();
+        }
+    }
+
     internal sealed class ItemQueryReference
     {
         public int ItemType { get; set; }

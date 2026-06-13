@@ -10,7 +10,8 @@ namespace JueMingZ.UI.Legacy
     {
         public const string InputId = "search-query:input";
         public const string PickItemButtonId = "search-query:pick-item";
-        public const int CandidateMaxResults = 24;
+        public const int CandidateMaxResults = 40;
+        public const string MoreCandidatesMessage = "还有更多，继续输入缩小范围";
         private const int RecentItemHistoryLimit = 8;
 
         private static readonly object SyncRoot = new object();
@@ -18,6 +19,7 @@ namespace JueMingZ.UI.Legacy
         private static readonly List<int> RecentItemTypes = new List<int>();
         private static string _queryText = string.Empty;
         private static string _candidateMessage = string.Empty;
+        private static bool _hasMoreCandidates;
         private static ItemQueryResult _selectedResult;
         private static int _selectedItemType;
         private static int _candidateScrollOffset;
@@ -43,6 +45,11 @@ namespace JueMingZ.UI.Legacy
         public static string CandidateMessage
         {
             get { lock (SyncRoot) { return _candidateMessage; } }
+        }
+
+        public static bool HasMoreCandidates
+        {
+            get { lock (SyncRoot) { return _hasMoreCandidates; } }
         }
 
         public static int CandidateCount
@@ -162,6 +169,7 @@ namespace JueMingZ.UI.Legacy
                 _selectionHintText = "已进入选择物品模式：松开按钮后，再左键点击要查询的目标。";
                 _selectionSourceSummary = NormalizeSelectionSource(sourceSummary);
                 Candidates.Clear();
+                _hasMoreCandidates = false;
                 _candidateMessage = "等待左键选择物品";
                 ClearCandidateViewportLocked();
             }
@@ -216,6 +224,7 @@ namespace JueMingZ.UI.Legacy
                 _selectedResult = null;
                 _selectedItemType = 0;
                 Candidates.Clear();
+                _hasMoreCandidates = false;
                 ClearCandidateViewportLocked();
                 _candidateMessage = string.IsNullOrWhiteSpace(hintText)
                     ? "未识别到可查询物品"
@@ -260,6 +269,7 @@ namespace JueMingZ.UI.Legacy
             {
                 _queryText = string.Empty;
                 _candidateMessage = string.Empty;
+                _hasMoreCandidates = false;
                 _selectedResult = null;
                 _selectedItemType = 0;
                 Candidates.Clear();
@@ -365,6 +375,7 @@ namespace JueMingZ.UI.Legacy
                     var hash = 17;
                     AddHash(ref hash, _queryText);
                     AddHash(ref hash, _candidateMessage);
+                    AddHash(ref hash, _hasMoreCandidates);
                     AddHash(ref hash, Candidates.Count);
                     for (var index = 0; index < Candidates.Count; index++)
                     {
@@ -552,6 +563,8 @@ namespace JueMingZ.UI.Legacy
                 return "{" +
                        "\"query\":\"" + EscapeJson(_queryText) + "\"," +
                        "\"candidateCount\":" + Candidates.Count.ToString(CultureInfo.InvariantCulture) + "," +
+                       "\"hasMoreCandidates\":" + (_hasMoreCandidates ? "true" : "false") + "," +
+                       "\"candidateMessage\":\"" + EscapeJson(_candidateMessage) + "\"," +
                        "\"selectedItemType\":" + _selectedItemType.ToString(CultureInfo.InvariantCulture) + "," +
                        "\"hasResult\":" + ((_selectedResult != null && _selectedResult.Found) ? "true" : "false") + "," +
                        "\"hoverItemType\":" + _hoverItemType.ToString(CultureInfo.InvariantCulture) + "," +
@@ -575,6 +588,7 @@ namespace JueMingZ.UI.Legacy
             {
                 _queryText = string.Empty;
                 _candidateMessage = string.Empty;
+                _hasMoreCandidates = false;
                 _selectedResult = null;
                 _selectedItemType = 0;
                 Candidates.Clear();
@@ -597,6 +611,7 @@ namespace JueMingZ.UI.Legacy
                 _selectedItemType = result != null && result.Found ? result.ItemType : 0;
                 _queryText = BuildSelectedQueryText(result, result == null ? 0 : result.ItemType);
                 Candidates.Clear();
+                _hasMoreCandidates = false;
                 _candidateMessage = string.Empty;
                 ClearCandidateViewportLocked();
             }
@@ -605,6 +620,7 @@ namespace JueMingZ.UI.Legacy
         private static void RebuildCandidatesLocked()
         {
             Candidates.Clear();
+            _hasMoreCandidates = false;
             ClearCandidateViewportLocked();
 
             if (_queryText.Length <= 0)
@@ -613,10 +629,10 @@ namespace JueMingZ.UI.Legacy
                 return;
             }
 
-            IList<ItemQueryCandidate> candidates;
+            ItemQueryCandidateResult queryResult;
             try
             {
-                candidates = ItemQueryService.ResolveCandidates(_queryText, CandidateMaxResults);
+                queryResult = ItemQueryService.ResolveCandidateQuery(_queryText, CandidateMaxResults);
             }
             catch
             {
@@ -624,19 +640,23 @@ namespace JueMingZ.UI.Legacy
                 return;
             }
 
-            if (candidates != null)
+            if (queryResult != null && queryResult.Candidates != null)
             {
-                for (var index = 0; index < candidates.Count; index++)
+                for (var index = 0; index < queryResult.Candidates.Count; index++)
                 {
-                    var candidate = NormalizeCandidate(candidates[index]);
+                    var candidate = NormalizeCandidate(queryResult.Candidates[index]);
                     if (candidate != null)
                     {
                         Candidates.Add(candidate);
                     }
                 }
+
+                _hasMoreCandidates = queryResult.HasMore;
             }
 
-            _candidateMessage = Candidates.Count <= 0 ? "未找到匹配物品" : string.Empty;
+            _candidateMessage = Candidates.Count <= 0
+                ? "未找到匹配物品"
+                : (_hasMoreCandidates ? MoreCandidatesMessage : string.Empty);
         }
 
         private static ItemQueryCandidate NormalizeCandidate(ItemQueryCandidate candidate)
@@ -687,6 +707,7 @@ namespace JueMingZ.UI.Legacy
             _selectedItemType = found ? itemType : 0;
             _queryText = BuildSelectedQueryText(result, itemType);
             Candidates.Clear();
+            _hasMoreCandidates = false;
             _candidateMessage = found ? string.Empty : "未找到对应物品";
             ClearCandidateViewportLocked();
             if (found)

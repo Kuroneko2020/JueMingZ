@@ -18,6 +18,7 @@ namespace JueMingZ.UI.Legacy
         private const string SearchInputLabelText = "查询物品";
         private const string SearchPickButtonText = "选择物品";
         private const string SearchPickButtonTooltipText = "点击需要查询的物品";
+        private const string SearchAcquisitionSectionTitle = "获取来源（仅供参考，不包准确全面）";
         private const int SearchCandidatePopupMinHeight = 78;
         private const int SearchCandidatePopupMaxHeight = 226;
         private const int SearchCandidatePopupMinWidth = 220;
@@ -29,6 +30,7 @@ namespace JueMingZ.UI.Legacy
         private const int SearchCandidateHeaderHeight = 26;
         private const int SearchCandidateRowHeight = 30;
         private const int SearchCandidateRowVisualGap = 3;
+        private const int SearchCandidateMoreMessageHeight = 24;
         private const int SearchSectionGap = 8;
         private const int SearchSectionTitleContentGap = 2;
         private const int SearchSectionBodyOffset = LegacyUiMetrics.SectionHeaderHeight + SearchSectionTitleContentGap;
@@ -365,7 +367,7 @@ namespace JueMingZ.UI.Legacy
         private static void DrawSearchAcquisitionSection(object spriteBatch, LegacyScrollArea area, int contentY, IList<ItemAcquisitionSourceSummary> sources)
         {
             var y = contentY;
-            DrawSection(spriteBatch, area, y, "获取来源");
+            DrawSection(spriteBatch, area, y, SearchAcquisitionSectionTitle);
             y += SearchSectionBodyOffset;
             var count = sources == null ? 0 : sources.Count;
             if (count <= 0)
@@ -789,7 +791,8 @@ namespace JueMingZ.UI.Legacy
                 return null;
             }
 
-            var contentHeight = candidates.Count * SearchCandidateRowHeight;
+            var hasMore = SearchItemQueryUiState.HasMoreCandidates;
+            var contentHeight = candidates.Count * SearchCandidateRowHeight + (hasMore ? SearchCandidateMoreMessageHeight : 0);
             SearchItemQueryUiState.SetCandidateViewport(body, contentHeight);
             var scrollOffset = SearchItemQueryUiState.CandidateScrollOffset;
             var clip = body.Intersect(area.Viewport);
@@ -805,7 +808,43 @@ namespace JueMingZ.UI.Legacy
                 hovered = DrawSearchCandidateRow(spriteBatch, mouse, elements, clip, row, candidates[index]) ?? hovered;
             }
 
+            if (hasMore)
+            {
+                var moreRow = new LegacyUiRect(
+                    body.X,
+                    body.Y + candidates.Count * SearchCandidateRowHeight - scrollOffset,
+                    body.Width,
+                    SearchCandidateMoreMessageHeight);
+                DrawSearchCandidateMoreMessage(spriteBatch, clip, moreRow);
+            }
+
             return hovered;
+        }
+
+        private static void DrawSearchCandidateMoreMessage(object spriteBatch, LegacyUiRect clip, LegacyUiRect row)
+        {
+            if (!row.Intersects(clip))
+            {
+                return;
+            }
+
+            LegacyUiTheme.DrawRowClipped(spriteBatch, row, clip);
+            UiTextRenderer.DrawTextClipped(
+                spriteBatch,
+                SearchItemQueryUiState.MoreCandidatesMessage,
+                row.X + 8,
+                row.Y + 4,
+                row.Width - 16,
+                16,
+                clip.X,
+                clip.Y,
+                clip.Width,
+                clip.Height,
+                210,
+                222,
+                238,
+                235,
+                0.56f);
         }
 
         private static LegacyUiElement DrawSearchCandidateRow(object spriteBatch, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, LegacyUiRect clip, LegacyUiRect row, ItemQueryCandidate candidate)
@@ -1031,7 +1070,6 @@ namespace JueMingZ.UI.Legacy
             AddSearchAcquisitionDetailPart(parts, source.QuantityText);
             AddSearchAcquisitionDetailPart(parts, source.ProbabilityText);
             AddSearchAcquisitionDetailPart(parts, source.ConditionText);
-            AddSearchAcquisitionDetailPart(parts, source.ContextText);
             return parts;
         }
 
@@ -1371,7 +1409,7 @@ namespace JueMingZ.UI.Legacy
 
         internal static string[] GetSearchResultSectionOrderForTesting()
         {
-            return new[] { "基础信息", "获取来源", "合成来源", "合成用途", "微光反应" };
+            return new[] { "基础信息", SearchAcquisitionSectionTitle, "合成来源", "合成用途", "微光反应" };
         }
 
         internal static string GetSearchAcquisitionEmptyTextForTesting()

@@ -67,6 +67,262 @@ namespace JueMingZ.Tests
             });
         }
 
+        private static void SearchQueryCandidateResultReportsMoreState()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                AddSearchCandidateBatch(1000, "单候选", 1);
+                AddSearchCandidateBatch(1100, "四十候选", 40);
+                AddSearchCandidateBatch(1200, "四十一候选", 41);
+                ItemQueryService.ResetForTesting();
+
+                var empty = ItemQueryService.ResolveCandidateQuery("零候选", SearchItemQueryUiState.CandidateMaxResults);
+                if (empty.Candidates.Count != 0 || empty.HasMore)
+                {
+                    throw new InvalidOperationException("Search candidate result should keep empty queries untruncated.");
+                }
+
+                var single = ItemQueryService.ResolveCandidateQuery("单候选", SearchItemQueryUiState.CandidateMaxResults);
+                if (single.Candidates.Count != 1 || single.HasMore)
+                {
+                    throw new InvalidOperationException("Search candidate result should not mark a single match as truncated.");
+                }
+
+                var exactLimit = ItemQueryService.ResolveCandidateQuery("四十候选", SearchItemQueryUiState.CandidateMaxResults);
+                if (exactLimit.Candidates.Count != SearchItemQueryUiState.CandidateMaxResults || exactLimit.HasMore)
+                {
+                    throw new InvalidOperationException("Search candidate result should not mark exactly 40 matches as truncated.");
+                }
+
+                var truncated = ItemQueryService.ResolveCandidateQuery("四十一候选", SearchItemQueryUiState.CandidateMaxResults);
+                if (truncated.Candidates.Count != SearchItemQueryUiState.CandidateMaxResults || !truncated.HasMore)
+                {
+                    throw new InvalidOperationException("Search candidate result should return 40 rows and report more matches for 41+ results.");
+                }
+            });
+        }
+
+        private static void SearchQueryUiStateShowsMorePromptAndSignature()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                AddSearchCandidateBatch(1300, "状态候选", SearchItemQueryUiState.CandidateMaxResults);
+                ItemQueryService.ResetForTesting();
+                SearchItemQueryUiState.ResetForTesting();
+                SearchItemQueryUiState.UpdateDraft("状态候选");
+
+                if (SearchItemQueryUiState.CandidateCount != SearchItemQueryUiState.CandidateMaxResults ||
+                    SearchItemQueryUiState.HasMoreCandidates ||
+                    !string.IsNullOrEmpty(SearchItemQueryUiState.CandidateMessage))
+                {
+                    throw new InvalidOperationException("Search UI should show exactly 40 matches without a more prompt when the result fits the limit.");
+                }
+
+                var signatureWithoutMore = SearchItemQueryUiState.BuildStateSignature();
+                AddSearchItem(1399, "状态候选99", "StateCandidate99", 1, 0, 0, false, false, -1, -1);
+                ItemQueryService.ResetForTesting();
+                SearchItemQueryUiState.ResetForTesting();
+                SearchItemQueryUiState.UpdateDraft("状态候选");
+
+                if (SearchItemQueryUiState.CandidateCount != SearchItemQueryUiState.CandidateMaxResults ||
+                    !SearchItemQueryUiState.HasMoreCandidates)
+                {
+                    throw new InvalidOperationException("Search UI should cap visible candidates at 40 while preserving has-more state.");
+                }
+
+                AssertStringEquals(
+                    SearchItemQueryUiState.CandidateMessage,
+                    SearchItemQueryUiState.MoreCandidatesMessage,
+                    "search UI more candidates prompt");
+
+                var signatureWithMore = SearchItemQueryUiState.BuildStateSignature();
+                if (signatureWithMore == signatureWithoutMore)
+                {
+                    throw new InvalidOperationException("Search UI state signature must change when the same visible candidates gain a more-results prompt.");
+                }
+
+                var json = SearchItemQueryUiState.BuildUiStateJson();
+                AssertContains(json, "\"hasMoreCandidates\":true");
+                AssertContains(json, "\"candidateMessage\":\"" + SearchItemQueryUiState.MoreCandidatesMessage + "\"");
+            });
+        }
+
+        private static void SearchQueryLegacyTextInputShowsImeCompositionForAllKnownInputs()
+        {
+            var inputIds = new[]
+            {
+                SearchItemQueryUiState.InputId,
+                SearchChestLocatorUiState.InputId,
+                FishingFilterUiState.KeywordInputId,
+                FishingFilterUiState.GlobalSearchInputId,
+                FishingFilterUiState.PresetNameInputId,
+                "fishing-quick-rename:name",
+                "misc-quick-reforge:prefix"
+            };
+
+            try
+            {
+                TerrariaTextInputCompat.SetTextInputOverridesForTesting(current => current, "预览");
+                for (var index = 0; index < inputIds.Length; index++)
+                {
+                    var inputId = inputIds[index];
+                    LegacyTextInput.Focus(inputId, "草稿");
+                    LegacyTextInput.Update(inputId);
+
+                    AssertStringEquals(LegacyTextInput.GetDraft(inputId), "草稿", "legacy text input committed draft");
+                    AssertStringEquals(LegacyTextInput.GetCompositionPreviewForTesting(inputId), "预览", "legacy text input IME composition preview");
+
+                    var display = LegacyTextInput.GetDisplayText(inputId, "placeholder");
+                    AssertContains(display, "草稿预览");
+                    if (display.IndexOf("placeholder", StringComparison.Ordinal) >= 0)
+                    {
+                        throw new InvalidOperationException("Focused legacy text input must not show placeholder while IME composition preview is active.");
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(LegacyTextInput.DiagnosticMessage))
+                    {
+                        throw new InvalidOperationException("IME composition test override should not produce a diagnostic: " + LegacyTextInput.DiagnosticMessage);
+                    }
+                }
+            }
+            finally
+            {
+                LegacyTextInput.ClearFocus();
+                TerrariaTextInputCompat.SetTextInputOverridesForTesting(null, null);
+            }
+        }
+
+        private static void SearchQueryLegacyTextInputAvoidsNativeImePanelDraw()
+        {
+            var repoRoot = ResolveSearchQueryRepoRoot();
+            var sourceFiles = new[]
+            {
+                Path.Combine(repoRoot, "src", "JueMingZ", "UI", "Legacy", "LegacyTextInput.cs"),
+                Path.Combine(repoRoot, "src", "JueMingZ", "Compat", "TerrariaTextInputCompat.cs")
+            };
+
+            var forbidden = new[] { "DrawIMEPanel", "SetIMEPanelAnchor" };
+            for (var fileIndex = 0; fileIndex < sourceFiles.Length; fileIndex++)
+            {
+                var text = File.ReadAllText(sourceFiles[fileIndex]);
+                for (var forbiddenIndex = 0; forbiddenIndex < forbidden.Length; forbiddenIndex++)
+                {
+                    if (text.IndexOf(forbidden[forbiddenIndex], StringComparison.Ordinal) >= 0)
+                    {
+                        throw new InvalidOperationException(
+                            "Legacy text input IME preview must not call native IME panel drawing before SpriteBatch stage is verified: " + sourceFiles[fileIndex]);
+                    }
+                }
+            }
+        }
+
+        private static void SearchQueryDynamicCoverageMatrixCoversStageSamples()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                AddSearchCandidateBatch(2100, "矩阵候选", SearchItemQueryUiState.CandidateMaxResults + 1);
+                AddSearchDynamicCoverageSampleItems();
+                Terraria.Lang.NpcNames[17] = "商人";
+                Terraria.Lang.NpcNames[228] = "巫医";
+                ItemQueryService.ResetForTesting();
+
+                var candidates = ItemQueryService.ResolveCandidateQuery("矩阵候选", SearchItemQueryUiState.CandidateMaxResults);
+                if (candidates.Candidates.Count != SearchItemQueryUiState.CandidateMaxResults || !candidates.HasMore)
+                {
+                    throw new InvalidOperationException("Dynamic coverage matrix should include the 40-row candidate cap and has-more signal.");
+                }
+
+                AssertCoverageSource(5400, "最土的块", ItemAcquisitionSourceTypes.Other, ItemAcquisitionSourceTags.WorldGeneration, "最土的块", "不扫描当前世界");
+                AssertCoverageSource(3198, "利器站可敲下", ItemAcquisitionSourceTypes.Other, ItemAcquisitionSourceTags.MiningGathering, "利器站", "商店来源保持并列");
+                AssertCoverageSource(3198, "利器站商店并列", ItemAcquisitionSourceTypes.NpcShop, string.Empty, "商人", "困难模式后");
+                AssertCoverageSource(148, "水蜡烛同类可敲下", ItemAcquisitionSourceTypes.Other, ItemAcquisitionSourceTags.MiningGathering, "水蜡烛", "地牢");
+                AssertCoverageSource(149, "书同类可敲下", ItemAcquisitionSourceTypes.Other, ItemAcquisitionSourceTags.MiningGathering, "书", "地牢");
+                AssertCoverageSource(1746, "苦力怕套装礼袋", ItemAcquisitionSourceTypes.Other, ItemAcquisitionSourceTags.ContainerOpen, "礼袋", "服装套装池");
+                AssertCoverageSource(1810, "霉运纱线礼袋", ItemAcquisitionSourceTypes.Other, ItemAcquisitionSourceTags.ContainerOpen, "礼袋", "稀有");
+                AssertCoverageSource(1800, "蝙蝠钩同池礼袋", ItemAcquisitionSourceTypes.Other, ItemAcquisitionSourceTags.ContainerOpen, "礼袋", "开包整理表");
+                AssertCoverageSource(939, "蛛丝吊索蛛网箱", ItemAcquisitionSourceTypes.Other, ItemAcquisitionSourceTags.Chest, "蛛网箱", "不读取真实箱子内容");
+                AssertCoverageSource(3085, "金锁盒地牢匣", ItemAcquisitionSourceTypes.Other, ItemAcquisitionSourceTags.ContainerOpen, "地牢匣", "宝匣开包整理表");
+                AssertCoverageSource(3317, "英勇球地牢匣", ItemAcquisitionSourceTypes.Other, ItemAcquisitionSourceTags.ContainerOpen, "地牢匣", "不表示宝匣可钓到");
+                AssertCoverageSource(3000, "炼药桌地牢钓鱼", ItemAcquisitionSourceTypes.Other, ItemAcquisitionSourceTags.Fishing, "地牢水域", "地牢钓鱼直接鱼获");
+                AssertCoverageSource(3000, "炼药桌可敲下", ItemAcquisitionSourceTypes.Other, ItemAcquisitionSourceTags.MiningGathering, "炼药桌", "地牢");
+                AssertCoverageSource(2999, "施法桌巫医", ItemAcquisitionSourceTypes.NpcShop, string.Empty, "巫医", "巫师在场");
+                AssertCoverageSource(2999, "施法桌地牢钓鱼", ItemAcquisitionSourceTypes.Other, ItemAcquisitionSourceTags.Fishing, "地牢水域", "不预测当前水域");
+                AssertCoverageSource(2999, "施法桌可敲下", ItemAcquisitionSourceTypes.Other, ItemAcquisitionSourceTags.MiningGathering, "施法桌", "地牢");
+                AssertCoverageSource(1158, "矮人项链巫医条件", ItemAcquisitionSourceTypes.NpcShop, string.Empty, "巫医", "夜晚出售");
+                AssertCoverageSource(1162, "叶之翼巫医条件", ItemAcquisitionSourceTypes.NpcShop, string.Empty, "巫医", "夜晚、击败世纪之花");
+
+                try
+                {
+                    TerrariaTextInputCompat.SetTextInputOverridesForTesting(current => current, "矩阵预览");
+                    LegacyTextInput.Focus(SearchItemQueryUiState.InputId, "矩阵");
+                    LegacyTextInput.Update(SearchItemQueryUiState.InputId);
+                    AssertContains(LegacyTextInput.GetDisplayText(SearchItemQueryUiState.InputId, "placeholder"), "矩阵矩阵预览");
+                }
+                finally
+                {
+                    LegacyTextInput.ClearFocus();
+                    TerrariaTextInputCompat.SetTextInputOverridesForTesting(null, null);
+                }
+            });
+        }
+
+        private static void SearchQueryDynamicSourceBoundaryProtectsProductionPaths()
+        {
+            var repoRoot = ResolveSearchQueryRepoRoot();
+            var sourceFiles = new List<string>(
+                Directory.GetFiles(
+                    Path.Combine(repoRoot, "src", "JueMingZ", "Automation", "Search"),
+                    "*.cs"));
+            sourceFiles.Add(Path.Combine(repoRoot, "src", "JueMingZ", "UI", "Legacy", "LegacyMainWindow.Search.cs"));
+            sourceFiles.Add(Path.Combine(repoRoot, "src", "JueMingZ", "UI", "Legacy", "LegacyTextInput.cs"));
+            sourceFiles.Add(Path.Combine(repoRoot, "src", "JueMingZ", "Compat", "TerrariaTextInputCompat.cs"));
+
+            var forbiddenTerms = new[]
+            {
+                "OpenBossBag",
+                "OpenGoodieBag",
+                "OpenFishingCrate",
+                "OpenHerbBag",
+                "QuickSpawnItem",
+                "Item.NewItem",
+                "FishDropsDB",
+                "GetDisplayableDrops",
+                "TryGetItemDropType",
+                "GetAnglerReward",
+                "WorldGen.",
+                "WorldGen(",
+                "Main.tile",
+                "Main.chest",
+                "FindChest",
+                "OpenShop(",
+                "SetupShop(",
+                "Main.npcShop",
+                "Main.travelShop",
+                "SetupTravelShop",
+                "NPC.AnyNPCs",
+                "ExtractinatorHelper",
+                "RollExtractinatorDrop",
+                "DrawIMEPanel",
+                "SetIMEPanelAnchor"
+            };
+
+            for (var fileIndex = 0; fileIndex < sourceFiles.Count; fileIndex++)
+            {
+                var path = sourceFiles[fileIndex];
+                var text = File.ReadAllText(path, Encoding.UTF8);
+                for (var termIndex = 0; termIndex < forbiddenTerms.Length; termIndex++)
+                {
+                    var term = forbiddenTerms[termIndex];
+                    if (text.IndexOf(term, StringComparison.Ordinal) >= 0)
+                    {
+                        throw new InvalidOperationException(
+                            "Search query dynamic coverage must stay on readonly snapshots/static tables and avoid live vanilla/UI entrypoints: " +
+                            Path.GetFileName(path) + " contains " + term + ".");
+                    }
+                }
+            }
+        }
+
         private static void SearchQueryBuildsCraftingSourceSummaries()
         {
             WithSearchQueryFixture(() =>
@@ -509,6 +765,42 @@ namespace JueMingZ.Tests
             });
         }
 
+        private static void SearchQueryNpcShopKnownWitchDoctorConditionsCoverSameFamily()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                AddSearchItem(2999, "施法桌", "BewitchingTable", 99, 1, 0, false, false, 354, -1);
+                AddSearchItem(1158, "矮人项链", "PygmyNecklace", 1, 1, 0, false, false, -1, -1);
+                AddSearchItem(1159, "提基面具", "TikiMask", 1, 1, 0, false, false, -1, -1);
+                AddSearchItem(1160, "提基衣", "TikiShirt", 1, 1, 0, false, false, -1, -1);
+                AddSearchItem(1161, "提基裤", "TikiPants", 1, 1, 0, false, false, -1, -1);
+                AddSearchItem(1167, "大力士甲虫", "HerculesBeetle", 1, 1, 0, false, false, -1, -1);
+                AddSearchItem(1339, "小瓶毒液", "VialofVenom", 99, 1, 0, false, false, -1, -1);
+                AddSearchItem(1171, "提基图腾", "TikiTotem", 1, 1, 0, false, false, -1, -1);
+                AddSearchItem(1162, "叶之翼", "LeafWings", 1, 5, 0, false, false, -1, -1);
+                Terraria.Lang.NpcNames[228] = "巫医";
+
+                ItemQueryService.ResetForTesting();
+                var bewitchingSources = ItemQueryService.BuildQuery(2999).AcquisitionSources;
+                AssertNpcShopSource(bewitchingSources, "巫医", "巫师在场", "施法桌");
+                AssertNpcShopSource(ItemQueryService.BuildQuery(1158).AcquisitionSources, "巫医", "夜晚出售", "矮人项链");
+                AssertNpcShopSource(ItemQueryService.BuildQuery(1159).AcquisitionSources, "巫医", "击败世纪之花", "提基面具");
+                AssertNpcShopSource(ItemQueryService.BuildQuery(1160).AcquisitionSources, "巫医", "击败世纪之花", "提基衣");
+                AssertNpcShopSource(ItemQueryService.BuildQuery(1161).AcquisitionSources, "巫医", "击败世纪之花", "提基裤");
+                AssertNpcShopSource(ItemQueryService.BuildQuery(1167).AcquisitionSources, "巫医", "位于丛林", "大力士甲虫");
+                AssertNpcShopSource(ItemQueryService.BuildQuery(1339).AcquisitionSources, "巫医", "击败世纪之花", "小瓶毒液");
+                AssertNpcShopSource(ItemQueryService.BuildQuery(1171).AcquisitionSources, "巫医", "位于丛林", "提基图腾");
+                AssertNpcShopSource(ItemQueryService.BuildQuery(1162).AcquisitionSources, "巫医", "夜晚、击败世纪之花", "叶之翼");
+                AssertSourceTextDoesNotExposeInternalShopTerms(bewitchingSources);
+
+                if (!ContainsSourceTag(bewitchingSources, ItemAcquisitionSourceTags.Fishing) ||
+                    !ContainsSourceTag(bewitchingSources, ItemAcquisitionSourceTags.MiningGathering))
+                {
+                    throw new InvalidOperationException("Bewitching Table should keep Witch Doctor, dungeon fishing, and breakable dungeon furniture sources together. Actual: " + DescribeSearchSources(bewitchingSources));
+                }
+            });
+        }
+
         private static void SearchQueryNpcShopKnownPossibleSourcesAvoidForbiddenLiveShopEntrypoints()
         {
             var repoRoot = ResolveSearchQueryRepoRoot();
@@ -519,6 +811,7 @@ namespace JueMingZ.Tests
                 "OpenShop(",
                 "Main.travelShop",
                 "SetupTravelShop",
+                "NPC.AnyNPCs",
                 "currentShoppingSettings"
             };
 
@@ -597,6 +890,112 @@ namespace JueMingZ.Tests
                     throw new InvalidOperationException("Unregistered mining/gathering items should not receive guessed acquisition tags.");
                 }
             });
+        }
+
+        private static void SearchQueryWorldPlaceableSourcesCoverUserSamples()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                AddSearchItem(5400, "最土的块", "DirtiestBlock", 999, 1, 0, true, false, 668, -1);
+                AddSearchItem(3198, "利器站", "SharpeningStation", 99, 1, 0, false, false, 377, -1);
+                AddSearchItem(2999, "施法桌", "BewitchingTable", 99, 1, 0, false, false, 354, -1);
+                AddSearchItem(3000, "炼药桌", "AlchemyTable", 99, 1, 0, false, false, 355, -1);
+                AddSearchItem(148, "水蜡烛", "WaterCandle", 99, 1, 0, false, false, 49, -1);
+                AddSearchItem(149, "书", "Book", 99, 0, 0, false, false, 50, -1);
+                Terraria.Lang.NpcNames[17] = "商人";
+
+                ItemQueryService.ResetForTesting();
+                var dirt = FindSourceByNameAndTag(
+                    ItemQueryService.BuildQuery(5400).AcquisitionSources,
+                    "最土的块",
+                    ItemAcquisitionSourceTags.WorldGeneration);
+                if (dirt == null ||
+                    dirt.Title.IndexOf("特殊世界物", StringComparison.Ordinal) < 0 ||
+                    dirt.ConditionText.IndexOf("不扫描当前世界", StringComparison.Ordinal) < 0)
+                {
+                    throw new InvalidOperationException("Dirtiest Block should expose a special world-object source without scanning the current world. Actual: " + DescribeSearchSources(ItemQueryService.BuildQuery(5400).AcquisitionSources));
+                }
+
+                var sharpeningSources = ItemQueryService.BuildQuery(3198).AcquisitionSources;
+                var sharpening = FindSourceByNameAndTag(sharpeningSources, "利器站", ItemAcquisitionSourceTags.MiningGathering);
+                if (sharpening == null ||
+                    sharpening.ConditionText.IndexOf("商店来源保持并列", StringComparison.Ordinal) < 0 ||
+                    !sharpeningSources.Any(source => source != null && string.Equals(source.SourceType, ItemAcquisitionSourceTypes.NpcShop, StringComparison.Ordinal)))
+                {
+                    throw new InvalidOperationException("Sharpening Station should keep merchant and breakable placed-object sources in parallel. Actual: " + DescribeSearchSources(sharpeningSources));
+                }
+
+                var bewitching = FindSourceByNameAndTag(
+                    ItemQueryService.BuildQuery(2999).AcquisitionSources,
+                    "施法桌",
+                    ItemAcquisitionSourceTags.MiningGathering);
+                var alchemy = FindSourceByNameAndTag(
+                    ItemQueryService.BuildQuery(3000).AcquisitionSources,
+                    "炼药桌",
+                    ItemAcquisitionSourceTags.MiningGathering);
+                if (bewitching == null ||
+                    bewitching.ConditionText.IndexOf("地牢", StringComparison.Ordinal) < 0 ||
+                    alchemy == null ||
+                    alchemy.ConditionText.IndexOf("地牢", StringComparison.Ordinal) < 0)
+                {
+                    throw new InvalidOperationException("Dungeon placed functional furniture should expose breakable acquisition sources.");
+                }
+
+                var waterCandle = FindSourceByNameAndTag(
+                    ItemQueryService.BuildQuery(148).AcquisitionSources,
+                    "水蜡烛",
+                    ItemAcquisitionSourceTags.MiningGathering);
+                var book = FindSourceByNameAndTag(
+                    ItemQueryService.BuildQuery(149).AcquisitionSources,
+                    "书",
+                    ItemAcquisitionSourceTags.MiningGathering);
+                if (waterCandle == null ||
+                    waterCandle.ConditionText.IndexOf("地牢", StringComparison.Ordinal) < 0 ||
+                    book == null ||
+                    book.ConditionText.IndexOf("地牢", StringComparison.Ordinal) < 0)
+                {
+                    throw new InvalidOperationException("World-placeable sources should include representative dungeon breakable objects.");
+                }
+            });
+        }
+
+        private static void SearchQueryWorldPlaceableSourceUsesReadonlyTables()
+        {
+            var repoRoot = ResolveSearchQueryRepoRoot();
+            var sourceFiles = new List<string>(
+                Directory.GetFiles(
+                    Path.Combine(repoRoot, "src", "JueMingZ", "Automation", "Search"),
+                    "ItemWorldPlaceableSourceIndex*.cs"));
+            sourceFiles.Add(Path.Combine(repoRoot, "src", "JueMingZ", "Automation", "Search", "ItemQueryService.cs"));
+            var forbiddenTerms = new[]
+            {
+                "WorldGen.",
+                "GenerateWorld",
+                "Main.tile",
+                "Main.chest",
+                "FindChest",
+                "KillTile",
+                "PlaceTile",
+                "OpenShop(",
+                "SetupShop(",
+                "QuickSpawnItem"
+            };
+
+            for (var fileIndex = 0; fileIndex < sourceFiles.Count; fileIndex++)
+            {
+                var path = sourceFiles[fileIndex];
+                var text = File.ReadAllText(path, Encoding.UTF8);
+                for (var termIndex = 0; termIndex < forbiddenTerms.Length; termIndex++)
+                {
+                    var term = forbiddenTerms[termIndex];
+                    if (text.IndexOf(term, StringComparison.Ordinal) >= 0)
+                    {
+                        throw new InvalidOperationException(
+                            "Search query world-placeable sources must use readonly static tables, not live world generation, tile, shop, or spawn APIs: " +
+                            Path.GetFileName(path) + " contains " + term + ".");
+                    }
+                }
+            }
         }
 
         private static void SearchQueryIndexesTreasureBagSources()
@@ -733,6 +1132,61 @@ namespace JueMingZ.Tests
             });
         }
 
+        private static void SearchQueryIndexesGoodieBagSeasonalOpenSources()
+        {
+            WithSearchQueryFixture(() =>
+            {
+                AddSearchItem(1746, "苦力怕面具", "CreeperMask", 1, 1, 0, false, false, -1, -1);
+                AddSearchItem(1747, "苦力怕衣", "CreeperShirt", 1, 1, 0, false, false, -1, -1);
+                AddSearchItem(1748, "苦力怕裤", "CreeperPants", 1, 1, 0, false, false, -1, -1);
+                AddSearchItem(1810, "霉运纱线", "UnluckyYarn", 1, 1, 0, false, false, -1, -1);
+                AddSearchItem(1800, "蝙蝠钩", "BatHook", 1, 1, 0, false, false, -1, -1);
+                AddSearchItem(1809, "臭鸡蛋", "RottenEgg", 99, 1, 0, false, false, -1, -1);
+                AddSearchItem(1846, "杰克骷髅王", "JackingSkeletron", 99, 1, 0, false, false, -1, -1);
+                AddSearchItem(1824, "猫耳", "CatEars", 1, 1, 0, false, false, -1, -1);
+                AddSearchItem(1774, "礼袋", "GoodieBag", 999, 1, 0, false, true, -1, -1);
+
+                ItemQueryService.ResetForTesting();
+                var creeperMask = FindSourceByNameAndTag(ItemQueryService.BuildQuery(1746).AcquisitionSources, "礼袋", ItemAcquisitionSourceTags.ContainerOpen);
+                var creeperShirt = FindSourceByNameAndTag(ItemQueryService.BuildQuery(1747).AcquisitionSources, "礼袋", ItemAcquisitionSourceTags.ContainerOpen);
+                var creeperPants = FindSourceByNameAndTag(ItemQueryService.BuildQuery(1748).AcquisitionSources, "礼袋", ItemAcquisitionSourceTags.ContainerOpen);
+                var unluckyYarn = FindSourceByNameAndTag(ItemQueryService.BuildQuery(1810).AcquisitionSources, "礼袋", ItemAcquisitionSourceTags.ContainerOpen);
+                var batHook = FindSourceByNameAndTag(ItemQueryService.BuildQuery(1800).AcquisitionSources, "礼袋", ItemAcquisitionSourceTags.ContainerOpen);
+                var rottenEgg = FindSourceByNameAndTag(ItemQueryService.BuildQuery(1809).AcquisitionSources, "礼袋", ItemAcquisitionSourceTags.ContainerOpen);
+                var painting = FindSourceByNameAndTag(ItemQueryService.BuildQuery(1846).AcquisitionSources, "礼袋", ItemAcquisitionSourceTags.ContainerOpen);
+                var catEars = FindSourceByNameAndTag(ItemQueryService.BuildQuery(1824).AcquisitionSources, "礼袋", ItemAcquisitionSourceTags.ContainerOpen);
+
+                if (creeperMask == null ||
+                    creeperShirt == null ||
+                    creeperPants == null ||
+                    unluckyYarn == null ||
+                    batHook == null ||
+                    rottenEgg == null ||
+                    painting == null ||
+                    catEars == null)
+                {
+                    throw new InvalidOperationException("Goodie Bag seasonal open sources should cover user samples and same-pool representative items. Actual Creeper: " + DescribeSearchSources(ItemQueryService.BuildQuery(1746).AcquisitionSources));
+                }
+
+                if (creeperMask.RelatedItemType != 1774 ||
+                    creeperMask.QuantityText.IndexOf("服装套装池", StringComparison.Ordinal) < 0 ||
+                    unluckyYarn.QuantityText.IndexOf("稀有", StringComparison.Ordinal) < 0 ||
+                    rottenEgg.QuantityText.IndexOf("10-40", StringComparison.Ordinal) < 0 ||
+                    painting.QuantityText.IndexOf("装饰画", StringComparison.Ordinal) < 0 ||
+                    catEars.ContextText.IndexOf("开包整理表", StringComparison.Ordinal) < 0 ||
+                    !string.Equals(creeperMask.SourceType, ItemAcquisitionSourceTypes.Other, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Goodie Bag sources should stay in otherSource with the short open-container tag and readable static-pool details.");
+                }
+
+                var creeperResult = ItemQueryService.BuildQuery(1746);
+                if (creeperResult.CraftingUses.Count != 0)
+                {
+                    throw new InvalidOperationException("Goodie Bag acquisition sources must not be represented as crafting uses.");
+                }
+            });
+        }
+
         private static void SearchQueryIndexesFishingCrateOpenContents()
         {
             WithSearchQueryFixture(() =>
@@ -741,6 +1195,10 @@ namespace JueMingZ.Tests
                 AddSearchItem(4407, "绿洲匣", "OasisCrate", 99, 1, 0, false, true, -1, -1);
                 AddSearchItem(4978, "雏翼", "CreativeWings", 1, 1, 0, false, false, -1, -1);
                 AddSearchItem(3206, "天空匣", "FloatingIslandFishingCrate", 99, 1, 0, false, true, -1, -1);
+                AddSearchItem(3205, "地牢匣", "DungeonFishingCrate", 99, 1, 0, false, true, -1, -1);
+                AddSearchItem(3984, "围栏匣", "DungeonFishingCrateHard", 99, 1, 0, false, true, -1, -1);
+                AddSearchItem(3085, "金锁盒", "LockBox", 99, 1, 0, false, true, -1, -1);
+                AddSearchItem(3317, "英勇球", "Valor", 1, 1, 0, false, false, -1, -1);
 
                 ItemQueryService.ResetForTesting();
                 var sandstormSources = ItemQueryService.BuildQuery(857).AcquisitionSources;
@@ -759,6 +1217,24 @@ namespace JueMingZ.Tests
                     wingSource.ContextText.IndexOf("宝匣开包整理表", StringComparison.Ordinal) < 0)
                 {
                     throw new InvalidOperationException("Creative Wings should expose Floating Island Crate as an open-container source when that static source is known. Actual: " + DescribeSearchSources(ItemQueryService.BuildQuery(4978).AcquisitionSources));
+                }
+
+                var lockBoxSources = ItemQueryService.BuildQuery(3085).AcquisitionSources;
+                var lockBoxDungeonCrate = FindSourceByNameAndTag(lockBoxSources, "地牢匣", ItemAcquisitionSourceTags.ContainerOpen);
+                var lockBoxHardDungeonCrate = FindSourceByNameAndTag(lockBoxSources, "围栏匣", ItemAcquisitionSourceTags.ContainerOpen);
+                if (lockBoxDungeonCrate == null ||
+                    lockBoxHardDungeonCrate == null ||
+                    lockBoxDungeonCrate.ContextText.IndexOf("宝匣开包整理表", StringComparison.Ordinal) < 0)
+                {
+                    throw new InvalidOperationException("Dungeon fishing crates should expose Lock Box as a representative open-container output. Actual: " + DescribeSearchSources(lockBoxSources));
+                }
+
+                var valorSource = FindSourceByNameAndTag(ItemQueryService.BuildQuery(3317).AcquisitionSources, "地牢匣", ItemAcquisitionSourceTags.ContainerOpen);
+                if (valorSource == null ||
+                    valorSource.RelatedItemType != 3205 ||
+                    valorSource.ContextText.IndexOf("不表示宝匣可钓到", StringComparison.Ordinal) < 0)
+                {
+                    throw new InvalidOperationException("Dungeon fishing crates should expose Valor #3317 through the static crate content table. Actual: " + DescribeSearchSources(ItemQueryService.BuildQuery(3317).AcquisitionSources));
                 }
             });
         }
@@ -787,6 +1263,8 @@ namespace JueMingZ.Tests
                 AddSearchItem(2334, "木匣", "WoodenCrate", 99, 1, 0, false, false, -1, -1);
                 AddSearchItem(2368, "渔夫背心", "AnglerVest", 1, 1, 0, false, false, -1, -1);
                 AddSearchItem(2373, "优质钓鱼线", "HighTestFishingLine", 1, 1, 0, false, false, -1, -1);
+                AddSearchItem(3000, "炼药桌", "AlchemyTable", 99, 1, 0, false, false, 355, -1);
+                AddSearchItem(2999, "施法桌", "BewitchingTable", 99, 1, 0, false, false, 354, -1);
 
                 ItemQueryService.ResetForTesting();
                 var questFish = FindSourceByTag(ItemQueryService.BuildQuery(2479).AcquisitionSources, ItemAcquisitionSourceTags.Fishing);
@@ -794,6 +1272,10 @@ namespace JueMingZ.Tests
                 var fishingCrate = FindSourceByTag(ItemQueryService.BuildQuery(2334).AcquisitionSources, ItemAcquisitionSourceTags.Fishing);
                 var anglerVest = FindSourceByTag(ItemQueryService.BuildQuery(2368).AcquisitionSources, ItemAcquisitionSourceTags.AnglerReward);
                 var randomReward = FindSourceByTag(ItemQueryService.BuildQuery(2373).AcquisitionSources, ItemAcquisitionSourceTags.AnglerReward);
+                var alchemySources = ItemQueryService.BuildQuery(3000).AcquisitionSources;
+                var alchemyFishing = FindSourceByNameAndTag(alchemySources, "地牢水域", ItemAcquisitionSourceTags.Fishing);
+                var alchemyGathering = FindSourceByNameAndTag(alchemySources, "炼药桌", ItemAcquisitionSourceTags.MiningGathering);
+                var bewitchingFishing = FindSourceByNameAndTag(ItemQueryService.BuildQuery(2999).AcquisitionSources, "地牢水域", ItemAcquisitionSourceTags.Fishing);
 
                 if (questFish == null ||
                     !string.Equals(questFish.Title, "渔夫任务鱼", StringComparison.Ordinal) ||
@@ -832,6 +1314,20 @@ namespace JueMingZ.Tests
                 {
                     throw new InvalidOperationException("Angler random rewards should stay conditional instead of being written as guaranteed.");
                 }
+
+                if (alchemyFishing == null ||
+                    !string.Equals(alchemyFishing.Title, "地牢鱼获", StringComparison.Ordinal) ||
+                    alchemyFishing.ConditionText.IndexOf("地牢钓鱼直接鱼获", StringComparison.Ordinal) < 0 ||
+                    alchemyGathering == null)
+                {
+                    throw new InvalidOperationException("Alchemy Table should expose dungeon fishing and breakable dungeon furniture sources together. Actual: " + DescribeSearchSources(alchemySources));
+                }
+
+                if (bewitchingFishing == null ||
+                    bewitchingFishing.ConditionText.IndexOf("不预测当前水域", StringComparison.Ordinal) < 0)
+                {
+                    throw new InvalidOperationException("Bewitching Table should expose the same static dungeon fishing source as Alchemy Table. Actual: " + DescribeSearchSources(ItemQueryService.BuildQuery(2999).AcquisitionSources));
+                }
             });
         }
 
@@ -848,6 +1344,9 @@ namespace JueMingZ.Tests
                 AddSearchItem(4978, "雏翼", "CreativeWings", 1, 1, 0, false, false, -1, -1);
                 AddSearchItem(155, "村正", "Muramasa", 1, 1, 0, false, false, -1, -1);
                 AddSearchItem(112, "火之花", "FlowerofFire", 1, 1, 0, false, false, -1, -1);
+                AddSearchItem(939, "蛛丝吊索", "WebSlinger", 1, 1, 0, false, false, -1, -1);
+                AddSearchItem(952, "蛛网箱", "WebCoveredChest", 99, 1, 0, false, true, 21, -1);
+                AddSearchItem(3317, "英勇球", "Valor", 1, 1, 0, false, false, -1, -1);
 
                 ItemQueryService.ResetForTesting();
                 var chest = FindSourceByTag(ItemQueryService.BuildQuery(50).AcquisitionSources, ItemAcquisitionSourceTags.Chest);
@@ -859,6 +1358,8 @@ namespace JueMingZ.Tests
                 var creativeWingsWorld = FindSourceByTag(ItemQueryService.BuildQuery(4978).AcquisitionSources, ItemAcquisitionSourceTags.WorldGeneration);
                 var dungeonChest = FindSourceByNameAndTag(ItemQueryService.BuildQuery(155).AcquisitionSources, "地牢金箱", ItemAcquisitionSourceTags.Chest);
                 var hellChest = FindSourceByNameAndTag(ItemQueryService.BuildQuery(112).AcquisitionSources, "暗影箱", ItemAcquisitionSourceTags.Chest);
+                var webSlinger = FindSourceByNameAndTag(ItemQueryService.BuildQuery(939).AcquisitionSources, "蛛网箱", ItemAcquisitionSourceTags.Chest);
+                var valorChest = FindSourceByNameAndTag(ItemQueryService.BuildQuery(3317).AcquisitionSources, "地牢金箱", ItemAcquisitionSourceTags.Chest);
 
                 if (chest == null ||
                     !string.Equals(chest.SourceTag, ItemAcquisitionSourceTags.Chest, StringComparison.Ordinal) ||
@@ -912,6 +1413,18 @@ namespace JueMingZ.Tests
                 if (dungeonChest == null || hellChest == null)
                 {
                     throw new InvalidOperationException("Curated chest sources should include representative dungeon and hell chest pools.");
+                }
+
+                if (webSlinger == null ||
+                    webSlinger.Title.IndexOf("蜘蛛洞", StringComparison.Ordinal) < 0 ||
+                    webSlinger.ConditionText.IndexOf("不读取真实箱子内容", StringComparison.Ordinal) < 0)
+                {
+                    throw new InvalidOperationException("Web Slinger should expose the spider cave web-covered chest source without scanning real chests. Actual: " + DescribeSearchSources(ItemQueryService.BuildQuery(939).AcquisitionSources));
+                }
+
+                if (valorChest == null)
+                {
+                    throw new InvalidOperationException("Valor #3317 should remain represented in the static dungeon chest pool.");
                 }
             });
         }
@@ -1070,6 +1583,7 @@ namespace JueMingZ.Tests
             var forbiddenTerms = new[]
             {
                 "OpenBossBag",
+                "OpenGoodieBag",
                 "OpenFishingCrate",
                 "OpenHerbBag",
                 "QuickSpawnItem",
@@ -1274,7 +1788,8 @@ namespace JueMingZ.Tests
             var formatted = LegacyMainWindow.FormatSearchAcquisitionSourceForTesting(snapshot.AcquisitionSources[0]);
             AssertStringEquals(formatted[0], "NPC掉落", "search acquisition source type label");
             AssertStringEquals(formatted[1], "掉落来源：史莱姆", "search acquisition source title");
-            AssertStringEquals(formatted[2], "1-2个 / 25% / 白天 / 测试上下文", "search acquisition source detail");
+            AssertStringEquals(formatted[2], "1-2个 / 25% / 白天", "search acquisition source detail");
+            AssertDoesNotContain(formatted[2], "测试上下文");
         }
 
         private static void SearchQueryAcquisitionSourcesAffectLayoutSignature()
@@ -1304,7 +1819,7 @@ namespace JueMingZ.Tests
         private static void SearchQueryAcquisitionSectionKeepsOrderAndHeight()
         {
             var order = LegacyMainWindow.GetSearchResultSectionOrderForTesting();
-            var expected = new[] { "基础信息", "获取来源", "合成来源", "合成用途", "微光反应" };
+            var expected = new[] { "基础信息", "获取来源（仅供参考，不包准确全面）", "合成来源", "合成用途", "微光反应" };
             if (order.Length != expected.Length)
             {
                 throw new InvalidOperationException("Search result section order test helper returned an unexpected length.");
@@ -1359,7 +1874,7 @@ namespace JueMingZ.Tests
             }
         }
 
-        private static void SearchQueryAcquisitionDetailsHideInternalContextWords()
+        private static void SearchQueryAcquisitionDetailsHideContextText()
         {
             var noisySource = CreateSearchAcquisitionSource(
                 ItemAcquisitionSourceTypes.NpcShop,
@@ -1371,11 +1886,12 @@ namespace JueMingZ.Tests
                 "原版商店低频索引 / 当前世界和玩家上下文 / 商店入口：基础");
 
             var formatted = LegacyMainWindow.FormatSearchAcquisitionSourceForTesting(noisySource);
+            AssertStringEquals(formatted[2], "可购买 / 当前上下文可售卖", "search acquisition detail without context");
             AssertDoesNotContain(formatted[2], "原版商店低频索引");
             AssertDoesNotContain(formatted[2], "当前世界和玩家上下文");
             AssertDoesNotContain(formatted[2], "商店入口");
-            AssertContains(formatted[2], "原版商店资料");
-            AssertContains(formatted[2], "店铺：基础");
+            AssertDoesNotContain(formatted[2], "原版商店资料");
+            AssertDoesNotContain(formatted[2], "店铺：基础");
 
             var curatedSource = CreateSearchAcquisitionSource(
                 ItemAcquisitionSourceTypes.Other,
@@ -1387,9 +1903,10 @@ namespace JueMingZ.Tests
                 "curated 宝箱标签，非完整概率百科",
                 ItemAcquisitionSourceTags.Chest);
             var curatedFormatted = LegacyMainWindow.FormatSearchAcquisitionSourceForTesting(curatedSource);
+            AssertStringEquals(curatedFormatted[2], "地下", "search curated context hidden");
             AssertDoesNotContain(curatedFormatted[2], "curated");
             AssertDoesNotContain(curatedFormatted[2], "非完整概率百科");
-            AssertContains(curatedFormatted[2], "来源线索");
+            AssertDoesNotContain(curatedFormatted[2], "来源线索");
         }
 
         private static void SearchQueryOtherSourcesFormatShortTagsAndAvoidCraftingUses()
@@ -1412,7 +1929,8 @@ namespace JueMingZ.Tests
             var formatted = LegacyMainWindow.FormatSearchAcquisitionSourceForTesting(result.AcquisitionSources[0]);
             AssertStringEquals(formatted[0], "其他来源", "other source type label");
             AssertStringEquals(formatted[1], "[宝藏袋] 可开出：克苏鲁之眼宝藏袋", "other source short tag title");
-            AssertStringEquals(formatted[2], "专家模式 / Boss 宝藏袋 / 整理来源表", "other source detail");
+            AssertStringEquals(formatted[2], "专家模式 / Boss 宝藏袋", "other source detail");
+            AssertDoesNotContain(formatted[2], "整理来源表");
         }
 
         private static void SearchQueryUiHotPathAvoidsAcquisitionSourceReads()
@@ -1439,6 +1957,7 @@ namespace JueMingZ.Tests
                 "ItemContainerOpenSourceIndex",
                 "ItemFishingSourceIndex",
                 "ItemCuratedOtherSourceIndex",
+                "ItemWorldPlaceableSourceIndex",
                 "ItemAcquisitionTagIndex"
             };
 
@@ -1590,6 +2109,93 @@ namespace JueMingZ.Tests
             }
 
             return null;
+        }
+
+        private static void AddSearchDynamicCoverageSampleItems()
+        {
+            AddSearchItem(5400, "最土的块", "DirtiestBlock", 999, 1, 0, true, false, 668, -1);
+            AddSearchItem(3198, "利器站", "SharpeningStation", 99, 1, 0, false, false, 377, -1);
+            AddSearchItem(148, "水蜡烛", "WaterCandle", 99, 1, 0, false, false, 49, -1);
+            AddSearchItem(149, "书", "Book", 99, 0, 0, false, false, 50, -1);
+            AddSearchItem(1746, "苦力怕面具", "CreeperMask", 1, 1, 0, false, false, -1, -1);
+            AddSearchItem(1810, "霉运纱线", "UnluckyYarn", 1, 1, 0, false, false, -1, -1);
+            AddSearchItem(1800, "蝙蝠钩", "BatHook", 1, 1, 0, false, false, -1, -1);
+            AddSearchItem(1774, "礼袋", "GoodieBag", 999, 1, 0, false, true, -1, -1);
+            AddSearchItem(939, "蛛丝吊索", "WebSlinger", 1, 1, 0, false, false, -1, -1);
+            AddSearchItem(952, "蛛网箱", "WebCoveredChest", 99, 1, 0, false, true, 21, -1);
+            AddSearchItem(3085, "金锁盒", "LockBox", 99, 1, 0, false, true, -1, -1);
+            AddSearchItem(3317, "英勇球", "Valor", 1, 1, 0, false, false, -1, -1);
+            AddSearchItem(3205, "地牢匣", "DungeonFishingCrate", 99, 1, 0, false, true, -1, -1);
+            AddSearchItem(3984, "围栏匣", "DungeonFishingCrateHard", 99, 1, 0, false, true, -1, -1);
+            AddSearchItem(3000, "炼药桌", "AlchemyTable", 99, 1, 0, false, false, 355, -1);
+            AddSearchItem(2999, "施法桌", "BewitchingTable", 99, 1, 0, false, false, 354, -1);
+            AddSearchItem(1158, "矮人项链", "PygmyNecklace", 1, 1, 0, false, false, -1, -1);
+            AddSearchItem(1162, "叶之翼", "LeafWings", 1, 5, 0, false, false, -1, -1);
+        }
+
+        private static void AssertCoverageSource(
+            int itemType,
+            string label,
+            string sourceType,
+            string sourceTag,
+            string sourceName,
+            string requiredText)
+        {
+            var result = ItemQueryService.BuildQuery(itemType);
+            if (result == null || !result.Found)
+            {
+                throw new InvalidOperationException(label + " should resolve a known item.");
+            }
+
+            AssertNoDuplicateAcquisitionSources(result.AcquisitionSources, label);
+            for (var index = 0; index < result.AcquisitionSources.Count; index++)
+            {
+                var source = result.AcquisitionSources[index];
+                if (source == null ||
+                    !string.Equals(source.SourceType, sourceType, StringComparison.Ordinal) ||
+                    !string.Equals(source.SourceName, sourceName, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (!string.IsNullOrEmpty(sourceTag) &&
+                    !string.Equals(source.SourceTag, sourceTag, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var searchableText = string.Join(
+                    "|",
+                    source.Title ?? string.Empty,
+                    source.QuantityText ?? string.Empty,
+                    source.ProbabilityText ?? string.Empty,
+                    source.ConditionText ?? string.Empty,
+                    source.ContextText ?? string.Empty);
+                if (!string.IsNullOrEmpty(requiredText) &&
+                    searchableText.IndexOf(requiredText, StringComparison.Ordinal) < 0)
+                {
+                    throw new InvalidOperationException(label + " matched the right source row but missed text '" + requiredText + "'. Actual: " + DescribeSearchSources(result.AcquisitionSources));
+                }
+
+                if (string.Equals(source.SourceType, ItemAcquisitionSourceTypes.Other, StringComparison.Ordinal) &&
+                    string.IsNullOrEmpty(source.SourceTag))
+                {
+                    throw new InvalidOperationException(label + " other-source rows must keep their short source tag.");
+                }
+
+                if (result.CraftingUses.Count != 0 &&
+                    (string.Equals(sourceTag, ItemAcquisitionSourceTags.ContainerOpen, StringComparison.Ordinal) ||
+                        string.Equals(sourceTag, ItemAcquisitionSourceTags.Chest, StringComparison.Ordinal) ||
+                        string.Equals(sourceTag, ItemAcquisitionSourceTags.Fishing, StringComparison.Ordinal) ||
+                        string.Equals(sourceTag, ItemAcquisitionSourceTags.WorldGeneration, StringComparison.Ordinal)))
+                {
+                    throw new InvalidOperationException(label + " acquisition sources must not be represented as crafting uses.");
+                }
+
+                return;
+            }
+
+            throw new InvalidOperationException(label + " expected coverage source was missing. Actual: " + DescribeSearchSources(result.AcquisitionSources));
         }
 
         private static void SearchQueryUiStateSelectsCandidateAndClears()
@@ -4187,6 +4793,24 @@ namespace JueMingZ.Tests
             Terraria.Lang.ItemNames[itemType] = displayName;
             Terraria.ID.ItemID.Search.SetName(itemType, internalName);
             Terraria.ID.ItemID.Sets.IsAMaterial[itemType] = material;
+        }
+
+        private static void AddSearchCandidateBatch(int startItemType, string prefix, int count)
+        {
+            for (var index = 0; index < count; index++)
+            {
+                AddSearchItem(
+                    startItemType + index,
+                    prefix + index.ToString("00", CultureInfo.InvariantCulture),
+                    prefix + "Internal" + index.ToString("00", CultureInfo.InvariantCulture),
+                    1,
+                    0,
+                    0,
+                    false,
+                    false,
+                    -1,
+                    -1);
+            }
         }
 
         private static void ResetSearchQueryFakes()

@@ -12,7 +12,14 @@ namespace JueMingZ.Compat
         private static readonly object SyncRoot = new object();
         private static bool _resolvedGetInputText;
         private static MethodInfo _getInputTextMethod;
+        private static bool _resolvedHandleIme;
+        private static MethodInfo _handleImeMethod;
+        private static bool _resolvedImeComposition;
+        private static MethodInfo _platformGetImeServiceMethod;
+        private static PropertyInfo _imeCompositionStringProperty;
         private static bool _captureArmed;
+        private static Func<string, string> _inputTextOverrideForTesting;
+        private static string _imeCompositionOverrideForTesting;
 
         public static string LastMessage { get; private set; } = string.Empty;
         public static bool NativeInputAvailable { get; private set; }
@@ -24,6 +31,15 @@ namespace JueMingZ.Compat
 
             try
             {
+                if (_inputTextOverrideForTesting != null)
+                {
+                    updatedText = _inputTextOverrideForTesting(updatedText) ?? updatedText;
+                    message = "Terraria native text input test override OK.";
+                    LastMessage = message;
+                    NativeInputAvailable = true;
+                    return true;
+                }
+
                 var mainType = TerrariaRuntimeTypes.MainType;
                 if (mainType == null)
                 {
@@ -48,6 +64,7 @@ namespace JueMingZ.Compat
                 }
 
                 TrySetNativeInputCapture(true);
+                TryInvokeHandleIme(mainType);
                 var args = BuildGetInputTextArgs(method, updatedText);
                 var result = method.Invoke(null, args);
                 updatedText = result as string ?? updatedText;
@@ -70,6 +87,55 @@ namespace JueMingZ.Compat
             }
         }
 
+        public static bool TryGetImeCompositionString(out string compositionString, out string message)
+        {
+            compositionString = string.Empty;
+            message = string.Empty;
+
+            try
+            {
+                if (_imeCompositionOverrideForTesting != null)
+                {
+                    compositionString = _imeCompositionOverrideForTesting;
+                    return true;
+                }
+
+                var method = ResolvePlatformGetImeService();
+                var property = _imeCompositionStringProperty;
+                if (method == null || property == null)
+                {
+                    message = "ReLogic IImeService.CompositionString not found; IME preview falls back to committed text.";
+                    return false;
+                }
+
+                var service = method.Invoke(null, null);
+                if (service == null)
+                {
+                    message = "ReLogic IImeService unavailable; IME preview falls back to committed text.";
+                    return false;
+                }
+
+                compositionString = property.GetValue(service, null) as string ?? string.Empty;
+                return true;
+            }
+            catch (Exception error)
+            {
+                message = "Read IME composition failed: " + error.Message;
+                LogThrottle.WarnThrottled(
+                    "terraria-text-input-ime-composition-read-failed",
+                    TimeSpan.FromSeconds(10),
+                    "TerrariaTextInputCompat",
+                    message);
+                return false;
+            }
+        }
+
+        internal static void SetTextInputOverridesForTesting(Func<string, string> inputTextOverride, string imeCompositionOverride)
+        {
+            _inputTextOverrideForTesting = inputTextOverride;
+            _imeCompositionOverrideForTesting = imeCompositionOverride;
+        }
+
         public static void EndTextInput()
         {
             try
@@ -87,6 +153,46 @@ namespace JueMingZ.Compat
                 LastMessage = "End native text input failed: " + error.Message;
                 LogThrottle.WarnThrottled(
                     "terraria-text-input-native-release-failed",
+                    TimeSpan.FromSeconds(10),
+                    "TerrariaTextInputCompat",
+                    LastMessage);
+            }
+        }
+
+        private static void TryInvokeHandleIme(Type mainType)
+        {
+            try
+            {
+                var method = ResolveHandleIme(mainType);
+                if (method == null)
+                {
+                    return;
+                }
+
+                object instance = null;
+                FieldInfo field;
+                if (TerrariaMemberCache.TryGetField(mainType, "instance", true, out field))
+                {
+                    instance = field.GetValue(null);
+                }
+
+                PropertyInfo property;
+                if (instance == null &&
+                    TerrariaMemberCache.TryGetProperty(mainType, "instance", true, out property))
+                {
+                    instance = property.GetValue(null, null);
+                }
+
+                if (instance != null)
+                {
+                    method.Invoke(instance, null);
+                }
+            }
+            catch (Exception error)
+            {
+                LastMessage = "Handle IME failed: " + error.Message;
+                LogThrottle.WarnThrottled(
+                    "terraria-text-input-handle-ime-failed",
                     TimeSpan.FromSeconds(10),
                     "TerrariaTextInputCompat",
                     LastMessage);
@@ -154,6 +260,78 @@ namespace JueMingZ.Compat
                     }
                 }
 
+                return null;
+            }
+        }
+
+        private static MethodInfo ResolveHandleIme(Type mainType)
+        {
+            lock (SyncRoot)
+            {
+                if (_resolvedHandleIme)
+                {
+                    return _handleImeMethod;
+                }
+
+                _resolvedHandleIme = true;
+                if (mainType == null)
+                {
+                    return null;
+                }
+
+                _handleImeMethod = mainType.GetMethod(
+                    "HandleIME",
+                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance,
+                    null,
+                    Type.EmptyTypes,
+                    null);
+                return _handleImeMethod;
+            }
+        }
+
+        private static MethodInfo ResolvePlatformGetImeService()
+        {
+            lock (SyncRoot)
+            {
+                if (_resolvedImeComposition)
+                {
+                    return _platformGetImeServiceMethod;
+                }
+
+                _resolvedImeComposition = true;
+                var platformType = FindType("ReLogic.OS.Platform");
+                var imeServiceType = FindType("ReLogic.OS.IImeService");
+                if (platformType == null || imeServiceType == null)
+                {
+                    return null;
+                }
+
+                _imeCompositionStringProperty = imeServiceType.GetProperty("CompositionString", BindingFlags.Public | BindingFlags.Instance);
+                if (_imeCompositionStringProperty == null ||
+                    _imeCompositionStringProperty.PropertyType != typeof(string))
+                {
+                    _imeCompositionStringProperty = null;
+                    return null;
+                }
+
+                var methods = platformType.GetMethods(StaticFlags);
+                for (var index = 0; index < methods.Length; index++)
+                {
+                    var method = methods[index];
+                    if (method == null ||
+                        !method.IsGenericMethodDefinition ||
+                        !string.Equals(method.Name, "Get", StringComparison.Ordinal) ||
+                        method.GetGenericArguments().Length != 1 ||
+                        method.GetParameters().Length != 0)
+                    {
+                        continue;
+                    }
+
+                    _platformGetImeServiceMethod = method.MakeGenericMethod(imeServiceType);
+                    return _platformGetImeServiceMethod;
+                }
+
+                _imeCompositionStringProperty = null;
                 return null;
             }
         }

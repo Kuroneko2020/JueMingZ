@@ -38,6 +38,8 @@ namespace JueMingZ.Automation.Search
                 Fish("ReaverShark", 2341, "特殊鱼获", "海洋水域", "鱼获候选", "海洋水域鱼获；不展示完整概率"),
                 Fish("SawtoothShark", 2342, "特殊鱼获", "海洋水域", "鱼获候选", "海洋水域鱼获；不展示完整概率"),
                 Fish("ObsidianSwordfish", 2331, "特殊鱼获", "熔岩钓鱼", "鱼获候选", "熔岩困难模式鱼获候选；不展示完整概率"),
+                Fish("AlchemyTable", 3000, "地牢鱼获", "地牢水域", "鱼获候选", "地牢钓鱼直接鱼获；不预测当前水域或渔力"),
+                Fish("BewitchingTable", 2999, "地牢鱼获", "地牢水域", "鱼获候选", "地牢钓鱼直接鱼获；不预测当前水域或渔力"),
 
                 FishingCrate("WoodenCrate", 2334, "普通钓鱼", "普通宝匣，可由钓鱼获得"),
                 FishingCrate("WoodenCrateHard", 3979, "困难模式普通钓鱼", "普通困难模式宝匣，可由钓鱼获得"),

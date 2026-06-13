@@ -32,7 +32,12 @@ namespace JueMingZ.Automation.Search
 
         public static IList<ItemQueryCandidate> ResolveCandidates(string query, int maxResults)
         {
-            return ItemCatalogIndex.ResolveCandidates(query, maxResults);
+            return ResolveCandidateQuery(query, maxResults).Candidates;
+        }
+
+        public static ItemQueryCandidateResult ResolveCandidateQuery(string query, int maxResults)
+        {
+            return ItemCatalogIndex.ResolveCandidateQuery(query, maxResults);
         }
 
         internal static void ResetForTesting()
@@ -45,6 +50,7 @@ namespace JueMingZ.Automation.Search
             ItemContainerOpenSourceIndex.ResetForTesting();
             ItemFishingSourceIndex.ResetForTesting();
             ItemCuratedOtherSourceIndex.ResetForTesting();
+            ItemWorldPlaceableSourceIndex.ResetForTesting();
             ItemAcquisitionTagIndex.ResetForTesting();
         }
 
@@ -71,6 +77,11 @@ namespace JueMingZ.Automation.Search
             }
 
             foreach (var source in ItemCuratedOtherSourceIndex.GetSources(itemType))
+            {
+                yield return source;
+            }
+
+            foreach (var source in ItemWorldPlaceableSourceIndex.GetSources(itemType))
             {
                 yield return source;
             }

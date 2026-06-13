@@ -9,6 +9,7 @@ namespace JueMingZ.UI.Legacy
         private static readonly object SyncRoot = new object();
         private static string _activeId = string.Empty;
         private static string _draft = string.Empty;
+        private static string _compositionPreview = string.Empty;
         private static string _diagnosticMessage = string.Empty;
 
         public static bool IsAnyFocused
@@ -32,6 +33,7 @@ namespace JueMingZ.UI.Legacy
             {
                 _activeId = id ?? string.Empty;
                 _draft = NormalizeText(currentText);
+                _compositionPreview = string.Empty;
                 _diagnosticMessage = string.Empty;
             }
         }
@@ -42,6 +44,7 @@ namespace JueMingZ.UI.Legacy
             {
                 _activeId = string.Empty;
                 _draft = string.Empty;
+                _compositionPreview = string.Empty;
                 _diagnosticMessage = string.Empty;
             }
 
@@ -74,7 +77,8 @@ namespace JueMingZ.UI.Legacy
                 }
 
                 var text = _draft ?? string.Empty;
-                return text + (ShowCaret() ? "|" : string.Empty);
+                var composition = _compositionPreview ?? string.Empty;
+                return text + composition + (ShowCaret() ? "|" : string.Empty);
             }
         }
 
@@ -103,8 +107,16 @@ namespace JueMingZ.UI.Legacy
                 next = NormalizeText(next);
                 var changed = !string.Equals(_draft, next, StringComparison.Ordinal);
                 _draft = next;
-                _diagnosticMessage = string.Empty;
+                RefreshCompositionPreviewLocked();
                 return changed;
+            }
+        }
+
+        internal static string GetCompositionPreviewForTesting(string id)
+        {
+            lock (SyncRoot)
+            {
+                return IsFocusedLocked(id) ? _compositionPreview ?? string.Empty : string.Empty;
             }
         }
 
@@ -122,6 +134,25 @@ namespace JueMingZ.UI.Legacy
 
             var text = value.Replace("\r", string.Empty).Replace("\n", string.Empty).Replace("\t", " ");
             return text.Length > MaxTextLength ? text.Substring(0, MaxTextLength) : text;
+        }
+
+        private static void RefreshCompositionPreviewLocked()
+        {
+            string composition;
+            string message;
+            if (TerrariaTextInputCompat.TryGetImeCompositionString(out composition, out message))
+            {
+                _compositionPreview = NormalizeText(composition);
+                _diagnosticMessage = string.Empty;
+                return;
+            }
+
+            _compositionPreview = string.Empty;
+            _diagnosticMessage = "原生 IME 组合预览不可用，已降级为提交后显示。";
+            if (!string.IsNullOrWhiteSpace(message))
+            {
+                _diagnosticMessage += " " + message;
+            }
         }
 
         private static bool ShowCaret()

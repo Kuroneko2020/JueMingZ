@@ -73,18 +73,20 @@ namespace JueMingZ.Automation.Search
                     Output("PlatinumCoin", 74, "可能开出")),
 
                 FishingCrate("DungeonFishingCrate", 3205, "地牢匣",
+                    Output("LockBox", 3085, "可能开出"),
                     Output("Muramasa", 155, "可能开出"),
                     Output("CobaltShield", 156, "可能开出"),
                     Output("AquaScepter", 157, "可能开出"),
                     Output("MagicMissile", 113, "可能开出"),
-                    Output("Valor", 328, "可能开出")),
+                    Output("Valor", 3317, "可能开出")),
 
                 FishingCrate("DungeonFishingCrateHard", 3984, "围栏匣",
+                    Output("LockBox", 3085, "可能开出"),
                     Output("Muramasa", 155, "可能开出"),
                     Output("CobaltShield", 156, "可能开出"),
                     Output("AquaScepter", 157, "可能开出"),
                     Output("MagicMissile", 113, "可能开出"),
-                    Output("Valor", 328, "可能开出")),
+                    Output("Valor", 3317, "可能开出")),
 
                 FishingCrate("LavaCrate", 4877, "黑曜石匣",
                     Output("LavaCharm", 906, "可能开出"),
