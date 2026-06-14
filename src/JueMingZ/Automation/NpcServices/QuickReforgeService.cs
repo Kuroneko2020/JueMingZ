@@ -30,12 +30,16 @@ namespace JueMingZ.Automation.NpcServices
     public static class QuickReforgeService
     {
         private const long CheckIntervalTicks = 1;
+        private const string MatchedTargetResultMessagePrefix = "matched target prefix";
         private static readonly object SyncRoot = new object();
         private static long _lastScanTick = -CheckIntervalTicks;
         private static string _lastDecision = string.Empty;
         private static string _lastTargetPrefixes = string.Empty;
         private static string _lastMatchedPrefix = string.Empty;
         private static DateTime? _lastDecisionUtc;
+        private static Guid _lastSubmittedRequestId = Guid.Empty;
+        private static bool _holdSessionMatched;
+        private static string _holdSessionMatchedPrefix = string.Empty;
 
         public static void Tick(InputActionQueue queue, GameStateSnapshot gameState, RuntimeState runtimeState)
         {
@@ -68,6 +72,49 @@ namespace JueMingZ.Automation.NpcServices
         internal static InputActionRequest BuildQuickReforgeRequestForTesting(IReadOnlyList<string> prefixes, string currentAffix)
         {
             return BuildQuickReforgeRequest(prefixes, currentAffix);
+        }
+
+        internal static void ResetForTesting()
+        {
+            lock (SyncRoot)
+            {
+                _lastScanTick = -CheckIntervalTicks;
+                _lastDecision = string.Empty;
+                _lastTargetPrefixes = string.Empty;
+                _lastMatchedPrefix = string.Empty;
+                _lastDecisionUtc = null;
+                _lastSubmittedRequestId = Guid.Empty;
+                _holdSessionMatched = false;
+                _holdSessionMatchedPrefix = string.Empty;
+            }
+        }
+
+        internal static void RememberSubmittedRequestForTesting(Guid requestId)
+        {
+            RememberSubmittedRequest(requestId);
+        }
+
+        internal static bool RefreshHoldSessionFromLastSubmittedResultForTesting(InputActionQueue queue, IReadOnlyList<string> prefixes)
+        {
+            return RefreshHoldSessionFromLastSubmittedResult(queue, prefixes);
+        }
+
+        internal static bool IsHoldSessionMatchedForTesting()
+        {
+            lock (SyncRoot)
+            {
+                return _holdSessionMatched;
+            }
+        }
+
+        internal static string GetHoldSessionMatchedPrefixForTesting()
+        {
+            return GetHoldSessionMatchedPrefix();
+        }
+
+        internal static void RecordAlreadyMatchedCurrentPrefixForTesting(IReadOnlyList<string> prefixes, string matchedPrefix)
+        {
+            RecordAlreadyMatchedCurrentPrefix(prefixes, matchedPrefix);
         }
 
         public static QuickReforgeServiceDiagnostics GetDiagnostics()
@@ -103,6 +150,7 @@ namespace JueMingZ.Automation.NpcServices
             var prefixes = NormalizeTargetPrefixes(settings.NpcAutoReforgePrefixes);
             if (prefixes.Count <= 0)
             {
+                ClearHoldSession();
                 RecordDecision("quick reforge list empty", string.Empty, string.Empty);
                 return;
             }
@@ -121,6 +169,7 @@ namespace JueMingZ.Automation.NpcServices
                 gameState.Player.Dead ||
                 gameState.Player.Ghost)
             {
+                ClearHoldSession();
                 RecordDecision("player unavailable", JoinPrefixes(prefixes), string.Empty);
                 return;
             }
@@ -135,6 +184,7 @@ namespace JueMingZ.Automation.NpcServices
             object player;
             if (!TerrariaInputCompat.TryGetLocalPlayer(out player) || player == null)
             {
+                ClearHoldSession();
                 RecordDecision("local player unavailable", JoinPrefixes(prefixes), string.Empty);
                 return;
             }
@@ -142,7 +192,15 @@ namespace JueMingZ.Automation.NpcServices
             bool useItemHeld;
             if (!TerrariaInputCompat.TryReadUseItemHeld(player, out useItemHeld) || !useItemHeld)
             {
+                ClearHoldSession();
                 RecordDecision("reforge key not held", JoinPrefixes(prefixes), string.Empty);
+                return;
+            }
+
+            if (RefreshHoldSessionFromLastSubmittedResult(queue, prefixes))
+            {
+                HoldMatchedTargetCooldown();
+                RecordDecision("hold session target already matched", JoinPrefixes(prefixes), GetHoldSessionMatchedPrefix());
                 return;
             }
 
@@ -164,7 +222,7 @@ namespace JueMingZ.Automation.NpcServices
             string matchedPrefix;
             if (ReforgeCompat.TryMatchTargetPrefixText(prefixes, currentAffix, out matchedPrefix))
             {
-                RecordDecision("already matched target prefix", JoinPrefixes(prefixes), matchedPrefix);
+                RecordAlreadyMatchedCurrentPrefix(prefixes, matchedPrefix);
                 return;
             }
 
@@ -182,6 +240,7 @@ namespace JueMingZ.Automation.NpcServices
                 return;
             }
 
+            RememberSubmittedRequest(request.RequestId);
             RecordDecision("submitted quick reforge request", JoinPrefixes(prefixes), string.Empty);
         }
 
@@ -253,6 +312,130 @@ namespace JueMingZ.Automation.NpcServices
                    ItemUseBridge.PendingRequestId != Guid.Empty;
         }
 
+        private static void RememberSubmittedRequest(Guid requestId)
+        {
+            lock (SyncRoot)
+            {
+                _lastSubmittedRequestId = requestId;
+            }
+        }
+
+        private static bool RefreshHoldSessionFromLastSubmittedResult(InputActionQueue queue, IReadOnlyList<string> prefixes)
+        {
+            Guid requestId;
+            lock (SyncRoot)
+            {
+                if (_holdSessionMatched)
+                {
+                    return true;
+                }
+
+                requestId = _lastSubmittedRequestId;
+            }
+
+            if (queue == null || requestId == Guid.Empty)
+            {
+                return false;
+            }
+
+            InputActionResult result;
+            if (!queue.TryGetResultByRequestId(requestId, out result) || result == null)
+            {
+                return false;
+            }
+
+            string matchedPrefix;
+            var matched = TryReadMatchedTargetResult(result, prefixes, out matchedPrefix);
+            lock (SyncRoot)
+            {
+                if (_lastSubmittedRequestId == requestId)
+                {
+                    _lastSubmittedRequestId = Guid.Empty;
+                }
+
+                if (matched)
+                {
+                    _holdSessionMatched = true;
+                    _holdSessionMatchedPrefix = matchedPrefix ?? string.Empty;
+                    return true;
+                }
+
+                return _holdSessionMatched;
+            }
+        }
+
+        private static bool TryReadMatchedTargetResult(InputActionResult result, IReadOnlyList<string> prefixes, out string matchedPrefix)
+        {
+            matchedPrefix = string.Empty;
+            if (result == null ||
+                result.Status != InputActionStatus.Succeeded ||
+                result.Kind != InputActionKind.Reforge ||
+                !string.Equals(result.SourceFeatureId, FeatureIds.NpcAutoReforge, StringComparison.Ordinal) ||
+                !string.Equals(result.Scenario, ScenarioNames.NpcQuickReforge, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            var message = result.Message ?? string.Empty;
+            if (!message.StartsWith(MatchedTargetResultMessagePrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            var separatorIndex = message.IndexOf(':');
+            if (separatorIndex >= 0 && separatorIndex + 1 < message.Length)
+            {
+                matchedPrefix = message.Substring(separatorIndex + 1).Trim();
+            }
+
+            if (string.IsNullOrWhiteSpace(matchedPrefix) && prefixes != null && prefixes.Count == 1)
+            {
+                matchedPrefix = prefixes[0] ?? string.Empty;
+            }
+
+            return true;
+        }
+
+        private static void MarkHoldSessionMatched(string matchedPrefix)
+        {
+            lock (SyncRoot)
+            {
+                _holdSessionMatched = true;
+                _holdSessionMatchedPrefix = matchedPrefix ?? string.Empty;
+                _lastSubmittedRequestId = Guid.Empty;
+            }
+        }
+
+        private static void ClearHoldSession()
+        {
+            lock (SyncRoot)
+            {
+                _holdSessionMatched = false;
+                _holdSessionMatchedPrefix = string.Empty;
+                _lastSubmittedRequestId = Guid.Empty;
+            }
+        }
+
+        private static string GetHoldSessionMatchedPrefix()
+        {
+            lock (SyncRoot)
+            {
+                return _holdSessionMatchedPrefix ?? string.Empty;
+            }
+        }
+
+        private static void HoldMatchedTargetCooldown()
+        {
+            // Only action-result matches own this stop cooldown. A pre-existing
+            // target prefix must not make the original reforge button feel stuck.
+            ReforgeCompat.TryHoldMatchedTargetCooldown();
+        }
+
+        private static void RecordAlreadyMatchedCurrentPrefix(IReadOnlyList<string> prefixes, string matchedPrefix)
+        {
+            RecordDecision("already matched target prefix", JoinPrefixes(prefixes), matchedPrefix);
+        }
+
         private static void ClearTracking(string decision)
         {
             lock (SyncRoot)
@@ -262,6 +445,9 @@ namespace JueMingZ.Automation.NpcServices
                 _lastTargetPrefixes = string.Empty;
                 _lastMatchedPrefix = string.Empty;
                 _lastDecisionUtc = DateTime.UtcNow;
+                _lastSubmittedRequestId = Guid.Empty;
+                _holdSessionMatched = false;
+                _holdSessionMatchedPrefix = string.Empty;
             }
         }
 

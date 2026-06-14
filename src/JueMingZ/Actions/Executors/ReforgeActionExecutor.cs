@@ -31,14 +31,12 @@ namespace JueMingZ.Actions.Executors
             // Reforge must run through the vanilla NPC reforge path; matching a
             // target prefix never permits direct item prefix or inventory edits.
             var invoked = ReforgeCompat.TryQuickReforgeOnce(targetPrefixes, out result);
-            if (invoked && result != null && result.ReforgeInvoked && result.MatchedTargetPrefix)
-            {
-                return Finish(execution, startedUtc, InputActionStatus.Succeeded, DiagnosticResultCode.Succeeded, result.Message, result);
-            }
-
             if (invoked && result != null && result.ReforgeInvoked)
             {
-                return Finish(execution, startedUtc, InputActionStatus.AttemptedButUnverified, DiagnosticResultCode.AttemptedButUnverified, result.Message, result);
+                InputActionStatus status;
+                DiagnosticResultCode code;
+                ResolveInvokedReforgeCompletion(result.MatchedTargetPrefix, out status, out code);
+                return Finish(execution, startedUtc, status, code, result.Message, result);
             }
 
             var message = result == null ? "Quick reforge failed." : result.Message;
@@ -53,6 +51,19 @@ namespace JueMingZ.Actions.Executors
             }
 
             return Finish(execution, startedUtc, InputActionStatus.Failed, DiagnosticResultCode.Failed, message, result);
+        }
+
+        internal static void ResolveInvokedReforgeCompletionForTesting(bool matchedTargetPrefix, out InputActionStatus status, out DiagnosticResultCode code)
+        {
+            ResolveInvokedReforgeCompletion(matchedTargetPrefix, out status, out code);
+        }
+
+        private static void ResolveInvokedReforgeCompletion(bool matchedTargetPrefix, out InputActionStatus status, out DiagnosticResultCode code)
+        {
+            // A vanilla reforge invocation is a verified click. A non-target roll
+            // is the expected middle state of auto reforge, not a recovery risk.
+            status = InputActionStatus.Succeeded;
+            code = DiagnosticResultCode.Succeeded;
         }
 
         private InputActionExecutionStepResult Finish(
@@ -158,6 +169,7 @@ namespace JueMingZ.Actions.Executors
             return "{" +
                    "\"reforgeInvoked\":" + BoolRaw(result != null && result.ReforgeInvoked) + "," +
                    "\"cooldownCleared\":" + BoolRaw(result != null && result.CooldownCleared) + "," +
+                   "\"cooldownHeldAfterMatch\":" + BoolRaw(result != null && result.CooldownHeldAfterMatch) + "," +
                    "\"matchedTargetPrefix\":" + BoolRaw(result != null && result.MatchedTargetPrefix) +
                    "}";
         }

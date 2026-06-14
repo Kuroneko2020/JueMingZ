@@ -11,6 +11,7 @@ namespace JueMingZ.Compat
         public bool MouseReforge { get; set; }
         public bool ReforgeInvoked { get; set; }
         public bool CooldownCleared { get; set; }
+        public bool CooldownHeldAfterMatch { get; set; }
         public bool MatchedTargetPrefix { get; set; }
         public int PrefixBefore { get; set; }
         public int PrefixAfter { get; set; }
@@ -32,6 +33,7 @@ namespace JueMingZ.Compat
     {
         // Reforge automation stays inside the vanilla reforge menu and verifies
         // prefix changes; callers must not edit item prefixes.
+        private const int MatchedTargetCooldownTicks = 60;
         private static readonly object SyncRoot = new object();
         private static MethodInfo _reforgeItemMethod;
 
@@ -155,7 +157,6 @@ namespace JueMingZ.Compat
             result.ReforgeInvoked = true;
             result.PrefixAfter = ReadInt(item, "prefix", 0);
             result.AffixAfter = ResolveAffixName(item);
-            result.CooldownCleared = TrySetStaticInt(mainType, "reforgeCooldown", 0);
             string matchedPrefix;
             if (TryMatchTargetPrefixText(normalizedTargets, result.AffixAfter, out matchedPrefix))
             {
@@ -163,10 +164,42 @@ namespace JueMingZ.Compat
                 result.MatchedPrefix = matchedPrefix;
             }
 
+            if (ShouldClearCooldownAfterReforge(result.MatchedTargetPrefix))
+            {
+                result.CooldownCleared = TrySetStaticInt(mainType, "reforgeCooldown", 0);
+            }
+            else
+            {
+                // Once the user target is reached, preserve a short vanilla UI
+                // cooldown so the held original reforge button cannot immediately
+                // roll past the target before the service observes the stop lock.
+                result.CooldownHeldAfterMatch = TrySetMatchedTargetCooldown(mainType);
+            }
+
             result.Message = result.MatchedTargetPrefix
-                ? "matched target prefix"
+                ? "matched target prefix: " + result.MatchedPrefix
                 : "reforge completed";
             return true;
+        }
+
+        internal static bool ShouldClearCooldownAfterReforgeForTesting(bool matchedTargetPrefix)
+        {
+            return ShouldClearCooldownAfterReforge(matchedTargetPrefix);
+        }
+
+        internal static int GetMatchedTargetCooldownTicksForTesting()
+        {
+            return MatchedTargetCooldownTicks;
+        }
+
+        public static bool TryHoldMatchedTargetCooldown()
+        {
+            if (!TerrariaRuntimeTypes.EnsureInitializedLateOnly())
+            {
+                return false;
+            }
+
+            return TrySetMatchedTargetCooldown(TerrariaRuntimeTypes.MainType);
         }
 
         public static bool TryMatchTargetPrefixText(IEnumerable<string> targetPrefixes, string affixText, out string matchedPrefix)
@@ -236,6 +269,16 @@ namespace JueMingZ.Compat
             }
 
             return set;
+        }
+
+        private static bool ShouldClearCooldownAfterReforge(bool matchedTargetPrefix)
+        {
+            return !matchedTargetPrefix;
+        }
+
+        private static bool TrySetMatchedTargetCooldown(Type mainType)
+        {
+            return TrySetStaticInt(mainType, "reforgeCooldown", MatchedTargetCooldownTicks);
         }
 
         private static string NormalizePrefixText(string raw)

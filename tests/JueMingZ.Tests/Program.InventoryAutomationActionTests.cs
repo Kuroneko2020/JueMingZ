@@ -1071,6 +1071,116 @@ namespace JueMingZ.Tests
             AssertMetadata(request, "CurrentAffix", "强力");
         }
 
+        private static void QuickReforgeCompletedRollUsesSucceededStatus()
+        {
+            InputActionStatus status;
+            DiagnosticResultCode code;
+            ReforgeActionExecutor.ResolveInvokedReforgeCompletionForTesting(false, out status, out code);
+            if (status != InputActionStatus.Succeeded || code != DiagnosticResultCode.Succeeded)
+            {
+                throw new InvalidOperationException("Non-target quick reforge rolls must be successful intermediate clicks, not unverified failures.");
+            }
+
+            ReforgeActionExecutor.ResolveInvokedReforgeCompletionForTesting(true, out status, out code);
+            if (status != InputActionStatus.Succeeded || code != DiagnosticResultCode.Succeeded)
+            {
+                throw new InvalidOperationException("Matched quick reforge rolls must stay successful.");
+            }
+        }
+
+        private static void QuickReforgeSucceededRollDoesNotCreateCleanupLease()
+        {
+            var executors = new Dictionary<InputActionKind, IInputActionExecutor>();
+            executors[InputActionKind.Reforge] = new TerminalFakeExecutor(
+                InputActionKind.Reforge,
+                InputActionStatus.Succeeded,
+                "reforge completed");
+            var queue = new InputActionQueue(executors);
+            var first = QuickReforgeService.BuildQuickReforgeRequestForTesting(new[] { "虚幻" }, "强力");
+            InputActionAdmissionResult admission;
+            if (!queue.TryEnqueue(first, out admission))
+            {
+                throw new InvalidOperationException("Expected first quick reforge request to be admitted.");
+            }
+
+            queue.Update(null);
+            if (queue.GetSnapshot().ActionQueueCleanupLeaseCount != 0)
+            {
+                throw new InvalidOperationException("Succeeded quick reforge rolls must not create cleanup leases.");
+            }
+
+            var second = QuickReforgeService.BuildQuickReforgeRequestForTesting(new[] { "虚幻" }, "暴怒");
+            if (!queue.TryEnqueue(second, out admission))
+            {
+                throw new InvalidOperationException("Expected next quick reforge request to be admitted immediately after a succeeded roll: " + (admission == null ? "null" : admission.Reason));
+            }
+        }
+
+        private static void QuickReforgeMatchedResultLocksCurrentHold()
+        {
+            QuickReforgeService.ResetForTesting();
+            try
+            {
+                var executors = new Dictionary<InputActionKind, IInputActionExecutor>();
+                executors[InputActionKind.Reforge] = new TerminalFakeExecutor(
+                    InputActionKind.Reforge,
+                    InputActionStatus.Succeeded,
+                    "matched target prefix: 虚幻");
+                var queue = new InputActionQueue(executors);
+                var request = QuickReforgeService.BuildQuickReforgeRequestForTesting(new[] { "神话", "虚幻" }, "暴怒");
+                InputActionAdmissionResult admission;
+                if (!queue.TryEnqueue(request, out admission))
+                {
+                    throw new InvalidOperationException("Expected matched quick reforge request to be admitted.");
+                }
+
+                QuickReforgeService.RememberSubmittedRequestForTesting(request.RequestId);
+                queue.Update(null);
+
+                if (!QuickReforgeService.RefreshHoldSessionFromLastSubmittedResultForTesting(queue, new[] { "神话", "虚幻" }) ||
+                    !QuickReforgeService.IsHoldSessionMatchedForTesting() ||
+                    !string.Equals(QuickReforgeService.GetHoldSessionMatchedPrefixForTesting(), "虚幻", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Matched quick reforge result must lock the current held reforge session until release.");
+                }
+            }
+            finally
+            {
+                QuickReforgeService.ResetForTesting();
+            }
+        }
+
+        private static void QuickReforgeExistingTargetDoesNotLockCurrentHold()
+        {
+            QuickReforgeService.ResetForTesting();
+            try
+            {
+                QuickReforgeService.RecordAlreadyMatchedCurrentPrefixForTesting(new[] { "虚幻" }, "虚幻");
+                if (QuickReforgeService.IsHoldSessionMatchedForTesting())
+                {
+                    throw new InvalidOperationException("An already-matched current prefix must not lock the held vanilla reforge button.");
+                }
+            }
+            finally
+            {
+                QuickReforgeService.ResetForTesting();
+            }
+        }
+
+        private static void QuickReforgeCooldownClearsOnlyBeforeTargetMatch()
+        {
+            if (!ReforgeCompat.ShouldClearCooldownAfterReforgeForTesting(false))
+            {
+                throw new InvalidOperationException("Quick reforge must clear vanilla cooldown for non-target rolls to stay fast.");
+            }
+
+            if (ReforgeCompat.ShouldClearCooldownAfterReforgeForTesting(true) ||
+                ReforgeCompat.GetMatchedTargetCooldownTicksForTesting() <= 0)
+            {
+                throw new InvalidOperationException("Quick reforge must hold a short vanilla cooldown after target match to avoid rolling past the target.");
+            }
+        }
+
         private static void AutoTaxCollectRequestUsesNpcMetadata()
         {
             var request = AutoTaxCollectorService.BuildAutoTaxCollectRequestForTesting(

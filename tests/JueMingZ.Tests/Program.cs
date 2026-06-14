@@ -1188,6 +1188,11 @@ namespace JueMingZ.Tests
             Run("quick reforge prefixes normalize blanks and duplicates", ref failed, QuickReforgePrefixesNormalizeBlanksAndDuplicates);
             Run("quick reforge prefix matching accepts full affix names", ref failed, QuickReforgePrefixMatchingAcceptsFullAffixNames);
             Run("quick reforge request uses reforge metadata", ref failed, QuickReforgeRequestUsesReforgeMetadata);
+            Run("quick reforge completed roll uses succeeded status", ref failed, QuickReforgeCompletedRollUsesSucceededStatus);
+            Run("quick reforge succeeded roll does not create cleanup lease", ref failed, QuickReforgeSucceededRollDoesNotCreateCleanupLease);
+            Run("quick reforge matched result locks current hold", ref failed, QuickReforgeMatchedResultLocksCurrentHold);
+            Run("quick reforge existing target does not lock current hold", ref failed, QuickReforgeExistingTargetDoesNotLockCurrentHold);
+            Run("quick reforge cooldown clears only before target match", ref failed, QuickReforgeCooldownClearsOnlyBeforeTargetMatch);
             Run("auto tax collect request uses npc metadata", ref failed, AutoTaxCollectRequestUsesNpcMetadata);
             Run("feature catalog exposes travel menu", ref failed, FeatureCatalogExposesTravelMenu);
             Run("travel menu runtime path is resumed", ref failed, TravelMenuRuntimePathIsResumed);
