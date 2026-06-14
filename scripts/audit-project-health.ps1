@@ -1199,6 +1199,7 @@ function Test-LegacyUiOverlayGovernance {
     }
 
     $expectedPopupPanelUses = @{
+        "LegacyMainWindow.MapEnhancement.cs" = 1
         "LegacyMainWindow.Misc.cs" = 1
         "LegacyMainWindow.Movement.cs" = 1
         "LegacyMainWindow.Rows.Recovery.cs" = 1
@@ -2306,6 +2307,50 @@ function Test-IterationLogNumbers {
     }
 }
 
+function Test-PlayerWorldExplorationGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $servicePath = Join-Path $RepoRoot "src\JueMingZ\Records\PlayerWorldExplorationService.cs"
+    $readerPath = Join-Path $RepoRoot "src\JueMingZ\Records\PlayerWorldExplorationMapReader.cs"
+    $cachePath = Join-Path $RepoRoot "src\JueMingZ\Records\PlayerWorldExplorationCache.cs"
+    $uiPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.MapEnhancement.cs"
+
+    $serviceText = Read-TextIfExists -Path $servicePath
+    $readerText = Read-TextIfExists -Path $readerPath
+    $cacheText = Read-TextIfExists -Path $cachePath
+    $uiText = Read-TextIfExists -Path $uiPath
+
+    if ($null -eq $serviceText -or $null -eq $readerText -or $null -eq $cacheText) {
+        Write-FailHealth "Player-world exploration service, reader, and cache files must exist as separate responsibilities."
+        return
+    }
+
+    if ($serviceText.Contains("ScanTileBudget") -and
+        $serviceText.Contains("ScanCadenceTicks") -and
+        $serviceText.Contains("PlayerWorldFeatureDataStore.TryWriteJson")) {
+        Write-Pass "Player-world exploration keeps chunk budget, cadence, and throttled summary writes in the service layer."
+    }
+    else {
+        Write-FailHealth "Player-world exploration scanning must keep fixed budget, cadence, and summary writes in PlayerWorldExplorationService."
+    }
+
+    if ($readerText.Contains(".IsRevealed(") -and -not $uiText.Contains(".IsRevealed(")) {
+        Write-Pass "Player-world exploration reads Main.Map.IsRevealed only through the map reader, not the UI draw path."
+    }
+    else {
+        Write-FailHealth "Player-world exploration must not read map reveal state from Legacy UI draw code."
+    }
+
+    if ($uiText.Contains("PlayerWorldExplorationCache.ReadCurrent()") -and
+        -not $uiText.Contains("PlayerWorldExplorationService.") -and
+        -not $uiText.Contains("PlayerWorldFeatureDataStore.TryWriteJson")) {
+        Write-Pass "Map enhancement UI reads cached exploration summary only and does not scan or write JSON."
+    }
+    else {
+        Write-FailHealth "Map enhancement UI must read PlayerWorldExplorationCache only; scanning and JSON writes belong outside Draw."
+    }
+}
+
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
 
@@ -2333,6 +2378,7 @@ Test-LegacyUiOverlayGovernance -RepoRoot $repoRoot
 Test-CombatAimDiagnosticsGovernance -RepoRoot $repoRoot
 Test-PhasebladeQuickSwitchDiagnosticsGovernance -RepoRoot $repoRoot
 Test-MapQuickAnnouncementGovernance -RepoRoot $repoRoot
+Test-PlayerWorldExplorationGovernance -RepoRoot $repoRoot
 Test-ActionQueueDirectEnqueueGovernance -RepoRoot $repoRoot
 Test-NewFeatureBoundaryGovernance -RepoRoot $repoRoot
 Test-DeepStructureBoundaryGovernance -RepoRoot $repoRoot

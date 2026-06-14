@@ -312,6 +312,49 @@ namespace JueMingZ.UI.Legacy
             MapQuickAnnouncementCaptureWasDown.Clear();
         }
 
+        public static void ToggleMapDeathHistoryPopup()
+        {
+            _mapDeathHistoryPopupOpen = !_mapDeathHistoryPopupOpen;
+            if (_mapDeathHistoryPopupOpen)
+            {
+                _mapDeathHistoryPageIndex = 0;
+            }
+        }
+
+        public static void CloseMapDeathHistoryPopup()
+        {
+            _mapDeathHistoryPopupOpen = false;
+        }
+
+        public static int MoveMapDeathHistoryPage(int delta)
+        {
+            if (!_mapDeathHistoryPopupOpen)
+            {
+                _mapDeathHistoryPopupOpen = true;
+            }
+
+            _mapDeathHistoryPageIndex = Math.Max(0, _mapDeathHistoryPageIndex + delta);
+            return _mapDeathHistoryPageIndex;
+        }
+
+        public static bool IsMapDeathHistoryPopupOpen()
+        {
+            return _mapDeathHistoryPopupOpen;
+        }
+
+        public static int GetMapDeathHistoryPageIndex()
+        {
+            return _mapDeathHistoryPageIndex;
+        }
+
+        internal static void ResetMapDeathHistoryPopupForTesting()
+        {
+            _mapDeathHistoryPopupOpen = false;
+            _mapDeathHistoryAnchor = new LegacyUiRect();
+            _mapDeathHistoryAnchorVisible = false;
+            _mapDeathHistoryPageIndex = 0;
+        }
+
         internal static string GetMapQuickAnnouncementHotkeyCaptureSlotForTesting()
         {
             return _mapQuickAnnouncementHotkeyCaptureSlot;

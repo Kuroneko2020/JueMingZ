@@ -18,6 +18,7 @@ using JueMingZ.Diagnostics;
 using JueMingZ.Features;
 using JueMingZ.GameState;
 using JueMingZ.Input;
+using JueMingZ.Records;
 using JueMingZ.UI;
 using JueMingZ.UI.Information;
 using JueMingZ.UI.Legacy;
@@ -35,7 +36,7 @@ namespace JueMingZ.Runtime
         private static long _lastRuntimeUpdateStartTimestamp;
         private static readonly RuntimeTickPipeline TickPipeline = CreateTickPipeline();
 
-        public const string Version = "0.678-chest-locator-more-candidates";
+        public const string Version = "0.687-map-player-world-records-closeout";
 
         public static RuntimeState State { get; private set; } = new RuntimeState();
         public static FeatureRegistry FeatureRegistry { get; private set; }
@@ -118,6 +119,8 @@ namespace JueMingZ.Runtime
                 new RuntimeTickStage("ui-text-resource-monitor", UpdateUiTextResources),
                 new RuntimeTickStage("post-terraria-input-guards", RunPostTerrariaInputGuards),
                 new RuntimeTickStage("game-state-read", ReadGameState),
+                new RuntimeTickStage("player-world-playtime-sampling", RunPlayerWorldPlaytimeSampling),
+                new RuntimeTickStage("player-world-exploration-scan", RunPlayerWorldExplorationScan),
                 new RuntimeTickStage("search-chest-locator-lifecycle", RunSearchChestLocatorLifecycleGuards),
                 new RuntimeTickStage("input-focus-guard", RunInputFocusGuard),
                 new RuntimeTickStage("targeting-and-ui-actions", RunTargetingAndUiActions),
@@ -178,6 +181,20 @@ namespace JueMingZ.Runtime
         private static void RunSearchChestLocatorLifecycleGuards(RuntimeTickContext context)
         {
             ClearSearchChestLocatorHighlightIfChestOpen(context == null ? null : context.GameState);
+        }
+
+        private static void RunPlayerWorldPlaytimeSampling(RuntimeTickContext context)
+        {
+            PlayerWorldPlaytimeService.Tick(
+                context == null ? null : context.GameState,
+                State);
+        }
+
+        private static void RunPlayerWorldExplorationScan(RuntimeTickContext context)
+        {
+            PlayerWorldExplorationService.Tick(
+                context == null ? null : context.GameState,
+                State);
         }
 
         internal static bool ClearSearchChestLocatorHighlightIfChestOpenForTesting(GameStateSnapshot snapshot)
@@ -483,6 +500,8 @@ namespace JueMingZ.Runtime
                     return;
                 }
 
+                PlayerWorldPlaytimeService.FlushPending();
+                PlayerWorldExplorationService.FlushPending();
                 State.MarkShutdown();
                 _initialized = false;
                 Logger.Info("Runtime", "Runtime shutdown completed.");

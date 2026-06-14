@@ -100,6 +100,22 @@ namespace JueMingZ.Bootstrap
                     Logger.Warn("LateBootstrap", "Quick announcement ItemSlot.MouseHover hook did not install; UI hover item announcements will safely fall back to world target resolution.");
                 }
 
+                Logger.Info("LateBootstrap", "Installing Player.KillMe death record hook...");
+                var playerDeathHookResult = PlayerDeathHookInstaller.Install();
+                Logger.Info("LateBootstrap", "Player death hook handoff result: " + playerDeathHookResult.Message);
+                if (!playerDeathHookResult.Succeeded)
+                {
+                    Logger.Warn("LateBootstrap", "Player death hook did not install; player-world death records will fail closed.");
+                }
+
+                Logger.Info("LateBootstrap", "Installing player-world death marker map layer...");
+                var playerWorldDeathMarkerLayerResult = PlayerWorldDeathMarkerMapLayerInstaller.Install();
+                Logger.Info("LateBootstrap", "Player-world death marker map layer handoff result: " + playerWorldDeathMarkerLayerResult.Message);
+                if (!playerWorldDeathMarkerLayerResult.Succeeded)
+                {
+                    Logger.Warn("LateBootstrap", "Player-world death marker map layer did not install; persistent death markers will not draw.");
+                }
+
                 Logger.Info("LateBootstrap", "Installing auto mining PickTile hook...");
                 var autoMiningPickTileHookResult = AutoMiningPickTileHookInstaller.Install();
                 Logger.Info("LateBootstrap", "Auto mining PickTile hook handoff result: " + autoMiningPickTileHookResult.Message);

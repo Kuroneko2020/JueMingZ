@@ -70,6 +70,10 @@ namespace JueMingZ.UI.Legacy
         private const int AutoRecoveryItemPopupRowGap = 6;
         private const int AutoRecoveryItemOptionMinWidth = 132;
         private const int AutoRecoveryItemOptionHeight = 34;
+        private const int MapDeathHistoryPopupMaxWidth = 520;
+        private const int MapDeathHistoryPopupMinWidth = 360;
+        private const int MapDeathHistoryPopupHeight = 294;
+        private const int MapDeathHistoryPopupPageSize = 6;
         private const int FishingFilterPanelHeight = 296;
         private const int FishingFilterSettingsMinWidth = 132;
         private const int FishingFilterSettingsMaxWidth = 144;
@@ -150,6 +154,10 @@ namespace JueMingZ.UI.Legacy
         private static int _quickItemHotkeyCaptureBindingIndex = -1;
         private static bool _autoMiningHotkeyCaptureActive;
         private static string _mapQuickAnnouncementHotkeyCaptureSlot = string.Empty;
+        private static bool _mapDeathHistoryPopupOpen;
+        private static LegacyUiRect _mapDeathHistoryAnchor;
+        private static bool _mapDeathHistoryAnchorVisible;
+        private static int _mapDeathHistoryPageIndex;
         private static readonly Dictionary<int, bool> QuickItemCaptureWasDown = new Dictionary<int, bool>();
         private static readonly Dictionary<int, bool> AutoMiningCaptureWasDown = new Dictionary<int, bool>();
         private static readonly Dictionary<int, bool> MapQuickAnnouncementCaptureWasDown = new Dictionary<int, bool>();

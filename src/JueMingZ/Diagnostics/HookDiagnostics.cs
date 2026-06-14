@@ -13,6 +13,7 @@ namespace JueMingZ.Diagnostics
         public static bool DrawHookInstalled { get; private set; }
         public static bool InterfaceLayerHookInstalled { get; private set; }
         public static bool ItemCheckHookInstalled { get; private set; }
+        public static bool PlayerDeathHookInstalled { get; private set; }
         public static bool TeleportRodHookInstalled { get; private set; }
         public static bool GoblinExecutionHookInstalled { get; private set; }
         public static string SafeBootstrapHookMethod { get; private set; } = string.Empty;
@@ -22,6 +23,9 @@ namespace JueMingZ.Diagnostics
         public static string ItemCheckHookMethod { get; private set; } = string.Empty;
         public static string ItemCheckHookMessage { get; private set; } = string.Empty;
         public static string ItemCheckHookError { get; private set; } = string.Empty;
+        public static string PlayerDeathHookMethod { get; private set; } = string.Empty;
+        public static string PlayerDeathHookMessage { get; private set; } = string.Empty;
+        public static string PlayerDeathHookError { get; private set; } = string.Empty;
         public static string TeleportRodHookMethod { get; private set; } = string.Empty;
         public static string TeleportRodHookMessage { get; private set; } = string.Empty;
         public static string TeleportRodHookError { get; private set; } = string.Empty;
@@ -160,6 +164,51 @@ namespace JueMingZ.Diagnostics
                 ItemCheckHookMethod = string.Empty;
                 ItemCheckHookMessage = message ?? string.Empty;
                 ItemCheckHookError = error == null ? string.Empty : error.ToString();
+                LastInstallMessage = message ?? string.Empty;
+                LastInstallError = error == null ? string.Empty : error.ToString();
+                LastInstallAttemptUtc = DateTime.UtcNow;
+            }
+        }
+
+        public static void MarkPlayerDeathHookSucceeded(string methodName, string message)
+        {
+            lock (SyncRoot)
+            {
+                HookInstallAttempted = true;
+                PlayerDeathHookInstalled = true;
+                PlayerDeathHookMethod = methodName ?? string.Empty;
+                PlayerDeathHookMessage = message ?? string.Empty;
+                PlayerDeathHookError = string.Empty;
+                LastInstallMessage = message ?? string.Empty;
+                LastInstallError = string.Empty;
+                LastInstallAttemptUtc = DateTime.UtcNow;
+            }
+        }
+
+        public static void MarkPlayerDeathHookSkipped(string message)
+        {
+            lock (SyncRoot)
+            {
+                HookInstallAttempted = true;
+                PlayerDeathHookInstalled = false;
+                PlayerDeathHookMethod = string.Empty;
+                PlayerDeathHookMessage = message ?? string.Empty;
+                PlayerDeathHookError = string.Empty;
+                LastInstallMessage = message ?? string.Empty;
+                LastInstallError = string.Empty;
+                LastInstallAttemptUtc = DateTime.UtcNow;
+            }
+        }
+
+        public static void MarkPlayerDeathHookFailed(string message, Exception error)
+        {
+            lock (SyncRoot)
+            {
+                HookInstallAttempted = true;
+                PlayerDeathHookInstalled = false;
+                PlayerDeathHookMethod = string.Empty;
+                PlayerDeathHookMessage = message ?? string.Empty;
+                PlayerDeathHookError = error == null ? string.Empty : error.ToString();
                 LastInstallMessage = message ?? string.Empty;
                 LastInstallError = error == null ? string.Empty : error.ToString();
                 LastInstallAttemptUtc = DateTime.UtcNow;

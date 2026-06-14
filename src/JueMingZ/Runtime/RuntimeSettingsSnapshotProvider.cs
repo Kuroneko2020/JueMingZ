@@ -122,6 +122,7 @@ namespace JueMingZ.Runtime
             private bool _worldAutomationAutoCaptureCritterEmpressButterflyEnabled;
             private bool _worldAutomationAutoCaptureCritterOtherEnabled;
             private bool _worldAutomationAutoHarvestEnabled;
+            private bool _mapPersistentDeathMarkersEnabled;
             private bool _mapQuickAnnouncementEnabled;
             private string _mapQuickAnnouncementHotkeySlot1;
             private string _mapQuickAnnouncementHotkeySlot2;
@@ -249,6 +250,7 @@ namespace JueMingZ.Runtime
                     _worldAutomationAutoCaptureCritterEmpressButterflyEnabled = settings.MiscAutoCaptureCritterEmpressButterflyEnabled,
                     _worldAutomationAutoCaptureCritterOtherEnabled = settings.MiscAutoCaptureCritterOtherEnabled,
                     _worldAutomationAutoHarvestEnabled = settings.WorldAutomationAutoHarvestEnabled,
+                    _mapPersistentDeathMarkersEnabled = settings.MapPersistentDeathMarkersEnabled,
                     _mapQuickAnnouncementEnabled = settings.MapQuickAnnouncementEnabled,
                     _mapQuickAnnouncementHotkeySlot1 = settings.MapQuickAnnouncementHotkeySlot1,
                     _mapQuickAnnouncementHotkeySlot2 = settings.MapQuickAnnouncementHotkeySlot2,
@@ -371,6 +373,7 @@ namespace JueMingZ.Runtime
                        _worldAutomationAutoCaptureCritterEmpressButterflyEnabled == other._worldAutomationAutoCaptureCritterEmpressButterflyEnabled &&
                        _worldAutomationAutoCaptureCritterOtherEnabled == other._worldAutomationAutoCaptureCritterOtherEnabled &&
                        _worldAutomationAutoHarvestEnabled == other._worldAutomationAutoHarvestEnabled &&
+                       _mapPersistentDeathMarkersEnabled == other._mapPersistentDeathMarkersEnabled &&
                        _mapQuickAnnouncementEnabled == other._mapQuickAnnouncementEnabled &&
                        Same(_mapQuickAnnouncementHotkeySlot1, other._mapQuickAnnouncementHotkeySlot1) &&
                        Same(_mapQuickAnnouncementHotkeySlot2, other._mapQuickAnnouncementHotkeySlot2) &&

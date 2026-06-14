@@ -5,6 +5,7 @@ using JueMingZ.Automation.Information;
 using JueMingZ.Automation.Movement;
 using JueMingZ.Automation.WorldAutomation;
 using JueMingZ.Config;
+using JueMingZ.Records;
 using JueMingZ.UI;
 
 namespace JueMingZ.UI.Legacy
@@ -510,6 +511,12 @@ namespace JueMingZ.UI.Legacy
                 }
                 else if (string.Equals(selectedPage, "map_enhancement", StringComparison.Ordinal))
                 {
+                    AddHash(ref hash, settings.MapPersistentDeathMarkersEnabled);
+                    AddHash(ref hash, _mapDeathHistoryPopupOpen);
+                    AddHash(ref hash, _mapDeathHistoryPageIndex);
+                    AddHash(ref hash, PlayerWorldDeathHistoryCache.LastStateSignature);
+                    AddHash(ref hash, PlayerWorldPlaytimeCache.LastStateSignature);
+                    AddHash(ref hash, PlayerWorldExplorationCache.LastStateSignature);
                     AddHash(ref hash, settings.MapQuickAnnouncementEnabled);
                     AddHash(ref hash, settings.MapQuickAnnouncementHotkeySlot1);
                     AddHash(ref hash, settings.MapQuickAnnouncementHotkeySlot2);

@@ -7,9 +7,30 @@ namespace JueMingZ.Input
 {
     public static partial class LegacyUiActionService
     {
+        private static void HandleMapPersistentDeathMarkersMode(LegacyUiCommand command, string payload)
+        {
+            var before = BuildMapEnhancementUiStateJson();
+            var enabled = IsOnMode(payload);
+            var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
+            var changed = settings.MapPersistentDeathMarkersEnabled != enabled;
+            settings.MapPersistentDeathMarkersEnabled = enabled;
+            ConfigService.SaveAll();
+
+            Record(
+                command,
+                "Ui.Toggle.MapPersistentDeathMarkers",
+                "UI",
+                changed ? "Succeeded" : "NotApplicable",
+                enabled ? "Persistent death markers enabled." : "Persistent death markers disabled.",
+                before,
+                BuildMapEnhancementUiStateJson(),
+                "{\"submitted\":false,\"implemented\":true,\"featureId\":\"" + EscapeJson(FeatureIds.MapPersistentDeathMarkers) + "\",\"enabled\":" + BoolRaw(enabled) + ",\"changed\":" + BoolRaw(changed) + ",\"deathRecordingAffected\":false,\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                "Button");
+        }
+
         private static void HandleMapQuickAnnouncementMode(LegacyUiCommand command, string payload)
         {
-            var before = BuildMapQuickAnnouncementUiStateJson();
+            var before = BuildMapEnhancementUiStateJson();
             var enabled = IsOnMode(payload);
             var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
             var changed = settings.MapQuickAnnouncementEnabled != enabled;
@@ -23,8 +44,55 @@ namespace JueMingZ.Input
                 changed ? "Succeeded" : "NotApplicable",
                 enabled ? "Map quick announcement enabled." : "Map quick announcement disabled.",
                 before,
-                BuildMapQuickAnnouncementUiStateJson(),
+                BuildMapEnhancementUiStateJson(),
                 "{\"submitted\":false,\"implemented\":true,\"runtimeTriggerImplemented\":true,\"featureId\":\"" + EscapeJson(FeatureIds.MapQuickAnnouncement) + "\",\"enabled\":" + BoolRaw(enabled) + ",\"changed\":" + BoolRaw(changed) + ",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                "Button");
+        }
+
+        private static void HandleMapDeathHistoryCommand(LegacyUiCommand command, string action)
+        {
+            var before = BuildMapEnhancementUiStateJson();
+            action = (action ?? string.Empty).Trim();
+            var outcome = "Succeeded";
+            var message = "Map death history command handled.";
+
+            if (string.Equals(action, "toggle", StringComparison.OrdinalIgnoreCase))
+            {
+                LegacyMainWindow.ToggleMapDeathHistoryPopup();
+                message = LegacyMainWindow.IsMapDeathHistoryPopupOpen()
+                    ? "Map death history popup opened."
+                    : "Map death history popup closed.";
+            }
+            else if (string.Equals(action, "close", StringComparison.OrdinalIgnoreCase))
+            {
+                LegacyMainWindow.CloseMapDeathHistoryPopup();
+                message = "Map death history popup closed.";
+            }
+            else if (string.Equals(action, "prev", StringComparison.OrdinalIgnoreCase))
+            {
+                LegacyMainWindow.MoveMapDeathHistoryPage(-1);
+                message = "Map death history moved to previous page.";
+            }
+            else if (string.Equals(action, "next", StringComparison.OrdinalIgnoreCase))
+            {
+                LegacyMainWindow.MoveMapDeathHistoryPage(1);
+                message = "Map death history moved to next page.";
+            }
+            else
+            {
+                outcome = "Rejected";
+                message = "Map death history command rejected because the action was invalid.";
+            }
+
+            Record(
+                command,
+                "Ui.MapDeathHistory." + (string.IsNullOrWhiteSpace(action) ? "Invalid" : action),
+                "UI",
+                outcome,
+                message,
+                before,
+                BuildMapEnhancementUiStateJson(),
+                "{\"submitted\":false,\"implemented\":true,\"featureId\":\"" + EscapeJson(FeatureIds.MapDeathHistory) + "\",\"action\":\"" + EscapeJson(action) + "\",\"popupOpen\":" + BoolRaw(LegacyMainWindow.IsMapDeathHistoryPopupOpen()) + ",\"pageIndex\":" + IntRaw(LegacyMainWindow.GetMapDeathHistoryPageIndex()) + ",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
                 "Button");
         }
 
@@ -77,12 +145,20 @@ namespace JueMingZ.Input
 
         private static string BuildMapQuickAnnouncementUiStateJson()
         {
+            return BuildMapEnhancementUiStateJson();
+        }
+
+        private static string BuildMapEnhancementUiStateJson()
+        {
             var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
             var hotkey = MapQuickAnnouncementSettings.NormalizeHotkey(
                 settings.MapQuickAnnouncementHotkeySlot1,
                 settings.MapQuickAnnouncementHotkeySlot2,
                 settings.MapQuickAnnouncementTriggerKey);
             return "{" +
+                   "\"mapPersistentDeathMarkersEnabled\":" + BoolRaw(settings.MapPersistentDeathMarkersEnabled) + "," +
+                   "\"mapDeathHistoryPopupOpen\":" + BoolRaw(LegacyMainWindow.IsMapDeathHistoryPopupOpen()) + "," +
+                   "\"mapDeathHistoryPageIndex\":" + IntRaw(LegacyMainWindow.GetMapDeathHistoryPageIndex()) + "," +
                    "\"mapQuickAnnouncementEnabled\":" + BoolRaw(settings.MapQuickAnnouncementEnabled) + "," +
                    "\"mapQuickAnnouncementHotkeySlot1\":\"" + EscapeJson(hotkey.Slot1) + "\"," +
                    "\"mapQuickAnnouncementHotkeySlot2\":\"" + EscapeJson(hotkey.Slot2) + "\"," +

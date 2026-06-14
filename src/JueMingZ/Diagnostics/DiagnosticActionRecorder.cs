@@ -340,6 +340,8 @@ namespace JueMingZ.Diagnostics
                    "\"runtimeUpdateHookInstalled\":" + (HookDiagnostics.HookUpdateInstalled ? "true" : "false") + "," +
                    "\"interfaceLayerHookInstalled\":" + (HookDiagnostics.InterfaceLayerHookInstalled ? "true" : "false") + "," +
                    "\"itemCheckHookInstalled\":" + (HookDiagnostics.ItemCheckHookInstalled ? "true" : "false") + "," +
+                   "\"playerDeathHookInstalled\":" + (HookDiagnostics.PlayerDeathHookInstalled ? "true" : "false") + "," +
+                   "\"playerDeathMarkerLayerInstalled\":" + (PlayerWorldDeathMarkerDiagnostics.GetSnapshot().LayerInstalled ? "true" : "false") + "," +
                    "\"teleportRodHookInstalled\":" + (HookDiagnostics.TeleportRodHookInstalled ? "true" : "false") +
                    "}";
         }

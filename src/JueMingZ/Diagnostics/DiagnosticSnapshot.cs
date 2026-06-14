@@ -28,6 +28,64 @@ namespace JueMingZ.Diagnostics
         public string ItemCheckHookMethod { get; set; }
         public bool GoblinExecutionHookInstalled { get; set; }
         public string GoblinExecutionHookMethod { get; set; }
+        public bool PlayerWorldDeathHookInstalled { get; set; }
+        public string PlayerWorldDeathHookMethod { get; set; }
+        public string PlayerWorldDeathHookMessage { get; set; }
+        public string PlayerWorldDeathLastRecordStatus { get; set; }
+        public string PlayerWorldDeathLastRecordMessage { get; set; }
+        public string PlayerWorldDeathLastEventId { get; set; }
+        public string PlayerWorldDeathLastPairId { get; set; }
+        public int PlayerWorldDeathLastDeathCount { get; set; }
+        public bool PlayerWorldDeathHistoryReadFailed { get; set; }
+        public bool PlayerWorldDeathMarkerLayerInstalled { get; set; }
+        public string PlayerWorldDeathMarkerLayerMessage { get; set; }
+        public string PlayerWorldDeathMarkerLastStatus { get; set; }
+        public string PlayerWorldDeathMarkerLastMessage { get; set; }
+        public string PlayerWorldDeathMarkerLastPairId { get; set; }
+        public int PlayerWorldDeathMarkerCachedCount { get; set; }
+        public int PlayerWorldDeathMarkerDrawnCount { get; set; }
+        public bool PlayerWorldDeathMarkerCulledByLimit { get; set; }
+        public bool PlayerWorldDeathMarkerHistoryReadFailed { get; set; }
+        public DateTime? PlayerWorldDeathMarkerLastDrawUtc { get; set; }
+        public string PlayerWorldDeathHistoryLastStatus { get; set; }
+        public string PlayerWorldDeathHistoryLastMessage { get; set; }
+        public string PlayerWorldDeathHistoryLastPairId { get; set; }
+        public int PlayerWorldDeathHistoryDeathCount { get; set; }
+        public int PlayerWorldDeathHistoryTotalEventCount { get; set; }
+        public int PlayerWorldDeathHistoryPageIndex { get; set; }
+        public int PlayerWorldDeathHistoryPageCount { get; set; }
+        public bool PlayerWorldDeathHistorySummaryReadFailed { get; set; }
+        public bool PlayerWorldDeathHistoryPageReadFailed { get; set; }
+        public DateTime? PlayerWorldDeathHistoryLastReadUtc { get; set; }
+        public string PlayerWorldPlaytimeLastStatus { get; set; }
+        public string PlayerWorldPlaytimeLastMessage { get; set; }
+        public string PlayerWorldPlaytimeLastPairId { get; set; }
+        public double PlayerWorldPlaytimeTotalGameTicks { get; set; }
+        public int PlayerWorldPlaytimeWholeDayCount { get; set; }
+        public bool PlayerWorldPlaytimeReadFailed { get; set; }
+        public bool PlayerWorldPlaytimeWriteFailed { get; set; }
+        public double PlayerWorldPlaytimeLastDeltaGameTicks { get; set; }
+        public string PlayerWorldPlaytimeLastSkippedDeltaReason { get; set; }
+        public DateTime? PlayerWorldPlaytimeLastSampleUtc { get; set; }
+        public DateTime? PlayerWorldPlaytimeLastWriteUtc { get; set; }
+        public string PlayerWorldExplorationLastStatus { get; set; }
+        public string PlayerWorldExplorationLastMessage { get; set; }
+        public string PlayerWorldExplorationLastPairId { get; set; }
+        public int PlayerWorldExplorationWorldWidth { get; set; }
+        public int PlayerWorldExplorationWorldHeight { get; set; }
+        public long PlayerWorldExplorationTotalTileCount { get; set; }
+        public long PlayerWorldExplorationRevealedTileCount { get; set; }
+        public long PlayerWorldExplorationWorkingRevealedTileCount { get; set; }
+        public long PlayerWorldExplorationScannedTileCount { get; set; }
+        public long PlayerWorldExplorationNextTileIndex { get; set; }
+        public int PlayerWorldExplorationLastScannedTileBudget { get; set; }
+        public double PlayerWorldExplorationRevealedPercent { get; set; }
+        public bool PlayerWorldExplorationScanComplete { get; set; }
+        public bool PlayerWorldExplorationReadFailed { get; set; }
+        public bool PlayerWorldExplorationWriteFailed { get; set; }
+        public DateTime? PlayerWorldExplorationLastScanUtc { get; set; }
+        public DateTime? PlayerWorldExplorationLastCompletedScanUtc { get; set; }
+        public DateTime? PlayerWorldExplorationLastWriteUtc { get; set; }
         public bool DiagnosticsOverlayVisible { get; set; }
         public long DrawCallCount { get; set; }
         public DateTime? LastDrawUtc { get; set; }
@@ -913,6 +971,26 @@ namespace JueMingZ.Diagnostics
             DiagnosticInputSkipReason = string.Empty;
             LastGameStateReadError = string.Empty;
             ItemCheckHookMethod = string.Empty;
+            PlayerWorldDeathHookMethod = string.Empty;
+            PlayerWorldDeathHookMessage = string.Empty;
+            PlayerWorldDeathLastRecordStatus = string.Empty;
+            PlayerWorldDeathLastRecordMessage = string.Empty;
+            PlayerWorldDeathLastEventId = string.Empty;
+            PlayerWorldDeathLastPairId = string.Empty;
+            PlayerWorldDeathMarkerLayerMessage = string.Empty;
+            PlayerWorldDeathMarkerLastStatus = string.Empty;
+            PlayerWorldDeathMarkerLastMessage = string.Empty;
+            PlayerWorldDeathMarkerLastPairId = string.Empty;
+            PlayerWorldDeathHistoryLastStatus = string.Empty;
+            PlayerWorldDeathHistoryLastMessage = string.Empty;
+            PlayerWorldDeathHistoryLastPairId = string.Empty;
+            PlayerWorldPlaytimeLastStatus = string.Empty;
+            PlayerWorldPlaytimeLastMessage = string.Empty;
+            PlayerWorldPlaytimeLastPairId = string.Empty;
+            PlayerWorldPlaytimeLastSkippedDeltaReason = string.Empty;
+            PlayerWorldExplorationLastStatus = string.Empty;
+            PlayerWorldExplorationLastMessage = string.Empty;
+            PlayerWorldExplorationLastPairId = string.Empty;
             RunningActionKind = string.Empty;
             RunningActionSource = string.Empty;
             RunningActionStatus = string.Empty;

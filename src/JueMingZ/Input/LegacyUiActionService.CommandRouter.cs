@@ -343,6 +343,18 @@ namespace JueMingZ.Input
                 return;
             }
 
+            if (command.ElementId.StartsWith("map-death-history:", StringComparison.Ordinal))
+            {
+                HandleMapDeathHistoryCommand(command, command.ElementId.Substring("map-death-history:".Length));
+                return;
+            }
+
+            if (command.ElementId.StartsWith("map-persistent-death-markers-mode:", StringComparison.Ordinal))
+            {
+                HandleMapPersistentDeathMarkersMode(command, command.ElementId.Substring("map-persistent-death-markers-mode:".Length));
+                return;
+            }
+
             if (command.ElementId.StartsWith("map-quick-announcement-key:", StringComparison.Ordinal))
             {
                 HandleMapQuickAnnouncementKeySlot(command, command.ElementId.Substring("map-quick-announcement-key:".Length));
