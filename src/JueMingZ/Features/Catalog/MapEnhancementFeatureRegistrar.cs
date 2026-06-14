@@ -72,7 +72,7 @@ namespace JueMingZ.Features.Catalog
                 .DefaultEnabled(true)
                 .VisibleInMainUi(true)
                 .Implemented(true)
-                .Notes("地图加强页第四行固定信息功能；runtime 低频分片只读 Main.Map.IsRevealed(x,y)，每 10 tick 最多 4096 tile，缓存到当前 pairId 的 exploration-summary.json，不在 Draw 中扫描或写文件。")
+                .Notes("地图加强页第四行固定信息功能；runtime 按性能/快速模式用时间预算分片只读 Main.Map.IsRevealed(x,y)，缓存到当前 pairId 的 exploration-summary.json，不在 Draw 中扫描或写文件。")
                 .Build());
 
             registry.Register(FeatureDefinitionBuilder

@@ -119,6 +119,17 @@ namespace JueMingZ.Runtime
             snapshot.PlayerWorldExplorationScannedTileCount = explorationDiagnostics.ScannedTileCount;
             snapshot.PlayerWorldExplorationNextTileIndex = explorationDiagnostics.NextTileIndex;
             snapshot.PlayerWorldExplorationLastScannedTileBudget = explorationDiagnostics.LastScannedTileBudget;
+            snapshot.PlayerWorldExplorationScanMode = explorationDiagnostics.ScanMode;
+            snapshot.PlayerWorldExplorationControlState = explorationDiagnostics.ControlState;
+            snapshot.PlayerWorldExplorationPausedByUser = explorationDiagnostics.PausedByUser;
+            snapshot.PlayerWorldExplorationIdleComplete = explorationDiagnostics.IdleComplete;
+            snapshot.PlayerWorldExplorationLastScanElapsedMs = explorationDiagnostics.LastScanElapsedMs;
+            snapshot.PlayerWorldExplorationLastScanTileCount = explorationDiagnostics.LastScanTileCount;
+            snapshot.PlayerWorldExplorationCurrentTimeBudgetMs = explorationDiagnostics.CurrentTimeBudgetMs;
+            snapshot.PlayerWorldExplorationCurrentCadenceTicks = explorationDiagnostics.CurrentCadenceTicks;
+            snapshot.PlayerWorldExplorationBackoffApplied = explorationDiagnostics.BackoffApplied;
+            snapshot.PlayerWorldExplorationLastUserCommand = explorationDiagnostics.LastUserCommand;
+            snapshot.PlayerWorldExplorationAutoRescanDisabled = explorationDiagnostics.AutoRescanDisabled;
             snapshot.PlayerWorldExplorationRevealedPercent = explorationDiagnostics.RevealedPercent;
             snapshot.PlayerWorldExplorationScanComplete = explorationDiagnostics.ScanComplete;
             snapshot.PlayerWorldExplorationReadFailed = explorationDiagnostics.ReadFailed;

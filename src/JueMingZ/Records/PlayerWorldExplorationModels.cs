@@ -6,11 +6,73 @@ namespace JueMingZ.Records
     public static class PlayerWorldExplorationConstants
     {
         public const int SchemaVersion = 1;
-        public const int ScanTileBudget = 4096;
-        public const long ScanCadenceTicks = 10;
+        public const int PerformanceScanTileCap = 512;
+        public const int FastScanTileCap = 4096;
+        public const int ScanTileBudget = FastScanTileCap;
+        public const long PerformanceScanCadenceTicks = 30;
+        public const long PerformanceBackoffScanCadenceTicks = 90;
+        public const long FastScanCadenceTicks = 1;
+        public const long ScanCadenceTicks = PerformanceScanCadenceTicks;
         public const long FlushCadenceTicks = 1800;
-        public const long RescanCadenceTicks = 3600;
-        public const string ScanSemantics = "mainMapIsRevealed;chunked4096tilesPer10ticks;publishedValueUsesLastCompleteScanWhenAvailable";
+        public const double PerformanceScanTimeBudgetMs = 0.35d;
+        public const double FastScanTimeBudgetMs = 3.0d;
+        public const string ScanSemantics = "mainMapIsRevealed;modeTimedBudgetWithBackoff;manualRefreshOnlyAfterComplete;publishedValueUsesLastCompleteScanWhenAvailable";
+    }
+
+    public static class PlayerWorldExplorationScanModes
+    {
+        public const string Performance = "Performance";
+        public const string Fast = "Fast";
+
+        public static string Normalize(string value)
+        {
+            if (string.Equals(value, Fast, StringComparison.OrdinalIgnoreCase))
+            {
+                return Fast;
+            }
+
+            return Performance;
+        }
+    }
+
+    public static class PlayerWorldExplorationControlStates
+    {
+        public const string Scanning = "Scanning";
+        public const string PausedByUser = "PausedByUser";
+        public const string IdleComplete = "IdleComplete";
+    }
+
+    public sealed class PlayerWorldExplorationControlSnapshot
+    {
+        public string ScanMode { get; set; }
+        public string ControlState { get; set; }
+        public string PairId { get; set; }
+        public bool ManualRefreshPending { get; set; }
+        public bool ScanComplete { get; set; }
+        public bool HasCursor { get; set; }
+        public long ScannedTileCount { get; set; }
+        public long NextTileIndex { get; set; }
+        public long TotalTileCount { get; set; }
+        public int ScanTileCap { get; set; }
+        public double TimeBudgetMs { get; set; }
+        public long CurrentCadenceTicks { get; set; }
+        public bool BackoffApplied { get; set; }
+        public double LastScanElapsedMs { get; set; }
+        public int LastScanTileCount { get; set; }
+        public string LastUserCommand { get; set; }
+        public bool AutoRescanDisabled { get; set; }
+
+        public PlayerWorldExplorationControlSnapshot()
+        {
+            ScanMode = PlayerWorldExplorationScanModes.Performance;
+            ControlState = PlayerWorldExplorationControlStates.Scanning;
+            PairId = string.Empty;
+            ScanTileCap = PlayerWorldExplorationConstants.PerformanceScanTileCap;
+            TimeBudgetMs = PlayerWorldExplorationConstants.PerformanceScanTimeBudgetMs;
+            CurrentCadenceTicks = PlayerWorldExplorationConstants.PerformanceScanCadenceTicks;
+            LastUserCommand = string.Empty;
+            AutoRescanDisabled = true;
+        }
     }
 
     [DataContract]
@@ -104,6 +166,16 @@ namespace JueMingZ.Records
         public long ScannedTileCount { get; set; }
         public long NextTileIndex { get; set; }
         public int LastScannedTileBudget { get; set; }
+        public string ScanMode { get; set; }
+        public string ControlState { get; set; }
+        public int ScanTileCap { get; set; }
+        public double TimeBudgetMs { get; set; }
+        public long CurrentCadenceTicks { get; set; }
+        public bool BackoffApplied { get; set; }
+        public double LastScanElapsedMs { get; set; }
+        public int LastScanTileCount { get; set; }
+        public string LastUserCommand { get; set; }
+        public bool AutoRescanDisabled { get; set; }
         public bool ScanComplete { get; set; }
         public double RevealedPercent { get; set; }
         public int DataSignature { get; set; }
@@ -117,6 +189,13 @@ namespace JueMingZ.Records
             Status = string.Empty;
             Message = string.Empty;
             PairId = string.Empty;
+            ScanMode = PlayerWorldExplorationScanModes.Performance;
+            ControlState = PlayerWorldExplorationControlStates.Scanning;
+            ScanTileCap = PlayerWorldExplorationConstants.PerformanceScanTileCap;
+            TimeBudgetMs = PlayerWorldExplorationConstants.PerformanceScanTimeBudgetMs;
+            CurrentCadenceTicks = PlayerWorldExplorationConstants.PerformanceScanCadenceTicks;
+            LastUserCommand = string.Empty;
+            AutoRescanDisabled = true;
             LastReadUtc = DateTime.UtcNow;
         }
     }
@@ -141,6 +220,16 @@ namespace JueMingZ.Records
         public long NextTileIndex { get; set; }
         public int TilesScannedThisTick { get; set; }
         public int RevealedTilesThisTick { get; set; }
+        public string ScanMode { get; set; }
+        public string ControlState { get; set; }
+        public int ScanTileCap { get; set; }
+        public double TimeBudgetMs { get; set; }
+        public long CurrentCadenceTicks { get; set; }
+        public bool BackoffApplied { get; set; }
+        public double LastScanElapsedMs { get; set; }
+        public int LastScanTileCount { get; set; }
+        public string LastUserCommand { get; set; }
+        public bool AutoRescanDisabled { get; set; }
         public double RevealedPercent { get; set; }
         public DateTime? LastScanUtc { get; set; }
         public DateTime? LastCompletedScanUtc { get; set; }
@@ -151,6 +240,13 @@ namespace JueMingZ.Records
             Status = string.Empty;
             Message = string.Empty;
             PairId = string.Empty;
+            ScanMode = PlayerWorldExplorationScanModes.Performance;
+            ControlState = PlayerWorldExplorationControlStates.Scanning;
+            ScanTileCap = PlayerWorldExplorationConstants.PerformanceScanTileCap;
+            TimeBudgetMs = PlayerWorldExplorationConstants.PerformanceScanTimeBudgetMs;
+            CurrentCadenceTicks = PlayerWorldExplorationConstants.PerformanceScanCadenceTicks;
+            LastUserCommand = string.Empty;
+            AutoRescanDisabled = true;
         }
     }
 }

@@ -99,10 +99,14 @@ namespace JueMingZ.Tests
 
         private static void LegacyMapPersistentDeathMarkersTooltipMatchesRequestedWording()
         {
-            AssertStringEquals(
-                LegacyMainWindow.GetMapPersistentDeathMarkersTooltipForTesting(),
-                "大地图常驻显示死亡点",
-                "persistent death markers map page tooltip");
+            var tooltips = LegacyMainWindow.GetMapPersistentDeathMarkersButtonTooltipsForTesting();
+            if (tooltips == null || tooltips.Length != 2)
+            {
+                throw new InvalidOperationException("Persistent death marker tooltip test contract must expose two button slots.");
+            }
+
+            AssertStringEquals(tooltips[0], "大地图常驻显示死亡点", "persistent death markers on tooltip");
+            AssertStringEquals(tooltips[1], string.Empty, "persistent death markers off tooltip");
         }
 
         private static void PlayerWorldDeathMarkerCacheReadsOwnJsonlAndLimitsMarkers()

@@ -1,6 +1,7 @@
 using System;
 using JueMingZ.Common;
 using JueMingZ.Config;
+using JueMingZ.Records;
 using JueMingZ.UI.Legacy;
 
 namespace JueMingZ.Input
@@ -96,6 +97,64 @@ namespace JueMingZ.Input
                 "Button");
         }
 
+        private static void HandleMapRevealedAreaRatioCommand(LegacyUiCommand command, string action)
+        {
+            var before = BuildMapEnhancementUiStateJson();
+            action = (action ?? string.Empty).Trim();
+            var outcome = "Succeeded";
+            var message = "Map revealed area ratio command handled.";
+
+            if (string.Equals(action, "toggle", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(action, "value", StringComparison.OrdinalIgnoreCase))
+            {
+                LegacyMainWindow.ToggleMapRevealedAreaDetailsPopup();
+                message = LegacyMainWindow.IsMapRevealedAreaDetailsPopupOpen()
+                    ? "Map revealed area details popup opened."
+                    : "Map revealed area details popup closed.";
+            }
+            else if (string.Equals(action, "close", StringComparison.OrdinalIgnoreCase))
+            {
+                LegacyMainWindow.CloseMapRevealedAreaDetailsPopup();
+                message = "Map revealed area details popup closed.";
+            }
+            else if (action.StartsWith("mode:", StringComparison.OrdinalIgnoreCase))
+            {
+                var mode = NormalizeMapRevealedAreaCommandMode(action.Substring("mode:".Length));
+                PlayerWorldExplorationService.SetMode(mode);
+                message = "Map revealed area scan mode switched to " + mode + ".";
+            }
+            else if (string.Equals(action, "pause", StringComparison.OrdinalIgnoreCase))
+            {
+                PlayerWorldExplorationService.PauseScanning();
+                message = "Map revealed area scan paused.";
+            }
+            else if (string.Equals(action, "start", StringComparison.OrdinalIgnoreCase))
+            {
+                PlayerWorldExplorationService.StartScanning();
+                message = "Map revealed area scan started.";
+            }
+            else
+            {
+                outcome = "Rejected";
+                message = "Map revealed area command rejected because the action was invalid.";
+            }
+
+            var control = PlayerWorldExplorationService.GetControlSnapshot();
+            var modeAfter = control == null ? string.Empty : control.ScanMode;
+            var paused = control != null &&
+                         string.Equals(control.ControlState, PlayerWorldExplorationControlStates.PausedByUser, StringComparison.Ordinal);
+            Record(
+                command,
+                "Ui.MapRevealedAreaRatio." + (string.IsNullOrWhiteSpace(action) ? "Invalid" : action),
+                "UI",
+                outcome,
+                message,
+                before,
+                BuildMapEnhancementUiStateJson(),
+                "{\"submitted\":false,\"implemented\":true,\"featureId\":\"" + EscapeJson(FeatureIds.MapRevealedAreaRatio) + "\",\"action\":\"" + EscapeJson(action) + "\",\"mode\":\"" + EscapeJson(modeAfter) + "\",\"paused\":" + BoolRaw(paused) + ",\"popupOpen\":" + BoolRaw(LegacyMainWindow.IsMapRevealedAreaDetailsPopupOpen()) + ",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                "Button");
+        }
+
         private static void HandleMapQuickAnnouncementKeySlot(LegacyUiCommand command, string slot)
         {
             var before = BuildMapQuickAnnouncementUiStateJson();
@@ -155,10 +214,14 @@ namespace JueMingZ.Input
                 settings.MapQuickAnnouncementHotkeySlot1,
                 settings.MapQuickAnnouncementHotkeySlot2,
                 settings.MapQuickAnnouncementTriggerKey);
+            var exploration = PlayerWorldExplorationService.GetControlSnapshot();
             return "{" +
                    "\"mapPersistentDeathMarkersEnabled\":" + BoolRaw(settings.MapPersistentDeathMarkersEnabled) + "," +
                    "\"mapDeathHistoryPopupOpen\":" + BoolRaw(LegacyMainWindow.IsMapDeathHistoryPopupOpen()) + "," +
                    "\"mapDeathHistoryPageIndex\":" + IntRaw(LegacyMainWindow.GetMapDeathHistoryPageIndex()) + "," +
+                   "\"mapRevealedAreaDetailsPopupOpen\":" + BoolRaw(LegacyMainWindow.IsMapRevealedAreaDetailsPopupOpen()) + "," +
+                   "\"mapRevealedAreaScanMode\":\"" + EscapeJson(exploration == null ? string.Empty : exploration.ScanMode) + "\"," +
+                   "\"mapRevealedAreaControlState\":\"" + EscapeJson(exploration == null ? string.Empty : exploration.ControlState) + "\"," +
                    "\"mapQuickAnnouncementEnabled\":" + BoolRaw(settings.MapQuickAnnouncementEnabled) + "," +
                    "\"mapQuickAnnouncementHotkeySlot1\":\"" + EscapeJson(hotkey.Slot1) + "\"," +
                    "\"mapQuickAnnouncementHotkeySlot2\":\"" + EscapeJson(hotkey.Slot2) + "\"," +
@@ -167,6 +230,17 @@ namespace JueMingZ.Input
                    "\"mapQuickAnnouncementCooldownMilliseconds\":" + IntRaw(MapQuickAnnouncementSettings.NormalizeCooldownMilliseconds(settings.MapQuickAnnouncementCooldownMilliseconds, MapQuickAnnouncementSettings.DefaultCooldownMilliseconds)) + "," +
                    "\"mapQuickAnnouncementAirCooldownMilliseconds\":" + IntRaw(MapQuickAnnouncementSettings.NormalizeCooldownMilliseconds(settings.MapQuickAnnouncementAirCooldownMilliseconds, MapQuickAnnouncementSettings.DefaultAirCooldownMilliseconds)) +
                    "}";
+        }
+
+        private static string NormalizeMapRevealedAreaCommandMode(string mode)
+        {
+            if (string.Equals(mode, "fast", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(mode, PlayerWorldExplorationScanModes.Fast, StringComparison.OrdinalIgnoreCase))
+            {
+                return PlayerWorldExplorationScanModes.Fast;
+            }
+
+            return PlayerWorldExplorationScanModes.Performance;
         }
     }
 }

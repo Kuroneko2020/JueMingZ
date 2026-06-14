@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Globalization;
 using JueMingZ.Diagnostics;
 using JueMingZ.GameState;
@@ -11,7 +12,6 @@ namespace JueMingZ.Records
         internal const int ScanTileBudget = PlayerWorldExplorationConstants.ScanTileBudget;
         internal const long ScanCadenceTicks = PlayerWorldExplorationConstants.ScanCadenceTicks;
         internal const long FlushCadenceTicks = PlayerWorldExplorationConstants.FlushCadenceTicks;
-        internal const long RescanCadenceTicks = PlayerWorldExplorationConstants.RescanCadenceTicks;
 
         private static readonly object SyncRoot = new object();
         private static IPlayerWorldExplorationMapReader _mapReader = PlayerWorldExplorationMapReader.Instance;
@@ -20,7 +20,16 @@ namespace JueMingZ.Records
         private static bool _dirty;
         private static long _nextScanTick;
         private static long _nextFlushTick;
-        private static long _nextRescanTick;
+        private static string _scanMode = PlayerWorldExplorationScanModes.Performance;
+        private static string _controlState = PlayerWorldExplorationControlStates.Scanning;
+        private static bool _manualRefreshRequested;
+        private static double _lastScanElapsedMs;
+        private static int _lastScanTileCap = PlayerWorldExplorationConstants.PerformanceScanTileCap;
+        private static int _lastScanTileCount;
+        private static double _lastTimeBudgetMs = PlayerWorldExplorationConstants.PerformanceScanTimeBudgetMs;
+        private static long _lastCadenceTicks = PlayerWorldExplorationConstants.PerformanceScanCadenceTicks;
+        private static bool _lastBackoffApplied;
+        private static string _lastUserCommand = "none";
         private static int _lastStateSignature;
         private static DateTime? _lastWriteUtc;
 
@@ -42,7 +51,7 @@ namespace JueMingZ.Records
             }
 
             PlayerWorldIdentityResolution identity;
-            if (!PlayerWorldIdentityResolver.TryResolveCurrent(out identity) ||
+            if (!PlayerWorldIdentityRuntimeCache.TryResolveCurrentCached(runtimeTick, out identity) ||
                 identity == null ||
                 !identity.IsResolved ||
                 string.IsNullOrWhiteSpace(identity.PairId))
@@ -71,6 +80,57 @@ namespace JueMingZ.Records
             lock (SyncRoot)
             {
                 FlushLocked("explicitFlush");
+            }
+        }
+
+        public static PlayerWorldExplorationControlSnapshot SetMode(string mode)
+        {
+            lock (SyncRoot)
+            {
+                var normalized = PlayerWorldExplorationScanModes.Normalize(mode);
+                _lastUserCommand = "setMode:" + normalized;
+                if (!string.Equals(_scanMode, normalized, StringComparison.Ordinal))
+                {
+                    _scanMode = normalized;
+                }
+
+                UpdateStateSignatureLocked();
+                return BuildControlSnapshotLocked();
+            }
+        }
+
+        public static PlayerWorldExplorationControlSnapshot PauseScanning()
+        {
+            lock (SyncRoot)
+            {
+                _manualRefreshRequested = false;
+                _controlState = PlayerWorldExplorationControlStates.PausedByUser;
+                _lastUserCommand = "pause";
+                FlushLocked("pausedByUser");
+                _nextScanTick = 0;
+                UpdateStateSignatureLocked();
+                return BuildControlSnapshotLocked();
+            }
+        }
+
+        public static PlayerWorldExplorationControlSnapshot StartScanning()
+        {
+            lock (SyncRoot)
+            {
+                _controlState = PlayerWorldExplorationControlStates.Scanning;
+                _manualRefreshRequested = true;
+                _lastUserCommand = "start";
+                _nextScanTick = 0;
+                UpdateStateSignatureLocked();
+                return BuildControlSnapshotLocked();
+            }
+        }
+
+        public static PlayerWorldExplorationControlSnapshot GetControlSnapshot()
+        {
+            lock (SyncRoot)
+            {
+                return BuildControlSnapshotLocked();
             }
         }
 
@@ -129,7 +189,16 @@ namespace JueMingZ.Records
                 _dirty = false;
                 _nextScanTick = 0;
                 _nextFlushTick = 0;
-                _nextRescanTick = 0;
+                _scanMode = PlayerWorldExplorationScanModes.Performance;
+                _controlState = PlayerWorldExplorationControlStates.Scanning;
+                _manualRefreshRequested = false;
+                _lastScanElapsedMs = 0d;
+                _lastScanTileCap = PlayerWorldExplorationConstants.PerformanceScanTileCap;
+                _lastScanTileCount = 0;
+                _lastTimeBudgetMs = PlayerWorldExplorationConstants.PerformanceScanTimeBudgetMs;
+                _lastCadenceTicks = PlayerWorldExplorationConstants.PerformanceScanCadenceTicks;
+                _lastBackoffApplied = false;
+                _lastUserCommand = "none";
                 _lastStateSignature = 0;
                 _lastWriteUtc = null;
             }
@@ -140,6 +209,7 @@ namespace JueMingZ.Records
             lock (SyncRoot)
             {
                 FlushLocked(reason);
+                PrepareCheapDiagnosticsLocked();
                 RecordDiagnosticsLocked(BuildResult(
                     false,
                     false,
@@ -156,7 +226,11 @@ namespace JueMingZ.Records
                 _dirty = false;
                 _nextScanTick = 0;
                 _nextFlushTick = 0;
-                _nextRescanTick = 0;
+                _manualRefreshRequested = false;
+                if (!IsPausedByUserLocked())
+                {
+                    _controlState = PlayerWorldExplorationControlStates.Scanning;
+                }
             }
         }
 
@@ -170,6 +244,7 @@ namespace JueMingZ.Records
         {
             if (string.IsNullOrWhiteSpace(pairId))
             {
+                PrepareCheapDiagnosticsLocked();
                 var failed = BuildResult(false, false, false, false, false, false, "identityUnavailable", "pairId unavailable", 0, 0);
                 RecordDiagnosticsLocked(failed);
                 return failed;
@@ -177,6 +252,7 @@ namespace JueMingZ.Records
 
             if (reader == null || width <= 0 || height <= 0)
             {
+                PrepareCheapDiagnosticsLocked();
                 var failed = BuildResult(false, true, false, false, false, false, "mapUnavailable", "world size unavailable", 0, 0);
                 RecordDiagnosticsLocked(failed);
                 return failed;
@@ -192,24 +268,47 @@ namespace JueMingZ.Records
             if (_currentFile.WorldWidth != width || _currentFile.WorldHeight != height)
             {
                 ResetFileLocked(pairId, width, height, "worldSizeChanged", false);
+                if (!IsPausedByUserLocked())
+                {
+                    _controlState = PlayerWorldExplorationControlStates.Scanning;
+                }
+            }
+
+            if (IsPausedByUserLocked())
+            {
+                PrepareCheapDiagnosticsLocked();
+                var paused = BuildResult(true, true, false, _currentFile.ScanComplete, false, false, "pausedByUser", "scan paused by user", 0, 0);
+                RecordDiagnosticsLocked(paused);
+                UpdateStateSignatureLocked();
+                return paused;
             }
 
             if (_currentFile.ScanComplete)
             {
-                if (_nextRescanTick <= 0)
+                if (!_manualRefreshRequested)
                 {
-                    _nextRescanTick = runtimeTick + RescanCadenceTicks;
-                }
-
-                if (!forceFlush && runtimeTick < _nextRescanTick)
-                {
-                    _nextScanTick = runtimeTick + ScanCadenceTicks;
-                    var complete = BuildResult(true, true, false, true, false, false, "complete", "last scan complete", 0, 0);
+                    int idleTileCap;
+                    long idleCadenceTicks;
+                    long idleBackoffCadenceTicks;
+                    double idleTimeBudgetMs;
+                    GetScanBudgetLocked(out idleTileCap, out idleCadenceTicks, out idleBackoffCadenceTicks, out idleTimeBudgetMs);
+                    _controlState = PlayerWorldExplorationControlStates.IdleComplete;
+                    SetLastScanBudgetDiagnosticsLocked(idleTileCap, idleTimeBudgetMs, idleCadenceTicks, false, 0d, 0);
+                    _nextScanTick = runtimeTick + idleCadenceTicks;
+                    var complete = BuildResult(true, true, false, true, false, false, "idleComplete", "last scan complete", 0, 0);
                     RecordDiagnosticsLocked(complete);
+                    UpdateStateSignatureLocked();
                     return complete;
                 }
 
-                ResetFileLocked(pairId, width, height, "rescan", true);
+                _manualRefreshRequested = false;
+                _controlState = PlayerWorldExplorationControlStates.Scanning;
+                ResetFileLocked(pairId, width, height, "manualRefresh", true);
+            }
+            else
+            {
+                _manualRefreshRequested = false;
+                _controlState = PlayerWorldExplorationControlStates.Scanning;
             }
 
             var total = CalculateTotal(width, height);
@@ -218,8 +317,16 @@ namespace JueMingZ.Records
             var scanFailed = false;
             var scanMessage = string.Empty;
             var now = DateTime.UtcNow;
+            int scanTileCap;
+            long scanCadenceTicks;
+            long backoffCadenceTicks;
+            double timeBudgetMs;
+            GetScanBudgetLocked(out scanTileCap, out scanCadenceTicks, out backoffCadenceTicks, out timeBudgetMs);
+            var timeBudgetTicks = MillisecondsToStopwatchTicks(timeBudgetMs);
+            var scanTimer = Stopwatch.StartNew();
+            var timeBudgetReached = false;
 
-            while (tilesScanned < ScanTileBudget && _currentFile.NextTileIndex < total)
+            while (tilesScanned < scanTileCap && _currentFile.NextTileIndex < total)
             {
                 var index = _currentFile.NextTileIndex;
                 var x = (int)(index % width);
@@ -241,10 +348,18 @@ namespace JueMingZ.Records
                     _currentFile.WorkingRevealedTileCount++;
                     revealedThisTick++;
                 }
+
+                if (_currentFile.NextTileIndex < total && scanTimer.ElapsedTicks >= timeBudgetTicks)
+                {
+                    timeBudgetReached = true;
+                    break;
+                }
             }
 
+            scanTimer.Stop();
+            var elapsedMs = StopwatchTicksToMilliseconds(scanTimer.ElapsedTicks);
             _currentFile.LastScanUtc = FormatUtc(now);
-            _currentFile.LastScannedTileBudget = ScanTileBudget;
+            _currentFile.LastScannedTileBudget = scanTileCap;
             _currentFile.TotalTileCount = total;
             ClampCounters(_currentFile);
             if (string.IsNullOrWhiteSpace(_currentFile.LastCompletedScanUtc))
@@ -260,11 +375,15 @@ namespace JueMingZ.Records
                 _currentFile.NextTileIndex = total;
                 _currentFile.RevealedTileCount = _currentFile.WorkingRevealedTileCount;
                 _currentFile.LastCompletedScanUtc = FormatUtc(now);
-                _nextRescanTick = runtimeTick + RescanCadenceTicks;
+                _controlState = PlayerWorldExplorationControlStates.IdleComplete;
+                _manualRefreshRequested = false;
             }
 
             _dirty = _dirty || tilesScanned > 0 || scanFailed || completedThisTick;
-            _nextScanTick = runtimeTick + ScanCadenceTicks;
+            var backoffApplied = ShouldApplyPerformanceBackoff(timeBudgetReached, completedThisTick, scanFailed);
+            var currentCadenceTicks = backoffApplied ? backoffCadenceTicks : scanCadenceTicks;
+            _nextScanTick = runtimeTick + currentCadenceTicks;
+            SetLastScanBudgetDiagnosticsLocked(scanTileCap, timeBudgetMs, currentCadenceTicks, backoffApplied, elapsedMs, tilesScanned);
             UpdateStateSignatureLocked();
 
             var flushAttempted = forceFlush || completedThisTick || runtimeTick >= _nextFlushTick;
@@ -306,7 +425,13 @@ namespace JueMingZ.Records
             _dirty = false;
             _lastWriteUtc = TryParseUtc(_currentFile.LastUpdatedUtc);
             _nextFlushTick = 0;
-            _nextRescanTick = 0;
+            _manualRefreshRequested = false;
+            if (!IsPausedByUserLocked())
+            {
+                _controlState = _currentFile != null && _currentFile.ScanComplete
+                    ? PlayerWorldExplorationControlStates.IdleComplete
+                    : PlayerWorldExplorationControlStates.Scanning;
+            }
             UpdateStateSignatureLocked();
         }
 
@@ -480,6 +605,16 @@ namespace JueMingZ.Records
                 LastWriteUtc = writeUtc
             };
             result.RevealedPercent = CalculatePercent(result.RevealedTileCount, result.TotalTileCount);
+            result.ScanMode = _scanMode;
+            result.ControlState = _controlState;
+            result.ScanTileCap = _lastScanTileCap;
+            result.TimeBudgetMs = _lastTimeBudgetMs;
+            result.CurrentCadenceTicks = _lastCadenceTicks;
+            result.BackoffApplied = _lastBackoffApplied;
+            result.LastScanElapsedMs = _lastScanElapsedMs;
+            result.LastScanTileCount = _lastScanTileCount;
+            result.LastUserCommand = _lastUserCommand;
+            result.AutoRescanDisabled = true;
             result.DataSignature = BuildSignature(result);
             return result;
         }
@@ -516,6 +651,16 @@ namespace JueMingZ.Records
                 NextTileIndex = _currentFile == null ? 0L : _currentFile.NextTileIndex,
                 TilesScannedThisTick = Math.Max(0, tilesScanned),
                 RevealedTilesThisTick = Math.Max(0, revealedThisTick),
+                ScanMode = _scanMode,
+                ControlState = _controlState,
+                ScanTileCap = _lastScanTileCap,
+                TimeBudgetMs = _lastTimeBudgetMs,
+                CurrentCadenceTicks = _lastCadenceTicks,
+                BackoffApplied = _lastBackoffApplied,
+                LastScanElapsedMs = _lastScanElapsedMs,
+                LastScanTileCount = _lastScanTileCount,
+                LastUserCommand = _lastUserCommand,
+                AutoRescanDisabled = true,
                 LastScanUtc = _currentFile == null ? null : TryParseUtc(_currentFile.LastScanUtc),
                 LastCompletedScanUtc = _currentFile == null ? null : TryParseUtc(_currentFile.LastCompletedScanUtc),
                 LastWriteUtc = _lastWriteUtc
@@ -543,6 +688,17 @@ namespace JueMingZ.Records
                 result.ScannedTileCount,
                 result.NextTileIndex,
                 result.TilesScannedThisTick,
+                result.ScanMode,
+                result.ControlState,
+                string.Equals(result.ControlState, PlayerWorldExplorationControlStates.PausedByUser, StringComparison.Ordinal),
+                string.Equals(result.ControlState, PlayerWorldExplorationControlStates.IdleComplete, StringComparison.Ordinal),
+                result.LastScanElapsedMs,
+                result.TilesScannedThisTick,
+                result.TimeBudgetMs,
+                result.CurrentCadenceTicks,
+                result.BackoffApplied,
+                result.LastUserCommand,
+                result.AutoRescanDisabled,
                 result.RevealedPercent,
                 result.ScanComplete,
                 result.ReadFailed,
@@ -574,8 +730,125 @@ namespace JueMingZ.Records
                 hash = hash * 31 + (result != null && result.ScanComplete ? 1 : 0);
                 hash = hash * 31 + (result != null && result.ReadFailed ? 1 : 0);
                 hash = hash * 31 + (result != null && result.WriteFailed ? 1 : 0);
+                hash = hash * 31 + StringComparer.Ordinal.GetHashCode(result == null ? string.Empty : result.ScanMode ?? string.Empty);
+                hash = hash * 31 + StringComparer.Ordinal.GetHashCode(result == null ? string.Empty : result.ControlState ?? string.Empty);
+                hash = hash * 31 + (result == null ? 0 : result.ScanTileCap);
+                hash = hash * 31 + (result == null ? 0 : result.TimeBudgetMs.GetHashCode());
+                hash = hash * 31 + (result == null ? 0 : result.CurrentCadenceTicks.GetHashCode());
+                hash = hash * 31 + (result != null && result.BackoffApplied ? 1 : 0);
+                hash = hash * 31 + StringComparer.Ordinal.GetHashCode(result == null ? string.Empty : result.LastUserCommand ?? string.Empty);
                 return hash;
             }
+        }
+
+        private static bool IsPausedByUserLocked()
+        {
+            return string.Equals(_controlState, PlayerWorldExplorationControlStates.PausedByUser, StringComparison.Ordinal);
+        }
+
+        private static PlayerWorldExplorationControlSnapshot BuildControlSnapshotLocked()
+        {
+            var file = _currentFile;
+            return new PlayerWorldExplorationControlSnapshot
+            {
+                ScanMode = _scanMode,
+                ControlState = _controlState,
+                PairId = _currentPairId ?? string.Empty,
+                ManualRefreshPending = _manualRefreshRequested,
+                ScanComplete = file != null && file.ScanComplete,
+                HasCursor = file != null && !file.ScanComplete && file.NextTileIndex > 0L,
+                ScannedTileCount = file == null ? 0L : file.ScannedTileCount,
+                NextTileIndex = file == null ? 0L : file.NextTileIndex,
+                TotalTileCount = file == null ? 0L : file.TotalTileCount,
+                ScanTileCap = _lastScanTileCap,
+                TimeBudgetMs = _lastTimeBudgetMs,
+                CurrentCadenceTicks = _lastCadenceTicks,
+                BackoffApplied = _lastBackoffApplied,
+                LastScanElapsedMs = _lastScanElapsedMs,
+                LastUserCommand = _lastUserCommand,
+                AutoRescanDisabled = true
+            };
+        }
+
+        private static void PrepareCheapDiagnosticsLocked()
+        {
+            int tileCap;
+            long cadenceTicks;
+            long backoffCadenceTicks;
+            double timeBudgetMs;
+            GetScanBudgetLocked(out tileCap, out cadenceTicks, out backoffCadenceTicks, out timeBudgetMs);
+            SetLastScanBudgetDiagnosticsLocked(tileCap, timeBudgetMs, cadenceTicks, false, 0d, 0);
+        }
+
+        private static void GetScanBudgetLocked(
+            out int tileCap,
+            out long cadenceTicks,
+            out long backoffCadenceTicks,
+            out double timeBudgetMs)
+        {
+            if (string.Equals(_scanMode, PlayerWorldExplorationScanModes.Fast, StringComparison.Ordinal))
+            {
+                tileCap = PlayerWorldExplorationConstants.FastScanTileCap;
+                cadenceTicks = PlayerWorldExplorationConstants.FastScanCadenceTicks;
+                backoffCadenceTicks = PlayerWorldExplorationConstants.FastScanCadenceTicks;
+                timeBudgetMs = PlayerWorldExplorationConstants.FastScanTimeBudgetMs;
+                return;
+            }
+
+            tileCap = PlayerWorldExplorationConstants.PerformanceScanTileCap;
+            cadenceTicks = PlayerWorldExplorationConstants.PerformanceScanCadenceTicks;
+            backoffCadenceTicks = PlayerWorldExplorationConstants.PerformanceBackoffScanCadenceTicks;
+            timeBudgetMs = PlayerWorldExplorationConstants.PerformanceScanTimeBudgetMs;
+        }
+
+        private static bool ShouldApplyPerformanceBackoff(bool timeBudgetReached, bool completedThisTick, bool scanFailed)
+        {
+            return timeBudgetReached &&
+                !completedThisTick &&
+                !scanFailed &&
+                string.Equals(_scanMode, PlayerWorldExplorationScanModes.Performance, StringComparison.Ordinal);
+        }
+
+        private static void SetLastScanBudgetDiagnosticsLocked(
+            int tileCap,
+            double timeBudgetMs,
+            long cadenceTicks,
+            bool backoffApplied,
+            double elapsedMs,
+            int tileCount)
+        {
+            _lastScanTileCap = Math.Max(0, tileCap);
+            _lastTimeBudgetMs = Math.Max(0d, timeBudgetMs);
+            _lastCadenceTicks = Math.Max(0L, cadenceTicks);
+            _lastBackoffApplied = backoffApplied;
+            _lastScanElapsedMs = Math.Max(0d, elapsedMs);
+            _lastScanTileCount = Math.Max(0, tileCount);
+        }
+
+        private static long MillisecondsToStopwatchTicks(double milliseconds)
+        {
+            if (milliseconds <= 0d)
+            {
+                return 1L;
+            }
+
+            var ticks = milliseconds * Stopwatch.Frequency / 1000d;
+            if (ticks >= long.MaxValue)
+            {
+                return long.MaxValue;
+            }
+
+            return Math.Max(1L, (long)Math.Ceiling(ticks));
+        }
+
+        private static double StopwatchTicksToMilliseconds(long ticks)
+        {
+            if (ticks <= 0L || Stopwatch.Frequency <= 0L)
+            {
+                return 0d;
+            }
+
+            return ticks * 1000d / Stopwatch.Frequency;
         }
 
         private static long CalculateTotal(int width, int height)

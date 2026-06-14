@@ -54,6 +54,31 @@ namespace JueMingZ.Records
             return TryResolve(facts, out resolution);
         }
 
+        internal static bool TryPersistResolved(PlayerWorldIdentityResolution resolution)
+        {
+            if (resolution == null ||
+                !resolution.IsResolved ||
+                string.IsNullOrWhiteSpace(resolution.PlayerId) ||
+                string.IsNullOrWhiteSpace(resolution.WorldId) ||
+                string.IsNullOrWhiteSpace(resolution.PairId))
+            {
+                return false;
+            }
+
+            try
+            {
+                PersistIdentityFiles(resolution);
+                return resolution.IdentityFilesWritten;
+            }
+            catch (Exception error)
+            {
+                resolution.IdentityFilesWritten = false;
+                resolution.StorageMessage = error.GetType().Name + ": " + error.Message;
+                resolution.DiagnosticSummary = BuildDiagnosticSummary(resolution);
+                return false;
+            }
+        }
+
         private static bool TryBuildCurrentFacts(out PlayerWorldIdentityFacts facts, out string failureReason)
         {
             facts = null;

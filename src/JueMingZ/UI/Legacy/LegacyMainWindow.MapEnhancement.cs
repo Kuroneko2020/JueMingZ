@@ -11,9 +11,9 @@ namespace JueMingZ.UI.Legacy
     public static partial class LegacyMainWindow
     {
         private const string MapPersistentDeathMarkersTooltip = "大地图常驻显示死亡点";
-        private const string MapDeathHistoryDetailsTooltip = "分页查看当前玩家-世界死亡记录";
         private const string MapWorldDayCountTooltip = "当前玩家-世界累计游戏天数";
         private const string MapRevealedAreaRatioTooltip = "当前玩家-世界地图揭示区域占比";
+        private const string MapRevealedAreaRatioClickTooltip = "点击打开详情";
         private const string MapQuickAnnouncementKeyboardSlotTooltip = "双击进行改键，不支持鼠标按键";
         private const string MapQuickAnnouncementTriggerSlotTooltip = "双击进行改键，支持鼠标按键";
         private const string MapQuickAnnouncementOnTooltip = "按下快捷键对鼠标位置内容进行广播";
@@ -25,6 +25,7 @@ namespace JueMingZ.UI.Legacy
             var hovered = (LegacyUiElement)null;
             var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
             _mapDeathHistoryAnchorVisible = false;
+            _mapRevealedAreaDetailsAnchorVisible = false;
             UpdateMapQuickAnnouncementHotkeyCapture(settings);
 
             hovered = DrawMapPersistentDeathMarkersRow(spriteBatch, area, mouse, elements, 0, settings) ?? hovered;
@@ -37,6 +38,7 @@ namespace JueMingZ.UI.Legacy
             hovered = DrawMapQuickAnnouncementRow(spriteBatch, area, mouse, elements, LegacyUiMetrics.RowHeight * 4 + LegacyUiMetrics.SettingRowGap * 4, settings) ?? hovered;
             DrawMapEnhancementFuturePlaceholder(spriteBatch, area, LegacyUiMetrics.RowHeight * 5 + LegacyUiMetrics.SettingRowGap * 5);
             RegisterMapDeathHistoryPopupOverlay(area);
+            RegisterMapRevealedAreaDetailsPopupOverlay(area, exploration);
             return hovered;
         }
 
@@ -54,7 +56,7 @@ namespace JueMingZ.UI.Legacy
                 new[] { "开启", "关闭" },
                 new[] { "On", "Off" },
                 "map-persistent-death-markers-mode:",
-                new[] { MapPersistentDeathMarkersTooltip, MapPersistentDeathMarkersTooltip });
+                new[] { MapPersistentDeathMarkersTooltip, string.Empty });
         }
 
         private static LegacyUiElement DrawMapDeathHistoryRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, PlayerWorldDeathHistoryReadResult summary)
@@ -121,7 +123,7 @@ namespace JueMingZ.UI.Legacy
                 Bounds = detailsRect,
                 Selected = _mapDeathHistoryPopupOpen,
                 TextScale = 0.76f,
-                TooltipLines = BuildMapDeathHistoryTooltipLines(summary)
+                TooltipLines = null
             }.Draw(context);
 
             if (_mapDeathHistoryPopupOpen)
@@ -141,21 +143,6 @@ namespace JueMingZ.UI.Legacy
             }
 
             return Math.Max(0, summary.DeathCount).ToString(CultureInfo.InvariantCulture) + " 次";
-        }
-
-        private static string[] BuildMapDeathHistoryTooltipLines(PlayerWorldDeathHistoryReadResult summary)
-        {
-            if (summary == null || !summary.IdentityResolved)
-            {
-                return new[] { "当前玩家-世界身份不可用" };
-            }
-
-            if (summary.SummaryReadFailed || summary.HistoryReadFailed)
-            {
-                return new[] { MapDeathHistoryDetailsTooltip, "部分历史读取失败，已跳过损坏记录" };
-            }
-
-            return new[] { MapDeathHistoryDetailsTooltip };
         }
 
         private static LegacyUiElement DrawMapWorldDayCountRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, PlayerWorldPlaytimeReadResult playtime)
@@ -282,37 +269,28 @@ namespace JueMingZ.UI.Legacy
                 255,
                 0.86f);
 
-            LegacyUiTheme.DrawButtonClipped(spriteBatch, countRect, false, false, true, false, area.Viewport);
-            UiTextRenderer.DrawCenteredTextClipped(
-                spriteBatch,
-                BuildMapRevealedAreaRatioText(exploration),
-                countRect.X + 3,
-                countRect.Y,
-                countRect.Width - 6,
-                countRect.Height,
-                area.Viewport.X,
-                area.Viewport.Y,
-                area.Viewport.Width,
-                area.Viewport.Height,
-                255,
-                245,
-                205,
-                255,
-                0.76f);
-
             var hit = countRect.Intersect(area.Viewport);
             var elementRect = hit.Width > 0 && hit.Height > 0 ? hit : countRect;
-            var element = new LegacyUiElement
+            var element = new LegacyButtonControl
             {
-                Id = "map-revealed-area-ratio:value",
+                Id = "map-revealed-area-ratio:toggle",
                 Label = "揭示区域",
-                Kind = "info",
-                Rect = elementRect,
-                Enabled = false,
+                Text = BuildMapRevealedAreaRatioText(exploration),
+                ElementLabel = "揭示区域:详情",
+                Kind = "button",
+                Bounds = elementRect,
+                Selected = _mapRevealedAreaDetailsPopupOpen,
+                TextScale = 0.76f,
                 TooltipLines = BuildMapRevealedAreaRatioTooltipLines(exploration)
-            };
-            elements.Add(element);
-            return context.IsElementHovered(element.Id, elementRect) ? element : null;
+            }.Draw(context);
+
+            if (_mapRevealedAreaDetailsPopupOpen)
+            {
+                _mapRevealedAreaDetailsAnchor = countRect;
+                _mapRevealedAreaDetailsAnchorVisible = true;
+            }
+
+            return element != null && context.IsElementHovered(element.Id, elementRect) ? element : null;
         }
 
         private static string BuildMapRevealedAreaRatioText(PlayerWorldExplorationReadResult exploration)
@@ -327,39 +305,7 @@ namespace JueMingZ.UI.Legacy
 
         private static string[] BuildMapRevealedAreaRatioTooltipLines(PlayerWorldExplorationReadResult exploration)
         {
-            if (exploration == null || !exploration.IdentityResolved)
-            {
-                return new[] { "当前玩家-世界身份不可用" };
-            }
-
-            if (exploration.ReadFailed)
-            {
-                return new[] { MapRevealedAreaRatioTooltip, "exploration-summary.json 读取失败" };
-            }
-
-            if (exploration.TotalTileCount <= 0)
-            {
-                return new[] { MapRevealedAreaRatioTooltip, "等待地图扫描" };
-            }
-
-            var countLine = "已揭示 " +
-                            Math.Max(0L, exploration.RevealedTileCount).ToString(CultureInfo.InvariantCulture) +
-                            " / " +
-                            Math.Max(0L, exploration.TotalTileCount).ToString(CultureInfo.InvariantCulture);
-            if (!exploration.ScanComplete)
-            {
-                return new[]
-                {
-                    MapRevealedAreaRatioTooltip,
-                    countLine,
-                    "扫描中 " + Math.Max(0L, exploration.ScannedTileCount).ToString(CultureInfo.InvariantCulture) + " / " + Math.Max(0L, exploration.TotalTileCount).ToString(CultureInfo.InvariantCulture)
-                };
-            }
-
-            var completed = exploration.LastCompletedScanUtc.HasValue
-                ? exploration.LastCompletedScanUtc.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)
-                : "尚未记录";
-            return new[] { MapRevealedAreaRatioTooltip, countLine, "上次统计 " + completed };
+            return new[] { MapRevealedAreaRatioClickTooltip };
         }
 
         private static bool RegisterMapDeathHistoryPopupOverlay(LegacyScrollArea area)
@@ -775,9 +721,18 @@ namespace JueMingZ.UI.Legacy
             return MapPersistentDeathMarkersTooltip;
         }
 
+        internal static string[] GetMapPersistentDeathMarkersButtonTooltipsForTesting()
+        {
+            return new[]
+            {
+                MapPersistentDeathMarkersTooltip,
+                string.Empty
+            };
+        }
+
         internal static string GetMapDeathHistoryDetailsTooltipForTesting()
         {
-            return MapDeathHistoryDetailsTooltip;
+            return string.Empty;
         }
 
         internal static int GetMapDeathHistoryPageSizeForTesting()
@@ -812,7 +767,7 @@ namespace JueMingZ.UI.Legacy
 
         internal static string GetMapRevealedAreaRatioTooltipForTesting()
         {
-            return MapRevealedAreaRatioTooltip;
+            return MapRevealedAreaRatioClickTooltip;
         }
 
         internal static bool RegisterMapDeathHistoryPopupOverlayForTesting(LegacyScrollArea area, LegacyUiRect anchor, int pageIndex)

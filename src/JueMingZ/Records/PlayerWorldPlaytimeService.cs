@@ -41,7 +41,7 @@ namespace JueMingZ.Records
             }
 
             PlayerWorldIdentityResolution identity;
-            if (!PlayerWorldIdentityResolver.TryResolveCurrent(out identity) ||
+            if (!PlayerWorldIdentityRuntimeCache.TryResolveCurrentCached(runtimeTick, out identity) ||
                 identity == null ||
                 !identity.IsResolved ||
                 string.IsNullOrWhiteSpace(identity.PairId))

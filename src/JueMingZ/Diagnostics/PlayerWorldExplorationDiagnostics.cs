@@ -19,6 +19,17 @@ namespace JueMingZ.Diagnostics
             long scannedTileCount,
             long nextTileIndex,
             int lastScannedTileBudget,
+            string scanMode,
+            string controlState,
+            bool pausedByUser,
+            bool idleComplete,
+            double lastScanElapsedMs,
+            int lastScanTileCount,
+            double currentTimeBudgetMs,
+            long currentCadenceTicks,
+            bool backoffApplied,
+            string lastUserCommand,
+            bool autoRescanDisabled,
             double revealedPercent,
             bool scanComplete,
             bool readFailed,
@@ -40,6 +51,17 @@ namespace JueMingZ.Diagnostics
                 _snapshot.ScannedTileCount = scannedTileCount;
                 _snapshot.NextTileIndex = nextTileIndex;
                 _snapshot.LastScannedTileBudget = lastScannedTileBudget;
+                _snapshot.ScanMode = scanMode ?? string.Empty;
+                _snapshot.ControlState = controlState ?? string.Empty;
+                _snapshot.PausedByUser = pausedByUser;
+                _snapshot.IdleComplete = idleComplete;
+                _snapshot.LastScanElapsedMs = lastScanElapsedMs;
+                _snapshot.LastScanTileCount = lastScanTileCount;
+                _snapshot.CurrentTimeBudgetMs = currentTimeBudgetMs;
+                _snapshot.CurrentCadenceTicks = currentCadenceTicks;
+                _snapshot.BackoffApplied = backoffApplied;
+                _snapshot.LastUserCommand = lastUserCommand ?? string.Empty;
+                _snapshot.AutoRescanDisabled = autoRescanDisabled;
                 _snapshot.RevealedPercent = revealedPercent;
                 _snapshot.ScanComplete = scanComplete;
                 _snapshot.ReadFailed = readFailed;
@@ -67,6 +89,17 @@ namespace JueMingZ.Diagnostics
                     ScannedTileCount = _snapshot.ScannedTileCount,
                     NextTileIndex = _snapshot.NextTileIndex,
                     LastScannedTileBudget = _snapshot.LastScannedTileBudget,
+                    ScanMode = _snapshot.ScanMode,
+                    ControlState = _snapshot.ControlState,
+                    PausedByUser = _snapshot.PausedByUser,
+                    IdleComplete = _snapshot.IdleComplete,
+                    LastScanElapsedMs = _snapshot.LastScanElapsedMs,
+                    LastScanTileCount = _snapshot.LastScanTileCount,
+                    CurrentTimeBudgetMs = _snapshot.CurrentTimeBudgetMs,
+                    CurrentCadenceTicks = _snapshot.CurrentCadenceTicks,
+                    BackoffApplied = _snapshot.BackoffApplied,
+                    LastUserCommand = _snapshot.LastUserCommand,
+                    AutoRescanDisabled = _snapshot.AutoRescanDisabled,
                     RevealedPercent = _snapshot.RevealedPercent,
                     ScanComplete = _snapshot.ScanComplete,
                     ReadFailed = _snapshot.ReadFailed,
@@ -100,6 +133,17 @@ namespace JueMingZ.Diagnostics
         public long ScannedTileCount { get; set; }
         public long NextTileIndex { get; set; }
         public int LastScannedTileBudget { get; set; }
+        public string ScanMode { get; set; }
+        public string ControlState { get; set; }
+        public bool PausedByUser { get; set; }
+        public bool IdleComplete { get; set; }
+        public double LastScanElapsedMs { get; set; }
+        public int LastScanTileCount { get; set; }
+        public double CurrentTimeBudgetMs { get; set; }
+        public long CurrentCadenceTicks { get; set; }
+        public bool BackoffApplied { get; set; }
+        public string LastUserCommand { get; set; }
+        public bool AutoRescanDisabled { get; set; }
         public double RevealedPercent { get; set; }
         public bool ScanComplete { get; set; }
         public bool ReadFailed { get; set; }
@@ -113,6 +157,10 @@ namespace JueMingZ.Diagnostics
             LastStatus = string.Empty;
             LastMessage = string.Empty;
             LastPairId = string.Empty;
+            ScanMode = string.Empty;
+            ControlState = string.Empty;
+            LastUserCommand = string.Empty;
+            AutoRescanDisabled = true;
         }
     }
 }

@@ -349,6 +349,12 @@ namespace JueMingZ.Input
                 return;
             }
 
+            if (command.ElementId.StartsWith("map-revealed-area-ratio:", StringComparison.Ordinal))
+            {
+                HandleMapRevealedAreaRatioCommand(command, command.ElementId.Substring("map-revealed-area-ratio:".Length));
+                return;
+            }
+
             if (command.ElementId.StartsWith("map-persistent-death-markers-mode:", StringComparison.Ordinal))
             {
                 HandleMapPersistentDeathMarkersMode(command, command.ElementId.Substring("map-persistent-death-markers-mode:".Length));

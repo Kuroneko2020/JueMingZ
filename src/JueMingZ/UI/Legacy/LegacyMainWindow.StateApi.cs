@@ -347,12 +347,34 @@ namespace JueMingZ.UI.Legacy
             return _mapDeathHistoryPageIndex;
         }
 
+        public static void ToggleMapRevealedAreaDetailsPopup()
+        {
+            _mapRevealedAreaDetailsPopupOpen = !_mapRevealedAreaDetailsPopupOpen;
+        }
+
+        public static void CloseMapRevealedAreaDetailsPopup()
+        {
+            _mapRevealedAreaDetailsPopupOpen = false;
+        }
+
+        public static bool IsMapRevealedAreaDetailsPopupOpen()
+        {
+            return _mapRevealedAreaDetailsPopupOpen;
+        }
+
         internal static void ResetMapDeathHistoryPopupForTesting()
         {
             _mapDeathHistoryPopupOpen = false;
             _mapDeathHistoryAnchor = new LegacyUiRect();
             _mapDeathHistoryAnchorVisible = false;
             _mapDeathHistoryPageIndex = 0;
+        }
+
+        internal static void ResetMapRevealedAreaDetailsPopupForTesting()
+        {
+            _mapRevealedAreaDetailsPopupOpen = false;
+            _mapRevealedAreaDetailsAnchor = new LegacyUiRect();
+            _mapRevealedAreaDetailsAnchorVisible = false;
         }
 
         internal static string GetMapQuickAnnouncementHotkeyCaptureSlotForTesting()

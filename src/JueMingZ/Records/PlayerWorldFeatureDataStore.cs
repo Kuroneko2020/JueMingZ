@@ -7,6 +7,8 @@ namespace JueMingZ.Records
 {
     public static class PlayerWorldFeatureDataStore
     {
+        private static Action<string, Type> _writeObserverForTesting;
+
         public static bool TryWriteJson<T>(string path, T value, out string message)
             where T : class
         {
@@ -23,6 +25,7 @@ namespace JueMingZ.Records
                 return false;
             }
 
+            NotifyWriteObserverForTesting(path, typeof(T));
             var tempPath = path + ".tmp-" + Guid.NewGuid().ToString("N");
             try
             {
@@ -106,6 +109,27 @@ namespace JueMingZ.Records
             where T : class
         {
             return TryWriteJson(path, value, out message);
+        }
+
+        internal static void SetWriteObserverForTesting(Action<string, Type> observer)
+        {
+            _writeObserverForTesting = observer;
+        }
+
+        internal static void ResetTestingHooks()
+        {
+            _writeObserverForTesting = null;
+        }
+
+        private static void NotifyWriteObserverForTesting(string path, Type type)
+        {
+            var observer = _writeObserverForTesting;
+            if (observer == null)
+            {
+                return;
+            }
+
+            observer(path, type);
         }
 
         private static DataContractJsonSerializer CreateSerializer(Type type)

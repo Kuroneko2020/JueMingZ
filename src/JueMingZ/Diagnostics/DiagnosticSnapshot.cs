@@ -79,6 +79,17 @@ namespace JueMingZ.Diagnostics
         public long PlayerWorldExplorationScannedTileCount { get; set; }
         public long PlayerWorldExplorationNextTileIndex { get; set; }
         public int PlayerWorldExplorationLastScannedTileBudget { get; set; }
+        public string PlayerWorldExplorationScanMode { get; set; }
+        public string PlayerWorldExplorationControlState { get; set; }
+        public bool PlayerWorldExplorationPausedByUser { get; set; }
+        public bool PlayerWorldExplorationIdleComplete { get; set; }
+        public double PlayerWorldExplorationLastScanElapsedMs { get; set; }
+        public int PlayerWorldExplorationLastScanTileCount { get; set; }
+        public double PlayerWorldExplorationCurrentTimeBudgetMs { get; set; }
+        public long PlayerWorldExplorationCurrentCadenceTicks { get; set; }
+        public bool PlayerWorldExplorationBackoffApplied { get; set; }
+        public string PlayerWorldExplorationLastUserCommand { get; set; }
+        public bool PlayerWorldExplorationAutoRescanDisabled { get; set; }
         public double PlayerWorldExplorationRevealedPercent { get; set; }
         public bool PlayerWorldExplorationScanComplete { get; set; }
         public bool PlayerWorldExplorationReadFailed { get; set; }
@@ -991,6 +1002,10 @@ namespace JueMingZ.Diagnostics
             PlayerWorldExplorationLastStatus = string.Empty;
             PlayerWorldExplorationLastMessage = string.Empty;
             PlayerWorldExplorationLastPairId = string.Empty;
+            PlayerWorldExplorationScanMode = string.Empty;
+            PlayerWorldExplorationControlState = string.Empty;
+            PlayerWorldExplorationLastUserCommand = string.Empty;
+            PlayerWorldExplorationAutoRescanDisabled = true;
             RunningActionKind = string.Empty;
             RunningActionSource = string.Empty;
             RunningActionStatus = string.Empty;

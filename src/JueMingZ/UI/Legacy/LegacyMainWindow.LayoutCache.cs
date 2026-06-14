@@ -514,6 +514,7 @@ namespace JueMingZ.UI.Legacy
                     AddHash(ref hash, settings.MapPersistentDeathMarkersEnabled);
                     AddHash(ref hash, _mapDeathHistoryPopupOpen);
                     AddHash(ref hash, _mapDeathHistoryPageIndex);
+                    AddHash(ref hash, _mapRevealedAreaDetailsPopupOpen);
                     AddHash(ref hash, PlayerWorldDeathHistoryCache.LastStateSignature);
                     AddHash(ref hash, PlayerWorldPlaytimeCache.LastStateSignature);
                     AddHash(ref hash, PlayerWorldExplorationCache.LastStateSignature);

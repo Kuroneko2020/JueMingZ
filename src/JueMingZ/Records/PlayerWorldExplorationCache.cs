@@ -128,6 +128,20 @@ namespace JueMingZ.Records
                 LastReadUtc = now,
                 LastWriteUtc = writeUtc == DateTime.MinValue ? (DateTime?)null : writeUtc
             };
+            var control = PlayerWorldExplorationService.GetControlSnapshot();
+            if (control != null)
+            {
+                result.ScanMode = control.ScanMode;
+                result.ControlState = control.ControlState;
+                result.ScanTileCap = control.ScanTileCap;
+                result.TimeBudgetMs = control.TimeBudgetMs;
+                result.CurrentCadenceTicks = control.CurrentCadenceTicks;
+                result.BackoffApplied = control.BackoffApplied;
+                result.LastScanElapsedMs = control.LastScanElapsedMs;
+                result.LastScanTileCount = control.LastScanTileCount;
+                result.LastUserCommand = control.LastUserCommand;
+                result.AutoRescanDisabled = control.AutoRescanDisabled;
+            }
 
             PlayerWorldExplorationSummaryFile file;
             string message;
@@ -222,6 +236,16 @@ namespace JueMingZ.Records
             clone.ScannedTileCount = source.ScannedTileCount;
             clone.NextTileIndex = source.NextTileIndex;
             clone.LastScannedTileBudget = source.LastScannedTileBudget;
+            clone.ScanMode = source.ScanMode ?? string.Empty;
+            clone.ControlState = source.ControlState ?? string.Empty;
+            clone.ScanTileCap = source.ScanTileCap;
+            clone.TimeBudgetMs = source.TimeBudgetMs;
+            clone.CurrentCadenceTicks = source.CurrentCadenceTicks;
+            clone.BackoffApplied = source.BackoffApplied;
+            clone.LastScanElapsedMs = source.LastScanElapsedMs;
+            clone.LastScanTileCount = source.LastScanTileCount;
+            clone.LastUserCommand = source.LastUserCommand ?? string.Empty;
+            clone.AutoRescanDisabled = source.AutoRescanDisabled;
             clone.ScanComplete = source.ScanComplete;
             clone.RevealedPercent = source.RevealedPercent;
             clone.DataSignature = source.DataSignature;
@@ -249,6 +273,13 @@ namespace JueMingZ.Records
                 hash = hash * 31 + (result == null ? 0 : result.NextTileIndex.GetHashCode());
                 hash = hash * 31 + (result != null && result.ScanComplete ? 1 : 0);
                 hash = hash * 31 + (result != null && result.ReadFailed ? 1 : 0);
+                hash = hash * 31 + StringComparer.Ordinal.GetHashCode(result == null ? string.Empty : result.ScanMode ?? string.Empty);
+                hash = hash * 31 + StringComparer.Ordinal.GetHashCode(result == null ? string.Empty : result.ControlState ?? string.Empty);
+                hash = hash * 31 + (result == null ? 0 : result.ScanTileCap);
+                hash = hash * 31 + (result == null ? 0 : result.TimeBudgetMs.GetHashCode());
+                hash = hash * 31 + (result == null ? 0 : result.CurrentCadenceTicks.GetHashCode());
+                hash = hash * 31 + (result != null && result.BackoffApplied ? 1 : 0);
+                hash = hash * 31 + StringComparer.Ordinal.GetHashCode(result == null ? string.Empty : result.LastUserCommand ?? string.Empty);
                 return hash;
             }
         }
@@ -273,6 +304,17 @@ namespace JueMingZ.Records
                 result.ScannedTileCount,
                 result.NextTileIndex,
                 result.LastScannedTileBudget,
+                result.ScanMode,
+                result.ControlState,
+                string.Equals(result.ControlState, PlayerWorldExplorationControlStates.PausedByUser, StringComparison.Ordinal),
+                string.Equals(result.ControlState, PlayerWorldExplorationControlStates.IdleComplete, StringComparison.Ordinal),
+                result.LastScanElapsedMs,
+                result.LastScanTileCount,
+                result.TimeBudgetMs,
+                result.CurrentCadenceTicks,
+                result.BackoffApplied,
+                result.LastUserCommand,
+                result.AutoRescanDisabled,
                 result.RevealedPercent,
                 result.ScanComplete,
                 result.ReadFailed,

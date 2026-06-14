@@ -205,6 +205,14 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void LegacyMapDeathHistoryDetailsTooltipIsSuppressed()
+        {
+            AssertStringEquals(
+                LegacyMainWindow.GetMapDeathHistoryDetailsTooltipForTesting(),
+                string.Empty,
+                "death history details tooltip");
+        }
+
         private static void PlayerWorldDeathHistoryDiagnosticsWrittenToSnapshot()
         {
             var snapshot = new DiagnosticSnapshot

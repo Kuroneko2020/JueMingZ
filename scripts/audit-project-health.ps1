@@ -1200,6 +1200,7 @@ function Test-LegacyUiOverlayGovernance {
 
     $expectedPopupPanelUses = @{
         "LegacyMainWindow.MapEnhancement.cs" = 1
+        "LegacyMainWindow.MapEnhancement.RevealedArea.cs" = 1
         "LegacyMainWindow.Misc.cs" = 1
         "LegacyMainWindow.Movement.cs" = 1
         "LegacyMainWindow.Rows.Recovery.cs" = 1
@@ -2311,34 +2312,66 @@ function Test-PlayerWorldExplorationGovernance {
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
 
     $servicePath = Join-Path $RepoRoot "src\JueMingZ\Records\PlayerWorldExplorationService.cs"
+    $modelPath = Join-Path $RepoRoot "src\JueMingZ\Records\PlayerWorldExplorationModels.cs"
+    $playtimePath = Join-Path $RepoRoot "src\JueMingZ\Records\PlayerWorldPlaytimeService.cs"
     $readerPath = Join-Path $RepoRoot "src\JueMingZ\Records\PlayerWorldExplorationMapReader.cs"
     $cachePath = Join-Path $RepoRoot "src\JueMingZ\Records\PlayerWorldExplorationCache.cs"
     $uiPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.MapEnhancement.cs"
+    $uiDetailsPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.MapEnhancement.RevealedArea.cs"
+    $testPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.PlayerWorldExplorationTests.cs"
+    $identityTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.PlayerWorldIdentityStoreTests.cs"
 
     $serviceText = Read-TextIfExists -Path $servicePath
+    $modelText = Read-TextIfExists -Path $modelPath
+    $playtimeText = Read-TextIfExists -Path $playtimePath
     $readerText = Read-TextIfExists -Path $readerPath
     $cacheText = Read-TextIfExists -Path $cachePath
-    $uiText = Read-TextIfExists -Path $uiPath
+    $uiMainText = Read-TextIfExists -Path $uiPath
+    $uiDetailsText = Read-TextIfExists -Path $uiDetailsPath
+    $uiMainForAudit = ""
+    $uiDetailsForAudit = ""
+    if ($null -ne $uiMainText) {
+        $uiMainForAudit = $uiMainText
+    }
+    if ($null -ne $uiDetailsText) {
+        $uiDetailsForAudit = $uiDetailsText
+    }
+    $uiText = $uiMainForAudit + "`n" + $uiDetailsForAudit
+    $testText = Read-TextIfExists -Path $testPath
+    $identityTestText = Read-TextIfExists -Path $identityTestPath
 
-    if ($null -eq $serviceText -or $null -eq $readerText -or $null -eq $cacheText) {
-        Write-FailHealth "Player-world exploration service, reader, and cache files must exist as separate responsibilities."
+    if ($null -eq $serviceText -or $null -eq $modelText -or $null -eq $playtimeText -or $null -eq $readerText -or $null -eq $cacheText -or $null -eq $uiMainText -or $null -eq $uiDetailsText -or $null -eq $testText -or $null -eq $identityTestText) {
+        Write-FailHealth "Player-world exploration/playtime service, reader, UI partial, cache, and test files must exist as separate responsibilities."
         return
     }
 
-    if ($serviceText.Contains("ScanTileBudget") -and
-        $serviceText.Contains("ScanCadenceTicks") -and
+    if ($serviceText.Contains("Stopwatch.StartNew()") -and
+        $serviceText.Contains("GetScanBudgetLocked") -and
+        $serviceText.Contains("ShouldApplyPerformanceBackoff") -and
+        $modelText.Contains("PerformanceScanTimeBudgetMs") -and
+        $modelText.Contains("FastScanTimeBudgetMs") -and
+        $modelText.Contains("PerformanceBackoffScanCadenceTicks") -and
         $serviceText.Contains("PlayerWorldFeatureDataStore.TryWriteJson")) {
-        Write-Pass "Player-world exploration keeps chunk budget, cadence, and throttled summary writes in the service layer."
+        Write-Pass "Player-world exploration uses mode-specific Stopwatch budgets, cadence backoff, and throttled summary writes in the service layer."
     }
     else {
-        Write-FailHealth "Player-world exploration scanning must keep fixed budget, cadence, and summary writes in PlayerWorldExplorationService."
+        Write-FailHealth "Player-world exploration scanning must keep mode-specific time budgets, backoff cadence, and summary writes in PlayerWorldExplorationService."
     }
 
-    if ($readerText.Contains(".IsRevealed(") -and -not $uiText.Contains(".IsRevealed(")) {
-        Write-Pass "Player-world exploration reads Main.Map.IsRevealed only through the map reader, not the UI draw path."
+    $directRevealReadPattern = "^\s*[^`"]*\.IsRevealed\("
+    $invalidRevealReaders = @()
+    Get-ChildItem -LiteralPath (Join-Path $RepoRoot "src\JueMingZ") -Recurse -Filter "*.cs" | ForEach-Object {
+        $path = $_.FullName
+        $text = Read-TextIfExists -Path $path
+        if ($text -and [regex]::IsMatch($text, $directRevealReadPattern, [System.Text.RegularExpressions.RegexOptions]::Multiline) -and ($path -ne $readerPath)) {
+            $invalidRevealReaders += $path
+        }
+    }
+    if ($readerText.Contains(".IsRevealed(") -and $invalidRevealReaders.Count -eq 0) {
+        Write-Pass "Player-world exploration reads Main.Map.IsRevealed only through the map reader."
     }
     else {
-        Write-FailHealth "Player-world exploration must not read map reveal state from Legacy UI draw code."
+        Write-FailHealth "Player-world exploration must not read map reveal state outside PlayerWorldExplorationMapReader."
     }
 
     if ($uiText.Contains("PlayerWorldExplorationCache.ReadCurrent()") -and
@@ -2348,6 +2381,76 @@ function Test-PlayerWorldExplorationGovernance {
     }
     else {
         Write-FailHealth "Map enhancement UI must read PlayerWorldExplorationCache only; scanning and JSON writes belong outside Draw."
+    }
+
+    $tooltipMatch = [regex]::Match(
+        $uiMainText,
+        "private static string\[\] BuildMapRevealedAreaRatioTooltipLines\([^)]*\)\s*\{(?<body>.*?)\n        \}",
+        [System.Text.RegularExpressions.RegexOptions]::Singleline)
+    $tooltipBody = if ($tooltipMatch.Success) { $tooltipMatch.Groups["body"].Value } else { "" }
+    if ($tooltipBody.Contains("MapRevealedAreaRatioClickTooltip") -and
+        -not $tooltipBody.Contains("已揭示") -and
+        -not $tooltipBody.Contains("扫描中") -and
+        -not $tooltipBody.Contains("上次统计")) {
+        Write-Pass "Map revealed-area hover tooltip stays as the click hint; detailed statistics live in the modal."
+    }
+    else {
+        Write-FailHealth "Map revealed-area hover tooltip must not reintroduce revealed/scanning/last-stat details."
+    }
+
+    if ($serviceText.Contains("PlayerWorldIdentityRuntimeCache.TryResolveCurrentCached") -and
+        $playtimeText.Contains("PlayerWorldIdentityRuntimeCache.TryResolveCurrentCached") -and
+        -not $serviceText.Contains("PlayerWorldIdentityResolver.TryResolveCurrent(") -and
+        -not $playtimeText.Contains("PlayerWorldIdentityResolver.TryResolveCurrent(")) {
+        Write-Pass "Player-world exploration/playtime cadence paths use cached identity resolution instead of the persisting resolver."
+    }
+    else {
+        Write-FailHealth "Player-world exploration/playtime cadence paths must not call the persisting identity resolver directly."
+    }
+
+    if (-not $modelText.Contains("RescanCadenceTicks") -and
+        -not $serviceText.Contains("RescanCadenceTicks") -and
+        -not $serviceText.Contains("_nextRescanTick") -and
+        -not $serviceText.Contains('"rescan"')) {
+        Write-Pass "Player-world exploration complete scans no longer carry automatic 3600-tick rescan state."
+    }
+    else {
+        Write-FailHealth "Player-world exploration must not reintroduce automatic complete-state rescan cadence."
+    }
+
+    $pauseIndex = $serviceText.IndexOf("if (IsPausedByUserLocked())")
+    $readIndex = $serviceText.IndexOf("reader.TryIsRevealed")
+    if ($serviceText.Contains("PauseScanning()") -and
+        $serviceText.Contains("StartScanning()") -and
+        $serviceText.Contains("PlayerWorldExplorationScanModes") -and
+        $pauseIndex -ge 0 -and
+        $readIndex -gt $pauseIndex) {
+        Write-Pass "Player-world exploration exposes scan control API and checks paused state before reading tiles."
+    }
+    else {
+        Write-FailHealth "Player-world exploration scan control must stop tile reads while paused and expose start/pause/mode APIs."
+    }
+
+    if ($testText.Contains("PlayerWorldExplorationPerformanceModeUsesTimeBudgetAndBackoff") -and
+        $testText.Contains("PlayerWorldExplorationFastModeAdvancesMoreThanPerformanceMode") -and
+        $testText.Contains("PlayerWorldExplorationFastModeCompleteStaysIdleWithoutRescan") -and
+        $testText.Contains("PlayerWorldExplorationPauseStopsTileReadsInBothModes") -and
+        $testText.Contains("PlayerWorldExplorationCompleteStaysIdlePastLegacyRescanCadence") -and
+        $testText.Contains("PlayerWorldExplorationPauseStopsTileReadsAndStartResumesCursor") -and
+        $testText.Contains("PlayerWorldExplorationIdleStartPerformsManualRefresh") -and
+        $testText.Contains("PlayerWorldExplorationPairChangeDoesNotReviveOldPairScan") -and
+        $testText.Contains("PlayerWorldExplorationModeSwitchDoesNotClearCompletedResult") -and
+        $testText.Contains("PlayerWorldExplorationLegacySummaryDefaultsToPerformanceState") -and
+        $testText.Contains("LegacyMapRevealedAreaTooltipAndDetailsLines") -and
+        $testText.Contains("LegacyMapRevealedAreaDetailsPopupRegistersAsModal") -and
+        $testText.Contains("LegacyMapRevealedAreaCommandsDrivePopupAndScanControl") -and
+        $testText.Contains("PlayerWorldExplorationDiagnosticsWrittenToSnapshot") -and
+        $identityTestText.Contains("PlayerWorldIdentityRuntimeCacheThrottlesExplorationIdentityPersistence") -and
+        $identityTestText.Contains("PlayerWorldIdentityRuntimeCacheThrottlesPlaytimeIdentityPersistence")) {
+        Write-Pass "Player-world exploration regressions cover time budget, fast mode, idle, pause/start, UI modal commands, diagnostics, legacy summaries, and identity hot paths."
+    }
+    else {
+        Write-FailHealth "Player-world exploration tests must cover time budget/backoff, fast mode, idle no-rescan, paused no-tile-read, start resume/manual refresh, pair change, mode switch, legacy summary defaults, UI modal commands, diagnostics, and identity hot paths."
     }
 }
 

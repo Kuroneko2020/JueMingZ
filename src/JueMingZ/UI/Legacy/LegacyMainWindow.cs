@@ -74,6 +74,9 @@ namespace JueMingZ.UI.Legacy
         private const int MapDeathHistoryPopupMinWidth = 360;
         private const int MapDeathHistoryPopupHeight = 294;
         private const int MapDeathHistoryPopupPageSize = 6;
+        private const int MapRevealedAreaDetailsPopupMaxWidth = 500;
+        private const int MapRevealedAreaDetailsPopupMinWidth = 380;
+        private const int MapRevealedAreaDetailsPopupHeight = 206;
         private const int FishingFilterPanelHeight = 296;
         private const int FishingFilterSettingsMinWidth = 132;
         private const int FishingFilterSettingsMaxWidth = 144;
@@ -158,6 +161,9 @@ namespace JueMingZ.UI.Legacy
         private static LegacyUiRect _mapDeathHistoryAnchor;
         private static bool _mapDeathHistoryAnchorVisible;
         private static int _mapDeathHistoryPageIndex;
+        private static bool _mapRevealedAreaDetailsPopupOpen;
+        private static LegacyUiRect _mapRevealedAreaDetailsAnchor;
+        private static bool _mapRevealedAreaDetailsAnchorVisible;
         private static readonly Dictionary<int, bool> QuickItemCaptureWasDown = new Dictionary<int, bool>();
         private static readonly Dictionary<int, bool> AutoMiningCaptureWasDown = new Dictionary<int, bool>();
         private static readonly Dictionary<int, bool> MapQuickAnnouncementCaptureWasDown = new Dictionary<int, bool>();

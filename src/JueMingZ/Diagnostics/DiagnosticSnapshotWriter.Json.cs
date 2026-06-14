@@ -88,6 +88,17 @@ namespace JueMingZ.Diagnostics
             Append(builder, "PlayerWorldExplorationScannedTileCount", snapshot.PlayerWorldExplorationScannedTileCount, true);
             Append(builder, "PlayerWorldExplorationNextTileIndex", snapshot.PlayerWorldExplorationNextTileIndex, true);
             Append(builder, "PlayerWorldExplorationLastScannedTileBudget", snapshot.PlayerWorldExplorationLastScannedTileBudget, true);
+            Append(builder, "PlayerWorldExplorationScanMode", snapshot.PlayerWorldExplorationScanMode, true);
+            Append(builder, "PlayerWorldExplorationControlState", snapshot.PlayerWorldExplorationControlState, true);
+            Append(builder, "PlayerWorldExplorationPausedByUser", snapshot.PlayerWorldExplorationPausedByUser, true);
+            Append(builder, "PlayerWorldExplorationIdleComplete", snapshot.PlayerWorldExplorationIdleComplete, true);
+            Append(builder, "PlayerWorldExplorationLastScanElapsedMs", snapshot.PlayerWorldExplorationLastScanElapsedMs, true);
+            Append(builder, "PlayerWorldExplorationLastScanTileCount", snapshot.PlayerWorldExplorationLastScanTileCount, true);
+            Append(builder, "PlayerWorldExplorationCurrentTimeBudgetMs", snapshot.PlayerWorldExplorationCurrentTimeBudgetMs, true);
+            Append(builder, "PlayerWorldExplorationCurrentCadenceTicks", snapshot.PlayerWorldExplorationCurrentCadenceTicks, true);
+            Append(builder, "PlayerWorldExplorationBackoffApplied", snapshot.PlayerWorldExplorationBackoffApplied, true);
+            Append(builder, "PlayerWorldExplorationLastUserCommand", snapshot.PlayerWorldExplorationLastUserCommand, true);
+            Append(builder, "PlayerWorldExplorationAutoRescanDisabled", snapshot.PlayerWorldExplorationAutoRescanDisabled, true);
             Append(builder, "PlayerWorldExplorationRevealedPercent", snapshot.PlayerWorldExplorationRevealedPercent, true);
             Append(builder, "PlayerWorldExplorationScanComplete", snapshot.PlayerWorldExplorationScanComplete, true);
             Append(builder, "PlayerWorldExplorationReadFailed", snapshot.PlayerWorldExplorationReadFailed, true);
