@@ -116,6 +116,13 @@ namespace JueMingZ.Runtime
             snapshot.LegacyUiDispatchElapsedMsLast = LegacyUiActionService.DispatchElapsedMsLast;
             snapshot.LegacyUiCommandCoalescedCount = LegacyUiActionService.CommandCoalescedCount;
             snapshot.LegacyUiDragFrameActionSkipCount = LegacyUiActionService.DragFrameActionSkipCount;
+            var f5Hotkey = DebugHotkeyService.GetF5HotkeySnapshot();
+            snapshot.LegacyMainUiLastF5HotkeyDecision = f5Hotkey.Decision;
+            snapshot.LegacyMainUiLastF5HotkeyReason = f5Hotkey.Reason;
+            snapshot.LegacyMainUiLastF5HotkeyDown = f5Hotkey.Down;
+            snapshot.LegacyMainUiLastF5HotkeyWasDown = f5Hotkey.WasDown;
+            snapshot.LegacyMainUiLastF5HotkeyDebounceRemainingMs = f5Hotkey.DebounceRemainingMs;
+            snapshot.LegacyMainUiLastF5HotkeyUtc = f5Hotkey.Utc;
             var imePanel = TerrariaTextInputCompat.GetImePanelDiagnosticsForSnapshot();
             snapshot.LegacyImePanelFocused = LegacyTextInput.IsAnyFocused;
             snapshot.LegacyImePanelDiagnosticMessage = LegacyTextInput.DiagnosticMessage;

@@ -116,7 +116,18 @@ namespace JueMingZ.Input
             var resultCode = string.Empty;
             var markerTileX = 0;
             var markerTileY = 0;
+            var requestedTileX = 0;
+            var requestedTileY = 0;
             var jumpScale = 0f;
+            var jumpWrittenMapPosX = 0f;
+            var jumpWrittenMapPosY = 0f;
+            var jumpAttempted = false;
+            var jumpReleasedUiCapture = false;
+            var jumpClosedF5 = false;
+            var jumpClearedPanState = false;
+            var jumpConsumedButtonPulse = false;
+            var jumpVanillaMapInputHandoff = false;
+            var jumpButtonPulseMessage = string.Empty;
 
             if (string.Equals(action, "name", StringComparison.OrdinalIgnoreCase))
             {
@@ -154,6 +165,27 @@ namespace JueMingZ.Input
                     message = "Double-click the marker name field to edit.";
                 }
             }
+            else if (string.Equals(action, "confirm-name", StringComparison.OrdinalIgnoreCase))
+            {
+                var inputId = LegacyMainWindow.BuildMapMarkerNameInputId(markerId);
+                if (LegacyTextInput.IsFocused(inputId))
+                {
+                    write = PlayerWorldMapMarkerStore.RenameMarkerForPair(pairId, markerId, LegacyTextInput.GetDraft(inputId));
+                    if (write.Succeeded)
+                    {
+                        LegacyTextInput.ClearFocus();
+                    }
+
+                    outcome = write.Succeeded ? (write.Changed ? "Succeeded" : "NotApplicable") : "Failed";
+                    message = write.Succeeded ? "Map custom marker name confirmed." : "Map custom marker name confirm failed: " + write.Message;
+                }
+                else
+                {
+                    outcome = "NotApplicable";
+                    resultCode = "nameInputNotFocused";
+                    message = "Map custom marker name confirm skipped because the name field is not being edited.";
+                }
+            }
             else if (string.Equals(action, "delete", StringComparison.OrdinalIgnoreCase))
             {
                 write = PlayerWorldMapMarkerStore.DeleteMarkerForPair(pairId, markerId);
@@ -167,6 +199,7 @@ namespace JueMingZ.Input
             }
             else if (string.Equals(action, "jump", StringComparison.OrdinalIgnoreCase))
             {
+                jumpAttempted = true;
                 TrySaveFocusedMapMarkerName(pairId, markerId);
                 var read = PlayerWorldMapMarkerCache.ReadForPair(pairId);
                 var marker = FindMapMarker(read, markerId);
@@ -180,18 +213,37 @@ namespace JueMingZ.Input
                 {
                     outcome = "Succeeded";
                     resultCode = jump.ResultCode;
+                    requestedTileX = marker.TileX;
+                    requestedTileY = marker.TileY;
                     markerTileX = jump.TileX;
                     markerTileY = jump.TileY;
                     jumpScale = jump.Scale;
+                    jumpWrittenMapPosX = jump.WrittenMapPosX;
+                    jumpWrittenMapPosY = jump.WrittenMapPosY;
+                    jumpClearedPanState = jump.ClearedPanState;
                     message = "Map custom marker jump opened the fullscreen map.";
+                    // Jump stays a fullscreen-map UI state change only. Consume
+                    // only the F5 button's left-click pulse, then vanilla owns
+                    // fullscreen map drag and ping input after the button release.
+                    var release = LegacyMainUiState.HideForMapCustomMarkerJumpAndReleaseCapture();
+                    jumpReleasedUiCapture = release != null && release.ReleasedUiCapture;
+                    jumpClosedF5 = release != null && release.F5WasVisible;
+                    jumpConsumedButtonPulse = release != null && release.ConsumedJumpButtonPulse;
+                    jumpVanillaMapInputHandoff = release != null && release.VanillaMapInputHandoff;
+                    jumpButtonPulseMessage = release == null ? string.Empty : release.ConsumeJumpButtonPulseMessage ?? string.Empty;
                 }
                 else
                 {
                     outcome = "Failed";
                     resultCode = jump == null ? "failed" : jump.ResultCode;
+                    requestedTileX = marker.TileX;
+                    requestedTileY = marker.TileY;
                     markerTileX = marker.TileX;
                     markerTileY = marker.TileY;
                     jumpScale = jump == null ? 0f : jump.Scale;
+                    jumpWrittenMapPosX = jump == null ? 0f : jump.WrittenMapPosX;
+                    jumpWrittenMapPosY = jump == null ? 0f : jump.WrittenMapPosY;
+                    jumpClearedPanState = jump != null && jump.ClearedPanState;
                     message = jump == null ? "Map custom marker jump failed." : jump.Message;
                 }
             }
@@ -213,6 +265,19 @@ namespace JueMingZ.Input
             }
 
             PlayerWorldMapMarkerDiagnostics.RecordUiAction(metadataAction, resultCode, IsMapCustomMarkerUiOnlyAction(action));
+            if (jumpAttempted)
+            {
+                PlayerWorldMapMarkerDiagnostics.RecordJumpState(
+                    requestedTileX,
+                    requestedTileY,
+                    jumpWrittenMapPosX,
+                    jumpWrittenMapPosY,
+                    jumpScale,
+                    jumpReleasedUiCapture,
+                    jumpClearedPanState,
+                    jumpConsumedButtonPulse,
+                    jumpVanillaMapInputHandoff);
+            }
 
             Record(
                 command,
@@ -222,7 +287,7 @@ namespace JueMingZ.Input
                 message,
                 before,
                 BuildMapEnhancementUiStateJson(),
-                "{\"submitted\":false,\"implemented\":" + BoolRaw(!IsMapCustomMarkerUiOnlyAction(action)) + ",\"uiOnly\":" + BoolRaw(IsMapCustomMarkerUiOnlyAction(action)) + ",\"featureId\":\"" + EscapeJson(FeatureIds.MapCustomMarkers) + "\",\"action\":\"" + EscapeJson(metadataAction) + "\",\"markerId\":\"" + EscapeJson(markerId) + "\",\"pairId\":\"" + EscapeJson(pairId) + "\",\"tileX\":" + IntRaw(markerTileX) + ",\"tileY\":" + IntRaw(markerTileY) + ",\"scale\":" + jumpScale.ToString(System.Globalization.CultureInfo.InvariantCulture) + ",\"resultCode\":\"" + EscapeJson(resultCode) + "\",\"writeStatus\":\"" + EscapeJson(write == null ? string.Empty : write.Status) + "\",\"changed\":" + BoolRaw(write != null && write.Changed) + ",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                "{\"submitted\":false,\"implemented\":" + BoolRaw(!IsMapCustomMarkerUiOnlyAction(action)) + ",\"uiOnly\":" + BoolRaw(IsMapCustomMarkerUiOnlyAction(action)) + ",\"featureId\":\"" + EscapeJson(FeatureIds.MapCustomMarkers) + "\",\"action\":\"" + EscapeJson(metadataAction) + "\",\"markerId\":\"" + EscapeJson(markerId) + "\",\"pairId\":\"" + EscapeJson(pairId) + "\",\"requestedTileX\":" + IntRaw(requestedTileX) + ",\"requestedTileY\":" + IntRaw(requestedTileY) + ",\"tileX\":" + IntRaw(markerTileX) + ",\"tileY\":" + IntRaw(markerTileY) + ",\"writtenMapPosX\":" + jumpWrittenMapPosX.ToString(System.Globalization.CultureInfo.InvariantCulture) + ",\"writtenMapPosY\":" + jumpWrittenMapPosY.ToString(System.Globalization.CultureInfo.InvariantCulture) + ",\"scale\":" + jumpScale.ToString(System.Globalization.CultureInfo.InvariantCulture) + ",\"resultCode\":\"" + EscapeJson(resultCode) + "\",\"writeStatus\":\"" + EscapeJson(write == null ? string.Empty : write.Status) + "\",\"changed\":" + BoolRaw(write != null && write.Changed) + ",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + ",\"releasedUiCapture\":" + BoolRaw(jumpReleasedUiCapture) + ",\"closedF5\":" + BoolRaw(jumpClosedF5) + ",\"clearedPanState\":" + BoolRaw(jumpClearedPanState) + ",\"consumedJumpButtonPulse\":" + BoolRaw(jumpConsumedButtonPulse) + ",\"vanillaMapInputHandoff\":" + BoolRaw(jumpVanillaMapInputHandoff) + ",\"jumpButtonPulseMessage\":\"" + EscapeJson(jumpButtonPulseMessage) + "\"}",
                 "Button");
         }
 

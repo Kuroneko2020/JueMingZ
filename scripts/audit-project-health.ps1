@@ -1524,6 +1524,7 @@ function Test-MapQuickAnnouncementGovernance {
         "src/JueMingZ/Automation/MapEnhancement/MapCustomMarkerInteractionService.cs",
         "src/JueMingZ/Automation/Information/MapQuickAnnouncementRuntimeService.cs",
         "src/JueMingZ/Automation/Search/SearchItemPickRuntimeService.cs",
+        "src/JueMingZ/UI/UiMouseCaptureService.cs",
         "src/JueMingZ/Compat/TerrariaUiMouseCompat.cs"
     )
     $consumeCounts = @{}
@@ -1557,7 +1558,7 @@ function Test-MapQuickAnnouncementGovernance {
         Write-FailHealth "Controlled UI mouse consume path changed; unexpected=$($unexpectedConsumePaths -join ', ') missing=$($missingConsumePaths -join ', ')"
     }
     else {
-        Write-Pass "Controlled UI mouse input consumption remains centralized in approved runtime services and Terraria UI compat."
+        Write-Pass "Controlled UI mouse input consumption remains centralized in approved runtime services, UI capture service, and Terraria UI compat."
     }
 
     $actionsRoot = Join-Path $RepoRoot "src\JueMingZ\Actions"
@@ -1582,42 +1583,64 @@ function Test-MapCustomMarkerGovernance {
 
     $registrarPath = Join-Path $RepoRoot "src\JueMingZ\Features\Catalog\MapEnhancementFeatureRegistrar.cs"
     $rootPath = Join-Path $RepoRoot "src\JueMingZ\Records\PlayerWorldFeatureDataRoot.cs"
+    $modelsPath = Join-Path $RepoRoot "src\JueMingZ\Records\PlayerWorldMapMarkerModels.cs"
+    $stylesPath = Join-Path $RepoRoot "src\JueMingZ\Records\PlayerWorldMapMarkerStyles.cs"
     $storePath = Join-Path $RepoRoot "src\JueMingZ\Records\PlayerWorldMapMarkerStore.cs"
     $cachePath = Join-Path $RepoRoot "src\JueMingZ\Records\PlayerWorldMapMarkerCache.cs"
     $diagnosticsPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\PlayerWorldMapMarkerDiagnostics.cs"
     $snapshotPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\DiagnosticSnapshot.cs"
     $snapshotWriterPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\DiagnosticSnapshotWriter.Json.cs"
     $snapshotBuilderPath = Join-Path $RepoRoot "src\JueMingZ\Runtime\Diagnostics\RuntimeDiagnosticSnapshotBuilder.Bootstrap.cs"
+    $diagnosticUiSnapshotBuilderPath = Join-Path $RepoRoot "src\JueMingZ\Runtime\Diagnostics\RuntimeDiagnosticSnapshotBuilder.DiagnosticUi.cs"
     $interactionPath = Join-Path $RepoRoot "src\JueMingZ\Automation\MapEnhancement\MapCustomMarkerInteractionService.cs"
+    $mapCompatPath = Join-Path $RepoRoot "src\JueMingZ\Compat\MapCustomMarkerMapCompat.cs"
+    $debugHotkeyPath = Join-Path $RepoRoot "src\JueMingZ\Input\DebugHotkeyService.cs"
     $handlerPath = Join-Path $RepoRoot "src\JueMingZ\Input\LegacyUiActionService.MapEnhancementHandlers.cs"
     $interfaceLayerPath = Join-Path $RepoRoot "src\JueMingZ\Hooks\InterfaceLayerHookCallbacks.cs"
     $fullscreenPickerDrawInstallerPath = Join-Path $RepoRoot "src\JueMingZ\Hooks\MapCustomMarkerFullscreenMapDrawInstaller.cs"
     $stylePickerOverlayPath = Join-Path $RepoRoot "src\JueMingZ\UI\MapCustomMarkerStylePickerOverlay.cs"
+    $legacyWindowStatePath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainUiState.Window.cs"
+    $uiMouseCaptureServicePath = Join-Path $RepoRoot "src\JueMingZ\UI\UiMouseCaptureService.cs"
+    $markerUiPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.MapEnhancement.Markers.cs"
     $mapLayerPath = Join-Path $RepoRoot "src\JueMingZ\Hooks\PlayerWorldMapMarkerMapLayer.cs"
     $fullscreenCompatPath = Join-Path $RepoRoot "src\JueMingZ\Compat\MapFullscreenCompat.cs"
     $testPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.PlayerWorldMapMarkerTests.cs"
+    $uiInputTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.UiInputFrameTests.cs"
     $interfaceTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.InterfaceLayerHookTests.cs"
+    $mapMarkerFeatureDocPath = Join-Path $RepoRoot "文档\功能介绍\地图加强页\地图标记.md"
+    $diagnosticRulesPath = Join-Path $RepoRoot "文档\项目规则\AI诊断日志说明.md"
 
     $registrarText = Read-TextIfExists -Path $registrarPath
     $rootText = Read-TextIfExists -Path $rootPath
+    $modelsText = Read-TextIfExists -Path $modelsPath
+    $stylesText = Read-TextIfExists -Path $stylesPath
     $storeText = Read-TextIfExists -Path $storePath
     $cacheText = Read-TextIfExists -Path $cachePath
     $diagnosticsText = Read-TextIfExists -Path $diagnosticsPath
     $snapshotText = Read-TextIfExists -Path $snapshotPath
     $snapshotWriterText = Read-TextIfExists -Path $snapshotWriterPath
     $snapshotBuilderText = Read-TextIfExists -Path $snapshotBuilderPath
+    $diagnosticUiSnapshotBuilderText = Read-TextIfExists -Path $diagnosticUiSnapshotBuilderPath
     $interactionText = Read-TextIfExists -Path $interactionPath
+    $mapCompatText = Read-TextIfExists -Path $mapCompatPath
+    $debugHotkeyText = Read-TextIfExists -Path $debugHotkeyPath
     $handlerText = Read-TextIfExists -Path $handlerPath
     $interfaceLayerText = Read-TextIfExists -Path $interfaceLayerPath
     $fullscreenPickerDrawInstallerText = Read-TextIfExists -Path $fullscreenPickerDrawInstallerPath
     $stylePickerOverlayText = Read-TextIfExists -Path $stylePickerOverlayPath
+    $legacyWindowStateText = Read-TextIfExists -Path $legacyWindowStatePath
+    $uiMouseCaptureServiceText = Read-TextIfExists -Path $uiMouseCaptureServicePath
+    $markerUiText = Read-TextIfExists -Path $markerUiPath
     $mapLayerText = Read-TextIfExists -Path $mapLayerPath
     $fullscreenCompatText = Read-TextIfExists -Path $fullscreenCompatPath
     $testText = Read-TextIfExists -Path $testPath
+    $uiInputTestText = Read-TextIfExists -Path $uiInputTestPath
     $interfaceTestText = Read-TextIfExists -Path $interfaceTestPath
+    $mapMarkerFeatureDocText = Read-TextIfExists -Path $mapMarkerFeatureDocPath
+    $diagnosticRulesText = Read-TextIfExists -Path $diagnosticRulesPath
 
-    if ($null -eq $registrarText -or $null -eq $rootText -or $null -eq $storeText -or $null -eq $cacheText -or $null -eq $diagnosticsText -or $null -eq $snapshotText -or $null -eq $snapshotWriterText -or $null -eq $snapshotBuilderText -or $null -eq $interactionText -or $null -eq $handlerText -or $null -eq $interfaceLayerText -or $null -eq $fullscreenPickerDrawInstallerText -or $null -eq $stylePickerOverlayText -or $null -eq $mapLayerText -or $null -eq $fullscreenCompatText -or $null -eq $testText -or $null -eq $interfaceTestText) {
-        Write-FailHealth "Map custom marker registrar, store/cache, diagnostics, interaction, UI layer, handler, map layer, compat, and tests must exist as separate responsibilities."
+    if ($null -eq $registrarText -or $null -eq $rootText -or $null -eq $modelsText -or $null -eq $stylesText -or $null -eq $storeText -or $null -eq $cacheText -or $null -eq $diagnosticsText -or $null -eq $snapshotText -or $null -eq $snapshotWriterText -or $null -eq $snapshotBuilderText -or $null -eq $diagnosticUiSnapshotBuilderText -or $null -eq $interactionText -or $null -eq $mapCompatText -or $null -eq $debugHotkeyText -or $null -eq $handlerText -or $null -eq $interfaceLayerText -or $null -eq $fullscreenPickerDrawInstallerText -or $null -eq $stylePickerOverlayText -or $null -eq $legacyWindowStateText -or $null -eq $uiMouseCaptureServiceText -or $null -eq $markerUiText -or $null -eq $mapLayerText -or $null -eq $fullscreenCompatText -or $null -eq $testText -or $null -eq $uiInputTestText -or $null -eq $interfaceTestText -or $null -eq $mapMarkerFeatureDocText -or $null -eq $diagnosticRulesText) {
+        Write-FailHealth "Map custom marker registrar, models/styles, store/cache, diagnostics, interaction, coordinate compat, UI layer, handler, map layer, fullscreen compat, docs, and tests must exist as separate responsibilities."
         return
     }
 
@@ -1641,6 +1664,37 @@ function Test-MapCustomMarkerGovernance {
     }
     else {
         Write-FailHealth "map-markers.json must stay behind PlayerWorldFeatureDataRoot.MapMarkersFileName and PlayerWorldMapMarkerStore safe writes."
+    }
+
+    if ($modelsText.Contains("LegacyFallenStarIconItemId = 75") -and
+        $modelsText.Contains("ReplacementBedIconItemId = 224") -and
+        $modelsText.Contains("return ReplacementBedIconItemId") -and
+        $stylesText.Contains("ReplacementBedIconItemId") -and
+        -not $stylesText.Contains('"坠星"') -and
+        $testText.Contains("PlayerWorldMapMarkersLegacyFallenStarIconMapsToBed")) {
+        Write-Pass "Map marker style whitelist replaces fallen star with bed and maps legacy 75 markers forward."
+    }
+    else {
+        Write-FailHealth "Map marker icon whitelist must replace fallen star with bed, map legacy item 75 to item 224, and keep a regression test."
+    }
+
+    if ($markerUiText.Contains("CalculateMapMarkerListBodyHeightForTesting") -and
+        $markerUiText.Contains("empty-text-only") -and
+        $markerUiText.Contains("section+link-card+empty-text-only+focused-confirm") -and
+        $markerUiText.Contains("ShouldShowMapMarkerConfirmButton") -and
+        $markerUiText.Contains("LegacyTextInput.IsFocused(BuildMapMarkerNameInputId") -and
+        -not $markerUiText.Contains("DrawSubPanelClipped") -and
+        $handlerText.Contains('string.Equals(action, "confirm-name"') -and
+        $handlerText.Contains("nameInputNotFocused") -and
+        $testText.Contains("MapCustomMarkerConfirmNameCommandSavesAndClearsFocus") -and
+        $testText.Contains("ShouldShowMapMarkerConfirmButtonForTesting") -and
+        $testText.Contains("GetMapMarkerVisibleActionIdsForTesting") -and
+        $testText.Contains("BuildMapMarkerConfirmCommandIdForTesting") -and
+        -not $testText.Contains("section+subpanel-card+empty-text-only+confirm-button")) {
+        Write-Pass "Map marker F5 list keeps name-save command coverage without locking the old subpanel or always-visible confirm visual contract."
+    }
+    else {
+        Write-FailHealth "Map marker F5 list must keep confirm-name command coverage without re-locking the old subpanel/card or always-visible confirm visual contract."
     }
 
     $srcRoot = Join-Path $RepoRoot "src\JueMingZ"
@@ -1726,7 +1780,7 @@ function Test-MapCustomMarkerGovernance {
         Write-Pass "Map fullscreen jump compat remains limited to fullscreen-map UI fields."
     }
     else {
-        Write-FailHealth "MapFullscreenCompat must only write Main.mapFullscreen, Main.mapFullscreenPos, and Main.mapFullscreenScale."
+        Write-FailHealth "MapFullscreenCompat must only write fullscreen-map UI state and must not expand into player movement, ActionQueue, or JSON writes."
     }
 
     $requiredDiagnosticFields = @(
@@ -1735,17 +1789,58 @@ function Test-MapCustomMarkerGovernance {
         "PlayerWorldMapMarkersLastMessage",
         "PlayerWorldMapMarkersLastPairId",
         "PlayerWorldMapMarkersCount",
+        "PlayerWorldMapMarkersReadFailed",
+        "PlayerWorldMapMarkersWriteFailed",
+        "PlayerWorldMapMarkersLimitExceeded",
+        "PlayerWorldMapMarkersCulledByCacheLimit",
         "PlayerWorldMapMarkersLastOperation",
         "PlayerWorldMapMarkersLastUiAction",
         "PlayerWorldMapMarkersLastJumpResult",
+        "MapMarkerLastJumpRequestedTileX",
+        "MapMarkerLastJumpRequestedTileY",
+        "MapMarkerLastJumpWrittenMapPosX",
+        "MapMarkerLastJumpWrittenMapPosY",
+        "MapMarkerLastJumpScale",
+        "MapMarkerLastJumpReleasedUiCapture",
+        "MapMarkerLastJumpClearedPanState",
+        "MapMarkerLastJumpConsumedButtonPulse",
+        "MapMarkerLastJumpVanillaMapInputHandoff",
+        "MapMarkerLastBlockedReason",
+        "MapMarkerLastTransformRoute",
+        "MapMarkerLastTransformScreenWidth",
+        "MapMarkerLastTransformScreenHeight",
+        "MapMarkerLastTransformMapTopLeftX",
+        "MapMarkerLastTransformMapTopLeftY",
+        "MapMarkerLastTransformScale",
+        "MapMarkerLastTransformMapFullscreenPosX",
+        "MapMarkerLastTransformMapFullscreenPosY",
+        "MapMarkerLastTransformGameUpdateCount",
+        "MapMarkerLastTransformUtc",
+        "MapMarkerLastRightClickMouseX",
+        "MapMarkerLastRightClickMouseY",
+        "MapMarkerLastRightClickTileX",
+        "MapMarkerLastRightClickTileY",
+        "MapMarkerLastRightClickTransformSource",
+        "MapMarkerLastRightClickFallbackReason",
+        "MapMarkerLastRightClickMapFullscreenPosX",
+        "MapMarkerLastRightClickMapFullscreenPosY",
+        "MapMarkerLastRightClickMapScale",
+        "MapMarkerLastRightClickTransformAgeUpdates",
         "PlayerWorldMapMarkersUiOnlyActionCount",
         "MapMarkerPickerOpen",
+        "MapMarkerPickerAnchorScreenX",
+        "MapMarkerPickerAnchorScreenY",
+        "MapMarkerPickerPanelX",
+        "MapMarkerPickerPanelY",
+        "MapMarkerPickerPanelClamped",
         "MapMarkerPickerLastDraw",
         "MapMarkerPickerLastFullscreenDraw",
         "MapMarkerPickerDrawRoute",
         "MapMarkerPickerDrawSkippedReason",
         "MapMarkerPickerLastClick",
-        "MapMarkerPickerLastCloseReason"
+        "MapMarkerPickerLastCloseReason",
+        "PlayerWorldMapMarkersLastReadUtc",
+        "PlayerWorldMapMarkersLastWriteUtc"
     )
     $missingDiagnosticFields = @()
     foreach ($field in $requiredDiagnosticFields) {
@@ -1756,11 +1851,85 @@ function Test-MapCustomMarkerGovernance {
         }
     }
 
-    if ($diagnosticsText.Contains("RecordUiAction") -and $missingDiagnosticFields.Count -eq 0) {
-        Write-Pass "Map marker runtime snapshot covers read/write status, picker state, and UI action summaries."
+    if ($diagnosticsText.Contains("RecordUiAction") -and
+        $diagnosticsText.Contains("RecordJumpState") -and
+        $diagnosticsText.Contains("RecordFullscreenTransform") -and
+        $diagnosticsText.Contains("RecordRightClick") -and
+        $testText.Contains("PlayerWorldMapMarkerDiagnosticsRecordsUiActionAndJumpState") -and
+        $testText.Contains("PlayerWorldMapMarkerDiagnosticsRecordsCoordinateTransformState") -and
+        $missingDiagnosticFields.Count -eq 0) {
+        Write-Pass "Map marker runtime snapshot covers read/write status, picker state, transform coordinates, jump state, and UI action summaries."
     }
     else {
-        Write-FailHealth "Map marker diagnostics must include read/write status, picker draw/click/close state, last UI action, last jump result, and UI-only action count in runtime snapshot JSON."
+        Write-FailHealth "Map marker diagnostics must include read/write status, transform coordinates, picker draw/click/close state, last UI action, last jump state, and UI-only action count in runtime snapshot JSON."
+    }
+
+    $screenToTileBody = [System.Text.RegularExpressions.Regex]::Match(
+        $mapCompatText,
+        'internal\s+static\s+MapCustomMarkerMapPoint\s+ScreenToTile\([\s\S]*?internal\s+static\s+Vector2\s+BuildFallbackMapTopLeftForTesting',
+        [System.Text.RegularExpressions.RegexOptions]::Singleline).Value
+    $fallbackScreenToTileUsesSharedOrigin =
+        $screenToTileBody.Contains("BuildFallbackMapTopLeft") -and
+        $screenToTileBody.Contains("ScreenToTileFromTransform") -and
+        -not [System.Text.RegularExpressions.Regex]::IsMatch($screenToTileBody, 'mouse[XY]\s*[-+]\s*.*screen(?:Width|Height)\s*/\s*2f')
+    $screenToTileFromTransformBody = [System.Text.RegularExpressions.Regex]::Match(
+        $mapCompatText,
+        'private\s+static\s+MapCustomMarkerMapPoint\s+ScreenToTileFromTransform\([\s\S]*?private\s+static\s+long\s+ReadGameUpdateCountOrUnknown',
+        [System.Text.RegularExpressions.RegexOptions]::Singleline).Value
+    $screenToTileUsesRecordedOverlayOrigin =
+        $screenToTileFromTransformBody.Contains("mouseX - mapTopLeftX") -and
+        $screenToTileFromTransformBody.Contains("mouseY - mapTopLeftY") -and
+        -not $screenToTileFromTransformBody.Contains("FullscreenMapIconOriginTileOffset") -and
+        -not [System.Text.RegularExpressions.Regex]::IsMatch($screenToTileFromTransformBody, 'mapTopLeft[XY]\s*-\s*[^;\r\n]*scale')
+    if ($mapCompatText.Contains("RecordFullscreenTransform") -and
+        $mapCompatText.Contains("TryScreenToTileFromLastTransform") -and
+        $mapCompatText.Contains("ScreenToTileFromTransform") -and
+        $mapCompatText.Contains("AreScreenSizesCompatible") -and
+        $mapCompatText.Contains("IsTransformViewStateFresh") -and
+        $mapCompatText.Contains("viewStateMismatch") -and
+        $mapCompatText.Contains("BuildFallbackMapTopLeft") -and
+        $screenToTileUsesRecordedOverlayOrigin -and
+        $fallbackScreenToTileUsesSharedOrigin -and
+        $stylePickerOverlayText.Contains("MapCustomMarkerMapCompat.RecordFullscreenTransform") -and
+        $stylePickerOverlayText.Contains("RecordFullscreenTransform(transform)") -and
+        $interactionText.Contains("RecordRightClick(point)") -and
+        $interactionText.Contains("CreatePlacement(point)") -and
+        $testText.Contains("TryScreenToTileFromLastTransformForTesting") -and
+        $testText.Contains("stale transform cache") -and
+        $testText.Contains("pending placement must freeze the right-click tile") -and
+        $testText.Contains("round-trip with the MapOverlayDrawContext draw path") -and
+        $testText.Contains("UI scale-equivalent screen size") -and
+        $testText.Contains("same overlay origin")) {
+        Write-Pass "Map marker fullscreen coordinates use the cached OnPostFullscreenMapDraw overlay origin and round-trip with the map-layer draw path before falling back."
+    }
+    else {
+        Write-FailHealth "Map marker right-click coordinates must prefer the cached fullscreen draw transform, use the recorded overlay origin without a second 10-tile subtraction, record diagnostics, and keep fallback on the shared transform path."
+    }
+
+    if ($mapMarkerFeatureDocText.Contains("viewStateMismatch") -and
+        $mapMarkerFeatureDocText.Contains("MapMarkerLastRightClickTransformAgeUpdates") -and
+        $mapMarkerFeatureDocText.Contains("UI scale 等价 screen size") -and
+        $diagnosticRulesText.Contains("MapMarkerLastRightClickFallbackReason") -and
+        $diagnosticRulesText.Contains("screenSizeMismatch") -and
+        $diagnosticRulesText.Contains("viewStateMismatch") -and
+        $diagnosticRulesText.Contains("MapMarkerLastRightClickTransformAgeUpdates") -and
+        $diagnosticRulesText.Contains("MapMarkerLastTransformMapFullscreenPosX/Y")) {
+        Write-Pass "Map marker feature and diagnostics docs explain right-click transform source, fallback reason, view-state mismatch, and transform age fields."
+    }
+    else {
+        Write-FailHealth "Map marker docs must explain transform source, screenSizeMismatch, viewStateMismatch, and transform-age diagnostics for user-returned snapshots."
+    }
+
+    if ($stylePickerOverlayText.Contains('VisualContract = "icon-cells-only"') -and
+        $stylePickerOverlayText.Contains("var desiredX = anchorX;") -and
+        $stylePickerOverlayText.Contains("var desiredY = anchorY;") -and
+        -not $stylePickerOverlayText.Contains("UiPrimitiveRenderer.DrawRoundedRect") -and
+        $testText.Contains("must sit directly at the right-click anchor") -and
+        $testText.Contains('"icon-cells-only"')) {
+        Write-Pass "Map marker style picker stays anchored to the right-click point and keeps the icon-cells-only visual contract."
+    }
+    else {
+        Write-FailHealth "Map marker style picker must sit at the right-click anchor by default, clamp only at screen edges, and avoid a large rounded panel background."
     }
 
     $mapPickerInGameDispatcher = [System.Text.RegularExpressions.Regex]::IsMatch(
@@ -1800,11 +1969,28 @@ function Test-MapCustomMarkerGovernance {
 
     if ($handlerText.Contains("RecordUiAction") -and
         $handlerText.Contains("uiOnlyNotImplemented") -and
+        $handlerText.Contains('\"requestedTileX\"') -and
+        $handlerText.Contains('\"requestedTileY\"') -and
         $handlerText.Contains('\"tileX\"') -and
         $handlerText.Contains('\"tileY\"') -and
+        $handlerText.Contains('\"writtenMapPosX\"') -and
+        $handlerText.Contains('\"writtenMapPosY\"') -and
         $handlerText.Contains('\"scale\"') -and
         $handlerText.Contains('\"resultCode\"') -and
+        $handlerText.Contains('\"writeStatus\"') -and
         $handlerText.Contains('\"mouseCaptured\"') -and
+        $handlerText.Contains('\"releasedUiCapture\"') -and
+        $handlerText.Contains('\"closedF5\"') -and
+        $handlerText.Contains('\"clearedPanState\"') -and
+        $handlerText.Contains('\"consumedJumpButtonPulse\"') -and
+        $handlerText.Contains('\"vanillaMapInputHandoff\"') -and
+        $handlerText.Contains("HideForMapCustomMarkerJumpAndReleaseCapture") -and
+        $handlerText.Contains("RecordJumpState") -and
+        $legacyWindowStateText.Contains('ConsumeMouseTriggerForOperationWindow("MouseLeft"') -and
+        $legacyWindowStateText.Contains("ConsumedJumpButtonPulse") -and
+        $uiMouseCaptureServiceText.Contains("ConsumeMouseTriggerForOperationWindow") -and
+        $uiMouseCaptureServiceText.Contains("TryConsumeMouseTriggerInput") -and
+        $handlerText.Contains("nameInputNotFocused") -and
         $handlerText.Contains("must not scan paths") -and
         $handlerText.Contains("move the player")) {
         Write-Pass "Map marker UI command metadata covers jump diagnostics and UI-only placeholder boundaries."
@@ -1813,13 +1999,56 @@ function Test-MapCustomMarkerGovernance {
         Write-FailHealth "Map marker UI actions must keep featureId/markerId/tile/scale/result/mouse metadata and explicit UI-only placeholder result codes."
     }
 
+    $requiredF5HotkeyFields = @(
+        "LegacyMainUiLastF5HotkeyDecision",
+        "LegacyMainUiLastF5HotkeyReason",
+        "LegacyMainUiLastF5HotkeyDown",
+        "LegacyMainUiLastF5HotkeyWasDown",
+        "LegacyMainUiLastF5HotkeyDebounceRemainingMs",
+        "LegacyMainUiLastF5HotkeyUtc"
+    )
+    $missingF5HotkeyFields = @()
+    foreach ($field in $requiredF5HotkeyFields) {
+        if (-not $snapshotText.Contains($field) -or
+            -not $snapshotWriterText.Contains($field) -or
+            -not $diagnosticUiSnapshotBuilderText.Contains($field)) {
+            $missingF5HotkeyFields += $field
+        }
+    }
+
+    if ($missingF5HotkeyFields.Count -eq 0 -and
+        $debugHotkeyText.Contains("EvaluateF5HotkeyForTesting") -and
+        $debugHotkeyText.Contains("gameInputUnavailable") -and
+        $debugHotkeyText.Contains("notForeground") -and
+        $debugHotkeyText.Contains("NextWasDown") -and
+        $debugHotkeyText.Contains("RecordF5HotkeyDecision") -and
+        -not $debugHotkeyText.Contains("ToggleDebounce") -and
+        -not $debugHotkeyText.Contains('"debounce"') -and
+        $uiInputTestText.Contains("LegacyMainF5HotkeyEdgeTracksPhysicalPressAcrossGates") -and
+        $uiInputTestText.Contains("rapidRepress") -and
+        $uiInputTestText.Contains("DiagnosticSnapshotWritesLegacyMainF5HotkeyState") -and
+        -not $uiInputTestText.Contains("AssertF5Decision(debounce")) {
+        Write-Pass "Map marker F5 hotkey diagnostics stay covered without locking a fixed debounce contract."
+    }
+    else {
+        Write-FailHealth "F5 hotkey edge diagnostics must keep snapshot fields and gate-aware tests without requiring a fixed debounce swallow."
+    }
+
     if ($testText.Contains("PlayerWorldMapMarkersDiagnosticsWrittenToSnapshot") -and
+        $testText.Contains("PlayerWorldMapMarkerDiagnosticsRecordsUiActionAndJumpState") -and
         $testText.Contains("MapFullscreenJumpTargetClampsPositionAndScale") -and
         $testText.Contains("MapFullscreenJumpTargetFailsWithoutWorldDimensions") -and
+        $testText.Contains("MapFullscreenJumpClearsPanState") -and
+        $testText.Contains("MapCustomMarkerJumpReleaseClosesF5AndUiCapture") -and
+        $testText.Contains("must stop after release so vanilla fullscreen map input can take over") -and
+        $testText.Contains("MapCustomMarkerConfirmNameCommandSavesAndClearsFocus") -and
         $testText.Contains("MapCustomMarkerRightClickReleaseGateRequiresReleaseBeforeClose") -and
+        $testText.Contains("MapCustomMarkerFullscreenCoordinateClamp") -and
+        $testText.Contains("MapCustomMarkerStyleWhitelistAndPickerClamp") -and
         $testText.Contains("MapCustomMarkerFullscreenPickerDrawRouteUsesPostFullscreenMapDraw") -and
-        $testText.Contains("Only navigation, teleport and autopilot must stay UI-only")) {
-        Write-Pass "Map marker tests cover diagnostics, fullscreen draw route, right-click close gating, jump clamp/fail-soft, and UI-only action classification."
+        $testText.Contains("Only navigation, teleport and autopilot must stay UI-only") -and
+        $uiInputTestText.Contains("LegacyMainF5HotkeyEdgeTracksPhysicalPressAcrossGates")) {
+        Write-Pass "Map marker tests cover diagnostics, fullscreen draw route, right-click close gating, jump clamp/fail-soft, F5 edge handling, and UI-only action classification."
     }
     else {
         Write-FailHealth "Map marker tests must cover diagnostics JSON, fullscreen draw route, right-click close gating, jump target clamp/fail-soft, and navigation/teleport/autopilot UI-only classification."

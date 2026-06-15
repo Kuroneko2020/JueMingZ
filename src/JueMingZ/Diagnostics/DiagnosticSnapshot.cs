@@ -109,8 +109,43 @@ namespace JueMingZ.Diagnostics
         public string PlayerWorldMapMarkersLastOperation { get; set; }
         public string PlayerWorldMapMarkersLastUiAction { get; set; }
         public string PlayerWorldMapMarkersLastJumpResult { get; set; }
+        public int MapMarkerLastJumpRequestedTileX { get; set; }
+        public int MapMarkerLastJumpRequestedTileY { get; set; }
+        public double MapMarkerLastJumpWrittenMapPosX { get; set; }
+        public double MapMarkerLastJumpWrittenMapPosY { get; set; }
+        public double MapMarkerLastJumpScale { get; set; }
+        public bool MapMarkerLastJumpReleasedUiCapture { get; set; }
+        public bool MapMarkerLastJumpClearedPanState { get; set; }
+        public bool MapMarkerLastJumpConsumedButtonPulse { get; set; }
+        public bool MapMarkerLastJumpVanillaMapInputHandoff { get; set; }
+        public string MapMarkerLastBlockedReason { get; set; }
+        public string MapMarkerLastTransformRoute { get; set; }
+        public int MapMarkerLastTransformScreenWidth { get; set; }
+        public int MapMarkerLastTransformScreenHeight { get; set; }
+        public double MapMarkerLastTransformMapTopLeftX { get; set; }
+        public double MapMarkerLastTransformMapTopLeftY { get; set; }
+        public double MapMarkerLastTransformScale { get; set; }
+        public double MapMarkerLastTransformMapFullscreenPosX { get; set; }
+        public double MapMarkerLastTransformMapFullscreenPosY { get; set; }
+        public long MapMarkerLastTransformGameUpdateCount { get; set; }
+        public DateTime? MapMarkerLastTransformUtc { get; set; }
+        public int MapMarkerLastRightClickMouseX { get; set; }
+        public int MapMarkerLastRightClickMouseY { get; set; }
+        public int MapMarkerLastRightClickTileX { get; set; }
+        public int MapMarkerLastRightClickTileY { get; set; }
+        public string MapMarkerLastRightClickTransformSource { get; set; }
+        public string MapMarkerLastRightClickFallbackReason { get; set; }
+        public double MapMarkerLastRightClickMapFullscreenPosX { get; set; }
+        public double MapMarkerLastRightClickMapFullscreenPosY { get; set; }
+        public double MapMarkerLastRightClickMapScale { get; set; }
+        public long MapMarkerLastRightClickTransformAgeUpdates { get; set; }
         public int PlayerWorldMapMarkersUiOnlyActionCount { get; set; }
         public bool MapMarkerPickerOpen { get; set; }
+        public int MapMarkerPickerAnchorScreenX { get; set; }
+        public int MapMarkerPickerAnchorScreenY { get; set; }
+        public int MapMarkerPickerPanelX { get; set; }
+        public int MapMarkerPickerPanelY { get; set; }
+        public bool MapMarkerPickerPanelClamped { get; set; }
         public DateTime? MapMarkerPickerLastDraw { get; set; }
         public DateTime? MapMarkerPickerLastFullscreenDraw { get; set; }
         public string MapMarkerPickerDrawRoute { get; set; }
@@ -333,6 +368,12 @@ namespace JueMingZ.Diagnostics
         public double LegacyUiDispatchElapsedMsLast { get; set; }
         public long LegacyUiCommandCoalescedCount { get; set; }
         public long LegacyUiDragFrameActionSkipCount { get; set; }
+        public string LegacyMainUiLastF5HotkeyDecision { get; set; }
+        public string LegacyMainUiLastF5HotkeyReason { get; set; }
+        public bool LegacyMainUiLastF5HotkeyDown { get; set; }
+        public bool LegacyMainUiLastF5HotkeyWasDown { get; set; }
+        public int LegacyMainUiLastF5HotkeyDebounceRemainingMs { get; set; }
+        public DateTime? LegacyMainUiLastF5HotkeyUtc { get; set; }
         public bool LegacyImePanelFocused { get; set; }
         public string LegacyImePanelDiagnosticMessage { get; set; }
         public string LegacyImePanelLastStatus { get; set; }
@@ -1034,6 +1075,12 @@ namespace JueMingZ.Diagnostics
             PlayerWorldMapMarkersLastOperation = string.Empty;
             PlayerWorldMapMarkersLastUiAction = string.Empty;
             PlayerWorldMapMarkersLastJumpResult = string.Empty;
+            MapMarkerLastBlockedReason = string.Empty;
+            MapMarkerLastTransformRoute = string.Empty;
+            MapMarkerLastRightClickTransformSource = string.Empty;
+            MapMarkerLastRightClickFallbackReason = string.Empty;
+            MapMarkerLastTransformGameUpdateCount = -1;
+            MapMarkerLastRightClickTransformAgeUpdates = -1;
             MapMarkerPickerDrawRoute = string.Empty;
             MapMarkerPickerDrawSkippedReason = string.Empty;
             MapMarkerPickerLastCloseReason = string.Empty;
@@ -1135,6 +1182,8 @@ namespace JueMingZ.Diagnostics
             HoveredButtonVisualY = -1;
             HoveredButtonHitX = -1;
             HoveredButtonHitY = -1;
+            LegacyMainUiLastF5HotkeyDecision = string.Empty;
+            LegacyMainUiLastF5HotkeyReason = string.Empty;
             LegacyImePanelDiagnosticMessage = string.Empty;
             LegacyImePanelLastStatus = string.Empty;
             LegacyImePanelLastMessage = string.Empty;

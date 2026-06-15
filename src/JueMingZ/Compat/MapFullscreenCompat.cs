@@ -36,6 +36,9 @@ namespace JueMingZ.Compat
                 Main.mapFullscreen = true;
                 Main.mapFullscreenPos = new Vector2(target.TileX, target.TileY);
                 Main.mapFullscreenScale = target.Scale;
+                target.WrittenMapPosX = Main.mapFullscreenPos.X;
+                target.WrittenMapPosY = Main.mapFullscreenPos.Y;
+                target.ClearedPanState = ClearFullscreenMapPanState();
 
                 result = target;
                 result.ResultCode = "jumped";
@@ -74,9 +77,43 @@ namespace JueMingZ.Compat
             result.TileY = Clamp(tileY, 0, maxTilesY - 1);
             result.WorldSizeX = maxTilesX;
             result.WorldSizeY = maxTilesY;
+            result.WrittenMapPosX = result.TileX;
+            result.WrittenMapPosY = result.TileY;
             result.ResultCode = "ok";
             result.Message = "ok";
             return result;
+        }
+
+        private static bool ClearFullscreenMapPanState()
+        {
+            // Jump writes only fullscreen map UI state. Keeping vanilla pan and
+            // drag anchors synchronized prevents the next draw from lerping or
+            // dragging away from the requested marker.
+            var state = BuildClearedPanState(Main.mapFullscreenPos, Main.mouseX, Main.mouseY);
+            Main.PanTargetMapFullscreen = state.PanTargetMapFullscreen;
+            Main.PanTargetMapFullscreenEnd = state.PanTargetMapFullscreenEnd;
+            Main.resetMapFull = state.ResetMapFull;
+            Main.grabMapX = state.GrabMapX;
+            Main.grabMapY = state.GrabMapY;
+            return state.Cleared;
+        }
+
+        internal static MapFullscreenPanStateSnapshot BuildClearedPanStateForTesting(Vector2 mapFullscreenPos, int mouseX, int mouseY)
+        {
+            return BuildClearedPanState(mapFullscreenPos, mouseX, mouseY);
+        }
+
+        private static MapFullscreenPanStateSnapshot BuildClearedPanState(Vector2 mapFullscreenPos, int mouseX, int mouseY)
+        {
+            return new MapFullscreenPanStateSnapshot
+            {
+                PanTargetMapFullscreen = false,
+                PanTargetMapFullscreenEnd = mapFullscreenPos,
+                ResetMapFull = false,
+                GrabMapX = mouseX,
+                GrabMapY = mouseY,
+                Cleared = true
+            };
         }
 
         private static float ClampScale(float scale)
@@ -115,11 +152,24 @@ namespace JueMingZ.Compat
         public int WorldSizeX { get; set; }
         public int WorldSizeY { get; set; }
         public float Scale { get; set; }
+        public float WrittenMapPosX { get; set; }
+        public float WrittenMapPosY { get; set; }
+        public bool ClearedPanState { get; set; }
 
         public MapFullscreenJumpResult()
         {
             ResultCode = string.Empty;
             Message = string.Empty;
         }
+    }
+
+    internal sealed class MapFullscreenPanStateSnapshot
+    {
+        public bool PanTargetMapFullscreen { get; set; }
+        public Vector2 PanTargetMapFullscreenEnd { get; set; }
+        public bool ResetMapFull { get; set; }
+        public float GrabMapX { get; set; }
+        public float GrabMapY { get; set; }
+        public bool Cleared { get; set; }
     }
 }

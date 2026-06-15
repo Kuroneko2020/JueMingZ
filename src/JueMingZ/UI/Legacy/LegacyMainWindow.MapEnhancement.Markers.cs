@@ -11,14 +11,19 @@ namespace JueMingZ.UI.Legacy
     public static partial class LegacyMainWindow
     {
         private const int MapMarkerListHeaderHeight = 24;
-        private const int MapMarkerListRowHeight = 34;
+        private const int MapMarkerListCardHeight = 34;
+        private const int MapMarkerListCardGap = 5;
+        private const int MapMarkerListBodyPadding = 8;
         private const int MapMarkerListEmptyHeight = 30;
         private const int MapMarkerListTopGap = 8;
         private const string MapMarkerNameTooltip = "双击输入，限10个字";
+        private const string MapMarkerNameConfirmTooltip = "确认保存名称";
         private const string MapMarkerJumpTooltip = "地图跳转到标记位置";
         private const string MapMarkerNavigateTooltip = "分析可达路径";
         private const string MapMarkerTeleportTooltip = "消耗虫洞药水*1 回忆药水*1传送";
         private const string MapMarkerAutopilotTooltip = "暂未实现";
+        private const string MapMarkerConfirmAction = "confirm-name";
+        private const string MapMarkerListVisualContract = "section+link-card+empty-text-only+focused-confirm";
 
         private static LegacyUiElement DrawMapMarkerList(
             object spriteBatch,
@@ -34,7 +39,7 @@ namespace JueMingZ.UI.Legacy
             var y = contentY + MapMarkerListTopGap;
             var hovered = (LegacyUiElement)null;
 
-            DrawMapMarkerListHeader(spriteBatch, area, y, read);
+            DrawSection(spriteBatch, area, y, BuildMapMarkerListSectionTitle(read));
             y += MapMarkerListHeaderHeight;
 
             if (markers.Count <= 0)
@@ -43,40 +48,19 @@ namespace JueMingZ.UI.Legacy
                 return null;
             }
 
+            var cardY = y + MapMarkerListBodyPadding;
             for (var index = 0; index < markers.Count; index++)
             {
-                hovered = DrawMapMarkerListRow(spriteBatch, area, mouse, elements, y + index * MapMarkerListRowHeight, markers[index], index) ?? hovered;
+                hovered = DrawMapMarkerListRow(spriteBatch, area, mouse, elements, cardY + index * (MapMarkerListCardHeight + MapMarkerListCardGap), markers[index], index) ?? hovered;
             }
 
             return hovered;
         }
 
-        private static void DrawMapMarkerListHeader(object spriteBatch, LegacyScrollArea area, int contentY, PlayerWorldMapMarkerReadResult read)
+        private static string BuildMapMarkerListSectionTitle(PlayerWorldMapMarkerReadResult read)
         {
-            var rect = new LegacyUiRect(area.Viewport.X, area.ToScreenY(contentY), area.Viewport.Width, MapMarkerListHeaderHeight);
-            if (!area.IsVisible(rect))
-            {
-                return;
-            }
-
             var count = read == null || !read.IdentityResolved ? "--" : Math.Max(0, read.MarkerCount).ToString(CultureInfo.InvariantCulture);
-            UiTextRenderer.DrawAlignedTextClipped(
-                spriteBatch,
-                "标记列表 " + count,
-                rect.X + 10,
-                rect.Y + 2,
-                Math.Max(1, rect.Width - 20),
-                rect.Height - 2,
-                UiTextHorizontalAlignment.Left,
-                area.Viewport.X,
-                area.Viewport.Y,
-                area.Viewport.Width,
-                area.Viewport.Height,
-                205,
-                218,
-                238,
-                235,
-                0.72f);
+            return "标记列表 " + count;
         }
 
         private static void DrawMapMarkerListEmpty(object spriteBatch, LegacyScrollArea area, int contentY, PlayerWorldMapMarkerReadResult read)
@@ -87,7 +71,6 @@ namespace JueMingZ.UI.Legacy
                 return;
             }
 
-            LegacyUiTheme.DrawRowClipped(spriteBatch, rect, area.Viewport);
             var text = read == null || read.IdentityResolved ? "暂无地图标记" : "当前玩家-世界身份不可用";
             UiTextRenderer.DrawAlignedTextClipped(
                 spriteBatch,
@@ -122,21 +105,24 @@ namespace JueMingZ.UI.Legacy
                 return null;
             }
 
-            var row = new LegacyUiRect(area.Viewport.X, area.ToScreenY(contentY), area.Viewport.Width, MapMarkerListRowHeight - 4);
-            if (!area.IsVisible(row))
+            var card = new LegacyUiRect(area.Viewport.X + MapMarkerListBodyPadding, area.ToScreenY(contentY), area.Viewport.Width - MapMarkerListBodyPadding * 2, MapMarkerListCardHeight);
+            if (!area.IsVisible(card))
             {
                 return null;
             }
 
-            LegacyUiTheme.DrawRowClipped(spriteBatch, row, area.Viewport);
-            var iconRect = new LegacyUiRect(row.X + 8, row.Y + 4, 22, 22);
+            LegacyUiTheme.DrawRowClipped(spriteBatch, card, area.Viewport);
+            var iconCell = new LegacyUiRect(card.X + 4, card.Y + Math.Max(0, (card.Height - QuickItemIconCellSize) / 2), QuickItemIconCellSize, QuickItemIconCellSize);
+            LegacyUiTheme.DrawCellClipped(spriteBatch, iconCell, false, false, false, area.Viewport);
+            var iconRect = new LegacyUiRect(iconCell.X + 2, iconCell.Y + 2, iconCell.Width - 4, iconCell.Height - 4);
             DrawMapMarkerItemIcon(spriteBatch, iconRect, area.Viewport, marker.IconItemId);
 
             const int gap = 5;
-            var buttonY = row.Y + 4;
-            var smallWidth = ResolveMapMarkerSmallButtonWidth(row.Width);
+            var confirmVisible = ShouldShowMapMarkerConfirmButton(marker.MarkerId);
+            var buttonY = card.Y + Math.Max(0, (card.Height - RowModeButtonHeight) / 2);
+            var smallWidth = ResolveMapMarkerSmallButtonWidth(card.Width);
             var deleteWidth = Math.Max(38, smallWidth);
-            var x = row.Right - 8 - deleteWidth;
+            var x = card.Right - 4 - deleteWidth;
             var hovered = (LegacyUiElement)null;
             hovered = DrawMapMarkerSmallButton(spriteBatch, area, mouse, elements, new LegacyUiRect(x, buttonY, deleteWidth, RowModeButtonHeight), "map-custom-marker:delete:" + marker.MarkerId, "删除", "删除地图标记", true, false) ?? hovered;
             x -= smallWidth + gap;
@@ -147,8 +133,15 @@ namespace JueMingZ.UI.Legacy
             hovered = DrawMapMarkerSmallButton(spriteBatch, area, mouse, elements, new LegacyUiRect(x, buttonY, smallWidth, RowModeButtonHeight), "map-custom-marker:navigate:" + marker.MarkerId, "导航", MapMarkerNavigateTooltip, false, false) ?? hovered;
             x -= smallWidth + gap;
             hovered = DrawMapMarkerSmallButton(spriteBatch, area, mouse, elements, new LegacyUiRect(x, buttonY, smallWidth, RowModeButtonHeight), "map-custom-marker:jump:" + marker.MarkerId, "跳转", MapMarkerJumpTooltip, true, false) ?? hovered;
+            if (confirmVisible)
+            {
+                x -= smallWidth + gap;
+                // Confirm belongs only to the active name input state; keeping it
+                // hidden when unfocused avoids turning it back into a permanent row action.
+                hovered = DrawMapMarkerSmallButton(spriteBatch, area, mouse, elements, new LegacyUiRect(x, buttonY, smallWidth, RowModeButtonHeight), BuildMapMarkerConfirmCommandId(marker.MarkerId), "确认", MapMarkerNameConfirmTooltip, true, false) ?? hovered;
+            }
 
-            var inputX = iconRect.Right + 7;
+            var inputX = iconCell.Right + 5;
             var inputWidth = Math.Max(54, x - gap - inputX);
             var inputRect = new LegacyUiRect(inputX, buttonY, inputWidth, RowModeButtonHeight);
             hovered = DrawMapMarkerNameInput(spriteBatch, area, mouse, elements, inputRect, marker, index) ?? hovered;
@@ -284,7 +277,7 @@ namespace JueMingZ.UI.Legacy
 
         private static int ResolveMapMarkerSmallButtonWidth(int rowWidth)
         {
-            return rowWidth < 420 ? 38 : 44;
+            return rowWidth < 420 ? 36 : 42;
         }
 
         private static float FitMapMarkerButtonTextScale(string label, int width)
@@ -308,7 +301,14 @@ namespace JueMingZ.UI.Legacy
 
         private static int CalculateMapMarkerListHeightForCount(int markerCount)
         {
-            return MapMarkerListTopGap + MapMarkerListHeaderHeight + (markerCount <= 0 ? MapMarkerListEmptyHeight : markerCount * MapMarkerListRowHeight);
+            return MapMarkerListTopGap + MapMarkerListHeaderHeight + CalculateMapMarkerListBodyHeightForCount(markerCount);
+        }
+
+        private static int CalculateMapMarkerListBodyHeightForCount(int markerCount)
+        {
+            return markerCount <= 0
+                ? MapMarkerListEmptyHeight
+                : MapMarkerListBodyPadding * 2 + markerCount * MapMarkerListCardHeight + Math.Max(0, markerCount - 1) * MapMarkerListCardGap;
         }
 
         internal static string BuildMapMarkerNameInputId(string markerId)
@@ -316,11 +316,59 @@ namespace JueMingZ.UI.Legacy
             return "map-custom-marker:name-input:" + ((markerId ?? string.Empty).Trim());
         }
 
+        internal static string BuildMapMarkerConfirmCommandIdForTesting(string markerId)
+        {
+            return BuildMapMarkerConfirmCommandId(markerId);
+        }
+
+        private static string BuildMapMarkerConfirmCommandId(string markerId)
+        {
+            return "map-custom-marker:" + MapMarkerConfirmAction + ":" + ((markerId ?? string.Empty).Trim());
+        }
+
+        private static bool ShouldShowMapMarkerConfirmButton(string markerId)
+        {
+            return LegacyTextInput.IsFocused(BuildMapMarkerNameInputId(markerId));
+        }
+
+        internal static bool ShouldShowMapMarkerConfirmButtonForTesting(string markerId)
+        {
+            return ShouldShowMapMarkerConfirmButton(markerId);
+        }
+
+        internal static string[] GetMapMarkerVisibleActionIdsForTesting(string markerId)
+        {
+            var normalizedMarkerId = (markerId ?? string.Empty).Trim();
+            var ids = new List<string>();
+            if (ShouldShowMapMarkerConfirmButton(normalizedMarkerId))
+            {
+                ids.Add(BuildMapMarkerConfirmCommandId(normalizedMarkerId));
+            }
+
+            ids.Add("map-custom-marker:jump:" + normalizedMarkerId);
+            ids.Add("map-custom-marker:navigate:" + normalizedMarkerId);
+            ids.Add("map-custom-marker:teleport:" + normalizedMarkerId);
+            ids.Add("map-custom-marker:autopilot:" + normalizedMarkerId);
+            ids.Add("map-custom-marker:delete:" + normalizedMarkerId);
+            return ids.ToArray();
+        }
+
+        internal static int CalculateMapMarkerListBodyHeightForTesting(int markerCount)
+        {
+            return CalculateMapMarkerListBodyHeightForCount(markerCount);
+        }
+
+        internal static string GetMapMarkerListVisualContractForTesting()
+        {
+            return MapMarkerListVisualContract;
+        }
+
         internal static string[] GetMapMarkerActionTooltipsForTesting()
         {
             return new[]
             {
                 MapMarkerNameTooltip,
+                MapMarkerNameConfirmTooltip,
                 MapMarkerJumpTooltip,
                 MapMarkerNavigateTooltip,
                 MapMarkerTeleportTooltip,

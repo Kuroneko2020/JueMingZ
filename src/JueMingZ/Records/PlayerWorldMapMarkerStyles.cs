@@ -9,7 +9,7 @@ namespace JueMingZ.Records
             new PlayerWorldMapMarkerStyle(8, "火把"),
             new PlayerWorldMapMarkerStyle(48, "宝箱"),
             new PlayerWorldMapMarkerStyle(50, "魔镜"),
-            new PlayerWorldMapMarkerStyle(75, "坠星"),
+            new PlayerWorldMapMarkerStyle(PlayerWorldMapMarkerConstants.ReplacementBedIconItemId, "床"),
             new PlayerWorldMapMarkerStyle(171, "标牌"),
             new PlayerWorldMapMarkerStyle(393, "指南针"),
             new PlayerWorldMapMarkerStyle(966, "篝火"),

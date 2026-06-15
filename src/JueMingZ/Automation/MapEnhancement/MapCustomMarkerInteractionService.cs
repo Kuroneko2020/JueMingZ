@@ -36,8 +36,15 @@ namespace JueMingZ.Automation.MapEnhancement
             settings = settings ?? RuntimeSettingsSnapshotProvider.GetCurrent();
             var enabled = settings.MapCustomMarkersEnabled;
 
-            if (!enabled || !CanInteract(snapshot))
+            var blockedReason = string.Empty;
+            if (!enabled || !CanInteract(snapshot, out blockedReason))
             {
+                if (!enabled)
+                {
+                    blockedReason = "disabled";
+                }
+
+                PlayerWorldMapMarkerDiagnostics.RecordBlockedReason(blockedReason);
                 ClosePicker("blocked");
                 _rightDownLastTick = false;
                 return;
@@ -84,17 +91,10 @@ namespace JueMingZ.Automation.MapEnhancement
                 return;
             }
 
+            PlayerWorldMapMarkerDiagnostics.RecordRightClick(point);
             lock (SyncRoot)
             {
-                _placement = new MapCustomMarkerPendingPlacement
-                {
-                    TileX = point.TileX,
-                    TileY = point.TileY,
-                    ScreenX = point.ScreenX,
-                    ScreenY = point.ScreenY,
-                    WorldSizeX = point.WorldSizeX,
-                    WorldSizeY = point.WorldSizeY
-                };
+                _placement = CreatePlacement(point);
                 _pendingIconItemId = null;
                 _ignoreRightCloseUntilReleased = true;
             }
@@ -181,24 +181,63 @@ namespace JueMingZ.Automation.MapEnhancement
             _lastMessage = string.Empty;
         }
 
-        private static bool CanInteract(GameStateSnapshot snapshot)
+        internal static MapCustomMarkerPendingPlacement CreatePlacementForTesting(MapCustomMarkerMapPoint point)
         {
+            return CreatePlacement(point);
+        }
+
+        private static bool CanInteract(GameStateSnapshot snapshot, out string blockedReason)
+        {
+            blockedReason = string.Empty;
             if (snapshot == null || !snapshot.IsInWorld || snapshot.IsInMainMenu)
             {
+                blockedReason = "mapClosed";
                 return false;
             }
 
-            if (LegacyMainUiState.Visible || LegacyTextInput.IsAnyFocused)
+            if (LegacyMainUiState.Visible)
             {
+                blockedReason = "f5Visible";
+                return false;
+            }
+
+            if (LegacyTextInput.IsAnyFocused)
+            {
+                blockedReason = "textInputFocused";
                 return false;
             }
 
             var ui = snapshot.Ui;
-            return ui == null ||
-                   (ui.GameInputAvailable &&
-                    !ui.ChatOpen &&
-                    !ui.ChestOpen &&
-                    !ui.NpcChatOpen);
+            if (ui == null)
+            {
+                return true;
+            }
+
+            if (!ui.GameInputAvailable)
+            {
+                blockedReason = "gameInputUnavailable";
+                return false;
+            }
+
+            if (ui.ChatOpen)
+            {
+                blockedReason = "chatOpen";
+                return false;
+            }
+
+            if (ui.ChestOpen)
+            {
+                blockedReason = "chestOpen";
+                return false;
+            }
+
+            if (ui.NpcChatOpen)
+            {
+                blockedReason = "npcChatOpen";
+                return false;
+            }
+
+            return true;
         }
 
         private static void ConsumePendingSelection()
@@ -255,6 +294,24 @@ namespace JueMingZ.Automation.MapEnhancement
             {
                 RecordStatus(write == null ? "writeFailed" : write.Status, write == null ? "write unavailable" : write.Message);
             }
+        }
+
+        private static MapCustomMarkerPendingPlacement CreatePlacement(MapCustomMarkerMapPoint point)
+        {
+            if (point == null)
+            {
+                return null;
+            }
+
+            return new MapCustomMarkerPendingPlacement
+            {
+                TileX = point.TileX,
+                TileY = point.TileY,
+                ScreenX = point.ScreenX,
+                ScreenY = point.ScreenY,
+                WorldSizeX = point.WorldSizeX,
+                WorldSizeY = point.WorldSizeY
+            };
         }
 
         private static void ReleaseRightCloseGateIfNeeded(bool rightDown)

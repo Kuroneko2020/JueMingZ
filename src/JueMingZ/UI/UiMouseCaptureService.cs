@@ -102,6 +102,32 @@ namespace JueMingZ.UI
             return released;
         }
 
+        public static bool ConsumeMouseTriggerForOperationWindow(string triggerToken, out string message)
+        {
+            // One-shot UI command cleanup only: this consumes the click that
+            // activated a Legacy UI control and lets vanilla own later input.
+            if (!TerrariaMainCompat.AllowsInputProcessing)
+            {
+                InvalidateCache();
+                message = "UI mouse trigger consume skipped because game input is unavailable.";
+                return false;
+            }
+
+            var consumed = TerrariaUiMouseCompat.TryConsumeMouseTriggerInput(triggerToken, out message);
+            lock (SyncRoot)
+            {
+                _captureActive = false;
+                _lastCaptureSucceeded = false;
+                _lastSuppressSucceeded = false;
+                _lastCaptureFrameKey = UiInputFrameKey.None;
+                _lastSuppressFrameKey = UiInputFrameKey.None;
+                _lastCaptureFrameKeyValid = false;
+                _lastSuppressFrameKeyValid = false;
+            }
+
+            return consumed;
+        }
+
         public static void InvalidateCache()
         {
             lock (SyncRoot)

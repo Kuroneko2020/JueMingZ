@@ -2,6 +2,8 @@ using System;
 using System.Reflection;
 using JueMingZ.Compat;
 using JueMingZ.Config;
+using JueMingZ.Diagnostics;
+using JueMingZ.Input;
 using JueMingZ.UI;
 using JueMingZ.UI.Legacy;
 
@@ -276,6 +278,49 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void LegacyMainF5HotkeyEdgeTracksPhysicalPressAcrossGates()
+        {
+            var now = new DateTime(2026, 6, 15, 6, 30, 0, DateTimeKind.Utc);
+            var accepted = DebugHotkeyService.EvaluateF5HotkeyForTesting(true, false, true, true, now, DateTime.MinValue);
+            AssertF5Decision(accepted, true, "pressed", true, false, 0, true);
+
+            var held = DebugHotkeyService.EvaluateF5HotkeyForTesting(true, true, true, true, now.AddMilliseconds(16), now);
+            AssertF5Decision(held, false, "held", true, true, -1, false);
+
+            var blockedInput = DebugHotkeyService.EvaluateF5HotkeyForTesting(true, false, false, true, now.AddSeconds(1), DateTime.MinValue);
+            AssertF5Decision(blockedInput, false, "gameInputUnavailable", true, false, 0, true);
+
+            var heldAfterInputReturns = DebugHotkeyService.EvaluateF5HotkeyForTesting(true, blockedInput.NextWasDown, true, true, now.AddSeconds(2), DateTime.MinValue);
+            AssertF5Decision(heldAfterInputReturns, false, "held", true, true, 0, false);
+
+            var released = DebugHotkeyService.EvaluateF5HotkeyForTesting(false, true, true, true, now.AddSeconds(3), now);
+            AssertF5Decision(released, false, "released", false, true, 0, true);
+
+            var rapidRepress = DebugHotkeyService.EvaluateF5HotkeyForTesting(true, false, true, true, now.AddMilliseconds(80), now);
+            AssertF5Decision(rapidRepress, true, "pressed", true, false, 0, true);
+        }
+
+        private static void DiagnosticSnapshotWritesLegacyMainF5HotkeyState()
+        {
+            var snapshot = new DiagnosticSnapshot
+            {
+                LegacyMainUiLastF5HotkeyDecision = "skipped",
+                LegacyMainUiLastF5HotkeyReason = "gameInputUnavailable",
+                LegacyMainUiLastF5HotkeyDown = true,
+                LegacyMainUiLastF5HotkeyWasDown = false,
+                LegacyMainUiLastF5HotkeyDebounceRemainingMs = 123,
+                LegacyMainUiLastF5HotkeyUtc = new DateTime(2026, 6, 15, 6, 31, 0, DateTimeKind.Utc)
+            };
+
+            var json = InvokeDiagnosticSnapshotJson(snapshot);
+            AssertContains(json, "\"LegacyMainUiLastF5HotkeyDecision\": \"skipped\"");
+            AssertContains(json, "\"LegacyMainUiLastF5HotkeyReason\": \"gameInputUnavailable\"");
+            AssertContains(json, "\"LegacyMainUiLastF5HotkeyDown\": true");
+            AssertContains(json, "\"LegacyMainUiLastF5HotkeyWasDown\": false");
+            AssertContains(json, "\"LegacyMainUiLastF5HotkeyDebounceRemainingMs\": 123");
+            AssertContains(json, "\"LegacyMainUiLastF5HotkeyUtc\": \"2026-06-15T06:31:00.0000000Z\"");
+        }
+
         private static void LegacyUiUpdatePrefixSkipsScrollSnapshotWhenWheelIdle()
         {
             var restoreRuntimeTypes = PushFakeTerrariaMainType();
@@ -503,6 +548,32 @@ namespace JueMingZ.Tests
             Terraria.Main.dedServ = false;
             Terraria.Main.screenWidth = 1280;
             Terraria.Main.screenHeight = 800;
+        }
+
+        private static void AssertF5Decision(
+            F5HotkeyDecision decision,
+            bool shouldToggle,
+            string reason,
+            bool down,
+            bool wasDown,
+            int debounceRemainingMs,
+            bool recordDiagnostic)
+        {
+            if (decision == null ||
+                decision.ShouldToggle != shouldToggle ||
+                !string.Equals(decision.Reason, reason, StringComparison.Ordinal) ||
+                decision.Down != down ||
+                decision.WasDown != wasDown ||
+                (debounceRemainingMs >= 0 && decision.DebounceRemainingMs != debounceRemainingMs) ||
+                decision.RecordDiagnostic != recordDiagnostic)
+            {
+                throw new InvalidOperationException(
+                    "Unexpected F5 hotkey decision: expected " +
+                    reason +
+                    ", got " +
+                    (decision == null ? "<null>" : decision.Reason) +
+                    ".");
+            }
         }
 
         private static Action PushUiMouseCompatMainType(Type mainType)

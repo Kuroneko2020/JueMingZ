@@ -159,6 +159,38 @@ namespace JueMingZ.Tests
             });
         }
 
+        private static void PlayerWorldMapMarkersLegacyFallenStarIconMapsToBed()
+        {
+            WithTemporaryPlayerWorldDataRoot(root =>
+            {
+                if (PlayerWorldMapMarkerConstants.IsAllowedIconItemId(PlayerWorldMapMarkerConstants.LegacyFallenStarIconItemId) ||
+                    PlayerWorldMapMarkerConstants.NormalizeIconItemId(PlayerWorldMapMarkerConstants.LegacyFallenStarIconItemId) != PlayerWorldMapMarkerConstants.ReplacementBedIconItemId ||
+                    PlayerWorldMapMarkerConstants.NormalizeIconItemId(PlayerWorldMapMarkerConstants.ReplacementBedIconItemId) != PlayerWorldMapMarkerConstants.ReplacementBedIconItemId)
+                {
+                    throw new InvalidOperationException("Legacy fallen-star marker icons must normalize to the replacement bed icon without keeping 75 in the active whitelist.");
+                }
+
+                var marker = CreateMapMarker("legacy-fallen-star", 1, 2, PlayerWorldMapMarkerConstants.LegacyFallenStarIconItemId, "legacy", 0);
+                var write = PlayerWorldMapMarkerStore.SaveForPairForTesting(
+                    "pair-legacy-icon",
+                    100,
+                    100,
+                    new List<PlayerWorldMapMarkerRecord> { marker },
+                    "legacyIcon");
+                if (!write.Succeeded)
+                {
+                    throw new InvalidOperationException("Legacy map marker icon seed save should succeed.");
+                }
+
+                var read = PlayerWorldMapMarkerStore.ReadForPairForTesting("pair-legacy-icon");
+                if (read.Markers[0].IconItemId != PlayerWorldMapMarkerConstants.ReplacementBedIconItemId ||
+                    !string.Equals(PlayerWorldMapMarkerStyles.GetDisplayName(PlayerWorldMapMarkerConstants.LegacyFallenStarIconItemId), "床", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Legacy fallen-star markers must display and persist through the replacement bed icon.");
+                }
+            });
+        }
+
         private static void PlayerWorldMapMarkersAllowEmptyName()
         {
             WithTemporaryPlayerWorldDataRoot(root =>
@@ -344,8 +376,43 @@ namespace JueMingZ.Tests
                 PlayerWorldMapMarkersLastOperation = "rename",
                 PlayerWorldMapMarkersLastUiAction = "jump",
                 PlayerWorldMapMarkersLastJumpResult = "jumped",
+                MapMarkerLastJumpRequestedTileX = 101,
+                MapMarkerLastJumpRequestedTileY = 202,
+                MapMarkerLastJumpWrittenMapPosX = 101,
+                MapMarkerLastJumpWrittenMapPosY = 202,
+                MapMarkerLastJumpScale = 2,
+                MapMarkerLastJumpReleasedUiCapture = true,
+                MapMarkerLastJumpClearedPanState = false,
+                MapMarkerLastJumpConsumedButtonPulse = true,
+                MapMarkerLastJumpVanillaMapInputHandoff = true,
+                MapMarkerLastBlockedReason = "f5Visible",
+                MapMarkerLastTransformRoute = "fullscreenMap",
+                MapMarkerLastTransformScreenWidth = 1280,
+                MapMarkerLastTransformScreenHeight = 720,
+                MapMarkerLastTransformMapTopLeftX = 12.5,
+                MapMarkerLastTransformMapTopLeftY = 24.5,
+                MapMarkerLastTransformScale = 2,
+                MapMarkerLastTransformMapFullscreenPosX = 4100.25,
+                MapMarkerLastTransformMapFullscreenPosY = 1200.5,
+                MapMarkerLastTransformGameUpdateCount = 12345,
+                MapMarkerLastTransformUtc = new DateTime(2026, 6, 15, 1, 4, 4, DateTimeKind.Utc),
+                MapMarkerLastRightClickMouseX = 640,
+                MapMarkerLastRightClickMouseY = 360,
+                MapMarkerLastRightClickTileX = 313,
+                MapMarkerLastRightClickTileY = 167,
+                MapMarkerLastRightClickTransformSource = "fullscreenTransform",
+                MapMarkerLastRightClickFallbackReason = string.Empty,
+                MapMarkerLastRightClickMapFullscreenPosX = 4100.25,
+                MapMarkerLastRightClickMapFullscreenPosY = 1200.5,
+                MapMarkerLastRightClickMapScale = 2,
+                MapMarkerLastRightClickTransformAgeUpdates = 1,
                 PlayerWorldMapMarkersUiOnlyActionCount = 2,
                 MapMarkerPickerOpen = true,
+                MapMarkerPickerAnchorScreenX = 640,
+                MapMarkerPickerAnchorScreenY = 360,
+                MapMarkerPickerPanelX = 652,
+                MapMarkerPickerPanelY = 372,
+                MapMarkerPickerPanelClamped = true,
                 MapMarkerPickerLastDraw = new DateTime(2026, 6, 15, 1, 4, 5, DateTimeKind.Utc),
                 MapMarkerPickerLastFullscreenDraw = new DateTime(2026, 6, 15, 1, 4, 7, DateTimeKind.Utc),
                 MapMarkerPickerDrawRoute = "fullscreenMap",
@@ -368,8 +435,43 @@ namespace JueMingZ.Tests
             AssertContains(json, "\"PlayerWorldMapMarkersLastOperation\": \"rename\"");
             AssertContains(json, "\"PlayerWorldMapMarkersLastUiAction\": \"jump\"");
             AssertContains(json, "\"PlayerWorldMapMarkersLastJumpResult\": \"jumped\"");
+            AssertContains(json, "\"MapMarkerLastJumpRequestedTileX\": 101");
+            AssertContains(json, "\"MapMarkerLastJumpRequestedTileY\": 202");
+            AssertContains(json, "\"MapMarkerLastJumpWrittenMapPosX\": 101");
+            AssertContains(json, "\"MapMarkerLastJumpWrittenMapPosY\": 202");
+            AssertContains(json, "\"MapMarkerLastJumpScale\": 2");
+            AssertContains(json, "\"MapMarkerLastJumpReleasedUiCapture\": true");
+            AssertContains(json, "\"MapMarkerLastJumpClearedPanState\": false");
+            AssertContains(json, "\"MapMarkerLastJumpConsumedButtonPulse\": true");
+            AssertContains(json, "\"MapMarkerLastJumpVanillaMapInputHandoff\": true");
+            AssertContains(json, "\"MapMarkerLastBlockedReason\": \"f5Visible\"");
+            AssertContains(json, "\"MapMarkerLastTransformRoute\": \"fullscreenMap\"");
+            AssertContains(json, "\"MapMarkerLastTransformScreenWidth\": 1280");
+            AssertContains(json, "\"MapMarkerLastTransformScreenHeight\": 720");
+            AssertContains(json, "\"MapMarkerLastTransformMapTopLeftX\": 12.5");
+            AssertContains(json, "\"MapMarkerLastTransformMapTopLeftY\": 24.5");
+            AssertContains(json, "\"MapMarkerLastTransformScale\": 2");
+            AssertContains(json, "\"MapMarkerLastTransformMapFullscreenPosX\": 4100.25");
+            AssertContains(json, "\"MapMarkerLastTransformMapFullscreenPosY\": 1200.5");
+            AssertContains(json, "\"MapMarkerLastTransformGameUpdateCount\": 12345");
+            AssertContains(json, "\"MapMarkerLastTransformUtc\": \"2026-06-15T01:04:04.0000000Z\"");
+            AssertContains(json, "\"MapMarkerLastRightClickMouseX\": 640");
+            AssertContains(json, "\"MapMarkerLastRightClickMouseY\": 360");
+            AssertContains(json, "\"MapMarkerLastRightClickTileX\": 313");
+            AssertContains(json, "\"MapMarkerLastRightClickTileY\": 167");
+            AssertContains(json, "\"MapMarkerLastRightClickTransformSource\": \"fullscreenTransform\"");
+            AssertContains(json, "\"MapMarkerLastRightClickFallbackReason\": \"\"");
+            AssertContains(json, "\"MapMarkerLastRightClickMapFullscreenPosX\": 4100.25");
+            AssertContains(json, "\"MapMarkerLastRightClickMapFullscreenPosY\": 1200.5");
+            AssertContains(json, "\"MapMarkerLastRightClickMapScale\": 2");
+            AssertContains(json, "\"MapMarkerLastRightClickTransformAgeUpdates\": 1");
             AssertContains(json, "\"PlayerWorldMapMarkersUiOnlyActionCount\": 2");
             AssertContains(json, "\"MapMarkerPickerOpen\": true");
+            AssertContains(json, "\"MapMarkerPickerAnchorScreenX\": 640");
+            AssertContains(json, "\"MapMarkerPickerAnchorScreenY\": 360");
+            AssertContains(json, "\"MapMarkerPickerPanelX\": 652");
+            AssertContains(json, "\"MapMarkerPickerPanelY\": 372");
+            AssertContains(json, "\"MapMarkerPickerPanelClamped\": true");
             AssertContains(json, "\"MapMarkerPickerLastDraw\": \"2026-06-15T01:04:05.0000000Z\"");
             AssertContains(json, "\"MapMarkerPickerLastFullscreenDraw\": \"2026-06-15T01:04:07.0000000Z\"");
             AssertContains(json, "\"MapMarkerPickerDrawRoute\": \"fullscreenMap\"");
@@ -378,6 +480,89 @@ namespace JueMingZ.Tests
             AssertContains(json, "\"MapMarkerPickerLastCloseReason\": \"rightClickClose\"");
             AssertContains(json, "\"PlayerWorldMapMarkersLastReadUtc\": \"2026-06-15T01:02:03.0000000Z\"");
             AssertContains(json, "\"PlayerWorldMapMarkersLastWriteUtc\": \"2026-06-15T01:03:04.0000000Z\"");
+        }
+
+        private static void PlayerWorldMapMarkerDiagnosticsRecordsUiActionAndJumpState()
+        {
+            var before = PlayerWorldMapMarkerDiagnostics.GetSnapshot();
+
+            PlayerWorldMapMarkerDiagnostics.RecordUiAction("jump", "jumped", false);
+            PlayerWorldMapMarkerDiagnostics.RecordJumpState(123, 456, 12.5f, 34.5f, 2f, true, true, true, true);
+            PlayerWorldMapMarkerDiagnostics.RecordUiAction("navigate", "uiOnlyNotImplemented", true);
+
+            var after = PlayerWorldMapMarkerDiagnostics.GetSnapshot();
+            AssertStringEquals(after.LastUiAction, "navigate", "last map marker UI action");
+            AssertStringEquals(after.LastJumpResult, "jumped", "last map marker jump result");
+            if (after.LastJumpRequestedTileX != 123 ||
+                after.LastJumpRequestedTileY != 456 ||
+                Math.Abs(after.LastJumpWrittenMapPosX - 12.5f) > 0.0001f ||
+                Math.Abs(after.LastJumpWrittenMapPosY - 34.5f) > 0.0001f ||
+                Math.Abs(after.LastJumpScale - 2f) > 0.0001f ||
+                !after.LastJumpReleasedUiCapture ||
+                !after.LastJumpClearedPanState ||
+                !after.LastJumpConsumedButtonPulse ||
+                !after.LastJumpVanillaMapInputHandoff ||
+                after.UiOnlyActionCount != before.UiOnlyActionCount + 1)
+            {
+                throw new InvalidOperationException("Map marker diagnostics must record jump state and count UI-only placeholder actions.");
+            }
+        }
+
+        private static void PlayerWorldMapMarkerDiagnosticsRecordsCoordinateTransformState()
+        {
+            PlayerWorldMapMarkerDiagnostics.RecordFullscreenTransform(new MapCustomMarkerFullscreenTransformSnapshot
+            {
+                HasTransform = true,
+                Route = "fullscreenMap",
+                ScreenWidth = 2133,
+                ScreenHeight = 1141,
+                MapTopLeftX = -3986.33f,
+                MapTopLeftY = 27.568f,
+                MapScale = 1.198f,
+                MapFullscreenPosX = 4480.5f,
+                MapFullscreenPosY = 560.25f,
+                GameUpdateCount = 67890,
+                Utc = new DateTime(2026, 6, 15, 2, 7, 8, DateTimeKind.Utc)
+            });
+
+            PlayerWorldMapMarkerDiagnostics.RecordRightClick(new MapCustomMarkerMapPoint
+            {
+                ScreenX = 1531,
+                ScreenY = 755,
+                TileX = 4482,
+                TileY = 558,
+                TransformSource = "fallback",
+                FallbackReason = "viewStateMismatch",
+                CurrentMapFullscreenPosX = 4482.75f,
+                CurrentMapFullscreenPosY = 559.5f,
+                CurrentMapScale = 1.25f,
+                TransformAgeUpdates = 3
+            });
+
+            var after = PlayerWorldMapMarkerDiagnostics.GetSnapshot();
+            if (!string.Equals(after.LastTransformRoute, "fullscreenMap", StringComparison.Ordinal) ||
+                after.LastTransformScreenWidth != 2133 ||
+                after.LastTransformScreenHeight != 1141 ||
+                Math.Abs(after.LastTransformMapTopLeftX - -3986.33f) > 0.001f ||
+                Math.Abs(after.LastTransformMapTopLeftY - 27.568f) > 0.001f ||
+                Math.Abs(after.LastTransformScale - 1.198f) > 0.001f ||
+                Math.Abs(after.LastTransformMapFullscreenPosX - 4480.5f) > 0.001f ||
+                Math.Abs(after.LastTransformMapFullscreenPosY - 560.25f) > 0.001f ||
+                after.LastTransformGameUpdateCount != 67890 ||
+                after.LastTransformUtc != new DateTime(2026, 6, 15, 2, 7, 8, DateTimeKind.Utc) ||
+                after.LastRightClickMouseX != 1531 ||
+                after.LastRightClickMouseY != 755 ||
+                after.LastRightClickTileX != 4482 ||
+                after.LastRightClickTileY != 558 ||
+                !string.Equals(after.LastRightClickTransformSource, "fallback", StringComparison.Ordinal) ||
+                !string.Equals(after.LastRightClickFallbackReason, "viewStateMismatch", StringComparison.Ordinal) ||
+                Math.Abs(after.LastRightClickMapFullscreenPosX - 4482.75f) > 0.001f ||
+                Math.Abs(after.LastRightClickMapFullscreenPosY - 559.5f) > 0.001f ||
+                Math.Abs(after.LastRightClickMapScale - 1.25f) > 0.001f ||
+                after.LastRightClickTransformAgeUpdates != 3)
+            {
+                throw new InvalidOperationException("Map marker diagnostics must record transform view-state and right-click fallback context for user-returned snapshots.");
+            }
         }
 
         private static void LegacyMapEnhancementPageIncludesMapCustomMarkersRow()
@@ -410,17 +595,65 @@ namespace JueMingZ.Tests
                 throw new InvalidOperationException("Map custom marker list height must grow with marker count.");
             }
 
+            if (emptyHeight != LegacyUiMetrics.SectionHeaderHeight + 8 + LegacyMainWindow.CalculateMapMarkerListBodyHeightForTesting(0) ||
+                threeHeight != LegacyUiMetrics.SectionHeaderHeight + 8 + LegacyMainWindow.CalculateMapMarkerListBodyHeightForTesting(3))
+            {
+                throw new InvalidOperationException("Map custom marker list height must keep the section header and text-only empty state sizing.");
+            }
+
             var inputId = LegacyMainWindow.BuildMapMarkerNameInputId("marker-a");
             AssertStringEquals(inputId, "map-custom-marker:name-input:marker-a", "map marker name input id");
+            AssertStringEquals(
+                LegacyMainWindow.BuildMapMarkerConfirmCommandIdForTesting("marker-a"),
+                "map-custom-marker:confirm-name:marker-a",
+                "map marker confirm command id");
+            AssertStringEquals(
+                LegacyMainWindow.GetMapMarkerListVisualContractForTesting(),
+                "section+link-card+empty-text-only+focused-confirm",
+                "map marker list visual contract");
+
+            LegacyTextInput.ClearFocus();
+            if (LegacyMainWindow.ShouldShowMapMarkerConfirmButtonForTesting("marker-a"))
+            {
+                throw new InvalidOperationException("Map marker confirm button must be hidden until the marker name input is focused.");
+            }
+
+            var unfocusedActions = LegacyMainWindow.GetMapMarkerVisibleActionIdsForTesting("marker-a");
+            if (Array.IndexOf(unfocusedActions, LegacyMainWindow.BuildMapMarkerConfirmCommandIdForTesting("marker-a")) >= 0 ||
+                Array.IndexOf(unfocusedActions, "map-custom-marker:jump:marker-a") < 0 ||
+                Array.IndexOf(unfocusedActions, "map-custom-marker:delete:marker-a") < 0)
+            {
+                throw new InvalidOperationException("Map marker unfocused row must keep marker actions but not register the confirm button.");
+            }
+
+            LegacyTextInput.Focus(inputId, "draft");
+            try
+            {
+                if (!LegacyMainWindow.ShouldShowMapMarkerConfirmButtonForTesting("marker-a"))
+                {
+                    throw new InvalidOperationException("Map marker confirm button must be visible while the marker name input is focused.");
+                }
+
+                var focusedActions = LegacyMainWindow.GetMapMarkerVisibleActionIdsForTesting("marker-a");
+                if (Array.IndexOf(focusedActions, LegacyMainWindow.BuildMapMarkerConfirmCommandIdForTesting("marker-a")) < 0)
+                {
+                    throw new InvalidOperationException("Map marker focused row must register the confirm button.");
+                }
+            }
+            finally
+            {
+                LegacyTextInput.ClearFocus();
+            }
 
             var tooltips = LegacyMainWindow.GetMapMarkerActionTooltipsForTesting();
             if (tooltips == null ||
-                tooltips.Length != 5 ||
+                tooltips.Length != 6 ||
                 !string.Equals(tooltips[0], "双击输入，限10个字", StringComparison.Ordinal) ||
-                !string.Equals(tooltips[1], "地图跳转到标记位置", StringComparison.Ordinal) ||
-                !string.Equals(tooltips[2], "分析可达路径", StringComparison.Ordinal) ||
-                !string.Equals(tooltips[3], "消耗虫洞药水*1 回忆药水*1传送", StringComparison.Ordinal) ||
-                !string.Equals(tooltips[4], "暂未实现", StringComparison.Ordinal))
+                !string.Equals(tooltips[1], "确认保存名称", StringComparison.Ordinal) ||
+                !string.Equals(tooltips[2], "地图跳转到标记位置", StringComparison.Ordinal) ||
+                !string.Equals(tooltips[3], "分析可达路径", StringComparison.Ordinal) ||
+                !string.Equals(tooltips[4], "消耗虫洞药水*1 回忆药水*1传送", StringComparison.Ordinal) ||
+                !string.Equals(tooltips[5], "暂未实现", StringComparison.Ordinal))
             {
                 throw new InvalidOperationException("Map marker list tooltip contract changed.");
             }
@@ -435,6 +668,101 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void MapCustomMarkerConfirmNameCommandSavesAndClearsFocus()
+        {
+            WithTemporaryPlayerWorldDataRoot(root =>
+            {
+                var restoreRuntimeMain = PushMapMarkerRuntimeMainTypeForTesting(typeof(Terraria.Main));
+                var restoreIdentity = PushFakePlayerWorldIdentity(
+                    Path.Combine(root, "Players", "MarkerPlayer.plr"),
+                    "MarkerPlayer",
+                    Path.Combine(root, "Worlds", "MarkerWorld.wld"),
+                    "MarkerWorld",
+                    "marker-world-uid",
+                    "MarkerWorld.map",
+                    7654,
+                    8400,
+                    2400);
+                try
+                {
+                    PlayerWorldIdentityResolution identity;
+                    if (!PlayerWorldIdentityResolver.TryResolveCurrentReadOnly(out identity) ||
+                        identity == null ||
+                        !identity.IsResolved ||
+                        string.IsNullOrWhiteSpace(identity.PairId))
+                    {
+                        throw new InvalidOperationException("Expected map marker confirm test identity to resolve.");
+                    }
+
+                    var seed = PlayerWorldMapMarkerStore.SaveForPairForTesting(
+                        identity.PairId,
+                        8400,
+                        2400,
+                        new List<PlayerWorldMapMarkerRecord> { CreateMapMarker("confirm-me", 10, 20, 48, "old", 0) },
+                        "seedConfirm");
+                    if (!seed.Succeeded)
+                    {
+                        throw new InvalidOperationException("Map marker confirm seed save should succeed.");
+                    }
+
+                    var inputId = LegacyMainWindow.BuildMapMarkerNameInputId("confirm-me");
+                    LegacyTextInput.Focus(inputId, "confirmed");
+                    LegacyUiInput.ResetActionUpdateGateStateForTesting();
+                    LegacyUiActionService.ResetActionUpdateDiagnosticsForTesting();
+
+                    LegacyUiInput.EnqueueClick(
+                        new LegacyUiElement
+                        {
+                            Id = LegacyMainWindow.BuildMapMarkerConfirmCommandIdForTesting("confirm-me"),
+                            Label = "地图标记:确认",
+                            Kind = "button",
+                            Rect = new LegacyUiRect(0, 0, 42, 24),
+                            Enabled = true
+                        },
+                        new LegacyMouseSnapshot
+                        {
+                            X = 1,
+                            Y = 1,
+                            LeftPressed = true,
+                            ReadAvailable = true,
+                            ReadMode = "test"
+                        },
+                        true);
+                    LegacyUiActionService.Update(new InputActionQueue(), null);
+
+                    if (LegacyUiActionService.DispatchedCommandCountLast != 1 ||
+                        LegacyTextInput.IsFocused(inputId))
+                    {
+                        throw new InvalidOperationException("Map marker confirm button must dispatch once and clear the active name input.");
+                    }
+
+                    var after = PlayerWorldMapMarkerStore.ReadForPairForTesting(identity.PairId);
+                    AssertStringEquals(after.Markers[0].Name, "confirmed", "confirmed map marker name");
+                }
+                finally
+                {
+                    LegacyTextInput.ClearFocus();
+                    LegacyUiInput.ResetActionUpdateGateStateForTesting();
+                    LegacyUiActionService.ResetActionUpdateDiagnosticsForTesting();
+                    restoreIdentity();
+                    restoreRuntimeMain();
+                }
+            });
+        }
+
+        private static Action PushMapMarkerRuntimeMainTypeForTesting(Type mainType)
+        {
+            var runtimeMainField = typeof(TerrariaRuntimeTypes).GetField("_mainType", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+            if (runtimeMainField == null)
+            {
+                throw new InvalidOperationException("Terraria runtime main type cache field missing.");
+            }
+
+            var previousRuntimeMain = runtimeMainField.GetValue(null);
+            runtimeMainField.SetValue(null, mainType);
+            return () => runtimeMainField.SetValue(null, previousRuntimeMain);
+        }
+
         private static void MapFullscreenJumpTargetClampsPositionAndScale()
         {
             var target = MapFullscreenCompat.BuildJumpTargetForTesting(99999, -20, 8400, 2400, 999f);
@@ -442,6 +770,8 @@ namespace JueMingZ.Tests
                 !string.Equals(target.ResultCode, "ok", StringComparison.Ordinal) ||
                 target.TileX != 8399 ||
                 target.TileY != 0 ||
+                Math.Abs(target.WrittenMapPosX - 8399f) > 0.0001f ||
+                Math.Abs(target.WrittenMapPosY - 0f) > 0.0001f ||
                 Math.Abs(target.Scale - MapFullscreenCompat.MaxJumpScale) > 0.0001f)
             {
                 throw new InvalidOperationException("Fullscreen map jump target must clamp tile position and scale.");
@@ -454,6 +784,25 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void MapFullscreenJumpClearsPanState()
+        {
+            var state = MapFullscreenCompat.BuildClearedPanStateForTesting(
+                new Microsoft.Xna.Framework.Vector2(100f, 200f),
+                456,
+                234);
+            if (state == null ||
+                !state.Cleared ||
+                state.PanTargetMapFullscreen ||
+                state.ResetMapFull ||
+                Math.Abs(state.PanTargetMapFullscreenEnd.X - 100f) > 0.0001f ||
+                Math.Abs(state.PanTargetMapFullscreenEnd.Y - 200f) > 0.0001f ||
+                Math.Abs(state.GrabMapX - 456f) > 0.0001f ||
+                Math.Abs(state.GrabMapY - 234f) > 0.0001f)
+            {
+                throw new InvalidOperationException("Map fullscreen jump must clear vanilla pan target, reset flag, and drag anchors without touching player state.");
+            }
+        }
+
         private static void MapFullscreenJumpTargetFailsWithoutWorldDimensions()
         {
             var target = MapFullscreenCompat.BuildJumpTargetForTesting(10, 20, 0, 2400, 2f);
@@ -461,6 +810,105 @@ namespace JueMingZ.Tests
                 !string.Equals(target.ResultCode, "worldUnavailable", StringComparison.Ordinal))
             {
                 throw new InvalidOperationException("Fullscreen map jump target must fail soft when world dimensions are unavailable.");
+            }
+        }
+
+        private static void MapCustomMarkerJumpReleaseClosesF5AndUiCapture()
+        {
+            var restoreRuntimeTypes = PushFakeTerrariaMainType();
+            try
+            {
+                TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(true);
+                ResetUiInputFrameTestState();
+                var player = new Terraria.Player();
+                Terraria.Main.LocalPlayer = player;
+                Terraria.Main.player[0] = player;
+                Terraria.Main.myPlayer = 0;
+                LegacyMainUiState.SetVisible(true);
+                Terraria.Main.GameUpdateCount = 42;
+                Terraria.Main.mouseLeft = true;
+                Terraria.Main.mouseLeftRelease = true;
+                Terraria.Main.mouseInterface = true;
+                Terraria.Main.blockMouse = true;
+                player.mouseInterface = true;
+                player.controlUseItem = true;
+                player.releaseUseItem = false;
+                player.channel = true;
+                Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft = true;
+                Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft = true;
+
+                var release = LegacyMainUiState.HideForMapCustomMarkerJumpAndReleaseCapture();
+                if (release == null ||
+                    !release.F5WasVisible ||
+                    !release.ReleasedUiCapture ||
+                    !release.ConsumedJumpButtonPulse ||
+                    !release.VanillaMapInputHandoff ||
+                    LegacyMainUiState.Visible ||
+                    !Terraria.Main.mouseInterface ||
+                    !Terraria.Main.blockMouse ||
+                    Terraria.Main.mouseLeft ||
+                    Terraria.Main.mouseLeftRelease ||
+                    !player.mouseInterface ||
+                    player.controlUseItem ||
+                    !player.releaseUseItem ||
+                    player.channel ||
+                    Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft ||
+                    Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft)
+                {
+                    throw new InvalidOperationException("Map marker jump must close F5, release Legacy UI capture, and consume the triggering left-click pulse.");
+                }
+
+                Terraria.Main.mouseLeft = true;
+                Terraria.Main.mouseLeftRelease = true;
+                player.controlUseItem = true;
+                player.releaseUseItem = false;
+                player.channel = true;
+                Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft = true;
+                Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft = true;
+                TerrariaUiMouseCompat.UpdateActiveTriggerSuppressionPrefixGuard();
+                if (Terraria.Main.mouseLeft ||
+                    Terraria.Main.mouseLeftRelease ||
+                    player.controlUseItem ||
+                    !player.releaseUseItem ||
+                    player.channel ||
+                    Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft ||
+                    Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft)
+                {
+                    throw new InvalidOperationException("Map marker jump button suppression must keep the consumed pulse blocked until the physical left button is released.");
+                }
+
+                Terraria.Main.mouseLeft = false;
+                Terraria.Main.mouseLeftRelease = false;
+                player.controlUseItem = false;
+                player.releaseUseItem = true;
+                player.channel = false;
+                Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft = false;
+                Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft = false;
+                TerrariaUiMouseCompat.UpdateActiveTriggerSuppressionPrefixGuard();
+
+                Terraria.Main.mouseLeft = true;
+                Terraria.Main.mouseLeftRelease = true;
+                player.controlUseItem = true;
+                player.releaseUseItem = false;
+                Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft = true;
+                Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft = true;
+                TerrariaUiMouseCompat.UpdateActiveTriggerSuppressionPrefixGuard();
+                if (!Terraria.Main.mouseLeft ||
+                    !Terraria.Main.mouseLeftRelease ||
+                    !player.controlUseItem ||
+                    player.releaseUseItem ||
+                    !Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft ||
+                    !Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft)
+                {
+                    throw new InvalidOperationException("Map marker jump suppression must stop after release so vanilla fullscreen map input can take over.");
+                }
+            }
+            finally
+            {
+                LegacyMainUiState.SetVisible(false);
+                ResetUiInputFrameTestState();
+                TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(null);
+                restoreRuntimeTypes();
             }
         }
 
@@ -503,41 +951,299 @@ namespace JueMingZ.Tests
 
         private static void MapCustomMarkerFullscreenCoordinateClamp()
         {
-            var point = MapCustomMarkerMapCompat.ScreenToTile(
-                640,
-                360,
-                new Microsoft.Xna.Framework.Vector2(4200f, 1200f),
-                2f,
-                1280,
-                720,
+            const int expectedTileX = 320;
+            const int expectedTileY = 200;
+            const float mapScale = 2f;
+            var mapTopLeft = new Microsoft.Xna.Framework.Vector2(100f, 60f);
+            var mouseX = (int)(mapTopLeft.X + (expectedTileX + 0.5f) * mapScale);
+            var mouseY = (int)(mapTopLeft.Y + (expectedTileY + 0.5f) * mapScale);
+            var point = MapCustomMarkerMapCompat.ScreenToTileFromTransformForTesting(
+                mouseX,
+                mouseY,
+                mapTopLeft,
+                mapScale,
                 8400,
                 2400);
-            if (point.TileX != 4200 || point.TileY != 1200)
+            if (point.TileX != expectedTileX || point.TileY != expectedTileY ||
+                !string.Equals(point.TransformSource, "fullscreenTransform", StringComparison.Ordinal) ||
+                !string.IsNullOrEmpty(point.FallbackReason))
             {
-                throw new InvalidOperationException("Fullscreen map center screen point should map back to fullscreen map center tile.");
+                throw new InvalidOperationException("Fullscreen map transform should convert screen coordinates back to the original overlay tile.");
             }
 
-            var clamped = MapCustomMarkerMapCompat.ScreenToTile(
+            var projected = ProjectMapOverlayTileToScreenForTesting(
+                new Microsoft.Xna.Framework.Vector2(point.TileX + 0.5f, point.TileY + 0.5f),
+                Microsoft.Xna.Framework.Vector2.Zero,
+                mapTopLeft,
+                mapScale);
+            if (Math.Abs(projected.X - mouseX) > 0.001f || Math.Abs(projected.Y - mouseY) > 0.001f)
+            {
+                throw new InvalidOperationException("Fullscreen map marker coordinates must round-trip with the MapOverlayDrawContext draw path.");
+            }
+
+            var clamped = MapCustomMarkerMapCompat.ScreenToTileFromTransformForTesting(
                 -99999,
                 99999,
-                new Microsoft.Xna.Framework.Vector2(4200f, 1200f),
+                new Microsoft.Xna.Framework.Vector2(100f, 60f),
                 2f,
-                1280,
-                720,
                 8400,
                 2400);
             if (clamped.TileX < 0 || clamped.TileY < 0 || clamped.TileX >= 8400 || clamped.TileY >= 2400)
             {
                 throw new InvalidOperationException("Fullscreen map mouse tile conversion must clamp to world bounds.");
             }
+
+            MapCustomMarkerMapCompat.ResetFullscreenTransformForTesting();
+            MapCustomMarkerMapPoint cachedPoint;
+            string fallbackReason;
+            if (MapCustomMarkerMapCompat.TryScreenToTileFromLastTransformForTesting(740, 460, 1280, 720, 8400, 2400, out cachedPoint, out fallbackReason) ||
+                !string.Equals(fallbackReason, "noRecentFullscreenTransform", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Fullscreen map coordinate conversion must report fallback when no draw transform has been cached.");
+            }
+
+            var invalidScaleTransform = MapCustomMarkerMapCompat.RecordFullscreenTransform(mapTopLeft, 0f, 1280, 720, "fullscreenMap");
+            if (invalidScaleTransform.HasTransform ||
+                MapCustomMarkerMapCompat.TryScreenToTileFromLastTransformForTesting(740, 460, 1280, 720, 8400, 2400, out cachedPoint, out fallbackReason) ||
+                !string.Equals(fallbackReason, "scaleMismatch", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Fullscreen map coordinate conversion must distinguish invalid cached map scale from a missing transform.");
+            }
+
+            var transform = MapCustomMarkerMapCompat.RecordFullscreenTransform(mapTopLeft, mapScale, 1280, 720, "fullscreenMap");
+            if (!transform.HasTransform ||
+                !MapCustomMarkerMapCompat.TryScreenToTileFromLastTransformForTesting(mouseX, mouseY, 1280, 720, 8400, 2400, out cachedPoint, out fallbackReason) ||
+                cachedPoint.TileX != expectedTileX ||
+                cachedPoint.TileY != expectedTileY ||
+                !string.Equals(cachedPoint.TransformSource, "fullscreenTransform", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Fullscreen map coordinate conversion must prefer the cached draw transform.");
+            }
+
+            transform = MapCustomMarkerMapCompat.RecordFullscreenTransform(mapTopLeft, mapScale, 2133, 1141, "fullscreenMap");
+            if (!transform.HasTransform ||
+                !MapCustomMarkerMapCompat.TryScreenToTileFromLastTransformForTesting(mouseX, mouseY, 2560, 1369, 8400, 2400, out cachedPoint, out fallbackReason) ||
+                cachedPoint.TileX != expectedTileX ||
+                cachedPoint.TileY != expectedTileY ||
+                !string.Equals(cachedPoint.TransformSource, "fullscreenTransform", StringComparison.Ordinal) ||
+                !string.IsNullOrEmpty(cachedPoint.FallbackReason))
+            {
+                throw new InvalidOperationException("Fullscreen map coordinate conversion must treat UI scale-equivalent screen size as the same coordinate space instead of falling back.");
+            }
+
+            if (MapCustomMarkerMapCompat.TryScreenToTileFromLastTransformForTesting(740, 460, 1024, 720, 8400, 2400, out cachedPoint, out fallbackReason) ||
+                !string.Equals(fallbackReason, "screenSizeMismatch", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Fullscreen map coordinate conversion must reject stale transform cache when screen size changed.");
+            }
+
+            var fullscreenPos = new Microsoft.Xna.Framework.Vector2(4200f, 1200f);
+            var fallbackScreenWidth = 1280;
+            var fallbackScreenHeight = 720;
+            var fallbackMouseX = 740;
+            var fallbackMouseY = 460;
+            var fallbackPoint = MapCustomMarkerMapCompat.ScreenToTile(
+                fallbackMouseX,
+                fallbackMouseY,
+                fullscreenPos,
+                mapScale,
+                fallbackScreenWidth,
+                fallbackScreenHeight,
+                8400,
+                2400);
+            var fallbackMapTopLeft = MapCustomMarkerMapCompat.BuildFallbackMapTopLeftForTesting(
+                fullscreenPos,
+                mapScale,
+                fallbackScreenWidth,
+                fallbackScreenHeight);
+            var equivalentTransformPoint = MapCustomMarkerMapCompat.ScreenToTileFromTransformForTesting(
+                fallbackMouseX,
+                fallbackMouseY,
+                fallbackMapTopLeft,
+                mapScale,
+                8400,
+                2400);
+            if (fallbackPoint.TileX != equivalentTransformPoint.TileX ||
+                fallbackPoint.TileY != equivalentTransformPoint.TileY ||
+                !string.Equals(fallbackPoint.TransformSource, "fallback", StringComparison.Ordinal) ||
+                !string.Equals(fallbackPoint.FallbackReason, "fullscreenTransformUnavailable", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Fullscreen map fallback must derive the same overlay origin as the cached draw transform route.");
+            }
+        }
+
+        private static void MapCustomMarkerFullscreenCoordinateFreshness()
+        {
+            var oldMapPos = new Microsoft.Xna.Framework.Vector2(4200f, 1200f);
+            var draggedMapPos = new Microsoft.Xna.Framework.Vector2(4212f, 1216f);
+            var mouseX = 740;
+            var mouseY = 460;
+            var oldTileX = 320;
+            var oldTileY = 200;
+            var latestTileX = 360;
+            var latestTileY = 240;
+            var oldScale = 2f;
+            var zoomedScale = 2.25f;
+            var oldMapTopLeft = new Microsoft.Xna.Framework.Vector2(
+                mouseX - (oldTileX + 0.5f) * oldScale,
+                mouseY - (oldTileY + 0.5f) * oldScale);
+            var latestMapTopLeft = new Microsoft.Xna.Framework.Vector2(
+                mouseX - (latestTileX + 0.5f) * zoomedScale,
+                mouseY - (latestTileY + 0.5f) * zoomedScale);
+
+            MapCustomMarkerMapCompat.ResetFullscreenTransformForTesting();
+            MapCustomMarkerMapCompat.RecordFullscreenTransformForTesting(
+                oldMapTopLeft,
+                oldScale,
+                1280,
+                720,
+                "fullscreenMap",
+                oldMapPos,
+                100);
+
+            MapCustomMarkerMapPoint cachedPoint;
+            string fallbackReason;
+            long transformAgeUpdates;
+            if (MapCustomMarkerMapCompat.TryScreenToTileFromLastTransformForTesting(
+                    mouseX,
+                    mouseY,
+                    1280,
+                    720,
+                    8400,
+                    2400,
+                    oldMapPos,
+                    zoomedScale,
+                    103,
+                    out cachedPoint,
+                    out fallbackReason,
+                    out transformAgeUpdates) ||
+                !string.Equals(fallbackReason, "viewStateMismatch", StringComparison.Ordinal) ||
+                transformAgeUpdates != 3)
+            {
+                throw new InvalidOperationException("Map marker coordinate conversion must reject stale transform cache after wheel zoom and record its update age.");
+            }
+
+            if (MapCustomMarkerMapCompat.TryScreenToTileFromLastTransformForTesting(
+                    mouseX,
+                    mouseY,
+                    1280,
+                    720,
+                    8400,
+                    2400,
+                    draggedMapPos,
+                    oldScale,
+                    104,
+                    out cachedPoint,
+                    out fallbackReason,
+                    out transformAgeUpdates) ||
+                !string.Equals(fallbackReason, "viewStateMismatch", StringComparison.Ordinal) ||
+                transformAgeUpdates != 4)
+            {
+                throw new InvalidOperationException("Map marker coordinate conversion must reject stale transform cache after fullscreen map drag.");
+            }
+
+            MapCustomMarkerMapCompat.RecordFullscreenTransformForTesting(
+                latestMapTopLeft,
+                zoomedScale,
+                1280,
+                720,
+                "fullscreenMap",
+                draggedMapPos,
+                105);
+            if (!MapCustomMarkerMapCompat.TryScreenToTileFromLastTransformForTesting(
+                    mouseX,
+                    mouseY,
+                    1280,
+                    720,
+                    8400,
+                    2400,
+                    draggedMapPos,
+                    zoomedScale,
+                    105,
+                    out cachedPoint,
+                    out fallbackReason,
+                    out transformAgeUpdates) ||
+                cachedPoint.TileX != latestTileX ||
+                cachedPoint.TileY != latestTileY ||
+                transformAgeUpdates != 0 ||
+                !string.Equals(cachedPoint.TransformSource, "fullscreenTransform", StringComparison.Ordinal) ||
+                !string.IsNullOrEmpty(cachedPoint.FallbackReason))
+            {
+                throw new InvalidOperationException("Map marker coordinate conversion must use the latest fullscreen draw transform after drag or zoom refreshes the view.");
+            }
+        }
+
+        private static void MapCustomMarkerPendingPlacementFreezesRightClickTile()
+        {
+            var point = new MapCustomMarkerMapPoint
+            {
+                TileX = 320,
+                TileY = 200,
+                ScreenX = 740,
+                ScreenY = 460,
+                WorldSizeX = 8400,
+                WorldSizeY = 2400,
+                TransformSource = "fullscreenTransform",
+                CurrentMapFullscreenPosX = 4200f,
+                CurrentMapFullscreenPosY = 1200f,
+                CurrentMapScale = 2f
+            };
+
+            var placement = MapCustomMarkerInteractionService.CreatePlacementForTesting(point);
+            point.TileX = 999;
+            point.TileY = 888;
+            point.ScreenX = 111;
+            point.ScreenY = 222;
+            point.CurrentMapFullscreenPosX = 4300f;
+            point.CurrentMapFullscreenPosY = 1300f;
+            point.CurrentMapScale = 3f;
+
+            if (placement == null ||
+                placement.TileX != 320 ||
+                placement.TileY != 200 ||
+                placement.ScreenX != 740 ||
+                placement.ScreenY != 460 ||
+                placement.WorldSizeX != 8400 ||
+                placement.WorldSizeY != 2400)
+            {
+                throw new InvalidOperationException("Map marker pending placement must freeze the right-click tile and screen anchor before picker-time view changes.");
+            }
         }
 
         private static void MapCustomMarkerStyleWhitelistAndPickerClamp()
         {
+            var hasBed = false;
+            var hasFallenStar = false;
+            for (var index = 0; index < PlayerWorldMapMarkerStyles.All.Count; index++)
+            {
+                var style = PlayerWorldMapMarkerStyles.All[index];
+                if (style.IconItemId == PlayerWorldMapMarkerConstants.ReplacementBedIconItemId &&
+                    string.Equals(style.DisplayName, "床", StringComparison.Ordinal))
+                {
+                    hasBed = true;
+                }
+
+                if (style.IconItemId == PlayerWorldMapMarkerConstants.LegacyFallenStarIconItemId ||
+                    string.Equals(style.DisplayName, "坠星", StringComparison.Ordinal))
+                {
+                    hasFallenStar = true;
+                }
+            }
+
             if (PlayerWorldMapMarkerStyles.All.Count != 8 ||
+                !hasBed ||
+                hasFallenStar ||
                 !string.Equals(PlayerWorldMapMarkerStyles.GetDisplayName(999999), "火把", StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("Map custom marker styles must keep the frozen whitelist and torch fallback.");
+                throw new InvalidOperationException("Map custom marker styles must keep eight active icons, replace fallen star with bed, and keep torch fallback.");
+            }
+
+            var anchoredPanel = MapCustomMarkerStylePickerOverlay.CalculatePanelRect(420, 240, 1280, 720);
+            if (anchoredPanel.X != 420 ||
+                anchoredPanel.Y != 240 ||
+                MapCustomMarkerStylePickerOverlay.CalculatePanelClampedForTesting(420, 240, 1280, 720))
+            {
+                throw new InvalidOperationException("Map custom marker style picker must sit directly at the right-click anchor unless clamped by the screen edge.");
             }
 
             var panel = MapCustomMarkerStylePickerOverlay.CalculatePanelRect(1260, 700, 1280, 720);
@@ -545,6 +1251,16 @@ namespace JueMingZ.Tests
             {
                 throw new InvalidOperationException("Map custom marker style picker must clamp inside the screen.");
             }
+
+            if (!MapCustomMarkerStylePickerOverlay.CalculatePanelClampedForTesting(1260, 700, 1280, 720))
+            {
+                throw new InvalidOperationException("Map custom marker style picker must report panel clamp for diagnostics.");
+            }
+
+            AssertStringEquals(
+                MapCustomMarkerStylePickerOverlay.GetVisualContractForTesting(),
+                "icon-cells-only",
+                "map marker picker visual contract");
         }
 
         private static void MapCustomMarkerFullscreenPickerDrawRouteUsesPostFullscreenMapDraw()
@@ -573,6 +1289,15 @@ namespace JueMingZ.Tests
                 MapCustomMarkerFullscreenMapDrawInstaller.GetHookTargetNameForTesting(),
                 "Terraria.Main.OnPostFullscreenMapDraw",
                 "fullscreen map picker draw hook target");
+        }
+
+        private static Microsoft.Xna.Framework.Vector2 ProjectMapOverlayTileToScreenForTesting(
+            Microsoft.Xna.Framework.Vector2 tilePosition,
+            Microsoft.Xna.Framework.Vector2 mapPosition,
+            Microsoft.Xna.Framework.Vector2 mapOffset,
+            float mapScale)
+        {
+            return (tilePosition - mapPosition) * mapScale + mapOffset;
         }
 
         private static PlayerWorldMapMarkerRecord CreateMapMarker(

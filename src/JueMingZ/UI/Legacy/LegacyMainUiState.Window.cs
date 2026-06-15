@@ -63,6 +63,35 @@ namespace JueMingZ.UI.Legacy
             }
         }
 
+        internal static LegacyMainUiJumpReleaseResult HideForMapCustomMarkerJumpAndReleaseCapture()
+        {
+            EnsureLoaded();
+            bool wasVisible;
+            lock (SyncRoot)
+            {
+                wasVisible = _visible;
+                _visible = false;
+            }
+
+            if (wasVisible)
+            {
+                LegacyUiInput.ResetInteractionState();
+                FishingFilterUiState.Reset();
+            }
+
+            var released = UiMouseCaptureService.ReleaseForOperationWindow();
+            string consumeMessage;
+            var consumedPulse = UiMouseCaptureService.ConsumeMouseTriggerForOperationWindow("MouseLeft", out consumeMessage);
+            return new LegacyMainUiJumpReleaseResult
+            {
+                F5WasVisible = wasVisible,
+                ReleasedUiCapture = released,
+                ConsumedJumpButtonPulse = consumedPulse,
+                ConsumeJumpButtonPulseMessage = consumeMessage ?? string.Empty,
+                VanillaMapInputHandoff = consumedPulse
+            };
+        }
+
         public static bool HideIfMainMenu(string source)
         {
             bool blocked;
@@ -340,5 +369,14 @@ namespace JueMingZ.UI.Legacy
 
             return null;
         }
+    }
+
+    internal sealed class LegacyMainUiJumpReleaseResult
+    {
+        public bool F5WasVisible { get; set; }
+        public bool ReleasedUiCapture { get; set; }
+        public bool ConsumedJumpButtonPulse { get; set; }
+        public string ConsumeJumpButtonPulseMessage { get; set; }
+        public bool VanillaMapInputHandoff { get; set; }
     }
 }

@@ -12,8 +12,10 @@ namespace JueMingZ.Records
         public const int MaxCachedMarkers = 512;
         public const int MaxNameTextUnits = 10;
         public const int DefaultIconItemId = 8;
+        public const int LegacyFallenStarIconItemId = 75;
+        public const int ReplacementBedIconItemId = 224;
 
-        private static readonly int[] IconWhitelist = { 8, 48, 50, 75, 171, 393, 966, 29 };
+        private static readonly int[] IconWhitelist = { 8, 48, 50, ReplacementBedIconItemId, 171, 393, 966, 29 };
 
         public static bool IsAllowedIconItemId(int itemId)
         {
@@ -30,6 +32,11 @@ namespace JueMingZ.Records
 
         public static int NormalizeIconItemId(int itemId)
         {
+            if (itemId == LegacyFallenStarIconItemId)
+            {
+                return ReplacementBedIconItemId;
+            }
+
             return IsAllowedIconItemId(itemId) ? itemId : DefaultIconItemId;
         }
 

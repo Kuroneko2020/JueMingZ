@@ -16,9 +16,11 @@ namespace JueMingZ.UI
     {
         internal const string UiOverlayRoute = "uiOverlay";
         internal const string FullscreenMapRoute = "fullscreenMap";
+        private const string VisualContract = "icon-cells-only";
         private const int CellSize = 34;
         private const int CellGap = 6;
-        private const int Padding = 10;
+        private const int Padding = 0;
+        private const int HoverTextHeight = 20;
 
         public static bool DrawInterfaceLayer()
         {
@@ -41,6 +43,14 @@ namespace JueMingZ.UI
 
         public static void DrawFullscreenMapLayer(Vector2 mapTopLeft, float scale)
         {
+            var transform = MapCustomMarkerMapCompat.RecordFullscreenTransform(
+                mapTopLeft,
+                scale,
+                TerrariaMainCompat.ScreenWidth,
+                TerrariaMainCompat.ScreenHeight,
+                FullscreenMapRoute);
+            PlayerWorldMapMarkerDiagnostics.RecordFullscreenTransform(transform);
+
             var placement = MapCustomMarkerInteractionService.GetPlacementSnapshot();
             if (!ShouldUseDrawRoute(placement != null, Main.mapFullscreen))
             {
@@ -130,12 +140,33 @@ namespace JueMingZ.UI
 
         internal static LegacyUiRect CalculatePanelRect(int anchorX, int anchorY, int screenWidth, int screenHeight)
         {
+            return CalculatePanelPlacement(anchorX, anchorY, screenWidth, screenHeight).Panel;
+        }
+
+        internal static bool CalculatePanelClampedForTesting(int anchorX, int anchorY, int screenWidth, int screenHeight)
+        {
+            return CalculatePanelPlacement(anchorX, anchorY, screenWidth, screenHeight).Clamped;
+        }
+
+        internal static string GetVisualContractForTesting()
+        {
+            return VisualContract;
+        }
+
+        private static MapCustomMarkerPickerPanelPlacement CalculatePanelPlacement(int anchorX, int anchorY, int screenWidth, int screenHeight)
+        {
             var styles = PlayerWorldMapMarkerStyles.All;
             var width = Padding * 2 + styles.Count * CellSize + Math.Max(0, styles.Count - 1) * CellGap;
-            var height = Padding * 2 + CellSize + 20;
-            var x = Clamp(anchorX + 12, 8, Math.Max(8, screenWidth - width - 8));
-            var y = Clamp(anchorY + 12, 8, Math.Max(8, screenHeight - height - 8));
-            return new LegacyUiRect(x, y, width, height);
+            var height = Padding * 2 + CellSize + HoverTextHeight;
+            // User-visible contract: the picker belongs at the right-click
+            // point; only screen-edge clamping is allowed to move it.
+            var desiredX = anchorX;
+            var desiredY = anchorY;
+            var x = Clamp(desiredX, 8, Math.Max(8, screenWidth - width - 8));
+            var y = Clamp(desiredY, 8, Math.Max(8, screenHeight - height - 8));
+            return new MapCustomMarkerPickerPanelPlacement(
+                new LegacyUiRect(x, y, width, height),
+                x != desiredX || y != desiredY);
         }
 
         private static bool ShouldUseDrawRoute(bool pickerOpen, bool mapFullscreen)
@@ -166,9 +197,9 @@ namespace JueMingZ.UI
         {
             PlayerWorldMapMarkerDiagnostics.RecordPickerDraw(route);
             var mouse = LegacyUiInput.ReadMouse();
-            var panel = CalculatePanelRect(placement.ScreenX, placement.ScreenY, TerrariaMainCompat.ScreenWidth, TerrariaMainCompat.ScreenHeight);
-            UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, panel.X, panel.Y, panel.Width, panel.Height, 6, 34, 42, 66, 238);
-            UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, panel.X + 1, panel.Y + 1, panel.Width - 2, panel.Height - 2, 5, 16, 21, 34, 242);
+            var panelPlacement = CalculatePanelPlacement(placement.ScreenX, placement.ScreenY, TerrariaMainCompat.ScreenWidth, TerrariaMainCompat.ScreenHeight);
+            var panel = panelPlacement.Panel;
+            PlayerWorldMapMarkerDiagnostics.RecordPickerAnchor(placement.ScreenX, placement.ScreenY, panel.X, panel.Y, panelPlacement.Clamped);
 
             var styles = PlayerWorldMapMarkerStyles.All;
             var hoveredAny = panel.Contains(mouse.X, mouse.Y);
@@ -258,6 +289,18 @@ namespace JueMingZ.UI
             }
 
             return value > max ? max : value;
+        }
+
+        private sealed class MapCustomMarkerPickerPanelPlacement
+        {
+            public MapCustomMarkerPickerPanelPlacement(LegacyUiRect panel, bool clamped)
+            {
+                Panel = panel;
+                Clamped = clamped;
+            }
+
+            public LegacyUiRect Panel { get; private set; }
+            public bool Clamped { get; private set; }
         }
     }
 }
