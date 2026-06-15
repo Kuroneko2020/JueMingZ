@@ -1,6 +1,8 @@
 using System;
 using JueMingZ.Common;
+using JueMingZ.Compat;
 using JueMingZ.Config;
+using JueMingZ.Diagnostics;
 using JueMingZ.Records;
 using JueMingZ.UI.Legacy;
 
@@ -47,6 +49,180 @@ namespace JueMingZ.Input
                 before,
                 BuildMapEnhancementUiStateJson(),
                 "{\"submitted\":false,\"implemented\":true,\"runtimeTriggerImplemented\":true,\"featureId\":\"" + EscapeJson(FeatureIds.MapQuickAnnouncement) + "\",\"enabled\":" + BoolRaw(enabled) + ",\"changed\":" + BoolRaw(changed) + ",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                "Button");
+        }
+
+        private static void HandleMapCustomMarkersMode(LegacyUiCommand command, string payload)
+        {
+            var before = BuildMapEnhancementUiStateJson();
+            var enabled = IsOnMode(payload);
+            var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
+            var changed = settings.MapCustomMarkersEnabled != enabled;
+            settings.MapCustomMarkersEnabled = enabled;
+            ConfigService.SaveAll();
+
+            Record(
+                command,
+                "Ui.Toggle.MapCustomMarkers",
+                "UI",
+                changed ? "Succeeded" : "NotApplicable",
+                enabled ? "Map custom markers enabled." : "Map custom markers disabled.",
+                before,
+                BuildMapEnhancementUiStateJson(),
+                "{\"submitted\":false,\"implemented\":true,\"featureId\":\"" + EscapeJson(FeatureIds.MapCustomMarkers) + "\",\"enabled\":" + BoolRaw(enabled) + ",\"changed\":" + BoolRaw(changed) + ",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                "Button");
+        }
+
+        private static void HandleMapCustomMarkerCommand(LegacyUiCommand command, string payload)
+        {
+            var before = BuildMapEnhancementUiStateJson();
+            string action;
+            string markerId;
+            SplitMapCustomMarkerPayload(payload, out action, out markerId);
+            action = (action ?? string.Empty).Trim();
+            markerId = (markerId ?? string.Empty).Trim();
+
+            PlayerWorldIdentityResolution identity;
+            var hasIdentity = PlayerWorldIdentityResolver.TryResolveCurrentReadOnly(out identity) &&
+                              identity != null &&
+                              identity.IsResolved &&
+                              !string.IsNullOrWhiteSpace(identity.PairId);
+            if (!hasIdentity)
+            {
+                LegacyTextInput.ClearFocus();
+                Record(
+                    command,
+                    "Ui.MapCustomMarkers." + BuildMapCustomMarkerActionLabel(action),
+                    "UI",
+                    "Failed",
+                    "Map custom marker command failed because player-world identity is unavailable.",
+                    before,
+                    BuildMapEnhancementUiStateJson(),
+                    "{\"submitted\":false,\"implemented\":true,\"featureId\":\"" + EscapeJson(FeatureIds.MapCustomMarkers) + "\",\"action\":\"" + EscapeJson(action) + "\",\"markerId\":\"" + EscapeJson(markerId) + "\",\"identityResolved\":false,\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                    "Button");
+                return;
+            }
+
+            HandleMapCustomMarkerCommandForPair(command, action, markerId, identity.PairId, before);
+        }
+
+        private static void HandleMapCustomMarkerCommandForPair(LegacyUiCommand command, string action, string markerId, string pairId, string before)
+        {
+            var outcome = "Succeeded";
+            var message = "Map custom marker command handled.";
+            var metadataAction = action ?? string.Empty;
+            PlayerWorldMapMarkerWriteResult write = null;
+            MapFullscreenJumpResult jump = null;
+            var resultCode = string.Empty;
+            var markerTileX = 0;
+            var markerTileY = 0;
+            var jumpScale = 0f;
+
+            if (string.Equals(action, "name", StringComparison.OrdinalIgnoreCase))
+            {
+                var inputId = LegacyMainWindow.BuildMapMarkerNameInputId(markerId);
+                if (LegacyTextInput.IsFocused(inputId))
+                {
+                    write = PlayerWorldMapMarkerStore.RenameMarkerForPair(pairId, markerId, LegacyTextInput.GetDraft(inputId));
+                    if (write.Succeeded)
+                    {
+                        LegacyTextInput.ClearFocus();
+                    }
+
+                    outcome = write.Succeeded ? (write.Changed ? "Succeeded" : "NotApplicable") : "Failed";
+                    message = write.Succeeded ? "Map custom marker name saved." : "Map custom marker name save failed: " + write.Message;
+                }
+                else if (command.IsDoubleClick)
+                {
+                    var read = PlayerWorldMapMarkerStore.ReadForPair(pairId);
+                    var marker = FindMapMarker(read, markerId);
+                    if (marker == null)
+                    {
+                        outcome = "Failed";
+                        message = "Map custom marker name edit failed because marker was not found.";
+                    }
+                    else
+                    {
+                        LegacyTextInput.Focus(inputId, marker.Name);
+                        outcome = "Succeeded";
+                        message = "Map custom marker name input focused.";
+                    }
+                }
+                else
+                {
+                    outcome = "NotApplicable";
+                    message = "Double-click the marker name field to edit.";
+                }
+            }
+            else if (string.Equals(action, "delete", StringComparison.OrdinalIgnoreCase))
+            {
+                write = PlayerWorldMapMarkerStore.DeleteMarkerForPair(pairId, markerId);
+                if (write.Succeeded)
+                {
+                    LegacyTextInput.ClearFocus();
+                }
+
+                outcome = write.Succeeded ? "Succeeded" : "Failed";
+                message = write.Succeeded ? "Map custom marker deleted." : "Map custom marker delete failed: " + write.Message;
+            }
+            else if (string.Equals(action, "jump", StringComparison.OrdinalIgnoreCase))
+            {
+                TrySaveFocusedMapMarkerName(pairId, markerId);
+                var read = PlayerWorldMapMarkerCache.ReadForPair(pairId);
+                var marker = FindMapMarker(read, markerId);
+                if (marker == null)
+                {
+                    outcome = "Failed";
+                    resultCode = read == null || !read.IdentityResolved ? "identityUnavailable" : "markerNotFound";
+                    message = "Map custom marker jump failed because the marker was not found.";
+                }
+                else if (MapFullscreenCompat.TryJumpToTile(marker.TileX, marker.TileY, out jump))
+                {
+                    outcome = "Succeeded";
+                    resultCode = jump.ResultCode;
+                    markerTileX = jump.TileX;
+                    markerTileY = jump.TileY;
+                    jumpScale = jump.Scale;
+                    message = "Map custom marker jump opened the fullscreen map.";
+                }
+                else
+                {
+                    outcome = "Failed";
+                    resultCode = jump == null ? "failed" : jump.ResultCode;
+                    markerTileX = marker.TileX;
+                    markerTileY = marker.TileY;
+                    jumpScale = jump == null ? 0f : jump.Scale;
+                    message = jump == null ? "Map custom marker jump failed." : jump.Message;
+                }
+            }
+            else if (IsMapCustomMarkerUiOnlyAction(action))
+            {
+                TrySaveFocusedMapMarkerName(pairId, markerId);
+                outcome = "NotImplemented";
+                resultCode = "uiOnlyNotImplemented";
+                // Navigation, teleport and autopilot are intentionally UI-only
+                // in this plan. They must not scan paths, consume potions,
+                // move the player, or submit movement input from this handler.
+                message = "Map custom marker " + action + " is a UI-only placeholder in this stage.";
+            }
+            else
+            {
+                outcome = "Rejected";
+                resultCode = "invalidAction";
+                message = "Map custom marker command rejected because the action was invalid.";
+            }
+
+            PlayerWorldMapMarkerDiagnostics.RecordUiAction(metadataAction, resultCode, IsMapCustomMarkerUiOnlyAction(action));
+
+            Record(
+                command,
+                "Ui.MapCustomMarkers." + BuildMapCustomMarkerActionLabel(action),
+                "UI",
+                outcome,
+                message,
+                before,
+                BuildMapEnhancementUiStateJson(),
+                "{\"submitted\":false,\"implemented\":" + BoolRaw(!IsMapCustomMarkerUiOnlyAction(action)) + ",\"uiOnly\":" + BoolRaw(IsMapCustomMarkerUiOnlyAction(action)) + ",\"featureId\":\"" + EscapeJson(FeatureIds.MapCustomMarkers) + "\",\"action\":\"" + EscapeJson(metadataAction) + "\",\"markerId\":\"" + EscapeJson(markerId) + "\",\"pairId\":\"" + EscapeJson(pairId) + "\",\"tileX\":" + IntRaw(markerTileX) + ",\"tileY\":" + IntRaw(markerTileY) + ",\"scale\":" + jumpScale.ToString(System.Globalization.CultureInfo.InvariantCulture) + ",\"resultCode\":\"" + EscapeJson(resultCode) + "\",\"writeStatus\":\"" + EscapeJson(write == null ? string.Empty : write.Status) + "\",\"changed\":" + BoolRaw(write != null && write.Changed) + ",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
                 "Button");
         }
 
@@ -222,6 +398,9 @@ namespace JueMingZ.Input
                    "\"mapRevealedAreaDetailsPopupOpen\":" + BoolRaw(LegacyMainWindow.IsMapRevealedAreaDetailsPopupOpen()) + "," +
                    "\"mapRevealedAreaScanMode\":\"" + EscapeJson(exploration == null ? string.Empty : exploration.ScanMode) + "\"," +
                    "\"mapRevealedAreaControlState\":\"" + EscapeJson(exploration == null ? string.Empty : exploration.ControlState) + "\"," +
+                   "\"mapCustomMarkersEnabled\":" + BoolRaw(settings.MapCustomMarkersEnabled) + "," +
+                   "\"mapCustomMarkersSignature\":" + IntRaw(PlayerWorldMapMarkerCache.LastStateSignature) + "," +
+                   "\"mapCustomMarkerNameInputActive\":" + BoolRaw(LegacyTextInput.IsAnyFocused) + "," +
                    "\"mapQuickAnnouncementEnabled\":" + BoolRaw(settings.MapQuickAnnouncementEnabled) + "," +
                    "\"mapQuickAnnouncementHotkeySlot1\":\"" + EscapeJson(hotkey.Slot1) + "\"," +
                    "\"mapQuickAnnouncementHotkeySlot2\":\"" + EscapeJson(hotkey.Slot2) + "\"," +
@@ -241,6 +420,75 @@ namespace JueMingZ.Input
             }
 
             return PlayerWorldExplorationScanModes.Performance;
+        }
+
+        private static void SplitMapCustomMarkerPayload(string payload, out string action, out string markerId)
+        {
+            payload = payload ?? string.Empty;
+            var split = payload.IndexOf(':');
+            if (split < 0)
+            {
+                action = payload;
+                markerId = string.Empty;
+                return;
+            }
+
+            action = payload.Substring(0, split);
+            markerId = payload.Substring(split + 1);
+        }
+
+        private static PlayerWorldMapMarkerRecord FindMapMarker(PlayerWorldMapMarkerReadResult read, string markerId)
+        {
+            if (read == null || read.Markers == null || string.IsNullOrWhiteSpace(markerId))
+            {
+                return null;
+            }
+
+            for (var index = 0; index < read.Markers.Count; index++)
+            {
+                var marker = read.Markers[index];
+                if (marker != null &&
+                    string.Equals(marker.MarkerId, markerId, StringComparison.Ordinal))
+                {
+                    return marker;
+                }
+            }
+
+            return null;
+        }
+
+        private static bool TrySaveFocusedMapMarkerName(string pairId, string markerId)
+        {
+            var inputId = LegacyMainWindow.BuildMapMarkerNameInputId(markerId);
+            if (!LegacyTextInput.IsFocused(inputId))
+            {
+                return false;
+            }
+
+            var write = PlayerWorldMapMarkerStore.RenameMarkerForPair(pairId, markerId, LegacyTextInput.GetDraft(inputId));
+            if (write.Succeeded)
+            {
+                LegacyTextInput.ClearFocus();
+            }
+
+            return write.Succeeded;
+        }
+
+        private static bool IsMapCustomMarkerUiOnlyAction(string action)
+        {
+            return string.Equals(action, "navigate", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(action, "teleport", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(action, "autopilot", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string BuildMapCustomMarkerActionLabel(string action)
+        {
+            return string.IsNullOrWhiteSpace(action) ? "Invalid" : action.Trim();
+        }
+
+        internal static bool IsMapCustomMarkerUiOnlyActionForTesting(string action)
+        {
+            return IsMapCustomMarkerUiOnlyAction(action);
         }
     }
 }

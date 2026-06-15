@@ -117,6 +117,7 @@ namespace JueMingZ.Runtime
                 WorldAutomationAutoCaptureCritterOtherEnabled = settings.MiscAutoCaptureCritterOtherEnabled,
                 WorldAutomationAutoHarvestEnabled = settings.WorldAutomationAutoHarvestEnabled,
                 MapPersistentDeathMarkersEnabled = settings.MapPersistentDeathMarkersEnabled,
+                MapCustomMarkersEnabled = settings.MapCustomMarkersEnabled,
                 MapQuickAnnouncementEnabled = settings.MapQuickAnnouncementEnabled,
                 MapQuickAnnouncementHotkeySlot1 = mapQuickAnnouncementHotkey.Slot1,
                 MapQuickAnnouncementHotkeySlot2 = mapQuickAnnouncementHotkey.Slot2,
@@ -237,6 +238,7 @@ namespace JueMingZ.Runtime
         public bool WorldAutomationAutoCaptureCritterOtherEnabled { get; private set; }
         public bool WorldAutomationAutoHarvestEnabled { get; private set; }
         public bool MapPersistentDeathMarkersEnabled { get; private set; }
+        public bool MapCustomMarkersEnabled { get; private set; }
         public bool MapQuickAnnouncementEnabled { get; private set; }
         public string MapQuickAnnouncementHotkeySlot1 { get; private set; }
         public string MapQuickAnnouncementHotkeySlot2 { get; private set; }

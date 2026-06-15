@@ -14,6 +14,7 @@ namespace JueMingZ.UI.Legacy
         private const string MapWorldDayCountTooltip = "当前玩家-世界累计游戏天数";
         private const string MapRevealedAreaRatioTooltip = "当前玩家-世界地图揭示区域占比";
         private const string MapRevealedAreaRatioClickTooltip = "点击打开详情";
+        private const string MapCustomMarkersOnTooltip = "右键大地图试试吧";
         private const string MapQuickAnnouncementKeyboardSlotTooltip = "双击进行改键，不支持鼠标按键";
         private const string MapQuickAnnouncementTriggerSlotTooltip = "双击进行改键，支持鼠标按键";
         private const string MapQuickAnnouncementOnTooltip = "按下快捷键对鼠标位置内容进行广播";
@@ -35,8 +36,12 @@ namespace JueMingZ.UI.Legacy
             hovered = DrawMapWorldDayCountRow(spriteBatch, area, mouse, elements, LegacyUiMetrics.RowHeight * 2 + LegacyUiMetrics.SettingRowGap * 2, playtime) ?? hovered;
             var exploration = PlayerWorldExplorationCache.ReadCurrent();
             hovered = DrawMapRevealedAreaRatioRow(spriteBatch, area, mouse, elements, LegacyUiMetrics.RowHeight * 3 + LegacyUiMetrics.SettingRowGap * 3, exploration) ?? hovered;
-            hovered = DrawMapQuickAnnouncementRow(spriteBatch, area, mouse, elements, LegacyUiMetrics.RowHeight * 4 + LegacyUiMetrics.SettingRowGap * 4, settings) ?? hovered;
-            DrawMapEnhancementFuturePlaceholder(spriteBatch, area, LegacyUiMetrics.RowHeight * 5 + LegacyUiMetrics.SettingRowGap * 5);
+            hovered = DrawMapCustomMarkersRow(spriteBatch, area, mouse, elements, LegacyUiMetrics.RowHeight * 4 + LegacyUiMetrics.SettingRowGap * 4, settings) ?? hovered;
+            var markerListY = LegacyUiMetrics.RowHeight * 5 + LegacyUiMetrics.SettingRowGap * 5;
+            hovered = DrawMapMarkerList(spriteBatch, area, mouse, elements, markerListY) ?? hovered;
+            var quickAnnouncementY = markerListY + CalculateMapMarkerListHeight() + LegacyUiMetrics.SettingRowGap;
+            hovered = DrawMapQuickAnnouncementRow(spriteBatch, area, mouse, elements, quickAnnouncementY, settings) ?? hovered;
+            DrawMapEnhancementFuturePlaceholder(spriteBatch, area, quickAnnouncementY + LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap);
             RegisterMapDeathHistoryPopupOverlay(area);
             RegisterMapRevealedAreaDetailsPopupOverlay(area, exploration);
             return hovered;
@@ -57,6 +62,23 @@ namespace JueMingZ.UI.Legacy
                 new[] { "On", "Off" },
                 "map-persistent-death-markers-mode:",
                 new[] { MapPersistentDeathMarkersTooltip, string.Empty });
+        }
+
+        private static LegacyUiElement DrawMapCustomMarkersRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, AppSettings settings)
+        {
+            settings = settings ?? AppSettings.CreateDefault();
+            return DrawRightModeRow(
+                spriteBatch,
+                area,
+                mouse,
+                elements,
+                contentY,
+                "地图标记",
+                settings.MapCustomMarkersEnabled ? "On" : "Off",
+                new[] { "开启", "关闭" },
+                new[] { "On", "Off" },
+                "map-custom-markers-mode:",
+                new[] { MapCustomMarkersOnTooltip, string.Empty });
         }
 
         private static LegacyUiElement DrawMapDeathHistoryRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, PlayerWorldDeathHistoryReadResult summary)
@@ -726,6 +748,15 @@ namespace JueMingZ.UI.Legacy
             return new[]
             {
                 MapPersistentDeathMarkersTooltip,
+                string.Empty
+            };
+        }
+
+        internal static string[] GetMapCustomMarkersButtonTooltipsForTesting()
+        {
+            return new[]
+            {
+                MapCustomMarkersOnTooltip,
                 string.Empty
             };
         }

@@ -116,6 +116,22 @@ namespace JueMingZ.Bootstrap
                     Logger.Warn("LateBootstrap", "Player-world death marker map layer did not install; persistent death markers will not draw.");
                 }
 
+                Logger.Info("LateBootstrap", "Installing player-world map marker map layer...");
+                var playerWorldMapMarkerLayerResult = PlayerWorldMapMarkerMapLayerInstaller.Install();
+                Logger.Info("LateBootstrap", "Player-world map marker layer handoff result: " + playerWorldMapMarkerLayerResult.Message);
+                if (!playerWorldMapMarkerLayerResult.Succeeded)
+                {
+                    Logger.Warn("LateBootstrap", "Player-world map marker layer did not install; custom map markers will not draw.");
+                }
+
+                Logger.Info("LateBootstrap", "Installing map marker fullscreen picker draw hook...");
+                var mapMarkerFullscreenPickerDrawResult = MapCustomMarkerFullscreenMapDrawInstaller.Install();
+                Logger.Info("LateBootstrap", "Map marker fullscreen picker draw hook handoff result: " + mapMarkerFullscreenPickerDrawResult.Message);
+                if (!mapMarkerFullscreenPickerDrawResult.Succeeded)
+                {
+                    Logger.Warn("LateBootstrap", "Map marker fullscreen picker draw hook did not install; right-click style picker will not draw on the fullscreen map.");
+                }
+
                 Logger.Info("LateBootstrap", "Installing auto mining PickTile hook...");
                 var autoMiningPickTileHookResult = AutoMiningPickTileHookInstaller.Install();
                 Logger.Info("LateBootstrap", "Auto mining PickTile hook handoff result: " + autoMiningPickTileHookResult.Message);

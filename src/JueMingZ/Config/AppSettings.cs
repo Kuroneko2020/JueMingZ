@@ -158,6 +158,9 @@ namespace JueMingZ.Config
         [DataMember(Order = 195)]
         public bool MapPersistentDeathMarkersEnabled { get; set; }
 
+        [DataMember(Order = 196)]
+        public bool MapCustomMarkersEnabled { get; set; }
+
         [DataMember(Order = 37)]
         public bool CombatPerfectRevolverEnabled { get; set; }
 
@@ -795,6 +798,7 @@ namespace JueMingZ.Config
                 MapQuickAnnouncementAirCooldownMilliseconds = MapQuickAnnouncementSettings.DefaultAirCooldownMilliseconds,
                 SearchChestLocatorMultiplayerSectionRequestEnabled = true,
                 MapPersistentDeathMarkersEnabled = false,
+                MapCustomMarkersEnabled = false,
                 CombatPerfectRevolverEnabled = false,
                 CombatMagicStringClickerEnabled = false,
                 CombatAutoFacingEnabled = false,

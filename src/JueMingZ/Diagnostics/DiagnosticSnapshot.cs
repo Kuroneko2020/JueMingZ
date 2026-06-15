@@ -97,6 +97,28 @@ namespace JueMingZ.Diagnostics
         public DateTime? PlayerWorldExplorationLastScanUtc { get; set; }
         public DateTime? PlayerWorldExplorationLastCompletedScanUtc { get; set; }
         public DateTime? PlayerWorldExplorationLastWriteUtc { get; set; }
+        public bool PlayerWorldMapMarkersEnabled { get; set; }
+        public string PlayerWorldMapMarkersLastStatus { get; set; }
+        public string PlayerWorldMapMarkersLastMessage { get; set; }
+        public string PlayerWorldMapMarkersLastPairId { get; set; }
+        public int PlayerWorldMapMarkersCount { get; set; }
+        public bool PlayerWorldMapMarkersReadFailed { get; set; }
+        public bool PlayerWorldMapMarkersWriteFailed { get; set; }
+        public bool PlayerWorldMapMarkersLimitExceeded { get; set; }
+        public bool PlayerWorldMapMarkersCulledByCacheLimit { get; set; }
+        public string PlayerWorldMapMarkersLastOperation { get; set; }
+        public string PlayerWorldMapMarkersLastUiAction { get; set; }
+        public string PlayerWorldMapMarkersLastJumpResult { get; set; }
+        public int PlayerWorldMapMarkersUiOnlyActionCount { get; set; }
+        public bool MapMarkerPickerOpen { get; set; }
+        public DateTime? MapMarkerPickerLastDraw { get; set; }
+        public DateTime? MapMarkerPickerLastFullscreenDraw { get; set; }
+        public string MapMarkerPickerDrawRoute { get; set; }
+        public string MapMarkerPickerDrawSkippedReason { get; set; }
+        public DateTime? MapMarkerPickerLastClick { get; set; }
+        public string MapMarkerPickerLastCloseReason { get; set; }
+        public DateTime? PlayerWorldMapMarkersLastReadUtc { get; set; }
+        public DateTime? PlayerWorldMapMarkersLastWriteUtc { get; set; }
         public bool DiagnosticsOverlayVisible { get; set; }
         public long DrawCallCount { get; set; }
         public DateTime? LastDrawUtc { get; set; }
@@ -1006,6 +1028,15 @@ namespace JueMingZ.Diagnostics
             PlayerWorldExplorationControlState = string.Empty;
             PlayerWorldExplorationLastUserCommand = string.Empty;
             PlayerWorldExplorationAutoRescanDisabled = true;
+            PlayerWorldMapMarkersLastStatus = string.Empty;
+            PlayerWorldMapMarkersLastMessage = string.Empty;
+            PlayerWorldMapMarkersLastPairId = string.Empty;
+            PlayerWorldMapMarkersLastOperation = string.Empty;
+            PlayerWorldMapMarkersLastUiAction = string.Empty;
+            PlayerWorldMapMarkersLastJumpResult = string.Empty;
+            MapMarkerPickerDrawRoute = string.Empty;
+            MapMarkerPickerDrawSkippedReason = string.Empty;
+            MapMarkerPickerLastCloseReason = string.Empty;
             RunningActionKind = string.Empty;
             RunningActionSource = string.Empty;
             RunningActionStatus = string.Empty;

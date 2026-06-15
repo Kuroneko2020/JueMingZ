@@ -133,6 +133,69 @@ namespace JueMingZ.Compat
             }
         }
 
+        public static bool TryReadMouseRightPressedEdge(out bool pressed, out string message)
+        {
+            pressed = false;
+            message = string.Empty;
+
+            try
+            {
+                var mainType = TerrariaRuntimeTypes.MainType;
+                if (mainType == null)
+                {
+                    message = "Terraria.Main unavailable";
+                    return false;
+                }
+
+                EnsureUiMouseAccessors(mainType);
+                bool mainRight;
+                bool mainRightRelease;
+                var hasMainRight = _mainMouseRightAccessor.TryGet(null, out mainRight);
+                var hasMainRightRelease = _mainMouseRightReleaseAccessor.TryGet(null, out mainRightRelease);
+                bool playerInputJustPressed;
+                var hasPlayerInput = TryReadPlayerInputTriggerForMouseToken("JustPressed", "MouseRight", out playerInputJustPressed);
+                pressed = (hasMainRight && hasMainRightRelease && mainRight && mainRightRelease) ||
+                          (hasPlayerInput && playerInputJustPressed);
+                message = "ok";
+                return hasMainRight || hasMainRightRelease || hasPlayerInput;
+            }
+            catch (Exception error)
+            {
+                pressed = false;
+                message = "Read mouse right edge failed: " + error.Message;
+                return false;
+            }
+        }
+
+        public static bool IsMouseRightCurrentlyDown()
+        {
+            try
+            {
+                var mainType = TerrariaRuntimeTypes.MainType;
+                if (mainType != null)
+                {
+                    EnsureUiMouseAccessors(mainType);
+                    bool mainRight;
+                    if (_mainMouseRightAccessor.TryGet(null, out mainRight) && mainRight)
+                    {
+                        return true;
+                    }
+                }
+
+                bool playerInputRight;
+                if (TryReadPlayerInputTriggerForMouseToken("Current", "MouseRight", out playerInputRight) && playerInputRight)
+                {
+                    return true;
+                }
+
+                return IsMouseButtonDownFallback(VkRightButton);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         public static bool TryReadHoverItemSnapshot(out TerrariaUiHoverItemSnapshot snapshot)
         {
             snapshot = null;

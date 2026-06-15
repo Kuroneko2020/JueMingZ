@@ -310,6 +310,11 @@ namespace JueMingZ.UI.Legacy
                     AddHash(ref hash, SearchItemQueryUiState.BuildStateSignature());
                     AddHash(ref hash, LegacyTextInput.IsFocused(SearchItemQueryUiState.InputId));
                 }
+                else if (string.Equals(selectedPage, "map_enhancement", StringComparison.Ordinal))
+                {
+                    AddHash(ref hash, PlayerWorldMapMarkerCache.LastStateSignature);
+                    AddHash(ref hash, LegacyTextInput.IsAnyFocused);
+                }
 
                 return hash;
             }
@@ -518,6 +523,9 @@ namespace JueMingZ.UI.Legacy
                     AddHash(ref hash, PlayerWorldDeathHistoryCache.LastStateSignature);
                     AddHash(ref hash, PlayerWorldPlaytimeCache.LastStateSignature);
                     AddHash(ref hash, PlayerWorldExplorationCache.LastStateSignature);
+                    AddHash(ref hash, settings.MapCustomMarkersEnabled);
+                    AddHash(ref hash, PlayerWorldMapMarkerCache.LastStateSignature);
+                    AddHash(ref hash, LegacyTextInput.IsAnyFocused);
                     AddHash(ref hash, settings.MapQuickAnnouncementEnabled);
                     AddHash(ref hash, settings.MapQuickAnnouncementHotkeySlot1);
                     AddHash(ref hash, settings.MapQuickAnnouncementHotkeySlot2);

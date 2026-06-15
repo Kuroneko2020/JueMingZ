@@ -1521,6 +1521,7 @@ function Test-MapQuickAnnouncementGovernance {
 
     $srcRoot = Join-Path $RepoRoot "src\JueMingZ"
     $allowedConsumePaths = @(
+        "src/JueMingZ/Automation/MapEnhancement/MapCustomMarkerInteractionService.cs",
         "src/JueMingZ/Automation/Information/MapQuickAnnouncementRuntimeService.cs",
         "src/JueMingZ/Automation/Search/SearchItemPickRuntimeService.cs",
         "src/JueMingZ/Compat/TerrariaUiMouseCompat.cs"
@@ -1573,6 +1574,255 @@ function Test-MapQuickAnnouncementGovernance {
     }
     else {
         Write-Pass "Map quick announcement has no ActionQueue action backflow."
+    }
+}
+
+function Test-MapCustomMarkerGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $registrarPath = Join-Path $RepoRoot "src\JueMingZ\Features\Catalog\MapEnhancementFeatureRegistrar.cs"
+    $rootPath = Join-Path $RepoRoot "src\JueMingZ\Records\PlayerWorldFeatureDataRoot.cs"
+    $storePath = Join-Path $RepoRoot "src\JueMingZ\Records\PlayerWorldMapMarkerStore.cs"
+    $cachePath = Join-Path $RepoRoot "src\JueMingZ\Records\PlayerWorldMapMarkerCache.cs"
+    $diagnosticsPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\PlayerWorldMapMarkerDiagnostics.cs"
+    $snapshotPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\DiagnosticSnapshot.cs"
+    $snapshotWriterPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\DiagnosticSnapshotWriter.Json.cs"
+    $snapshotBuilderPath = Join-Path $RepoRoot "src\JueMingZ\Runtime\Diagnostics\RuntimeDiagnosticSnapshotBuilder.Bootstrap.cs"
+    $interactionPath = Join-Path $RepoRoot "src\JueMingZ\Automation\MapEnhancement\MapCustomMarkerInteractionService.cs"
+    $handlerPath = Join-Path $RepoRoot "src\JueMingZ\Input\LegacyUiActionService.MapEnhancementHandlers.cs"
+    $interfaceLayerPath = Join-Path $RepoRoot "src\JueMingZ\Hooks\InterfaceLayerHookCallbacks.cs"
+    $fullscreenPickerDrawInstallerPath = Join-Path $RepoRoot "src\JueMingZ\Hooks\MapCustomMarkerFullscreenMapDrawInstaller.cs"
+    $stylePickerOverlayPath = Join-Path $RepoRoot "src\JueMingZ\UI\MapCustomMarkerStylePickerOverlay.cs"
+    $mapLayerPath = Join-Path $RepoRoot "src\JueMingZ\Hooks\PlayerWorldMapMarkerMapLayer.cs"
+    $fullscreenCompatPath = Join-Path $RepoRoot "src\JueMingZ\Compat\MapFullscreenCompat.cs"
+    $testPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.PlayerWorldMapMarkerTests.cs"
+    $interfaceTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.InterfaceLayerHookTests.cs"
+
+    $registrarText = Read-TextIfExists -Path $registrarPath
+    $rootText = Read-TextIfExists -Path $rootPath
+    $storeText = Read-TextIfExists -Path $storePath
+    $cacheText = Read-TextIfExists -Path $cachePath
+    $diagnosticsText = Read-TextIfExists -Path $diagnosticsPath
+    $snapshotText = Read-TextIfExists -Path $snapshotPath
+    $snapshotWriterText = Read-TextIfExists -Path $snapshotWriterPath
+    $snapshotBuilderText = Read-TextIfExists -Path $snapshotBuilderPath
+    $interactionText = Read-TextIfExists -Path $interactionPath
+    $handlerText = Read-TextIfExists -Path $handlerPath
+    $interfaceLayerText = Read-TextIfExists -Path $interfaceLayerPath
+    $fullscreenPickerDrawInstallerText = Read-TextIfExists -Path $fullscreenPickerDrawInstallerPath
+    $stylePickerOverlayText = Read-TextIfExists -Path $stylePickerOverlayPath
+    $mapLayerText = Read-TextIfExists -Path $mapLayerPath
+    $fullscreenCompatText = Read-TextIfExists -Path $fullscreenCompatPath
+    $testText = Read-TextIfExists -Path $testPath
+    $interfaceTestText = Read-TextIfExists -Path $interfaceTestPath
+
+    if ($null -eq $registrarText -or $null -eq $rootText -or $null -eq $storeText -or $null -eq $cacheText -or $null -eq $diagnosticsText -or $null -eq $snapshotText -or $null -eq $snapshotWriterText -or $null -eq $snapshotBuilderText -or $null -eq $interactionText -or $null -eq $handlerText -or $null -eq $interfaceLayerText -or $null -eq $fullscreenPickerDrawInstallerText -or $null -eq $stylePickerOverlayText -or $null -eq $mapLayerText -or $null -eq $fullscreenCompatText -or $null -eq $testText -or $null -eq $interfaceTestText) {
+        Write-FailHealth "Map custom marker registrar, store/cache, diagnostics, interaction, UI layer, handler, map layer, compat, and tests must exist as separate responsibilities."
+        return
+    }
+
+    if ($registrarText.Contains("FeatureIds.MapCustomMarkers") -and
+        $registrarText.Contains(".Domain(FeatureCodeDomain.MapEnhancement)") -and
+        $registrarText.Contains(".Category(FeatureUserCategory.MapEnhancement)") -and
+        $registrarText.Contains(".Actions(InputActionKind.None)") -and
+        $registrarText.Contains(".Implemented(true)") -and
+        $registrarText.Contains("LocalAssistPendingMultiplayerVerification")) {
+        Write-Pass "Map custom markers stay registered as an implemented map-enhancement feature with no ActionQueue requirement."
+    }
+    else {
+        Write-FailHealth "map.custom_markers must stay in MapEnhancementFeatureRegistrar with MapEnhancement domain/category, None actions, and pending multiplayer verification."
+    }
+
+    if ($rootText.Contains('MapMarkersFileName = "map-markers.json"') -and
+        $storeText.Contains("BuildPlayerWorldFeatureFilePath(pairId, PlayerWorldFeatureDataRoot.MapMarkersFileName)") -and
+        $storeText.Contains("PlayerWorldFeatureDataStore.TryWriteJson") -and
+        $cacheText.Contains("PlayerWorldMapMarkerStore.ReadForPair")) {
+        Write-Pass "Map marker JSON remains isolated under player-world pair paths and written by the marker store."
+    }
+    else {
+        Write-FailHealth "map-markers.json must stay behind PlayerWorldFeatureDataRoot.MapMarkersFileName and PlayerWorldMapMarkerStore safe writes."
+    }
+
+    $srcRoot = Join-Path $RepoRoot "src\JueMingZ"
+    $writeJsonLeaks = @()
+    $mapMarkerBusinessLeaks = @()
+    $forbiddenUiOnlyLeaks = @()
+    foreach ($file in Get-ChildItem -LiteralPath $srcRoot -Recurse -Filter "*.cs" -File) {
+        $relative = $file.FullName.Substring($RepoRoot.Length).TrimStart('\', '/').Replace('\', '/')
+        $text = Read-TextIfExists -Path $file.FullName
+        if ($null -eq $text) {
+            continue
+        }
+
+        if ($text.Contains("MapMarkersFileName") -and
+            $text.Contains("PlayerWorldFeatureDataStore.TryWriteJson") -and
+            $relative -ne "src/JueMingZ/Records/PlayerWorldMapMarkerStore.cs") {
+            $writeJsonLeaks += $relative
+        }
+
+        if (($relative -eq "src/JueMingZ/Runtime/JueMingZRuntime.cs" -or
+             $relative -eq "src/JueMingZ/Input/LegacyUiActionService.cs" -or
+             $relative -eq "src/JueMingZ/Records/PlayerWorldBehaviorStore.cs") -and
+            ($text.Contains("MapCustomMarkers") -or $text.Contains("PlayerWorldMapMarker") -or $text.Contains("map.custom_markers"))) {
+            $mapMarkerBusinessLeaks += $relative
+        }
+
+        if ($relative -like "src/JueMingZ/Automation/MapEnhancement/*" -or
+            $relative -like "src/JueMingZ/Input/LegacyUiActionService.MapEnhancementHandlers.cs" -or
+            $relative -like "src/JueMingZ/UI/Legacy/LegacyMainWindow.MapEnhancement*.cs" -or
+            $relative -like "src/JueMingZ/Compat/MapFullscreenCompat.cs") {
+            if ($text.Contains("Player.Teleport") -or
+                [regex]::IsMatch($text, '\b(player|Player)\.position\s*=') -or
+                [regex]::IsMatch($text, '\b(player|Player)\.velocity\s*=') -or
+                $text.Contains("fallStart") -or
+                $text.Contains("noFallDmg") -or
+                $text.Contains("AddBuff") -or
+                $text.Contains(".stack =") -or
+                $text.Contains("InputActionQueue") -or
+                $text.Contains("BuildTeleportRodRequest") -or
+                $text.Contains("TryEnqueue")) {
+                $forbiddenUiOnlyLeaks += $relative
+            }
+        }
+    }
+
+    if ($writeJsonLeaks.Count -gt 0) {
+        Write-FailHealth "Map marker JSON writes must not leave PlayerWorldMapMarkerStore: $($writeJsonLeaks -join ', ')"
+    }
+    else {
+        Write-Pass "Map marker JSON writes remain confined to PlayerWorldMapMarkerStore."
+    }
+
+    if ($mapMarkerBusinessLeaks.Count -gt 0) {
+        Write-FailHealth "Map marker business logic must not backflow into runtime, legacy UI service main file, or behavior store: $($mapMarkerBusinessLeaks -join ', ')"
+    }
+    else {
+        Write-Pass "Map marker business logic stays out of runtime, legacy UI service main file, and behavior store."
+    }
+
+    if ($forbiddenUiOnlyLeaks.Count -gt 0) {
+        Write-FailHealth "Map marker jump/UI-only handlers must not move players, mutate state, consume buffs/items, or submit ActionQueue movement: $($forbiddenUiOnlyLeaks -join ', ')"
+    }
+    else {
+        Write-Pass "Map marker jump and UI-only placeholders do not contain player movement, potion, buff, inventory, or ActionQueue paths."
+    }
+
+    if ($mapLayerText.Contains("PlayerWorldMapMarkerCache.ReadCurrent()") -and
+        $mapLayerText.Contains("MaxDrawnMarkers = 256") -and
+        $mapLayerText.Contains("GetUnclampedDrawRegion") -and
+        -not $mapLayerText.Contains("TryWriteJson")) {
+        Write-Pass "Map marker IMapLayer draws from cache with culling and no JSON writes."
+    }
+    else {
+        Write-FailHealth "PlayerWorldMapMarkerMapLayer must only read marker cache, cull before draw, cap drawn markers, and never write JSON."
+    }
+
+    if ($fullscreenCompatText.Contains("Main.mapFullscreen = true") -and
+        $fullscreenCompatText.Contains("Main.mapFullscreenPos") -and
+        $fullscreenCompatText.Contains("Main.mapFullscreenScale") -and
+        -not $fullscreenCompatText.Contains("Player.Teleport") -and
+        -not $fullscreenCompatText.Contains("InputActionQueue") -and
+        -not $fullscreenCompatText.Contains("TryWriteJson")) {
+        Write-Pass "Map fullscreen jump compat remains limited to fullscreen-map UI fields."
+    }
+    else {
+        Write-FailHealth "MapFullscreenCompat must only write Main.mapFullscreen, Main.mapFullscreenPos, and Main.mapFullscreenScale."
+    }
+
+    $requiredDiagnosticFields = @(
+        "PlayerWorldMapMarkersEnabled",
+        "PlayerWorldMapMarkersLastStatus",
+        "PlayerWorldMapMarkersLastMessage",
+        "PlayerWorldMapMarkersLastPairId",
+        "PlayerWorldMapMarkersCount",
+        "PlayerWorldMapMarkersLastOperation",
+        "PlayerWorldMapMarkersLastUiAction",
+        "PlayerWorldMapMarkersLastJumpResult",
+        "PlayerWorldMapMarkersUiOnlyActionCount",
+        "MapMarkerPickerOpen",
+        "MapMarkerPickerLastDraw",
+        "MapMarkerPickerLastFullscreenDraw",
+        "MapMarkerPickerDrawRoute",
+        "MapMarkerPickerDrawSkippedReason",
+        "MapMarkerPickerLastClick",
+        "MapMarkerPickerLastCloseReason"
+    )
+    $missingDiagnosticFields = @()
+    foreach ($field in $requiredDiagnosticFields) {
+        if (-not $snapshotText.Contains($field) -or
+            -not $snapshotWriterText.Contains($field) -or
+            -not $snapshotBuilderText.Contains($field)) {
+            $missingDiagnosticFields += $field
+        }
+    }
+
+    if ($diagnosticsText.Contains("RecordUiAction") -and $missingDiagnosticFields.Count -eq 0) {
+        Write-Pass "Map marker runtime snapshot covers read/write status, picker state, and UI action summaries."
+    }
+    else {
+        Write-FailHealth "Map marker diagnostics must include read/write status, picker draw/click/close state, last UI action, last jump result, and UI-only action count in runtime snapshot JSON."
+    }
+
+    $mapPickerInGameDispatcher = [System.Text.RegularExpressions.Regex]::IsMatch(
+        $interfaceLayerText,
+        'GameOverlay(?:Fallback)?DispatcherDrawers\s*=\s*\{[^}]*MapCustomMarkerStylePickerOverlay\.DrawInterfaceLayer',
+        [System.Text.RegularExpressions.RegexOptions]::Singleline)
+    $mapPickerInUiDispatcher = [System.Text.RegularExpressions.Regex]::IsMatch(
+        $interfaceLayerText,
+        'UiOverlay(?:Fallback)?DispatcherDrawers\s*=\s*\{[^}]*MapCustomMarkerStylePickerOverlay\.DrawInterfaceLayer',
+        [System.Text.RegularExpressions.RegexOptions]::Singleline)
+
+    if ($mapPickerInUiDispatcher -and -not $mapPickerInGameDispatcher -and
+        $fullscreenPickerDrawInstallerText.Contains("Main.OnPostFullscreenMapDraw") -and
+        $fullscreenPickerDrawInstallerText.Contains("MapCustomMarkerStylePickerOverlay.DrawFullscreenMapLayer") -and
+        $stylePickerOverlayText.Contains("DrawFullscreenMapLayer") -and
+        $stylePickerOverlayText.Contains("spriteBatch.Begin") -and
+        $stylePickerOverlayText.Contains("Main.UIScaleMatrix") -and
+        $stylePickerOverlayText.Contains("FullscreenMapRoute") -and
+        $stylePickerOverlayText.Contains("RecordPickerDraw(route)") -and
+        $stylePickerOverlayText.Contains("RecordPickerDrawSkipped") -and
+        $interfaceTestText.Contains("MapCustomMarkerStylePickerOverlay.DrawInterfaceLayer")) {
+        Write-Pass "Map marker style picker keeps UI-scale dispatcher fallback and has a fullscreen-map draw hook with route diagnostics."
+    }
+    else {
+        Write-FailHealth "Map marker style picker must stay out of GameOverlayDispatcher and draw through both the UI-scale dispatcher fallback and Terraria.Main.OnPostFullscreenMapDraw with picker route diagnostics."
+    }
+
+    if ($interactionText.Contains("_ignoreRightCloseUntilReleased") -and
+        $interactionText.Contains("ReleaseRightCloseGateIfNeeded") -and
+        $interactionText.Contains("rightClickIgnored") -and
+        $testText.Contains("MapCustomMarkerRightClickReleaseGateRequiresReleaseBeforeClose")) {
+        Write-Pass "Map marker right-click close waits for button release after opening the picker."
+    }
+    else {
+        Write-FailHealth "Map marker picker must ignore right-click close until the opening right button has been released, with a regression test."
+    }
+
+    if ($handlerText.Contains("RecordUiAction") -and
+        $handlerText.Contains("uiOnlyNotImplemented") -and
+        $handlerText.Contains('\"tileX\"') -and
+        $handlerText.Contains('\"tileY\"') -and
+        $handlerText.Contains('\"scale\"') -and
+        $handlerText.Contains('\"resultCode\"') -and
+        $handlerText.Contains('\"mouseCaptured\"') -and
+        $handlerText.Contains("must not scan paths") -and
+        $handlerText.Contains("move the player")) {
+        Write-Pass "Map marker UI command metadata covers jump diagnostics and UI-only placeholder boundaries."
+    }
+    else {
+        Write-FailHealth "Map marker UI actions must keep featureId/markerId/tile/scale/result/mouse metadata and explicit UI-only placeholder result codes."
+    }
+
+    if ($testText.Contains("PlayerWorldMapMarkersDiagnosticsWrittenToSnapshot") -and
+        $testText.Contains("MapFullscreenJumpTargetClampsPositionAndScale") -and
+        $testText.Contains("MapFullscreenJumpTargetFailsWithoutWorldDimensions") -and
+        $testText.Contains("MapCustomMarkerRightClickReleaseGateRequiresReleaseBeforeClose") -and
+        $testText.Contains("MapCustomMarkerFullscreenPickerDrawRouteUsesPostFullscreenMapDraw") -and
+        $testText.Contains("Only navigation, teleport and autopilot must stay UI-only")) {
+        Write-Pass "Map marker tests cover diagnostics, fullscreen draw route, right-click close gating, jump clamp/fail-soft, and UI-only action classification."
+    }
+    else {
+        Write-FailHealth "Map marker tests must cover diagnostics JSON, fullscreen draw route, right-click close gating, jump target clamp/fail-soft, and navigation/teleport/autopilot UI-only classification."
     }
 }
 
@@ -2481,6 +2731,7 @@ Test-LegacyUiOverlayGovernance -RepoRoot $repoRoot
 Test-CombatAimDiagnosticsGovernance -RepoRoot $repoRoot
 Test-PhasebladeQuickSwitchDiagnosticsGovernance -RepoRoot $repoRoot
 Test-MapQuickAnnouncementGovernance -RepoRoot $repoRoot
+Test-MapCustomMarkerGovernance -RepoRoot $repoRoot
 Test-PlayerWorldExplorationGovernance -RepoRoot $repoRoot
 Test-ActionQueueDirectEnqueueGovernance -RepoRoot $repoRoot
 Test-NewFeatureBoundaryGovernance -RepoRoot $repoRoot

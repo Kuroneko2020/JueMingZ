@@ -57,13 +57,18 @@ namespace JueMingZ.Hooks
 
         private static readonly Func<bool>[] UiOverlayDispatcherDrawers =
         {
-            LegacyMainWindow.DrawInterfaceLayer
+            LegacyMainWindow.DrawInterfaceLayer,
+            // The map marker style picker uses screen/UI coordinates; keeping it
+            // in the UI-scale dispatcher prevents fullscreen map clicks from
+            // being transformed by the Game/world matrix.
+            MapCustomMarkerStylePickerOverlay.DrawInterfaceLayer
         };
 
         private static readonly Func<bool>[] UiOverlayFallbackDispatcherDrawers =
         {
             InformationStatusPanelOverlay.DrawInterfaceLayer,
-            LegacyMainWindow.DrawInterfaceLayer
+            LegacyMainWindow.DrawInterfaceLayer,
+            MapCustomMarkerStylePickerOverlay.DrawInterfaceLayer
         };
 
         private static int _firstLegacyInputGuardInsertLogged;

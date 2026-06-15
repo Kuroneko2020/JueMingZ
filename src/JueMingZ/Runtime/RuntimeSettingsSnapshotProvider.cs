@@ -123,6 +123,7 @@ namespace JueMingZ.Runtime
             private bool _worldAutomationAutoCaptureCritterOtherEnabled;
             private bool _worldAutomationAutoHarvestEnabled;
             private bool _mapPersistentDeathMarkersEnabled;
+            private bool _mapCustomMarkersEnabled;
             private bool _mapQuickAnnouncementEnabled;
             private string _mapQuickAnnouncementHotkeySlot1;
             private string _mapQuickAnnouncementHotkeySlot2;
@@ -251,6 +252,7 @@ namespace JueMingZ.Runtime
                     _worldAutomationAutoCaptureCritterOtherEnabled = settings.MiscAutoCaptureCritterOtherEnabled,
                     _worldAutomationAutoHarvestEnabled = settings.WorldAutomationAutoHarvestEnabled,
                     _mapPersistentDeathMarkersEnabled = settings.MapPersistentDeathMarkersEnabled,
+                    _mapCustomMarkersEnabled = settings.MapCustomMarkersEnabled,
                     _mapQuickAnnouncementEnabled = settings.MapQuickAnnouncementEnabled,
                     _mapQuickAnnouncementHotkeySlot1 = settings.MapQuickAnnouncementHotkeySlot1,
                     _mapQuickAnnouncementHotkeySlot2 = settings.MapQuickAnnouncementHotkeySlot2,
@@ -374,6 +376,7 @@ namespace JueMingZ.Runtime
                        _worldAutomationAutoCaptureCritterOtherEnabled == other._worldAutomationAutoCaptureCritterOtherEnabled &&
                        _worldAutomationAutoHarvestEnabled == other._worldAutomationAutoHarvestEnabled &&
                        _mapPersistentDeathMarkersEnabled == other._mapPersistentDeathMarkersEnabled &&
+                       _mapCustomMarkersEnabled == other._mapCustomMarkersEnabled &&
                        _mapQuickAnnouncementEnabled == other._mapQuickAnnouncementEnabled &&
                        Same(_mapQuickAnnouncementHotkeySlot1, other._mapQuickAnnouncementHotkeySlot1) &&
                        Same(_mapQuickAnnouncementHotkeySlot2, other._mapQuickAnnouncementHotkeySlot2) &&

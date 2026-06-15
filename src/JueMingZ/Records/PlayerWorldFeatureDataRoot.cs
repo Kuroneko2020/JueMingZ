@@ -13,6 +13,7 @@ namespace JueMingZ.Records
         public const string DeathSummaryFileName = "death-summary.json";
         public const string PlaytimeFileName = "playtime.json";
         public const string ExplorationSummaryFileName = "exploration-summary.json";
+        public const string MapMarkersFileName = "map-markers.json";
 
         private static readonly object SyncRoot = new object();
         private static string _dataRootDirectory;

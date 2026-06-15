@@ -1185,6 +1185,7 @@ namespace JueMingZ.Tests
                     "targeting.startup-diagnostic-noop|targeting.startup-diagnostic-noop|1",
                     "targeting.diagnostic-button-actions|targeting.diagnostic-button-actions|1",
                     "targeting.legacy-ui-actions|targeting.legacy-ui-actions|1",
+                    "targeting.map-custom-markers|targeting.map-custom-markers|1",
                     "targeting.diagnostic-hotkeys|targeting.diagnostic-hotkeys|1"
                 });
 

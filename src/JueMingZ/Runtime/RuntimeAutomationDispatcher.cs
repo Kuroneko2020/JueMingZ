@@ -6,6 +6,7 @@ using JueMingZ.Automation.Combat;
 using JueMingZ.Automation.Fishing;
 using JueMingZ.Automation.Information;
 using JueMingZ.Automation.InventoryAndItems;
+using JueMingZ.Automation.MapEnhancement;
 using JueMingZ.Automation.Movement;
 using JueMingZ.Automation.NpcServices;
 using JueMingZ.Automation.WorldAutomation;
@@ -32,6 +33,8 @@ namespace JueMingZ.Runtime
             new RuntimeDispatchStep("targeting.diagnostic-button-actions", "targeting.diagnostic-button-actions", 1);
         private static readonly RuntimeDispatchStep TargetingLegacyUiActions =
             new RuntimeDispatchStep("targeting.legacy-ui-actions", "targeting.legacy-ui-actions", 1);
+        private static readonly RuntimeDispatchStep TargetingMapCustomMarkers =
+            new RuntimeDispatchStep("targeting.map-custom-markers", "targeting.map-custom-markers", 1);
         private static readonly RuntimeDispatchStep TargetingDiagnosticHotkeys =
             new RuntimeDispatchStep("targeting.diagnostic-hotkeys", "targeting.diagnostic-hotkeys", 1);
 
@@ -112,6 +115,7 @@ namespace JueMingZ.Runtime
             TargetingStartupDiagnosticNoop,
             TargetingDiagnosticButtonActions,
             TargetingLegacyUiActions,
+            TargetingMapCustomMarkers,
             TargetingDiagnosticHotkeys
         };
 
@@ -198,6 +202,13 @@ namespace JueMingZ.Runtime
             operationStart = Stopwatch.GetTimestamp();
             LegacyUiActionService.Update(actionQueue, gameState);
             RecordOperationTiming(context, TargetingLegacyUiActions, operationStart);
+            operationStart = Stopwatch.GetTimestamp();
+            if (ShouldRun(TargetingMapCustomMarkers, settings.MapCustomMarkersEnabled || MapCustomMarkerInteractionService.IsPickerOpen, context.UpdateTick))
+            {
+                MapCustomMarkerInteractionService.Tick(gameState, settings);
+                RecordOperationTiming(context, TargetingMapCustomMarkers, operationStart);
+            }
+
             operationStart = Stopwatch.GetTimestamp();
             DiagnosticActionHotkeyService.Update(actionQueue, gameState);
             RecordOperationTiming(context, TargetingDiagnosticHotkeys, operationStart);

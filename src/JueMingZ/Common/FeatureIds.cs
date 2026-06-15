@@ -41,6 +41,7 @@ namespace JueMingZ.Common
         public const string MapDeathHistory = "map.death_history";
         public const string MapWorldDayCount = "map.world_day_count";
         public const string MapRevealedAreaRatio = "map.revealed_area_ratio";
+        public const string MapCustomMarkers = "map.custom_markers";
         public const string MapQuickAnnouncement = "map.quick_announcement";
         public const string SearchMain = "search.main";
         public const string SearchChestItemLocator = "search.chest_item_locator";

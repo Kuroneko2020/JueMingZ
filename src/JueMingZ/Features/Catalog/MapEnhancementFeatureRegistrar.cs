@@ -16,7 +16,7 @@ namespace JueMingZ.Features.Catalog
                 .Multiplayer(FeatureMultiplayerSupport.Unknown)
                 .VisibleInMainUi(true)
                 .Implemented(false)
-                .Notes("开启后，在大地图右键弹出图标，可标注资源、矿物、怪物或其他特殊地点；未来应有单独界面和定位列表。")
+                .Notes("开启后，在大地图右键弹出图标，可标注资源、矿物、怪物或其它特殊地点；未来应有单独界面和定位列表。")
                 .Build());
 
             registry.Register(FeatureDefinitionBuilder
@@ -73,6 +73,20 @@ namespace JueMingZ.Features.Catalog
                 .VisibleInMainUi(true)
                 .Implemented(true)
                 .Notes("地图加强页第四行固定信息功能；runtime 按性能/快速模式用时间预算分片只读 Main.Map.IsRevealed(x,y)，缓存到当前 pairId 的 exploration-summary.json，不在 Draw 中扫描或写文件。")
+                .Build());
+
+            registry.Register(FeatureDefinitionBuilder
+                .Create(FeatureIds.MapCustomMarkers, "地图标记", "为当前玩家-世界保存自定义地图标记。")
+                .Domain(FeatureCodeDomain.MapEnhancement)
+                .Category(FeatureUserCategory.MapEnhancement)
+                .Actions(InputActionKind.None)
+                .GameState(GameStateKind.Map, GameStateKind.World, GameStateKind.UiState)
+                .Multiplayer(FeatureMultiplayerSupport.LocalAssistPendingMultiplayerVerification)
+                .Config(FeatureConfigUiKind.None)
+                .DefaultEnabled(false)
+                .VisibleInMainUi(true)
+                .Implemented(true)
+                .Notes("地图标记独立于 map.enhanced_map 占位入口；当前接入开关、player-worlds/<pairId>/map-markers.json 数据底座、右键建点、大地图绘制、F5 列表命名删除和只写大地图 UI 状态的跳转。导航/传送/智驾仍是 UI-only 占位。")
                 .Build());
 
             registry.Register(FeatureDefinitionBuilder

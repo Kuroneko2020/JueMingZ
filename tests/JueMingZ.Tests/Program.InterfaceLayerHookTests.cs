@@ -164,7 +164,8 @@ namespace JueMingZ.Tests
                 InterfaceLayerHookCallbacks.GetUiOverlayDispatcherRouteNamesForTesting(true),
                 new[]
                 {
-                    "LegacyMainWindow.DrawInterfaceLayer"
+                    "LegacyMainWindow.DrawInterfaceLayer",
+                    "MapCustomMarkerStylePickerOverlay.DrawInterfaceLayer"
                 },
                 "UI overlay dispatcher routes when low status panel layer is active");
 
@@ -173,7 +174,8 @@ namespace JueMingZ.Tests
                 new[]
                 {
                     "InformationStatusPanelOverlay.DrawInterfaceLayer",
-                    "LegacyMainWindow.DrawInterfaceLayer"
+                    "LegacyMainWindow.DrawInterfaceLayer",
+                    "MapCustomMarkerStylePickerOverlay.DrawInterfaceLayer"
                 },
                 "UI overlay fallback dispatcher routes when low status panel layer is missing");
         }
