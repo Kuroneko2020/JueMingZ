@@ -36,7 +36,7 @@ namespace JueMingZ.Runtime
         private static long _lastRuntimeUpdateStartTimestamp;
         private static readonly RuntimeTickPipeline TickPipeline = CreateTickPipeline();
 
-        public const string Version = "0.729-map-marker-overlay-origin";
+        public const string Version = "0.730-f5-fullscreen-map-separation";
 
         public static RuntimeState State { get; private set; } = new RuntimeState();
         public static FeatureRegistry FeatureRegistry { get; private set; }
@@ -165,6 +165,9 @@ namespace JueMingZ.Runtime
         {
             LegacyHotbarScrollGuard.ApplyPostTerrariaUpdate();
             LegacyMainUiState.HideIfMainMenu("Runtime.PostTerrariaInputGuard");
+            LegacyMainUiState.HideIfFullscreenMapOpen(
+                "Runtime.PostTerrariaInputGuard",
+                TerrariaMainCompat.IsMapFullscreenOpen);
             DebugHotkeyService.Update();
         }
 

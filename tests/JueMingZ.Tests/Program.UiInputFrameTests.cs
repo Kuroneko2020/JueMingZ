@@ -281,23 +281,77 @@ namespace JueMingZ.Tests
         private static void LegacyMainF5HotkeyEdgeTracksPhysicalPressAcrossGates()
         {
             var now = new DateTime(2026, 6, 15, 6, 30, 0, DateTimeKind.Utc);
-            var accepted = DebugHotkeyService.EvaluateF5HotkeyForTesting(true, false, true, true, now, DateTime.MinValue);
+            var accepted = DebugHotkeyService.EvaluateF5HotkeyForTesting(true, false, true, false, true, now, DateTime.MinValue);
             AssertF5Decision(accepted, true, "pressed", true, false, 0, true);
 
-            var held = DebugHotkeyService.EvaluateF5HotkeyForTesting(true, true, true, true, now.AddMilliseconds(16), now);
+            var held = DebugHotkeyService.EvaluateF5HotkeyForTesting(true, true, true, false, true, now.AddMilliseconds(16), now);
             AssertF5Decision(held, false, "held", true, true, -1, false);
 
-            var blockedInput = DebugHotkeyService.EvaluateF5HotkeyForTesting(true, false, false, true, now.AddSeconds(1), DateTime.MinValue);
+            var blockedMap = DebugHotkeyService.EvaluateF5HotkeyForTesting(true, false, true, true, true, now.AddMilliseconds(32), DateTime.MinValue);
+            AssertF5Decision(blockedMap, false, "mapFullscreen", true, false, 0, true);
+
+            var heldAfterMapCloses = DebugHotkeyService.EvaluateF5HotkeyForTesting(true, blockedMap.NextWasDown, true, false, true, now.AddMilliseconds(48), DateTime.MinValue);
+            AssertF5Decision(heldAfterMapCloses, false, "held", true, true, 0, false);
+
+            var blockedInput = DebugHotkeyService.EvaluateF5HotkeyForTesting(true, false, false, false, true, now.AddSeconds(1), DateTime.MinValue);
             AssertF5Decision(blockedInput, false, "gameInputUnavailable", true, false, 0, true);
 
-            var heldAfterInputReturns = DebugHotkeyService.EvaluateF5HotkeyForTesting(true, blockedInput.NextWasDown, true, true, now.AddSeconds(2), DateTime.MinValue);
+            var heldAfterInputReturns = DebugHotkeyService.EvaluateF5HotkeyForTesting(true, blockedInput.NextWasDown, true, false, true, now.AddSeconds(2), DateTime.MinValue);
             AssertF5Decision(heldAfterInputReturns, false, "held", true, true, 0, false);
 
-            var released = DebugHotkeyService.EvaluateF5HotkeyForTesting(false, true, true, true, now.AddSeconds(3), now);
+            var released = DebugHotkeyService.EvaluateF5HotkeyForTesting(false, true, true, false, true, now.AddSeconds(3), now);
             AssertF5Decision(released, false, "released", false, true, 0, true);
 
-            var rapidRepress = DebugHotkeyService.EvaluateF5HotkeyForTesting(true, false, true, true, now.AddMilliseconds(80), now);
+            var rapidRepress = DebugHotkeyService.EvaluateF5HotkeyForTesting(true, false, true, false, true, now.AddMilliseconds(80), now);
             AssertF5Decision(rapidRepress, true, "pressed", true, false, 0, true);
+        }
+
+        private static void LegacyMainFullscreenMapOpenClosesF5WithoutLatentInteraction()
+        {
+            var restoreRuntimeTypes = PushFakeTerrariaMainType();
+            try
+            {
+                ResetUiInputFrameTestState();
+                LegacyMainUiState.SetVisible(true);
+                LegacyTextInput.Focus("test-text", "abc");
+                LegacyHexColorInput.Focus("test-color", "#112233");
+
+                if (!LegacyMainUiState.Visible || !LegacyUiInput.IsActiveInteraction())
+                {
+                    throw new InvalidOperationException("Expected F5 and text inputs to start visible and active.");
+                }
+
+                if (LegacyMainUiState.HideIfFullscreenMapOpen("test.no-map", false))
+                {
+                    throw new InvalidOperationException("F5 must not close when fullscreen map is not open.");
+                }
+
+                if (!LegacyMainUiState.Visible || !LegacyUiInput.IsActiveInteraction())
+                {
+                    throw new InvalidOperationException("F5 state changed before fullscreen map opened.");
+                }
+
+                if (!LegacyMainUiState.HideIfFullscreenMapOpen("test.map", true))
+                {
+                    throw new InvalidOperationException("Expected fullscreen map gate to close the visible F5 window.");
+                }
+
+                if (LegacyMainUiState.Visible || LegacyUiInput.IsActiveInteraction() || LegacyTextInput.IsAnyFocused || LegacyHexColorInput.IsAnyFocused)
+                {
+                    throw new InvalidOperationException("Fullscreen map close must clear F5 visibility and text interaction state.");
+                }
+
+                if (LegacyMainUiState.HideIfFullscreenMapOpen("test.map.again", true))
+                {
+                    throw new InvalidOperationException("Closing an already hidden F5 window should not report another close.");
+                }
+            }
+            finally
+            {
+                LegacyMainUiState.SetVisible(false);
+                ResetUiInputFrameTestState();
+                restoreRuntimeTypes();
+            }
         }
 
         private static void DiagnosticSnapshotWritesLegacyMainF5HotkeyState()

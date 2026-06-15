@@ -20,12 +20,14 @@ namespace JueMingZ.Input
             {
                 var physicalDown = (GetAsyncKeyState(VkF5) & 0x8000) != 0;
                 var inputAvailable = TerrariaMainCompat.AllowsInputProcessing;
+                var mapFullscreenOpen = TerrariaMainCompat.IsMapFullscreenOpen;
                 var foreground = IsCurrentProcessForeground();
                 var now = DateTime.UtcNow;
                 var decision = EvaluateF5HotkeyForTesting(
                     physicalDown,
                     _wasDown,
                     inputAvailable,
+                    mapFullscreenOpen,
                     foreground,
                     now,
                     DateTime.MinValue);
@@ -44,6 +46,13 @@ namespace JueMingZ.Input
                     {
                         RecordF5HotkeyDecision(decision.WithSkippedReason("mainMenu"));
                         Logger.Info("DebugHotkeyService", "Legacy main UI toggle ignored on Terraria main menu.");
+                        return;
+                    }
+
+                    if (TerrariaMainCompat.IsMapFullscreenOpen)
+                    {
+                        RecordF5HotkeyDecision(decision.WithSkippedReason("mapFullscreen"));
+                        Logger.Info("DebugHotkeyService", "Legacy main UI toggle ignored while fullscreen map is open.");
                         return;
                     }
 
@@ -74,6 +83,7 @@ namespace JueMingZ.Input
             bool physicalDown,
             bool wasDown,
             bool inputAvailable,
+            bool mapFullscreenOpen,
             bool foreground,
             DateTime nowUtc,
             DateTime lastToggleUtc)
@@ -105,6 +115,19 @@ namespace JueMingZ.Input
                     nowUtc,
                     true,
                     false);
+            }
+
+            if (mapFullscreenOpen)
+            {
+                return new F5HotkeyDecision(
+                    false,
+                    "mapFullscreen",
+                    physicalDown,
+                    wasDown,
+                    debounceRemainingMs,
+                    nowUtc,
+                    true,
+                    true);
             }
 
             if (!inputAvailable)

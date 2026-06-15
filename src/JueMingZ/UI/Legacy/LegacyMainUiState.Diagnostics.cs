@@ -68,6 +68,26 @@ namespace JueMingZ.UI.Legacy
                 string.Empty);
         }
 
+        private static void RecordWindowFullscreenMapSuppressed(string source, bool releasedUiCapture)
+        {
+            DiagnosticActionRecorder.RecordCustomEvent(
+                Guid.Empty,
+                "Ui.MainWindow.FullscreenMapSuppressed",
+                "UI",
+                string.Empty,
+                "Succeeded",
+                "Succeeded",
+                "Legacy main UI closed because the fullscreen map is open.",
+                0,
+                "{\"source\":\"" + EscapeJson(source) + "\",\"mapFullscreen\":true}",
+                BuildUiStateJson(),
+                "{\"submitted\":false,\"releasedUiCapture\":" + (releasedUiCapture ? "true" : "false") + "}",
+                "UI",
+                "LegacyMainWindow",
+                string.Empty,
+                string.Empty);
+        }
+
         private static string IntRaw(int value)
         {
             return value.ToString(CultureInfo.InvariantCulture);

@@ -34,6 +34,11 @@ namespace JueMingZ.Compat
             get { return Main.gamePaused; }
         }
 
+        public static bool IsMapFullscreenOpen
+        {
+            get { return Main.mapFullscreen; }
+        }
+
         public static int NetMode
         {
             get { return Main.netMode; }

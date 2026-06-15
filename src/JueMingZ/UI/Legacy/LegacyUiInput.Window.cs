@@ -81,6 +81,7 @@ namespace JueMingZ.UI.Legacy
             }
 
             LegacyTextInput.ClearFocus();
+            LegacyHexColorInput.ClearFocus();
         }
 
         public static void HandleWindowFrame(LegacyMouseSnapshot mouse, LegacyUiRect titleRect, LegacyUiRect resizeRect)

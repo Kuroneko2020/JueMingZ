@@ -1796,6 +1796,7 @@ namespace JueMingZ.Tests
             Run("UI mouse capture service clears pending MouseText and NPC hover", ref failed, UiMouseCaptureServiceClearsPendingMouseTextAndNpcHover);
             Run("legacy MouseText guard suppresses inside F5 only", ref failed, LegacyMouseTextGuardSuppressesInsideF5Only);
             Run("legacy main F5 hotkey edge tracks physical press across gates", ref failed, LegacyMainF5HotkeyEdgeTracksPhysicalPressAcrossGates);
+            Run("legacy main fullscreen map open closes F5 without latent interaction", ref failed, LegacyMainFullscreenMapOpenClosesF5WithoutLatentInteraction);
             Run("diagnostic snapshot writes legacy main F5 hotkey state", ref failed, DiagnosticSnapshotWritesLegacyMainF5HotkeyState);
             Run("combat performance caches stable metadata only", ref failed, CombatPerformanceCachesStableMetadataOnly);
             Run("runtime performance diagnostics records slowest operation", ref failed, RuntimePerformanceDiagnosticsRecordsSlowestOperation);

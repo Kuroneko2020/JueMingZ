@@ -63,6 +63,33 @@ namespace JueMingZ.UI.Legacy
             }
         }
 
+        public static bool HideIfFullscreenMapOpen(string source, bool mapFullscreenOpen)
+        {
+            if (!mapFullscreenOpen)
+            {
+                return false;
+            }
+
+            EnsureLoaded();
+            bool wasVisible;
+            lock (SyncRoot)
+            {
+                wasVisible = _visible;
+                _visible = false;
+            }
+
+            if (!wasVisible)
+            {
+                return false;
+            }
+
+            LegacyUiInput.ResetInteractionState();
+            FishingFilterUiState.Reset();
+            var released = UiMouseCaptureService.ReleaseForOperationWindow();
+            RecordWindowFullscreenMapSuppressed(source, released);
+            return true;
+        }
+
         internal static LegacyMainUiJumpReleaseResult HideForMapCustomMarkerJumpAndReleaseCapture()
         {
             EnsureLoaded();
