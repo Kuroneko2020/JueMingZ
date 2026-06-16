@@ -246,7 +246,7 @@ namespace JueMingZ.Tests
             var content = new LegacyUiRect(58, 134, 520, 200);
             var expectedHeight =
                 LegacyUiMetrics.RowHeight * 7 +
-                LegacyUiMetrics.SettingRowGap * 7 +
+                LegacyUiMetrics.SettingRowGap * 6 +
                 LegacyMainWindow.CalculateMapMarkerListHeightForTesting(0) +
                 24;
 

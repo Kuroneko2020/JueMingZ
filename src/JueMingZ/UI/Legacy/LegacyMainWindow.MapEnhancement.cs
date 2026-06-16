@@ -37,7 +37,7 @@ namespace JueMingZ.UI.Legacy
             var exploration = PlayerWorldExplorationCache.ReadCurrent();
             hovered = DrawMapRevealedAreaRatioRow(spriteBatch, area, mouse, elements, LegacyUiMetrics.RowHeight * 3 + LegacyUiMetrics.SettingRowGap * 3, exploration) ?? hovered;
             hovered = DrawMapCustomMarkersRow(spriteBatch, area, mouse, elements, LegacyUiMetrics.RowHeight * 4 + LegacyUiMetrics.SettingRowGap * 4, settings) ?? hovered;
-            var markerListY = LegacyUiMetrics.RowHeight * 5 + LegacyUiMetrics.SettingRowGap * 5;
+            var markerListY = CalculateMapMarkerListContentY();
             hovered = DrawMapMarkerList(spriteBatch, area, mouse, elements, markerListY) ?? hovered;
             var quickAnnouncementY = markerListY + CalculateMapMarkerListHeight() + LegacyUiMetrics.SettingRowGap;
             hovered = DrawMapQuickAnnouncementRow(spriteBatch, area, mouse, elements, quickAnnouncementY, settings) ?? hovered;
@@ -45,6 +45,11 @@ namespace JueMingZ.UI.Legacy
             RegisterMapDeathHistoryPopupOverlay(area);
             RegisterMapRevealedAreaDetailsPopupOverlay(area, exploration);
             return hovered;
+        }
+
+        private static int CalculateMapMarkerListContentY()
+        {
+            return LegacyUiMetrics.RowHeight * 5 + LegacyUiMetrics.SettingRowGap * 4;
         }
 
         private static LegacyUiElement DrawMapPersistentDeathMarkersRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, AppSettings settings)
@@ -724,6 +729,11 @@ namespace JueMingZ.UI.Legacy
             return BuildMapQuickAnnouncementKeyText(hotkey.Slot1) + "|" +
                    BuildMapQuickAnnouncementKeyText(hotkey.Slot2) + "|" +
                    BuildMapQuickAnnouncementKeyText(hotkey.TriggerKey);
+        }
+
+        internal static int CalculateMapMarkerListContentYForTesting()
+        {
+            return CalculateMapMarkerListContentY();
         }
 
         internal static string[] GetMapQuickAnnouncementButtonTooltipsForTesting()

@@ -568,12 +568,18 @@ namespace JueMingZ.Tests
         private static void LegacyMapEnhancementPageIncludesMapCustomMarkersRow()
         {
             var expectedHeight = LegacyUiMetrics.RowHeight * 7 +
-                                 LegacyUiMetrics.SettingRowGap * 7 +
+                                 LegacyUiMetrics.SettingRowGap * 6 +
                                  LegacyMainWindow.CalculateMapMarkerListHeightForTesting(0) +
                                  24;
             if (LegacyMainWindow.CalculateMapEnhancementContentHeightForTesting() != expectedHeight)
             {
                 throw new InvalidOperationException("Map enhancement content height must include custom marker row.");
+            }
+
+            var expectedMarkerListY = LegacyUiMetrics.RowHeight * 5 + LegacyUiMetrics.SettingRowGap * 4;
+            if (LegacyMainWindow.CalculateMapMarkerListContentYForTesting() != expectedMarkerListY)
+            {
+                throw new InvalidOperationException("Map custom marker list must start directly after the main title row without an extra setting gap.");
             }
 
             var tooltips = LegacyMainWindow.GetMapCustomMarkersButtonTooltipsForTesting();
@@ -595,10 +601,12 @@ namespace JueMingZ.Tests
                 throw new InvalidOperationException("Map custom marker list height must grow with marker count.");
             }
 
-            if (emptyHeight != 8 + LegacyMainWindow.CalculateMapMarkerListBodyHeightForTesting(0) ||
-                threeHeight != 8 + LegacyMainWindow.CalculateMapMarkerListBodyHeightForTesting(3))
+            if (emptyHeight != LegacyMainWindow.CalculateMapMarkerListBodyHeightForTesting(0) ||
+                threeHeight != LegacyMainWindow.CalculateMapMarkerListBodyHeightForTesting(3) ||
+                LegacyMainWindow.GetMapMarkerListTopGapForTesting() != 0 ||
+                LegacyMainWindow.GetMapMarkerListHorizontalInsetForTesting() != 0)
             {
-                throw new InvalidOperationException("Map custom marker list height must omit the duplicate subtitle row and keep text-only empty state sizing.");
+                throw new InvalidOperationException("Map custom marker list height must omit the duplicate subtitle row, attach to the main row, and keep same-width text-only empty state sizing.");
             }
 
             var inputId = LegacyMainWindow.BuildMapMarkerNameInputId("marker-a");
@@ -609,7 +617,7 @@ namespace JueMingZ.Tests
                 "map marker confirm command id");
             AssertStringEquals(
                 LegacyMainWindow.GetMapMarkerListVisualContractForTesting(),
-                "link-card+empty-text-only+focused-confirm",
+                "attached-link-card+same-width+empty-text-only+focused-confirm",
                 "map marker list visual contract");
 
             LegacyTextInput.ClearFocus();

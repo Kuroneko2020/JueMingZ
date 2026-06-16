@@ -1601,6 +1601,7 @@ function Test-MapCustomMarkerGovernance {
     $stylePickerOverlayPath = Join-Path $RepoRoot "src\JueMingZ\UI\MapCustomMarkerStylePickerOverlay.cs"
     $legacyWindowStatePath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainUiState.Window.cs"
     $uiMouseCaptureServicePath = Join-Path $RepoRoot "src\JueMingZ\UI\UiMouseCaptureService.cs"
+    $mapEnhancementUiPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.MapEnhancement.cs"
     $markerUiPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.MapEnhancement.Markers.cs"
     $mapLayerPath = Join-Path $RepoRoot "src\JueMingZ\Hooks\PlayerWorldMapMarkerMapLayer.cs"
     $fullscreenCompatPath = Join-Path $RepoRoot "src\JueMingZ\Compat\MapFullscreenCompat.cs"
@@ -1630,6 +1631,7 @@ function Test-MapCustomMarkerGovernance {
     $stylePickerOverlayText = Read-TextIfExists -Path $stylePickerOverlayPath
     $legacyWindowStateText = Read-TextIfExists -Path $legacyWindowStatePath
     $uiMouseCaptureServiceText = Read-TextIfExists -Path $uiMouseCaptureServicePath
+    $mapEnhancementUiText = Read-TextIfExists -Path $mapEnhancementUiPath
     $markerUiText = Read-TextIfExists -Path $markerUiPath
     $mapLayerText = Read-TextIfExists -Path $mapLayerPath
     $fullscreenCompatText = Read-TextIfExists -Path $fullscreenCompatPath
@@ -1639,7 +1641,7 @@ function Test-MapCustomMarkerGovernance {
     $mapMarkerFeatureDocText = Read-TextIfExists -Path $mapMarkerFeatureDocPath
     $diagnosticRulesText = Read-TextIfExists -Path $diagnosticRulesPath
 
-    if ($null -eq $registrarText -or $null -eq $rootText -or $null -eq $modelsText -or $null -eq $stylesText -or $null -eq $storeText -or $null -eq $cacheText -or $null -eq $diagnosticsText -or $null -eq $snapshotText -or $null -eq $snapshotWriterText -or $null -eq $snapshotBuilderText -or $null -eq $diagnosticUiSnapshotBuilderText -or $null -eq $interactionText -or $null -eq $mapCompatText -or $null -eq $debugHotkeyText -or $null -eq $handlerText -or $null -eq $interfaceLayerText -or $null -eq $fullscreenPickerDrawInstallerText -or $null -eq $stylePickerOverlayText -or $null -eq $legacyWindowStateText -or $null -eq $uiMouseCaptureServiceText -or $null -eq $markerUiText -or $null -eq $mapLayerText -or $null -eq $fullscreenCompatText -or $null -eq $testText -or $null -eq $uiInputTestText -or $null -eq $interfaceTestText -or $null -eq $mapMarkerFeatureDocText -or $null -eq $diagnosticRulesText) {
+    if ($null -eq $registrarText -or $null -eq $rootText -or $null -eq $modelsText -or $null -eq $stylesText -or $null -eq $storeText -or $null -eq $cacheText -or $null -eq $diagnosticsText -or $null -eq $snapshotText -or $null -eq $snapshotWriterText -or $null -eq $snapshotBuilderText -or $null -eq $diagnosticUiSnapshotBuilderText -or $null -eq $interactionText -or $null -eq $mapCompatText -or $null -eq $debugHotkeyText -or $null -eq $handlerText -or $null -eq $interfaceLayerText -or $null -eq $fullscreenPickerDrawInstallerText -or $null -eq $stylePickerOverlayText -or $null -eq $legacyWindowStateText -or $null -eq $uiMouseCaptureServiceText -or $null -eq $mapEnhancementUiText -or $null -eq $markerUiText -or $null -eq $mapLayerText -or $null -eq $fullscreenCompatText -or $null -eq $testText -or $null -eq $uiInputTestText -or $null -eq $interfaceTestText -or $null -eq $mapMarkerFeatureDocText -or $null -eq $diagnosticRulesText) {
         Write-FailHealth "Map custom marker registrar, models/styles, store/cache, diagnostics, interaction, coordinate compat, UI layer, handler, map layer, fullscreen compat, docs, and tests must exist as separate responsibilities."
         return
     }
@@ -1679,8 +1681,12 @@ function Test-MapCustomMarkerGovernance {
     }
 
     if ($markerUiText.Contains("CalculateMapMarkerListBodyHeightForTesting") -and
+        $markerUiText.Contains("GetMapMarkerListHorizontalInsetForTesting") -and
+        $mapEnhancementUiText.Contains("CalculateMapMarkerListContentYForTesting") -and
+        $mapEnhancementUiText.Contains("LegacyUiMetrics.RowHeight * 5 + LegacyUiMetrics.SettingRowGap * 4") -and
+        -not $mapEnhancementUiText.Contains("var markerListY = LegacyUiMetrics.RowHeight * 5 + LegacyUiMetrics.SettingRowGap * 5") -and
         $markerUiText.Contains("empty-text-only") -and
-        $markerUiText.Contains("link-card+empty-text-only+focused-confirm") -and
+        $markerUiText.Contains("attached-link-card+same-width+empty-text-only+focused-confirm") -and
         $markerUiText.Contains("ShouldShowMapMarkerConfirmButton") -and
         $markerUiText.Contains("LegacyTextInput.IsFocused(BuildMapMarkerNameInputId") -and
         -not $markerUiText.Contains("DrawSubPanelClipped") -and
@@ -1690,12 +1696,14 @@ function Test-MapCustomMarkerGovernance {
         $testText.Contains("ShouldShowMapMarkerConfirmButtonForTesting") -and
         $testText.Contains("GetMapMarkerVisibleActionIdsForTesting") -and
         $testText.Contains("BuildMapMarkerConfirmCommandIdForTesting") -and
+        $testText.Contains("attach to the main row") -and
+        $testText.Contains("directly after the main title row") -and
         $testText.Contains("omit the duplicate subtitle row") -and
         -not $testText.Contains("section+subpanel-card+empty-text-only+confirm-button")) {
-        Write-Pass "Map marker F5 list keeps no-subtitle name-save coverage without locking the old subpanel or always-visible confirm visual contract."
+        Write-Pass "Map marker F5 list keeps attached same-width no-subtitle name-save coverage without locking the old subpanel or always-visible confirm visual contract."
     }
     else {
-        Write-FailHealth "Map marker F5 list must keep no-subtitle confirm-name coverage without re-locking the old subpanel/card or always-visible confirm visual contract."
+        Write-FailHealth "Map marker F5 list must keep attached same-width no-subtitle confirm-name coverage without re-locking the old subpanel/card or always-visible confirm visual contract."
     }
 
     $srcRoot = Join-Path $RepoRoot "src\JueMingZ"

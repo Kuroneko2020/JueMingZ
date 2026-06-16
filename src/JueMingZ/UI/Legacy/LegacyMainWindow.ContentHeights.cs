@@ -145,7 +145,7 @@ namespace JueMingZ.UI.Legacy
         private static int CalculateMapEnhancementContentHeight()
         {
             return LegacyUiMetrics.RowHeight * 7 +
-                   LegacyUiMetrics.SettingRowGap * 7 +
+                   LegacyUiMetrics.SettingRowGap * 6 +
                    CalculateMapMarkerListHeight() +
                    PageContentBottomPadding;
         }

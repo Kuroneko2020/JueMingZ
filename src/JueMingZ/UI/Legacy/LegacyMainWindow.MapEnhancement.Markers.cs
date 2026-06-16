@@ -12,9 +12,9 @@ namespace JueMingZ.UI.Legacy
     {
         private const int MapMarkerListCardHeight = 34;
         private const int MapMarkerListCardGap = 5;
-        private const int MapMarkerListBodyPadding = 8;
+        private const int MapMarkerListHorizontalInset = 0;
         private const int MapMarkerListEmptyHeight = 30;
-        private const int MapMarkerListTopGap = 8;
+        private const int MapMarkerListTopGap = 0;
         private const string MapMarkerNameTooltip = "双击输入，限10个字";
         private const string MapMarkerNameConfirmTooltip = "确认保存名称";
         private const string MapMarkerJumpTooltip = "地图跳转到标记位置";
@@ -22,7 +22,7 @@ namespace JueMingZ.UI.Legacy
         private const string MapMarkerTeleportTooltip = "消耗虫洞药水*1 回忆药水*1传送";
         private const string MapMarkerAutopilotTooltip = "暂未实现";
         private const string MapMarkerConfirmAction = "confirm-name";
-        private const string MapMarkerListVisualContract = "link-card+empty-text-only+focused-confirm";
+        private const string MapMarkerListVisualContract = "attached-link-card+same-width+empty-text-only+focused-confirm";
 
         private static LegacyUiElement DrawMapMarkerList(
             object spriteBatch,
@@ -44,7 +44,7 @@ namespace JueMingZ.UI.Legacy
                 return null;
             }
 
-            var cardY = y + MapMarkerListBodyPadding;
+            var cardY = y;
             for (var index = 0; index < markers.Count; index++)
             {
                 hovered = DrawMapMarkerListRow(spriteBatch, area, mouse, elements, cardY + index * (MapMarkerListCardHeight + MapMarkerListCardGap), markers[index], index) ?? hovered;
@@ -95,7 +95,7 @@ namespace JueMingZ.UI.Legacy
                 return null;
             }
 
-            var card = new LegacyUiRect(area.Viewport.X + MapMarkerListBodyPadding, area.ToScreenY(contentY), area.Viewport.Width - MapMarkerListBodyPadding * 2, MapMarkerListCardHeight);
+            var card = new LegacyUiRect(area.Viewport.X + MapMarkerListHorizontalInset, area.ToScreenY(contentY), area.Viewport.Width - MapMarkerListHorizontalInset * 2, MapMarkerListCardHeight);
             if (!area.IsVisible(card))
             {
                 return null;
@@ -298,7 +298,7 @@ namespace JueMingZ.UI.Legacy
         {
             return markerCount <= 0
                 ? MapMarkerListEmptyHeight
-                : MapMarkerListBodyPadding * 2 + markerCount * MapMarkerListCardHeight + Math.Max(0, markerCount - 1) * MapMarkerListCardGap;
+                : markerCount * MapMarkerListCardHeight + Math.Max(0, markerCount - 1) * MapMarkerListCardGap;
         }
 
         internal static string BuildMapMarkerNameInputId(string markerId)
@@ -346,6 +346,16 @@ namespace JueMingZ.UI.Legacy
         internal static int CalculateMapMarkerListBodyHeightForTesting(int markerCount)
         {
             return CalculateMapMarkerListBodyHeightForCount(markerCount);
+        }
+
+        internal static int GetMapMarkerListTopGapForTesting()
+        {
+            return MapMarkerListTopGap;
+        }
+
+        internal static int GetMapMarkerListHorizontalInsetForTesting()
+        {
+            return MapMarkerListHorizontalInset;
         }
 
         internal static string GetMapMarkerListVisualContractForTesting()
