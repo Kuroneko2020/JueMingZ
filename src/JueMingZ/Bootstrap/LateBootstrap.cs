@@ -108,6 +108,14 @@ namespace JueMingZ.Bootstrap
                     Logger.Warn("LateBootstrap", "Player death hook did not install; player-world death records will fail closed.");
                 }
 
+                Logger.Info("LateBootstrap", "Installing player-world footprint map layer...");
+                var playerWorldFootprintLayerResult = PlayerWorldFootprintMapLayerInstaller.Install();
+                Logger.Info("LateBootstrap", "Player-world footprint map layer handoff result: " + playerWorldFootprintLayerResult.Message);
+                if (!playerWorldFootprintLayerResult.Succeeded)
+                {
+                    Logger.Warn("LateBootstrap", "Player-world footprint map layer did not install; map footprints will not draw.");
+                }
+
                 Logger.Info("LateBootstrap", "Installing player-world death marker map layer...");
                 var playerWorldDeathMarkerLayerResult = PlayerWorldDeathMarkerMapLayerInstaller.Install();
                 Logger.Info("LateBootstrap", "Player-world death marker map layer handoff result: " + playerWorldDeathMarkerLayerResult.Message);
@@ -130,6 +138,14 @@ namespace JueMingZ.Bootstrap
                 if (!mapMarkerFullscreenPickerDrawResult.Succeeded)
                 {
                     Logger.Warn("LateBootstrap", "Map marker fullscreen picker draw hook did not install; right-click style picker will not draw on the fullscreen map.");
+                }
+
+                Logger.Info("LateBootstrap", "Installing map footprint playback overlay draw hook...");
+                var mapFootprintPlaybackOverlayResult = MapFootprintFullscreenOverlayInstaller.Install();
+                Logger.Info("LateBootstrap", "Map footprint playback overlay hook handoff result: " + mapFootprintPlaybackOverlayResult.Message);
+                if (!mapFootprintPlaybackOverlayResult.Succeeded)
+                {
+                    Logger.Warn("LateBootstrap", "Map footprint playback overlay hook did not install; fullscreen map footprints playback UI will not draw.");
                 }
 
                 Logger.Info("LateBootstrap", "Installing auto mining PickTile hook...");

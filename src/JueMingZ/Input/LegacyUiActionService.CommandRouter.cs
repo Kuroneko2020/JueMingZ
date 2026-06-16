@@ -385,6 +385,12 @@ namespace JueMingZ.Input
                 return;
             }
 
+            if (command.ElementId.StartsWith("map-footprints-display-mode:", StringComparison.Ordinal))
+            {
+                HandleMapFootprintsDisplayMode(command, command.ElementId.Substring("map-footprints-display-mode:".Length));
+                return;
+            }
+
             if (command.ElementId.StartsWith("map-quick-announcement-key:", StringComparison.Ordinal))
             {
                 HandleMapQuickAnnouncementKeySlot(command, command.ElementId.Substring("map-quick-announcement-key:".Length));

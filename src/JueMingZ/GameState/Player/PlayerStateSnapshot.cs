@@ -14,6 +14,8 @@ namespace JueMingZ.GameState.Player
         public int ManaMax { get; set; }
         public float PositionX { get; set; }
         public float PositionY { get; set; }
+        public float CenterX { get; set; }
+        public float CenterY { get; set; }
         public float VelocityX { get; set; }
         public float VelocityY { get; set; }
         public int SelectedItem { get; set; }

@@ -14,6 +14,7 @@ namespace JueMingZ.Records
         public const string PlaytimeFileName = "playtime.json";
         public const string ExplorationSummaryFileName = "exploration-summary.json";
         public const string MapMarkersFileName = "map-markers.json";
+        public const string FootprintsFileName = "footprints.json";
 
         private static readonly object SyncRoot = new object();
         private static string _dataRootDirectory;

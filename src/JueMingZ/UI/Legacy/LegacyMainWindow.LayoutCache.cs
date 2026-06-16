@@ -528,6 +528,7 @@ namespace JueMingZ.UI.Legacy
                     AddHash(ref hash, PlayerWorldMapMarkerCache.LastStateSignature);
                     AddHash(ref hash, _mapCustomMarkerPageIndex);
                     AddHash(ref hash, LegacyTextInput.IsAnyFocused);
+                    AddHash(ref hash, settings.MapFootprintsDisplayEnabled);
                     AddHash(ref hash, settings.MapQuickAnnouncementEnabled);
                     AddHash(ref hash, settings.MapQuickAnnouncementHotkeySlot1);
                     AddHash(ref hash, settings.MapQuickAnnouncementHotkeySlot2);

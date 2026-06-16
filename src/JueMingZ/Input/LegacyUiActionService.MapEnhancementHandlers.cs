@@ -73,6 +73,27 @@ namespace JueMingZ.Input
                 "Button");
         }
 
+        private static void HandleMapFootprintsDisplayMode(LegacyUiCommand command, string payload)
+        {
+            var before = BuildMapEnhancementUiStateJson();
+            var enabled = IsOnMode(payload);
+            var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
+            var changed = settings.MapFootprintsDisplayEnabled != enabled;
+            settings.MapFootprintsDisplayEnabled = enabled;
+            ConfigService.SaveAll();
+
+            Record(
+                command,
+                "Ui.Toggle.MapFootprintsDisplay",
+                "UI",
+                changed ? "Succeeded" : "NotApplicable",
+                enabled ? "Map footprints display enabled." : "Map footprints display disabled.",
+                before,
+                BuildMapEnhancementUiStateJson(),
+                "{\"submitted\":false,\"implemented\":true,\"displayOnly\":true,\"recordingAffected\":false,\"featureId\":\"" + EscapeJson(FeatureIds.MapFootprints) + "\",\"enabled\":" + BoolRaw(enabled) + ",\"changed\":" + BoolRaw(changed) + ",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                "Button");
+        }
+
         private static void HandleMapCustomMarkersPage(LegacyUiCommand command, string action)
         {
             var before = BuildMapEnhancementUiStateJson();
@@ -508,6 +529,7 @@ namespace JueMingZ.Input
                    "\"mapCustomMarkersSignature\":" + IntRaw(PlayerWorldMapMarkerCache.LastStateSignature) + "," +
                    "\"mapCustomMarkerPageIndex\":" + IntRaw(LegacyMainWindow.GetMapCustomMarkerPageIndex()) + "," +
                    "\"mapCustomMarkerNameInputActive\":" + BoolRaw(LegacyTextInput.IsAnyFocused) + "," +
+                   "\"mapFootprintsDisplayEnabled\":" + BoolRaw(settings.MapFootprintsDisplayEnabled) + "," +
                    "\"mapQuickAnnouncementEnabled\":" + BoolRaw(settings.MapQuickAnnouncementEnabled) + "," +
                    "\"mapQuickAnnouncementHotkeySlot1\":\"" + EscapeJson(hotkey.Slot1) + "\"," +
                    "\"mapQuickAnnouncementHotkeySlot2\":\"" + EscapeJson(hotkey.Slot2) + "\"," +

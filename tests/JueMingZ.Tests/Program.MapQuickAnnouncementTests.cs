@@ -245,14 +245,14 @@ namespace JueMingZ.Tests
             var window = new LegacyUiRect(40, 50, LegacyUiMetrics.DefaultWidth, LegacyUiMetrics.DefaultHeight);
             var content = new LegacyUiRect(58, 134, 520, 200);
             var expectedHeight =
-                LegacyUiMetrics.RowHeight * 7 +
-                LegacyUiMetrics.SettingRowGap * 6 +
+                LegacyUiMetrics.RowHeight * 8 +
+                LegacyUiMetrics.SettingRowGap * 7 +
                 LegacyMainWindow.CalculateMapMarkerListHeightForTesting(0) +
                 24;
 
             if (LegacyMainWindow.CalculateMapEnhancementContentHeightForTesting() != expectedHeight)
             {
-                throw new InvalidOperationException("Map enhancement content height must include persistent death markers, death history, world day count, revealed area ratio, map custom markers, quick announcement, and future placeholder rows.");
+                throw new InvalidOperationException("Map enhancement content height must include persistent death markers, death history, world day count, revealed area ratio, map custom markers, map footprints, quick announcement, and future placeholder rows.");
             }
 
             AssertStringEquals(
@@ -269,10 +269,18 @@ namespace JueMingZ.Tests
                 throw new InvalidOperationException("Map enhancement page layout must dirty when persistent death marker state changes.");
             }
 
+            settings.MapFootprintsDisplayEnabled = true;
+            var footprintsChanged = LegacyMainWindow.BuildPageLayoutSnapshotForTesting("map_enhancement", window, content, 0, settings);
+            if (footprintsChanged.PageStateSignature == markerChanged.PageStateSignature ||
+                footprintsChanged.RebuildCount <= markerChanged.RebuildCount)
+            {
+                throw new InvalidOperationException("Map enhancement page layout must dirty when map footprints display state changes.");
+            }
+
             settings.MapQuickAnnouncementEnabled = true;
             var changed = LegacyMainWindow.BuildPageLayoutSnapshotForTesting("map_enhancement", window, content, 0, settings);
-            if (changed.PageStateSignature == markerChanged.PageStateSignature ||
-                changed.RebuildCount <= markerChanged.RebuildCount)
+            if (changed.PageStateSignature == footprintsChanged.PageStateSignature ||
+                changed.RebuildCount <= footprintsChanged.RebuildCount)
             {
                 throw new InvalidOperationException("Map enhancement page layout must dirty when quick announcement state changes.");
             }

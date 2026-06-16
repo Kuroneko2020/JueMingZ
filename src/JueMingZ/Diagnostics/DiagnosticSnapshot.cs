@@ -158,6 +158,65 @@ namespace JueMingZ.Diagnostics
         public DateTime? MapMarkerLastTraceEventWrittenAtUtc { get; set; }
         public string MapMarkerLastTraceEventType { get; set; }
         public string MapMarkerLastTraceMarkerId { get; set; }
+        public bool MapFootprintsDisplayEnabled { get; set; }
+        public string PlayerWorldFootprintsLastStatus { get; set; }
+        public string PlayerWorldFootprintsLastDecision { get; set; }
+        public string PlayerWorldFootprintsLastMessage { get; set; }
+        public string PlayerWorldFootprintsLastPairId { get; set; }
+        public bool PlayerWorldFootprintsIdentityResolved { get; set; }
+        public bool PlayerWorldFootprintsIsRecording { get; set; }
+        public bool PlayerWorldFootprintsReadFailed { get; set; }
+        public bool PlayerWorldFootprintsWriteFailed { get; set; }
+        public bool PlayerWorldFootprintsRetentionTrimmed { get; set; }
+        public long PlayerWorldFootprintsMaxRetainedHours { get; set; }
+        public double PlayerWorldFootprintsRetainedHours { get; set; }
+        public int PlayerWorldFootprintsSegmentCount { get; set; }
+        public int PlayerWorldFootprintsPointCount { get; set; }
+        public int PlayerWorldFootprintsBreakCount { get; set; }
+        public long PlayerWorldFootprintsTimelineStartTicks { get; set; }
+        public long PlayerWorldFootprintsTimelineEndTicks { get; set; }
+        public double PlayerWorldFootprintsLastPointTileX { get; set; }
+        public double PlayerWorldFootprintsLastPointTileY { get; set; }
+        public long PlayerWorldFootprintsLastPointDurationTicks { get; set; }
+        public long PlayerWorldFootprintsLastRecordRuntimeTick { get; set; }
+        public string PlayerWorldFootprintsLastFlushStatus { get; set; }
+        public DateTime? PlayerWorldFootprintsLastReadUtc { get; set; }
+        public DateTime? PlayerWorldFootprintsLastRecordUtc { get; set; }
+        public DateTime? PlayerWorldFootprintsLastWriteUtc { get; set; }
+        public string MapFootprintsRenderCacheStatus { get; set; }
+        public string MapFootprintsRenderCacheMessage { get; set; }
+        public string MapFootprintsRenderCachePairId { get; set; }
+        public string MapFootprintsRenderCacheSource { get; set; }
+        public int MapFootprintsRenderCacheSegmentCount { get; set; }
+        public int MapFootprintsRenderCachePointCount { get; set; }
+        public int MapFootprintsRenderCacheLineCount { get; set; }
+        public int MapFootprintsRenderCacheDataSignature { get; set; }
+        public bool MapFootprintsRenderCacheLimitHit { get; set; }
+        public string MapFootprintsLastDrawStatus { get; set; }
+        public string MapFootprintsLastDrawMessage { get; set; }
+        public string MapFootprintsLastDrawPairId { get; set; }
+        public int MapFootprintsCachedLineCount { get; set; }
+        public int MapFootprintsDrawnLineCount { get; set; }
+        public int MapFootprintsCulledLineCount { get; set; }
+        public int MapFootprintsThinnedLineCount { get; set; }
+        public int MapFootprintsDrawLimitSkippedLineCount { get; set; }
+        public bool MapFootprintsDrawLimitHit { get; set; }
+        public DateTime? MapFootprintsLastDrawUtc { get; set; }
+        public string MapFootprintsPlaybackOverlayStatus { get; set; }
+        public string MapFootprintsPlaybackOverlayMessage { get; set; }
+        public string MapFootprintsPlaybackPairId { get; set; }
+        public bool MapFootprintsPlaybackPaused { get; set; }
+        public int MapFootprintsPlaybackRate { get; set; }
+        public long MapFootprintsPlaybackCursorTicks { get; set; }
+        public long MapFootprintsPlaybackTimelineStartTicks { get; set; }
+        public long MapFootprintsPlaybackLatestTicks { get; set; }
+        public double MapFootprintsPlaybackProgress { get; set; }
+        public bool MapFootprintsPlaybackAtLatest { get; set; }
+        public bool MapFootprintsPlaybackDragging { get; set; }
+        public bool MapFootprintsPlaybackMouseCaptured { get; set; }
+        public bool MapFootprintsPlaybackBarHovered { get; set; }
+        public string MapFootprintsPlaybackLastInteraction { get; set; }
+        public DateTime? MapFootprintsPlaybackLastUpdateUtc { get; set; }
         public bool DiagnosticsOverlayVisible { get; set; }
         public long DrawCallCount { get; set; }
         public DateTime? LastDrawUtc { get; set; }
@@ -1103,6 +1162,23 @@ namespace JueMingZ.Diagnostics
             MapMarkerTraceEventsPath = string.Empty;
             MapMarkerLastTraceEventType = string.Empty;
             MapMarkerLastTraceMarkerId = string.Empty;
+            PlayerWorldFootprintsLastStatus = string.Empty;
+            PlayerWorldFootprintsLastDecision = string.Empty;
+            PlayerWorldFootprintsLastMessage = string.Empty;
+            PlayerWorldFootprintsLastPairId = string.Empty;
+            PlayerWorldFootprintsLastFlushStatus = string.Empty;
+            MapFootprintsRenderCacheStatus = string.Empty;
+            MapFootprintsRenderCacheMessage = string.Empty;
+            MapFootprintsRenderCachePairId = string.Empty;
+            MapFootprintsRenderCacheSource = string.Empty;
+            MapFootprintsLastDrawStatus = string.Empty;
+            MapFootprintsLastDrawMessage = string.Empty;
+            MapFootprintsLastDrawPairId = string.Empty;
+            MapFootprintsPlaybackOverlayStatus = string.Empty;
+            MapFootprintsPlaybackOverlayMessage = string.Empty;
+            MapFootprintsPlaybackPairId = string.Empty;
+            MapFootprintsPlaybackRate = 1;
+            MapFootprintsPlaybackLastInteraction = string.Empty;
             RunningActionKind = string.Empty;
             RunningActionSource = string.Empty;
             RunningActionStatus = string.Empty;

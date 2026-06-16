@@ -7,10 +7,10 @@
     <Platforms>AnyCPU;x86</Platforms>
     <PlatformTarget>x86</PlatformTarget>
     <LangVersion>7.3</LangVersion>
-    <Version>0.740</Version>
-    <AssemblyVersion>0.740.0</AssemblyVersion>
-    <FileVersion>0.740.0</FileVersion>
-    <InformationalVersion>0.740-combat-auto-boss-report</InformationalVersion>
+    <Version>0.748</Version>
+    <AssemblyVersion>0.748.0</AssemblyVersion>
+    <FileVersion>0.748.0</FileVersion>
+    <InformationalVersion>0.748-map-footprints-closeout</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Deterministic>true</Deterministic>
     <RestoreConfigFile>$(MSBuildThisFileDirectory)..\..\NuGet.Config</RestoreConfigFile>

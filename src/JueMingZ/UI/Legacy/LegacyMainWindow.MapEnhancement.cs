@@ -15,6 +15,7 @@ namespace JueMingZ.UI.Legacy
         private const string MapRevealedAreaRatioTooltip = "当前玩家-世界地图揭示区域占比";
         private const string MapRevealedAreaRatioClickTooltip = "点击打开详情";
         private const string MapCustomMarkersOnTooltip = "右键大地图试试吧";
+        private const string MapFootprintsDisplayTooltip = "在大地图展示足迹";
         private const string MapQuickAnnouncementKeyboardSlotTooltip = "双击进行改键，不支持鼠标按键";
         private const string MapQuickAnnouncementTriggerSlotTooltip = "双击进行改键，支持鼠标按键";
         private const string MapQuickAnnouncementOnTooltip = "按下快捷键对鼠标位置内容进行广播";
@@ -39,7 +40,9 @@ namespace JueMingZ.UI.Legacy
             hovered = DrawMapCustomMarkersRow(spriteBatch, area, mouse, elements, LegacyUiMetrics.RowHeight * 4 + LegacyUiMetrics.SettingRowGap * 4, settings) ?? hovered;
             var markerListY = CalculateMapMarkerListContentY();
             hovered = DrawMapMarkerList(spriteBatch, area, mouse, elements, markerListY) ?? hovered;
-            var quickAnnouncementY = markerListY + CalculateMapMarkerListHeight() + LegacyUiMetrics.SettingRowGap;
+            var footprintsY = markerListY + CalculateMapMarkerListHeight() + LegacyUiMetrics.SettingRowGap;
+            hovered = DrawMapFootprintsDisplayRow(spriteBatch, area, mouse, elements, footprintsY, settings) ?? hovered;
+            var quickAnnouncementY = footprintsY + LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawMapQuickAnnouncementRow(spriteBatch, area, mouse, elements, quickAnnouncementY, settings) ?? hovered;
             DrawMapEnhancementFuturePlaceholder(spriteBatch, area, quickAnnouncementY + LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap);
             RegisterMapDeathHistoryPopupOverlay(area);
@@ -67,6 +70,23 @@ namespace JueMingZ.UI.Legacy
                 new[] { "On", "Off" },
                 "map-persistent-death-markers-mode:",
                 new[] { MapPersistentDeathMarkersTooltip, string.Empty });
+        }
+
+        private static LegacyUiElement DrawMapFootprintsDisplayRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, AppSettings settings)
+        {
+            settings = settings ?? AppSettings.CreateDefault();
+            return DrawRightModeRow(
+                spriteBatch,
+                area,
+                mouse,
+                elements,
+                contentY,
+                "足迹",
+                settings.MapFootprintsDisplayEnabled ? "On" : "Off",
+                new[] { "开启", "关闭" },
+                new[] { "On", "Off" },
+                "map-footprints-display-mode:",
+                new[] { MapFootprintsDisplayTooltip, string.Empty });
         }
 
         private static LegacyUiElement DrawMapCustomMarkersRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, AppSettings settings)
@@ -863,6 +883,15 @@ namespace JueMingZ.UI.Legacy
             return new[]
             {
                 MapCustomMarkersOnTooltip,
+                string.Empty
+            };
+        }
+
+        internal static string[] GetMapFootprintsDisplayButtonTooltipsForTesting()
+        {
+            return new[]
+            {
+                MapFootprintsDisplayTooltip,
                 string.Empty
             };
         }

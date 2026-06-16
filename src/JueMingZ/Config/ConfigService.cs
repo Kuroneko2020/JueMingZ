@@ -269,6 +269,7 @@ namespace JueMingZ.Config
             SetFeatureEnabledLocked(FeatureIds.CombatGoblinExecution, settings.CombatGoblinExecutionEnabled);
             SetFeatureEnabledLocked(FeatureIds.MapPersistentDeathMarkers, settings.MapPersistentDeathMarkersEnabled);
             SetFeatureEnabledLocked(FeatureIds.MapCustomMarkers, settings.MapCustomMarkersEnabled);
+            SetFeatureEnabledLocked(FeatureIds.MapFootprints, settings.MapFootprintsDisplayEnabled);
             SetFeatureEnabledLocked(FeatureIds.MapQuickAnnouncement, settings.MapQuickAnnouncementEnabled);
             SetFeatureEnabledLocked("information.enemy_name_labels", settings.InformationEnemyNameLabelsEnabled);
             SetFeatureEnabledLocked("information.critter_name_labels", settings.InformationCritterNameLabelsEnabled);
@@ -344,6 +345,7 @@ namespace JueMingZ.Config
             if (settings.CombatGoblinExecutionEnabled) count++;
             if (settings.MapPersistentDeathMarkersEnabled) count++;
             if (settings.MapCustomMarkersEnabled) count++;
+            if (settings.MapFootprintsDisplayEnabled) count++;
             if (settings.MapQuickAnnouncementEnabled) count++;
             if (settings.InformationEnemyNameLabelsEnabled) count++;
             if (settings.InformationCritterNameLabelsEnabled) count++;

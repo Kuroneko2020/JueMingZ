@@ -35,9 +35,12 @@ namespace JueMingZ.GameState.Player
                 snapshot.IsUsingItem = TerrariaPlayerReadCompat.ItemAnimation(player) > 0;
 
                 var position = TerrariaPlayerReadCompat.Position(player);
+                var center = TerrariaPlayerReadCompat.Center(player);
                 var velocity = TerrariaPlayerReadCompat.Velocity(player);
                 snapshot.PositionX = position.X;
                 snapshot.PositionY = position.Y;
+                snapshot.CenterX = center.X;
+                snapshot.CenterY = center.Y;
                 snapshot.VelocityX = velocity.X;
                 snapshot.VelocityY = velocity.Y;
             }

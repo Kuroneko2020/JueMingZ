@@ -147,6 +147,7 @@ namespace JueMingZ.Bootstrap
                     UiInputFrameClock.BeginUpdateFrame("Main.Update.Prefix");
                     TerrariaUiMouseCompat.UpdateActiveTriggerSuppressionPrefixGuard();
                     DiagnosticUiInteractionBridge.UpdatePrefixGuard();
+                    MapFootprintPlaybackOverlay.UpdatePrefixGuard();
                     LegacyUiInput.UpdatePrefixGuard();
                     SearchItemPickRuntimeService.UpdatePrefixGuard();
                     MapQuickAnnouncementRuntimeService.UpdatePrefixGuard();

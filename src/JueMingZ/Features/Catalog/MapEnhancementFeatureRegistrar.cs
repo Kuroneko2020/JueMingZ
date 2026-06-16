@@ -90,6 +90,20 @@ namespace JueMingZ.Features.Catalog
                 .Build());
 
             registry.Register(FeatureDefinitionBuilder
+                .Create(FeatureIds.MapFootprints, "足迹", "在大地图展示当前玩家-世界足迹。")
+                .Domain(FeatureCodeDomain.MapEnhancement)
+                .Category(FeatureUserCategory.MapEnhancement)
+                .Actions(InputActionKind.None)
+                .GameState(GameStateKind.Map, GameStateKind.World, GameStateKind.UiState)
+                .Multiplayer(FeatureMultiplayerSupport.LocalAssistPendingMultiplayerVerification)
+                .Config(FeatureConfigUiKind.None)
+                .DefaultEnabled(false)
+                .VisibleInMainUi(true)
+                .Implemented(true)
+                .Notes("MapFootprintsDisplayEnabled controls fullscreen display only; recording remains always-on during normal world ticks. Current stage includes config, F5 switch, footprints.json, runtime recorder, render cache, green map lines, playback UI, and runtime snapshot diagnostics.")
+                .Build());
+
+            registry.Register(FeatureDefinitionBuilder
                 .Create(FeatureIds.MapQuickAnnouncement, "快捷宣告", "把鼠标指向对象转换为聊天宣告。")
                 .Domain(FeatureCodeDomain.Information)
                 .Category(FeatureUserCategory.MapEnhancement)

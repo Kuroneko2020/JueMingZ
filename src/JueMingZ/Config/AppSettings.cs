@@ -164,6 +164,9 @@ namespace JueMingZ.Config
         [DataMember(Order = 197)]
         public bool CombatAutoBossDamageReportEnabled { get; set; }
 
+        [DataMember(Order = 198)]
+        public bool MapFootprintsDisplayEnabled { get; set; }
+
         [DataMember(Order = 37)]
         public bool CombatPerfectRevolverEnabled { get; set; }
 
@@ -807,6 +810,7 @@ namespace JueMingZ.Config
                 CombatAutoFacingEnabled = false,
                 CombatEquipmentWarningEnabled = false,
                 CombatAutoBossDamageReportEnabled = false,
+                MapFootprintsDisplayEnabled = false,
                 CombatGoblinExecutionEnabled = false,
                 AimRangeOrigin = CombatAimModes.RangeOriginPlayer,
                 AimTargetPriority = CombatAimModes.TargetPriorityNearest,

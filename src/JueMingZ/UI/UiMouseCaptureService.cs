@@ -128,6 +128,17 @@ namespace JueMingZ.UI
             return consumed;
         }
 
+        public static bool ConsumeScrollForOperationWindow()
+        {
+            if (!TerrariaMainCompat.AllowsInputProcessing)
+            {
+                InvalidateCache();
+                return false;
+            }
+
+            return TerrariaUiMouseCompat.TryConsumeUiScroll();
+        }
+
         public static void InvalidateCache()
         {
             lock (SyncRoot)

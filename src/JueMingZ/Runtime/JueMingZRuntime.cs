@@ -7,6 +7,7 @@ using JueMingZ.Automation.Combat;
 using JueMingZ.Automation.Fishing;
 using JueMingZ.Automation.Information;
 using JueMingZ.Automation.InventoryAndItems;
+using JueMingZ.Automation.MapEnhancement;
 using JueMingZ.Automation.Movement;
 using JueMingZ.Automation.NpcServices;
 using JueMingZ.Automation.WorldAutomation;
@@ -36,7 +37,7 @@ namespace JueMingZ.Runtime
         private static long _lastRuntimeUpdateStartTimestamp;
         private static readonly RuntimeTickPipeline TickPipeline = CreateTickPipeline();
 
-        public const string Version = "0.740-combat-auto-boss-report";
+        public const string Version = "0.748-map-footprints-closeout";
 
         public static RuntimeState State { get; private set; } = new RuntimeState();
         public static FeatureRegistry FeatureRegistry { get; private set; }
@@ -120,6 +121,8 @@ namespace JueMingZ.Runtime
                 new RuntimeTickStage("post-terraria-input-guards", RunPostTerrariaInputGuards),
                 new RuntimeTickStage("game-state-read", ReadGameState),
                 new RuntimeTickStage("player-world-playtime-sampling", RunPlayerWorldPlaytimeSampling),
+                new RuntimeTickStage("player-world-footprints-recording", RunPlayerWorldFootprintsRecording),
+                new RuntimeTickStage("player-world-footprints-render-cache", RunPlayerWorldFootprintsRenderCache),
                 new RuntimeTickStage("player-world-exploration-scan", RunPlayerWorldExplorationScan),
                 new RuntimeTickStage("search-chest-locator-lifecycle", RunSearchChestLocatorLifecycleGuards),
                 new RuntimeTickStage("input-focus-guard", RunInputFocusGuard),
@@ -198,6 +201,21 @@ namespace JueMingZ.Runtime
             PlayerWorldExplorationService.Tick(
                 context == null ? null : context.GameState,
                 State);
+        }
+
+        private static void RunPlayerWorldFootprintsRecording(RuntimeTickContext context)
+        {
+            PlayerWorldFootprintService.Tick(
+                context == null ? null : context.GameState,
+                State);
+        }
+
+        private static void RunPlayerWorldFootprintsRenderCache(RuntimeTickContext context)
+        {
+            MapFootprintRenderCache.Tick(
+                context == null ? null : context.SettingsSnapshot,
+                context == null ? null : context.GameState,
+                State == null ? 0L : State.UpdateCount);
         }
 
         internal static bool ClearSearchChestLocatorHighlightIfChestOpenForTesting(GameStateSnapshot snapshot)
@@ -504,6 +522,7 @@ namespace JueMingZ.Runtime
                 }
 
                 PlayerWorldPlaytimeService.FlushPending();
+                PlayerWorldFootprintService.FlushPending();
                 PlayerWorldExplorationService.FlushPending();
                 State.MarkShutdown();
                 _initialized = false;

@@ -759,8 +759,8 @@ namespace JueMingZ.Tests
 
         private static void LegacyMapEnhancementPageIncludesMapCustomMarkersRow()
         {
-            var expectedHeight = LegacyUiMetrics.RowHeight * 7 +
-                                 LegacyUiMetrics.SettingRowGap * 6 +
+            var expectedHeight = LegacyUiMetrics.RowHeight * 8 +
+                                 LegacyUiMetrics.SettingRowGap * 7 +
                                  LegacyMainWindow.CalculateMapMarkerListHeightForTesting(0) +
                                  24;
             if (LegacyMainWindow.CalculateMapEnhancementContentHeightForTesting() != expectedHeight)

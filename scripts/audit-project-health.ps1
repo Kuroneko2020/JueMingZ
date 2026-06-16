@@ -2123,6 +2123,337 @@ function Test-MapCustomMarkerGovernance {
     }
 }
 
+function Test-MapFootprintGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $registrarPath = Join-Path $RepoRoot "src\JueMingZ\Features\Catalog\MapEnhancementFeatureRegistrar.cs"
+    $featureIdsPath = Join-Path $RepoRoot "src\JueMingZ\Common\FeatureIds.cs"
+    $appSettingsPath = Join-Path $RepoRoot "src\JueMingZ\Config\AppSettings.cs"
+    $configServicePath = Join-Path $RepoRoot "src\JueMingZ\Config\ConfigService.cs"
+    $settingsSnapshotPath = Join-Path $RepoRoot "src\JueMingZ\Runtime\RuntimeSettingsSnapshot.cs"
+    $settingsSnapshotProviderPath = Join-Path $RepoRoot "src\JueMingZ\Runtime\RuntimeSettingsSnapshotProvider.cs"
+    $runtimePath = Join-Path $RepoRoot "src\JueMingZ\Runtime\JueMingZRuntime.cs"
+    $rootPath = Join-Path $RepoRoot "src\JueMingZ\Records\PlayerWorldFeatureDataRoot.cs"
+    $modelsPath = Join-Path $RepoRoot "src\JueMingZ\Records\PlayerWorldFootprintModels.cs"
+    $storePath = Join-Path $RepoRoot "src\JueMingZ\Records\PlayerWorldFootprintStore.cs"
+    $cachePath = Join-Path $RepoRoot "src\JueMingZ\Records\PlayerWorldFootprintCache.cs"
+    $servicePath = Join-Path $RepoRoot "src\JueMingZ\Records\PlayerWorldFootprintService.cs"
+    $diagnosticsPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\PlayerWorldFootprintDiagnostics.cs"
+    $renderCachePath = Join-Path $RepoRoot "src\JueMingZ\Automation\MapEnhancement\MapFootprintRenderCache.cs"
+    $playbackStatePath = Join-Path $RepoRoot "src\JueMingZ\Automation\MapEnhancement\MapFootprintPlaybackState.cs"
+    $mapLayerPath = Join-Path $RepoRoot "src\JueMingZ\Hooks\PlayerWorldFootprintMapLayer.cs"
+    $mapLayerInstallerPath = Join-Path $RepoRoot "src\JueMingZ\Hooks\PlayerWorldFootprintMapLayerInstaller.cs"
+    $overlayInstallerPath = Join-Path $RepoRoot "src\JueMingZ\Hooks\MapFootprintFullscreenOverlayInstaller.cs"
+    $overlayPath = Join-Path $RepoRoot "src\JueMingZ\UI\MapFootprintPlaybackOverlay.cs"
+    $uiMouseCaptureServicePath = Join-Path $RepoRoot "src\JueMingZ\UI\UiMouseCaptureService.cs"
+    $hookInstallerPath = Join-Path $RepoRoot "src\JueMingZ\Bootstrap\HookInstaller.cs"
+    $handlerPath = Join-Path $RepoRoot "src\JueMingZ\Input\LegacyUiActionService.MapEnhancementHandlers.cs"
+    $snapshotPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\DiagnosticSnapshot.cs"
+    $snapshotWriterPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\DiagnosticSnapshotWriter.Json.cs"
+    $snapshotBuilderPath = Join-Path $RepoRoot "src\JueMingZ\Runtime\Diagnostics\RuntimeDiagnosticSnapshotBuilder.Bootstrap.cs"
+    $testPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.PlayerWorldFootprintTests.cs"
+    $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
+    $featureDocPath = Join-Path $RepoRoot "文档\功能介绍\地图加强页\足迹.md"
+    $diagnosticRulesPath = Join-Path $RepoRoot "文档\项目规则\AI诊断日志说明.md"
+
+    $registrarText = Read-TextIfExists -Path $registrarPath
+    $featureIdsText = Read-TextIfExists -Path $featureIdsPath
+    $appSettingsText = Read-TextIfExists -Path $appSettingsPath
+    $configServiceText = Read-TextIfExists -Path $configServicePath
+    $settingsSnapshotText = Read-TextIfExists -Path $settingsSnapshotPath
+    $settingsSnapshotProviderText = Read-TextIfExists -Path $settingsSnapshotProviderPath
+    $runtimeText = Read-TextIfExists -Path $runtimePath
+    $rootText = Read-TextIfExists -Path $rootPath
+    $modelsText = Read-TextIfExists -Path $modelsPath
+    $storeText = Read-TextIfExists -Path $storePath
+    $cacheText = Read-TextIfExists -Path $cachePath
+    $serviceText = Read-TextIfExists -Path $servicePath
+    $diagnosticsText = Read-TextIfExists -Path $diagnosticsPath
+    $renderCacheText = Read-TextIfExists -Path $renderCachePath
+    $playbackStateText = Read-TextIfExists -Path $playbackStatePath
+    $mapLayerText = Read-TextIfExists -Path $mapLayerPath
+    $mapLayerInstallerText = Read-TextIfExists -Path $mapLayerInstallerPath
+    $overlayInstallerText = Read-TextIfExists -Path $overlayInstallerPath
+    $overlayText = Read-TextIfExists -Path $overlayPath
+    $uiMouseCaptureServiceText = Read-TextIfExists -Path $uiMouseCaptureServicePath
+    $hookInstallerText = Read-TextIfExists -Path $hookInstallerPath
+    $handlerText = Read-TextIfExists -Path $handlerPath
+    $snapshotText = Read-TextIfExists -Path $snapshotPath
+    $snapshotWriterText = Read-TextIfExists -Path $snapshotWriterPath
+    $snapshotBuilderText = Read-TextIfExists -Path $snapshotBuilderPath
+    $testText = Read-TextIfExists -Path $testPath
+    $programText = Read-TextIfExists -Path $programPath
+    $featureDocText = Read-TextIfExists -Path $featureDocPath
+    $diagnosticRulesText = Read-TextIfExists -Path $diagnosticRulesPath
+
+    if ($null -eq $registrarText -or $null -eq $featureIdsText -or $null -eq $appSettingsText -or $null -eq $configServiceText -or $null -eq $settingsSnapshotText -or $null -eq $settingsSnapshotProviderText -or $null -eq $runtimeText -or $null -eq $rootText -or $null -eq $modelsText -or $null -eq $storeText -or $null -eq $cacheText -or $null -eq $serviceText -or $null -eq $diagnosticsText -or $null -eq $renderCacheText -or $null -eq $playbackStateText -or $null -eq $mapLayerText -or $null -eq $mapLayerInstallerText -or $null -eq $overlayInstallerText -or $null -eq $overlayText -or $null -eq $uiMouseCaptureServiceText -or $null -eq $hookInstallerText -or $null -eq $handlerText -or $null -eq $snapshotText -or $null -eq $snapshotWriterText -or $null -eq $snapshotBuilderText -or $null -eq $testText -or $null -eq $programText -or $null -eq $featureDocText -or $null -eq $diagnosticRulesText) {
+        Write-FailHealth "Map footprints registrar, config, runtime, store/cache/service, render/playback, diagnostics, docs, and tests must exist as separate responsibilities."
+        return
+    }
+
+    if ($featureIdsText.Contains('MapFootprints = "map.footprints"') -and
+        $registrarText.Contains("FeatureIds.MapFootprints") -and
+        $registrarText.Contains(".Domain(FeatureCodeDomain.MapEnhancement)") -and
+        $registrarText.Contains(".Category(FeatureUserCategory.MapEnhancement)") -and
+        $registrarText.Contains(".Actions(InputActionKind.None)") -and
+        $registrarText.Contains(".Implemented(true)") -and
+        $registrarText.Contains("LocalAssistPendingMultiplayerVerification")) {
+        Write-Pass "Map footprints stay registered as an implemented map-enhancement display feature with no ActionQueue requirement."
+    }
+    else {
+        Write-FailHealth "map.footprints must stay in MapEnhancementFeatureRegistrar with MapEnhancement domain/category, None actions, implemented status, and pending multiplayer verification."
+    }
+
+    if ($appSettingsText.Contains("MapFootprintsDisplayEnabled") -and
+        $configServiceText.Contains("FeatureIds.MapFootprints") -and
+        $settingsSnapshotText.Contains("MapFootprintsDisplayEnabled") -and
+        $settingsSnapshotProviderText.Contains("_mapFootprintsDisplayEnabled") -and
+        $handlerText.Contains("displayOnly") -and
+        $handlerText.Contains("recordingAffected") -and
+        $testText.Contains("MapFootprintsDisplayConfigDefaultsAndFeatureSync")) {
+        Write-Pass "Map footprints display config remains a display-only switch synced to settings and UI metadata."
+    }
+    else {
+        Write-FailHealth "MapFootprintsDisplayEnabled must remain a display-only config with FeatureSettings/runtime snapshot sync and recordingAffected=false UI metadata."
+    }
+
+    if ($rootText.Contains('FootprintsFileName = "footprints.json"') -and
+        $storeText.Contains("BuildPlayerWorldFeatureFilePath(pairId, PlayerWorldFeatureDataRoot.FootprintsFileName)") -and
+        $storeText.Contains("PlayerWorldFeatureDataStore.TryWriteJson") -and
+        $storeText.Contains("identityUnavailable") -and
+        $cacheText.Contains("PlayerWorldFootprintStore.ReadForPair") -and
+        $modelsText.Contains("MaxRetainedHours = 200L") -and
+        $testText.Contains("PlayerWorldFootprintsIdentityUnavailableDoesNotWriteUnknown")) {
+        Write-Pass "Map footprints JSON stays pair-scoped, safe-written by the store, capped at 200h, and fail-closed without unknown buckets."
+    }
+    else {
+        Write-FailHealth "footprints.json must stay behind pair-scoped PlayerWorldFootprintStore safe writes, 200h retention, and identity fail-closed coverage."
+    }
+
+    $gameReadIndex = $runtimeText.IndexOf('"game-state-read"', [System.StringComparison]::Ordinal)
+    $recordingIndex = $runtimeText.IndexOf('"player-world-footprints-recording"', [System.StringComparison]::Ordinal)
+    $renderIndex = $runtimeText.IndexOf('"player-world-footprints-render-cache"', [System.StringComparison]::Ordinal)
+    $inputGateIndex = $runtimeText.IndexOf('"input-focus-guard"', [System.StringComparison]::Ordinal)
+    if ($gameReadIndex -ge 0 -and $recordingIndex -gt $gameReadIndex -and $renderIndex -gt $recordingIndex -and $inputGateIndex -gt $renderIndex -and
+        $runtimeText.Contains("RunPlayerWorldFootprintsRecording") -and
+        $runtimeText.Contains("PlayerWorldFootprintService.Tick") -and
+        $runtimeText.Contains("MapFootprintRenderCache.Tick")) {
+        Write-Pass "Map footprints recording and render-cache stages stay after game-state-read and before input/UI/action gates."
+    }
+    else {
+        Write-FailHealth "Map footprints runtime stages must stay after game-state-read and before input-focus/action gates, with render cache after recording."
+    }
+
+    if (-not $serviceText.Contains("MapFootprintsDisplayEnabled") -and
+        -not $serviceText.Contains("GameInputAvailable") -and
+        -not $serviceText.Contains("InputActionQueue") -and
+        -not $serviceText.Contains("ActionSubmitting") -and
+        $serviceText.Contains("PlayerWorldIdentityRuntimeCache.TryResolveCurrentCached") -and
+        $serviceText.Contains("FlushPending") -and
+        $testText.Contains("PlayerWorldFootprintRecorderDisplayOffStillRecords") -and
+        $testText.Contains("PlayerWorldFootprintRecorderUiStatesDoNotBlockRecording") -and
+        $testText.Contains("PlayerWorldFootprintRecorderWallClockGapBreaksWithoutDuration")) {
+        Write-Pass "Map footprints recorder ignores display/UI/action gates and keeps identity, flush, and no-tick gap tests."
+    }
+    else {
+        Write-FailHealth "Map footprints recorder must not read MapFootprintsDisplayEnabled, UI input focus, or ActionQueue gates; tests must cover display-off, UI states, and wall-clock gaps."
+    }
+
+    $forbiddenMutationPattern = '(Player\.Teleport|NetMessage|\.statLife\s*=|\.statMana\s*=|\.velocity\s*=|\.position\s*=|\.fallStart\s*=|\.noFallDmg\s*=|AddBuff\s*\(|\.buffType\s*=|\.buffTime\s*=|\.stack\s*=|Main\.tile|NPC\[[^\]]+\]\s*=|WorldGen\.)'
+    $footprintRuntimeFiles = @($servicePath, $renderCachePath, $playbackStatePath, $mapLayerPath, $overlayPath, $diagnosticsPath)
+    $mutationLeaks = @()
+    foreach ($path in $footprintRuntimeFiles) {
+        $text = Read-TextIfExists -Path $path
+        if ($null -ne $text -and [System.Text.RegularExpressions.Regex]::IsMatch($text, $forbiddenMutationPattern)) {
+            $mutationLeaks += $path.Substring($RepoRoot.Length).TrimStart('\', '/').Replace('\', '/')
+        }
+    }
+
+    if ($mutationLeaks.Count -eq 0) {
+        Write-Pass "Map footprints runtime, draw, playback, and diagnostics files avoid player/world/inventory/NPC/tile/network mutations."
+    }
+    else {
+        Write-FailHealth "Map footprints must not mutate player/world/inventory/NPC/tile/network state: $($mutationLeaks -join ', ')"
+    }
+
+    if ($renderCacheText.Contains("PlayerWorldFootprintService.TryGetInMemoryForPair") -and
+        $renderCacheText.Contains("PlayerWorldFootprintCache.ReadForPair") -and
+        $renderCacheText.Contains("BuildDrawPlan") -and
+        $renderCacheText.Contains("cursorTicks") -and
+        $renderCacheText.Contains("MapFootprintsDisplayEnabled") -and
+        -not $renderCacheText.Contains("TryWriteJson") -and
+        -not $renderCacheText.Contains("SaveForPair") -and
+        -not $renderCacheText.Contains("PlayerWorldFootprintStore") -and
+        $testText.Contains("MapFootprintRenderCacheBuildsLinesWithoutCrossSegmentConnection") -and
+        $testText.Contains("MapFootprintRenderDrawPlanCullsThinsAndLimits") -and
+        $testText.Contains("MapFootprintPlaybackDrawPlanSlicesCurrentLine")) {
+        Write-Pass "Map footprints render cache stays read-only, display-gated, and covered for cull/thin/limit/time-slice drawing."
+    }
+    else {
+        Write-FailHealth "Map footprints render cache must only read in-memory/cache snapshots, keep cursor time-slice draw planning, and avoid JSON/store writes."
+    }
+
+    if ($mapLayerText.Contains("MapFootprintRenderCache.GetSnapshot") -and
+        $mapLayerText.Contains("MapFootprintRenderCache.BuildDrawPlan") -and
+        $mapLayerText.Contains("PlayerWorldFootprintDiagnostics.RecordMapDraw") -and
+        $mapLayerText.Contains("MapFootprintRenderCache.DefaultMaxDrawnLines") -and
+        $mapLayerText.Contains("MapFootprintRenderCache.DefaultMinDrawPixelStep") -and
+        $renderCacheText.Contains("DefaultMaxDrawnLines = 6000") -and
+        $renderCacheText.Contains("DefaultMinDrawPixelStep = 1.5f") -and
+        -not $mapLayerText.Contains("TryWriteJson") -and
+        -not $mapLayerText.Contains("PlayerWorldFootprintStore") -and
+        -not $mapLayerText.Contains("PlayerWorldFootprintCache.Read")) {
+        Write-Pass "Map footprint map layer draws from render cache with cull/thin/limit diagnostics and no JSON/store reads."
+    }
+    else {
+        Write-FailHealth "PlayerWorldFootprintMapLayer must draw only from render cache, keep draw limits, and avoid JSON/store/cache file reads."
+    }
+
+    if ($overlayInstallerText.Contains("Main.OnPostFullscreenMapDraw") -and
+        $overlayText.Contains("DrawFullscreenMapLayer") -and
+        $overlayText.Contains("UpdatePrefixGuard") -and
+        $hookInstallerText.Contains("MapFootprintPlaybackOverlay.UpdatePrefixGuard") -and
+        $overlayText.Contains("MapFootprintPlaybackState.CalculateLayout(TerrariaMainCompat.ScreenWidth, TerrariaMainCompat.ScreenHeight)") -and
+        $playbackStateText.Contains("var safeWidth = Math.Max(1, screenWidth)") -and
+        $playbackStateText.Contains("var safeHeight = Math.Max(1, screenHeight)") -and
+        $playbackStateText.Contains("safeHeight - bottomMargin - height") -and
+        -not $overlayText.Contains("MapOverlayDrawContext") -and
+        -not $playbackStateText.Contains("MapOverlayDrawContext") -and
+        $testText.Contains("MapFootprintPlaybackDefaultsToLatestPausedAndScreenSpaceLayout")) {
+        Write-Pass "Map footprint playback overlay stays fullscreen screen-space and bottom-safe-margin based."
+    }
+    else {
+        Write-FailHealth "Map footprint playback UI must use OnPostFullscreenMapDraw plus screen-size layout, not map-content coordinates."
+    }
+
+    if ($playbackStateText.Contains("interaction.MouseCaptured = hit.BarHovered || _dragging || (_lastLeftDown && leftReleased)") -and
+        $playbackStateText.Contains("interaction.ScrollConsumed = interaction.MouseCaptured") -and
+        $overlayText.Contains("UiMouseCaptureService.ConsumeMouseTriggerForOperationWindow") -and
+        $overlayText.Contains("UiMouseCaptureService.ConsumeScrollForOperationWindow") -and
+        $uiMouseCaptureServiceText.Contains("TerrariaUiMouseCompat.TryConsumeMouseTriggerInput") -and
+        $testText.Contains("MapFootprintPlaybackHandlesRateDragAndInputHandoff")) {
+        Write-Pass "Map footprint playback input consumption remains limited to bar/drag hits through UiMouseCaptureService."
+    }
+    else {
+        Write-FailHealth "Map footprint playback input must only capture bar/drag mouse and scroll through UiMouseCaptureService, with release handoff coverage."
+    }
+
+    $footprintFiles = @($servicePath, $renderCachePath, $playbackStatePath, $mapLayerPath, $overlayPath, $mapLayerInstallerPath, $overlayInstallerPath, $diagnosticsPath, $storePath, $cachePath)
+    $actionBackflow = @()
+    foreach ($path in $footprintFiles) {
+        $text = Read-TextIfExists -Path $path
+        if ($null -ne $text -and ($text.Contains("InputActionQueue") -or $text.Contains("InputActionRequest") -or $text.Contains("ActionKind"))) {
+            $actionBackflow += $path.Substring($RepoRoot.Length).TrimStart('\', '/').Replace('\', '/')
+        }
+    }
+
+    if ($actionBackflow.Count -eq 0) {
+        Write-Pass "Map footprints feature files stay out of ActionQueue and input action request paths."
+    }
+    else {
+        Write-FailHealth "Map footprints must not introduce ActionQueue/request backflow: $($actionBackflow -join ', ')"
+    }
+
+    $requiredDiagnosticFields = @(
+        "MapFootprintsDisplayEnabled",
+        "PlayerWorldFootprintsLastStatus",
+        "PlayerWorldFootprintsLastDecision",
+        "PlayerWorldFootprintsLastMessage",
+        "PlayerWorldFootprintsLastPairId",
+        "PlayerWorldFootprintsIdentityResolved",
+        "PlayerWorldFootprintsIsRecording",
+        "PlayerWorldFootprintsReadFailed",
+        "PlayerWorldFootprintsWriteFailed",
+        "PlayerWorldFootprintsRetentionTrimmed",
+        "PlayerWorldFootprintsMaxRetainedHours",
+        "PlayerWorldFootprintsRetainedHours",
+        "PlayerWorldFootprintsSegmentCount",
+        "PlayerWorldFootprintsPointCount",
+        "PlayerWorldFootprintsBreakCount",
+        "PlayerWorldFootprintsTimelineStartTicks",
+        "PlayerWorldFootprintsTimelineEndTicks",
+        "PlayerWorldFootprintsLastPointTileX",
+        "PlayerWorldFootprintsLastPointTileY",
+        "PlayerWorldFootprintsLastPointDurationTicks",
+        "PlayerWorldFootprintsLastRecordRuntimeTick",
+        "PlayerWorldFootprintsLastFlushStatus",
+        "PlayerWorldFootprintsLastReadUtc",
+        "PlayerWorldFootprintsLastRecordUtc",
+        "PlayerWorldFootprintsLastWriteUtc",
+        "MapFootprintsRenderCacheStatus",
+        "MapFootprintsRenderCacheMessage",
+        "MapFootprintsRenderCachePairId",
+        "MapFootprintsRenderCacheSource",
+        "MapFootprintsRenderCacheSegmentCount",
+        "MapFootprintsRenderCachePointCount",
+        "MapFootprintsRenderCacheLineCount",
+        "MapFootprintsRenderCacheDataSignature",
+        "MapFootprintsRenderCacheLimitHit",
+        "MapFootprintsLastDrawStatus",
+        "MapFootprintsLastDrawMessage",
+        "MapFootprintsLastDrawPairId",
+        "MapFootprintsCachedLineCount",
+        "MapFootprintsDrawnLineCount",
+        "MapFootprintsCulledLineCount",
+        "MapFootprintsThinnedLineCount",
+        "MapFootprintsDrawLimitSkippedLineCount",
+        "MapFootprintsDrawLimitHit",
+        "MapFootprintsLastDrawUtc",
+        "MapFootprintsPlaybackOverlayStatus",
+        "MapFootprintsPlaybackOverlayMessage",
+        "MapFootprintsPlaybackPairId",
+        "MapFootprintsPlaybackPaused",
+        "MapFootprintsPlaybackRate",
+        "MapFootprintsPlaybackCursorTicks",
+        "MapFootprintsPlaybackTimelineStartTicks",
+        "MapFootprintsPlaybackLatestTicks",
+        "MapFootprintsPlaybackProgress",
+        "MapFootprintsPlaybackAtLatest",
+        "MapFootprintsPlaybackDragging",
+        "MapFootprintsPlaybackMouseCaptured",
+        "MapFootprintsPlaybackBarHovered",
+        "MapFootprintsPlaybackLastInteraction",
+        "MapFootprintsPlaybackLastUpdateUtc"
+    )
+    $missingDiagnosticFields = @()
+    foreach ($field in $requiredDiagnosticFields) {
+        if (-not $snapshotText.Contains($field) -or
+            -not $snapshotWriterText.Contains($field) -or
+            -not $snapshotBuilderText.Contains($field)) {
+            $missingDiagnosticFields += $field
+        }
+    }
+
+    if ($diagnosticsText.Contains("RecordRuntime") -and
+        $diagnosticsText.Contains("RecordRenderCache") -and
+        $diagnosticsText.Contains("RecordMapDraw") -and
+        $diagnosticsText.Contains("RecordPlaybackOverlay") -and
+        $missingDiagnosticFields.Count -eq 0 -and
+        $testText.Contains("PlayerWorldFootprintsDiagnosticsWrittenToSnapshot") -and
+        $programText.Contains("player-world footprints diagnostics written to snapshot")) {
+        Write-Pass "Map footprints recorder/render/playback diagnostics reach runtime snapshot JSON and console coverage."
+    }
+    else {
+        Write-FailHealth "Map footprints diagnostics must expose recorder, render, draw, and playback fields through DiagnosticSnapshot, JSON writer, builder, and tests. Missing=$($missingDiagnosticFields -join ', ')"
+    }
+
+    if ($featureDocText.Contains("MapFootprintsDisplayEnabled") -and
+        $featureDocText.Contains("display-only") -and
+        $featureDocText.Contains("记录服务不读取该开关") -and
+        $featureDocText.Contains("PlayerWorldFootprintsLastDecision") -and
+        $featureDocText.Contains("MapFootprintsPlaybackProgress") -and
+        $featureDocText.Contains("Draw、UI 和 cache 读取路径不得写 JSON") -and
+        $diagnosticRulesText.Contains("PlayerWorldFootprintsLastDecision") -and
+        $diagnosticRulesText.Contains("MapFootprintsPlaybackProgress") -and
+        $diagnosticRulesText.Contains("display-only") -and
+        $diagnosticRulesText.Contains("inputUiStillRecording")) {
+        Write-Pass "Map footprints feature and diagnostics docs explain display-only recording, snapshot fields, draw/UI boundaries, and decision meanings."
+    }
+    else {
+        Write-FailHealth "Map footprints docs must explain display-only recording, runtime snapshot fields, draw/UI no-JSON boundaries, input handoff, and decision meanings."
+    }
+}
+
 function Test-ActionQueueDirectEnqueueGovernance {
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
 
@@ -3029,6 +3360,7 @@ Test-CombatAimDiagnosticsGovernance -RepoRoot $repoRoot
 Test-PhasebladeQuickSwitchDiagnosticsGovernance -RepoRoot $repoRoot
 Test-MapQuickAnnouncementGovernance -RepoRoot $repoRoot
 Test-MapCustomMarkerGovernance -RepoRoot $repoRoot
+Test-MapFootprintGovernance -RepoRoot $repoRoot
 Test-PlayerWorldExplorationGovernance -RepoRoot $repoRoot
 Test-ActionQueueDirectEnqueueGovernance -RepoRoot $repoRoot
 Test-NewFeatureBoundaryGovernance -RepoRoot $repoRoot
