@@ -73,6 +73,47 @@ namespace JueMingZ.Input
                 "Button");
         }
 
+        private static void HandleMapCustomMarkersPage(LegacyUiCommand command, string action)
+        {
+            var before = BuildMapEnhancementUiStateJson();
+            action = (action ?? string.Empty).Trim();
+            var outcome = "Succeeded";
+            var message = "Map custom marker page command handled.";
+            var delta = 0;
+            if (string.Equals(action, "prev", StringComparison.OrdinalIgnoreCase))
+            {
+                delta = -1;
+                message = "Map custom marker list moved to previous page.";
+            }
+            else if (string.Equals(action, "next", StringComparison.OrdinalIgnoreCase))
+            {
+                delta = 1;
+                message = "Map custom marker list moved to next page.";
+            }
+            else
+            {
+                outcome = "Rejected";
+                message = "Map custom marker page command rejected because the action was invalid.";
+            }
+
+            if (delta != 0)
+            {
+                LegacyMainWindow.MoveMapCustomMarkerPage(delta);
+                LegacyTextInput.ClearFocus();
+            }
+
+            Record(
+                command,
+                "Ui.MapCustomMarkers.Page",
+                "UI",
+                outcome,
+                message,
+                before,
+                BuildMapEnhancementUiStateJson(),
+                "{\"submitted\":false,\"implemented\":true,\"featureId\":\"" + EscapeJson(FeatureIds.MapCustomMarkers) + "\",\"action\":\"" + EscapeJson(action) + "\",\"pageIndex\":" + IntRaw(LegacyMainWindow.GetMapCustomMarkerPageIndex()) + ",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                "Button");
+        }
+
         private static void HandleMapCustomMarkerCommand(LegacyUiCommand command, string payload)
         {
             var before = BuildMapEnhancementUiStateJson();
@@ -465,6 +506,7 @@ namespace JueMingZ.Input
                    "\"mapRevealedAreaControlState\":\"" + EscapeJson(exploration == null ? string.Empty : exploration.ControlState) + "\"," +
                    "\"mapCustomMarkersEnabled\":" + BoolRaw(settings.MapCustomMarkersEnabled) + "," +
                    "\"mapCustomMarkersSignature\":" + IntRaw(PlayerWorldMapMarkerCache.LastStateSignature) + "," +
+                   "\"mapCustomMarkerPageIndex\":" + IntRaw(LegacyMainWindow.GetMapCustomMarkerPageIndex()) + "," +
                    "\"mapCustomMarkerNameInputActive\":" + BoolRaw(LegacyTextInput.IsAnyFocused) + "," +
                    "\"mapQuickAnnouncementEnabled\":" + BoolRaw(settings.MapQuickAnnouncementEnabled) + "," +
                    "\"mapQuickAnnouncementHotkeySlot1\":\"" + EscapeJson(hotkey.Slot1) + "\"," +

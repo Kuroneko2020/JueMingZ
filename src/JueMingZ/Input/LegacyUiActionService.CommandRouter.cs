@@ -367,6 +367,12 @@ namespace JueMingZ.Input
                 return;
             }
 
+            if (command.ElementId.StartsWith("map-custom-markers-page:", StringComparison.Ordinal))
+            {
+                HandleMapCustomMarkersPage(command, command.ElementId.Substring("map-custom-markers-page:".Length));
+                return;
+            }
+
             if (command.ElementId.StartsWith("map-custom-marker:", StringComparison.Ordinal))
             {
                 HandleMapCustomMarkerCommand(command, command.ElementId.Substring("map-custom-marker:".Length));

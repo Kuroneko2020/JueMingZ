@@ -37,7 +37,7 @@ namespace JueMingZ.Hooks
                 return;
             }
 
-            var read = PlayerWorldDeathMarkerCache.ReadCurrentMarkers(PlayerWorldDeathMarkerCache.DefaultMaxMarkers);
+            var read = PlayerWorldDeathMarkerCache.ReadCurrentMarkers(MaxDrawnMarkers);
             if (read == null || read.Markers == null || read.Markers.Count <= 0)
             {
                 PlayerWorldDeathMarkerDiagnostics.RecordDraw(

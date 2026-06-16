@@ -105,7 +105,7 @@ namespace JueMingZ.Tests
                 throw new InvalidOperationException("Persistent death marker tooltip test contract must expose two button slots.");
             }
 
-            AssertStringEquals(tooltips[0], "大地图常驻显示死亡点", "persistent death markers on tooltip");
+            AssertStringEquals(tooltips[0], "大地图常驻显示死亡点（仅显示最近256次）", "persistent death markers on tooltip");
             AssertStringEquals(tooltips[1], string.Empty, "persistent death markers off tooltip");
         }
 
@@ -141,6 +141,29 @@ namespace JueMingZ.Tests
                 {
                     throw new InvalidOperationException("Death marker cache must convert world coordinates to tile coordinates.");
                 }
+
+                if (PlayerWorldDeathMarkerCache.DefaultMaxMarkers != 256)
+                {
+                    throw new InvalidOperationException("Persistent death marker display cache must stay capped at the latest 256 deaths.");
+                }
+
+                for (var index = 4; index <= 257; index++)
+                {
+                    WriteDeathMarkerEventLine(identity.PairId, deathPath, "event-" + index.ToString(System.Globalization.CultureInfo.InvariantCulture), 16f * index, 32f, "death-" + index.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                }
+
+                result = PlayerWorldDeathMarkerCache.ReadMarkersForPairForTesting(identity.PairId, PlayerWorldDeathMarkerCache.DefaultMaxMarkers);
+                if (!result.Succeeded ||
+                    !result.CulledByLimit ||
+                    result.TotalEventCount != 257 ||
+                    result.MarkerCount != 256 ||
+                    result.Markers.Count != 256)
+                {
+                    throw new InvalidOperationException("Persistent death marker display must keep only the newest 256 markers while preserving the full death history file.");
+                }
+
+                AssertStringEquals(result.Markers[0].EventId, "event-2", "death marker 257-display first visible event");
+                AssertStringEquals(result.Markers[result.Markers.Count - 1].EventId, "event-257", "death marker 257-display last visible event");
             });
         }
 

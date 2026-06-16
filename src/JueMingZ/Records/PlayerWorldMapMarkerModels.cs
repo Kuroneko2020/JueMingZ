@@ -8,8 +8,8 @@ namespace JueMingZ.Records
     public static class PlayerWorldMapMarkerConstants
     {
         public const int SchemaVersion = 1;
-        public const int MaxMarkersPerPair = 256;
-        public const int MaxCachedMarkers = 512;
+        public const int MaxMarkersPerPair = 120;
+        public const int MaxCachedMarkers = MaxMarkersPerPair;
         public const int MaxNameTextUnits = 10;
         public const int DefaultIconItemId = 8;
         public const int LegacyFallenStarIconItemId = 75;

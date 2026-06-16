@@ -161,6 +161,7 @@ namespace JueMingZ.UI.Legacy
         private static LegacyUiRect _mapDeathHistoryAnchor;
         private static bool _mapDeathHistoryAnchorVisible;
         private static int _mapDeathHistoryPageIndex;
+        private static int _mapCustomMarkerPageIndex;
         private static bool _mapRevealedAreaDetailsPopupOpen;
         private static LegacyUiRect _mapRevealedAreaDetailsAnchor;
         private static bool _mapRevealedAreaDetailsAnchorVisible;

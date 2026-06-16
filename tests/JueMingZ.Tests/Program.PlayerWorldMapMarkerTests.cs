@@ -274,6 +274,12 @@ namespace JueMingZ.Tests
 
         private static void PlayerWorldMapMarkersRejectLimitOverflow()
         {
+            if (PlayerWorldMapMarkerConstants.MaxMarkersPerPair != 120 ||
+                PlayerWorldMapMarkerConstants.MaxCachedMarkers != PlayerWorldMapMarkerConstants.MaxMarkersPerPair)
+            {
+                throw new InvalidOperationException("Map marker per-pair and cache limits must stay at 120.");
+            }
+
             WithTemporaryPlayerWorldDataRoot(root =>
             {
                 var markers = new List<PlayerWorldMapMarkerRecord>();
@@ -594,6 +600,7 @@ namespace JueMingZ.Tests
 
         private static void LegacyMapCustomMarkerListLayoutAndPlaceholders()
         {
+            LegacyMainWindow.ResetMapCustomMarkerPaginationForTesting();
             var emptyHeight = LegacyMainWindow.CalculateMapMarkerListHeightForTesting(0);
             var threeHeight = LegacyMainWindow.CalculateMapMarkerListHeightForTesting(3);
             if (threeHeight <= emptyHeight)
@@ -617,8 +624,45 @@ namespace JueMingZ.Tests
                 "map marker confirm command id");
             AssertStringEquals(
                 LegacyMainWindow.GetMapMarkerListVisualContractForTesting(),
-                "attached-link-card+same-width+empty-text-only+focused-confirm",
+                "attached-link-card+same-width+paged-10+empty-text-only+focused-confirm",
                 "map marker list visual contract");
+            if (LegacyMainWindow.GetMapMarkerListPageSizeForTesting() != 10 ||
+                LegacyMainWindow.GetMapMarkerPageCountForTesting(0) != 0 ||
+                LegacyMainWindow.GetMapMarkerPageCountForTesting(10) != 1 ||
+                LegacyMainWindow.GetMapMarkerPageCountForTesting(11) != 2 ||
+                LegacyMainWindow.GetMapMarkerPageCountForTesting(PlayerWorldMapMarkerConstants.MaxMarkersPerPair) != 12)
+            {
+                throw new InvalidOperationException("Map marker list must paginate by 10 rows and reach 12 pages at the 120 marker limit.");
+            }
+
+            var tenBodyHeight = LegacyMainWindow.CalculateMapMarkerListBodyHeightForTesting(10);
+            if (LegacyMainWindow.CalculateMapMarkerListHeightForTesting(13) != tenBodyHeight)
+            {
+                throw new InvalidOperationException("Map marker list first page height must be capped at 10 visible rows.");
+            }
+
+            LegacyMainWindow.MoveMapCustomMarkerPage(1);
+            if (LegacyMainWindow.CalculateMapMarkerListHeightForTesting(13) != LegacyMainWindow.CalculateMapMarkerListBodyHeightForTesting(3))
+            {
+                throw new InvalidOperationException("Map marker list second page height must use only remaining visible rows.");
+            }
+
+            LegacyMainWindow.MoveMapCustomMarkerPage(99);
+            LegacyMainWindow.CalculateMapMarkerListHeightForTesting(13);
+            if (LegacyMainWindow.GetMapCustomMarkerPageIndex() != 1)
+            {
+                throw new InvalidOperationException("Map marker list page index must clamp when data shrinks or the user over-advances.");
+            }
+
+            AssertStringEquals(
+                LegacyMainWindow.BuildMapCustomMarkersLabelForTesting(PlayerWorldMapMarkerConstants.MaxMarkersPerPair - 1),
+                "地图标记",
+                "map marker normal label");
+            AssertStringEquals(
+                LegacyMainWindow.BuildMapCustomMarkersLabelForTesting(PlayerWorldMapMarkerConstants.MaxMarkersPerPair),
+                "地图标记（已到标记上限）",
+                "map marker limit label");
+            LegacyMainWindow.ResetMapCustomMarkerPaginationForTesting();
 
             LegacyTextInput.ClearFocus();
             if (LegacyMainWindow.ShouldShowMapMarkerConfirmButtonForTesting("marker-a"))

@@ -10,7 +10,7 @@ namespace JueMingZ.UI.Legacy
 {
     public static partial class LegacyMainWindow
     {
-        private const string MapPersistentDeathMarkersTooltip = "大地图常驻显示死亡点";
+        private const string MapPersistentDeathMarkersTooltip = "大地图常驻显示死亡点（仅显示最近256次）";
         private const string MapWorldDayCountTooltip = "当前玩家-世界累计游戏天数";
         private const string MapRevealedAreaRatioTooltip = "当前玩家-世界地图揭示区域占比";
         private const string MapRevealedAreaRatioClickTooltip = "点击打开详情";
@@ -72,18 +72,109 @@ namespace JueMingZ.UI.Legacy
         private static LegacyUiElement DrawMapCustomMarkersRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, AppSettings settings)
         {
             settings = settings ?? AppSettings.CreateDefault();
-            return DrawRightModeRow(
-                spriteBatch,
-                area,
-                mouse,
-                elements,
-                contentY,
-                "地图标记",
-                settings.MapCustomMarkersEnabled ? "On" : "Off",
-                new[] { "开启", "关闭" },
-                new[] { "On", "Off" },
-                "map-custom-markers-mode:",
-                new[] { MapCustomMarkersOnTooltip, string.Empty });
+            var read = PlayerWorldMapMarkerCache.ReadCurrent();
+            var markerCount = read == null || read.Markers == null ? 0 : read.Markers.Count;
+            var pageCount = CalculateMapMarkerPageCount(markerCount);
+            var pageIndex = ClampMapMarkerPageIndex(GetMapCustomMarkerPageIndex(), markerCount);
+            var row = new LegacyUiRect(area.Viewport.X, area.ToScreenY(contentY), area.Viewport.Width, LegacyUiMetrics.RowHeight);
+            if (!area.IsVisible(row))
+            {
+                return null;
+            }
+
+            var context = LegacyUiContext.ForScrollArea(spriteBatch, mouse, area, elements, settings);
+            var buttonY = RowModeButtonY(row);
+            const int gap = 6;
+            var onWidth = ModeButtonWidth("开启");
+            var offWidth = ModeButtonWidth("关闭");
+            var pageButtonWidth = ModeButtonWidth("上一页");
+            var switchWidth = onWidth + offWidth + gap;
+            var pageWidth = pageCount > 1 ? pageButtonWidth * 2 + gap : 0;
+            var totalWidth = switchWidth + (pageWidth > 0 ? pageWidth + gap : 0);
+            var x = row.Right - totalWidth - 10;
+            var label = BuildMapCustomMarkersLabel(markerCount);
+            LegacySettingRowControl.DrawBackgroundAndLabel(context, row, label, x);
+
+            var hovered = (LegacyUiElement)null;
+            if (pageWidth > 0)
+            {
+                hovered = DrawMapCustomMarkerPageButton(
+                    context,
+                    new LegacyUiRect(x, buttonY, pageButtonWidth, RowModeButtonHeight),
+                    "prev",
+                    "上一页",
+                    MapMarkerPreviousPageTooltip,
+                    pageIndex > 0) ?? hovered;
+                x += pageButtonWidth + gap;
+                hovered = DrawMapCustomMarkerPageButton(
+                    context,
+                    new LegacyUiRect(x, buttonY, pageButtonWidth, RowModeButtonHeight),
+                    "next",
+                    "下一页",
+                    MapMarkerNextPageTooltip,
+                    pageIndex < pageCount - 1) ?? hovered;
+                x += pageButtonWidth + gap;
+            }
+
+            hovered = DrawMapCustomMarkerModeButton(
+                context,
+                new LegacyUiRect(x, buttonY, onWidth, RowModeButtonHeight),
+                "On",
+                "开启",
+                settings.MapCustomMarkersEnabled,
+                MapCustomMarkersOnTooltip) ?? hovered;
+            x += onWidth + gap;
+            hovered = DrawMapCustomMarkerModeButton(
+                context,
+                new LegacyUiRect(x, buttonY, offWidth, RowModeButtonHeight),
+                "Off",
+                "关闭",
+                !settings.MapCustomMarkersEnabled,
+                string.Empty) ?? hovered;
+            return context.HoveredElement ?? hovered;
+        }
+
+        private static string BuildMapCustomMarkersLabel(int markerCount)
+        {
+            return markerCount >= PlayerWorldMapMarkerConstants.MaxMarkersPerPair
+                ? "地图标记（已到标记上限）"
+                : "地图标记";
+        }
+
+        private static LegacyUiElement DrawMapCustomMarkerPageButton(LegacyUiContext context, LegacyUiRect rect, string action, string label, string tooltip, bool enabled)
+        {
+            var button = new LegacyButtonControl
+            {
+                Id = "map-custom-markers-page:" + action,
+                Label = label,
+                Text = label,
+                ElementLabel = "地图标记:" + label,
+                Kind = "button",
+                Bounds = rect,
+                Enabled = enabled,
+                TextScale = 0.70f,
+                TooltipLines = string.IsNullOrWhiteSpace(tooltip) ? null : new[] { tooltip }
+            };
+            var element = button.Draw(context);
+            return element != null && context.IsElementHovered(element.Id, rect) ? element : null;
+        }
+
+        private static LegacyUiElement DrawMapCustomMarkerModeButton(LegacyUiContext context, LegacyUiRect rect, string value, string label, bool selected, string tooltip)
+        {
+            var button = new LegacyButtonControl
+            {
+                Id = "map-custom-markers-mode:" + value,
+                Label = label,
+                Text = label,
+                ElementLabel = "地图标记:" + label,
+                Kind = "button",
+                Bounds = rect,
+                Selected = selected,
+                TextScale = 0.78f,
+                TooltipLines = string.IsNullOrWhiteSpace(tooltip) ? null : new[] { tooltip }
+            };
+            var element = button.Draw(context);
+            return element != null && context.IsElementHovered(element.Id, rect) ? element : null;
         }
 
         private static LegacyUiElement DrawMapDeathHistoryRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, PlayerWorldDeathHistoryReadResult summary)
@@ -734,6 +825,11 @@ namespace JueMingZ.UI.Legacy
         internal static int CalculateMapMarkerListContentYForTesting()
         {
             return CalculateMapMarkerListContentY();
+        }
+
+        internal static string BuildMapCustomMarkersLabelForTesting(int markerCount)
+        {
+            return BuildMapCustomMarkersLabel(markerCount);
         }
 
         internal static string[] GetMapQuickAnnouncementButtonTooltipsForTesting()

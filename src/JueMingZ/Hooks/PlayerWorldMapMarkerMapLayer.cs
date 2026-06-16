@@ -13,7 +13,7 @@ namespace JueMingZ.Hooks
 {
     internal sealed class PlayerWorldMapMarkerMapLayer : IMapLayer
     {
-        internal const int MaxDrawnMarkers = 256;
+        internal const int MaxDrawnMarkers = PlayerWorldMapMarkerConstants.MaxMarkersPerPair;
 
         public void Draw(ref MapOverlayDrawContext context, ref string text)
         {

@@ -1680,18 +1680,36 @@ function Test-MapCustomMarkerGovernance {
         Write-FailHealth "Map marker icon whitelist must replace fallen star with bed, map legacy item 75 to item 224, and keep a regression test."
     }
 
+    if ($modelsText.Contains("MaxMarkersPerPair = 120") -and
+        $modelsText.Contains("MaxCachedMarkers = MaxMarkersPerPair") -and
+        $testText.Contains("must stay at 120")) {
+        Write-Pass "Map marker per-pair and cache limits stay capped at 120."
+    }
+    else {
+        Write-FailHealth "Map marker per-pair and cache limits must stay capped at 120 with regression coverage."
+    }
+
     if ($markerUiText.Contains("CalculateMapMarkerListBodyHeightForTesting") -and
         $markerUiText.Contains("GetMapMarkerListHorizontalInsetForTesting") -and
+        $markerUiText.Contains("MapMarkerListPageSize = 10") -and
+        $markerUiText.Contains("CalculateMapMarkerVisibleCountForPage") -and
+        $mapEnhancementUiText.Contains('"map-custom-markers-page:"') -and
+        $mapEnhancementUiText.Contains("地图标记（已到标记上限）") -and
         $mapEnhancementUiText.Contains("CalculateMapMarkerListContentYForTesting") -and
         $mapEnhancementUiText.Contains("LegacyUiMetrics.RowHeight * 5 + LegacyUiMetrics.SettingRowGap * 4") -and
         -not $mapEnhancementUiText.Contains("var markerListY = LegacyUiMetrics.RowHeight * 5 + LegacyUiMetrics.SettingRowGap * 5") -and
         $markerUiText.Contains("empty-text-only") -and
-        $markerUiText.Contains("attached-link-card+same-width+empty-text-only+focused-confirm") -and
+        $markerUiText.Contains("attached-link-card+same-width+paged-10+empty-text-only+focused-confirm") -and
         $markerUiText.Contains("ShouldShowMapMarkerConfirmButton") -and
         $markerUiText.Contains("LegacyTextInput.IsFocused(BuildMapMarkerNameInputId") -and
         -not $markerUiText.Contains("DrawSubPanelClipped") -and
+        $handlerText.Contains("HandleMapCustomMarkersPage") -and
+        $handlerText.Contains('\"mapCustomMarkerPageIndex\"') -and
         $handlerText.Contains('string.Equals(action, "confirm-name"') -and
         $handlerText.Contains("nameInputNotFocused") -and
+        $testText.Contains("paged-10") -and
+        $testText.Contains("paginate by 10 rows") -and
+        $testText.Contains("已到标记上限") -and
         $testText.Contains("MapCustomMarkerConfirmNameCommandSavesAndClearsFocus") -and
         $testText.Contains("ShouldShowMapMarkerConfirmButtonForTesting") -and
         $testText.Contains("GetMapMarkerVisibleActionIdsForTesting") -and
@@ -1700,10 +1718,10 @@ function Test-MapCustomMarkerGovernance {
         $testText.Contains("directly after the main title row") -and
         $testText.Contains("omit the duplicate subtitle row") -and
         -not $testText.Contains("section+subpanel-card+empty-text-only+confirm-button")) {
-        Write-Pass "Map marker F5 list keeps attached same-width no-subtitle name-save coverage without locking the old subpanel or always-visible confirm visual contract."
+        Write-Pass "Map marker F5 list keeps attached same-width paged no-subtitle name-save coverage without locking the old subpanel or always-visible confirm visual contract."
     }
     else {
-        Write-FailHealth "Map marker F5 list must keep attached same-width no-subtitle confirm-name coverage without re-locking the old subpanel/card or always-visible confirm visual contract."
+        Write-FailHealth "Map marker F5 list must keep attached same-width 10-row pagination, limit label, confirm-name coverage, and no old subpanel/card or always-visible confirm visual contract."
     }
 
     $srcRoot = Join-Path $RepoRoot "src\JueMingZ"
@@ -1771,7 +1789,7 @@ function Test-MapCustomMarkerGovernance {
     }
 
     if ($mapLayerText.Contains("PlayerWorldMapMarkerCache.ReadCurrent()") -and
-        $mapLayerText.Contains("MaxDrawnMarkers = 256") -and
+        $mapLayerText.Contains("MaxDrawnMarkers = PlayerWorldMapMarkerConstants.MaxMarkersPerPair") -and
         $mapLayerText.Contains("GetUnclampedDrawRegion") -and
         -not $mapLayerText.Contains("TryWriteJson")) {
         Write-Pass "Map marker IMapLayer draws from cache with culling and no JSON writes."

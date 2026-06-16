@@ -347,6 +347,17 @@ namespace JueMingZ.UI.Legacy
             return _mapDeathHistoryPageIndex;
         }
 
+        public static int MoveMapCustomMarkerPage(int delta)
+        {
+            _mapCustomMarkerPageIndex = Math.Max(0, _mapCustomMarkerPageIndex + delta);
+            return _mapCustomMarkerPageIndex;
+        }
+
+        public static int GetMapCustomMarkerPageIndex()
+        {
+            return _mapCustomMarkerPageIndex;
+        }
+
         public static void ToggleMapRevealedAreaDetailsPopup()
         {
             _mapRevealedAreaDetailsPopupOpen = !_mapRevealedAreaDetailsPopupOpen;
@@ -368,6 +379,11 @@ namespace JueMingZ.UI.Legacy
             _mapDeathHistoryAnchor = new LegacyUiRect();
             _mapDeathHistoryAnchorVisible = false;
             _mapDeathHistoryPageIndex = 0;
+        }
+
+        internal static void ResetMapCustomMarkerPaginationForTesting()
+        {
+            _mapCustomMarkerPageIndex = 0;
         }
 
         internal static void ResetMapRevealedAreaDetailsPopupForTesting()

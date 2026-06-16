@@ -9,7 +9,7 @@ namespace JueMingZ.Records
 {
     internal static class PlayerWorldDeathMarkerCache
     {
-        public const int DefaultMaxMarkers = 512;
+        public const int DefaultMaxMarkers = 256;
         private static readonly object SyncRoot = new object();
         private static readonly TimeSpan RefreshInterval = TimeSpan.FromMilliseconds(500);
         private static PlayerWorldDeathMarkerReadResult _cachedResult;

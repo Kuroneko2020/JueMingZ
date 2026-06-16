@@ -15,14 +15,17 @@ namespace JueMingZ.UI.Legacy
         private const int MapMarkerListHorizontalInset = 0;
         private const int MapMarkerListEmptyHeight = 30;
         private const int MapMarkerListTopGap = 0;
+        private const int MapMarkerListPageSize = 10;
         private const string MapMarkerNameTooltip = "双击输入，限10个字";
         private const string MapMarkerNameConfirmTooltip = "确认保存名称";
         private const string MapMarkerJumpTooltip = "地图跳转到标记位置";
         private const string MapMarkerNavigateTooltip = "分析可达路径";
         private const string MapMarkerTeleportTooltip = "消耗虫洞药水*1 回忆药水*1传送";
         private const string MapMarkerAutopilotTooltip = "暂未实现";
+        private const string MapMarkerPreviousPageTooltip = "查看上一页地图标记";
+        private const string MapMarkerNextPageTooltip = "查看下一页地图标记";
         private const string MapMarkerConfirmAction = "confirm-name";
-        private const string MapMarkerListVisualContract = "attached-link-card+same-width+empty-text-only+focused-confirm";
+        private const string MapMarkerListVisualContract = "attached-link-card+same-width+paged-10+empty-text-only+focused-confirm";
 
         private static LegacyUiElement DrawMapMarkerList(
             object spriteBatch,
@@ -40,14 +43,19 @@ namespace JueMingZ.UI.Legacy
 
             if (markers.Count <= 0)
             {
+                ClampMapMarkerPageIndexForCount(0);
                 DrawMapMarkerListEmpty(spriteBatch, area, y, read);
                 return null;
             }
 
+            var pageIndex = ClampMapMarkerPageIndexForCount(markers.Count);
+            var startIndex = Math.Min(markers.Count, pageIndex * MapMarkerListPageSize);
+            var endIndex = Math.Min(markers.Count, startIndex + MapMarkerListPageSize);
             var cardY = y;
-            for (var index = 0; index < markers.Count; index++)
+            for (var index = startIndex; index < endIndex; index++)
             {
-                hovered = DrawMapMarkerListRow(spriteBatch, area, mouse, elements, cardY + index * (MapMarkerListCardHeight + MapMarkerListCardGap), markers[index], index) ?? hovered;
+                var visibleIndex = index - startIndex;
+                hovered = DrawMapMarkerListRow(spriteBatch, area, mouse, elements, cardY + visibleIndex * (MapMarkerListCardHeight + MapMarkerListCardGap), markers[index], index) ?? hovered;
             }
 
             return hovered;
@@ -291,7 +299,8 @@ namespace JueMingZ.UI.Legacy
 
         private static int CalculateMapMarkerListHeightForCount(int markerCount)
         {
-            return MapMarkerListTopGap + CalculateMapMarkerListBodyHeightForCount(markerCount);
+            var visibleCount = CalculateMapMarkerVisibleCountForPage(markerCount, ClampMapMarkerPageIndexForCount(markerCount));
+            return MapMarkerListTopGap + CalculateMapMarkerListBodyHeightForCount(visibleCount);
         }
 
         private static int CalculateMapMarkerListBodyHeightForCount(int markerCount)
@@ -299,6 +308,44 @@ namespace JueMingZ.UI.Legacy
             return markerCount <= 0
                 ? MapMarkerListEmptyHeight
                 : markerCount * MapMarkerListCardHeight + Math.Max(0, markerCount - 1) * MapMarkerListCardGap;
+        }
+
+        private static int CalculateMapMarkerVisibleCountForPage(int markerCount, int pageIndex)
+        {
+            markerCount = Math.Max(0, markerCount);
+            if (markerCount <= 0)
+            {
+                return 0;
+            }
+
+            var normalizedPage = ClampMapMarkerPageIndex(pageIndex, markerCount);
+            var start = Math.Min(markerCount, normalizedPage * MapMarkerListPageSize);
+            return Math.Min(MapMarkerListPageSize, markerCount - start);
+        }
+
+        private static int CalculateMapMarkerPageCount(int markerCount)
+        {
+            markerCount = Math.Max(0, markerCount);
+            return markerCount <= 0
+                ? 0
+                : (markerCount + MapMarkerListPageSize - 1) / MapMarkerListPageSize;
+        }
+
+        private static int ClampMapMarkerPageIndexForCount(int markerCount)
+        {
+            _mapCustomMarkerPageIndex = ClampMapMarkerPageIndex(_mapCustomMarkerPageIndex, markerCount);
+            return _mapCustomMarkerPageIndex;
+        }
+
+        private static int ClampMapMarkerPageIndex(int pageIndex, int markerCount)
+        {
+            var pageCount = CalculateMapMarkerPageCount(markerCount);
+            if (pageCount <= 1)
+            {
+                return 0;
+            }
+
+            return Math.Max(0, Math.Min(pageIndex, pageCount - 1));
         }
 
         internal static string BuildMapMarkerNameInputId(string markerId)
@@ -341,6 +388,21 @@ namespace JueMingZ.UI.Legacy
             ids.Add("map-custom-marker:autopilot:" + normalizedMarkerId);
             ids.Add("map-custom-marker:delete:" + normalizedMarkerId);
             return ids.ToArray();
+        }
+
+        internal static int GetMapMarkerListPageSizeForTesting()
+        {
+            return MapMarkerListPageSize;
+        }
+
+        internal static int GetMapMarkerPageCountForTesting(int markerCount)
+        {
+            return CalculateMapMarkerPageCount(markerCount);
+        }
+
+        internal static int GetMapMarkerVisibleCountForTesting(int markerCount, int pageIndex)
+        {
+            return CalculateMapMarkerVisibleCountForPage(markerCount, pageIndex);
         }
 
         internal static int CalculateMapMarkerListBodyHeightForTesting(int markerCount)
