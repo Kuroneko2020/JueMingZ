@@ -172,6 +172,28 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void LegacyItemAndReforgeListsOmitDuplicateSubtitles()
+        {
+            const int viewportWidth = 520;
+
+            var quickItemBody = LegacyMainWindow.CalculateQuickItemCardsBodyHeightForTesting(viewportWidth, 3);
+            if (LegacyMainWindow.CalculateQuickItemPanelHeightForTesting(viewportWidth, 3, false, false, 0) != quickItemBody)
+            {
+                throw new InvalidOperationException("Quick item list panel must not reserve the duplicate subtitle row.");
+            }
+
+            var autoListBody = LegacyMainWindow.CalculateAutoSellCardsBodyHeightForTesting(viewportWidth, 3);
+            if (LegacyMainWindow.CalculateAutoSellPanelHeightForTesting(viewportWidth, 3, false, 0) != autoListBody)
+            {
+                throw new InvalidOperationException("Auto sell/discard list panel must not reserve the duplicate subtitle row.");
+            }
+
+            if (LegacyMainWindow.CalculateQuickReforgePanelHeightForTesting(viewportWidth, 3) != autoListBody)
+            {
+                throw new InvalidOperationException("Quick reforge list panel must not reserve the duplicate subtitle row.");
+            }
+        }
+
         private static void AssertBottomRowVisibleAtMaxScroll(LegacyMainWindow.LegacyUiPageLayoutSnapshot snapshot, int contentHeight, string pageName)
         {
             var finalRowTop = contentHeight - 24 - LegacyUiMetrics.RowHeight;

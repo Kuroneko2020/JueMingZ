@@ -128,9 +128,8 @@ namespace JueMingZ.UI.Legacy
             }
 
             consumedHeight = CalculateQuickReforgePanelHeight(area.Viewport.Width, prefixes.Count);
-            DrawSection(spriteBatch, area, contentY, "快速重铸名单");
             var bodyHeight = CalculateAutoSellCardsBodyHeight(area.Viewport.Width, prefixes.Count);
-            var bodyRect = new LegacyUiRect(area.Viewport.X, area.ToScreenY(contentY + LegacyUiMetrics.SectionHeaderHeight), area.Viewport.Width, bodyHeight);
+            var bodyRect = new LegacyUiRect(area.Viewport.X, area.ToScreenY(contentY), area.Viewport.Width, bodyHeight);
             var hovered = (LegacyUiElement)null;
             if (area.IsVisible(bodyRect))
             {
@@ -219,7 +218,12 @@ namespace JueMingZ.UI.Legacy
 
         private static int CalculateQuickReforgePanelHeight(int viewportWidth, int prefixCount)
         {
-            return LegacyUiMetrics.SectionHeaderHeight + CalculateAutoSellCardsBodyHeight(viewportWidth, prefixCount);
+            return CalculateAutoSellCardsBodyHeight(viewportWidth, prefixCount);
+        }
+
+        internal static int CalculateQuickReforgePanelHeightForTesting(int viewportWidth, int prefixCount)
+        {
+            return CalculateQuickReforgePanelHeight(viewportWidth, prefixCount);
         }
 
         private static List<string> GetQuickReforgePrefixes()

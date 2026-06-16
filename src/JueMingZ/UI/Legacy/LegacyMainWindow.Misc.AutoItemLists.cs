@@ -69,7 +69,6 @@ namespace JueMingZ.UI.Legacy
                 _autoSellPickerIndex,
                 CloseAutoSellPicker,
                 GetAutoSellPickerCandidates,
-                "自动出售名单",
                 DrawAutoSellItemCard,
                 DrawAutoSellInventoryPickerPanel);
         }
@@ -140,7 +139,6 @@ namespace JueMingZ.UI.Legacy
                 _autoDiscardPickerIndex,
                 CloseAutoDiscardPicker,
                 GetAutoDiscardPickerCandidates,
-                "自动丢弃名单",
                 DrawAutoDiscardItemCard,
                 DrawAutoDiscardInventoryPickerPanel);
         }

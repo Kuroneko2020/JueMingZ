@@ -66,8 +66,7 @@ namespace JueMingZ.UI.Legacy
 
             var pickerCandidateCount = pickerCandidates == null ? 0 : pickerCandidates.Count;
             consumedHeight = CalculateQuickItemPanelHeight(area.Viewport.Width, bindings.Count, _quickItemHotkeyCaptureActive, _quickItemPickerOpen, pickerCandidateCount);
-            DrawSection(spriteBatch, area, contentY, "快捷物品列表");
-            var cardsContentY = contentY + LegacyUiMetrics.SectionHeaderHeight;
+            var cardsContentY = contentY;
             var cardsHeight = CalculateQuickItemCardsBodyHeight(area.Viewport.Width, bindings.Count);
             var cardsRect = new LegacyUiRect(area.Viewport.X, area.ToScreenY(cardsContentY), area.Viewport.Width, cardsHeight);
             var clip = area.Viewport;

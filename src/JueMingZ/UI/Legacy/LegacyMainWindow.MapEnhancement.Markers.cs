@@ -10,7 +10,6 @@ namespace JueMingZ.UI.Legacy
 {
     public static partial class LegacyMainWindow
     {
-        private const int MapMarkerListHeaderHeight = 24;
         private const int MapMarkerListCardHeight = 34;
         private const int MapMarkerListCardGap = 5;
         private const int MapMarkerListBodyPadding = 8;
@@ -23,7 +22,7 @@ namespace JueMingZ.UI.Legacy
         private const string MapMarkerTeleportTooltip = "消耗虫洞药水*1 回忆药水*1传送";
         private const string MapMarkerAutopilotTooltip = "暂未实现";
         private const string MapMarkerConfirmAction = "confirm-name";
-        private const string MapMarkerListVisualContract = "section+link-card+empty-text-only+focused-confirm";
+        private const string MapMarkerListVisualContract = "link-card+empty-text-only+focused-confirm";
 
         private static LegacyUiElement DrawMapMarkerList(
             object spriteBatch,
@@ -39,9 +38,6 @@ namespace JueMingZ.UI.Legacy
             var y = contentY + MapMarkerListTopGap;
             var hovered = (LegacyUiElement)null;
 
-            DrawSection(spriteBatch, area, y, BuildMapMarkerListSectionTitle(read));
-            y += MapMarkerListHeaderHeight;
-
             if (markers.Count <= 0)
             {
                 DrawMapMarkerListEmpty(spriteBatch, area, y, read);
@@ -55,12 +51,6 @@ namespace JueMingZ.UI.Legacy
             }
 
             return hovered;
-        }
-
-        private static string BuildMapMarkerListSectionTitle(PlayerWorldMapMarkerReadResult read)
-        {
-            var count = read == null || !read.IdentityResolved ? "--" : Math.Max(0, read.MarkerCount).ToString(CultureInfo.InvariantCulture);
-            return "标记列表 " + count;
         }
 
         private static void DrawMapMarkerListEmpty(object spriteBatch, LegacyScrollArea area, int contentY, PlayerWorldMapMarkerReadResult read)
@@ -301,7 +291,7 @@ namespace JueMingZ.UI.Legacy
 
         private static int CalculateMapMarkerListHeightForCount(int markerCount)
         {
-            return MapMarkerListTopGap + MapMarkerListHeaderHeight + CalculateMapMarkerListBodyHeightForCount(markerCount);
+            return MapMarkerListTopGap + CalculateMapMarkerListBodyHeightForCount(markerCount);
         }
 
         private static int CalculateMapMarkerListBodyHeightForCount(int markerCount)

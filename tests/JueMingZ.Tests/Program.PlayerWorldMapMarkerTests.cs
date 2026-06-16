@@ -595,10 +595,10 @@ namespace JueMingZ.Tests
                 throw new InvalidOperationException("Map custom marker list height must grow with marker count.");
             }
 
-            if (emptyHeight != LegacyUiMetrics.SectionHeaderHeight + 8 + LegacyMainWindow.CalculateMapMarkerListBodyHeightForTesting(0) ||
-                threeHeight != LegacyUiMetrics.SectionHeaderHeight + 8 + LegacyMainWindow.CalculateMapMarkerListBodyHeightForTesting(3))
+            if (emptyHeight != 8 + LegacyMainWindow.CalculateMapMarkerListBodyHeightForTesting(0) ||
+                threeHeight != 8 + LegacyMainWindow.CalculateMapMarkerListBodyHeightForTesting(3))
             {
-                throw new InvalidOperationException("Map custom marker list height must keep the section header and text-only empty state sizing.");
+                throw new InvalidOperationException("Map custom marker list height must omit the duplicate subtitle row and keep text-only empty state sizing.");
             }
 
             var inputId = LegacyMainWindow.BuildMapMarkerNameInputId("marker-a");
@@ -609,7 +609,7 @@ namespace JueMingZ.Tests
                 "map marker confirm command id");
             AssertStringEquals(
                 LegacyMainWindow.GetMapMarkerListVisualContractForTesting(),
-                "section+link-card+empty-text-only+focused-confirm",
+                "link-card+empty-text-only+focused-confirm",
                 "map marker list visual contract");
 
             LegacyTextInput.ClearFocus();

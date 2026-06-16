@@ -1724,6 +1724,7 @@ namespace JueMingZ.Tests
             Run("runtime settings snapshot carries recovery item filters", ref failed, RuntimeSettingsSnapshotCarriesRecoveryItemFilters);
             Run("feature catalog exposes recovery item config windows", ref failed, FeatureCatalogExposesRecoveryItemConfigWindows);
             Run("legacy items and misc content heights include bottom action rows", ref failed, LegacyItemsAndMiscContentHeightsIncludeBottomActionRows);
+            Run("legacy item and reforge lists omit duplicate subtitles", ref failed, LegacyItemAndReforgeListsOmitDuplicateSubtitles);
             Run("legacy map enhancement page layout tracks quick announcement state", ref failed, LegacyMapEnhancementPageLayoutTracksQuickAnnouncementState);
             Run("legacy map persistent death markers tooltip matches requested wording", ref failed, LegacyMapPersistentDeathMarkersTooltipMatchesRequestedWording);
             Run("legacy map quick announcement button tooltips match requested wording", ref failed, LegacyMapQuickAnnouncementButtonTooltipsMatchRequestedWording);

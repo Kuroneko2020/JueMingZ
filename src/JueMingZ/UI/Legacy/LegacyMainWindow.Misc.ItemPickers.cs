@@ -52,7 +52,12 @@ namespace JueMingZ.UI.Legacy
                 return CalculateAutoItemPickerPanelHeight(viewportWidth, pickerCandidateCount);
             }
 
-            return LegacyUiMetrics.SectionHeaderHeight + CalculateAutoSellCardsBodyHeight(viewportWidth, itemCount);
+            return CalculateAutoSellCardsBodyHeight(viewportWidth, itemCount);
+        }
+
+        internal static int CalculateAutoSellPanelHeightForTesting(int viewportWidth, int itemCount, bool pickerOpen, int pickerCandidateCount)
+        {
+            return CalculateAutoSellPanelHeight(viewportWidth, itemCount, pickerOpen, pickerCandidateCount);
         }
 
         private static int CalculateAutoSellCardsBodyHeight(int viewportWidth, int itemCount)
@@ -67,6 +72,11 @@ namespace JueMingZ.UI.Legacy
             int cardWidth;
             ComputeAutoSellCardLayout(viewportWidth, itemCount, out columns, out rows, out cardWidth);
             return rows * AutoSellGridCellHeight + Math.Max(0, rows - 1) * QuickItemCardGap + 16;
+        }
+
+        internal static int CalculateAutoSellCardsBodyHeightForTesting(int viewportWidth, int itemCount)
+        {
+            return CalculateAutoSellCardsBodyHeight(viewportWidth, itemCount);
         }
 
         private static int CalculateAutoItemPickerPanelHeight(int viewportWidth, int candidateCount)
@@ -105,7 +115,6 @@ namespace JueMingZ.UI.Legacy
             int pickerIndex,
             Action closePicker,
             Func<List<QuickItemInventoryCandidate>> buildPickerCandidates,
-            string sectionTitle,
             MiscItemCardRenderer drawCard,
             MiscItemPickerRenderer drawPicker)
         {
@@ -155,8 +164,7 @@ namespace JueMingZ.UI.Legacy
             }
 
             consumedHeight = CalculateAutoSellPanelHeight(area.Viewport.Width, itemIds.Count, false, 0);
-            DrawSection(spriteBatch, area, contentY, sectionTitle);
-            var cardsContentY = contentY + LegacyUiMetrics.SectionHeaderHeight;
+            var cardsContentY = contentY;
             var cardsHeight = CalculateAutoSellCardsBodyHeight(area.Viewport.Width, itemIds.Count);
             var cardsRect = new LegacyUiRect(area.Viewport.X, area.ToScreenY(cardsContentY), area.Viewport.Width, cardsHeight);
 

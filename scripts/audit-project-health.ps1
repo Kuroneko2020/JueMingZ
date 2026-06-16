@@ -1680,7 +1680,7 @@ function Test-MapCustomMarkerGovernance {
 
     if ($markerUiText.Contains("CalculateMapMarkerListBodyHeightForTesting") -and
         $markerUiText.Contains("empty-text-only") -and
-        $markerUiText.Contains("section+link-card+empty-text-only+focused-confirm") -and
+        $markerUiText.Contains("link-card+empty-text-only+focused-confirm") -and
         $markerUiText.Contains("ShouldShowMapMarkerConfirmButton") -and
         $markerUiText.Contains("LegacyTextInput.IsFocused(BuildMapMarkerNameInputId") -and
         -not $markerUiText.Contains("DrawSubPanelClipped") -and
@@ -1690,11 +1690,12 @@ function Test-MapCustomMarkerGovernance {
         $testText.Contains("ShouldShowMapMarkerConfirmButtonForTesting") -and
         $testText.Contains("GetMapMarkerVisibleActionIdsForTesting") -and
         $testText.Contains("BuildMapMarkerConfirmCommandIdForTesting") -and
+        $testText.Contains("omit the duplicate subtitle row") -and
         -not $testText.Contains("section+subpanel-card+empty-text-only+confirm-button")) {
-        Write-Pass "Map marker F5 list keeps name-save command coverage without locking the old subpanel or always-visible confirm visual contract."
+        Write-Pass "Map marker F5 list keeps no-subtitle name-save coverage without locking the old subpanel or always-visible confirm visual contract."
     }
     else {
-        Write-FailHealth "Map marker F5 list must keep confirm-name command coverage without re-locking the old subpanel/card or always-visible confirm visual contract."
+        Write-FailHealth "Map marker F5 list must keep no-subtitle confirm-name coverage without re-locking the old subpanel/card or always-visible confirm visual contract."
     }
 
     $srcRoot = Join-Path $RepoRoot "src\JueMingZ"

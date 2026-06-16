@@ -14,7 +14,7 @@ namespace JueMingZ.UI.Legacy
     {
         private static int CalculateQuickItemPanelHeight(int viewportWidth, int bindingCount, bool captureActive, bool pickerOpen, int pickerCandidateCount)
         {
-            var height = LegacyUiMetrics.SectionHeaderHeight + CalculateQuickItemCardsBodyHeight(viewportWidth, bindingCount);
+            var height = CalculateQuickItemCardsBodyHeight(viewportWidth, bindingCount);
             if (captureActive)
             {
                 height += QuickItemCaptureHintHeight + 6;
@@ -26,6 +26,11 @@ namespace JueMingZ.UI.Legacy
             }
 
             return height;
+        }
+
+        internal static int CalculateQuickItemPanelHeightForTesting(int viewportWidth, int bindingCount, bool captureActive, bool pickerOpen, int pickerCandidateCount)
+        {
+            return CalculateQuickItemPanelHeight(viewportWidth, bindingCount, captureActive, pickerOpen, pickerCandidateCount);
         }
 
         private static int CalculateQuickItemCardsBodyHeight(int viewportWidth, int bindingCount)
@@ -40,6 +45,11 @@ namespace JueMingZ.UI.Legacy
             int cardWidth;
             ComputeQuickItemCardLayout(viewportWidth, bindingCount, out columns, out rows, out cardWidth);
             return rows * QuickItemCardHeight + Math.Max(0, rows - 1) * QuickItemCardGap + 16;
+        }
+
+        internal static int CalculateQuickItemCardsBodyHeightForTesting(int viewportWidth, int bindingCount)
+        {
+            return CalculateQuickItemCardsBodyHeight(viewportWidth, bindingCount);
         }
 
         private static void ComputeQuickItemCardLayout(int viewportWidth, int bindingCount, out int columns, out int rows, out int cardWidth)
