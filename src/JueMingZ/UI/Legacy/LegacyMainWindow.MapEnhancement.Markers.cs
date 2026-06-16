@@ -13,7 +13,6 @@ namespace JueMingZ.UI.Legacy
         private const int MapMarkerListCardHeight = 34;
         private const int MapMarkerListCardGap = 5;
         private const int MapMarkerListHorizontalInset = 0;
-        private const int MapMarkerListEmptyHeight = 30;
         private const int MapMarkerListTopGap = 0;
         private const int MapMarkerListPageSize = 10;
         private const string MapMarkerNameTooltip = "双击输入，限10个字";
@@ -25,7 +24,7 @@ namespace JueMingZ.UI.Legacy
         private const string MapMarkerPreviousPageTooltip = "查看上一页地图标记";
         private const string MapMarkerNextPageTooltip = "查看下一页地图标记";
         private const string MapMarkerConfirmAction = "confirm-name";
-        private const string MapMarkerListVisualContract = "attached-link-card+same-width+paged-10+empty-text-only+focused-confirm";
+        private const string MapMarkerListVisualContract = "attached-link-card+same-width+paged-10+empty-silent+focused-confirm";
 
         private static LegacyUiElement DrawMapMarkerList(
             object spriteBatch,
@@ -44,7 +43,6 @@ namespace JueMingZ.UI.Legacy
             if (markers.Count <= 0)
             {
                 ClampMapMarkerPageIndexForCount(0);
-                DrawMapMarkerListEmpty(spriteBatch, area, y, read);
                 return null;
             }
 
@@ -59,34 +57,6 @@ namespace JueMingZ.UI.Legacy
             }
 
             return hovered;
-        }
-
-        private static void DrawMapMarkerListEmpty(object spriteBatch, LegacyScrollArea area, int contentY, PlayerWorldMapMarkerReadResult read)
-        {
-            var rect = new LegacyUiRect(area.Viewport.X, area.ToScreenY(contentY), area.Viewport.Width, MapMarkerListEmptyHeight);
-            if (!area.IsVisible(rect))
-            {
-                return;
-            }
-
-            var text = read == null || read.IdentityResolved ? "暂无地图标记" : "当前玩家-世界身份不可用";
-            UiTextRenderer.DrawAlignedTextClipped(
-                spriteBatch,
-                text,
-                rect.X + 10,
-                rect.Y,
-                Math.Max(1, rect.Width - 20),
-                rect.Height,
-                UiTextHorizontalAlignment.Left,
-                area.Viewport.X,
-                area.Viewport.Y,
-                area.Viewport.Width,
-                area.Viewport.Height,
-                178,
-                192,
-                214,
-                230,
-                0.70f);
         }
 
         private static LegacyUiElement DrawMapMarkerListRow(
@@ -306,7 +276,7 @@ namespace JueMingZ.UI.Legacy
         private static int CalculateMapMarkerListBodyHeightForCount(int markerCount)
         {
             return markerCount <= 0
-                ? MapMarkerListEmptyHeight
+                ? 0
                 : markerCount * MapMarkerListCardHeight + Math.Max(0, markerCount - 1) * MapMarkerListCardGap;
         }
 

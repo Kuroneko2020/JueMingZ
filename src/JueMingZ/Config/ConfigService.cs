@@ -265,6 +265,7 @@ namespace JueMingZ.Config
             SetFeatureEnabledLocked(FeatureIds.CombatMagicStringClicker, settings.CombatMagicStringClickerEnabled);
             SetFeatureEnabledLocked(FeatureIds.CombatAutoFacing, settings.CombatAutoFacingEnabled);
             SetFeatureEnabledLocked(FeatureIds.CombatEquipmentWarning, settings.CombatEquipmentWarningEnabled);
+            SetFeatureEnabledLocked(FeatureIds.CombatAutoBossDamageReport, settings.CombatAutoBossDamageReportEnabled);
             SetFeatureEnabledLocked(FeatureIds.CombatGoblinExecution, settings.CombatGoblinExecutionEnabled);
             SetFeatureEnabledLocked(FeatureIds.MapPersistentDeathMarkers, settings.MapPersistentDeathMarkersEnabled);
             SetFeatureEnabledLocked(FeatureIds.MapCustomMarkers, settings.MapCustomMarkersEnabled);
@@ -339,6 +340,7 @@ namespace JueMingZ.Config
             if (settings.CombatMagicStringClickerEnabled) count++;
             if (settings.CombatAutoFacingEnabled) count++;
             if (settings.CombatEquipmentWarningEnabled) count++;
+            if (settings.CombatAutoBossDamageReportEnabled) count++;
             if (settings.CombatGoblinExecutionEnabled) count++;
             if (settings.MapPersistentDeathMarkersEnabled) count++;
             if (settings.MapCustomMarkersEnabled) count++;

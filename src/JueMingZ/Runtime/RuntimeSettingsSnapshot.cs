@@ -71,6 +71,7 @@ namespace JueMingZ.Runtime
                 CombatMagicStringClickerEnabled = settings.CombatMagicStringClickerEnabled,
                 CombatAutoFacingEnabled = settings.CombatAutoFacingEnabled,
                 CombatEquipmentWarningEnabled = settings.CombatEquipmentWarningEnabled,
+                CombatAutoBossDamageReportEnabled = settings.CombatAutoBossDamageReportEnabled,
                 AimRangeOrigin = aimRangeOrigin,
                 AimTargetPriority = aimTargetPriority,
                 ReleaseHoldTicks = Clamp(settings.ReleaseHoldTicks, 0, 20),
@@ -206,6 +207,7 @@ namespace JueMingZ.Runtime
         public bool CombatMagicStringClickerEnabled { get; private set; }
         public bool CombatAutoFacingEnabled { get; private set; }
         public bool CombatEquipmentWarningEnabled { get; private set; }
+        public bool CombatAutoBossDamageReportEnabled { get; private set; }
         public string AimRangeOrigin { get; private set; }
         public string AimTargetPriority { get; private set; }
         public int ReleaseHoldTicks { get; private set; }

@@ -1006,6 +1006,18 @@ namespace JueMingZ.Diagnostics
             Append(builder, "CombatMagicStringClickerLastDecision", snapshot.CombatMagicStringClickerLastDecision, true);
             Append(builder, "CombatMagicStringClickerLastSkipReason", snapshot.CombatMagicStringClickerLastSkipReason, true);
             Append(builder, "CombatMagicStringClickerLastDecisionUtc", FormatDate(snapshot.CombatMagicStringClickerLastDecisionUtc), true);
+            Append(builder, "CombatAutoBossDamageReportEnabled", snapshot.CombatAutoBossDamageReportEnabled, true);
+            Append(builder, "CombatAutoBossDamageReportLastDecision", snapshot.CombatAutoBossDamageReportLastDecision, true);
+            Append(builder, "CombatAutoBossDamageReportLastReason", snapshot.CombatAutoBossDamageReportLastReason, true);
+            Append(builder, "CombatAutoBossDamageReportLastDecisionUtc", FormatDate(snapshot.CombatAutoBossDamageReportLastDecisionUtc), true);
+            Append(builder, "CombatAutoBossDamageReportRecentAttemptCount", snapshot.CombatAutoBossDamageReportRecentAttemptCount, true);
+            Append(builder, "CombatAutoBossDamageReportNewAttemptCount", snapshot.CombatAutoBossDamageReportNewAttemptCount, true);
+            Append(builder, "CombatAutoBossDamageReportLastAttemptKey", snapshot.CombatAutoBossDamageReportLastAttemptKey, true);
+            Append(builder, "CombatAutoBossDamageReportLastSendAttempted", snapshot.CombatAutoBossDamageReportLastSendAttempted, true);
+            Append(builder, "CombatAutoBossDamageReportLastSendSucceeded", snapshot.CombatAutoBossDamageReportLastSendSucceeded, true);
+            Append(builder, "CombatAutoBossDamageReportLastFailureReason", snapshot.CombatAutoBossDamageReportLastFailureReason, true);
+            Append(builder, "CombatAutoBossDamageReportSentCount", snapshot.CombatAutoBossDamageReportSentCount, true);
+            Append(builder, "CombatAutoBossDamageReportSkippedCount", snapshot.CombatAutoBossDamageReportSkippedCount, true);
             AppendAutoRecovery(builder, snapshot, true);
             Append(builder, "LastError", snapshot.LastError, false);
             builder.AppendLine("}");

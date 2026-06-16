@@ -486,6 +486,40 @@ namespace JueMingZ.Tests
             AssertContains(json, "\"CombatPhasebladeQuickSwitchSkippedCount\": 2");
         }
 
+        private static void DiagnosticSnapshotWritesCombatAutoBossDamageReportState()
+        {
+            var snapshot = new DiagnosticSnapshot
+            {
+                CombatAutoBossDamageReportEnabled = true,
+                CombatAutoBossDamageReportLastDecision = "send",
+                CombatAutoBossDamageReportLastReason = "new recent boss damage attempt detected",
+                CombatAutoBossDamageReportLastDecisionUtc = new DateTime(2026, 6, 16, 1, 2, 3, DateTimeKind.Utc),
+                CombatAutoBossDamageReportRecentAttemptCount = 2,
+                CombatAutoBossDamageReportNewAttemptCount = 1,
+                CombatAutoBossDamageReportLastAttemptKey = 456,
+                CombatAutoBossDamageReportLastSendAttempted = true,
+                CombatAutoBossDamageReportLastSendSucceeded = false,
+                CombatAutoBossDamageReportLastFailureReason = "unsupported netMode: 2",
+                CombatAutoBossDamageReportSentCount = 3,
+                CombatAutoBossDamageReportSkippedCount = 5
+            };
+
+            var json = InvokeDiagnosticSnapshotJson(snapshot);
+
+            AssertContains(json, "\"CombatAutoBossDamageReportEnabled\": true");
+            AssertContains(json, "\"CombatAutoBossDamageReportLastDecision\": \"send\"");
+            AssertContains(json, "\"CombatAutoBossDamageReportLastReason\": \"new recent boss damage attempt detected\"");
+            AssertContains(json, "\"CombatAutoBossDamageReportLastDecisionUtc\": \"2026-06-16T01:02:03.0000000Z\"");
+            AssertContains(json, "\"CombatAutoBossDamageReportRecentAttemptCount\": 2");
+            AssertContains(json, "\"CombatAutoBossDamageReportNewAttemptCount\": 1");
+            AssertContains(json, "\"CombatAutoBossDamageReportLastAttemptKey\": 456");
+            AssertContains(json, "\"CombatAutoBossDamageReportLastSendAttempted\": true");
+            AssertContains(json, "\"CombatAutoBossDamageReportLastSendSucceeded\": false");
+            AssertContains(json, "\"CombatAutoBossDamageReportLastFailureReason\": \"unsupported netMode: 2\"");
+            AssertContains(json, "\"CombatAutoBossDamageReportSentCount\": 3");
+            AssertContains(json, "\"CombatAutoBossDamageReportSkippedCount\": 5");
+        }
+
         private static void DiagnosticSnapshotWritesFishingIdlePipelineState()
         {
             var snapshot = new DiagnosticSnapshot
@@ -752,6 +786,7 @@ namespace JueMingZ.Tests
             settings.NpcAutoTaxCollectEnabled = true;
             settings.CombatPhasebladeQuickSwitchEnabled = true;
             settings.CombatPhasebladeQuickSwitchIntervalTicks = 99;
+            settings.CombatAutoBossDamageReportEnabled = true;
 
             var snapshot = RuntimeSettingsSnapshot.FromSettings(settings);
 
@@ -796,6 +831,11 @@ namespace JueMingZ.Tests
                 snapshot.CombatPhasebladeQuickSwitchIntervalTicks != CombatPhasebladeQuickSwitchSettings.MaxIntervalTicks)
             {
                 throw new InvalidOperationException("Runtime settings snapshot must expose and clamp phaseblade quick switch settings.");
+            }
+
+            if (!snapshot.CombatAutoBossDamageReportEnabled)
+            {
+                throw new InvalidOperationException("Runtime settings snapshot must expose auto boss damage report setting.");
             }
 
             settings.CombatPhasebladeQuickSwitchIntervalTicks = 1;
@@ -1215,6 +1255,7 @@ namespace JueMingZ.Tests
                     "combat-auto-facing|dispatch.combat-auto-facing|1",
                     "combat-phaseblade-quick-switch|dispatch.combat-phaseblade-quick-switch|1",
                     "combat-equipment-warning|dispatch.combat-equipment-warning|1",
+                    "combat-auto-boss-damage-report|dispatch.combat-auto-boss-damage-report|15",
                     "first-world-load-prompt|dispatch.first-world-load-prompt|0",
                     "movement-safe-landing|dispatch.movement-safe-landing|1",
                     "movement-continuous-dash|dispatch.movement-continuous-dash|1",
@@ -1250,6 +1291,7 @@ namespace JueMingZ.Tests
                     "combat-auto-facing|ActionSubmitting",
                     "combat-phaseblade-quick-switch|ActionSubmitting",
                     "combat-equipment-warning|ReadOnlyDisplay",
+                    "combat-auto-boss-damage-report|ReadOnlyDisplay",
                     "first-world-load-prompt|AlwaysMaintenance",
                     "movement-safe-landing|ActionSubmitting",
                     "movement-continuous-dash|ActionSubmitting",
@@ -1348,6 +1390,11 @@ namespace JueMingZ.Tests
                     throw new InvalidOperationException("ReadOnlyDisplay lane must not depend on user input focus.");
                 }
 
+                if (!JueMingZRuntime.ShouldRunAutomationDispatchStepForTesting("combat-auto-boss-damage-report", true, unfocused, 15))
+                {
+                    throw new InvalidOperationException("Auto boss damage report must stay on the read-only display lane.");
+                }
+
                 if (JueMingZRuntime.ShouldRunAutomationDispatchStepForTesting("auto-recovery", true, unfocused, 1))
                 {
                     throw new InvalidOperationException("ActionSubmitting lane must not dispatch when game input is unavailable.");
@@ -1415,6 +1462,11 @@ namespace JueMingZ.Tests
                 if (JueMingZRuntime.ShouldRunAutomationDispatchStepForTesting("combat-equipment-warning", true, mainMenu, 5))
                 {
                     throw new InvalidOperationException("ReadOnlyDisplay lane must not scan while outside the world.");
+                }
+
+                if (JueMingZRuntime.ShouldRunAutomationDispatchStepForTesting("combat-auto-boss-damage-report", true, mainMenu, 15))
+                {
+                    throw new InvalidOperationException("Auto boss damage report must not scan while outside the world.");
                 }
             }
             finally

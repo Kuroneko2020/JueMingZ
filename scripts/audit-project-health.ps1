@@ -1691,6 +1691,19 @@ function Test-MapCustomMarkerGovernance {
         Write-FailHealth "Map marker per-pair and cache limits must stay capped at 120 with regression coverage."
     }
 
+    if ($modelsText.Contains('ToString("yyMMddHHmm"') -and
+        $interactionText.Contains("DateTime.Now") -and
+        $interactionText.Contains("FormatDefaultName(localNow)") -and
+        $interactionText.Contains("BuildMarkerRecordForTesting") -and
+        $testText.Contains("2606160905") -and
+        $testText.Contains("PlayerWorldMapMarkersCreatedMarkerDefaultsToTimestampName") -and
+        -not $interactionText.Contains("Name = string.Empty")) {
+        Write-Pass "Map marker creation defaults the marker name to a local yyMMddHHmm timestamp."
+    }
+    else {
+        Write-FailHealth "Map marker creation must default new marker names to local yyMMddHHmm and keep regression coverage."
+    }
+
     if ($markerUiText.Contains("CalculateMapMarkerListBodyHeightForTesting") -and
         $markerUiText.Contains("GetMapMarkerListHorizontalInsetForTesting") -and
         $markerUiText.Contains("MapMarkerListPageSize = 10") -and
@@ -1700,8 +1713,9 @@ function Test-MapCustomMarkerGovernance {
         $mapEnhancementUiText.Contains("CalculateMapMarkerListContentYForTesting") -and
         $mapEnhancementUiText.Contains("LegacyUiMetrics.RowHeight * 5 + LegacyUiMetrics.SettingRowGap * 4") -and
         -not $mapEnhancementUiText.Contains("var markerListY = LegacyUiMetrics.RowHeight * 5 + LegacyUiMetrics.SettingRowGap * 5") -and
-        $markerUiText.Contains("empty-text-only") -and
-        $markerUiText.Contains("attached-link-card+same-width+paged-10+empty-text-only+focused-confirm") -and
+        $markerUiText.Contains("empty-silent") -and
+        $markerUiText.Contains("attached-link-card+same-width+paged-10+empty-silent+focused-confirm") -and
+        -not $markerUiText.Contains("暂无地图标记") -and
         $markerUiText.Contains("ShouldShowMapMarkerConfirmButton") -and
         $markerUiText.Contains("LegacyTextInput.IsFocused(BuildMapMarkerNameInputId") -and
         -not $markerUiText.Contains("DrawSubPanelClipped") -and
@@ -1710,6 +1724,7 @@ function Test-MapCustomMarkerGovernance {
         $handlerText.Contains('string.Equals(action, "confirm-name"') -and
         $handlerText.Contains("nameInputNotFocused") -and
         $testText.Contains("paged-10") -and
+        $testText.Contains("empty-silent") -and
         $testText.Contains("paginate by 10 rows") -and
         $testText.Contains("已到标记上限") -and
         $testText.Contains("MapCustomMarkerConfirmNameCommandSavesAndClearsFocus") -and
@@ -1719,8 +1734,9 @@ function Test-MapCustomMarkerGovernance {
         $testText.Contains("attach to the main row") -and
         $testText.Contains("directly after the main title row") -and
         $testText.Contains("omit the duplicate subtitle row") -and
+        $testText.Contains("silent zero-height empty state") -and
         -not $testText.Contains("section+subpanel-card+empty-text-only+confirm-button")) {
-        Write-Pass "Map marker F5 list keeps attached same-width paged no-subtitle name-save coverage without locking the old subpanel or always-visible confirm visual contract."
+        Write-Pass "Map marker F5 list keeps attached same-width paged no-subtitle name-save coverage and a silent empty state without locking the old subpanel or always-visible confirm visual contract."
     }
     else {
         Write-FailHealth "Map marker F5 list must keep attached same-width 10-row pagination, limit label, confirm-name coverage, and no old subpanel/card or always-visible confirm visual contract."

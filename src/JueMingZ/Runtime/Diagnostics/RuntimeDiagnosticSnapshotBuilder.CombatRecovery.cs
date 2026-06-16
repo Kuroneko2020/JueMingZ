@@ -33,6 +33,7 @@ namespace JueMingZ.Runtime
             var phasebladeQuickSwitchBridge = PhasebladeQuickSwitchBridge.GetSnapshot();
             var itemCheckAutoClicker = CombatItemCheckAutoClickService.GetDiagnostics();
             var magicStringClicker = CombatMagicStringClickerService.GetDiagnostics();
+            var autoBossDamageReport = CombatAutoBossDamageReportService.GetDiagnostics();
             var autoRecovery = AutoRecoveryService.GetStateSnapshot();
             var stationBuff = StationBuffCompat.GetDiagnostics();
             var settingsSnapshot = source.SettingsSnapshot;
@@ -117,6 +118,18 @@ namespace JueMingZ.Runtime
             snapshot.CombatMagicStringClickerLastDecision = magicStringClicker == null ? string.Empty : magicStringClicker.LastDecision;
             snapshot.CombatMagicStringClickerLastSkipReason = magicStringClicker == null ? string.Empty : magicStringClicker.LastSkipReason;
             snapshot.CombatMagicStringClickerLastDecisionUtc = magicStringClicker == null ? null : magicStringClicker.LastDecisionUtc;
+            snapshot.CombatAutoBossDamageReportEnabled = settingsSnapshot != null && settingsSnapshot.CombatAutoBossDamageReportEnabled;
+            snapshot.CombatAutoBossDamageReportLastDecision = autoBossDamageReport == null ? string.Empty : autoBossDamageReport.LastDecision;
+            snapshot.CombatAutoBossDamageReportLastReason = autoBossDamageReport == null ? string.Empty : autoBossDamageReport.LastReason;
+            snapshot.CombatAutoBossDamageReportLastDecisionUtc = autoBossDamageReport == null ? null : autoBossDamageReport.LastDecisionUtc;
+            snapshot.CombatAutoBossDamageReportRecentAttemptCount = autoBossDamageReport == null ? 0 : autoBossDamageReport.LastRecentAttemptCount;
+            snapshot.CombatAutoBossDamageReportNewAttemptCount = autoBossDamageReport == null ? 0 : autoBossDamageReport.LastNewAttemptCount;
+            snapshot.CombatAutoBossDamageReportLastAttemptKey = autoBossDamageReport == null ? 0 : autoBossDamageReport.LastAttemptKey;
+            snapshot.CombatAutoBossDamageReportLastSendAttempted = autoBossDamageReport != null && autoBossDamageReport.LastSendAttempted;
+            snapshot.CombatAutoBossDamageReportLastSendSucceeded = autoBossDamageReport != null && autoBossDamageReport.LastSendSucceeded;
+            snapshot.CombatAutoBossDamageReportLastFailureReason = autoBossDamageReport == null ? string.Empty : autoBossDamageReport.LastFailureReason;
+            snapshot.CombatAutoBossDamageReportSentCount = autoBossDamageReport == null ? 0 : autoBossDamageReport.SentCount;
+            snapshot.CombatAutoBossDamageReportSkippedCount = autoBossDamageReport == null ? 0 : autoBossDamageReport.SkippedCount;
             snapshot.AutoHealEnabled = autoRecovery.AutoHealEnabled;
             snapshot.AutoManaEnabled = autoRecovery.AutoManaEnabled;
             snapshot.AutoBuffEnabled = autoRecovery.AutoBuffEnabled;

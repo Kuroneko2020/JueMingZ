@@ -161,6 +161,9 @@ namespace JueMingZ.Config
         [DataMember(Order = 196)]
         public bool MapCustomMarkersEnabled { get; set; }
 
+        [DataMember(Order = 197)]
+        public bool CombatAutoBossDamageReportEnabled { get; set; }
+
         [DataMember(Order = 37)]
         public bool CombatPerfectRevolverEnabled { get; set; }
 
@@ -803,6 +806,7 @@ namespace JueMingZ.Config
                 CombatMagicStringClickerEnabled = false,
                 CombatAutoFacingEnabled = false,
                 CombatEquipmentWarningEnabled = false,
+                CombatAutoBossDamageReportEnabled = false,
                 CombatGoblinExecutionEnabled = false,
                 AimRangeOrigin = CombatAimModes.RangeOriginPlayer,
                 AimTargetPriority = CombatAimModes.TargetPriorityNearest,

@@ -51,6 +51,11 @@ namespace JueMingZ.Records
             return text.Substring(0, MaxNameTextUnits);
         }
 
+        public static string FormatDefaultName(DateTime localTime)
+        {
+            return localTime.ToString("yyMMddHHmm", CultureInfo.InvariantCulture);
+        }
+
         public static string FormatUtc(DateTime utc)
         {
             return utc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);

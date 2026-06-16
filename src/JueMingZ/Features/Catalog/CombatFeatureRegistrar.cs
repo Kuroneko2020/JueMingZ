@@ -54,6 +54,11 @@ namespace JueMingZ.Features.Catalog
                 .GameState(GameStateKind.Player, GameStateKind.World, GameStateKind.CombatTargets)
                 .Notes("只读扫描当前功能装备 / 饰品槽和 miscEquips；检测到 Boss 或血月以外的事件时，如果穿着建筑、钓鱼、信息、经济、召唤娃娃或非战斗头身腿等装备，在玩家头顶显示 1 秒提示，不提交动作也不修改装备。"), true);
 
+            Add(registry, FeatureDefinitionBuilder.Create(FeatureIds.CombatAutoBossDamageReport, "自动汇报", "boss战结束后自动汇报")
+                .Actions()
+                .GameState(GameStateKind.World, GameStateKind.CombatTargets)
+                .Notes("默认关闭。运行时只读 Terraria NPCDamageTracker.RecentAttempts()；开启后的首帧只建立基线，之后检测到新的已结束 Boss 伤害记录时，通过原版聊天命令路径发送 /bossdamage。不会模拟键盘输入，不写玩家、NPC、Tile 或网络状态。"), true);
+
             Add(registry, FeatureDefinitionBuilder.Create(FeatureIds.CombatGoblinExecution, "哥布林必死", "允许玩家武器命中哥布林工匠")
                 .Actions()
                 .GameState(GameStateKind.Player)

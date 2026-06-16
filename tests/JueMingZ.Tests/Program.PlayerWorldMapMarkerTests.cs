@@ -212,6 +212,58 @@ namespace JueMingZ.Tests
             });
         }
 
+        private static void PlayerWorldMapMarkersCreatedMarkerDefaultsToTimestampName()
+        {
+            var point = new MapCustomMarkerMapPoint
+            {
+                TileX = 320,
+                TileY = 200,
+                ScreenX = 740,
+                ScreenY = 460,
+                ScreenWidth = 1280,
+                ScreenHeight = 720,
+                WorldSizeX = 8400,
+                WorldSizeY = 2400,
+                TransformSource = "fullscreenDrawMouse",
+                FallbackReason = string.Empty,
+                MapTopLeftX = 99f,
+                MapTopLeftY = 55f,
+                MapScale = 2f,
+                CurrentMapFullscreenPosX = 4200f,
+                CurrentMapFullscreenPosY = 1200f,
+                CurrentMapScale = 2f,
+                CurrentGameUpdateCount = 456,
+                TransformAgeUpdates = 1
+            };
+
+            var placement = MapCustomMarkerInteractionService.CreatePlacementForTesting(point);
+            var marker = MapCustomMarkerInteractionService.BuildMarkerRecordForTesting(
+                placement,
+                48,
+                new DateTime(2026, 6, 16, 1, 2, 3, DateTimeKind.Utc),
+                new DateTime(2026, 6, 16, 9, 5, 0));
+
+            if (marker == null ||
+                marker.TileX != 320 ||
+                marker.TileY != 200 ||
+                marker.IconItemId != 48)
+            {
+                throw new InvalidOperationException("Map marker record creation must preserve the frozen placement and selected icon.");
+            }
+
+            AssertStringEquals(marker.Name, "2606160905", "default marker timestamp name");
+            AssertStringEquals(
+                marker.Name,
+                PlayerWorldMapMarkerConstants.FormatDefaultName(new DateTime(2026, 6, 16, 9, 5, 0)),
+                "default marker name helper");
+            AssertStringEquals(marker.CreatedUtc, "2026-06-16T01:02:03.0000000Z", "created marker CreatedUtc");
+            AssertStringEquals(marker.UpdatedUtc, marker.CreatedUtc, "created marker UpdatedUtc");
+            if (marker.Name.Length != PlayerWorldMapMarkerConstants.MaxNameTextUnits)
+            {
+                throw new InvalidOperationException("Default marker timestamp name must fit the 10-text-unit name limit exactly.");
+            }
+        }
+
         private static void PlayerWorldMapMarkersSeparatePairs()
         {
             WithTemporaryPlayerWorldDataRoot(root =>
@@ -743,11 +795,12 @@ namespace JueMingZ.Tests
             }
 
             if (emptyHeight != LegacyMainWindow.CalculateMapMarkerListBodyHeightForTesting(0) ||
+                emptyHeight != 0 ||
                 threeHeight != LegacyMainWindow.CalculateMapMarkerListBodyHeightForTesting(3) ||
                 LegacyMainWindow.GetMapMarkerListTopGapForTesting() != 0 ||
                 LegacyMainWindow.GetMapMarkerListHorizontalInsetForTesting() != 0)
             {
-                throw new InvalidOperationException("Map custom marker list height must omit the duplicate subtitle row, attach to the main row, and keep same-width text-only empty state sizing.");
+                throw new InvalidOperationException("Map custom marker list height must omit the duplicate subtitle row, attach to the main row, and keep a silent zero-height empty state.");
             }
 
             var inputId = LegacyMainWindow.BuildMapMarkerNameInputId("marker-a");
@@ -758,7 +811,7 @@ namespace JueMingZ.Tests
                 "map marker confirm command id");
             AssertStringEquals(
                 LegacyMainWindow.GetMapMarkerListVisualContractForTesting(),
-                "attached-link-card+same-width+paged-10+empty-text-only+focused-confirm",
+                "attached-link-card+same-width+paged-10+empty-silent+focused-confirm",
                 "map marker list visual contract");
             if (LegacyMainWindow.GetMapMarkerListPageSizeForTesting() != 10 ||
                 LegacyMainWindow.GetMapMarkerPageCountForTesting(0) != 0 ||

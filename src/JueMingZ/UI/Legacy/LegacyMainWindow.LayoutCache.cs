@@ -459,6 +459,7 @@ namespace JueMingZ.UI.Legacy
                     AddHash(ref hash, settings.CombatMagicStringClickerEnabled);
                     AddHash(ref hash, settings.CombatAutoFacingEnabled);
                     AddHash(ref hash, settings.CombatEquipmentWarningEnabled);
+                    AddHash(ref hash, settings.CombatAutoBossDamageReportEnabled);
                     AddHash(ref hash, settings.CombatGoblinExecutionEnabled);
                 }
                 else if (string.Equals(selectedPage, "home", StringComparison.Ordinal))

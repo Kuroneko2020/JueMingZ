@@ -68,6 +68,8 @@ namespace JueMingZ.UI.Legacy
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "装备提示", settings.CombatEquipmentWarningEnabled, "combat-equipment-warning-mode:", "又忘了换装备了？") ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
+            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "自动汇报", settings.CombatAutoBossDamageReportEnabled, "combat-auto-boss-damage-report-mode:", "boss战结束后自动汇报") ?? hovered;
+            y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "哥布林必死", settings.CombatGoblinExecutionEnabled, "combat-goblin-execution-mode:", "rnm 还钱！！") ?? hovered;
 
             return hovered;

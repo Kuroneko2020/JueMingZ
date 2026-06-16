@@ -11,6 +11,7 @@ namespace JueMingZ.Common
         public const string CombatMagicStringClicker = "combat.magic_string_clicker";
         public const string CombatAutoFacing = "combat.auto_facing";
         public const string CombatEquipmentWarning = "combat.equipment_warning";
+        public const string CombatAutoBossDamageReport = "combat.auto_boss_damage_report";
         public const string CombatGoblinExecution = "combat.goblin_execution";
         public const string DiagnosticsWorldGenDebugViewer = "diagnostics.worldgen_debug_viewer";
         public const string DiagnosticsDeveloperDebugCommands = "diagnostics.developer_debug_commands";

@@ -121,6 +121,12 @@ namespace JueMingZ.Input
                 return;
             }
 
+            if (command.ElementId.StartsWith("combat-auto-boss-damage-report-mode:", StringComparison.Ordinal))
+            {
+                SetCombatFeatureEnabled(command, "autoBossDamageReport", IsOnMode(command.ElementId.Substring("combat-auto-boss-damage-report-mode:".Length)));
+                return;
+            }
+
             if (command.ElementId.StartsWith("combat-goblin-execution-mode:", StringComparison.Ordinal))
             {
                 SetCombatFeatureEnabled(command, "goblinExecution", IsOnMode(command.ElementId.Substring("combat-goblin-execution-mode:".Length)));

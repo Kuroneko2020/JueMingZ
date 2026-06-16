@@ -348,6 +348,45 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void FeatureCatalogExposesAutoBossDamageReport()
+        {
+            var registry = FeatureRegistry.CreateDefault();
+            FeatureDefinition feature;
+            if (!registry.TryGet(FeatureIds.CombatAutoBossDamageReport, out feature) || feature == null)
+            {
+                throw new InvalidOperationException("Expected auto boss damage report feature to be registered.");
+            }
+
+            if (!feature.VisibleInMainUi || !feature.IsImplemented)
+            {
+                throw new InvalidOperationException("Auto boss damage report must be visible and implemented.");
+            }
+
+            if (feature.DefaultEnabled)
+            {
+                throw new InvalidOperationException("Auto boss damage report must default to disabled.");
+            }
+
+            if (feature.CodeDomain != FeatureCodeDomain.Combat ||
+                feature.UserCategory != FeatureUserCategory.Combat)
+            {
+                throw new InvalidOperationException("Auto boss damage report must stay Combat code-domain and Combat UI category.");
+            }
+
+            if (feature.RequiredActions.Count != 1 || feature.RequiredActions[0] != InputActionKind.None)
+            {
+                throw new InvalidOperationException("Auto boss damage report must not require ActionQueue actions.");
+            }
+
+            if (feature.MultiplayerSupport != FeatureMultiplayerSupport.SupportedByOriginalAction)
+            {
+                throw new InvalidOperationException("Auto boss damage report must use original chat-path multiplayer metadata.");
+            }
+
+            AssertStringEquals(feature.DisplayName, "自动汇报", "auto boss damage report display name");
+            AssertStringEquals(feature.Description, "boss战结束后自动汇报", "auto boss damage report description");
+        }
+
         private static void FeatureCatalogExposesPhasebladeQuickSwitchConfig()
         {
             var registry = FeatureRegistry.CreateDefault();

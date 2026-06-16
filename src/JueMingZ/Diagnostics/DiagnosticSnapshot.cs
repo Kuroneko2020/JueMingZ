@@ -997,6 +997,18 @@ namespace JueMingZ.Diagnostics
         public string CombatMagicStringClickerLastDecision { get; set; }
         public string CombatMagicStringClickerLastSkipReason { get; set; }
         public DateTime? CombatMagicStringClickerLastDecisionUtc { get; set; }
+        public bool CombatAutoBossDamageReportEnabled { get; set; }
+        public string CombatAutoBossDamageReportLastDecision { get; set; }
+        public string CombatAutoBossDamageReportLastReason { get; set; }
+        public DateTime? CombatAutoBossDamageReportLastDecisionUtc { get; set; }
+        public int CombatAutoBossDamageReportRecentAttemptCount { get; set; }
+        public int CombatAutoBossDamageReportNewAttemptCount { get; set; }
+        public int CombatAutoBossDamageReportLastAttemptKey { get; set; }
+        public bool CombatAutoBossDamageReportLastSendAttempted { get; set; }
+        public bool CombatAutoBossDamageReportLastSendSucceeded { get; set; }
+        public string CombatAutoBossDamageReportLastFailureReason { get; set; }
+        public long CombatAutoBossDamageReportSentCount { get; set; }
+        public long CombatAutoBossDamageReportSkippedCount { get; set; }
         public bool AutoHealEnabled { get; set; }
         public bool AutoManaEnabled { get; set; }
         public bool AutoBuffEnabled { get; set; }
@@ -1405,6 +1417,9 @@ namespace JueMingZ.Diagnostics
             CombatItemCheckAutoClickerLastReason = string.Empty;
             CombatMagicStringClickerLastDecision = string.Empty;
             CombatMagicStringClickerLastSkipReason = string.Empty;
+            CombatAutoBossDamageReportLastDecision = string.Empty;
+            CombatAutoBossDamageReportLastReason = string.Empty;
+            CombatAutoBossDamageReportLastFailureReason = string.Empty;
             LastAutoHealResult = string.Empty;
             LastAutoManaResult = string.Empty;
             LastAutoBuffResult = string.Empty;

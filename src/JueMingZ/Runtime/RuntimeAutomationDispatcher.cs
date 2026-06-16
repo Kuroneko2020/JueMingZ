@@ -94,6 +94,12 @@ namespace JueMingZ.Runtime
                 "dispatch.combat-equipment-warning",
                 1,
                 RuntimeDispatchLane.ReadOnlyDisplay);
+        private static readonly RuntimeDispatchStep DispatchCombatAutoBossDamageReport =
+            new RuntimeDispatchStep(
+                "combat-auto-boss-damage-report",
+                "dispatch.combat-auto-boss-damage-report",
+                15,
+                RuntimeDispatchLane.ReadOnlyDisplay);
         private static readonly RuntimeDispatchStep DispatchFirstWorldLoadPrompt =
             new RuntimeDispatchStep(
                 "first-world-load-prompt",
@@ -143,6 +149,7 @@ namespace JueMingZ.Runtime
             DispatchCombatAutoFacing,
             DispatchCombatPhasebladeQuickSwitch,
             DispatchCombatEquipmentWarning,
+            DispatchCombatAutoBossDamageReport,
             DispatchFirstWorldLoadPrompt,
             DispatchMovementSafeLanding,
             DispatchMovementContinuousDash,
@@ -398,6 +405,13 @@ namespace JueMingZ.Runtime
             {
                 CombatEquipmentWarningService.Tick(gameState, state, settings);
                 RecordOperationTiming(context, DispatchCombatEquipmentWarning, operationStart);
+                operationStart = Stopwatch.GetTimestamp();
+            }
+
+            if (ShouldRun(DispatchCombatAutoBossDamageReport, settings.CombatAutoBossDamageReportEnabled, gameState, tick))
+            {
+                CombatAutoBossDamageReportService.Tick(gameState, state, settings);
+                RecordOperationTiming(context, DispatchCombatAutoBossDamageReport, operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 

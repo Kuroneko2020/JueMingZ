@@ -188,6 +188,15 @@ namespace JueMingZ.Automation.MapEnhancement
             return CreatePlacement(point);
         }
 
+        internal static PlayerWorldMapMarkerRecord BuildMarkerRecordForTesting(
+            MapCustomMarkerPendingPlacement placement,
+            int iconItemId,
+            DateTime utcNow,
+            DateTime localNow)
+        {
+            return BuildMarkerRecord(placement, iconItemId, utcNow, localNow);
+        }
+
         private static bool CanInteract(GameStateSnapshot snapshot, out string blockedReason)
         {
             blockedReason = string.Empty;
@@ -279,18 +288,7 @@ namespace JueMingZ.Automation.MapEnhancement
                 return;
             }
 
-            var now = PlayerWorldMapMarkerConstants.FormatUtc(DateTime.UtcNow);
-            var marker = new PlayerWorldMapMarkerRecord
-            {
-                MarkerId = Guid.NewGuid().ToString("N"),
-                TileX = placement.TileX,
-                TileY = placement.TileY,
-                IconItemId = iconItemId.Value,
-                Name = string.Empty,
-                CreatedUtc = now,
-                UpdatedUtc = now,
-                SortOrder = 0
-            };
+            var marker = BuildMarkerRecord(placement, iconItemId.Value, DateTime.UtcNow, DateTime.Now);
 
             var write = PlayerWorldMapMarkerStore.AddMarkerForPair(
                 identity.PairId,
@@ -317,6 +315,31 @@ namespace JueMingZ.Automation.MapEnhancement
             {
                 RecordStatus(write == null ? "writeFailed" : write.Status, write == null ? "write unavailable" : write.Message);
             }
+        }
+
+        private static PlayerWorldMapMarkerRecord BuildMarkerRecord(
+            MapCustomMarkerPendingPlacement placement,
+            int iconItemId,
+            DateTime utcNow,
+            DateTime localNow)
+        {
+            if (placement == null)
+            {
+                return null;
+            }
+
+            var now = PlayerWorldMapMarkerConstants.FormatUtc(utcNow);
+            return new PlayerWorldMapMarkerRecord
+            {
+                MarkerId = Guid.NewGuid().ToString("N"),
+                TileX = placement.TileX,
+                TileY = placement.TileY,
+                IconItemId = iconItemId,
+                Name = PlayerWorldMapMarkerConstants.FormatDefaultName(localNow),
+                CreatedUtc = now,
+                UpdatedUtc = now,
+                SortOrder = 0
+            };
         }
 
         private static MapCustomMarkerPendingPlacement CreatePlacement(MapCustomMarkerMapPoint point)

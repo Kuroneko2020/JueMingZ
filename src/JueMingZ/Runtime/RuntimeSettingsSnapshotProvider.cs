@@ -90,6 +90,7 @@ namespace JueMingZ.Runtime
             private bool _combatMagicStringClickerEnabled;
             private bool _combatAutoFacingEnabled;
             private bool _combatEquipmentWarningEnabled;
+            private bool _combatAutoBossDamageReportEnabled;
             private string _aimRangeOrigin;
             private string _aimTargetPriority;
             private int _cursorAimRadius;
@@ -219,6 +220,7 @@ namespace JueMingZ.Runtime
                     _combatMagicStringClickerEnabled = settings.CombatMagicStringClickerEnabled,
                     _combatAutoFacingEnabled = settings.CombatAutoFacingEnabled,
                     _combatEquipmentWarningEnabled = settings.CombatEquipmentWarningEnabled,
+                    _combatAutoBossDamageReportEnabled = settings.CombatAutoBossDamageReportEnabled,
                     _aimRangeOrigin = settings.AimRangeOrigin,
                     _aimTargetPriority = settings.AimTargetPriority,
                     _cursorAimRadius = settings.CursorAimRadius,
@@ -343,6 +345,7 @@ namespace JueMingZ.Runtime
                        _combatMagicStringClickerEnabled == other._combatMagicStringClickerEnabled &&
                        _combatAutoFacingEnabled == other._combatAutoFacingEnabled &&
                        _combatEquipmentWarningEnabled == other._combatEquipmentWarningEnabled &&
+                       _combatAutoBossDamageReportEnabled == other._combatAutoBossDamageReportEnabled &&
                        Same(_aimRangeOrigin, other._aimRangeOrigin) &&
                        Same(_aimTargetPriority, other._aimTargetPriority) &&
                        _cursorAimRadius == other._cursorAimRadius &&

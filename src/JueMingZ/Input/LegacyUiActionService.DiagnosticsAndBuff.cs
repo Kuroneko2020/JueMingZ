@@ -250,6 +250,7 @@ namespace JueMingZ.Input
                    "\"combatMagicStringClickerEnabled\":" + BoolRaw(settings.CombatMagicStringClickerEnabled) + "," +
                    "\"combatAutoFacingEnabled\":" + BoolRaw(settings.CombatAutoFacingEnabled) + "," +
                    "\"combatEquipmentWarningEnabled\":" + BoolRaw(settings.CombatEquipmentWarningEnabled) + "," +
+                   "\"combatAutoBossDamageReportEnabled\":" + BoolRaw(settings.CombatAutoBossDamageReportEnabled) + "," +
                    "\"combatGoblinExecutionEnabled\":" + BoolRaw(settings.CombatGoblinExecutionEnabled) +
                    "}";
         }

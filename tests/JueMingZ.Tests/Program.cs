@@ -1281,12 +1281,14 @@ namespace JueMingZ.Tests
             Run("diagnostic snapshot writes combat ItemCheck auto clicker state", ref failed, DiagnosticSnapshotWritesCombatItemCheckAutoClickerState);
             Run("diagnostic snapshot writes combat flail combo state", ref failed, DiagnosticSnapshotWritesCombatFlailComboState);
             Run("diagnostic snapshot writes combat phaseblade quick switch state", ref failed, DiagnosticSnapshotWritesCombatPhasebladeQuickSwitchState);
+            Run("diagnostic snapshot writes combat auto boss damage report state", ref failed, DiagnosticSnapshotWritesCombatAutoBossDamageReportState);
             Run("diagnostic snapshot writes fishing idle pipeline state", ref failed, DiagnosticSnapshotWritesFishingIdlePipelineState);
             Run("performance hitch recorder detects runtime gaps", ref failed, PerformanceHitchRecorderDetectsRuntimeGaps);
             Run("performance operation recorder uses scenario thresholds", ref failed, PerformanceOperationRecorderUsesScenarioThresholds);
             Run("diagnostic snapshot writes performance hitch state", ref failed, DiagnosticSnapshotWritesPerformanceHitchState);
             Run("feature catalog exposes implemented items inventory automation", ref failed, FeatureCatalogExposesImplementedItemsInventoryAutomation);
             Run("feature catalog exposes goblin execution", ref failed, FeatureCatalogExposesGoblinExecution);
+            Run("feature catalog exposes auto boss damage report", ref failed, FeatureCatalogExposesAutoBossDamageReport);
             Run("feature catalog exposes phaseblade quick switch config", ref failed, FeatureCatalogExposesPhasebladeQuickSwitchConfig);
             Run("map quick announcement settings normalize slots and defaults", ref failed, MapQuickAnnouncementSettingsNormalizeSlotsAndDefaults);
             Run("first-run app settings defaults match requested UI baseline", ref failed, FirstRunAppSettingsDefaultsMatchRequestedUiBaseline);
@@ -1313,6 +1315,9 @@ namespace JueMingZ.Tests
             Run("runtime settings snapshot provider rebuilds after config mutation", ref failed, RuntimeSettingsSnapshotProviderRebuildsAfterConfigMutation);
             Run("runtime settings snapshot provider skips disabled list hashes", ref failed, RuntimeSettingsSnapshotProviderSkipsDisabledListHashes);
             Run("runtime service scheduler honors cadence and disabled cleanup", ref failed, RuntimeServiceSchedulerHonorsCadenceAndDisabledCleanup);
+            Run("combat auto boss damage report baselines existing attempts", ref failed, CombatAutoBossDamageReportBaselinesExistingAttempts);
+            Run("combat auto boss damage report sends new attempt once", ref failed, CombatAutoBossDamageReportSendsNewAttemptOnce);
+            Run("combat auto boss damage report disabled re-enable baselines", ref failed, CombatAutoBossDamageReportDisabledReenableBaselines);
             Run("runtime automation dispatcher preserves dispatch contract", ref failed, RuntimeAutomationDispatcherPreservesDispatchContract);
             Run("runtime automation dispatcher preserves lane contract", ref failed, RuntimeAutomationDispatcherPreservesLaneContract);
             Run("runtime input focus guard uses game state focus", ref failed, RuntimeInputFocusGuardUsesGameStateFocus);
@@ -1837,6 +1842,7 @@ namespace JueMingZ.Tests
             Run("player-world map markers roundtrip normalizes name and icon", ref failed, PlayerWorldMapMarkersRoundTripNormalizesNameAndIcon);
             Run("player-world map markers legacy fallen-star icon maps to bed", ref failed, PlayerWorldMapMarkersLegacyFallenStarIconMapsToBed);
             Run("player-world map markers allow empty name", ref failed, PlayerWorldMapMarkersAllowEmptyName);
+            Run("player-world map markers created marker defaults to timestamp name", ref failed, PlayerWorldMapMarkersCreatedMarkerDefaultsToTimestampName);
             Run("player-world map markers separate pairs", ref failed, PlayerWorldMapMarkersSeparatePairs);
             Run("player-world map markers save failure keeps existing file", ref failed, PlayerWorldMapMarkersSaveFailureKeepsExistingFile);
             Run("player-world map markers reject limit overflow", ref failed, PlayerWorldMapMarkersRejectLimitOverflow);

@@ -38,7 +38,7 @@ namespace JueMingZ.UI.Legacy
 
         private static int CalculateCombatContentHeight()
         {
-            return CombatAimRowHeight + LegacyUiMetrics.SettingRowGap * 8 + LegacyUiMetrics.RowHeight * 8 + 24;
+            return CombatAimRowHeight + LegacyUiMetrics.SettingRowGap * 9 + LegacyUiMetrics.RowHeight * 9 + 24;
         }
 
         private static int CalculateItemsContentHeight(LegacyUiRect contentRect)

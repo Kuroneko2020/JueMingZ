@@ -77,6 +77,7 @@ namespace JueMingZ.Tests
             AssertDefault(!settings.CombatMagicStringClickerEnabled, "combat magic string clicker off");
             AssertDefault(!settings.CombatAutoFacingEnabled, "combat auto facing off");
             AssertDefault(!settings.CombatEquipmentWarningEnabled, "combat equipment warning off");
+            AssertDefault(!settings.CombatAutoBossDamageReportEnabled, "combat auto boss damage report off");
             AssertDefault(!settings.CombatGoblinExecutionEnabled, "combat goblin execution off");
             AssertStringEquals(CombatAimModes.NormalizeTargetPriority(settings.AimTargetPriority), CombatAimModes.TargetPriorityNearest, "combat aim target priority");
             AssertStringEquals(CombatAimModes.NormalizeRangeOrigin(settings.AimRangeOrigin), CombatAimModes.RangeOriginPlayer, "combat aim range origin");

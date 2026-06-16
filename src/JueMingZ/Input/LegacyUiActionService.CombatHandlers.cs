@@ -218,6 +218,16 @@ namespace JueMingZ.Input
                     ? "装备提示已开启：Boss 或非血月事件期间，穿着非战斗装备时会在玩家头顶提示。"
                     : "装备提示已关闭。";
             }
+            else if (string.Equals(option, "autoBossDamageReport", StringComparison.Ordinal))
+            {
+                changed = settings.CombatAutoBossDamageReportEnabled != enabled;
+                settings.CombatAutoBossDamageReportEnabled = enabled;
+                scenario = "Ui.Toggle.CombatAutoBossDamageReport";
+                implemented = true;
+                message = enabled
+                    ? "自动汇报已开启：Boss 战结束后会通过原版聊天路径发送 /bossdamage。"
+                    : "自动汇报已关闭。";
+            }
             else if (string.Equals(option, "goblinExecution", StringComparison.Ordinal))
             {
                 changed = settings.CombatGoblinExecutionEnabled != enabled;
