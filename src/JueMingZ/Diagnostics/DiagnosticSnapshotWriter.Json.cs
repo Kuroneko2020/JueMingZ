@@ -163,6 +163,10 @@ namespace JueMingZ.Diagnostics
             Append(builder, "MapMarkerPickerLastCloseReason", snapshot.MapMarkerPickerLastCloseReason, true);
             Append(builder, "PlayerWorldMapMarkersLastReadUtc", FormatDate(snapshot.PlayerWorldMapMarkersLastReadUtc), true);
             Append(builder, "PlayerWorldMapMarkersLastWriteUtc", FormatDate(snapshot.PlayerWorldMapMarkersLastWriteUtc), true);
+            Append(builder, "MapMarkerTraceEventsPath", snapshot.MapMarkerTraceEventsPath, true);
+            Append(builder, "MapMarkerLastTraceEventWrittenAtUtc", FormatDate(snapshot.MapMarkerLastTraceEventWrittenAtUtc), true);
+            Append(builder, "MapMarkerLastTraceEventType", snapshot.MapMarkerLastTraceEventType, true);
+            Append(builder, "MapMarkerLastTraceMarkerId", snapshot.MapMarkerLastTraceMarkerId, true);
             Append(builder, "TeleportRodHookInstalled", snapshot.MovementTeleportCorrectionHookInstalled, true);
             Append(builder, "TeleportRodHookMethod", snapshot.MovementTeleportCorrectionHookMethod, true);
             Append(builder, "DiagnosticsOverlayVisible", snapshot.DiagnosticsOverlayVisible, true);

@@ -7,6 +7,7 @@ namespace JueMingZ.Compat
     internal static class MapCustomMarkerMapCompat
     {
         private const string FullscreenTransformSource = "fullscreenTransform";
+        private const string FullscreenDrawMouseSource = "fullscreenDrawMouse";
         private const string FallbackTransformSource = "fallback";
         private const float ScreenSizeScaleTolerance = 0.025f;
         private const int ScreenCoordinateTolerancePixels = 2;
@@ -15,6 +16,7 @@ namespace JueMingZ.Compat
         private const long UnknownGameUpdateCount = -1;
         private static readonly object TransformSyncRoot = new object();
         private static MapCustomMarkerFullscreenTransformSnapshot _lastFullscreenTransform;
+        private static MapCustomMarkerMapPoint _lastFullscreenDrawMousePoint;
 
         public static bool TryReadFullscreenMapMouseTile(out MapCustomMarkerMapPoint point, out string message)
         {
@@ -42,7 +44,7 @@ namespace JueMingZ.Compat
                 var currentGameUpdateCount = ReadGameUpdateCountOrUnknown();
                 string fallbackReason;
                 long transformAgeUpdates;
-                if (!TryScreenToTileFromLastTransform(
+                point = ResolveFullscreenMouseTile(
                     Main.mouseX,
                     Main.mouseY,
                     screenWidth,
@@ -52,24 +54,12 @@ namespace JueMingZ.Compat
                     currentFullscreenPos,
                     currentMapScale,
                     currentGameUpdateCount,
-                    out point,
                     out fallbackReason,
-                    out transformAgeUpdates))
-                {
-                    point = ScreenToTile(
-                        Main.mouseX,
-                        Main.mouseY,
-                        currentFullscreenPos,
-                        currentMapScale,
-                        screenWidth,
-                        screenHeight,
-                        Main.maxTilesX,
-                        Main.maxTilesY);
-                    point.TransformSource = FallbackTransformSource;
-                    point.FallbackReason = fallbackReason;
-                    point.TransformAgeUpdates = transformAgeUpdates;
-                }
+                    out transformAgeUpdates);
 
+                point.ScreenWidth = screenWidth;
+                point.ScreenHeight = screenHeight;
+                point.CurrentGameUpdateCount = currentGameUpdateCount;
                 message = "ok";
                 return true;
             }
@@ -87,7 +77,7 @@ namespace JueMingZ.Compat
             int screenHeight,
             string route)
         {
-            return RecordFullscreenTransformCore(
+            var snapshot = RecordFullscreenTransformCore(
                 mapTopLeft,
                 mapScale,
                 screenWidth,
@@ -95,6 +85,8 @@ namespace JueMingZ.Compat
                 route,
                 ReadMapFullscreenPosOrZero(),
                 ReadGameUpdateCountOrUnknown());
+            RecordFullscreenDrawMousePoint(snapshot, Main.mouseX, Main.mouseY, Main.maxTilesX, Main.maxTilesY);
+            return snapshot;
         }
 
         internal static MapCustomMarkerFullscreenTransformSnapshot RecordFullscreenTransformForTesting(
@@ -114,6 +106,16 @@ namespace JueMingZ.Compat
                 route,
                 mapFullscreenPos,
                 gameUpdateCount);
+        }
+
+        internal static MapCustomMarkerMapPoint RecordFullscreenDrawMousePointForTesting(
+            int mouseX,
+            int mouseY,
+            int maxTilesX,
+            int maxTilesY)
+        {
+            var transform = GetLastFullscreenTransformForTesting();
+            return RecordFullscreenDrawMousePoint(transform, mouseX, mouseY, maxTilesX, maxTilesY);
         }
 
         private static MapCustomMarkerFullscreenTransformSnapshot RecordFullscreenTransformCore(
@@ -148,6 +150,48 @@ namespace JueMingZ.Compat
             return snapshot.Clone();
         }
 
+        private static MapCustomMarkerMapPoint RecordFullscreenDrawMousePoint(
+            MapCustomMarkerFullscreenTransformSnapshot transform,
+            int mouseX,
+            int mouseY,
+            int maxTilesX,
+            int maxTilesY)
+        {
+            if (transform == null ||
+                !transform.HasTransform ||
+                maxTilesX <= 0 ||
+                maxTilesY <= 0)
+            {
+                return null;
+            }
+
+            // Original fullscreen ping resolves Main.MouseScreen inside DrawMap.
+            // Cache that draw-phase mouse sample so right-click creation can use
+            // the same coordinate space instead of reinterpreting Update mouse.
+            var point = ScreenToTileFromTransform(
+                mouseX,
+                mouseY,
+                transform.MapTopLeftX,
+                transform.MapTopLeftY,
+                transform.MapScale,
+                maxTilesX,
+                maxTilesY);
+            point.TransformSource = FullscreenDrawMouseSource;
+            point.ScreenWidth = Math.Max(1, transform.ScreenWidth);
+            point.ScreenHeight = Math.Max(1, transform.ScreenHeight);
+            point.CurrentMapFullscreenPosX = transform.MapFullscreenPosX;
+            point.CurrentMapFullscreenPosY = transform.MapFullscreenPosY;
+            point.CurrentMapScale = transform.MapScale;
+            point.CurrentGameUpdateCount = transform.GameUpdateCount;
+            point.TransformAgeUpdates = 0;
+            lock (TransformSyncRoot)
+            {
+                _lastFullscreenDrawMousePoint = CloneMapPoint(point);
+            }
+
+            return CloneMapPoint(point);
+        }
+
         internal static MapCustomMarkerFullscreenTransformSnapshot GetLastFullscreenTransformForTesting()
         {
             lock (TransformSyncRoot)
@@ -161,6 +205,7 @@ namespace JueMingZ.Compat
             lock (TransformSyncRoot)
             {
                 _lastFullscreenTransform = null;
+                _lastFullscreenDrawMousePoint = null;
             }
         }
 
@@ -229,6 +274,33 @@ namespace JueMingZ.Compat
                 out transformAgeUpdates);
         }
 
+        internal static MapCustomMarkerMapPoint ResolveFullscreenMouseTileForTesting(
+            int mouseX,
+            int mouseY,
+            int screenWidth,
+            int screenHeight,
+            int maxTilesX,
+            int maxTilesY,
+            Vector2 currentFullscreenPos,
+            float currentMapScale,
+            long currentGameUpdateCount,
+            out string fallbackReason,
+            out long transformAgeUpdates)
+        {
+            return ResolveFullscreenMouseTile(
+                mouseX,
+                mouseY,
+                screenWidth,
+                screenHeight,
+                maxTilesX,
+                maxTilesY,
+                currentFullscreenPos,
+                currentMapScale,
+                currentGameUpdateCount,
+                out fallbackReason,
+                out transformAgeUpdates);
+        }
+
         internal static MapCustomMarkerMapPoint ScreenToTile(
             int mouseX,
             int mouseY,
@@ -252,6 +324,8 @@ namespace JueMingZ.Compat
             point.CurrentMapFullscreenPosY = fullscreenPos.Y;
             point.CurrentMapScale = scale;
             point.TransformAgeUpdates = UnknownGameUpdateCount;
+            point.ScreenWidth = Math.Max(1, screenWidth);
+            point.ScreenHeight = Math.Max(1, screenHeight);
             return point;
         }
 
@@ -317,6 +391,124 @@ namespace JueMingZ.Compat
             point.CurrentMapFullscreenPosX = currentFullscreenPos.X;
             point.CurrentMapFullscreenPosY = currentFullscreenPos.Y;
             point.CurrentMapScale = currentMapScale;
+            point.CurrentGameUpdateCount = currentGameUpdateCount;
+            point.TransformAgeUpdates = transformAgeUpdates;
+            return true;
+        }
+
+        private static MapCustomMarkerMapPoint ResolveFullscreenMouseTile(
+            int mouseX,
+            int mouseY,
+            int screenWidth,
+            int screenHeight,
+            int maxTilesX,
+            int maxTilesY,
+            Vector2 currentFullscreenPos,
+            float currentMapScale,
+            long currentGameUpdateCount,
+            out string fallbackReason,
+            out long transformAgeUpdates)
+        {
+            MapCustomMarkerMapPoint point;
+            if (TryScreenToTileFromLastDrawMouse(
+                screenWidth,
+                screenHeight,
+                currentFullscreenPos,
+                currentMapScale,
+                currentGameUpdateCount,
+                out point,
+                out fallbackReason,
+                out transformAgeUpdates))
+            {
+                return point;
+            }
+
+            if (TryScreenToTileFromLastTransform(
+                mouseX,
+                mouseY,
+                screenWidth,
+                screenHeight,
+                maxTilesX,
+                maxTilesY,
+                currentFullscreenPos,
+                currentMapScale,
+                currentGameUpdateCount,
+                out point,
+                out fallbackReason,
+                out transformAgeUpdates))
+            {
+                return point;
+            }
+
+            point = ScreenToTile(
+                mouseX,
+                mouseY,
+                currentFullscreenPos,
+                currentMapScale,
+                screenWidth,
+                screenHeight,
+                maxTilesX,
+                maxTilesY);
+            point.TransformSource = FallbackTransformSource;
+            point.FallbackReason = fallbackReason;
+            point.TransformAgeUpdates = transformAgeUpdates;
+            return point;
+        }
+
+        private static bool TryScreenToTileFromLastDrawMouse(
+            int screenWidth,
+            int screenHeight,
+            Vector2 currentFullscreenPos,
+            float currentMapScale,
+            long currentGameUpdateCount,
+            out MapCustomMarkerMapPoint point,
+            out string fallbackReason,
+            out long transformAgeUpdates)
+        {
+            point = null;
+            fallbackReason = string.Empty;
+            transformAgeUpdates = UnknownGameUpdateCount;
+            MapCustomMarkerMapPoint sample;
+            lock (TransformSyncRoot)
+            {
+                sample = CloneMapPoint(_lastFullscreenDrawMousePoint);
+            }
+
+            if (sample == null)
+            {
+                fallbackReason = "noRecentFullscreenDrawMouse";
+                return false;
+            }
+
+            transformAgeUpdates = CalculatePointAgeUpdates(sample, currentGameUpdateCount);
+            if (!AreScreenSizesCompatible(
+                Math.Max(1, sample.ScreenWidth),
+                Math.Max(1, sample.ScreenHeight),
+                screenWidth,
+                screenHeight,
+                sample.ScreenX,
+                sample.ScreenY))
+            {
+                fallbackReason = "screenSizeMismatch";
+                return false;
+            }
+
+            if (!IsViewStateFresh(
+                sample.CurrentMapFullscreenPosX,
+                sample.CurrentMapFullscreenPosY,
+                sample.CurrentMapScale,
+                currentFullscreenPos,
+                currentMapScale))
+            {
+                fallbackReason = "viewStateMismatch";
+                return false;
+            }
+
+            point = sample;
+            point.CurrentMapFullscreenPosX = currentFullscreenPos.X;
+            point.CurrentMapFullscreenPosY = currentFullscreenPos.Y;
+            point.CurrentMapScale = currentMapScale;
+            point.CurrentGameUpdateCount = currentGameUpdateCount;
             point.TransformAgeUpdates = transformAgeUpdates;
             return true;
         }
@@ -330,6 +522,17 @@ namespace JueMingZ.Compat
         {
             var transformWidth = Math.Max(1, transform.ScreenWidth);
             var transformHeight = Math.Max(1, transform.ScreenHeight);
+            return AreScreenSizesCompatible(transformWidth, transformHeight, screenWidth, screenHeight, mouseX, mouseY);
+        }
+
+        private static bool AreScreenSizesCompatible(
+            int transformWidth,
+            int transformHeight,
+            int screenWidth,
+            int screenHeight,
+            int mouseX,
+            int mouseY)
+        {
             var currentWidth = Math.Max(1, screenWidth);
             var currentHeight = Math.Max(1, screenHeight);
             if (transformWidth == currentWidth && transformHeight == currentHeight)
@@ -390,6 +593,23 @@ namespace JueMingZ.Compat
                    Math.Abs(transform.MapFullscreenPosY - currentFullscreenPos.Y) <= MapFullscreenPosFreshnessToleranceTiles;
         }
 
+        private static bool IsViewStateFresh(
+            float snapshotFullscreenPosX,
+            float snapshotFullscreenPosY,
+            float snapshotMapScale,
+            Vector2 currentFullscreenPos,
+            float currentMapScale)
+        {
+            if (!IsValidScale(currentMapScale))
+            {
+                return false;
+            }
+
+            return Math.Abs(snapshotMapScale - currentMapScale) <= MapScaleFreshnessTolerance &&
+                   Math.Abs(snapshotFullscreenPosX - currentFullscreenPos.X) <= MapFullscreenPosFreshnessToleranceTiles &&
+                   Math.Abs(snapshotFullscreenPosY - currentFullscreenPos.Y) <= MapFullscreenPosFreshnessToleranceTiles;
+        }
+
         private static long CalculateTransformAgeUpdates(
             MapCustomMarkerFullscreenTransformSnapshot transform,
             long currentGameUpdateCount)
@@ -403,6 +623,21 @@ namespace JueMingZ.Compat
             }
 
             return currentGameUpdateCount - transform.GameUpdateCount;
+        }
+
+        private static long CalculatePointAgeUpdates(
+            MapCustomMarkerMapPoint point,
+            long currentGameUpdateCount)
+        {
+            if (point == null ||
+                point.CurrentGameUpdateCount < 0 ||
+                currentGameUpdateCount < 0 ||
+                currentGameUpdateCount < point.CurrentGameUpdateCount)
+            {
+                return UnknownGameUpdateCount;
+            }
+
+            return currentGameUpdateCount - point.CurrentGameUpdateCount;
         }
 
         private static MapCustomMarkerMapPoint ScreenToTileFromTransform(
@@ -499,6 +734,36 @@ namespace JueMingZ.Compat
 
             return value > max ? max : value;
         }
+
+        private static MapCustomMarkerMapPoint CloneMapPoint(MapCustomMarkerMapPoint source)
+        {
+            if (source == null)
+            {
+                return null;
+            }
+
+            return new MapCustomMarkerMapPoint
+            {
+                TileX = source.TileX,
+                TileY = source.TileY,
+                ScreenX = source.ScreenX,
+                ScreenY = source.ScreenY,
+                ScreenWidth = source.ScreenWidth,
+                ScreenHeight = source.ScreenHeight,
+                WorldSizeX = source.WorldSizeX,
+                WorldSizeY = source.WorldSizeY,
+                TransformSource = source.TransformSource ?? string.Empty,
+                FallbackReason = source.FallbackReason ?? string.Empty,
+                MapTopLeftX = source.MapTopLeftX,
+                MapTopLeftY = source.MapTopLeftY,
+                MapScale = source.MapScale,
+                CurrentMapFullscreenPosX = source.CurrentMapFullscreenPosX,
+                CurrentMapFullscreenPosY = source.CurrentMapFullscreenPosY,
+                CurrentMapScale = source.CurrentMapScale,
+                CurrentGameUpdateCount = source.CurrentGameUpdateCount,
+                TransformAgeUpdates = source.TransformAgeUpdates
+            };
+        }
     }
 
     internal sealed class MapCustomMarkerMapPoint
@@ -507,6 +772,8 @@ namespace JueMingZ.Compat
         public int TileY { get; set; }
         public int ScreenX { get; set; }
         public int ScreenY { get; set; }
+        public int ScreenWidth { get; set; }
+        public int ScreenHeight { get; set; }
         public int WorldSizeX { get; set; }
         public int WorldSizeY { get; set; }
         public string TransformSource { get; set; }
@@ -517,12 +784,14 @@ namespace JueMingZ.Compat
         public float CurrentMapFullscreenPosX { get; set; }
         public float CurrentMapFullscreenPosY { get; set; }
         public float CurrentMapScale { get; set; }
+        public long CurrentGameUpdateCount { get; set; }
         public long TransformAgeUpdates { get; set; }
 
         public MapCustomMarkerMapPoint()
         {
             TransformSource = string.Empty;
             FallbackReason = string.Empty;
+            CurrentGameUpdateCount = -1;
             TransformAgeUpdates = -1;
         }
     }

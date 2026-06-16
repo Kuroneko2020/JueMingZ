@@ -154,6 +154,10 @@ namespace JueMingZ.Diagnostics
         public string MapMarkerPickerLastCloseReason { get; set; }
         public DateTime? PlayerWorldMapMarkersLastReadUtc { get; set; }
         public DateTime? PlayerWorldMapMarkersLastWriteUtc { get; set; }
+        public string MapMarkerTraceEventsPath { get; set; }
+        public DateTime? MapMarkerLastTraceEventWrittenAtUtc { get; set; }
+        public string MapMarkerLastTraceEventType { get; set; }
+        public string MapMarkerLastTraceMarkerId { get; set; }
         public bool DiagnosticsOverlayVisible { get; set; }
         public long DrawCallCount { get; set; }
         public DateTime? LastDrawUtc { get; set; }
@@ -1084,6 +1088,9 @@ namespace JueMingZ.Diagnostics
             MapMarkerPickerDrawRoute = string.Empty;
             MapMarkerPickerDrawSkippedReason = string.Empty;
             MapMarkerPickerLastCloseReason = string.Empty;
+            MapMarkerTraceEventsPath = string.Empty;
+            MapMarkerLastTraceEventType = string.Empty;
+            MapMarkerLastTraceMarkerId = string.Empty;
             RunningActionKind = string.Empty;
             RunningActionSource = string.Empty;
             RunningActionStatus = string.Empty;

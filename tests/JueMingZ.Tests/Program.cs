@@ -1845,12 +1845,15 @@ namespace JueMingZ.Tests
             Run("player-world map markers diagnostics written to snapshot", ref failed, PlayerWorldMapMarkersDiagnosticsWrittenToSnapshot);
             Run("player-world map marker diagnostics records UI action and jump state", ref failed, PlayerWorldMapMarkerDiagnosticsRecordsUiActionAndJumpState);
             Run("player-world map marker diagnostics records coordinate transform state", ref failed, PlayerWorldMapMarkerDiagnosticsRecordsCoordinateTransformState);
+            Run("player-world map marker trace event json includes coordinate context", ref failed, PlayerWorldMapMarkerTraceEventJsonIncludesCoordinateContext);
+            Run("player-world map marker trace draw event includes screen delta", ref failed, PlayerWorldMapMarkerTraceDrawEventIncludesScreenDelta);
             Run("legacy map enhancement page includes map custom markers row", ref failed, LegacyMapEnhancementPageIncludesMapCustomMarkersRow);
             Run("legacy map custom marker list layout and placeholders", ref failed, LegacyMapCustomMarkerListLayoutAndPlaceholders);
             Run("map custom marker confirm name command saves and clears focus", ref failed, MapCustomMarkerConfirmNameCommandSavesAndClearsFocus);
             Run("map custom marker right click edge opens once", ref failed, MapCustomMarkerRightClickEdgeOpensOnce);
             Run("map custom marker right click release gate requires release before close", ref failed, MapCustomMarkerRightClickReleaseGateRequiresReleaseBeforeClose);
             Run("map custom marker fullscreen coordinate clamp", ref failed, MapCustomMarkerFullscreenCoordinateClamp);
+            Run("map custom marker fullscreen draw mouse sample wins over update mouse", ref failed, MapCustomMarkerFullscreenDrawMouseSampleWinsOverUpdateMouse);
             Run("map custom marker fullscreen coordinate freshness", ref failed, MapCustomMarkerFullscreenCoordinateFreshness);
             Run("map custom marker pending placement freezes right-click tile", ref failed, MapCustomMarkerPendingPlacementFreezesRightClickTile);
             Run("map fullscreen jump target clamps position and scale", ref failed, MapFullscreenJumpTargetClampsPositionAndScale);

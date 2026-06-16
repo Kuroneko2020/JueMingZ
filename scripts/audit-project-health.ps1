@@ -1588,6 +1588,7 @@ function Test-MapCustomMarkerGovernance {
     $storePath = Join-Path $RepoRoot "src\JueMingZ\Records\PlayerWorldMapMarkerStore.cs"
     $cachePath = Join-Path $RepoRoot "src\JueMingZ\Records\PlayerWorldMapMarkerCache.cs"
     $diagnosticsPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\PlayerWorldMapMarkerDiagnostics.cs"
+    $traceRecorderPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\PlayerWorldMapMarkerTraceRecorder.cs"
     $snapshotPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\DiagnosticSnapshot.cs"
     $snapshotWriterPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\DiagnosticSnapshotWriter.Json.cs"
     $snapshotBuilderPath = Join-Path $RepoRoot "src\JueMingZ\Runtime\Diagnostics\RuntimeDiagnosticSnapshotBuilder.Bootstrap.cs"
@@ -1618,6 +1619,7 @@ function Test-MapCustomMarkerGovernance {
     $storeText = Read-TextIfExists -Path $storePath
     $cacheText = Read-TextIfExists -Path $cachePath
     $diagnosticsText = Read-TextIfExists -Path $diagnosticsPath
+    $traceRecorderText = Read-TextIfExists -Path $traceRecorderPath
     $snapshotText = Read-TextIfExists -Path $snapshotPath
     $snapshotWriterText = Read-TextIfExists -Path $snapshotWriterPath
     $snapshotBuilderText = Read-TextIfExists -Path $snapshotBuilderPath
@@ -1641,7 +1643,7 @@ function Test-MapCustomMarkerGovernance {
     $mapMarkerFeatureDocText = Read-TextIfExists -Path $mapMarkerFeatureDocPath
     $diagnosticRulesText = Read-TextIfExists -Path $diagnosticRulesPath
 
-    if ($null -eq $registrarText -or $null -eq $rootText -or $null -eq $modelsText -or $null -eq $stylesText -or $null -eq $storeText -or $null -eq $cacheText -or $null -eq $diagnosticsText -or $null -eq $snapshotText -or $null -eq $snapshotWriterText -or $null -eq $snapshotBuilderText -or $null -eq $diagnosticUiSnapshotBuilderText -or $null -eq $interactionText -or $null -eq $mapCompatText -or $null -eq $debugHotkeyText -or $null -eq $handlerText -or $null -eq $interfaceLayerText -or $null -eq $fullscreenPickerDrawInstallerText -or $null -eq $stylePickerOverlayText -or $null -eq $legacyWindowStateText -or $null -eq $uiMouseCaptureServiceText -or $null -eq $mapEnhancementUiText -or $null -eq $markerUiText -or $null -eq $mapLayerText -or $null -eq $fullscreenCompatText -or $null -eq $testText -or $null -eq $uiInputTestText -or $null -eq $interfaceTestText -or $null -eq $mapMarkerFeatureDocText -or $null -eq $diagnosticRulesText) {
+    if ($null -eq $registrarText -or $null -eq $rootText -or $null -eq $modelsText -or $null -eq $stylesText -or $null -eq $storeText -or $null -eq $cacheText -or $null -eq $diagnosticsText -or $null -eq $traceRecorderText -or $null -eq $snapshotText -or $null -eq $snapshotWriterText -or $null -eq $snapshotBuilderText -or $null -eq $diagnosticUiSnapshotBuilderText -or $null -eq $interactionText -or $null -eq $mapCompatText -or $null -eq $debugHotkeyText -or $null -eq $handlerText -or $null -eq $interfaceLayerText -or $null -eq $fullscreenPickerDrawInstallerText -or $null -eq $stylePickerOverlayText -or $null -eq $legacyWindowStateText -or $null -eq $uiMouseCaptureServiceText -or $null -eq $mapEnhancementUiText -or $null -eq $markerUiText -or $null -eq $mapLayerText -or $null -eq $fullscreenCompatText -or $null -eq $testText -or $null -eq $uiInputTestText -or $null -eq $interfaceTestText -or $null -eq $mapMarkerFeatureDocText -or $null -eq $diagnosticRulesText) {
         Write-FailHealth "Map custom marker registrar, models/styles, store/cache, diagnostics, interaction, coordinate compat, UI layer, handler, map layer, fullscreen compat, docs, and tests must exist as separate responsibilities."
         return
     }
@@ -1791,11 +1793,15 @@ function Test-MapCustomMarkerGovernance {
     if ($mapLayerText.Contains("PlayerWorldMapMarkerCache.ReadCurrent()") -and
         $mapLayerText.Contains("MaxDrawnMarkers = PlayerWorldMapMarkerConstants.MaxMarkersPerPair") -and
         $mapLayerText.Contains("GetUnclampedDrawRegion") -and
+        $mapLayerText.Contains("PlayerWorldMapMarkerTraceRecorder.RecordDrawIfPending") -and
+        $traceRecorderText.Contains('"markerDraw"') -and
+        $traceRecorderText.Contains("DrawDeltaFromRightClickX") -and
+        $testText.Contains("PlayerWorldMapMarkerTraceDrawEventIncludesScreenDelta") -and
         -not $mapLayerText.Contains("TryWriteJson")) {
-        Write-Pass "Map marker IMapLayer draws from cache with culling and no JSON writes."
+        Write-Pass "Map marker IMapLayer draws from cache with culling, one-shot draw trace diagnostics, and no JSON writes."
     }
     else {
-        Write-FailHealth "PlayerWorldMapMarkerMapLayer must only read marker cache, cull before draw, cap drawn markers, and never write JSON."
+        Write-FailHealth "PlayerWorldMapMarkerMapLayer must only read marker cache, cull before draw, cap drawn markers, record one-shot draw trace diagnostics, and never write JSON."
     }
 
     if ($fullscreenCompatText.Contains("Main.mapFullscreen = true") -and
@@ -1867,7 +1873,11 @@ function Test-MapCustomMarkerGovernance {
         "MapMarkerPickerLastClick",
         "MapMarkerPickerLastCloseReason",
         "PlayerWorldMapMarkersLastReadUtc",
-        "PlayerWorldMapMarkersLastWriteUtc"
+        "PlayerWorldMapMarkersLastWriteUtc",
+        "MapMarkerTraceEventsPath",
+        "MapMarkerLastTraceEventWrittenAtUtc",
+        "MapMarkerLastTraceEventType",
+        "MapMarkerLastTraceMarkerId"
     )
     $missingDiagnosticFields = @()
     foreach ($field in $requiredDiagnosticFields) {
@@ -1910,6 +1920,10 @@ function Test-MapCustomMarkerGovernance {
         -not [System.Text.RegularExpressions.Regex]::IsMatch($screenToTileFromTransformBody, 'mapTopLeft[XY]\s*-\s*[^;\r\n]*scale')
     if ($mapCompatText.Contains("RecordFullscreenTransform") -and
         $mapCompatText.Contains("TryScreenToTileFromLastTransform") -and
+        $mapCompatText.Contains("RecordFullscreenDrawMousePoint") -and
+        $mapCompatText.Contains("ResolveFullscreenMouseTile") -and
+        $mapCompatText.Contains("TryScreenToTileFromLastDrawMouse") -and
+        $mapCompatText.Contains("fullscreenDrawMouse") -and
         $mapCompatText.Contains("ScreenToTileFromTransform") -and
         $mapCompatText.Contains("AreScreenSizesCompatible") -and
         $mapCompatText.Contains("IsTransformViewStateFresh") -and
@@ -1923,28 +1937,39 @@ function Test-MapCustomMarkerGovernance {
         $interactionText.Contains("CreatePlacement(point)") -and
         $testText.Contains("TryScreenToTileFromLastTransformForTesting") -and
         $testText.Contains("stale transform cache") -and
+        $testText.Contains("MapCustomMarkerFullscreenDrawMouseSampleWinsOverUpdateMouse") -and
+        $testText.Contains("draw-phase mouse tile sample") -and
         $testText.Contains("pending placement must freeze the right-click tile") -and
         $testText.Contains("round-trip with the MapOverlayDrawContext draw path") -and
         $testText.Contains("UI scale-equivalent screen size") -and
         $testText.Contains("same overlay origin")) {
-        Write-Pass "Map marker fullscreen coordinates use the cached OnPostFullscreenMapDraw overlay origin and round-trip with the map-layer draw path before falling back."
+        Write-Pass "Map marker fullscreen coordinates prefer the draw-phase mouse sample, keep cached OnPostFullscreenMapDraw overlay origin fallback, and round-trip with the map-layer draw path."
     }
     else {
-        Write-FailHealth "Map marker right-click coordinates must prefer the cached fullscreen draw transform, use the recorded overlay origin without a second 10-tile subtraction, record diagnostics, and keep fallback on the shared transform path."
+        Write-FailHealth "Map marker right-click coordinates must prefer the cached fullscreen draw mouse sample, use the recorded overlay origin without a second 10-tile subtraction, record diagnostics, and keep fallback on the shared transform path."
     }
 
     if ($mapMarkerFeatureDocText.Contains("viewStateMismatch") -and
+        $mapMarkerFeatureDocText.Contains("fullscreenDrawMouse") -and
+        $diagnosticRulesText.Contains("fullscreenDrawMouse") -and
         $mapMarkerFeatureDocText.Contains("MapMarkerLastRightClickTransformAgeUpdates") -and
         $mapMarkerFeatureDocText.Contains("UI scale 等价 screen size") -and
         $diagnosticRulesText.Contains("MapMarkerLastRightClickFallbackReason") -and
         $diagnosticRulesText.Contains("screenSizeMismatch") -and
         $diagnosticRulesText.Contains("viewStateMismatch") -and
         $diagnosticRulesText.Contains("MapMarkerLastRightClickTransformAgeUpdates") -and
-        $diagnosticRulesText.Contains("MapMarkerLastTransformMapFullscreenPosX/Y")) {
-        Write-Pass "Map marker feature and diagnostics docs explain right-click transform source, fallback reason, view-state mismatch, and transform age fields."
+        $diagnosticRulesText.Contains("MapMarkerLastTransformMapFullscreenPosX/Y") -and
+        $mapMarkerFeatureDocText.Contains("map-marker-events-YYYYMMDD.jsonl") -and
+        $diagnosticRulesText.Contains("MapMarkerTraceEventsPath") -and
+        $diagnosticRulesText.Contains("projection.tileCenterDeltaX/Y") -and
+        $mapMarkerFeatureDocText.Contains("markerDraw") -and
+        $diagnosticRulesText.Contains("markerDraw") -and
+        $mapMarkerFeatureDocText.Contains("draw.deltaFromRightClickX/Y") -and
+        $diagnosticRulesText.Contains("draw.deltaFromRightClickX/Y")) {
+        Write-Pass "Map marker feature and diagnostics docs explain right-click transform source, fallback reason, view-state mismatch, transform age, coordinate trace events, and draw-position comparison events."
     }
     else {
-        Write-FailHealth "Map marker docs must explain transform source, screenSizeMismatch, viewStateMismatch, and transform-age diagnostics for user-returned snapshots."
+        Write-FailHealth "Map marker docs must explain transform source, screenSizeMismatch, viewStateMismatch, transform-age diagnostics, coordinate trace events, and markerDraw screen-delta comparison for user-returned snapshots."
     }
 
     if ($stylePickerOverlayText.Contains('VisualContract = "icon-cells-only"') -and

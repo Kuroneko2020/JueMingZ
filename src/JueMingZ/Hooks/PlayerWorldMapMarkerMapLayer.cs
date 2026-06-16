@@ -1,5 +1,6 @@
 using System;
 using JueMingZ.Config;
+using JueMingZ.Diagnostics;
 using JueMingZ.Records;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -49,7 +50,22 @@ namespace JueMingZ.Hooks
 
                 var frame = new SpriteFrame((byte)1, (byte)1);
                 var tilePosition = new Vector2(marker.TileX + 0.5f, marker.TileY + 0.5f);
-                if (!IsVisibleOnScreen(context, texture, frame, tilePosition, screen))
+                var region = context.GetUnclampedDrawRegion(texture, tilePosition, frame, 1f, Alignment.Center);
+                var visible = IsVisibleOnScreen(region, screen);
+                PlayerWorldMapMarkerTraceRecorder.RecordDrawIfPending(
+                    marker.MarkerId,
+                    marker.TileX,
+                    marker.TileY,
+                    marker.IconItemId,
+                    region.X,
+                    region.Y,
+                    region.Width,
+                    region.Height,
+                    screen.Width,
+                    screen.Height,
+                    visible,
+                    visible ? string.Empty : "offscreen");
+                if (!visible)
                 {
                     continue;
                 }
@@ -105,13 +121,9 @@ namespace JueMingZ.Hooks
         }
 
         private static bool IsVisibleOnScreen(
-            MapOverlayDrawContext context,
-            Texture2D texture,
-            SpriteFrame frame,
-            Vector2 tilePosition,
+            Rectangle region,
             Rectangle screen)
         {
-            var region = context.GetUnclampedDrawRegion(texture, tilePosition, frame, 1f, Alignment.Center);
             return region.Width > 0 &&
                    region.Height > 0 &&
                    region.Intersects(screen);

@@ -195,6 +195,10 @@ namespace JueMingZ.Runtime
             snapshot.MapMarkerPickerLastCloseReason = mapMarkerDiagnostics.PickerLastCloseReason;
             snapshot.PlayerWorldMapMarkersLastReadUtc = mapMarkerDiagnostics.LastReadUtc;
             snapshot.PlayerWorldMapMarkersLastWriteUtc = mapMarkerDiagnostics.LastWriteUtc;
+            snapshot.MapMarkerTraceEventsPath = PlayerWorldMapMarkerTraceRecorder.TraceEventsPath;
+            snapshot.MapMarkerLastTraceEventWrittenAtUtc = PlayerWorldMapMarkerTraceRecorder.LastTraceEventWrittenAtUtc;
+            snapshot.MapMarkerLastTraceEventType = PlayerWorldMapMarkerTraceRecorder.LastTraceEventType;
+            snapshot.MapMarkerLastTraceMarkerId = PlayerWorldMapMarkerTraceRecorder.LastTraceMarkerId;
             snapshot.DiagnosticsOverlayVisible = DiagnosticsOverlay.Visible;
             snapshot.DrawCallCount = DiagnosticsOverlay.DrawCallCount;
             snapshot.LastDrawUtc = DiagnosticsOverlay.LastDrawUtc;

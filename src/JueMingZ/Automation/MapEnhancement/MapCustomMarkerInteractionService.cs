@@ -92,15 +92,17 @@ namespace JueMingZ.Automation.MapEnhancement
             }
 
             PlayerWorldMapMarkerDiagnostics.RecordRightClick(point);
+            var placement = CreatePlacement(point);
             lock (SyncRoot)
             {
-                _placement = CreatePlacement(point);
+                _placement = placement;
                 _pendingIconItemId = null;
                 _ignoreRightCloseUntilReleased = true;
             }
 
             ConsumeRightClick();
             PlayerWorldMapMarkerDiagnostics.RecordPickerOpen();
+            PlayerWorldMapMarkerTraceRecorder.Record(CreateTraceEvent("pickerOpen", placement));
             RecordStatus("pickerOpen", "map marker style picker opened");
         }
 
@@ -262,7 +264,18 @@ namespace JueMingZ.Automation.MapEnhancement
                 !identity.IsResolved ||
                 string.IsNullOrWhiteSpace(identity.PairId))
             {
-                RecordStatus("identityUnavailable", identity == null ? "identity unavailable" : identity.FailureReason);
+                var identityMessage = identity == null ? "identity unavailable" : identity.FailureReason;
+                PlayerWorldMapMarkerTraceRecorder.Record(CreateTraceEvent(
+                    "markerCreate",
+                    placement,
+                    iconItemId.Value,
+                    string.Empty,
+                    string.Empty,
+                    false,
+                    false,
+                    "identityUnavailable",
+                    identityMessage));
+                RecordStatus("identityUnavailable", identityMessage);
                 return;
             }
 
@@ -284,6 +297,16 @@ namespace JueMingZ.Automation.MapEnhancement
                 placement.WorldSizeX,
                 placement.WorldSizeY,
                 marker);
+            PlayerWorldMapMarkerTraceRecorder.Record(CreateTraceEvent(
+                "markerCreate",
+                placement,
+                iconItemId.Value,
+                identity.PairId,
+                marker.MarkerId,
+                true,
+                write != null && write.Succeeded,
+                write == null ? "writeUnavailable" : write.Status,
+                write == null ? "write unavailable" : write.Message));
 
             if (write != null && write.Succeeded)
             {
@@ -309,8 +332,69 @@ namespace JueMingZ.Automation.MapEnhancement
                 TileY = point.TileY,
                 ScreenX = point.ScreenX,
                 ScreenY = point.ScreenY,
+                ScreenWidth = point.ScreenWidth,
+                ScreenHeight = point.ScreenHeight,
                 WorldSizeX = point.WorldSizeX,
-                WorldSizeY = point.WorldSizeY
+                WorldSizeY = point.WorldSizeY,
+                TransformSource = point.TransformSource ?? string.Empty,
+                FallbackReason = point.FallbackReason ?? string.Empty,
+                MapTopLeftX = point.MapTopLeftX,
+                MapTopLeftY = point.MapTopLeftY,
+                MapScale = point.MapScale,
+                CurrentMapFullscreenPosX = point.CurrentMapFullscreenPosX,
+                CurrentMapFullscreenPosY = point.CurrentMapFullscreenPosY,
+                CurrentMapScale = point.CurrentMapScale,
+                CurrentGameUpdateCount = point.CurrentGameUpdateCount,
+                TransformAgeUpdates = point.TransformAgeUpdates
+            };
+        }
+
+        private static PlayerWorldMapMarkerTraceEvent CreateTraceEvent(
+            string eventType,
+            MapCustomMarkerPendingPlacement placement,
+            int iconItemId = -1,
+            string pairId = "",
+            string markerId = "",
+            bool writeAttempted = false,
+            bool writeSucceeded = false,
+            string writeStatus = "",
+            string writeMessage = "")
+        {
+            if (placement == null)
+            {
+                return null;
+            }
+
+            return new PlayerWorldMapMarkerTraceEvent
+            {
+                UtcNow = DateTime.UtcNow,
+                RuntimeVersion = JueMingZRuntime.Version,
+                EventType = eventType ?? string.Empty,
+                PairId = pairId ?? string.Empty,
+                MarkerId = markerId ?? string.Empty,
+                IconItemId = iconItemId,
+                WriteAttempted = writeAttempted,
+                WriteSucceeded = writeSucceeded,
+                WriteStatus = writeStatus ?? string.Empty,
+                WriteMessage = writeMessage ?? string.Empty,
+                TileX = placement.TileX,
+                TileY = placement.TileY,
+                ScreenX = placement.ScreenX,
+                ScreenY = placement.ScreenY,
+                ScreenWidth = placement.ScreenWidth,
+                ScreenHeight = placement.ScreenHeight,
+                WorldSizeX = placement.WorldSizeX,
+                WorldSizeY = placement.WorldSizeY,
+                TransformSource = placement.TransformSource,
+                FallbackReason = placement.FallbackReason,
+                MapTopLeftX = placement.MapTopLeftX,
+                MapTopLeftY = placement.MapTopLeftY,
+                MapScale = placement.MapScale,
+                CurrentMapFullscreenPosX = placement.CurrentMapFullscreenPosX,
+                CurrentMapFullscreenPosY = placement.CurrentMapFullscreenPosY,
+                CurrentMapScale = placement.CurrentMapScale,
+                CurrentGameUpdateCount = placement.CurrentGameUpdateCount,
+                TransformAgeUpdates = placement.TransformAgeUpdates
             };
         }
 
@@ -360,8 +444,20 @@ namespace JueMingZ.Automation.MapEnhancement
         public int TileY { get; set; }
         public int ScreenX { get; set; }
         public int ScreenY { get; set; }
+        public int ScreenWidth { get; set; }
+        public int ScreenHeight { get; set; }
         public int WorldSizeX { get; set; }
         public int WorldSizeY { get; set; }
+        public string TransformSource { get; set; }
+        public string FallbackReason { get; set; }
+        public float MapTopLeftX { get; set; }
+        public float MapTopLeftY { get; set; }
+        public float MapScale { get; set; }
+        public float CurrentMapFullscreenPosX { get; set; }
+        public float CurrentMapFullscreenPosY { get; set; }
+        public float CurrentMapScale { get; set; }
+        public long CurrentGameUpdateCount { get; set; }
+        public long TransformAgeUpdates { get; set; }
 
         public MapCustomMarkerPendingPlacement Clone()
         {
@@ -371,8 +467,20 @@ namespace JueMingZ.Automation.MapEnhancement
                 TileY = TileY,
                 ScreenX = ScreenX,
                 ScreenY = ScreenY,
+                ScreenWidth = ScreenWidth,
+                ScreenHeight = ScreenHeight,
                 WorldSizeX = WorldSizeX,
-                WorldSizeY = WorldSizeY
+                WorldSizeY = WorldSizeY,
+                TransformSource = TransformSource ?? string.Empty,
+                FallbackReason = FallbackReason ?? string.Empty,
+                MapTopLeftX = MapTopLeftX,
+                MapTopLeftY = MapTopLeftY,
+                MapScale = MapScale,
+                CurrentMapFullscreenPosX = CurrentMapFullscreenPosX,
+                CurrentMapFullscreenPosY = CurrentMapFullscreenPosY,
+                CurrentMapScale = CurrentMapScale,
+                CurrentGameUpdateCount = CurrentGameUpdateCount,
+                TransformAgeUpdates = TransformAgeUpdates
             };
         }
     }

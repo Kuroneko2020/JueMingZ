@@ -426,7 +426,11 @@ namespace JueMingZ.Tests
                 MapMarkerPickerLastClick = new DateTime(2026, 6, 15, 1, 4, 6, DateTimeKind.Utc),
                 MapMarkerPickerLastCloseReason = "rightClickClose",
                 PlayerWorldMapMarkersLastReadUtc = new DateTime(2026, 6, 15, 1, 2, 3, DateTimeKind.Utc),
-                PlayerWorldMapMarkersLastWriteUtc = new DateTime(2026, 6, 15, 1, 3, 4, DateTimeKind.Utc)
+                PlayerWorldMapMarkersLastWriteUtc = new DateTime(2026, 6, 15, 1, 3, 4, DateTimeKind.Utc),
+                MapMarkerTraceEventsPath = "diagnostics/map-marker-events-20260616.jsonl",
+                MapMarkerLastTraceEventWrittenAtUtc = new DateTime(2026, 6, 15, 1, 5, 4, DateTimeKind.Utc),
+                MapMarkerLastTraceEventType = "markerCreate",
+                MapMarkerLastTraceMarkerId = "marker-trace"
             };
 
             var json = InvokeDiagnosticSnapshotJson(snapshot);
@@ -486,6 +490,10 @@ namespace JueMingZ.Tests
             AssertContains(json, "\"MapMarkerPickerLastCloseReason\": \"rightClickClose\"");
             AssertContains(json, "\"PlayerWorldMapMarkersLastReadUtc\": \"2026-06-15T01:02:03.0000000Z\"");
             AssertContains(json, "\"PlayerWorldMapMarkersLastWriteUtc\": \"2026-06-15T01:03:04.0000000Z\"");
+            AssertContains(json, "\"MapMarkerTraceEventsPath\": \"diagnostics/map-marker-events-20260616.jsonl\"");
+            AssertContains(json, "\"MapMarkerLastTraceEventWrittenAtUtc\": \"2026-06-15T01:05:04.0000000Z\"");
+            AssertContains(json, "\"MapMarkerLastTraceEventType\": \"markerCreate\"");
+            AssertContains(json, "\"MapMarkerLastTraceMarkerId\": \"marker-trace\"");
         }
 
         private static void PlayerWorldMapMarkerDiagnosticsRecordsUiActionAndJumpState()
@@ -569,6 +577,132 @@ namespace JueMingZ.Tests
             {
                 throw new InvalidOperationException("Map marker diagnostics must record transform view-state and right-click fallback context for user-returned snapshots.");
             }
+        }
+
+        private static void PlayerWorldMapMarkerTraceEventJsonIncludesCoordinateContext()
+        {
+            var json = PlayerWorldMapMarkerTraceRecorder.BuildEventJsonForTesting(new PlayerWorldMapMarkerTraceEvent
+            {
+                UtcNow = new DateTime(2026, 6, 16, 3, 4, 5, DateTimeKind.Utc),
+                RuntimeVersion = "0.test",
+                EventType = "markerCreate",
+                PairId = "pair-trace",
+                MarkerId = "marker-trace",
+                IconItemId = 48,
+                WriteAttempted = true,
+                WriteSucceeded = true,
+                WriteStatus = "saved",
+                WriteMessage = "ok",
+                TileX = 5,
+                TileY = 7,
+                ScreenX = 110,
+                ScreenY = 214,
+                ScreenWidth = 1280,
+                ScreenHeight = 720,
+                WorldSizeX = 8400,
+                WorldSizeY = 2400,
+                TransformSource = "fullscreenTransform",
+                FallbackReason = string.Empty,
+                MapTopLeftX = 100f,
+                MapTopLeftY = 200f,
+                MapScale = 2f,
+                CurrentMapFullscreenPosX = 4200.25f,
+                CurrentMapFullscreenPosY = 1200.5f,
+                CurrentMapScale = 2f,
+                CurrentGameUpdateCount = 55,
+                TransformAgeUpdates = 0
+            });
+
+            AssertContains(json, "\"scenario\":\"MapCustomMarker.CoordinateTrace\"");
+            AssertContains(json, "\"runtimeVersion\":\"0.test\"");
+            AssertContains(json, "\"eventType\":\"markerCreate\"");
+            AssertContains(json, "\"pairId\":\"pair-trace\"");
+            AssertContains(json, "\"markerId\":\"marker-trace\"");
+            AssertContains(json, "\"iconItemId\":48");
+            AssertContains(json, "\"mouseX\":110");
+            AssertContains(json, "\"mouseY\":214");
+            AssertContains(json, "\"tileX\":5");
+            AssertContains(json, "\"tileY\":7");
+            AssertContains(json, "\"screenWidth\":1280");
+            AssertContains(json, "\"screenHeight\":720");
+            AssertContains(json, "\"source\":\"fullscreenTransform\"");
+            AssertContains(json, "\"mapTopLeftX\":100");
+            AssertContains(json, "\"currentMapFullscreenPosX\":4200.25");
+            AssertContains(json, "\"currentGameUpdateCount\":55");
+            AssertContains(json, "\"transformAgeUpdates\":0");
+            AssertContains(json, "\"tileCenterScreenX\":111");
+            AssertContains(json, "\"tileCenterScreenY\":215");
+            AssertContains(json, "\"tileCenterDeltaX\":1");
+            AssertContains(json, "\"tileCenterDeltaY\":1");
+            AssertContains(json, "\"attempted\":true");
+            AssertContains(json, "\"succeeded\":true");
+            AssertContains(json, "\"status\":\"saved\"");
+            AssertContains(json, "\"draw\":{\"attempted\":false");
+            AssertContains(json, "\"deltaFromRightClickX\":0");
+        }
+
+        private static void PlayerWorldMapMarkerTraceDrawEventIncludesScreenDelta()
+        {
+            var createSample = new PlayerWorldMapMarkerTraceEvent
+            {
+                UtcNow = new DateTime(2026, 6, 16, 3, 4, 5, DateTimeKind.Utc),
+                RuntimeVersion = "0.test",
+                EventType = "markerCreate",
+                PairId = "pair-trace",
+                MarkerId = "marker-draw",
+                IconItemId = 48,
+                WriteAttempted = true,
+                WriteSucceeded = true,
+                WriteStatus = "saved",
+                WriteMessage = "ok",
+                TileX = 5,
+                TileY = 7,
+                ScreenX = 110,
+                ScreenY = 214,
+                ScreenWidth = 1280,
+                ScreenHeight = 720,
+                WorldSizeX = 8400,
+                WorldSizeY = 2400,
+                TransformSource = "fullscreenTransform",
+                MapTopLeftX = 100f,
+                MapTopLeftY = 200f,
+                MapScale = 2f,
+                CurrentMapFullscreenPosX = 4200.25f,
+                CurrentMapFullscreenPosY = 1200.5f,
+                CurrentMapScale = 2f,
+                CurrentGameUpdateCount = 55,
+                TransformAgeUpdates = 0
+            };
+
+            var drawSample = PlayerWorldMapMarkerTraceRecorder.BuildDrawEventForTesting(
+                createSample,
+                120,
+                180,
+                40,
+                60,
+                1280,
+                720,
+                true,
+                string.Empty);
+            var json = PlayerWorldMapMarkerTraceRecorder.BuildEventJsonForTesting(drawSample);
+
+            AssertContains(json, "\"eventType\":\"markerDraw\"");
+            AssertContains(json, "\"markerId\":\"marker-draw\"");
+            AssertContains(json, "\"mouseX\":110");
+            AssertContains(json, "\"mouseY\":214");
+            AssertContains(json, "\"draw\":{\"attempted\":true");
+            AssertContains(json, "\"visible\":true");
+            AssertContains(json, "\"screenWidth\":1280");
+            AssertContains(json, "\"screenHeight\":720");
+            AssertContains(json, "\"regionX\":120");
+            AssertContains(json, "\"regionY\":180");
+            AssertContains(json, "\"regionWidth\":40");
+            AssertContains(json, "\"regionHeight\":60");
+            AssertContains(json, "\"centerScreenX\":140");
+            AssertContains(json, "\"centerScreenY\":210");
+            AssertContains(json, "\"deltaFromRightClickX\":30");
+            AssertContains(json, "\"deltaFromRightClickY\":-4");
+            AssertContains(json, "\"skippedReason\":\"\"");
         }
 
         private static void LegacyMapEnhancementPageIncludesMapCustomMarkersRow()
@@ -1054,7 +1188,15 @@ namespace JueMingZ.Tests
                 throw new InvalidOperationException("Fullscreen map coordinate conversion must report fallback when no draw transform has been cached.");
             }
 
-            var invalidScaleTransform = MapCustomMarkerMapCompat.RecordFullscreenTransform(mapTopLeft, 0f, 1280, 720, "fullscreenMap");
+            var testFullscreenPos = new Microsoft.Xna.Framework.Vector2(4200f, 1200f);
+            var invalidScaleTransform = MapCustomMarkerMapCompat.RecordFullscreenTransformForTesting(
+                mapTopLeft,
+                0f,
+                1280,
+                720,
+                "fullscreenMap",
+                testFullscreenPos,
+                10);
             if (invalidScaleTransform.HasTransform ||
                 MapCustomMarkerMapCompat.TryScreenToTileFromLastTransformForTesting(740, 460, 1280, 720, 8400, 2400, out cachedPoint, out fallbackReason) ||
                 !string.Equals(fallbackReason, "scaleMismatch", StringComparison.Ordinal))
@@ -1062,7 +1204,14 @@ namespace JueMingZ.Tests
                 throw new InvalidOperationException("Fullscreen map coordinate conversion must distinguish invalid cached map scale from a missing transform.");
             }
 
-            var transform = MapCustomMarkerMapCompat.RecordFullscreenTransform(mapTopLeft, mapScale, 1280, 720, "fullscreenMap");
+            var transform = MapCustomMarkerMapCompat.RecordFullscreenTransformForTesting(
+                mapTopLeft,
+                mapScale,
+                1280,
+                720,
+                "fullscreenMap",
+                testFullscreenPos,
+                20);
             if (!transform.HasTransform ||
                 !MapCustomMarkerMapCompat.TryScreenToTileFromLastTransformForTesting(mouseX, mouseY, 1280, 720, 8400, 2400, out cachedPoint, out fallbackReason) ||
                 cachedPoint.TileX != expectedTileX ||
@@ -1072,7 +1221,14 @@ namespace JueMingZ.Tests
                 throw new InvalidOperationException("Fullscreen map coordinate conversion must prefer the cached draw transform.");
             }
 
-            transform = MapCustomMarkerMapCompat.RecordFullscreenTransform(mapTopLeft, mapScale, 2133, 1141, "fullscreenMap");
+            transform = MapCustomMarkerMapCompat.RecordFullscreenTransformForTesting(
+                mapTopLeft,
+                mapScale,
+                2133,
+                1141,
+                "fullscreenMap",
+                testFullscreenPos,
+                30);
             if (!transform.HasTransform ||
                 !MapCustomMarkerMapCompat.TryScreenToTileFromLastTransformForTesting(mouseX, mouseY, 2560, 1369, 8400, 2400, out cachedPoint, out fallbackReason) ||
                 cachedPoint.TileX != expectedTileX ||
@@ -1121,6 +1277,76 @@ namespace JueMingZ.Tests
                 !string.Equals(fallbackPoint.FallbackReason, "fullscreenTransformUnavailable", StringComparison.Ordinal))
             {
                 throw new InvalidOperationException("Fullscreen map fallback must derive the same overlay origin as the cached draw transform route.");
+            }
+        }
+
+        private static void MapCustomMarkerFullscreenDrawMouseSampleWinsOverUpdateMouse()
+        {
+            const float mapScale = 2.5f;
+            var mapPos = new Microsoft.Xna.Framework.Vector2(4196.5f, 560.688f);
+            var mapTopLeft = new Microsoft.Xna.Framework.Vector2(-10091.25f, -893.72f);
+            var drawMouseX = 720;
+            var drawMouseY = 503;
+            var updateMouseX = 760;
+            var updateMouseY = 503;
+
+            MapCustomMarkerMapCompat.ResetFullscreenTransformForTesting();
+            MapCustomMarkerMapCompat.RecordFullscreenTransformForTesting(
+                mapTopLeft,
+                mapScale,
+                800,
+                1016,
+                "fullscreenMap",
+                mapPos,
+                500);
+            var drawSample = MapCustomMarkerMapCompat.RecordFullscreenDrawMousePointForTesting(
+                drawMouseX,
+                drawMouseY,
+                8400,
+                2400);
+            if (drawSample == null ||
+                drawSample.TileX != 4324 ||
+                drawSample.TileY != 558 ||
+                !string.Equals(drawSample.TransformSource, "fullscreenDrawMouse", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Fullscreen draw mouse sample must cache the same tile position the original map draw saw.");
+            }
+
+            string fallbackReason;
+            long transformAgeUpdates;
+            var resolved = MapCustomMarkerMapCompat.ResolveFullscreenMouseTileForTesting(
+                updateMouseX,
+                updateMouseY,
+                800,
+                1016,
+                8400,
+                2400,
+                mapPos,
+                mapScale,
+                501,
+                out fallbackReason,
+                out transformAgeUpdates);
+            if (resolved.TileX != drawSample.TileX ||
+                resolved.TileY != drawSample.TileY ||
+                resolved.ScreenX != drawMouseX ||
+                resolved.ScreenY != drawMouseY ||
+                transformAgeUpdates != 1 ||
+                !string.Equals(resolved.TransformSource, "fullscreenDrawMouse", StringComparison.Ordinal) ||
+                !string.IsNullOrEmpty(resolved.FallbackReason))
+            {
+                throw new InvalidOperationException("Right-click map marker placement must prefer the draw-phase mouse tile sample over reinterpreting Update mouse coordinates.");
+            }
+
+            var transformOnly = MapCustomMarkerMapCompat.ScreenToTileFromTransformForTesting(
+                updateMouseX,
+                updateMouseY,
+                mapTopLeft,
+                mapScale,
+                8400,
+                2400);
+            if (transformOnly.TileX == resolved.TileX)
+            {
+                throw new InvalidOperationException("Test setup must prove that the old Update-mouse transform path would pick a different tile.");
             }
         }
 
@@ -1233,12 +1459,20 @@ namespace JueMingZ.Tests
                 TileY = 200,
                 ScreenX = 740,
                 ScreenY = 460,
+                ScreenWidth = 1280,
+                ScreenHeight = 720,
                 WorldSizeX = 8400,
                 WorldSizeY = 2400,
                 TransformSource = "fullscreenTransform",
+                FallbackReason = string.Empty,
+                MapTopLeftX = 99f,
+                MapTopLeftY = 55f,
+                MapScale = 2f,
                 CurrentMapFullscreenPosX = 4200f,
                 CurrentMapFullscreenPosY = 1200f,
-                CurrentMapScale = 2f
+                CurrentMapScale = 2f,
+                CurrentGameUpdateCount = 456,
+                TransformAgeUpdates = 1
             };
 
             var placement = MapCustomMarkerInteractionService.CreatePlacementForTesting(point);
@@ -1246,19 +1480,40 @@ namespace JueMingZ.Tests
             point.TileY = 888;
             point.ScreenX = 111;
             point.ScreenY = 222;
+            point.ScreenWidth = 640;
+            point.ScreenHeight = 480;
+            point.TransformSource = "fallback";
+            point.FallbackReason = "viewStateMismatch";
+            point.MapTopLeftX = 1f;
+            point.MapTopLeftY = 2f;
+            point.MapScale = 3f;
             point.CurrentMapFullscreenPosX = 4300f;
             point.CurrentMapFullscreenPosY = 1300f;
             point.CurrentMapScale = 3f;
+            point.CurrentGameUpdateCount = 789;
+            point.TransformAgeUpdates = 9;
 
             if (placement == null ||
                 placement.TileX != 320 ||
                 placement.TileY != 200 ||
                 placement.ScreenX != 740 ||
                 placement.ScreenY != 460 ||
+                placement.ScreenWidth != 1280 ||
+                placement.ScreenHeight != 720 ||
                 placement.WorldSizeX != 8400 ||
-                placement.WorldSizeY != 2400)
+                placement.WorldSizeY != 2400 ||
+                !string.Equals(placement.TransformSource, "fullscreenTransform", StringComparison.Ordinal) ||
+                !string.IsNullOrEmpty(placement.FallbackReason) ||
+                Math.Abs(placement.MapTopLeftX - 99f) > 0.0001f ||
+                Math.Abs(placement.MapTopLeftY - 55f) > 0.0001f ||
+                Math.Abs(placement.MapScale - 2f) > 0.0001f ||
+                Math.Abs(placement.CurrentMapFullscreenPosX - 4200f) > 0.0001f ||
+                Math.Abs(placement.CurrentMapFullscreenPosY - 1200f) > 0.0001f ||
+                Math.Abs(placement.CurrentMapScale - 2f) > 0.0001f ||
+                placement.CurrentGameUpdateCount != 456 ||
+                placement.TransformAgeUpdates != 1)
             {
-                throw new InvalidOperationException("Map marker pending placement must freeze the right-click tile and screen anchor before picker-time view changes.");
+                throw new InvalidOperationException("Map marker pending placement must freeze the right-click tile, screen anchor, and transform context before picker-time view changes.");
             }
         }
 
