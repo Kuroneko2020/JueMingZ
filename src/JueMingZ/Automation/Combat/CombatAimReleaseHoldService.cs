@@ -411,6 +411,9 @@ namespace JueMingZ.Automation.Combat
         private static void ApplySelection(CombatAimItemCheckDecision decision, CombatAimTargetSelection selection, string mode, string reason)
         {
             decision.Selection = selection;
+            decision.HasCursorWorld = selection != null && selection.HasCursorWorld;
+            decision.CursorWorldX = selection == null ? 0f : selection.CursorWorldX;
+            decision.CursorWorldY = selection == null ? 0f : selection.CursorWorldY;
             decision.BallisticSolution = selection.BallisticSolution;
             decision.AimWorldX = selection.BallisticSolution == null ? selection.SelectedSampleWorldX : selection.BallisticSolution.AimWorldX;
             decision.AimWorldY = selection.BallisticSolution == null ? selection.SelectedSampleWorldY : selection.BallisticSolution.AimWorldY;
@@ -442,6 +445,7 @@ namespace JueMingZ.Automation.Combat
                 PlayerAimRadius = decision.PlayerAimRadius,
                 PlayerScreenMarginTiles = decision.PlayerScreenMarginTiles,
                 PlayerScreenRadiusTiles = decision.PlayerScreenRadiusTiles,
+                HasCursorWorld = readResult != null && readResult.HasCursorWorld,
                 CursorWorldX = readResult == null ? 0f : readResult.CursorWorldX,
                 CursorWorldY = readResult == null ? 0f : readResult.CursorWorldY,
                 RangeCenterWorldX = decision.RangeCenterWorldX,

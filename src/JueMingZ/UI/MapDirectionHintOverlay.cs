@@ -19,19 +19,23 @@ namespace JueMingZ.UI
         {
             try
             {
-                var snapshot = MapDirectionHintTargetService.GetSnapshot();
-                var travellingTarget = snapshot == null ? null : snapshot.TravellingMerchantTarget;
-                var rareTarget = snapshot == null ? null : snapshot.RareCreatureTarget;
-                var hasTravellingTarget = travellingTarget != null && travellingTarget.Enabled && travellingTarget.Active;
-                var hasRareTarget = rareTarget != null && rareTarget.Enabled && rareTarget.Active;
+                var snapshot = MapDirectionHintTargetService.GetRenderSnapshot();
+                var travellingTarget = snapshot == null
+                    ? MapTravellingMerchantDirectionRenderTarget.Disabled("targetUnavailable", "travelling merchant render target unavailable")
+                    : snapshot.TravellingMerchantTarget;
+                var rareTarget = snapshot == null
+                    ? MapRareCreatureDirectionRenderTarget.Disabled("targetUnavailable", "rare creature render target unavailable")
+                    : snapshot.RareCreatureTarget;
+                var hasTravellingTarget = travellingTarget.Enabled && travellingTarget.Active;
+                var hasRareTarget = rareTarget.Enabled && rareTarget.Active;
                 if (!hasTravellingTarget && !hasRareTarget)
                 {
                     MapDirectionHintDiagnostics.RecordTravellingMerchantProjection(
-                        MapTravellingMerchantDirectionProjection.Empty(travellingTarget == null ? "targetUnavailable" : travellingTarget.Status),
-                        travellingTarget == null ? "targetUnavailable" : travellingTarget.Status);
+                        MapTravellingMerchantDirectionProjection.Empty(travellingTarget.Status),
+                        travellingTarget.Status);
                     MapDirectionHintDiagnostics.RecordRareCreatureProjection(
-                        MapRareCreatureDirectionProjection.Empty(rareTarget == null ? "targetUnavailable" : rareTarget.Status),
-                        rareTarget == null ? "targetUnavailable" : rareTarget.Status);
+                        MapRareCreatureDirectionProjection.Empty(rareTarget.Status),
+                        rareTarget.Status);
                     return true;
                 }
 
@@ -57,13 +61,13 @@ namespace JueMingZ.UI
             return true;
         }
 
-        private static void DrawTravellingMerchant(object spriteBatch, MapTravellingMerchantDirectionTarget target)
+        private static void DrawTravellingMerchant(object spriteBatch, MapTravellingMerchantDirectionRenderTarget target)
         {
-            if (target == null || !target.Enabled || !target.Active)
+            if (!target.Enabled || !target.Active)
             {
                 MapDirectionHintDiagnostics.RecordTravellingMerchantProjection(
-                    MapTravellingMerchantDirectionProjection.Empty(target == null ? "targetUnavailable" : target.Status),
-                    target == null ? "targetUnavailable" : target.Status);
+                    MapTravellingMerchantDirectionProjection.Empty(target.Status),
+                    target.Status);
                 return;
             }
 
@@ -93,13 +97,13 @@ namespace JueMingZ.UI
             MapDirectionHintDiagnostics.RecordTravellingMerchantProjection(projection, "drawn");
         }
 
-        private static void DrawRareCreature(object spriteBatch, MapRareCreatureDirectionTarget target)
+        private static void DrawRareCreature(object spriteBatch, MapRareCreatureDirectionRenderTarget target)
         {
-            if (target == null || !target.Enabled || !target.Active)
+            if (!target.Enabled || !target.Active)
             {
                 MapDirectionHintDiagnostics.RecordRareCreatureProjection(
-                    MapRareCreatureDirectionProjection.Empty(target == null ? "targetUnavailable" : target.Status),
-                    target == null ? "targetUnavailable" : target.Status);
+                    MapRareCreatureDirectionProjection.Empty(target.Status),
+                    target.Status);
                 return;
             }
 

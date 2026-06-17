@@ -96,8 +96,19 @@ namespace JueMingZ.Automation.MapEnhancement
             MapDirectionHintScreenContext screen,
             out MapRareCreatureDirectionProjection projection)
         {
+            return TryBuildProjectionForTesting(
+                MapRareCreatureDirectionRenderTarget.FromTarget(target),
+                screen,
+                out projection);
+        }
+
+        internal static bool TryBuildProjectionForTesting(
+            MapRareCreatureDirectionRenderTarget target,
+            MapDirectionHintScreenContext screen,
+            out MapRareCreatureDirectionProjection projection)
+        {
             projection = MapRareCreatureDirectionProjection.Empty("targetUnavailable");
-            if (target == null || !target.Enabled)
+            if (!target.Enabled)
             {
                 projection = MapRareCreatureDirectionProjection.Empty("disabled");
                 return false;

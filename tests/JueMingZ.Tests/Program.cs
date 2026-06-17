@@ -1872,6 +1872,7 @@ namespace JueMingZ.Tests
             Run("legacy map direction hint handlers toggle settings", ref failed, LegacyMapDirectionHintHandlersToggleSettings);
             Run("legacy map enhancement layout tracks map direction hint state", ref failed, LegacyMapEnhancementLayoutTracksMapDirectionHintState);
             Run("map direction hint target service builds snapshot and honors cadence", ref failed, MapDirectionHintTargetServiceBuildsSnapshotAndHonorsCadence);
+            Run("map direction hint render snapshot stays target-only", ref failed, MapDirectionHintRenderSnapshotStaysTargetOnly);
             Run("map direction hint projection clamps ellipse quadrants and corners", ref failed, MapDirectionHintProjectionClampsEllipseQuadrantsAndCorners);
             Run("map direction hint projection handles visibility arrow and distance", ref failed, MapDirectionHintProjectionHandlesVisibilityArrowAndDistance);
             Run("map travelling merchant resolver selects NPCID 368 and hides on screen", ref failed, MapTravellingMerchantResolverSelectsNpcId368AndHidesOnScreen);

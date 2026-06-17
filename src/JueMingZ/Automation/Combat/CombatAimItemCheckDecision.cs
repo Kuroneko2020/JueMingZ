@@ -14,6 +14,9 @@ namespace JueMingZ.Automation.Combat
         public int PlayerAimRadius { get; set; }
         public int PlayerScreenMarginTiles { get; set; }
         public int PlayerScreenRadiusTiles { get; set; }
+        public bool HasCursorWorld { get; set; }
+        public float CursorWorldX { get; set; }
+        public float CursorWorldY { get; set; }
         public float RangeCenterWorldX { get; set; }
         public float RangeCenterWorldY { get; set; }
         public bool TrackDummy { get; set; }

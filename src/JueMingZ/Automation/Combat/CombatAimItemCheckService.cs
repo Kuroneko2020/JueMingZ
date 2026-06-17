@@ -287,6 +287,9 @@ namespace JueMingZ.Automation.Combat
                     selection.SelectionPurpose = selectionPurpose;
                 }
                 decision.Selection = selection;
+                decision.HasCursorWorld = selection != null && selection.HasCursorWorld;
+                decision.CursorWorldX = selection == null ? 0f : selection.CursorWorldX;
+                decision.CursorWorldY = selection == null ? 0f : selection.CursorWorldY;
                 decision.RangeCenterWorldX = selection == null ? 0f : selection.RangeCenterWorldX;
                 decision.RangeCenterWorldY = selection == null ? 0f : selection.RangeCenterWorldY;
                 if (selection == null || selection.Target == null)
@@ -672,6 +675,9 @@ namespace JueMingZ.Automation.Combat
             decision.RadiusTiles = range.RadiusTiles;
             decision.PlayerScreenMarginTiles = range.PlayerScreenMarginTiles;
             decision.PlayerScreenRadiusTiles = range.PlayerScreenRadiusTiles;
+            decision.HasCursorWorld = readResult != null && readResult.HasCursorWorld;
+            decision.CursorWorldX = readResult == null ? 0f : readResult.CursorWorldX;
+            decision.CursorWorldY = readResult == null ? 0f : readResult.CursorWorldY;
             decision.RangeCenterWorldX = range.RangeCenterWorldX;
             decision.RangeCenterWorldY = range.RangeCenterWorldY;
 
@@ -684,6 +690,9 @@ namespace JueMingZ.Automation.Combat
             // behavior stays with vanilla or the scoped takeover owner.
             decision.Selection.RangeCenterWorldX = decision.RangeCenterWorldX;
             decision.Selection.RangeCenterWorldY = decision.RangeCenterWorldY;
+            decision.Selection.HasCursorWorld = decision.HasCursorWorld;
+            decision.Selection.CursorWorldX = decision.CursorWorldX;
+            decision.Selection.CursorWorldY = decision.CursorWorldY;
             decision.Selection.AimRangeOrigin = decision.AimRangeOrigin;
             decision.Selection.AimTargetPriority = decision.AimTargetPriority;
             return true;
@@ -1022,8 +1031,8 @@ namespace JueMingZ.Automation.Combat
             AppendRaw(builder, "specialProjectileTailActive", BoolRaw(decision.SpecialProjectileTailActive), true);
             AppendRaw(builder, "specialProjectileTailRecomputedAim", BoolRaw(decision.SpecialProjectileTailRecomputedAim), true);
             AppendString(builder, "specialProjectileTailExpiredReason", decision.SpecialProjectileTailExpiredReason, true);
-            AppendRaw(builder, "userCursorWorldAvailable", BoolRaw(decision.Selection != null || decision.RangeCenterWorldX != 0f || decision.RangeCenterWorldY != 0f), true);
-            AppendRaw(builder, "userCursorWorld", BuildPointJson(decision.RangeCenterWorldX, decision.RangeCenterWorldY), true);
+            AppendRaw(builder, "userCursorWorldAvailable", BoolRaw(decision.HasCursorWorld), true);
+            AppendRaw(builder, "userCursorWorld", BuildPointJson(decision.CursorWorldX, decision.CursorWorldY), true);
             AppendRaw(builder, "simulatedAimWorld", BuildPointJson(decision.AimWorldX, decision.AimWorldY), true);
             AppendString(builder, "cursorOwnershipMode", persistentEligibility == null ? string.Empty : persistentEligibility.CursorOwnershipMode, true);
             AppendRaw(builder, "releaseHoldTargetDummyAllowed", BoolRaw(IsReleaseHoldTargetDummyAllowed(decision)), true);

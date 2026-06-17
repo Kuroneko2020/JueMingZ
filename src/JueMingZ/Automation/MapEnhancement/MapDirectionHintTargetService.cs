@@ -21,6 +21,8 @@ namespace JueMingZ.Automation.MapEnhancement
         private static IMapDirectionHintNpcObservationProvider _providerForTesting;
         private static MapDirectionHintTargetSnapshot _snapshot =
             MapDirectionHintTargetSnapshot.Empty("notInitialized", "map direction hint target service not initialized");
+        private static MapDirectionHintRenderSnapshot _renderSnapshot =
+            MapDirectionHintRenderSnapshot.Empty("notInitialized", "map direction hint target service not initialized");
         private static long _nextScanTick;
 
         public static void Tick(RuntimeSettingsSnapshot settings, GameStateSnapshot gameState, long runtimeTick)
@@ -124,6 +126,15 @@ namespace JueMingZ.Automation.MapEnhancement
             }
         }
 
+        public static MapDirectionHintRenderSnapshot GetRenderSnapshot()
+        {
+            lock (SyncRoot)
+            {
+                return _renderSnapshot ??
+                       MapDirectionHintRenderSnapshot.Empty("notInitialized", "map direction hint target service not initialized");
+            }
+        }
+
         internal static MapDirectionHintTargetSnapshot BuildSnapshotForTesting(
             MapDirectionHintNpcObservation[] observations,
             bool rareEnabled,
@@ -157,6 +168,7 @@ namespace JueMingZ.Automation.MapEnhancement
             lock (SyncRoot)
             {
                 _snapshot = MapDirectionHintTargetSnapshot.Empty("notInitialized", "map direction hint target service not initialized");
+                _renderSnapshot = MapDirectionHintRenderSnapshot.Empty("notInitialized", "map direction hint target service not initialized");
                 _providerForTesting = null;
                 _nextScanTick = 0L;
             }
@@ -176,6 +188,8 @@ namespace JueMingZ.Automation.MapEnhancement
             lock (SyncRoot)
             {
                 _snapshot = snapshot.Clone();
+                // Draw reads this immutable, target-only projection source so it never clones the full NPC observation array per frame.
+                _renderSnapshot = MapDirectionHintRenderSnapshot.FromTargetSnapshot(snapshot);
                 _nextScanTick = snapshot.Enabled ? Math.Max(0L, snapshot.NextScanTick) : 0L;
             }
 

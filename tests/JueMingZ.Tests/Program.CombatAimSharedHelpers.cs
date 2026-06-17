@@ -120,6 +120,11 @@ namespace JueMingZ.Tests
 
             var selection = new CombatAimTargetSelection
             {
+                HasCursorWorld = true,
+                CursorWorldX = 700f,
+                CursorWorldY = 610f,
+                RangeCenterWorldX = 800f,
+                RangeCenterWorldY = 600f,
                 Target = new CombatTargetSnapshot
                 {
                     WhoAmI = 3,
@@ -191,6 +196,11 @@ namespace JueMingZ.Tests
                 Shoot = item.shoot,
                 UseAmmo = item.useAmmo,
                 WeaponProfile = CombatAimWeaponProfile.Read(player, item),
+                HasCursorWorld = true,
+                CursorWorldX = selection.CursorWorldX,
+                CursorWorldY = selection.CursorWorldY,
+                RangeCenterWorldX = selection.RangeCenterWorldX,
+                RangeCenterWorldY = selection.RangeCenterWorldY,
                 Selection = selection,
                 BallisticSolution = new CombatAimBallisticSolution
                 {

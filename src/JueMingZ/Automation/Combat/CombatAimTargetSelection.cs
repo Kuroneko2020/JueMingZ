@@ -14,6 +14,7 @@ namespace JueMingZ.Automation.Combat
         public string ActiveRangeMode { get; set; } = string.Empty;
         public int PlayerScreenMarginTiles { get; set; }
         public int PlayerScreenRadiusTiles { get; set; }
+        public bool HasCursorWorld { get; set; }
         public float CursorWorldX { get; set; }
         public float CursorWorldY { get; set; }
         public float RangeCenterWorldX { get; set; }

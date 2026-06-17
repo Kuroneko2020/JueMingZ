@@ -2225,13 +2225,18 @@ function Test-MapDirectionHintGovernance {
         $runtimeText.Contains("MapDirectionHintTargetService.Tick") -and
         $targetServiceText.Contains("ScanCadenceTicks = 15") -and
         $targetServiceText.Contains("MaxObservedNpcs = 200") -and
+        $targetServiceText.Contains("GetRenderSnapshot") -and
+        $targetSnapshotText.Contains("MapDirectionHintRenderSnapshot") -and
+        $targetSnapshotText.Contains("MapTravellingMerchantDirectionRenderTarget") -and
+        $targetSnapshotText.Contains("MapRareCreatureDirectionRenderTarget") -and
         $targetServiceText.Contains("MapDirectionHintDiagnostics.RecordTravellingMerchantTarget") -and
         $targetServiceText.Contains("MapDirectionHintDiagnostics.RecordRareCreatureTarget") -and
-        $testText.Contains("MapDirectionHintTargetServiceBuildsSnapshotAndHonorsCadence")) {
-        Write-Pass "Map direction hint targeting stays a 15-tick read-only stage after game-state-read and before input/action gates."
+        $testText.Contains("MapDirectionHintTargetServiceBuildsSnapshotAndHonorsCadence") -and
+        $testText.Contains("MapDirectionHintRenderSnapshotStaysTargetOnly")) {
+        Write-Pass "Map direction hint targeting stays a 15-tick read-only stage and publishes a target-only render snapshot for Draw."
     }
     else {
-        Write-FailHealth "Map direction hint target scan must stay in a 15-tick runtime stage after game-state-read and before input/action gates."
+        Write-FailHealth "Map direction hint target scan must stay in a 15-tick runtime stage and publish a target-only render snapshot for Draw."
     }
 
     if ($rareResolverText.Contains("LifeformAnalyzerInfoIndex = 11") -and
@@ -2265,7 +2270,8 @@ function Test-MapDirectionHintGovernance {
         Write-FailHealth "Travelling merchant direction must keep NPCID 368 targeting and pylon/townCluster/pointBiome/unknown label source semantics."
     }
 
-    if ($overlayText.Contains("MapDirectionHintTargetService.GetSnapshot") -and
+    if ($overlayText.Contains("MapDirectionHintTargetService.GetRenderSnapshot") -and
+        -not $overlayText.Contains("MapDirectionHintTargetService.GetSnapshot") -and
         $overlayText.Contains("MapDirectionHintDiagnostics.RecordTravellingMerchantProjection") -and
         $overlayText.Contains("MapDirectionHintDiagnostics.RecordRareCreatureProjection") -and
         $overlayText.Contains("DrawTravellingMerchantLabel") -and

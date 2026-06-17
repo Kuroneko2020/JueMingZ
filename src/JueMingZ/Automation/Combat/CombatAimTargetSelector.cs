@@ -76,6 +76,7 @@ namespace JueMingZ.Automation.Combat
 
             if (readResult != null)
             {
+                selection.HasCursorWorld = readResult.HasCursorWorld;
                 selection.CursorWorldX = readResult.CursorWorldX;
                 selection.CursorWorldY = readResult.CursorWorldY;
                 selection.MouseScreenX = readResult.MouseScreenX;

@@ -205,6 +205,8 @@ namespace JueMingZ.Tests
             AssertContains(json, "\"aimDecisionCacheHit\":true");
             AssertContains(json, "\"liveTargetRevalidation\":\"lineOfSightChanged\"");
             AssertContains(json, "\"markerAttackTargetMismatchReason\":\"lineOfSightChanged\"");
+            AssertContains(json, "\"rangeCenterWorld\":{\"x\":800,\"y\":600}");
+            AssertContains(json, "\"userCursorWorld\":{\"x\":700,\"y\":610}");
             AssertContains(json, "\"projectileProfileKind\":\"GravityArc\"");
             AssertContains(json, "\"effectiveProjectileSpeed\":13.5");
             AssertContains(json, "\"gravityCompensationPixels\":3.25");

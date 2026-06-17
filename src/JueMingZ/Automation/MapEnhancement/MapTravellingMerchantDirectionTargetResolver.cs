@@ -98,8 +98,19 @@ namespace JueMingZ.Automation.MapEnhancement
             MapDirectionHintScreenContext screen,
             out MapTravellingMerchantDirectionProjection projection)
         {
+            return TryBuildProjectionForTesting(
+                MapTravellingMerchantDirectionRenderTarget.FromTarget(target),
+                screen,
+                out projection);
+        }
+
+        internal static bool TryBuildProjectionForTesting(
+            MapTravellingMerchantDirectionRenderTarget target,
+            MapDirectionHintScreenContext screen,
+            out MapTravellingMerchantDirectionProjection projection)
+        {
             projection = MapTravellingMerchantDirectionProjection.Empty("targetUnavailable");
-            if (target == null || !target.Enabled)
+            if (!target.Enabled)
             {
                 projection = MapTravellingMerchantDirectionProjection.Empty("disabled");
                 return false;

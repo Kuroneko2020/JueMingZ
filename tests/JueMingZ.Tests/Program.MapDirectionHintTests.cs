@@ -322,6 +322,76 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void MapDirectionHintRenderSnapshotStaysTargetOnly()
+        {
+            var settings = AppSettings.CreateDefault();
+            settings.MapTravellingMerchantDirectionEnabled = true;
+            var gameState = new GameStateSnapshot
+            {
+                IsInWorld = true,
+                IsInMainMenu = false
+            };
+            var provider = new MapDirectionHintTestProvider(new[]
+            {
+                CreateTravellingMerchant(12, 368, true, 800f, 320f),
+                CreateRareCreature(7, 616, true, 160f, 96f, 3, false)
+            });
+
+            MapDirectionHintTargetService.ResetForTesting();
+            MapDirectionHintTargetService.SetObservationProviderForTesting(provider);
+            try
+            {
+                MapDirectionHintTargetService.Tick(RuntimeSettingsSnapshot.FromSettings(settings), gameState, 200);
+                var full = MapDirectionHintTargetService.GetSnapshot();
+                var render = MapDirectionHintTargetService.GetRenderSnapshot();
+                var renderAgain = MapDirectionHintTargetService.GetRenderSnapshot();
+                if (!object.ReferenceEquals(render, renderAgain))
+                {
+                    throw new InvalidOperationException("Map direction hint render snapshot must be immutable and reusable by Draw without per-frame cloning.");
+                }
+
+                if (typeof(MapDirectionHintRenderSnapshot).GetProperty("Npcs") != null)
+                {
+                    throw new InvalidOperationException("Map direction hint render snapshot must not expose full NPC observations to Draw.");
+                }
+
+                if (provider.ReadCount != 1 ||
+                    full.NpcCount != 2 ||
+                    render == null ||
+                    !render.Enabled ||
+                    !render.TravellingMerchantTarget.Enabled ||
+                    !render.TravellingMerchantTarget.Active ||
+                    render.TravellingMerchantTarget.WhoAmI != 12 ||
+                    Math.Abs(render.TravellingMerchantTarget.CenterX - 800f) > 0.01f ||
+                    render.RareCreatureTarget.Enabled)
+                {
+                    throw new InvalidOperationException("Map direction hint render snapshot must carry only the currently enabled render targets.");
+                }
+
+                full.TravellingMerchantTarget.CenterX = -999f;
+                full.Npcs[0].CenterX = -888f;
+                if (Math.Abs(MapDirectionHintTargetService.GetRenderSnapshot().TravellingMerchantTarget.CenterX - 800f) > 0.01f)
+                {
+                    throw new InvalidOperationException("Mutating a full target snapshot clone must not affect the cached render snapshot.");
+                }
+
+                MapTravellingMerchantDirectionProjection projection;
+                if (!MapTravellingMerchantDirectionTargetResolver.TryBuildProjectionForTesting(
+                        render.TravellingMerchantTarget,
+                        CreateScreenContext(0f, 0f, 800, 600, 400f, 300f),
+                        out projection) ||
+                    !projection.OnScreen ||
+                    !string.Equals(projection.Status, "onScreenHidden", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Render target projections must preserve existing travelling merchant screen semantics.");
+                }
+            }
+            finally
+            {
+                MapDirectionHintTargetService.ResetForTesting();
+            }
+        }
+
         private static void MapDirectionHintProjectionClampsEllipseQuadrantsAndCorners()
         {
             var screen = new XnaRectangle(0, 0, 800, 600);

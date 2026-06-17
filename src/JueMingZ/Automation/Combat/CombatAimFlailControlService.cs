@@ -302,6 +302,7 @@ namespace JueMingZ.Automation.Combat
                 ActiveRangeMode = source.ActiveRangeMode ?? string.Empty,
                 PlayerScreenMarginTiles = source.PlayerScreenMarginTiles,
                 PlayerScreenRadiusTiles = source.PlayerScreenRadiusTiles,
+                HasCursorWorld = source.HasCursorWorld,
                 CursorWorldX = source.CursorWorldX,
                 CursorWorldY = source.CursorWorldY,
                 RangeCenterWorldX = source.RangeCenterWorldX,
