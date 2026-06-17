@@ -331,6 +331,14 @@ namespace JueMingZ.Diagnostics
         public bool MapFootprintsPlaybackPrefixMouseCaptured { get; set; }
         public bool MapFootprintsPlaybackPrefixClickConsumed { get; set; }
         public bool MapFootprintsPlaybackPrefixScrollConsumed { get; set; }
+        public bool MapFootprintsPlaybackPrefixShouldSuppressLeftInput { get; set; }
+        public bool MapFootprintsPlaybackPrefixShouldSuppressNonLeftInput { get; set; }
+        public bool MapFootprintsPlaybackPrefixShouldClearPanState { get; set; }
+        public bool MapFootprintsPlaybackPrefixLeftInputSuppressed { get; set; }
+        public bool MapFootprintsPlaybackPrefixNonLeftInputSuppressed { get; set; }
+        public bool MapFootprintsPlaybackPrefixScrollSuppressed { get; set; }
+        public bool MapFootprintsPlaybackPrefixPanStateClearAttempted { get; set; }
+        public bool MapFootprintsPlaybackPrefixPanStateClearSucceeded { get; set; }
         public bool MapFootprintsPlaybackPrefixLeftDown { get; set; }
         public bool MapFootprintsPlaybackPrefixLeftPressed { get; set; }
         public bool MapFootprintsPlaybackPrefixLeftReleased { get; set; }
@@ -340,6 +348,14 @@ namespace JueMingZ.Diagnostics
         public bool MapFootprintsPlaybackPrefixMainMouseLeftAfter { get; set; }
         public bool MapFootprintsPlaybackPrefixMainMouseLeftReleaseBefore { get; set; }
         public bool MapFootprintsPlaybackPrefixMainMouseLeftReleaseAfter { get; set; }
+        public bool MapFootprintsPlaybackPrefixMainMouseRightBefore { get; set; }
+        public bool MapFootprintsPlaybackPrefixMainMouseRightAfter { get; set; }
+        public bool MapFootprintsPlaybackPrefixMainMouseRightReleaseBefore { get; set; }
+        public bool MapFootprintsPlaybackPrefixMainMouseRightReleaseAfter { get; set; }
+        public int MapFootprintsPlaybackPrefixMainMouseScrollWheelBefore { get; set; }
+        public int MapFootprintsPlaybackPrefixMainMouseScrollWheelAfter { get; set; }
+        public int MapFootprintsPlaybackPrefixMainOldMouseScrollWheelBefore { get; set; }
+        public int MapFootprintsPlaybackPrefixMainOldMouseScrollWheelAfter { get; set; }
         public bool MapFootprintsPlaybackPrefixMainMouseInterfaceBefore { get; set; }
         public bool MapFootprintsPlaybackPrefixMainMouseInterfaceAfter { get; set; }
         public bool MapFootprintsPlaybackPrefixMainBlockMouseBefore { get; set; }
@@ -347,6 +363,20 @@ namespace JueMingZ.Diagnostics
         public bool MapFootprintsPlaybackPrefixPlayerMouseInterfaceBefore { get; set; }
         public bool MapFootprintsPlaybackPrefixPlayerMouseInterfaceAfter { get; set; }
         public DateTime? MapFootprintsPlaybackPrefixUtc { get; set; }
+        public bool MapFootprintsPlaybackAfterPlayerInputGuardActive { get; set; }
+        public bool MapFootprintsPlaybackAfterPlayerInputShouldSuppressLeftInput { get; set; }
+        public bool MapFootprintsPlaybackAfterPlayerInputShouldSuppressNonLeftInput { get; set; }
+        public bool MapFootprintsPlaybackAfterPlayerInputReleaseFrame { get; set; }
+        public bool MapFootprintsPlaybackAfterPlayerInputMainMouseLeftBefore { get; set; }
+        public bool MapFootprintsPlaybackAfterPlayerInputMainMouseLeftAfter { get; set; }
+        public bool MapFootprintsPlaybackAfterPlayerInputMainMouseLeftReleaseBefore { get; set; }
+        public bool MapFootprintsPlaybackAfterPlayerInputMainMouseLeftReleaseAfter { get; set; }
+        public bool MapFootprintsPlaybackAfterPlayerInputMainMouseRightBefore { get; set; }
+        public bool MapFootprintsPlaybackAfterPlayerInputMainMouseRightAfter { get; set; }
+        public bool MapFootprintsPlaybackAfterPlayerInputMainMouseRightReleaseBefore { get; set; }
+        public bool MapFootprintsPlaybackAfterPlayerInputMainMouseRightReleaseAfter { get; set; }
+        public long MapFootprintsPlaybackAfterPlayerInputGameUpdateCount { get; set; }
+        public DateTime? MapFootprintsPlaybackAfterPlayerInputUtc { get; set; }
         public string MapFootprintsPlaybackDrawHitTarget { get; set; }
         public string MapFootprintsPlaybackDrawMouseReadMode { get; set; }
         public int MapFootprintsPlaybackDrawMouseX { get; set; }
@@ -355,6 +385,10 @@ namespace JueMingZ.Diagnostics
         public bool MapFootprintsPlaybackDrawBarHovered { get; set; }
         public bool MapFootprintsPlaybackDrawMainMouseLeft { get; set; }
         public bool MapFootprintsPlaybackDrawMainMouseLeftRelease { get; set; }
+        public bool MapFootprintsPlaybackDrawMainMouseRight { get; set; }
+        public bool MapFootprintsPlaybackDrawMainMouseRightRelease { get; set; }
+        public int MapFootprintsPlaybackDrawMainMouseScrollWheel { get; set; }
+        public int MapFootprintsPlaybackDrawMainOldMouseScrollWheel { get; set; }
         public bool MapFootprintsPlaybackDrawMainMouseInterface { get; set; }
         public bool MapFootprintsPlaybackDrawMainBlockMouse { get; set; }
         public bool MapFootprintsPlaybackDrawPlayerMouseInterface { get; set; }
@@ -820,6 +854,14 @@ namespace JueMingZ.Diagnostics
         public string MapQuickAnnouncementLastHotkeySummary { get; set; }
         public bool MapQuickAnnouncementLastInputConsumed { get; set; }
         public string MapQuickAnnouncementLastInputConsumeResult { get; set; }
+        public string MapQuickAnnouncementLastVisibilityVerdict { get; set; }
+        public string MapQuickAnnouncementLastVisibilityReason { get; set; }
+        public string MapQuickAnnouncementLastVisibleLayers { get; set; }
+        public string MapQuickAnnouncementLastBlockedLayers { get; set; }
+        public bool MapQuickAnnouncementLastCircuitOnly { get; set; }
+        public string MapQuickAnnouncementLastEchoGate { get; set; }
+        public bool MapQuickAnnouncementLastInvisibleAir { get; set; }
+        public string MapQuickAnnouncementLastVisibilityUnavailableReason { get; set; }
         public DateTime? MapQuickAnnouncementLastDecisionUtc { get; set; }
         public bool FishingAutomationNeedsTick { get; set; }
         public bool FishingDisplayNeedsCatchResolver { get; set; }
@@ -1570,6 +1612,12 @@ namespace JueMingZ.Diagnostics
             MapQuickAnnouncementLastFailureReason = string.Empty;
             MapQuickAnnouncementLastHotkeySummary = string.Empty;
             MapQuickAnnouncementLastInputConsumeResult = string.Empty;
+            MapQuickAnnouncementLastVisibilityVerdict = string.Empty;
+            MapQuickAnnouncementLastVisibilityReason = string.Empty;
+            MapQuickAnnouncementLastVisibleLayers = string.Empty;
+            MapQuickAnnouncementLastBlockedLayers = string.Empty;
+            MapQuickAnnouncementLastEchoGate = string.Empty;
+            MapQuickAnnouncementLastVisibilityUnavailableReason = string.Empty;
             FishingLastDecision = string.Empty;
             FishingLastSkipReason = string.Empty;
             FishingAutoEquipmentLastDecision = string.Empty;

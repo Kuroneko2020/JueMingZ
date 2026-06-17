@@ -11,10 +11,14 @@ namespace JueMingZ.UI.Legacy
     public static partial class LegacyMainWindow
     {
         private const int SearchInputRowHeight = 36;
-        private const int SearchInputLabelWidth = 84;
-        private const int SearchInputPickWidth = 92;
-        private const int SearchInputClearWidth = 48;
-        private const int SearchInputControlGap = 6;
+        private const int SearchSharedInputLabelWidth = 96;
+        private const int SearchSharedActionButtonWidth = 84;
+        private const int SearchSharedClearButtonWidth = 48;
+        private const int SearchSharedControlGap = 6;
+        private const int SearchInputLabelWidth = SearchSharedInputLabelWidth;
+        private const int SearchInputPickWidth = SearchSharedActionButtonWidth;
+        private const int SearchInputClearWidth = SearchSharedClearButtonWidth;
+        private const int SearchInputControlGap = SearchSharedControlGap;
         private const string SearchInputLabelText = "查询物品";
         private const string SearchPickButtonText = "选择物品";
         private const string SearchPickButtonTooltipText = "点击需要查询的物品";
@@ -115,7 +119,7 @@ namespace JueMingZ.UI.Legacy
         private static LegacyUiElement DrawSearchInputRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, out LegacyUiRect inputRect)
         {
             var row = new LegacyUiRect(area.Viewport.X, area.ToScreenY(contentY), area.Viewport.Width, SearchInputRowHeight);
-            inputRect = new LegacyUiRect(row.X + SearchInputLabelWidth, row.Y + 4, Math.Max(120, row.Width - SearchInputLabelWidth - SearchInputPickWidth - SearchInputClearWidth - SearchInputControlGap * 3), SearchInputRowHeight - 8);
+            inputRect = new LegacyUiRect(row.X + SearchInputLabelWidth, row.Y + 4, CalculateSearchSharedInputWidth(row.Width), SearchInputRowHeight - 8);
             if (!area.IsVisible(row))
             {
                 return null;
@@ -1428,9 +1432,28 @@ namespace JueMingZ.UI.Legacy
             return new[] { SearchInputLabelText, SearchPickButtonText, "清空" };
         }
 
+        internal static int[] GetSearchInputRowGeometryForTesting(int rowWidth)
+        {
+            return new[]
+            {
+                SearchInputLabelWidth,
+                SearchInputPickWidth,
+                SearchInputClearWidth,
+                SearchInputControlGap,
+                CalculateSearchSharedInputWidth(rowWidth)
+            };
+        }
+
         internal static string GetSearchPickButtonTooltipForTesting()
         {
             return SearchPickButtonTooltipText;
+        }
+
+        private static int CalculateSearchSharedInputWidth(int rowWidth)
+        {
+            return Math.Max(
+                120,
+                rowWidth - SearchSharedInputLabelWidth - SearchSharedActionButtonWidth - SearchSharedClearButtonWidth - SearchSharedControlGap * 3);
         }
     }
 }

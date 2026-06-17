@@ -670,7 +670,21 @@ namespace JueMingZ.Tests
 
                 var labels = LegacyMainWindow.GetSearchChestLocatorInputRowTextForTesting();
                 AssertStringEquals(labels[0], "定位物品", "chest locator input label");
-                AssertStringEquals(labels[1], "定位", "chest locator submit button label");
+                AssertStringEquals(labels[1], "定位容器", "chest locator submit button label");
+                AssertStringEquals(SearchChestLocatorUiState.StatusMessage, "输入物品名、内部名或 #ID 后点击定位容器。", "chest locator default status message");
+                var queryGeometry = LegacyMainWindow.GetSearchInputRowGeometryForTesting(540);
+                var locatorGeometry = LegacyMainWindow.GetSearchChestLocatorInputRowGeometryForTesting(540);
+                if (queryGeometry.Length != 5 ||
+                    locatorGeometry.Length != 5 ||
+                    locatorGeometry[0] != queryGeometry[0] ||
+                    locatorGeometry[1] != queryGeometry[1] ||
+                    locatorGeometry[2] != queryGeometry[2] ||
+                    locatorGeometry[3] != queryGeometry[3] ||
+                    locatorGeometry[4] != queryGeometry[4])
+                {
+                    throw new InvalidOperationException("Expected chest locator and search query input rows to share label reserve, action width, clear width, gap, and input width.");
+                }
+
                 if (LegacyMainWindow.CalculateSearchChestLocatorBlockHeightForTesting(540) != 36)
                 {
                     throw new InvalidOperationException("Chest locator should not reserve an extra section title row above the input line.");

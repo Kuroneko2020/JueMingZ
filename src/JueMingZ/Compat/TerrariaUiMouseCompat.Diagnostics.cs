@@ -6,6 +6,10 @@ namespace JueMingZ.Compat
     {
         public bool MainMouseLeft { get; set; }
         public bool MainMouseLeftRelease { get; set; }
+        public bool MainMouseRight { get; set; }
+        public bool MainMouseRightRelease { get; set; }
+        public int MainMouseScrollWheel { get; set; }
+        public int MainOldMouseScrollWheel { get; set; }
         public bool MainMouseInterface { get; set; }
         public bool MainBlockMouse { get; set; }
         public bool PlayerMouseInterface { get; set; }
@@ -31,6 +35,22 @@ namespace JueMingZ.Compat
                     if (_mainMouseLeftReleaseAccessor.TryGet(null, out value))
                     {
                         snapshot.MainMouseLeftRelease = value;
+                    }
+
+                    if (_mainMouseRightAccessor.TryGet(null, out value))
+                    {
+                        snapshot.MainMouseRight = value;
+                    }
+
+                    if (_mainMouseRightReleaseAccessor.TryGet(null, out value))
+                    {
+                        snapshot.MainMouseRightRelease = value;
+                    }
+
+                    if (EnsureMainMouseAccessors())
+                    {
+                        snapshot.MainMouseScrollWheel = ReadInt(_mouseScrollWheelField, _mouseScrollWheelProperty, 0);
+                        snapshot.MainOldMouseScrollWheel = ReadInt(_oldMouseScrollWheelField, _oldMouseScrollWheelProperty, snapshot.MainMouseScrollWheel);
                     }
 
                     if (_mainMouseInterfaceAccessor.TryGet(null, out value))

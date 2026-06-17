@@ -2722,6 +2722,17 @@ namespace JueMingZ.Tests
                 LegacyMainWindow.GetSearchPickButtonTooltipForTesting(),
                 "点击需要查询的物品",
                 "search pick button tooltip");
+
+            var geometry = LegacyMainWindow.GetSearchInputRowGeometryForTesting(540);
+            if (geometry.Length != 5 ||
+                geometry[0] != 96 ||
+                geometry[1] != 84 ||
+                geometry[2] != 48 ||
+                geometry[3] != 6 ||
+                geometry[4] != 294)
+            {
+                throw new InvalidOperationException("Expected search query input row to use the shared label, action button, clear button, gap, and input widths.");
+            }
         }
 
         private static void SearchQueryPickCommandStartsPendingSelectionAndHidesWindow()

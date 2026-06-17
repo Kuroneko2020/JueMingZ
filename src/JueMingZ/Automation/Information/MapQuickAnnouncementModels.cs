@@ -37,6 +37,8 @@ namespace JueMingZ.Automation.Information
         public IList<MapQuickAnnouncementWorldItemTarget> WorldItems { get; private set; }
         public MapQuickAnnouncementTileTarget Tile { get; set; }
         public MapQuickAnnouncementWallTarget Wall { get; set; }
+        public MapQuickAnnouncementVisibilityRequest VisibilityRequest { get; set; }
+        public MapQuickAnnouncementVisibilityDecision VisibilityDecision { get; set; }
     }
 
     internal sealed class MapQuickAnnouncementResolveResult
@@ -48,6 +50,14 @@ namespace JueMingZ.Automation.Information
         public int TargetCount { get; set; }
         public bool SuppressDelivery { get; set; }
         public string FailureReason { get; set; }
+        public string VisibilityVerdict { get; set; }
+        public string VisibilityReason { get; set; }
+        public string VisibleLayers { get; set; }
+        public string BlockedLayers { get; set; }
+        public bool CircuitOnly { get; set; }
+        public string EchoGate { get; set; }
+        public bool InvisibleAir { get; set; }
+        public string VisibilityUnavailableReason { get; set; }
 
         public MapQuickAnnouncementResolveResult()
         {
@@ -56,6 +66,12 @@ namespace JueMingZ.Automation.Information
             Detail = string.Empty;
             TargetName = string.Empty;
             FailureReason = string.Empty;
+            VisibilityVerdict = string.Empty;
+            VisibilityReason = string.Empty;
+            VisibleLayers = string.Empty;
+            BlockedLayers = string.Empty;
+            EchoGate = string.Empty;
+            VisibilityUnavailableReason = string.Empty;
         }
     }
 
@@ -182,9 +198,19 @@ namespace JueMingZ.Automation.Information
             get { return LiquidAmount > 0; }
         }
 
+        public bool HasCircuitLayer
+        {
+            get { return RedWire || BlueWire || GreenWire || YellowWire || Actuator; }
+        }
+
+        public bool HasWorldLayer
+        {
+            get { return Active || HasLiquid; }
+        }
+
         public bool HasAnyLayer
         {
-            get { return Active || HasLiquid || RedWire || BlueWire || GreenWire || YellowWire || Actuator; }
+            get { return HasWorldLayer || HasCircuitLayer; }
         }
     }
 

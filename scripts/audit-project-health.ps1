@@ -1422,7 +1422,15 @@ function Test-MapQuickAnnouncementGovernance {
         "MapQuickAnnouncementLastPendingState",
         "MapQuickAnnouncementLastHoverCacheAgeUpdates",
         "MapQuickAnnouncementLastPlacementLookupSource",
-        "MapQuickAnnouncementLastFallbackReason"
+        "MapQuickAnnouncementLastFallbackReason",
+        "MapQuickAnnouncementLastVisibilityVerdict",
+        "MapQuickAnnouncementLastVisibilityReason",
+        "MapQuickAnnouncementLastVisibleLayers",
+        "MapQuickAnnouncementLastBlockedLayers",
+        "MapQuickAnnouncementLastCircuitOnly",
+        "MapQuickAnnouncementLastEchoGate",
+        "MapQuickAnnouncementLastInvisibleAir",
+        "MapQuickAnnouncementLastVisibilityUnavailableReason"
     )
     $missingDiagnosticFields = @()
     foreach ($field in $requiredDiagnosticFields) {
@@ -1441,6 +1449,76 @@ function Test-MapQuickAnnouncementGovernance {
     }
     else {
         Write-Pass "Map quick announcement source/fallback diagnostics reach the cached snapshot JSON."
+    }
+
+    $targetResolverPath = Join-Path $RepoRoot "src\JueMingZ\Automation\Information\MapQuickAnnouncementTargetResolver.cs"
+    $textBuilderPath = Join-Path $RepoRoot "src\JueMingZ\Automation\Information\MapQuickAnnouncementTextBuilder.cs"
+    $visibilityServicePath = Join-Path $RepoRoot "src\JueMingZ\Automation\Information\MapQuickAnnouncementVisibilityService.cs"
+    $visibilityModelsPath = Join-Path $RepoRoot "src\JueMingZ\Automation\Information\MapQuickAnnouncementVisibilityModels.cs"
+    $targetResolverText = Read-TextIfExists -Path $targetResolverPath
+    $textBuilderText = Read-TextIfExists -Path $textBuilderPath
+    $visibilityServiceText = Read-TextIfExists -Path $visibilityServicePath
+    $visibilityModelsText = Read-TextIfExists -Path $visibilityModelsPath
+
+    if ($null -ne $targetResolverText -and
+        $targetResolverText.Contains("MapQuickAnnouncementVisibilityService.Evaluate") -and
+        $targetResolverText.Contains("FilterTileTarget") -and
+        $targetResolverText.Contains("AllowsWorldLayer") -and
+        $targetResolverText.Contains("AllowsCircuitLayer")) {
+        Write-Pass "Map quick announcement resolver keeps world-layer visibility filtering in the dedicated service route."
+    }
+    else {
+        Write-FailHealth "Map quick announcement resolver must call the visibility service and keep tile/wall/liquid/circuit layer filtering explicit."
+    }
+
+    if ($null -ne $textBuilderText -and
+        $textBuilderText.Contains('InvisibleWorldText = "这里看不见东西"') -and
+        $null -ne $targetResolverText -and
+        $targetResolverText.Contains("BuildVisibilityBlockedResult") -and
+        $targetResolverText.Contains('FailureReason = "visibilityBlocked"')) {
+        Write-Pass "Map quick announcement keeps the fixed invisible-world text and visibilityBlocked result path."
+    }
+    else {
+        Write-FailHealth "Map quick announcement must retain the fixed invisible-world text and visibilityBlocked result path."
+    }
+
+    if ($null -ne $targetResolverText -and
+        $targetResolverText.Contains("BuildTileDetail(filteredTile)") -and
+        $targetResolverText.Contains("tile:circuitOnly") -and
+        $targetResolverText.Contains("WithVisibilitySummary") -and
+        $null -ne $visibilityModelsText -and
+        $visibilityModelsText.Contains("HasCircuitOnlyLayer")) {
+        Write-Pass "Map quick announcement circuit-only path uses filtered targets and diagnostics without hidden world-layer detail."
+    }
+    else {
+        Write-FailHealth "Map quick announcement circuit-only path must use filtered targets and keep hidden tile/wall/liquid detail out."
+    }
+
+    $visibilityBackflowLeaks = @()
+    $forbiddenVisibilityPaths = @(
+        "src/JueMingZ/Automation/Information/MapQuickAnnouncementRuntimeService.cs",
+        "src/JueMingZ/Runtime/Diagnostics/RuntimeDiagnosticSnapshotBuilder.InventoryInformationFishing.cs"
+    )
+    foreach ($relativePath in $forbiddenVisibilityPaths) {
+        $text = Read-TextIfExists -Path (Join-Path $RepoRoot $relativePath)
+        if ($null -ne $text -and $text.Contains("MapQuickAnnouncementVisibilityService")) {
+            $visibilityBackflowLeaks += $relativePath
+        }
+    }
+
+    $uiRoot = Join-Path $RepoRoot "src\JueMingZ\UI"
+    foreach ($file in Get-ChildItem -LiteralPath $uiRoot -Recurse -Filter "*.cs" -File -ErrorAction SilentlyContinue) {
+        $text = Read-TextIfExists -Path $file.FullName
+        if ($null -ne $text -and $text.Contains("MapQuickAnnouncementVisibilityService")) {
+            $visibilityBackflowLeaks += $file.FullName.Substring($RepoRoot.Length).TrimStart('\', '/').Replace('\', '/')
+        }
+    }
+
+    if ($visibilityBackflowLeaks.Count -gt 0) {
+        Write-FailHealth "Map quick announcement visibility service must not backflow into runtime, diagnostics builder, or UI paths: $($visibilityBackflowLeaks -join ', ')"
+    }
+    else {
+        Write-Pass "Map quick announcement visibility business stays out of runtime, diagnostics builder, and UI paths."
     }
 
     $uiMouseCompatPath = Join-Path $RepoRoot "src\JueMingZ\Compat\TerrariaUiMouseCompat.cs"
@@ -1579,6 +1657,202 @@ function Test-MapQuickAnnouncementGovernance {
     }
 }
 
+function Test-F5MultiPageUiLayoutGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $mapUiPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.MapEnhancement.cs"
+    $searchUiPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.Search.cs"
+    $searchChestUiPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.Search.ChestLocator.cs"
+    $searchChestStatePath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\SearchChestLocatorUiState.cs"
+    $fishingUiPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.Fishing.cs"
+    $miscUiPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.Misc.cs"
+    $mapQuickAnnouncementTestsPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.MapQuickAnnouncementTests.cs"
+    $mapMarkerTestsPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.PlayerWorldMapMarkerTests.cs"
+    $searchQueryTestsPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.SearchQueryTests.cs"
+    $searchChestTestsPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.SearchChestLocatorTests.cs"
+    $layoutTestsPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.LegacyUiLayoutCacheTests.cs"
+    $featureIndexPath = Join-Path $RepoRoot "文档\功能介绍\功能索引.md"
+    $quickAnnouncementDocPath = Join-Path $RepoRoot "文档\功能介绍\地图加强页\快捷宣告.md"
+    $deathHistoryDocPath = Join-Path $RepoRoot "文档\功能介绍\地图加强页\死亡信息.md"
+    $worldDayDocPath = Join-Path $RepoRoot "文档\功能介绍\地图加强页\世界天数.md"
+    $revealedAreaDocPath = Join-Path $RepoRoot "文档\功能介绍\地图加强页\揭示区域.md"
+    $persistentDeathDocPath = Join-Path $RepoRoot "文档\功能介绍\地图加强页\死亡点常驻.md"
+    $footprintsDocPath = Join-Path $RepoRoot "文档\功能介绍\地图加强页\足迹.md"
+    $rareDirectionDocPath = Join-Path $RepoRoot "文档\功能介绍\地图加强页\稀有生物显示方向.md"
+    $merchantDirectionDocPath = Join-Path $RepoRoot "文档\功能介绍\地图加强页\旅商显示方向.md"
+    $markerDocPath = Join-Path $RepoRoot "文档\功能介绍\地图加强页\地图标记.md"
+    $searchDocPath = Join-Path $RepoRoot "文档\功能介绍\搜索查询页\搜索查询.md"
+    $chestLocatorDocPath = Join-Path $RepoRoot "文档\功能介绍\搜索查询页\箱内物品定位.md"
+    $quickRenameDocPath = Join-Path $RepoRoot "文档\功能介绍\钓鱼页\快捷改名.md"
+    $fishingFilterDocPath = Join-Path $RepoRoot "文档\功能介绍\钓鱼页\钓鱼过滤.md"
+    $developerMenuDocPath = Join-Path $RepoRoot "文档\功能介绍\杂项页\开发者菜单.md"
+
+    $mapUiText = Read-TextIfExists -Path $mapUiPath
+    $searchUiText = Read-TextIfExists -Path $searchUiPath
+    $searchChestUiText = Read-TextIfExists -Path $searchChestUiPath
+    $searchChestStateText = Read-TextIfExists -Path $searchChestStatePath
+    $fishingUiText = Read-TextIfExists -Path $fishingUiPath
+    $miscUiText = Read-TextIfExists -Path $miscUiPath
+    $mapQuickAnnouncementTestsText = Read-TextIfExists -Path $mapQuickAnnouncementTestsPath
+    $mapMarkerTestsText = Read-TextIfExists -Path $mapMarkerTestsPath
+    $searchQueryTestsText = Read-TextIfExists -Path $searchQueryTestsPath
+    $searchChestTestsText = Read-TextIfExists -Path $searchChestTestsPath
+    $layoutTestsText = Read-TextIfExists -Path $layoutTestsPath
+    $featureIndexText = Read-TextIfExists -Path $featureIndexPath
+    $quickAnnouncementDocText = Read-TextIfExists -Path $quickAnnouncementDocPath
+    $deathHistoryDocText = Read-TextIfExists -Path $deathHistoryDocPath
+    $worldDayDocText = Read-TextIfExists -Path $worldDayDocPath
+    $revealedAreaDocText = Read-TextIfExists -Path $revealedAreaDocPath
+    $persistentDeathDocText = Read-TextIfExists -Path $persistentDeathDocPath
+    $footprintsDocText = Read-TextIfExists -Path $footprintsDocPath
+    $rareDirectionDocText = Read-TextIfExists -Path $rareDirectionDocPath
+    $merchantDirectionDocText = Read-TextIfExists -Path $merchantDirectionDocPath
+    $markerDocText = Read-TextIfExists -Path $markerDocPath
+    $searchDocText = Read-TextIfExists -Path $searchDocPath
+    $chestLocatorDocText = Read-TextIfExists -Path $chestLocatorDocPath
+    $quickRenameDocText = Read-TextIfExists -Path $quickRenameDocPath
+    $fishingFilterDocText = Read-TextIfExists -Path $fishingFilterDocPath
+    $developerMenuDocText = Read-TextIfExists -Path $developerMenuDocPath
+
+    if ($null -eq $mapUiText -or $null -eq $searchUiText -or $null -eq $searchChestUiText -or $null -eq $searchChestStateText -or $null -eq $fishingUiText -or $null -eq $miscUiText -or $null -eq $mapQuickAnnouncementTestsText -or $null -eq $mapMarkerTestsText -or $null -eq $searchQueryTestsText -or $null -eq $searchChestTestsText -or $null -eq $layoutTestsText -or $null -eq $featureIndexText -or $null -eq $quickAnnouncementDocText -or $null -eq $deathHistoryDocText -or $null -eq $worldDayDocText -or $null -eq $revealedAreaDocText -or $null -eq $persistentDeathDocText -or $null -eq $footprintsDocText -or $null -eq $rareDirectionDocText -or $null -eq $merchantDirectionDocText -or $null -eq $markerDocText -or $null -eq $searchDocText -or $null -eq $chestLocatorDocText -or $null -eq $quickRenameDocText -or $null -eq $fishingFilterDocText -or $null -eq $developerMenuDocText) {
+        Write-FailHealth "F5 multi-page UI layout source, tests, and feature docs must exist before layout governance can be audited."
+        return
+    }
+
+    $expectedMapOrder = '死亡信息`、`世界天数`、`揭示区域`、`死亡点常驻`、`足迹`、`稀有生物显示方向`、`旅商显示方向`、`快捷宣告`、`地图标记'
+
+    if ($mapUiText.Contains("MapDeathHistoryRowIndex = 0") -and
+        $mapUiText.Contains("MapWorldDayCountRowIndex = 1") -and
+        $mapUiText.Contains("MapRevealedAreaRatioRowIndex = 2") -and
+        $mapUiText.Contains("MapPersistentDeathMarkersRowIndex = 3") -and
+        $mapUiText.Contains("MapFootprintsDisplayRowIndex = 4") -and
+        $mapUiText.Contains("MapRareCreatureDirectionRowIndex = 5") -and
+        $mapUiText.Contains("MapTravellingMerchantDirectionRowIndex = 6") -and
+        $mapUiText.Contains("MapQuickAnnouncementRowIndex = 7") -and
+        $mapUiText.Contains("MapCustomMarkersRowIndex = 8") -and
+        $mapUiText.Contains("MapQuickAnnouncementSlotWidth = 64") -and
+        $mapUiText.Contains("MapQuickAnnouncementSeparatorWidth = 12") -and
+        $mapUiText.Contains('MapQuickAnnouncementOnTooltip = "按下三个快捷键对光标位置内容进行广播"') -and
+        $mapUiText.Contains('var onWidth = ModeButtonWidth("开启")') -and
+        $mapUiText.Contains('var offWidth = ModeButtonWidth("关闭")') -and
+        $mapUiText.Contains('"+",') -and
+        $mapUiText.Contains("CalculateMapDeathHistoryButtonRectsForTesting") -and
+        $mapUiText.Contains("GetMapEnhancementRowOrderForTesting") -and
+        $mapUiText.Contains("CalculateMapQuickAnnouncementLayoutForTesting")) {
+        Write-Pass "F5 map page layout keeps the frozen row order, death-history geometry hooks, quick-announcement plus separators, and standard switch widths."
+    }
+    else {
+        Write-FailHealth "F5 map page layout must keep rows 0-8 as death/history/world/revealed/persistent-death/footprints/rare/merchant/quick-announcement/map-marker, quick announcement 64px + separators, and standard switch widths."
+    }
+
+    if ($mapQuickAnnouncementTestsText.Contains("Map enhancement row order contract must expose all nine rows.") -and
+        $mapQuickAnnouncementTestsText.Contains("Map death history details button must sit left of the rightmost count button") -and
+        $mapQuickAnnouncementTestsText.Contains("Map quick announcement row must use 64px key slots, plus separators, and standard switch widths.") -and
+        $mapQuickAnnouncementTestsText.Contains("Map quick announcement row must keep visual plus separators between the three keys without adding command rects.") -and
+        $mapMarkerTestsText.Contains("Map custom marker list must stay attached to the final map marker row without an extra setting gap.")) {
+        Write-Pass "F5 map page layout tests cover row order, death-history button positions, quick-announcement geometry, and marker list bottom attachment."
+    }
+    else {
+        Write-FailHealth "F5 map page tests must cover row order, death-history button positions, quick-announcement 64px/+ geometry, and marker list attachment to the final marker row."
+    }
+
+    if ($quickAnnouncementDocText.Contains($expectedMapOrder) -and
+        $quickAnnouncementDocText.Contains('中间用 `+` 做视觉分隔') -and
+        $quickAnnouncementDocText.Contains("按下三个快捷键对光标位置内容进行广播") -and
+        $deathHistoryDocText.Contains('次数，`详情` 按钮位于次数左侧') -and
+        $worldDayDocText.Contains($expectedMapOrder) -and
+        $revealedAreaDocText.Contains($expectedMapOrder) -and
+        $persistentDeathDocText.Contains($expectedMapOrder) -and
+        $footprintsDocText.Contains('位于 `死亡点常驻` 之后、`稀有生物显示方向` 之前') -and
+        $rareDirectionDocText.Contains('在 `足迹` 后、`旅商显示方向` 前') -and
+        $merchantDirectionDocText.Contains('在 `稀有生物显示方向` 后显示 `旅商显示方向`') -and
+        $markerDocText.Contains('最后显示 `地图标记` 标准开关，位于 `快捷宣告` 后') -and
+        $markerDocText.Contains('列表第一行贴着 `地图标记` 主开关行下沿')) {
+        Write-Pass "F5 map feature docs keep the frozen row order, quick-announcement tooltip/plus text, death-history position, and marker-list bottom contract."
+    }
+    else {
+        Write-FailHealth "F5 map feature docs must describe the frozen row order, quick-announcement +/tooltip contract, death-history count/details positions, and map marker list as part of the final marker group."
+    }
+
+    if ($searchUiText.Contains("SearchSharedInputLabelWidth = 96") -and
+        $searchUiText.Contains("SearchSharedActionButtonWidth = 84") -and
+        $searchUiText.Contains("SearchSharedClearButtonWidth = 48") -and
+        $searchUiText.Contains("SearchSharedControlGap = 6") -and
+        $searchUiText.Contains("SearchInputPickWidth = SearchSharedActionButtonWidth") -and
+        $searchUiText.Contains("CalculateSearchSharedInputWidth(rowWidth)") -and
+        $searchChestUiText.Contains("SearchChestLocatorLabelWidth = SearchSharedInputLabelWidth") -and
+        $searchChestUiText.Contains("SearchChestLocatorSubmitWidth = SearchSharedActionButtonWidth") -and
+        $searchChestUiText.Contains("SearchChestLocatorClearWidth = SearchSharedClearButtonWidth") -and
+        $searchChestUiText.Contains("SearchChestLocatorControlGap = SearchSharedControlGap") -and
+        $searchChestUiText.Contains('SearchChestLocatorSubmitButtonText = "定位容器"') -and
+        $searchChestUiText.Contains("CalculateSearchSharedInputWidth(row.Width)") -and
+        $searchChestStateText.Contains("点击定位容器")) {
+        Write-Pass "F5 search page keeps shared query/chest-locator row geometry and the locator submit wording."
+    }
+    else {
+        Write-FailHealth "F5 search page must keep shared 96/84/48/6 input geometry for query and chest locator rows, and keep the submit wording as 定位容器."
+    }
+
+    if ($searchQueryTestsText.Contains("Expected search query input row to use the shared label, action button, clear button, gap, and input widths.") -and
+        $searchQueryTestsText.Contains("geometry[0] != 96") -and
+        $searchQueryTestsText.Contains("geometry[1] != 84") -and
+        $searchQueryTestsText.Contains("geometry[2] != 48") -and
+        $searchQueryTestsText.Contains("geometry[3] != 6") -and
+        $searchChestTestsText.Contains("Expected chest locator and search query input rows to share label reserve, action width, clear width, gap, and input width.") -and
+        $searchChestTestsText.Contains("chest locator submit button label") -and
+        $searchChestTestsText.Contains("点击定位容器")) {
+        Write-Pass "F5 search layout tests cover shared geometry, 定位容器 wording, and default status text."
+    }
+    else {
+        Write-FailHealth "F5 search layout tests must cover shared geometry, 定位容器 wording, and the default status text."
+    }
+
+    if ($searchDocText.Contains('按钮宽度与上方箱内定位的“定位容器”一致') -and
+        $searchDocText.Contains("两个输入框也使用同一宽度") -and
+        $chestLocatorDocText.Contains('提交按钮显示“定位容器”') -and
+        $chestLocatorDocText.Contains('该按钮与下方搜索查询的“选择物品”等宽') -and
+        $chestLocatorDocText.Contains('输入框也与“查询物品”输入框等宽') -and
+        $featureIndexText.Contains('`选择物品` 与 `定位容器` 等宽') -and
+        $featureIndexText.Contains("两个输入框等宽")) {
+        Write-Pass "F5 search feature docs and index keep shared button/input geometry and 定位容器 wording."
+    }
+    else {
+        Write-FailHealth "F5 search feature docs and function index must describe equal-width 选择物品/定位容器 buttons, equal input widths, and the submit wording as 定位容器."
+    }
+
+    if ($miscUiText.Contains("pending ? 0 : ModeButtonWidth(actionLabel)") -and
+        $miscUiText.Contains('CalculateSingleMiscActionButtonWidth("开启", rowWidth, ModeButtonWidth("开启"))') -and
+        $fishingUiText.Contains('"自动存放鱼"') -and
+        $fishingUiText.Contains('"切杆跳过"') -and
+        $fishingUiText.Contains('"快捷改名"') -and
+        $fishingUiText.Contains("GetFishingPageTopOrderForTesting") -and
+        $fishingUiText.Contains("GetFishingFilterContentYForTesting") -and
+        $fishingUiText.Contains("LegacyUiMetrics.RowHeight * 5") -and
+        $layoutTestsText.Contains("Expected developer menu default button to use standard width while the confirm warning stays readable.") -and
+        $layoutTestsText.Contains("fishing page cut-rod row") -and
+        $layoutTestsText.Contains("fishing page quick rename row") -and
+        $layoutTestsText.Contains("Expected fishing filter start to keep the existing five-row content offset.") -and
+        $layoutTestsText.Contains("Expected fishing content height to remain tied to the unchanged filter start.")) {
+        Write-Pass "F5 misc/fishing UI and tests keep developer-menu default width, readable warning width, fishing row order, and filter height contract."
+    }
+    else {
+        Write-FailHealth "F5 misc/fishing UI and tests must keep developer-menu default standard width, readable warning width, cut-rod above quick-rename, and unchanged five-row filter height."
+    }
+
+    if ($developerMenuDocText.Contains('按钮默认显示“开启”，按钮宽度与 F5 标准二态开关一致') -and
+        $developerMenuDocText.Contains("确认态保留更宽的可读按钮") -and
+        $quickRenameDocText.Contains('该行位于“切杆跳过”下方') -and
+        $fishingFilterDocText.Contains('“切杆跳过”位于“快捷改名”上方') -and
+        $fishingFilterDocText.Contains("过滤区仍在这两行之后") -and
+        $featureIndexText.Contains('`开发者菜单` 默认 `开启` 为标准开关宽度') -and
+        $featureIndexText.Contains('`切杆跳过` 位于 `快捷改名` 上方')) {
+        Write-Pass "F5 misc/fishing feature docs and index keep the developer-menu and fishing row-order contracts."
+    }
+    else {
+        Write-FailHealth "F5 misc/fishing feature docs and function index must describe developer-menu default standard width, readable warning width, and cut-rod above quick-rename."
+    }
+}
+
 function Test-MapCustomMarkerGovernance {
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
 
@@ -1603,6 +1877,7 @@ function Test-MapCustomMarkerGovernance {
     $stylePickerOverlayPath = Join-Path $RepoRoot "src\JueMingZ\UI\MapCustomMarkerStylePickerOverlay.cs"
     $legacyWindowStatePath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainUiState.Window.cs"
     $uiMouseCaptureServicePath = Join-Path $RepoRoot "src\JueMingZ\UI\UiMouseCaptureService.cs"
+    $uiMouseCompatPath = Join-Path $RepoRoot "src\JueMingZ\Compat\TerrariaUiMouseCompat.cs"
     $mapEnhancementUiPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.MapEnhancement.cs"
     $markerUiPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.MapEnhancement.Markers.cs"
     $mapLayerPath = Join-Path $RepoRoot "src\JueMingZ\Hooks\PlayerWorldMapMarkerMapLayer.cs"
@@ -1634,6 +1909,7 @@ function Test-MapCustomMarkerGovernance {
     $stylePickerOverlayText = Read-TextIfExists -Path $stylePickerOverlayPath
     $legacyWindowStateText = Read-TextIfExists -Path $legacyWindowStatePath
     $uiMouseCaptureServiceText = Read-TextIfExists -Path $uiMouseCaptureServicePath
+    $uiMouseCompatText = Read-TextIfExists -Path $uiMouseCompatPath
     $mapEnhancementUiText = Read-TextIfExists -Path $mapEnhancementUiPath
     $markerUiText = Read-TextIfExists -Path $markerUiPath
     $mapLayerText = Read-TextIfExists -Path $mapLayerPath
@@ -1644,7 +1920,7 @@ function Test-MapCustomMarkerGovernance {
     $mapMarkerFeatureDocText = Read-TextIfExists -Path $mapMarkerFeatureDocPath
     $diagnosticRulesText = Read-TextIfExists -Path $diagnosticRulesPath
 
-    if ($null -eq $registrarText -or $null -eq $rootText -or $null -eq $modelsText -or $null -eq $stylesText -or $null -eq $storeText -or $null -eq $cacheText -or $null -eq $diagnosticsText -or $null -eq $traceRecorderText -or $null -eq $snapshotText -or $null -eq $snapshotWriterText -or $null -eq $snapshotBuilderText -or $null -eq $diagnosticUiSnapshotBuilderText -or $null -eq $interactionText -or $null -eq $mapCompatText -or $null -eq $debugHotkeyText -or $null -eq $handlerText -or $null -eq $interfaceLayerText -or $null -eq $fullscreenPickerDrawInstallerText -or $null -eq $stylePickerOverlayText -or $null -eq $legacyWindowStateText -or $null -eq $uiMouseCaptureServiceText -or $null -eq $mapEnhancementUiText -or $null -eq $markerUiText -or $null -eq $mapLayerText -or $null -eq $fullscreenCompatText -or $null -eq $testText -or $null -eq $uiInputTestText -or $null -eq $interfaceTestText -or $null -eq $mapMarkerFeatureDocText -or $null -eq $diagnosticRulesText) {
+    if ($null -eq $registrarText -or $null -eq $rootText -or $null -eq $modelsText -or $null -eq $stylesText -or $null -eq $storeText -or $null -eq $cacheText -or $null -eq $diagnosticsText -or $null -eq $traceRecorderText -or $null -eq $snapshotText -or $null -eq $snapshotWriterText -or $null -eq $snapshotBuilderText -or $null -eq $diagnosticUiSnapshotBuilderText -or $null -eq $interactionText -or $null -eq $mapCompatText -or $null -eq $debugHotkeyText -or $null -eq $handlerText -or $null -eq $interfaceLayerText -or $null -eq $fullscreenPickerDrawInstallerText -or $null -eq $stylePickerOverlayText -or $null -eq $legacyWindowStateText -or $null -eq $uiMouseCaptureServiceText -or $null -eq $uiMouseCompatText -or $null -eq $mapEnhancementUiText -or $null -eq $markerUiText -or $null -eq $mapLayerText -or $null -eq $fullscreenCompatText -or $null -eq $testText -or $null -eq $uiInputTestText -or $null -eq $interfaceTestText -or $null -eq $mapMarkerFeatureDocText -or $null -eq $diagnosticRulesText) {
         Write-FailHealth "Map custom marker registrar, models/styles, store/cache, diagnostics, interaction, coordinate compat, UI layer, handler, map layer, fullscreen compat, docs, and tests must exist as separate responsibilities."
         return
     }
@@ -1712,7 +1988,8 @@ function Test-MapCustomMarkerGovernance {
         $mapEnhancementUiText.Contains('"map-custom-markers-page:"') -and
         $mapEnhancementUiText.Contains("地图标记（已到标记上限）") -and
         $mapEnhancementUiText.Contains("CalculateMapMarkerListContentYForTesting") -and
-        $mapEnhancementUiText.Contains("LegacyUiMetrics.RowHeight * 5 + LegacyUiMetrics.SettingRowGap * 4") -and
+        $mapEnhancementUiText.Contains("MapCustomMarkersRowIndex = 8") -and
+        $mapEnhancementUiText.Contains("CalculateMapEnhancementRowContentY(MapCustomMarkersRowIndex) + LegacyUiMetrics.RowHeight") -and
         -not $mapEnhancementUiText.Contains("var markerListY = LegacyUiMetrics.RowHeight * 5 + LegacyUiMetrics.SettingRowGap * 5") -and
         $markerUiText.Contains("empty-silent") -and
         $markerUiText.Contains("attached-link-card+same-width+paged-10+empty-silent+focused-confirm") -and
@@ -1733,7 +2010,7 @@ function Test-MapCustomMarkerGovernance {
         $testText.Contains("GetMapMarkerVisibleActionIdsForTesting") -and
         $testText.Contains("BuildMapMarkerConfirmCommandIdForTesting") -and
         $testText.Contains("attach to the main row") -and
-        $testText.Contains("directly after the main title row") -and
+        $testText.Contains("final map marker row") -and
         $testText.Contains("omit the duplicate subtitle row") -and
         $testText.Contains("silent zero-height empty state") -and
         -not $testText.Contains("section+subpanel-card+empty-text-only+confirm-button")) {
@@ -2066,6 +2343,18 @@ function Test-MapCustomMarkerGovernance {
     }
     else {
         Write-FailHealth "Map marker UI actions must keep featureId/markerId/tile/scale/result/mouse metadata and explicit UI-only placeholder result codes."
+    }
+
+    if ($uiMouseCompatText.Contains("_activeTriggerSuppressionObservedGameDown") -and
+        $uiMouseCompatText.Contains("ReadMouseTriggerGameDownState") -and
+        $uiMouseCompatText.Contains("HasActiveTriggerSuppressionObservedGameDown") -and
+        $uiMouseCompatText.Contains("IsMouseButtonDownFallback") -and
+        $testText.Contains("MapCustomMarkerJumpReleaseClosesF5AndUiCapture") -and
+        $testText.Contains("must stop after release so vanilla fullscreen map input can take over")) {
+        Write-Pass "Map marker jump trigger suppression observes Terraria game-state release before falling back to OS button state."
+    }
+    else {
+        Write-FailHealth "Map marker jump trigger suppression must stop after Terraria game-state release and keep the vanilla fullscreen-map handoff regression test."
     }
 
     $requiredF5HotkeyFields = @(
@@ -2401,9 +2690,12 @@ function Test-MapFootprintGovernance {
     $mapLayerInstallerPath = Join-Path $RepoRoot "src\JueMingZ\Hooks\PlayerWorldFootprintMapLayerInstaller.cs"
     $overlayInstallerPath = Join-Path $RepoRoot "src\JueMingZ\Hooks\MapFootprintFullscreenOverlayInstaller.cs"
     $overlayPath = Join-Path $RepoRoot "src\JueMingZ\UI\MapFootprintPlaybackOverlay.cs"
+    $mapFullscreenCompatPath = Join-Path $RepoRoot "src\JueMingZ\Compat\MapFullscreenCompat.cs"
+    $uiMouseCompatPath = Join-Path $RepoRoot "src\JueMingZ\Compat\TerrariaUiMouseCompat.cs"
     $diagnosticMouseReaderPath = Join-Path $RepoRoot "src\JueMingZ\UI\DiagnosticMouseStateReader.cs"
     $uiMouseCaptureServicePath = Join-Path $RepoRoot "src\JueMingZ\UI\UiMouseCaptureService.cs"
     $hookInstallerPath = Join-Path $RepoRoot "src\JueMingZ\Bootstrap\HookInstaller.cs"
+    $playerInputScrollHookInstallerPath = Join-Path $RepoRoot "src\JueMingZ\Hooks\PlayerInputScrollHookInstaller.cs"
     $handlerPath = Join-Path $RepoRoot "src\JueMingZ\Input\LegacyUiActionService.MapEnhancementHandlers.cs"
     $snapshotPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\DiagnosticSnapshot.cs"
     $snapshotWriterPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\DiagnosticSnapshotWriter.Json.cs"
@@ -2432,9 +2724,12 @@ function Test-MapFootprintGovernance {
     $mapLayerInstallerText = Read-TextIfExists -Path $mapLayerInstallerPath
     $overlayInstallerText = Read-TextIfExists -Path $overlayInstallerPath
     $overlayText = Read-TextIfExists -Path $overlayPath
+    $mapFullscreenCompatText = Read-TextIfExists -Path $mapFullscreenCompatPath
+    $uiMouseCompatText = Read-TextIfExists -Path $uiMouseCompatPath
     $diagnosticMouseReaderText = Read-TextIfExists -Path $diagnosticMouseReaderPath
     $uiMouseCaptureServiceText = Read-TextIfExists -Path $uiMouseCaptureServicePath
     $hookInstallerText = Read-TextIfExists -Path $hookInstallerPath
+    $playerInputScrollHookInstallerText = Read-TextIfExists -Path $playerInputScrollHookInstallerPath
     $handlerText = Read-TextIfExists -Path $handlerPath
     $snapshotText = Read-TextIfExists -Path $snapshotPath
     $snapshotWriterText = Read-TextIfExists -Path $snapshotWriterPath
@@ -2444,7 +2739,7 @@ function Test-MapFootprintGovernance {
     $featureDocText = Read-TextIfExists -Path $featureDocPath
     $diagnosticRulesText = Read-TextIfExists -Path $diagnosticRulesPath
 
-    if ($null -eq $registrarText -or $null -eq $featureIdsText -or $null -eq $appSettingsText -or $null -eq $configServiceText -or $null -eq $settingsSnapshotText -or $null -eq $settingsSnapshotProviderText -or $null -eq $runtimeText -or $null -eq $rootText -or $null -eq $modelsText -or $null -eq $storeText -or $null -eq $cacheText -or $null -eq $serviceText -or $null -eq $diagnosticsText -or $null -eq $renderCacheText -or $null -eq $playbackStateText -or $null -eq $mapLayerText -or $null -eq $mapLayerInstallerText -or $null -eq $overlayInstallerText -or $null -eq $overlayText -or $null -eq $diagnosticMouseReaderText -or $null -eq $uiMouseCaptureServiceText -or $null -eq $hookInstallerText -or $null -eq $handlerText -or $null -eq $snapshotText -or $null -eq $snapshotWriterText -or $null -eq $snapshotBuilderText -or $null -eq $testText -or $null -eq $programText -or $null -eq $featureDocText -or $null -eq $diagnosticRulesText) {
+    if ($null -eq $registrarText -or $null -eq $featureIdsText -or $null -eq $appSettingsText -or $null -eq $configServiceText -or $null -eq $settingsSnapshotText -or $null -eq $settingsSnapshotProviderText -or $null -eq $runtimeText -or $null -eq $rootText -or $null -eq $modelsText -or $null -eq $storeText -or $null -eq $cacheText -or $null -eq $serviceText -or $null -eq $diagnosticsText -or $null -eq $renderCacheText -or $null -eq $playbackStateText -or $null -eq $mapLayerText -or $null -eq $mapLayerInstallerText -or $null -eq $overlayInstallerText -or $null -eq $overlayText -or $null -eq $diagnosticMouseReaderText -or $null -eq $uiMouseCaptureServiceText -or $null -eq $hookInstallerText -or $null -eq $playerInputScrollHookInstallerText -or $null -eq $handlerText -or $null -eq $snapshotText -or $null -eq $snapshotWriterText -or $null -eq $snapshotBuilderText -or $null -eq $testText -or $null -eq $programText -or $null -eq $featureDocText -or $null -eq $diagnosticRulesText) {
         Write-FailHealth "Map footprints registrar, config, runtime, store/cache/service, render/playback, diagnostics, docs, and tests must exist as separate responsibilities."
         return
     }
@@ -2590,6 +2885,8 @@ function Test-MapFootprintGovernance {
         $overlayText.Contains("ReadFullscreenUiFrame(true)") -and
         $overlayText.Contains("ReadFullscreenUiFrame(false)") -and
         $overlayText.Contains("BuildFullscreenUiFrame") -and
+        $overlayText.Contains("RememberDrawFrameExtent") -and
+        $overlayText.Contains("ApplyLastDrawFrameExtent") -and
         $overlayText.Contains("/FullscreenUi") -and
         -not $overlayText.Contains("LegacyUiInput.ReadMouse()") -and
         $playbackStateText.Contains("var safeWidth = Math.Max(1, screenWidth)") -and
@@ -2598,20 +2895,34 @@ function Test-MapFootprintGovernance {
         -not $overlayText.Contains("MapOverlayDrawContext") -and
         -not $playbackStateText.Contains("MapOverlayDrawContext") -and
         $testText.Contains("MapFootprintPlaybackDefaultsToLatestPausedAndScreenSpaceLayout") -and
-        $testText.Contains("MapFootprintPlaybackFullscreenUiScaleHitTestCapturesBar")) {
-        Write-Pass "Map footprint playback overlay stays fullscreen UI screen-space, UIScale-aware, and bottom-safe-margin based."
+        $testText.Contains("MapFootprintPlaybackFullscreenUiScaleHitTestCapturesBar") -and
+        $testText.Contains("MapFootprintPlaybackPrefixUsesLastDrawExtentForHitTest")) {
+        Write-Pass "Map footprint playback overlay stays fullscreen UI screen-space, UIScale-aware, bottom-safe-margin based, and prefix hit-test follows the last draw extent."
     }
     else {
-        Write-FailHealth "Map footprint playback UI must use OnPostFullscreenMapDraw plus fullscreen UI-scale screen-size layout, not F5 base-logical or map-content coordinates."
+        Write-FailHealth "Map footprint playback UI must use OnPostFullscreenMapDraw plus fullscreen UI-scale screen-size layout, reuse the last draw extent for prefix hit-test, and avoid F5 base-logical or map-content coordinates."
     }
 
-    if ($playbackStateText.Contains("interaction.MouseCaptured = hit.BarHovered || _dragging || (_lastLeftDown && leftReleased)") -and
+    if ($playbackStateText.Contains("ShouldSuppressFullscreenMapLeftInput") -and
+        $playbackStateText.Contains("ShouldSuppressFullscreenMapNonLeftInput") -and
+        $playbackStateText.Contains("ShouldClearFullscreenMapPanState") -and
+        $playbackStateText.Contains("releaseOwnedByPlayback") -and
+        $playbackStateText.Contains("var playbackSurfaceCaptured = hit.BarHovered || _dragging || releaseOwnedByPlayback") -and
+        $playbackStateText.Contains("interaction.MouseCaptured = playbackSurfaceCaptured") -and
         $playbackStateText.Contains("interaction.ScrollConsumed = interaction.MouseCaptured") -and
         $playbackStateText.Contains("DisplayTimelineEndTicks") -and
         $overlayText.Contains("ReadForFullscreenMapOverlay") -and
-        $overlayText.Contains("TerrariaUiMouseCompat.TryConsumeMouseTriggerInput") -and
+        $overlayText.Contains("UpdateAfterPlayerInputGuard") -and
+        $overlayText.Contains("PlayerInput can rewrite Main.mouseLeft") -and
+        $overlayText.Contains("FullscreenMapNonLeftMouseTriggerTokens") -and
+        $overlayText.Contains('TerrariaUiMouseCompat.TryConsumeMouseTriggerInput("MouseLeft"') -and
+        $overlayText.Contains("TerrariaUiMouseCompat.TryConsumeMouseTriggerInputOnceForUi") -and
+        $overlayText.Contains("MapFullscreenCompat.TryClearFullscreenMapPanState") -and
         $overlayText.Contains("TerrariaUiMouseCompat.TryMarkUiMouseCapture") -and
         $overlayText.Contains("TerrariaUiMouseCompat.TryConsumeUiScroll") -and
+        $uiMouseCompatText.Contains("TryConsumeMouseTriggerInputOnceForUi") -and
+        $mapFullscreenCompatText.Contains("TryClearFullscreenMapPanState") -and
+        $playerInputScrollHookInstallerText.Contains("MapFootprintPlaybackOverlay.UpdateAfterPlayerInputGuard") -and
         $overlayText.Contains("raw.GameInputAvailable") -and
         $overlayText.Contains("raw.TerrariaReadAvailable && raw.TerrariaLeftDown") -and
         $diagnosticMouseReaderText.Contains("ReadForFullscreenMapOverlay") -and
@@ -2621,15 +2932,20 @@ function Test-MapFootprintGovernance {
         $overlayText.Contains("RecordPlaybackDrawInput") -and
         $uiMouseCaptureServiceText.Contains("TerrariaUiMouseCompat.TryConsumeMouseTriggerInput") -and
         $testText.Contains("MapFootprintPlaybackHandlesRateDragAndInputHandoff") -and
+        $testText.Contains("MapFootprintPlaybackAfterPlayerInputGuardSuppressesRewrittenLeft") -and
+        $testText.Contains("MapFootprintPlaybackCapturesWheelAndNonLeftMouseInsideBar") -and
+        $testText.Contains("MapFootprintPlaybackClearsPanStateForPlaybackOwnedLeft") -and
+        $testText.Contains("MapFootprintPlaybackOutsideMapActionsDoNotChangePlayback") -and
+        $testText.Contains("MapFootprintPlaybackReleaseFrameStopsBeforeNextOutsideDrag") -and
         $testText.Contains("MapFootprintPlaybackPausedProgressDisplayEndStaysStable") -and
         $testText.Contains("MapFootprintPlaybackFullscreenMouseKeepsReadableClickWhenGlobalGateFalseSpec") -and
         $testText.Contains("MapFootprintPlaybackFullscreenMouseDoesNotUseOsFallbackWhenGlobalGateFalse") -and
         $testText.Contains("MapFootprintPlaybackFullscreenCaptureClearsClickWhenGlobalGateFalse") -and
         -not $programText.Contains('RunExpectedFailure("map footprint playback fullscreen mouse keeps readable click when global gate false"')) {
-        Write-Pass "Map footprint playback input consumption remains limited to fullscreen bar/drag hits, gate-false Terraria mouse reads, and paused display progress uses a frozen visible timeline end."
+        Write-Pass "Map footprint playback input consumption keeps fullscreen bar left ownership through PlayerInput postfix, blocks wheel/non-left tokens, clears pan anchors for playback-owned left input, preserves outside map handoff, keeps gate-false Terraria mouse reads, and paused display progress uses a frozen visible timeline end."
     }
     else {
-        Write-FailHealth "Map footprint playback input must only capture fullscreen bar/drag mouse and scroll, keep gate-false Terraria mouse reads without OS fallback, forbid expected-failure rollback, and preserve paused display-end coverage."
+        Write-FailHealth "Map footprint playback input must keep explicit left ownership, suppress rewritten MouseLeft after PlayerInput, block wheel/non-left tokens, clear fullscreen map pan anchors only for playback-owned left input, keep outside map handoff, keep gate-false Terraria mouse reads without OS fallback, forbid expected-failure rollback, and preserve paused display-end coverage."
     }
 
     $footprintFiles = @($servicePath, $renderCachePath, $playbackStatePath, $mapLayerPath, $overlayPath, $mapLayerInstallerPath, $overlayInstallerPath, $diagnosticsPath, $storePath, $cachePath)
@@ -2762,6 +3078,14 @@ function Test-MapFootprintGovernance {
         "MapFootprintsPlaybackPrefixMouseCaptured",
         "MapFootprintsPlaybackPrefixClickConsumed",
         "MapFootprintsPlaybackPrefixScrollConsumed",
+        "MapFootprintsPlaybackPrefixShouldSuppressLeftInput",
+        "MapFootprintsPlaybackPrefixShouldSuppressNonLeftInput",
+        "MapFootprintsPlaybackPrefixShouldClearPanState",
+        "MapFootprintsPlaybackPrefixLeftInputSuppressed",
+        "MapFootprintsPlaybackPrefixNonLeftInputSuppressed",
+        "MapFootprintsPlaybackPrefixScrollSuppressed",
+        "MapFootprintsPlaybackPrefixPanStateClearAttempted",
+        "MapFootprintsPlaybackPrefixPanStateClearSucceeded",
         "MapFootprintsPlaybackPrefixLeftDown",
         "MapFootprintsPlaybackPrefixLeftPressed",
         "MapFootprintsPlaybackPrefixLeftReleased",
@@ -2771,6 +3095,14 @@ function Test-MapFootprintGovernance {
         "MapFootprintsPlaybackPrefixMainMouseLeftAfter",
         "MapFootprintsPlaybackPrefixMainMouseLeftReleaseBefore",
         "MapFootprintsPlaybackPrefixMainMouseLeftReleaseAfter",
+        "MapFootprintsPlaybackPrefixMainMouseRightBefore",
+        "MapFootprintsPlaybackPrefixMainMouseRightAfter",
+        "MapFootprintsPlaybackPrefixMainMouseRightReleaseBefore",
+        "MapFootprintsPlaybackPrefixMainMouseRightReleaseAfter",
+        "MapFootprintsPlaybackPrefixMainMouseScrollWheelBefore",
+        "MapFootprintsPlaybackPrefixMainMouseScrollWheelAfter",
+        "MapFootprintsPlaybackPrefixMainOldMouseScrollWheelBefore",
+        "MapFootprintsPlaybackPrefixMainOldMouseScrollWheelAfter",
         "MapFootprintsPlaybackPrefixMainMouseInterfaceBefore",
         "MapFootprintsPlaybackPrefixMainMouseInterfaceAfter",
         "MapFootprintsPlaybackPrefixMainBlockMouseBefore",
@@ -2778,6 +3110,20 @@ function Test-MapFootprintGovernance {
         "MapFootprintsPlaybackPrefixPlayerMouseInterfaceBefore",
         "MapFootprintsPlaybackPrefixPlayerMouseInterfaceAfter",
         "MapFootprintsPlaybackPrefixUtc",
+        "MapFootprintsPlaybackAfterPlayerInputGuardActive",
+        "MapFootprintsPlaybackAfterPlayerInputShouldSuppressLeftInput",
+        "MapFootprintsPlaybackAfterPlayerInputShouldSuppressNonLeftInput",
+        "MapFootprintsPlaybackAfterPlayerInputReleaseFrame",
+        "MapFootprintsPlaybackAfterPlayerInputMainMouseLeftBefore",
+        "MapFootprintsPlaybackAfterPlayerInputMainMouseLeftAfter",
+        "MapFootprintsPlaybackAfterPlayerInputMainMouseLeftReleaseBefore",
+        "MapFootprintsPlaybackAfterPlayerInputMainMouseLeftReleaseAfter",
+        "MapFootprintsPlaybackAfterPlayerInputMainMouseRightBefore",
+        "MapFootprintsPlaybackAfterPlayerInputMainMouseRightAfter",
+        "MapFootprintsPlaybackAfterPlayerInputMainMouseRightReleaseBefore",
+        "MapFootprintsPlaybackAfterPlayerInputMainMouseRightReleaseAfter",
+        "MapFootprintsPlaybackAfterPlayerInputGameUpdateCount",
+        "MapFootprintsPlaybackAfterPlayerInputUtc",
         "MapFootprintsPlaybackDrawHitTarget",
         "MapFootprintsPlaybackDrawMouseReadMode",
         "MapFootprintsPlaybackDrawMouseX",
@@ -2786,6 +3132,10 @@ function Test-MapFootprintGovernance {
         "MapFootprintsPlaybackDrawBarHovered",
         "MapFootprintsPlaybackDrawMainMouseLeft",
         "MapFootprintsPlaybackDrawMainMouseLeftRelease",
+        "MapFootprintsPlaybackDrawMainMouseRight",
+        "MapFootprintsPlaybackDrawMainMouseRightRelease",
+        "MapFootprintsPlaybackDrawMainMouseScrollWheel",
+        "MapFootprintsPlaybackDrawMainOldMouseScrollWheel",
         "MapFootprintsPlaybackDrawMainMouseInterface",
         "MapFootprintsPlaybackDrawMainBlockMouse",
         "MapFootprintsPlaybackDrawPlayerMouseInterface",
@@ -2807,6 +3157,7 @@ function Test-MapFootprintGovernance {
         $diagnosticsText.Contains("RecordMapDrawDetail") -and
         $diagnosticsText.Contains("RecordPlaybackOverlay") -and
         $diagnosticsText.Contains("RecordPlaybackPrefixInput") -and
+        $diagnosticsText.Contains("RecordPlaybackAfterPlayerInputGuard") -and
         $diagnosticsText.Contains("RecordPlaybackDrawInput") -and
         $missingDiagnosticFields.Count -eq 0 -and
         $testText.Contains("PlayerWorldFootprintsDiagnosticsWrittenToSnapshot") -and
@@ -2816,10 +3167,19 @@ function Test-MapFootprintGovernance {
         $testText.Contains("MapFootprintsPlaybackPrefixMouseReadMode") -and
         $testText.Contains("FullscreenOverlayGateBypass/FullscreenUi") -and
         $testText.Contains("MapFootprintsPlaybackPrefixMouseReadAvailable") -and
+        $testText.Contains("MapFootprintsPlaybackPrefixShouldSuppressLeftInput") -and
+        $testText.Contains("MapFootprintsPlaybackPrefixShouldSuppressNonLeftInput") -and
+        $testText.Contains("MapFootprintsPlaybackPrefixPanStateClearSucceeded") -and
+        $testText.Contains("MapFootprintsPlaybackAfterPlayerInputGuardActive") -and
+        $testText.Contains("MapFootprintsPlaybackAfterPlayerInputMainMouseRightAfter") -and
         $testText.Contains("MapFootprintsPlaybackPrefixMainMouseLeftAfter") -and
         $testText.Contains("MapFootprintsPlaybackPrefixMainMouseLeftReleaseAfter") -and
+        $testText.Contains("MapFootprintsPlaybackPrefixMainMouseRightAfter") -and
+        $testText.Contains("MapFootprintsPlaybackPrefixMainOldMouseScrollWheelAfter") -and
         $testText.Contains("MapFootprintsPlaybackDrawMouseReadMode") -and
         $testText.Contains("MapFootprintsPlaybackDrawMouseReadAvailable") -and
+        $testText.Contains("MapFootprintsPlaybackDrawMainMouseRight") -and
+        $testText.Contains("MapFootprintsPlaybackDrawMainMouseScrollWheel") -and
         $testText.Contains("MapFootprintsPlaybackDrawGameUpdateCount") -and
         $programText.Contains("player-world footprints diagnostics written to snapshot")) {
         Write-Pass "Map footprints recorder/render/playback diagnostics reach runtime snapshot JSON and console coverage."
@@ -2836,6 +3196,10 @@ function Test-MapFootprintGovernance {
         $featureDocText.Contains("MapFootprintsDrawMaxLinePixels") -and
         $featureDocText.Contains("draw command 的 screen start/end 是裁剪后的最终绘制端点") -and
         $featureDocText.Contains("tile start/end 仍保留原始缓存线段端点") -and
+        $featureDocText.Contains("MapFootprintsPlaybackPrefixShouldSuppressLeftInput") -and
+        $featureDocText.Contains("MapFootprintsPlaybackPrefixPanStateClearSucceeded") -and
+        $featureDocText.Contains("MapFootprintsPlaybackAfterPlayerInputGuardActive") -and
+        $featureDocText.Contains("MapFootprintsPlaybackDrawMainMouseRight") -and
         $featureDocText.Contains("MapFootprintsPlaybackDrawMouseReadMode") -and
         $featureDocText.Contains("MapFootprintsPlaybackDrawMainMouseLeftRelease") -and
         $featureDocText.Contains("FullscreenOverlayGateBypass") -and
@@ -2845,6 +3209,10 @@ function Test-MapFootprintGovernance {
         $diagnosticRulesText.Contains("MapFootprintsDrawMaxLinePixels") -and
         $diagnosticRulesText.Contains("screen 坐标表示最终裁剪后的 draw command 端点") -and
         $diagnosticRulesText.Contains("tile 坐标仍保留原始缓存线段端点") -and
+        $diagnosticRulesText.Contains("MapFootprintsPlaybackPrefixShouldSuppressLeftInput") -and
+        $diagnosticRulesText.Contains("MapFootprintsPlaybackPrefixPanStateClearSucceeded") -and
+        $diagnosticRulesText.Contains("MapFootprintsPlaybackAfterPlayerInputGuardActive") -and
+        $diagnosticRulesText.Contains("MapFootprintsPlaybackDrawMainMouseRight") -and
         $diagnosticRulesText.Contains("MapFootprintsPlaybackPrefixMainMouseLeftAfter") -and
         $diagnosticRulesText.Contains("MapFootprintsPlaybackDrawMouseReadMode") -and
         $diagnosticRulesText.Contains("FullscreenOverlayGateBypass") -and
@@ -3762,6 +4130,7 @@ Test-LegacyUiOverlayGovernance -RepoRoot $repoRoot
 Test-CombatAimDiagnosticsGovernance -RepoRoot $repoRoot
 Test-PhasebladeQuickSwitchDiagnosticsGovernance -RepoRoot $repoRoot
 Test-MapQuickAnnouncementGovernance -RepoRoot $repoRoot
+Test-F5MultiPageUiLayoutGovernance -RepoRoot $repoRoot
 Test-MapCustomMarkerGovernance -RepoRoot $repoRoot
 Test-MapDirectionHintGovernance -RepoRoot $repoRoot
 Test-MapFootprintGovernance -RepoRoot $repoRoot

@@ -382,10 +382,11 @@ namespace JueMingZ.UI.Legacy
                 "misc-developer-easter-egg:",
                 pending ? 238 : 230,
                 pending ? 82 : 232,
-                pending ? 72 : 224);
+                pending ? 72 : 224,
+                pending ? 0 : ModeButtonWidth(actionLabel));
         }
 
-        private static LegacyUiElement DrawSingleMiscActionRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, string label, string buttonLabel, string buttonValue, string elementPrefix, int textR, int textG, int textB)
+        private static LegacyUiElement DrawSingleMiscActionRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, string label, string buttonLabel, string buttonValue, string elementPrefix, int textR, int textG, int textB, int buttonWidthOverride = 0)
         {
             // Misc rows register hit-test elements only; clicks are translated to
             // LegacyUiCommand after the frame.
@@ -397,7 +398,7 @@ namespace JueMingZ.UI.Legacy
 
             LegacyUiTheme.DrawRowClipped(spriteBatch, row, area.Viewport);
 
-            var buttonWidth = Math.Min(Math.Max(118, UiTextRenderer.EstimateTextWidth(buttonLabel, 0.72f) + 20), Math.Max(118, row.Width - 150));
+            var buttonWidth = CalculateSingleMiscActionButtonWidth(buttonLabel, row.Width, buttonWidthOverride);
             var buttonX = row.Right - buttonWidth - 10;
             var labelWidth = Math.Max(60, buttonX - row.X - 20);
             UiTextRenderer.DrawAlignedTextClipped(spriteBatch, label, row.X + 10, row.Y, labelWidth, row.Height, UiTextHorizontalAlignment.Left, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 238, 226, 255, 0.86f);
@@ -413,6 +414,27 @@ namespace JueMingZ.UI.Legacy
             var element = AddFrameElement(elements, elementId, label + ":" + buttonLabel, "button", elementRect);
             RecordFrameElementHover(element, isHovered);
             return isHovered ? element : null;
+        }
+
+        private static int CalculateSingleMiscActionButtonWidth(string buttonLabel, int rowWidth, int buttonWidthOverride)
+        {
+            var maxWidth = Math.Max(1, rowWidth - 150);
+            if (buttonWidthOverride > 0)
+            {
+                return Math.Min(buttonWidthOverride, maxWidth);
+            }
+
+            return Math.Min(Math.Max(118, UiTextRenderer.EstimateTextWidth(buttonLabel, 0.72f) + 20), Math.Max(118, maxWidth));
+        }
+
+        internal static int[] GetDeveloperEasterEggButtonWidthsForTesting(int rowWidth)
+        {
+            return new[]
+            {
+                CalculateSingleMiscActionButtonWidth("开启", rowWidth, ModeButtonWidth("开启")),
+                CalculateSingleMiscActionButtonWidth("有坏档的风险慎用", rowWidth, 0),
+                RowModeButtonHeight
+            };
         }
 
         private static float ResolveSingleMiscButtonScale(string text, int availableWidth)

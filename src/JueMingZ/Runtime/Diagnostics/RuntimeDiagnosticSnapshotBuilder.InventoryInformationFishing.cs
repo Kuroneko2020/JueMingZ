@@ -203,6 +203,14 @@ namespace JueMingZ.Runtime
             snapshot.MapQuickAnnouncementLastHotkeySummary = quickAnnouncement.LastHotkeySummary;
             snapshot.MapQuickAnnouncementLastInputConsumed = quickAnnouncement.LastInputConsumed;
             snapshot.MapQuickAnnouncementLastInputConsumeResult = quickAnnouncement.LastInputConsumeResult;
+            snapshot.MapQuickAnnouncementLastVisibilityVerdict = quickAnnouncement.LastVisibilityVerdict;
+            snapshot.MapQuickAnnouncementLastVisibilityReason = quickAnnouncement.LastVisibilityReason;
+            snapshot.MapQuickAnnouncementLastVisibleLayers = quickAnnouncement.LastVisibleLayers;
+            snapshot.MapQuickAnnouncementLastBlockedLayers = quickAnnouncement.LastBlockedLayers;
+            snapshot.MapQuickAnnouncementLastCircuitOnly = quickAnnouncement.LastCircuitOnly;
+            snapshot.MapQuickAnnouncementLastEchoGate = quickAnnouncement.LastEchoGate;
+            snapshot.MapQuickAnnouncementLastInvisibleAir = quickAnnouncement.LastInvisibleAir;
+            snapshot.MapQuickAnnouncementLastVisibilityUnavailableReason = quickAnnouncement.LastVisibilityUnavailableReason;
             snapshot.MapQuickAnnouncementLastDecisionUtc = quickAnnouncement.LastDecisionUtc;
             snapshot.FishingAutomationNeedsTick = settingsSnapshot.FishingAutomationNeedsTick;
             snapshot.FishingDisplayNeedsCatchResolver = settingsSnapshot.FishingDisplayNeedsCatchResolver;

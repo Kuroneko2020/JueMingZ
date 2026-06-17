@@ -21,7 +21,7 @@ namespace JueMingZ.UI.Legacy
         private static string _queryText = string.Empty;
         private static string _candidateMessage = string.Empty;
         private static bool _hasMoreCandidates;
-        private static string _statusMessage = "输入物品名、内部名或 #ID 后点击定位。";
+        private static string _statusMessage = "输入物品名、内部名或 #ID 后点击定位容器。";
         private static string _degradeMessage = string.Empty;
         private static string _noticeMessage = string.Empty;
         private static ChestItemLocatorQueryResult _queryResult = ChestItemLocatorQueryResolver.Resolve(string.Empty);
@@ -206,7 +206,7 @@ namespace JueMingZ.UI.Legacy
                 _queryText = string.Empty;
                 _candidateMessage = string.Empty;
                 _hasMoreCandidates = false;
-                _statusMessage = "输入物品名、内部名或 #ID 后点击定位。";
+                _statusMessage = "输入物品名、内部名或 #ID 后点击定位容器。";
                 _degradeMessage = string.Empty;
                 _noticeMessage = string.Empty;
                 _queryResult = ChestItemLocatorQueryResolver.Resolve(string.Empty);
@@ -267,7 +267,7 @@ namespace JueMingZ.UI.Legacy
                 _queryText = string.Empty;
                 _candidateMessage = string.Empty;
                 _hasMoreCandidates = false;
-                _statusMessage = "输入物品名、内部名或 #ID 后点击定位。";
+                _statusMessage = "输入物品名、内部名或 #ID 后点击定位容器。";
                 _degradeMessage = string.Empty;
                 _noticeMessage = string.Empty;
                 _queryResult = ChestItemLocatorQueryResolver.Resolve(string.Empty);
@@ -389,7 +389,7 @@ namespace JueMingZ.UI.Legacy
             _candidateMessage = BuildQueryStatusMessage(_queryResult);
             if (_queryResult != null && _queryResult.Succeeded)
             {
-                _statusMessage = "候选 " + _queryResult.CandidateCount.ToString(CultureInfo.InvariantCulture) + " 个，点击定位扫描附近箱子。";
+                _statusMessage = "候选 " + _queryResult.CandidateCount.ToString(CultureInfo.InvariantCulture) + " 个，点击定位容器扫描附近箱子。";
                 return;
             }
 
@@ -401,7 +401,7 @@ namespace JueMingZ.UI.Legacy
 
             if (string.IsNullOrWhiteSpace(_queryText))
             {
-                _statusMessage = "输入物品名、内部名或 #ID 后点击定位。";
+                _statusMessage = "输入物品名、内部名或 #ID 后点击定位容器。";
             }
         }
 

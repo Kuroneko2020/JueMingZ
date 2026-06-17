@@ -20,8 +20,20 @@ namespace JueMingZ.UI.Legacy
         private const string MapTravellingMerchantDirectionTooltip = "显示旅商方位";
         private const string MapQuickAnnouncementKeyboardSlotTooltip = "双击进行改键，不支持鼠标按键";
         private const string MapQuickAnnouncementTriggerSlotTooltip = "双击进行改键，支持鼠标按键";
-        private const string MapQuickAnnouncementOnTooltip = "按下快捷键对鼠标位置内容进行广播";
+        private const string MapQuickAnnouncementOnTooltip = "按下三个快捷键对光标位置内容进行广播";
         private const string MapQuickAnnouncementOffTooltip = "";
+        private const int MapQuickAnnouncementSlotWidth = 64;
+        private const int MapQuickAnnouncementSeparatorWidth = 12;
+        private const int MapQuickAnnouncementGap = 6;
+        private const int MapDeathHistoryRowIndex = 0;
+        private const int MapWorldDayCountRowIndex = 1;
+        private const int MapRevealedAreaRatioRowIndex = 2;
+        private const int MapPersistentDeathMarkersRowIndex = 3;
+        private const int MapFootprintsDisplayRowIndex = 4;
+        private const int MapRareCreatureDirectionRowIndex = 5;
+        private const int MapTravellingMerchantDirectionRowIndex = 6;
+        private const int MapQuickAnnouncementRowIndex = 7;
+        private const int MapCustomMarkersRowIndex = 8;
 
         private static LegacyUiElement DrawMapEnhancementPage(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements)
         {
@@ -31,32 +43,33 @@ namespace JueMingZ.UI.Legacy
             _mapRevealedAreaDetailsAnchorVisible = false;
             UpdateMapQuickAnnouncementHotkeyCapture(settings);
 
-            hovered = DrawMapPersistentDeathMarkersRow(spriteBatch, area, mouse, elements, 0, settings) ?? hovered;
             var deathHistorySummary = PlayerWorldDeathHistoryCache.ReadCurrentSummary();
-            hovered = DrawMapDeathHistoryRow(spriteBatch, area, mouse, elements, LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap, deathHistorySummary) ?? hovered;
+            hovered = DrawMapDeathHistoryRow(spriteBatch, area, mouse, elements, CalculateMapEnhancementRowContentY(MapDeathHistoryRowIndex), deathHistorySummary) ?? hovered;
             var playtime = PlayerWorldPlaytimeCache.ReadCurrent();
-            hovered = DrawMapWorldDayCountRow(spriteBatch, area, mouse, elements, LegacyUiMetrics.RowHeight * 2 + LegacyUiMetrics.SettingRowGap * 2, playtime) ?? hovered;
+            hovered = DrawMapWorldDayCountRow(spriteBatch, area, mouse, elements, CalculateMapEnhancementRowContentY(MapWorldDayCountRowIndex), playtime) ?? hovered;
             var exploration = PlayerWorldExplorationCache.ReadCurrent();
-            hovered = DrawMapRevealedAreaRatioRow(spriteBatch, area, mouse, elements, LegacyUiMetrics.RowHeight * 3 + LegacyUiMetrics.SettingRowGap * 3, exploration) ?? hovered;
-            hovered = DrawMapCustomMarkersRow(spriteBatch, area, mouse, elements, LegacyUiMetrics.RowHeight * 4 + LegacyUiMetrics.SettingRowGap * 4, settings) ?? hovered;
+            hovered = DrawMapRevealedAreaRatioRow(spriteBatch, area, mouse, elements, CalculateMapEnhancementRowContentY(MapRevealedAreaRatioRowIndex), exploration) ?? hovered;
+            hovered = DrawMapPersistentDeathMarkersRow(spriteBatch, area, mouse, elements, CalculateMapEnhancementRowContentY(MapPersistentDeathMarkersRowIndex), settings) ?? hovered;
+            hovered = DrawMapFootprintsDisplayRow(spriteBatch, area, mouse, elements, CalculateMapEnhancementRowContentY(MapFootprintsDisplayRowIndex), settings) ?? hovered;
+            hovered = DrawMapRareCreatureDirectionRow(spriteBatch, area, mouse, elements, CalculateMapEnhancementRowContentY(MapRareCreatureDirectionRowIndex), settings) ?? hovered;
+            hovered = DrawMapTravellingMerchantDirectionRow(spriteBatch, area, mouse, elements, CalculateMapEnhancementRowContentY(MapTravellingMerchantDirectionRowIndex), settings) ?? hovered;
+            hovered = DrawMapQuickAnnouncementRow(spriteBatch, area, mouse, elements, CalculateMapEnhancementRowContentY(MapQuickAnnouncementRowIndex), settings) ?? hovered;
+            hovered = DrawMapCustomMarkersRow(spriteBatch, area, mouse, elements, CalculateMapEnhancementRowContentY(MapCustomMarkersRowIndex), settings) ?? hovered;
             var markerListY = CalculateMapMarkerListContentY();
             hovered = DrawMapMarkerList(spriteBatch, area, mouse, elements, markerListY) ?? hovered;
-            var footprintsY = markerListY + CalculateMapMarkerListHeight() + LegacyUiMetrics.SettingRowGap;
-            hovered = DrawMapFootprintsDisplayRow(spriteBatch, area, mouse, elements, footprintsY, settings) ?? hovered;
-            var quickAnnouncementY = footprintsY + LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
-            hovered = DrawMapQuickAnnouncementRow(spriteBatch, area, mouse, elements, quickAnnouncementY, settings) ?? hovered;
-            var rareCreatureDirectionY = quickAnnouncementY + LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
-            hovered = DrawMapRareCreatureDirectionRow(spriteBatch, area, mouse, elements, rareCreatureDirectionY, settings) ?? hovered;
-            var travellingMerchantDirectionY = rareCreatureDirectionY + LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
-            hovered = DrawMapTravellingMerchantDirectionRow(spriteBatch, area, mouse, elements, travellingMerchantDirectionY, settings) ?? hovered;
             RegisterMapDeathHistoryPopupOverlay(area);
             RegisterMapRevealedAreaDetailsPopupOverlay(area, exploration);
             return hovered;
         }
 
+        private static int CalculateMapEnhancementRowContentY(int rowIndex)
+        {
+            return LegacyUiMetrics.RowHeight * rowIndex + LegacyUiMetrics.SettingRowGap * rowIndex;
+        }
+
         private static int CalculateMapMarkerListContentY()
         {
-            return LegacyUiMetrics.RowHeight * 5 + LegacyUiMetrics.SettingRowGap * 4;
+            return CalculateMapEnhancementRowContentY(MapCustomMarkersRowIndex) + LegacyUiMetrics.RowHeight;
         }
 
         private static LegacyUiElement DrawMapPersistentDeathMarkersRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, AppSettings settings)
@@ -245,13 +258,10 @@ namespace JueMingZ.UI.Legacy
 
             var context = LegacyUiContext.ForScrollArea(spriteBatch, mouse, area, elements, ConfigService.AppSettings ?? AppSettings.CreateDefault());
             LegacyUiTheme.DrawRowClipped(spriteBatch, row, area.Viewport);
-            const int buttonWidth = 68;
-            const int countWidth = 82;
-            const int gap = 6;
-            var buttonY = RowModeButtonY(row);
-            var detailsRect = new LegacyUiRect(row.Right - buttonWidth - 10, buttonY, buttonWidth, RowModeButtonHeight);
-            var countRect = new LegacyUiRect(detailsRect.X - gap - countWidth, buttonY, countWidth, RowModeButtonHeight);
-            var labelWidth = Math.Max(60, countRect.X - row.X - 20);
+            LegacyUiRect detailsRect;
+            LegacyUiRect countRect;
+            CalculateMapDeathHistoryButtonRects(row, out detailsRect, out countRect);
+            var labelWidth = Math.Max(60, detailsRect.X - row.X - 20);
 
             UiTextRenderer.DrawAlignedTextClipped(
                 spriteBatch,
@@ -309,6 +319,16 @@ namespace JueMingZ.UI.Legacy
             }
 
             return element != null && context.IsElementHovered(element.Id, detailsRect) ? element : null;
+        }
+
+        private static void CalculateMapDeathHistoryButtonRects(LegacyUiRect row, out LegacyUiRect detailsRect, out LegacyUiRect countRect)
+        {
+            const int buttonWidth = 68;
+            const int countWidth = 82;
+            const int gap = 6;
+            var buttonY = RowModeButtonY(row);
+            countRect = new LegacyUiRect(row.Right - countWidth - 10, buttonY, countWidth, RowModeButtonHeight);
+            detailsRect = new LegacyUiRect(countRect.X - gap - buttonWidth, buttonY, buttonWidth, RowModeButtonHeight);
         }
 
         private static string BuildMapDeathHistoryCountText(PlayerWorldDeathHistoryReadResult summary)
@@ -716,63 +736,55 @@ namespace JueMingZ.UI.Legacy
                 255,
                 0.86f);
 
-            const int gap = 6;
-            const int switchWidth = 54;
-            var buttonY = RowModeButtonY(row);
-            var available = Math.Max(1, row.Width - 120);
-            var slotWidth = Math.Max(58, Math.Min(72, (available - switchWidth * 2 - gap * 4) / 3));
-            var totalWidth = slotWidth * 3 + switchWidth * 2 + gap * 4;
-            var x = row.Right - totalWidth - 10;
+            var layout = CalculateMapQuickAnnouncementLayout(row);
             var hovered = (LegacyUiElement)null;
 
             hovered = DrawMapQuickAnnouncementKeyButton(
                 context,
                 area.Viewport,
-                new LegacyUiRect(x, buttonY, slotWidth, RowModeButtonHeight),
+                layout[0],
                 "map-quick-announcement-key:1",
                 "快捷宣告:前置键1",
                 BuildMapQuickAnnouncementKeyText(hotkey.Slot1, MapQuickAnnouncementSettings.HotkeySlot1Id),
                 IsMapQuickAnnouncementHotkeyCaptureSlot(MapQuickAnnouncementSettings.HotkeySlot1Id),
                 MapQuickAnnouncementKeyboardSlotTooltip) ?? hovered;
-            x += slotWidth + gap;
+            DrawMapQuickAnnouncementSeparator(spriteBatch, area.Viewport, layout[1]);
 
             hovered = DrawMapQuickAnnouncementKeyButton(
                 context,
                 area.Viewport,
-                new LegacyUiRect(x, buttonY, slotWidth, RowModeButtonHeight),
+                layout[2],
                 "map-quick-announcement-key:2",
                 "快捷宣告:前置键2",
                 BuildMapQuickAnnouncementKeyText(hotkey.Slot2, MapQuickAnnouncementSettings.HotkeySlot2Id),
                 IsMapQuickAnnouncementHotkeyCaptureSlot(MapQuickAnnouncementSettings.HotkeySlot2Id),
                 MapQuickAnnouncementKeyboardSlotTooltip) ?? hovered;
-            x += slotWidth + gap;
+            DrawMapQuickAnnouncementSeparator(spriteBatch, area.Viewport, layout[3]);
 
             hovered = DrawMapQuickAnnouncementKeyButton(
                 context,
                 area.Viewport,
-                new LegacyUiRect(x, buttonY, slotWidth, RowModeButtonHeight),
+                layout[4],
                 "map-quick-announcement-key:trigger",
                 "快捷宣告:触发键",
                 BuildMapQuickAnnouncementKeyText(hotkey.TriggerKey, MapQuickAnnouncementSettings.HotkeyTriggerId),
                 IsMapQuickAnnouncementHotkeyCaptureSlot(MapQuickAnnouncementSettings.HotkeyTriggerId),
                 MapQuickAnnouncementTriggerSlotTooltip) ?? hovered;
-            x += slotWidth + gap;
 
             hovered = DrawMapQuickAnnouncementKeyButton(
                 context,
                 area.Viewport,
-                new LegacyUiRect(x, buttonY, switchWidth, RowModeButtonHeight),
+                layout[5],
                 "map-quick-announcement-mode:On",
                 "快捷宣告:开启",
                 "开启",
                 settings.MapQuickAnnouncementEnabled,
                 MapQuickAnnouncementOnTooltip) ?? hovered;
-            x += switchWidth + gap;
 
             hovered = DrawMapQuickAnnouncementKeyButton(
                 context,
                 area.Viewport,
-                new LegacyUiRect(x, buttonY, switchWidth, RowModeButtonHeight),
+                layout[6],
                 "map-quick-announcement-mode:Off",
                 "快捷宣告:关闭",
                 "关闭",
@@ -780,6 +792,55 @@ namespace JueMingZ.UI.Legacy
                 MapQuickAnnouncementOffTooltip) ?? hovered;
 
             return hovered;
+        }
+
+        private static LegacyUiRect[] CalculateMapQuickAnnouncementLayout(LegacyUiRect row)
+        {
+            var buttonY = RowModeButtonY(row);
+            var onWidth = ModeButtonWidth("开启");
+            var offWidth = ModeButtonWidth("关闭");
+            var totalWidth =
+                MapQuickAnnouncementSlotWidth * 3 +
+                MapQuickAnnouncementSeparatorWidth * 2 +
+                onWidth +
+                offWidth +
+                MapQuickAnnouncementGap * 6;
+            var x = row.Right - totalWidth - 10;
+            var rects = new LegacyUiRect[7];
+            rects[0] = new LegacyUiRect(x, buttonY, MapQuickAnnouncementSlotWidth, RowModeButtonHeight);
+            x += MapQuickAnnouncementSlotWidth + MapQuickAnnouncementGap;
+            rects[1] = new LegacyUiRect(x, buttonY, MapQuickAnnouncementSeparatorWidth, RowModeButtonHeight);
+            x += MapQuickAnnouncementSeparatorWidth + MapQuickAnnouncementGap;
+            rects[2] = new LegacyUiRect(x, buttonY, MapQuickAnnouncementSlotWidth, RowModeButtonHeight);
+            x += MapQuickAnnouncementSlotWidth + MapQuickAnnouncementGap;
+            rects[3] = new LegacyUiRect(x, buttonY, MapQuickAnnouncementSeparatorWidth, RowModeButtonHeight);
+            x += MapQuickAnnouncementSeparatorWidth + MapQuickAnnouncementGap;
+            rects[4] = new LegacyUiRect(x, buttonY, MapQuickAnnouncementSlotWidth, RowModeButtonHeight);
+            x += MapQuickAnnouncementSlotWidth + MapQuickAnnouncementGap;
+            rects[5] = new LegacyUiRect(x, buttonY, onWidth, RowModeButtonHeight);
+            x += onWidth + MapQuickAnnouncementGap;
+            rects[6] = new LegacyUiRect(x, buttonY, offWidth, RowModeButtonHeight);
+            return rects;
+        }
+
+        private static void DrawMapQuickAnnouncementSeparator(object spriteBatch, LegacyUiRect clip, LegacyUiRect rect)
+        {
+            UiTextRenderer.DrawCenteredTextClipped(
+                spriteBatch,
+                "+",
+                rect.X,
+                rect.Y,
+                rect.Width,
+                rect.Height,
+                clip.X,
+                clip.Y,
+                clip.Width,
+                clip.Height,
+                205,
+                218,
+                238,
+                235,
+                0.74f);
         }
 
         private static LegacyUiElement DrawMapQuickAnnouncementKeyButton(
@@ -855,6 +916,62 @@ namespace JueMingZ.UI.Legacy
         internal static int CalculateMapMarkerListContentYForTesting()
         {
             return CalculateMapMarkerListContentY();
+        }
+
+        internal static int GetMapEnhancementRowContentYForTesting(string rowName)
+        {
+            switch (rowName)
+            {
+                case "死亡信息":
+                    return CalculateMapEnhancementRowContentY(MapDeathHistoryRowIndex);
+                case "世界天数":
+                    return CalculateMapEnhancementRowContentY(MapWorldDayCountRowIndex);
+                case "揭示区域":
+                    return CalculateMapEnhancementRowContentY(MapRevealedAreaRatioRowIndex);
+                case "死亡点常驻":
+                    return CalculateMapEnhancementRowContentY(MapPersistentDeathMarkersRowIndex);
+                case "足迹":
+                    return CalculateMapEnhancementRowContentY(MapFootprintsDisplayRowIndex);
+                case "稀有生物显示方向":
+                    return CalculateMapEnhancementRowContentY(MapRareCreatureDirectionRowIndex);
+                case "旅商显示方向":
+                    return CalculateMapEnhancementRowContentY(MapTravellingMerchantDirectionRowIndex);
+                case "快捷宣告":
+                    return CalculateMapEnhancementRowContentY(MapQuickAnnouncementRowIndex);
+                case "地图标记":
+                    return CalculateMapEnhancementRowContentY(MapCustomMarkersRowIndex);
+                default:
+                    return -1;
+            }
+        }
+
+        internal static string[] GetMapEnhancementRowOrderForTesting()
+        {
+            return new[]
+            {
+                "死亡信息",
+                "世界天数",
+                "揭示区域",
+                "死亡点常驻",
+                "足迹",
+                "稀有生物显示方向",
+                "旅商显示方向",
+                "快捷宣告",
+                "地图标记"
+            };
+        }
+
+        internal static LegacyUiRect[] CalculateMapDeathHistoryButtonRectsForTesting(LegacyUiRect row)
+        {
+            LegacyUiRect detailsRect;
+            LegacyUiRect countRect;
+            CalculateMapDeathHistoryButtonRects(row, out detailsRect, out countRect);
+            return new[] { detailsRect, countRect };
+        }
+
+        internal static LegacyUiRect[] CalculateMapQuickAnnouncementLayoutForTesting(LegacyUiRect row)
+        {
+            return CalculateMapQuickAnnouncementLayout(row);
         }
 
         internal static string BuildMapCustomMarkersLabelForTesting(int markerCount)

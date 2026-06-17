@@ -240,6 +240,14 @@ namespace JueMingZ.Diagnostics
                 _snapshot.MapFootprintsPlaybackPrefixMouseCaptured = data.MouseCaptured;
                 _snapshot.MapFootprintsPlaybackPrefixClickConsumed = data.ClickConsumed;
                 _snapshot.MapFootprintsPlaybackPrefixScrollConsumed = data.ScrollConsumed;
+                _snapshot.MapFootprintsPlaybackPrefixShouldSuppressLeftInput = data.ShouldSuppressLeftInput;
+                _snapshot.MapFootprintsPlaybackPrefixShouldSuppressNonLeftInput = data.ShouldSuppressNonLeftInput;
+                _snapshot.MapFootprintsPlaybackPrefixShouldClearPanState = data.ShouldClearPanState;
+                _snapshot.MapFootprintsPlaybackPrefixLeftInputSuppressed = data.LeftInputSuppressed;
+                _snapshot.MapFootprintsPlaybackPrefixNonLeftInputSuppressed = data.NonLeftInputSuppressed;
+                _snapshot.MapFootprintsPlaybackPrefixScrollSuppressed = data.ScrollSuppressed;
+                _snapshot.MapFootprintsPlaybackPrefixPanStateClearAttempted = data.PanStateClearAttempted;
+                _snapshot.MapFootprintsPlaybackPrefixPanStateClearSucceeded = data.PanStateClearSucceeded;
                 _snapshot.MapFootprintsPlaybackPrefixLeftDown = data.LeftDown;
                 _snapshot.MapFootprintsPlaybackPrefixLeftPressed = data.LeftPressed;
                 _snapshot.MapFootprintsPlaybackPrefixLeftReleased = data.LeftReleased;
@@ -249,6 +257,14 @@ namespace JueMingZ.Diagnostics
                 _snapshot.MapFootprintsPlaybackPrefixMainMouseLeftAfter = data.MainMouseLeftAfter;
                 _snapshot.MapFootprintsPlaybackPrefixMainMouseLeftReleaseBefore = data.MainMouseLeftReleaseBefore;
                 _snapshot.MapFootprintsPlaybackPrefixMainMouseLeftReleaseAfter = data.MainMouseLeftReleaseAfter;
+                _snapshot.MapFootprintsPlaybackPrefixMainMouseRightBefore = data.MainMouseRightBefore;
+                _snapshot.MapFootprintsPlaybackPrefixMainMouseRightAfter = data.MainMouseRightAfter;
+                _snapshot.MapFootprintsPlaybackPrefixMainMouseRightReleaseBefore = data.MainMouseRightReleaseBefore;
+                _snapshot.MapFootprintsPlaybackPrefixMainMouseRightReleaseAfter = data.MainMouseRightReleaseAfter;
+                _snapshot.MapFootprintsPlaybackPrefixMainMouseScrollWheelBefore = data.MainMouseScrollWheelBefore;
+                _snapshot.MapFootprintsPlaybackPrefixMainMouseScrollWheelAfter = data.MainMouseScrollWheelAfter;
+                _snapshot.MapFootprintsPlaybackPrefixMainOldMouseScrollWheelBefore = data.MainOldMouseScrollWheelBefore;
+                _snapshot.MapFootprintsPlaybackPrefixMainOldMouseScrollWheelAfter = data.MainOldMouseScrollWheelAfter;
                 _snapshot.MapFootprintsPlaybackPrefixMainMouseInterfaceBefore = data.MainMouseInterfaceBefore;
                 _snapshot.MapFootprintsPlaybackPrefixMainMouseInterfaceAfter = data.MainMouseInterfaceAfter;
                 _snapshot.MapFootprintsPlaybackPrefixMainBlockMouseBefore = data.MainBlockMouseBefore;
@@ -256,6 +272,33 @@ namespace JueMingZ.Diagnostics
                 _snapshot.MapFootprintsPlaybackPrefixPlayerMouseInterfaceBefore = data.PlayerMouseInterfaceBefore;
                 _snapshot.MapFootprintsPlaybackPrefixPlayerMouseInterfaceAfter = data.PlayerMouseInterfaceAfter;
                 _snapshot.MapFootprintsPlaybackPrefixUtc = data.Utc;
+            }
+        }
+
+        public static void RecordPlaybackAfterPlayerInputGuard(MapFootprintPlaybackAfterPlayerInputDiagnosticsData data)
+        {
+            lock (SyncRoot)
+            {
+                ClearPlaybackAfterPlayerInputGuardLocked();
+                if (data == null)
+                {
+                    return;
+                }
+
+                _snapshot.MapFootprintsPlaybackAfterPlayerInputGuardActive = data.Active;
+                _snapshot.MapFootprintsPlaybackAfterPlayerInputShouldSuppressLeftInput = data.ShouldSuppressLeftInput;
+                _snapshot.MapFootprintsPlaybackAfterPlayerInputShouldSuppressNonLeftInput = data.ShouldSuppressNonLeftInput;
+                _snapshot.MapFootprintsPlaybackAfterPlayerInputReleaseFrame = data.ReleaseFrame;
+                _snapshot.MapFootprintsPlaybackAfterPlayerInputMainMouseLeftBefore = data.MainMouseLeftBefore;
+                _snapshot.MapFootprintsPlaybackAfterPlayerInputMainMouseLeftAfter = data.MainMouseLeftAfter;
+                _snapshot.MapFootprintsPlaybackAfterPlayerInputMainMouseLeftReleaseBefore = data.MainMouseLeftReleaseBefore;
+                _snapshot.MapFootprintsPlaybackAfterPlayerInputMainMouseLeftReleaseAfter = data.MainMouseLeftReleaseAfter;
+                _snapshot.MapFootprintsPlaybackAfterPlayerInputMainMouseRightBefore = data.MainMouseRightBefore;
+                _snapshot.MapFootprintsPlaybackAfterPlayerInputMainMouseRightAfter = data.MainMouseRightAfter;
+                _snapshot.MapFootprintsPlaybackAfterPlayerInputMainMouseRightReleaseBefore = data.MainMouseRightReleaseBefore;
+                _snapshot.MapFootprintsPlaybackAfterPlayerInputMainMouseRightReleaseAfter = data.MainMouseRightReleaseAfter;
+                _snapshot.MapFootprintsPlaybackAfterPlayerInputGameUpdateCount = data.GameUpdateCount;
+                _snapshot.MapFootprintsPlaybackAfterPlayerInputUtc = data.Utc;
             }
         }
 
@@ -277,6 +320,10 @@ namespace JueMingZ.Diagnostics
                 _snapshot.MapFootprintsPlaybackDrawBarHovered = data.BarHovered;
                 _snapshot.MapFootprintsPlaybackDrawMainMouseLeft = data.MainMouseLeft;
                 _snapshot.MapFootprintsPlaybackDrawMainMouseLeftRelease = data.MainMouseLeftRelease;
+                _snapshot.MapFootprintsPlaybackDrawMainMouseRight = data.MainMouseRight;
+                _snapshot.MapFootprintsPlaybackDrawMainMouseRightRelease = data.MainMouseRightRelease;
+                _snapshot.MapFootprintsPlaybackDrawMainMouseScrollWheel = data.MainMouseScrollWheel;
+                _snapshot.MapFootprintsPlaybackDrawMainOldMouseScrollWheel = data.MainOldMouseScrollWheel;
                 _snapshot.MapFootprintsPlaybackDrawMainMouseInterface = data.MainMouseInterface;
                 _snapshot.MapFootprintsPlaybackDrawMainBlockMouse = data.MainBlockMouse;
                 _snapshot.MapFootprintsPlaybackDrawPlayerMouseInterface = data.PlayerMouseInterface;
@@ -378,6 +425,14 @@ namespace JueMingZ.Diagnostics
             _snapshot.MapFootprintsPlaybackPrefixMouseCaptured = false;
             _snapshot.MapFootprintsPlaybackPrefixClickConsumed = false;
             _snapshot.MapFootprintsPlaybackPrefixScrollConsumed = false;
+            _snapshot.MapFootprintsPlaybackPrefixShouldSuppressLeftInput = false;
+            _snapshot.MapFootprintsPlaybackPrefixShouldSuppressNonLeftInput = false;
+            _snapshot.MapFootprintsPlaybackPrefixShouldClearPanState = false;
+            _snapshot.MapFootprintsPlaybackPrefixLeftInputSuppressed = false;
+            _snapshot.MapFootprintsPlaybackPrefixNonLeftInputSuppressed = false;
+            _snapshot.MapFootprintsPlaybackPrefixScrollSuppressed = false;
+            _snapshot.MapFootprintsPlaybackPrefixPanStateClearAttempted = false;
+            _snapshot.MapFootprintsPlaybackPrefixPanStateClearSucceeded = false;
             _snapshot.MapFootprintsPlaybackPrefixLeftDown = false;
             _snapshot.MapFootprintsPlaybackPrefixLeftPressed = false;
             _snapshot.MapFootprintsPlaybackPrefixLeftReleased = false;
@@ -387,6 +442,14 @@ namespace JueMingZ.Diagnostics
             _snapshot.MapFootprintsPlaybackPrefixMainMouseLeftAfter = false;
             _snapshot.MapFootprintsPlaybackPrefixMainMouseLeftReleaseBefore = false;
             _snapshot.MapFootprintsPlaybackPrefixMainMouseLeftReleaseAfter = false;
+            _snapshot.MapFootprintsPlaybackPrefixMainMouseRightBefore = false;
+            _snapshot.MapFootprintsPlaybackPrefixMainMouseRightAfter = false;
+            _snapshot.MapFootprintsPlaybackPrefixMainMouseRightReleaseBefore = false;
+            _snapshot.MapFootprintsPlaybackPrefixMainMouseRightReleaseAfter = false;
+            _snapshot.MapFootprintsPlaybackPrefixMainMouseScrollWheelBefore = 0;
+            _snapshot.MapFootprintsPlaybackPrefixMainMouseScrollWheelAfter = 0;
+            _snapshot.MapFootprintsPlaybackPrefixMainOldMouseScrollWheelBefore = 0;
+            _snapshot.MapFootprintsPlaybackPrefixMainOldMouseScrollWheelAfter = 0;
             _snapshot.MapFootprintsPlaybackPrefixMainMouseInterfaceBefore = false;
             _snapshot.MapFootprintsPlaybackPrefixMainMouseInterfaceAfter = false;
             _snapshot.MapFootprintsPlaybackPrefixMainBlockMouseBefore = false;
@@ -394,6 +457,24 @@ namespace JueMingZ.Diagnostics
             _snapshot.MapFootprintsPlaybackPrefixPlayerMouseInterfaceBefore = false;
             _snapshot.MapFootprintsPlaybackPrefixPlayerMouseInterfaceAfter = false;
             _snapshot.MapFootprintsPlaybackPrefixUtc = null;
+        }
+
+        private static void ClearPlaybackAfterPlayerInputGuardLocked()
+        {
+            _snapshot.MapFootprintsPlaybackAfterPlayerInputGuardActive = false;
+            _snapshot.MapFootprintsPlaybackAfterPlayerInputShouldSuppressLeftInput = false;
+            _snapshot.MapFootprintsPlaybackAfterPlayerInputShouldSuppressNonLeftInput = false;
+            _snapshot.MapFootprintsPlaybackAfterPlayerInputReleaseFrame = false;
+            _snapshot.MapFootprintsPlaybackAfterPlayerInputMainMouseLeftBefore = false;
+            _snapshot.MapFootprintsPlaybackAfterPlayerInputMainMouseLeftAfter = false;
+            _snapshot.MapFootprintsPlaybackAfterPlayerInputMainMouseLeftReleaseBefore = false;
+            _snapshot.MapFootprintsPlaybackAfterPlayerInputMainMouseLeftReleaseAfter = false;
+            _snapshot.MapFootprintsPlaybackAfterPlayerInputMainMouseRightBefore = false;
+            _snapshot.MapFootprintsPlaybackAfterPlayerInputMainMouseRightAfter = false;
+            _snapshot.MapFootprintsPlaybackAfterPlayerInputMainMouseRightReleaseBefore = false;
+            _snapshot.MapFootprintsPlaybackAfterPlayerInputMainMouseRightReleaseAfter = false;
+            _snapshot.MapFootprintsPlaybackAfterPlayerInputGameUpdateCount = 0L;
+            _snapshot.MapFootprintsPlaybackAfterPlayerInputUtc = null;
         }
 
         private static void ClearPlaybackDrawInputLocked()
@@ -406,6 +487,10 @@ namespace JueMingZ.Diagnostics
             _snapshot.MapFootprintsPlaybackDrawBarHovered = false;
             _snapshot.MapFootprintsPlaybackDrawMainMouseLeft = false;
             _snapshot.MapFootprintsPlaybackDrawMainMouseLeftRelease = false;
+            _snapshot.MapFootprintsPlaybackDrawMainMouseRight = false;
+            _snapshot.MapFootprintsPlaybackDrawMainMouseRightRelease = false;
+            _snapshot.MapFootprintsPlaybackDrawMainMouseScrollWheel = 0;
+            _snapshot.MapFootprintsPlaybackDrawMainOldMouseScrollWheel = 0;
             _snapshot.MapFootprintsPlaybackDrawMainMouseInterface = false;
             _snapshot.MapFootprintsPlaybackDrawMainBlockMouse = false;
             _snapshot.MapFootprintsPlaybackDrawPlayerMouseInterface = false;
@@ -527,6 +612,14 @@ namespace JueMingZ.Diagnostics
         public bool MapFootprintsPlaybackPrefixMouseCaptured { get; set; }
         public bool MapFootprintsPlaybackPrefixClickConsumed { get; set; }
         public bool MapFootprintsPlaybackPrefixScrollConsumed { get; set; }
+        public bool MapFootprintsPlaybackPrefixShouldSuppressLeftInput { get; set; }
+        public bool MapFootprintsPlaybackPrefixShouldSuppressNonLeftInput { get; set; }
+        public bool MapFootprintsPlaybackPrefixShouldClearPanState { get; set; }
+        public bool MapFootprintsPlaybackPrefixLeftInputSuppressed { get; set; }
+        public bool MapFootprintsPlaybackPrefixNonLeftInputSuppressed { get; set; }
+        public bool MapFootprintsPlaybackPrefixScrollSuppressed { get; set; }
+        public bool MapFootprintsPlaybackPrefixPanStateClearAttempted { get; set; }
+        public bool MapFootprintsPlaybackPrefixPanStateClearSucceeded { get; set; }
         public bool MapFootprintsPlaybackPrefixLeftDown { get; set; }
         public bool MapFootprintsPlaybackPrefixLeftPressed { get; set; }
         public bool MapFootprintsPlaybackPrefixLeftReleased { get; set; }
@@ -536,6 +629,14 @@ namespace JueMingZ.Diagnostics
         public bool MapFootprintsPlaybackPrefixMainMouseLeftAfter { get; set; }
         public bool MapFootprintsPlaybackPrefixMainMouseLeftReleaseBefore { get; set; }
         public bool MapFootprintsPlaybackPrefixMainMouseLeftReleaseAfter { get; set; }
+        public bool MapFootprintsPlaybackPrefixMainMouseRightBefore { get; set; }
+        public bool MapFootprintsPlaybackPrefixMainMouseRightAfter { get; set; }
+        public bool MapFootprintsPlaybackPrefixMainMouseRightReleaseBefore { get; set; }
+        public bool MapFootprintsPlaybackPrefixMainMouseRightReleaseAfter { get; set; }
+        public int MapFootprintsPlaybackPrefixMainMouseScrollWheelBefore { get; set; }
+        public int MapFootprintsPlaybackPrefixMainMouseScrollWheelAfter { get; set; }
+        public int MapFootprintsPlaybackPrefixMainOldMouseScrollWheelBefore { get; set; }
+        public int MapFootprintsPlaybackPrefixMainOldMouseScrollWheelAfter { get; set; }
         public bool MapFootprintsPlaybackPrefixMainMouseInterfaceBefore { get; set; }
         public bool MapFootprintsPlaybackPrefixMainMouseInterfaceAfter { get; set; }
         public bool MapFootprintsPlaybackPrefixMainBlockMouseBefore { get; set; }
@@ -543,6 +644,20 @@ namespace JueMingZ.Diagnostics
         public bool MapFootprintsPlaybackPrefixPlayerMouseInterfaceBefore { get; set; }
         public bool MapFootprintsPlaybackPrefixPlayerMouseInterfaceAfter { get; set; }
         public DateTime? MapFootprintsPlaybackPrefixUtc { get; set; }
+        public bool MapFootprintsPlaybackAfterPlayerInputGuardActive { get; set; }
+        public bool MapFootprintsPlaybackAfterPlayerInputShouldSuppressLeftInput { get; set; }
+        public bool MapFootprintsPlaybackAfterPlayerInputShouldSuppressNonLeftInput { get; set; }
+        public bool MapFootprintsPlaybackAfterPlayerInputReleaseFrame { get; set; }
+        public bool MapFootprintsPlaybackAfterPlayerInputMainMouseLeftBefore { get; set; }
+        public bool MapFootprintsPlaybackAfterPlayerInputMainMouseLeftAfter { get; set; }
+        public bool MapFootprintsPlaybackAfterPlayerInputMainMouseLeftReleaseBefore { get; set; }
+        public bool MapFootprintsPlaybackAfterPlayerInputMainMouseLeftReleaseAfter { get; set; }
+        public bool MapFootprintsPlaybackAfterPlayerInputMainMouseRightBefore { get; set; }
+        public bool MapFootprintsPlaybackAfterPlayerInputMainMouseRightAfter { get; set; }
+        public bool MapFootprintsPlaybackAfterPlayerInputMainMouseRightReleaseBefore { get; set; }
+        public bool MapFootprintsPlaybackAfterPlayerInputMainMouseRightReleaseAfter { get; set; }
+        public long MapFootprintsPlaybackAfterPlayerInputGameUpdateCount { get; set; }
+        public DateTime? MapFootprintsPlaybackAfterPlayerInputUtc { get; set; }
         public string MapFootprintsPlaybackDrawHitTarget { get; set; }
         public string MapFootprintsPlaybackDrawMouseReadMode { get; set; }
         public int MapFootprintsPlaybackDrawMouseX { get; set; }
@@ -551,6 +666,10 @@ namespace JueMingZ.Diagnostics
         public bool MapFootprintsPlaybackDrawBarHovered { get; set; }
         public bool MapFootprintsPlaybackDrawMainMouseLeft { get; set; }
         public bool MapFootprintsPlaybackDrawMainMouseLeftRelease { get; set; }
+        public bool MapFootprintsPlaybackDrawMainMouseRight { get; set; }
+        public bool MapFootprintsPlaybackDrawMainMouseRightRelease { get; set; }
+        public int MapFootprintsPlaybackDrawMainMouseScrollWheel { get; set; }
+        public int MapFootprintsPlaybackDrawMainOldMouseScrollWheel { get; set; }
         public bool MapFootprintsPlaybackDrawMainMouseInterface { get; set; }
         public bool MapFootprintsPlaybackDrawMainBlockMouse { get; set; }
         public bool MapFootprintsPlaybackDrawPlayerMouseInterface { get; set; }
@@ -704,6 +823,14 @@ namespace JueMingZ.Diagnostics
                 MapFootprintsPlaybackPrefixMouseCaptured = MapFootprintsPlaybackPrefixMouseCaptured,
                 MapFootprintsPlaybackPrefixClickConsumed = MapFootprintsPlaybackPrefixClickConsumed,
                 MapFootprintsPlaybackPrefixScrollConsumed = MapFootprintsPlaybackPrefixScrollConsumed,
+                MapFootprintsPlaybackPrefixShouldSuppressLeftInput = MapFootprintsPlaybackPrefixShouldSuppressLeftInput,
+                MapFootprintsPlaybackPrefixShouldSuppressNonLeftInput = MapFootprintsPlaybackPrefixShouldSuppressNonLeftInput,
+                MapFootprintsPlaybackPrefixShouldClearPanState = MapFootprintsPlaybackPrefixShouldClearPanState,
+                MapFootprintsPlaybackPrefixLeftInputSuppressed = MapFootprintsPlaybackPrefixLeftInputSuppressed,
+                MapFootprintsPlaybackPrefixNonLeftInputSuppressed = MapFootprintsPlaybackPrefixNonLeftInputSuppressed,
+                MapFootprintsPlaybackPrefixScrollSuppressed = MapFootprintsPlaybackPrefixScrollSuppressed,
+                MapFootprintsPlaybackPrefixPanStateClearAttempted = MapFootprintsPlaybackPrefixPanStateClearAttempted,
+                MapFootprintsPlaybackPrefixPanStateClearSucceeded = MapFootprintsPlaybackPrefixPanStateClearSucceeded,
                 MapFootprintsPlaybackPrefixLeftDown = MapFootprintsPlaybackPrefixLeftDown,
                 MapFootprintsPlaybackPrefixLeftPressed = MapFootprintsPlaybackPrefixLeftPressed,
                 MapFootprintsPlaybackPrefixLeftReleased = MapFootprintsPlaybackPrefixLeftReleased,
@@ -713,6 +840,14 @@ namespace JueMingZ.Diagnostics
                 MapFootprintsPlaybackPrefixMainMouseLeftAfter = MapFootprintsPlaybackPrefixMainMouseLeftAfter,
                 MapFootprintsPlaybackPrefixMainMouseLeftReleaseBefore = MapFootprintsPlaybackPrefixMainMouseLeftReleaseBefore,
                 MapFootprintsPlaybackPrefixMainMouseLeftReleaseAfter = MapFootprintsPlaybackPrefixMainMouseLeftReleaseAfter,
+                MapFootprintsPlaybackPrefixMainMouseRightBefore = MapFootprintsPlaybackPrefixMainMouseRightBefore,
+                MapFootprintsPlaybackPrefixMainMouseRightAfter = MapFootprintsPlaybackPrefixMainMouseRightAfter,
+                MapFootprintsPlaybackPrefixMainMouseRightReleaseBefore = MapFootprintsPlaybackPrefixMainMouseRightReleaseBefore,
+                MapFootprintsPlaybackPrefixMainMouseRightReleaseAfter = MapFootprintsPlaybackPrefixMainMouseRightReleaseAfter,
+                MapFootprintsPlaybackPrefixMainMouseScrollWheelBefore = MapFootprintsPlaybackPrefixMainMouseScrollWheelBefore,
+                MapFootprintsPlaybackPrefixMainMouseScrollWheelAfter = MapFootprintsPlaybackPrefixMainMouseScrollWheelAfter,
+                MapFootprintsPlaybackPrefixMainOldMouseScrollWheelBefore = MapFootprintsPlaybackPrefixMainOldMouseScrollWheelBefore,
+                MapFootprintsPlaybackPrefixMainOldMouseScrollWheelAfter = MapFootprintsPlaybackPrefixMainOldMouseScrollWheelAfter,
                 MapFootprintsPlaybackPrefixMainMouseInterfaceBefore = MapFootprintsPlaybackPrefixMainMouseInterfaceBefore,
                 MapFootprintsPlaybackPrefixMainMouseInterfaceAfter = MapFootprintsPlaybackPrefixMainMouseInterfaceAfter,
                 MapFootprintsPlaybackPrefixMainBlockMouseBefore = MapFootprintsPlaybackPrefixMainBlockMouseBefore,
@@ -720,6 +855,20 @@ namespace JueMingZ.Diagnostics
                 MapFootprintsPlaybackPrefixPlayerMouseInterfaceBefore = MapFootprintsPlaybackPrefixPlayerMouseInterfaceBefore,
                 MapFootprintsPlaybackPrefixPlayerMouseInterfaceAfter = MapFootprintsPlaybackPrefixPlayerMouseInterfaceAfter,
                 MapFootprintsPlaybackPrefixUtc = MapFootprintsPlaybackPrefixUtc,
+                MapFootprintsPlaybackAfterPlayerInputGuardActive = MapFootprintsPlaybackAfterPlayerInputGuardActive,
+                MapFootprintsPlaybackAfterPlayerInputShouldSuppressLeftInput = MapFootprintsPlaybackAfterPlayerInputShouldSuppressLeftInput,
+                MapFootprintsPlaybackAfterPlayerInputShouldSuppressNonLeftInput = MapFootprintsPlaybackAfterPlayerInputShouldSuppressNonLeftInput,
+                MapFootprintsPlaybackAfterPlayerInputReleaseFrame = MapFootprintsPlaybackAfterPlayerInputReleaseFrame,
+                MapFootprintsPlaybackAfterPlayerInputMainMouseLeftBefore = MapFootprintsPlaybackAfterPlayerInputMainMouseLeftBefore,
+                MapFootprintsPlaybackAfterPlayerInputMainMouseLeftAfter = MapFootprintsPlaybackAfterPlayerInputMainMouseLeftAfter,
+                MapFootprintsPlaybackAfterPlayerInputMainMouseLeftReleaseBefore = MapFootprintsPlaybackAfterPlayerInputMainMouseLeftReleaseBefore,
+                MapFootprintsPlaybackAfterPlayerInputMainMouseLeftReleaseAfter = MapFootprintsPlaybackAfterPlayerInputMainMouseLeftReleaseAfter,
+                MapFootprintsPlaybackAfterPlayerInputMainMouseRightBefore = MapFootprintsPlaybackAfterPlayerInputMainMouseRightBefore,
+                MapFootprintsPlaybackAfterPlayerInputMainMouseRightAfter = MapFootprintsPlaybackAfterPlayerInputMainMouseRightAfter,
+                MapFootprintsPlaybackAfterPlayerInputMainMouseRightReleaseBefore = MapFootprintsPlaybackAfterPlayerInputMainMouseRightReleaseBefore,
+                MapFootprintsPlaybackAfterPlayerInputMainMouseRightReleaseAfter = MapFootprintsPlaybackAfterPlayerInputMainMouseRightReleaseAfter,
+                MapFootprintsPlaybackAfterPlayerInputGameUpdateCount = MapFootprintsPlaybackAfterPlayerInputGameUpdateCount,
+                MapFootprintsPlaybackAfterPlayerInputUtc = MapFootprintsPlaybackAfterPlayerInputUtc,
                 MapFootprintsPlaybackDrawHitTarget = MapFootprintsPlaybackDrawHitTarget ?? string.Empty,
                 MapFootprintsPlaybackDrawMouseReadMode = MapFootprintsPlaybackDrawMouseReadMode ?? string.Empty,
                 MapFootprintsPlaybackDrawMouseX = MapFootprintsPlaybackDrawMouseX,
@@ -728,6 +877,10 @@ namespace JueMingZ.Diagnostics
                 MapFootprintsPlaybackDrawBarHovered = MapFootprintsPlaybackDrawBarHovered,
                 MapFootprintsPlaybackDrawMainMouseLeft = MapFootprintsPlaybackDrawMainMouseLeft,
                 MapFootprintsPlaybackDrawMainMouseLeftRelease = MapFootprintsPlaybackDrawMainMouseLeftRelease,
+                MapFootprintsPlaybackDrawMainMouseRight = MapFootprintsPlaybackDrawMainMouseRight,
+                MapFootprintsPlaybackDrawMainMouseRightRelease = MapFootprintsPlaybackDrawMainMouseRightRelease,
+                MapFootprintsPlaybackDrawMainMouseScrollWheel = MapFootprintsPlaybackDrawMainMouseScrollWheel,
+                MapFootprintsPlaybackDrawMainOldMouseScrollWheel = MapFootprintsPlaybackDrawMainOldMouseScrollWheel,
                 MapFootprintsPlaybackDrawMainMouseInterface = MapFootprintsPlaybackDrawMainMouseInterface,
                 MapFootprintsPlaybackDrawMainBlockMouse = MapFootprintsPlaybackDrawMainBlockMouse,
                 MapFootprintsPlaybackDrawPlayerMouseInterface = MapFootprintsPlaybackDrawPlayerMouseInterface,
@@ -802,6 +955,14 @@ namespace JueMingZ.Diagnostics
         public bool MouseCaptured { get; set; }
         public bool ClickConsumed { get; set; }
         public bool ScrollConsumed { get; set; }
+        public bool ShouldSuppressLeftInput { get; set; }
+        public bool ShouldSuppressNonLeftInput { get; set; }
+        public bool ShouldClearPanState { get; set; }
+        public bool LeftInputSuppressed { get; set; }
+        public bool NonLeftInputSuppressed { get; set; }
+        public bool ScrollSuppressed { get; set; }
+        public bool PanStateClearAttempted { get; set; }
+        public bool PanStateClearSucceeded { get; set; }
         public bool LeftDown { get; set; }
         public bool LeftPressed { get; set; }
         public bool LeftReleased { get; set; }
@@ -811,6 +972,14 @@ namespace JueMingZ.Diagnostics
         public bool MainMouseLeftAfter { get; set; }
         public bool MainMouseLeftReleaseBefore { get; set; }
         public bool MainMouseLeftReleaseAfter { get; set; }
+        public bool MainMouseRightBefore { get; set; }
+        public bool MainMouseRightAfter { get; set; }
+        public bool MainMouseRightReleaseBefore { get; set; }
+        public bool MainMouseRightReleaseAfter { get; set; }
+        public int MainMouseScrollWheelBefore { get; set; }
+        public int MainMouseScrollWheelAfter { get; set; }
+        public int MainOldMouseScrollWheelBefore { get; set; }
+        public int MainOldMouseScrollWheelAfter { get; set; }
         public bool MainMouseInterfaceBefore { get; set; }
         public bool MainMouseInterfaceAfter { get; set; }
         public bool MainBlockMouseBefore { get; set; }
@@ -828,6 +997,24 @@ namespace JueMingZ.Diagnostics
         }
     }
 
+    internal sealed class MapFootprintPlaybackAfterPlayerInputDiagnosticsData
+    {
+        public bool Active { get; set; }
+        public bool ShouldSuppressLeftInput { get; set; }
+        public bool ShouldSuppressNonLeftInput { get; set; }
+        public bool ReleaseFrame { get; set; }
+        public bool MainMouseLeftBefore { get; set; }
+        public bool MainMouseLeftAfter { get; set; }
+        public bool MainMouseLeftReleaseBefore { get; set; }
+        public bool MainMouseLeftReleaseAfter { get; set; }
+        public bool MainMouseRightBefore { get; set; }
+        public bool MainMouseRightAfter { get; set; }
+        public bool MainMouseRightReleaseBefore { get; set; }
+        public bool MainMouseRightReleaseAfter { get; set; }
+        public long GameUpdateCount { get; set; }
+        public DateTime? Utc { get; set; }
+    }
+
     internal sealed class MapFootprintPlaybackDrawInputDiagnosticsData
     {
         public string HitTarget { get; set; }
@@ -838,6 +1025,10 @@ namespace JueMingZ.Diagnostics
         public bool BarHovered { get; set; }
         public bool MainMouseLeft { get; set; }
         public bool MainMouseLeftRelease { get; set; }
+        public bool MainMouseRight { get; set; }
+        public bool MainMouseRightRelease { get; set; }
+        public int MainMouseScrollWheel { get; set; }
+        public int MainOldMouseScrollWheel { get; set; }
         public bool MainMouseInterface { get; set; }
         public bool MainBlockMouse { get; set; }
         public bool PlayerMouseInterface { get; set; }

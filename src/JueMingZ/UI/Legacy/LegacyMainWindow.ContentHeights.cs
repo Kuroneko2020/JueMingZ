@@ -137,6 +137,11 @@ namespace JueMingZ.UI.Legacy
                    24;
         }
 
+        internal static int CalculateFishingContentHeightForTesting(LegacyUiRect contentRect)
+        {
+            return CalculateFishingContentHeight(contentRect);
+        }
+
         private static int CalculateMovementContentHeight()
         {
             return LegacyUiMetrics.RowHeight * 5 + LegacyUiMetrics.SettingRowGap * 4 + 24;

@@ -302,6 +302,14 @@ namespace JueMingZ.Automation.Information
             result.TargetSummary = resolve.Result.Body ?? string.Empty;
             result.TargetCount = resolve.Result.TargetCount;
             result.IsAir = resolve.Result.Kind == MapQuickAnnouncementTargetKind.Air;
+            result.VisibilityVerdict = resolve.Result.VisibilityVerdict;
+            result.VisibilityReason = resolve.Result.VisibilityReason;
+            result.VisibleLayers = resolve.Result.VisibleLayers;
+            result.BlockedLayers = resolve.Result.BlockedLayers;
+            result.CircuitOnly = resolve.Result.CircuitOnly;
+            result.EchoGate = resolve.Result.EchoGate;
+            result.InvisibleAir = resolve.Result.InvisibleAir;
+            result.VisibilityUnavailableReason = resolve.Result.VisibilityUnavailableReason;
             if (resolve.Result.SuppressDelivery)
             {
                 result.ResultCode = string.IsNullOrWhiteSpace(resolve.Result.FailureReason)
@@ -632,6 +640,12 @@ namespace JueMingZ.Automation.Information
             DeliveryFailureReason = string.Empty;
             PendingState = string.Empty;
             UiHoverReadStatus = string.Empty;
+            VisibilityVerdict = string.Empty;
+            VisibilityReason = string.Empty;
+            VisibleLayers = string.Empty;
+            BlockedLayers = string.Empty;
+            EchoGate = string.Empty;
+            VisibilityUnavailableReason = string.Empty;
         }
 
         public bool Triggered { get; set; }
@@ -649,6 +663,14 @@ namespace JueMingZ.Automation.Information
         public string TargetSummary { get; set; }
         public int TargetCount { get; set; }
         public bool IsAir { get; set; }
+        public string VisibilityVerdict { get; set; }
+        public string VisibilityReason { get; set; }
+        public string VisibleLayers { get; set; }
+        public string BlockedLayers { get; set; }
+        public bool CircuitOnly { get; set; }
+        public string EchoGate { get; set; }
+        public bool InvisibleAir { get; set; }
+        public string VisibilityUnavailableReason { get; set; }
         public string DeliveryResultCode { get; set; }
         public string DeliveryFailureReason { get; set; }
         public int CooldownRemainingMilliseconds { get; set; }

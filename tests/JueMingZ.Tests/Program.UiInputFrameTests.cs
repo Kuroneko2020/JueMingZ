@@ -602,6 +602,16 @@ namespace JueMingZ.Tests
             Terraria.Main.dedServ = false;
             Terraria.Main.screenWidth = 1280;
             Terraria.Main.screenHeight = 800;
+            Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft = false;
+            Terraria.GameInput.PlayerInput.Triggers.Current.MouseRight = false;
+            Terraria.GameInput.PlayerInput.Triggers.Current.MouseMiddle = false;
+            Terraria.GameInput.PlayerInput.Triggers.Current.Mouse4 = false;
+            Terraria.GameInput.PlayerInput.Triggers.Current.Mouse5 = false;
+            Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft = false;
+            Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseRight = false;
+            Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseMiddle = false;
+            Terraria.GameInput.PlayerInput.Triggers.JustPressed.Mouse4 = false;
+            Terraria.GameInput.PlayerInput.Triggers.JustPressed.Mouse5 = false;
         }
 
         private static void AssertF5Decision(

@@ -22,6 +22,12 @@ namespace JueMingZ.Automation.Information
             LastFailureReason = string.Empty;
             LastHotkeySummary = string.Empty;
             LastInputConsumeResult = string.Empty;
+            LastVisibilityVerdict = string.Empty;
+            LastVisibilityReason = string.Empty;
+            LastVisibleLayers = string.Empty;
+            LastBlockedLayers = string.Empty;
+            LastEchoGate = string.Empty;
+            LastVisibilityUnavailableReason = string.Empty;
             LastHoverCacheAgeUpdates = -1;
         }
 
@@ -47,6 +53,14 @@ namespace JueMingZ.Automation.Information
         public string LastHotkeySummary { get; set; }
         public bool LastInputConsumed { get; set; }
         public string LastInputConsumeResult { get; set; }
+        public string LastVisibilityVerdict { get; set; }
+        public string LastVisibilityReason { get; set; }
+        public string LastVisibleLayers { get; set; }
+        public string LastBlockedLayers { get; set; }
+        public bool LastCircuitOnly { get; set; }
+        public string LastEchoGate { get; set; }
+        public bool LastInvisibleAir { get; set; }
+        public string LastVisibilityUnavailableReason { get; set; }
         public DateTime? LastDecisionUtc { get; set; }
 
         public MapQuickAnnouncementDiagnosticsSnapshot Clone()
@@ -75,6 +89,14 @@ namespace JueMingZ.Automation.Information
                 LastHotkeySummary = LastHotkeySummary,
                 LastInputConsumed = LastInputConsumed,
                 LastInputConsumeResult = LastInputConsumeResult,
+                LastVisibilityVerdict = LastVisibilityVerdict,
+                LastVisibilityReason = LastVisibilityReason,
+                LastVisibleLayers = LastVisibleLayers,
+                LastBlockedLayers = LastBlockedLayers,
+                LastCircuitOnly = LastCircuitOnly,
+                LastEchoGate = LastEchoGate,
+                LastInvisibleAir = LastInvisibleAir,
+                LastVisibilityUnavailableReason = LastVisibilityUnavailableReason,
                 LastDecisionUtc = LastDecisionUtc
             };
         }
@@ -137,6 +159,14 @@ namespace JueMingZ.Automation.Information
                     result.HotkeyState == null ? result.TriggerKey : result.HotkeyState.Signature),
                 LastInputConsumed = result.InputConsumed,
                 LastInputConsumeResult = Summarize(BuildInputConsumeResult(result)),
+                LastVisibilityVerdict = Summarize(result.VisibilityVerdict),
+                LastVisibilityReason = Summarize(result.VisibilityReason),
+                LastVisibleLayers = Summarize(result.VisibleLayers),
+                LastBlockedLayers = Summarize(result.BlockedLayers),
+                LastCircuitOnly = result.CircuitOnly,
+                LastEchoGate = Summarize(result.EchoGate),
+                LastInvisibleAir = result.InvisibleAir,
+                LastVisibilityUnavailableReason = Summarize(result.VisibilityUnavailableReason),
                 LastDecisionUtc = utcNow.Kind == DateTimeKind.Unspecified
                     ? DateTime.SpecifyKind(utcNow, DateTimeKind.Utc)
                     : utcNow.ToUniversalTime()

@@ -15,6 +15,7 @@ namespace JueMingZ.Automation.MapEnhancement
         private static bool _isAtLatest = true;
         private static bool _dragging;
         private static bool _lastLeftDown;
+        private static bool _leftInputOwned;
         private static DateTime _lastAdvanceUtc = DateTime.MinValue;
         private static string _pairId = string.Empty;
         private static int _dataSignature;
@@ -104,6 +105,7 @@ namespace JueMingZ.Automation.MapEnhancement
                 {
                     HideLocked();
                     _lastLeftDown = false;
+                    _leftInputOwned = false;
                     interaction.State = BuildSnapshotLocked(renderSnapshot, "hidden");
                     return interaction;
                 }
@@ -114,11 +116,17 @@ namespace JueMingZ.Automation.MapEnhancement
                 var leftDown = mouse.LeftDown;
                 var leftPressed = leftDown && !_lastLeftDown;
                 var leftReleased = !leftDown && _lastLeftDown;
+                var leftInputWasOwned = _leftInputOwned;
                 interaction.HitTarget = hit.Target;
                 interaction.BarHovered = hit.BarHovered;
                 interaction.LeftPressed = leftPressed;
                 interaction.LeftReleased = leftReleased;
                 interaction.ScrollDelta = mouse.ScrollDelta;
+
+                if (leftPressed && hit.BarHovered)
+                {
+                    _leftInputOwned = true;
+                }
 
                 if (leftPressed)
                 {
@@ -164,9 +172,19 @@ namespace JueMingZ.Automation.MapEnhancement
                     _lastInteraction = "dragReleased";
                 }
 
+                var releaseOwnedByPlayback = leftReleased && (leftInputWasOwned || _leftInputOwned);
+                var playbackSurfaceCaptured = hit.BarHovered || _dragging || releaseOwnedByPlayback;
+                interaction.ShouldSuppressFullscreenMapLeftInput = _leftInputOwned || _dragging || releaseOwnedByPlayback;
+                interaction.ShouldSuppressFullscreenMapNonLeftInput = playbackSurfaceCaptured;
+                interaction.ShouldClearFullscreenMapPanState = interaction.ShouldSuppressFullscreenMapLeftInput;
                 interaction.Dragging = _dragging;
-                interaction.MouseCaptured = hit.BarHovered || _dragging || (_lastLeftDown && leftReleased);
+                interaction.MouseCaptured = playbackSurfaceCaptured;
                 interaction.ScrollConsumed = interaction.MouseCaptured && mouse.ScrollDelta != 0;
+                if (leftReleased)
+                {
+                    _leftInputOwned = false;
+                }
+
                 _lastLeftDown = leftDown;
                 _lastAdvanceUtc = utcNow.ToUniversalTime();
                 interaction.State = BuildSnapshotLocked(renderSnapshot, _lastInteraction);
@@ -279,6 +297,7 @@ namespace JueMingZ.Automation.MapEnhancement
                 _isAtLatest = true;
                 _dragging = false;
                 _lastLeftDown = false;
+                _leftInputOwned = false;
                 _lastAdvanceUtc = DateTime.MinValue;
                 _pairId = string.Empty;
                 _dataSignature = 0;
@@ -351,11 +370,12 @@ namespace JueMingZ.Automation.MapEnhancement
 
         private static void HideLocked()
         {
-            _visible = false;
-            _dragging = false;
-            _lastLeftDown = false;
-            _lastAdvanceUtc = DateTime.MinValue;
-            _lastInteraction = "hidden";
+                _visible = false;
+                _dragging = false;
+                _lastLeftDown = false;
+                _leftInputOwned = false;
+                _lastAdvanceUtc = DateTime.MinValue;
+                _lastInteraction = "hidden";
         }
 
         private static void SetCursorFromTrackXLocked(LegacyUiRect track, int mouseX)
@@ -535,6 +555,9 @@ namespace JueMingZ.Automation.MapEnhancement
         public bool Dragging { get; set; }
         public bool LeftPressed { get; set; }
         public bool LeftReleased { get; set; }
+        public bool ShouldSuppressFullscreenMapLeftInput { get; set; }
+        public bool ShouldSuppressFullscreenMapNonLeftInput { get; set; }
+        public bool ShouldClearFullscreenMapPanState { get; set; }
         public int ScrollDelta { get; set; }
         public string HitTarget { get; set; }
         public MapFootprintPlaybackSnapshot State { get; set; }

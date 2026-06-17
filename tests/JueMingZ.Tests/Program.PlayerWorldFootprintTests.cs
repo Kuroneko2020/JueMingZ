@@ -1066,6 +1066,66 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void MapFootprintPlaybackPrefixUsesLastDrawExtentForHitTest()
+        {
+            MapFootprintPlaybackState.ResetForTesting();
+            MapFootprintPlaybackOverlay.ResetDrawFrameExtentForTesting();
+            try
+            {
+                var drawLayout = MapFootprintPlaybackOverlay.CalculateLayoutForTesting(1600, 1100);
+                var prefixFrame = new MapFootprintFullscreenUiFrame
+                {
+                    ScreenWidth = 1600,
+                    ScreenHeight = 1000,
+                    Mouse = new LegacyMouseSnapshot
+                    {
+                        X = drawLayout.Track.CenterX,
+                        Y = drawLayout.Track.CenterY,
+                        LeftDown = true,
+                        LeftPressed = true,
+                        ReadAvailable = true,
+                        ReadMode = "Terraria+OsClient/TerrariaRaw/UIScaleMatrix/FullscreenUi"
+                    }
+                };
+
+                var staleLayout = MapFootprintPlaybackOverlay.CalculateLayoutForTesting(prefixFrame.ScreenWidth, prefixFrame.ScreenHeight);
+                var staleHit = MapFootprintPlaybackOverlay.HitTestForTesting(staleLayout, prefixFrame.Mouse.X, prefixFrame.Mouse.Y);
+                if (staleHit.BarHovered)
+                {
+                    throw new InvalidOperationException("Fixture must represent the real regression: prefix extent misses a visually drawn playback bar.");
+                }
+
+                MapFootprintPlaybackOverlay.RememberDrawFrameExtentForTesting(1600, 1100);
+                var correctedFrame = MapFootprintPlaybackOverlay.ApplyLastDrawFrameExtentForTesting(prefixFrame);
+                var correctedLayout = MapFootprintPlaybackOverlay.CalculateLayoutForTesting(correctedFrame.ScreenWidth, correctedFrame.ScreenHeight);
+                var correctedHit = MapFootprintPlaybackOverlay.HitTestForTesting(correctedLayout, correctedFrame.Mouse.X, correctedFrame.Mouse.Y);
+                if (!correctedHit.BarHovered ||
+                    !string.Equals(correctedHit.Target, MapFootprintPlaybackHitTargets.Track, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Prefix hit-test must follow the last draw-frame fullscreen UI extent when update/draw extents diverge.");
+                }
+
+                var snapshot = CreatePlaybackRenderSnapshot("pair-footprint-playback-draw-extent", 0L, 100L);
+                MapFootprintPlaybackState.Advance(snapshot, true, new DateTime(2026, 6, 17, 13, 0, 0, DateTimeKind.Utc));
+                var interaction = MapFootprintPlaybackState.HandleInput(
+                    correctedLayout,
+                    correctedFrame.Mouse,
+                    snapshot,
+                    true,
+                    new DateTime(2026, 6, 17, 13, 0, 0, 16, DateTimeKind.Utc));
+                if (!interaction.MouseCaptured ||
+                    !interaction.ClickConsumed ||
+                    !string.Equals(interaction.HitTarget, MapFootprintPlaybackHitTargets.Track, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Prefix draw-extent correction must make the visible playback track clickable.");
+                }
+            }
+            finally
+            {
+                MapFootprintPlaybackOverlay.ResetDrawFrameExtentForTesting();
+            }
+        }
+
         private static void MapFootprintPlaybackFullscreenMouseKeepsReadableClickWhenGlobalGateFalseSpec()
         {
             MapFootprintPlaybackState.ResetForTesting();
@@ -1171,7 +1231,7 @@ namespace JueMingZ.Tests
             {
                 ResetUiInputFrameTestState();
                 TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(false);
-                Terraria.Main.mouseLeft = true;
+                Terraria.Main.mouseLeft = false;
                 Terraria.Main.mouseLeftRelease = true;
                 Terraria.Main.mouseInterface = false;
                 Terraria.Main.blockMouse = false;
@@ -1180,6 +1240,7 @@ namespace JueMingZ.Tests
                 {
                     MouseCaptured = true,
                     ClickConsumed = true,
+                    ShouldSuppressFullscreenMapLeftInput = true,
                     ScrollConsumed = false
                 });
 
@@ -1196,6 +1257,342 @@ namespace JueMingZ.Tests
                 ResetUiInputFrameTestState();
                 TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(null);
                 restoreRuntimeTypes();
+            }
+        }
+
+        private static void MapFootprintPlaybackAfterPlayerInputGuardSuppressesRewrittenLeft()
+        {
+            var restoreRuntimeTypes = PushFakeTerrariaMainType();
+            var previousLocalPlayer = Terraria.Main.LocalPlayer;
+            var previousPlayerZero = Terraria.Main.player[0];
+            var previousMyPlayer = Terraria.Main.myPlayer;
+            try
+            {
+                ResetUiInputFrameTestState();
+                TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(true);
+                TerrariaMainCompat.SetGameUpdateCountOverrideForTesting(240);
+                MapFootprintPlaybackState.ResetForTesting();
+                MapFootprintPlaybackOverlay.ResetInputSuppressionForTesting();
+
+                var player = new Terraria.Player();
+                Terraria.Main.LocalPlayer = player;
+                Terraria.Main.player[0] = player;
+                Terraria.Main.myPlayer = 0;
+
+                var snapshot = CreatePlaybackRenderSnapshot("pair-footprint-playback-after-player-input", 0L, 100L);
+                var now = new DateTime(2026, 6, 18, 0, 18, 0, DateTimeKind.Utc);
+                MapFootprintPlaybackState.Advance(snapshot, true, now);
+                var layout = MapFootprintPlaybackOverlay.CalculateLayoutForTesting(900, 600);
+                MapFootprintPlaybackState.HandleInput(
+                    layout,
+                    new LegacyMouseSnapshot
+                    {
+                        X = layout.Track.CenterX,
+                        Y = layout.Track.CenterY,
+                        LeftDown = true
+                    },
+                    snapshot,
+                    true,
+                    now.AddMilliseconds(16));
+
+                var dragHold = MapFootprintPlaybackState.HandleInput(
+                    layout,
+                    new LegacyMouseSnapshot
+                    {
+                        X = layout.Bar.X - 48,
+                        Y = layout.Bar.Y - 24,
+                        LeftDown = true
+                    },
+                    snapshot,
+                    true,
+                    now.AddMilliseconds(32));
+                if (!dragHold.MouseCaptured ||
+                    dragHold.ClickConsumed ||
+                    !dragHold.ShouldSuppressFullscreenMapLeftInput ||
+                    !dragHold.State.Dragging)
+                {
+                    throw new InvalidOperationException("Playback drag hold must keep left ownership even after the cursor leaves the bar, without depending on ClickConsumed.");
+                }
+
+                Terraria.Main.mouseLeft = true;
+                Terraria.Main.mouseLeftRelease = true;
+                Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft = true;
+                Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft = true;
+                player.controlUseItem = true;
+                player.releaseUseItem = false;
+                player.channel = true;
+                MapFootprintPlaybackOverlay.ApplyInputCaptureForTesting(dragHold);
+                if (Terraria.Main.mouseLeft ||
+                    Terraria.Main.mouseLeftRelease ||
+                    Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft ||
+                    Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft)
+                {
+                    throw new InvalidOperationException("Playback prefix capture must clear MouseLeft while dragging, even when ClickConsumed is false.");
+                }
+
+                Terraria.Main.mouseLeft = true;
+                Terraria.Main.mouseLeftRelease = true;
+                Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft = true;
+                Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft = true;
+                player.controlUseItem = true;
+                player.releaseUseItem = false;
+                player.channel = true;
+                MapFootprintPlaybackOverlay.UpdateAfterPlayerInputGuardForTesting();
+                if (Terraria.Main.mouseLeft ||
+                    Terraria.Main.mouseLeftRelease ||
+                    !Terraria.Main.mouseInterface ||
+                    !Terraria.Main.blockMouse ||
+                    !player.mouseInterface ||
+                    player.controlUseItem ||
+                    !player.releaseUseItem ||
+                    player.channel ||
+                    Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft ||
+                    Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft)
+                {
+                    throw new InvalidOperationException("Playback after-PlayerInput guard must clear rewritten MouseLeft before fullscreen DrawMap can pan.");
+                }
+            }
+            finally
+            {
+                MapFootprintPlaybackOverlay.ResetInputSuppressionForTesting();
+                MapFootprintPlaybackState.ResetForTesting();
+                TerrariaUiMouseCompat.ResetUiMouseCaptureAccessorsForTesting();
+                TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(null);
+                TerrariaMainCompat.SetGameUpdateCountOverrideForTesting(null);
+                Terraria.Main.LocalPlayer = previousLocalPlayer;
+                Terraria.Main.player[0] = previousPlayerZero;
+                Terraria.Main.myPlayer = previousMyPlayer;
+                ResetUiInputFrameTestState();
+                restoreRuntimeTypes();
+            }
+        }
+
+        private static void MapFootprintPlaybackCapturesWheelAndNonLeftMouseInsideBar()
+        {
+            var restoreRuntimeTypes = PushFakeTerrariaMainType();
+            var previousLocalPlayer = Terraria.Main.LocalPlayer;
+            var previousPlayerZero = Terraria.Main.player[0];
+            var previousMyPlayer = Terraria.Main.myPlayer;
+            try
+            {
+                ResetUiInputFrameTestState();
+                TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(true);
+                MapFootprintPlaybackState.ResetForTesting();
+                MapFootprintPlaybackOverlay.ResetInputSuppressionForTesting();
+
+                var player = new Terraria.Player();
+                Terraria.Main.LocalPlayer = player;
+                Terraria.Main.player[0] = player;
+                Terraria.Main.myPlayer = 0;
+
+                var snapshot = CreatePlaybackRenderSnapshot("pair-footprint-playback-all-mouse", 0L, 100L);
+                var now = new DateTime(2026, 6, 18, 0, 35, 0, DateTimeKind.Utc);
+                MapFootprintPlaybackState.Advance(snapshot, true, now);
+                var layout = MapFootprintPlaybackOverlay.CalculateLayoutForTesting(900, 600);
+                var hoverWheel = MapFootprintPlaybackState.HandleInput(
+                    layout,
+                    new LegacyMouseSnapshot
+                    {
+                        X = layout.Bar.CenterX,
+                        Y = layout.Bar.CenterY,
+                        LeftDown = false,
+                        ScrollDelta = -120
+                    },
+                    snapshot,
+                    true,
+                    now.AddMilliseconds(16));
+                if (!hoverWheel.MouseCaptured ||
+                    !hoverWheel.ScrollConsumed ||
+                    hoverWheel.ShouldSuppressFullscreenMapLeftInput ||
+                    !hoverWheel.ShouldSuppressFullscreenMapNonLeftInput ||
+                    hoverWheel.ShouldClearFullscreenMapPanState)
+                {
+                    throw new InvalidOperationException("Playback bar hover with wheel must capture UI scroll and non-left mouse tokens without taking left ownership.");
+                }
+
+                Terraria.Main.mouseLeft = true;
+                Terraria.Main.mouseRight = true;
+                Terraria.Main.mouseRightRelease = true;
+                Terraria.Main.mouseScrollWheel = 240;
+                Terraria.Main.oldMouseScrollWheel = 0;
+                Terraria.GameInput.PlayerInput.Triggers.Current.MouseRight = true;
+                Terraria.GameInput.PlayerInput.Triggers.Current.MouseMiddle = true;
+                Terraria.GameInput.PlayerInput.Triggers.Current.Mouse4 = true;
+                Terraria.GameInput.PlayerInput.Triggers.Current.Mouse5 = true;
+                Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseRight = true;
+                Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseMiddle = true;
+                Terraria.GameInput.PlayerInput.Triggers.JustPressed.Mouse4 = true;
+                Terraria.GameInput.PlayerInput.Triggers.JustPressed.Mouse5 = true;
+                MapFootprintPlaybackOverlay.ApplyInputCaptureForTesting(hoverWheel);
+                if (Terraria.Main.mouseLeft ||
+                    Terraria.Main.mouseRight ||
+                    Terraria.Main.mouseRightRelease ||
+                    Terraria.Main.mouseScrollWheel != Terraria.Main.oldMouseScrollWheel ||
+                    !Terraria.Main.mouseInterface ||
+                    !Terraria.Main.blockMouse ||
+                    !player.mouseInterface ||
+                    Terraria.GameInput.PlayerInput.Triggers.Current.MouseRight ||
+                    Terraria.GameInput.PlayerInput.Triggers.Current.MouseMiddle ||
+                    Terraria.GameInput.PlayerInput.Triggers.Current.Mouse4 ||
+                    Terraria.GameInput.PlayerInput.Triggers.Current.Mouse5 ||
+                    Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseRight ||
+                    Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseMiddle ||
+                    Terraria.GameInput.PlayerInput.Triggers.JustPressed.Mouse4 ||
+                    Terraria.GameInput.PlayerInput.Triggers.JustPressed.Mouse5)
+                {
+                    throw new InvalidOperationException("Playback bar capture must block wheel, right, middle, and side mouse input inside the UI surface.");
+                }
+
+                Terraria.Main.mouseRight = true;
+                Terraria.Main.mouseRightRelease = true;
+                Terraria.GameInput.PlayerInput.Triggers.Current.MouseRight = true;
+                Terraria.GameInput.PlayerInput.Triggers.Current.MouseMiddle = true;
+                Terraria.GameInput.PlayerInput.Triggers.Current.Mouse4 = true;
+                Terraria.GameInput.PlayerInput.Triggers.Current.Mouse5 = true;
+                Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseRight = true;
+                Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseMiddle = true;
+                Terraria.GameInput.PlayerInput.Triggers.JustPressed.Mouse4 = true;
+                Terraria.GameInput.PlayerInput.Triggers.JustPressed.Mouse5 = true;
+                MapFootprintPlaybackOverlay.UpdateAfterPlayerInputGuardForTesting();
+                if (Terraria.Main.mouseRight ||
+                    Terraria.Main.mouseRightRelease ||
+                    Terraria.GameInput.PlayerInput.Triggers.Current.MouseRight ||
+                    Terraria.GameInput.PlayerInput.Triggers.Current.MouseMiddle ||
+                    Terraria.GameInput.PlayerInput.Triggers.Current.Mouse4 ||
+                    Terraria.GameInput.PlayerInput.Triggers.Current.Mouse5 ||
+                    Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseRight ||
+                    Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseMiddle ||
+                    Terraria.GameInput.PlayerInput.Triggers.JustPressed.Mouse4 ||
+                    Terraria.GameInput.PlayerInput.Triggers.JustPressed.Mouse5)
+                {
+                    throw new InvalidOperationException("Playback after-PlayerInput guard must also clear non-left mouse tokens rewritten after prefix capture.");
+                }
+            }
+            finally
+            {
+                MapFootprintPlaybackOverlay.ResetInputSuppressionForTesting();
+                MapFootprintPlaybackState.ResetForTesting();
+                TerrariaUiMouseCompat.ResetUiMouseCaptureAccessorsForTesting();
+                TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(null);
+                Terraria.Main.LocalPlayer = previousLocalPlayer;
+                Terraria.Main.player[0] = previousPlayerZero;
+                Terraria.Main.myPlayer = previousMyPlayer;
+                ResetUiInputFrameTestState();
+                restoreRuntimeTypes();
+            }
+        }
+
+        private static void MapFootprintPlaybackClearsPanStateForPlaybackOwnedLeft()
+        {
+            MapFootprintPlaybackState.ResetForTesting();
+            var snapshot = CreatePlaybackRenderSnapshot("pair-footprint-playback-pan-clear", 0L, 100L);
+            var now = new DateTime(2026, 6, 18, 0, 35, 40, DateTimeKind.Utc);
+            MapFootprintPlaybackState.Advance(snapshot, true, now);
+            var layout = MapFootprintPlaybackOverlay.CalculateLayoutForTesting(900, 600);
+            var dragStart = MapFootprintPlaybackState.HandleInput(
+                layout,
+                new LegacyMouseSnapshot
+                {
+                    X = layout.Track.CenterX,
+                    Y = layout.Track.CenterY,
+                    LeftDown = true
+                },
+                snapshot,
+                true,
+                now.AddMilliseconds(16));
+            var dragHold = MapFootprintPlaybackState.HandleInput(
+                layout,
+                new LegacyMouseSnapshot
+                {
+                    X = layout.Bar.X - 24,
+                    Y = layout.Bar.Y - 20,
+                    LeftDown = true
+                },
+                snapshot,
+                true,
+                now.AddMilliseconds(32));
+            var dragRelease = MapFootprintPlaybackState.HandleInput(
+                layout,
+                new LegacyMouseSnapshot
+                {
+                    X = layout.Bar.X - 24,
+                    Y = layout.Bar.Y - 20,
+                    LeftDown = false
+                },
+                snapshot,
+                true,
+                now.AddMilliseconds(48));
+            if (!dragStart.ShouldClearFullscreenMapPanState ||
+                !dragHold.ShouldClearFullscreenMapPanState ||
+                !dragRelease.ShouldClearFullscreenMapPanState ||
+                !dragRelease.LeftReleased)
+            {
+                throw new InvalidOperationException("Playback-owned left press, hold, and release must request fullscreen map pan-anchor cleanup.");
+            }
+
+            var hoverOnly = MapFootprintPlaybackState.HandleInput(
+                layout,
+                new LegacyMouseSnapshot
+                {
+                    X = layout.Bar.CenterX,
+                    Y = layout.Bar.CenterY,
+                    LeftDown = false,
+                    ScrollDelta = 120
+                },
+                snapshot,
+                true,
+                now.AddMilliseconds(64));
+            if (hoverOnly.ShouldClearFullscreenMapPanState ||
+                !hoverOnly.ShouldSuppressFullscreenMapNonLeftInput)
+            {
+                throw new InvalidOperationException("Wheel/non-left playback UI capture must not request pan-anchor cleanup without playback-owned left input.");
+            }
+
+            var cleared = MapFullscreenCompat.BuildClearedPanStateForTesting(
+                new Microsoft.Xna.Framework.Vector2(412f, 96f),
+                333,
+                444);
+            if (cleared.PanTargetMapFullscreen ||
+                cleared.PanTargetMapFullscreenEnd.X != 412f ||
+                cleared.PanTargetMapFullscreenEnd.Y != 96f ||
+                cleared.ResetMapFull ||
+                cleared.GrabMapX != 333f ||
+                cleared.GrabMapY != 444f ||
+                !cleared.Cleared)
+            {
+                throw new InvalidOperationException("Fullscreen map pan cleanup helper must clear only vanilla fullscreen map UI anchors.");
+            }
+        }
+
+        private static void MapFootprintPlaybackOutsideMapActionsDoNotChangePlayback()
+        {
+            MapFootprintPlaybackState.ResetForTesting();
+            var snapshot = CreatePlaybackRenderSnapshot("pair-footprint-playback-outside-map", 0L, 100L);
+            var now = new DateTime(2026, 6, 18, 0, 36, 0, DateTimeKind.Utc);
+            MapFootprintPlaybackState.Advance(snapshot, true, now);
+            var layout = MapFootprintPlaybackOverlay.CalculateLayoutForTesting(900, 600);
+            var outside = MapFootprintPlaybackState.HandleInput(
+                layout,
+                new LegacyMouseSnapshot
+                {
+                    X = layout.Bar.X - 80,
+                    Y = layout.Bar.Y - 40,
+                    LeftDown = false,
+                    ScrollDelta = 120
+                },
+                snapshot,
+                true,
+                now.AddMilliseconds(16));
+            if (outside.MouseCaptured ||
+                outside.ScrollConsumed ||
+                outside.ShouldSuppressFullscreenMapLeftInput ||
+                outside.ShouldSuppressFullscreenMapNonLeftInput ||
+                outside.ShouldClearFullscreenMapPanState ||
+                outside.State.Dragging ||
+                outside.State.CursorTicks != 100L ||
+                !outside.State.IsAtLatest)
+            {
+                throw new InvalidOperationException("Fullscreen map mouse actions outside the playback bar must stay with vanilla map input and leave playback state untouched.");
             }
         }
 
@@ -1251,6 +1648,7 @@ namespace JueMingZ.Tests
                 now.AddMilliseconds(32));
             if (!rateClick.MouseCaptured ||
                 !rateClick.ClickConsumed ||
+                !rateClick.ShouldSuppressFullscreenMapLeftInput ||
                 rateClick.State.PlaybackRate != layout.RateValues[rateIndex] ||
                 !rateClick.State.Paused)
             {
@@ -1283,6 +1681,7 @@ namespace JueMingZ.Tests
                 now.AddMilliseconds(64));
             if (!dragStart.MouseCaptured ||
                 !dragStart.ClickConsumed ||
+                !dragStart.ShouldSuppressFullscreenMapLeftInput ||
                 !dragStart.State.Dragging ||
                 dragStart.State.CursorTicks < 45L ||
                 dragStart.State.CursorTicks > 55L)
@@ -1302,6 +1701,7 @@ namespace JueMingZ.Tests
                 true,
                 now.AddMilliseconds(80));
             if (!dragEnd.MouseCaptured ||
+                !dragEnd.ShouldSuppressFullscreenMapLeftInput ||
                 dragEnd.State.Dragging ||
                 dragEnd.State.CursorTicks != 100L ||
                 !dragEnd.State.IsAtLatest)
@@ -1323,6 +1723,121 @@ namespace JueMingZ.Tests
             if (afterReleaseOutside.MouseCaptured)
             {
                 throw new InvalidOperationException("Playback overlay must hand input back after drag release outside the bar.");
+            }
+
+            if (afterReleaseOutside.ShouldSuppressFullscreenMapLeftInput)
+            {
+                throw new InvalidOperationException("Playback left suppression must stop after the release frame so vanilla fullscreen map input can take over.");
+            }
+        }
+
+        private static void MapFootprintPlaybackReleaseFrameStopsBeforeNextOutsideDrag()
+        {
+            var restoreRuntimeTypes = PushFakeTerrariaMainType();
+            var previousLocalPlayer = Terraria.Main.LocalPlayer;
+            var previousPlayerZero = Terraria.Main.player[0];
+            var previousMyPlayer = Terraria.Main.myPlayer;
+            try
+            {
+                ResetUiInputFrameTestState();
+                TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(true);
+                TerrariaMainCompat.SetGameUpdateCountOverrideForTesting(300);
+                MapFootprintPlaybackState.ResetForTesting();
+                MapFootprintPlaybackOverlay.ResetInputSuppressionForTesting();
+
+                var player = new Terraria.Player();
+                Terraria.Main.LocalPlayer = player;
+                Terraria.Main.player[0] = player;
+                Terraria.Main.myPlayer = 0;
+
+                var snapshot = CreatePlaybackRenderSnapshot("pair-footprint-playback-release-handoff", 0L, 100L);
+                var now = new DateTime(2026, 6, 18, 0, 18, 20, DateTimeKind.Utc);
+                MapFootprintPlaybackState.Advance(snapshot, true, now);
+                var layout = MapFootprintPlaybackOverlay.CalculateLayoutForTesting(900, 600);
+                MapFootprintPlaybackState.HandleInput(
+                    layout,
+                    new LegacyMouseSnapshot
+                    {
+                        X = layout.Track.CenterX,
+                        Y = layout.Track.CenterY,
+                        LeftDown = true
+                    },
+                    snapshot,
+                    true,
+                    now.AddMilliseconds(16));
+                var release = MapFootprintPlaybackState.HandleInput(
+                    layout,
+                    new LegacyMouseSnapshot
+                    {
+                        X = layout.Bar.X - 40,
+                        Y = layout.Bar.Y - 18,
+                        LeftDown = false
+                    },
+                    snapshot,
+                    true,
+                    now.AddMilliseconds(32));
+                if (!release.MouseCaptured ||
+                    !release.LeftReleased ||
+                    !release.ShouldSuppressFullscreenMapLeftInput ||
+                    release.State.Dragging)
+                {
+                    throw new InvalidOperationException("Playback drag release must own exactly the release frame before handing map input back.");
+                }
+
+                Terraria.Main.mouseLeft = true;
+                Terraria.Main.mouseLeftRelease = true;
+                Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft = true;
+                Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft = true;
+                player.controlUseItem = true;
+                player.releaseUseItem = false;
+                player.channel = true;
+                MapFootprintPlaybackOverlay.ApplyInputCaptureForTesting(release);
+                Terraria.Main.mouseLeft = true;
+                Terraria.Main.mouseLeftRelease = true;
+                Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft = true;
+                Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft = true;
+                player.controlUseItem = true;
+                player.releaseUseItem = false;
+                player.channel = true;
+                MapFootprintPlaybackOverlay.UpdateAfterPlayerInputGuardForTesting();
+                if (Terraria.Main.mouseLeft ||
+                    Terraria.Main.mouseLeftRelease ||
+                    Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft ||
+                    Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft)
+                {
+                    throw new InvalidOperationException("Playback release frame must clear the fullscreen map left release pulse.");
+                }
+
+                Terraria.Main.mouseLeft = true;
+                Terraria.Main.mouseLeftRelease = true;
+                Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft = true;
+                Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft = true;
+                player.controlUseItem = true;
+                player.releaseUseItem = false;
+                player.channel = true;
+                MapFootprintPlaybackOverlay.UpdateAfterPlayerInputGuardForTesting();
+                if (!Terraria.Main.mouseLeft ||
+                    !Terraria.Main.mouseLeftRelease ||
+                    !Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft ||
+                    !Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft ||
+                    !player.controlUseItem ||
+                    player.releaseUseItem)
+                {
+                    throw new InvalidOperationException("Playback after-player guard must stop after release so the next outside fullscreen map drag can proceed.");
+                }
+            }
+            finally
+            {
+                MapFootprintPlaybackOverlay.ResetInputSuppressionForTesting();
+                MapFootprintPlaybackState.ResetForTesting();
+                TerrariaUiMouseCompat.ResetUiMouseCaptureAccessorsForTesting();
+                TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(null);
+                TerrariaMainCompat.SetGameUpdateCountOverrideForTesting(null);
+                Terraria.Main.LocalPlayer = previousLocalPlayer;
+                Terraria.Main.player[0] = previousPlayerZero;
+                Terraria.Main.myPlayer = previousMyPlayer;
+                ResetUiInputFrameTestState();
+                restoreRuntimeTypes();
             }
         }
 
@@ -1569,6 +2084,14 @@ namespace JueMingZ.Tests
                     MouseCaptured = true,
                     ClickConsumed = true,
                     ScrollConsumed = true,
+                    ShouldSuppressLeftInput = true,
+                    ShouldSuppressNonLeftInput = true,
+                    ShouldClearPanState = true,
+                    LeftInputSuppressed = true,
+                    NonLeftInputSuppressed = true,
+                    ScrollSuppressed = true,
+                    PanStateClearAttempted = true,
+                    PanStateClearSucceeded = true,
                     LeftDown = true,
                     LeftPressed = true,
                     LeftReleased = false,
@@ -1578,6 +2101,14 @@ namespace JueMingZ.Tests
                     MainMouseLeftAfter = false,
                     MainMouseLeftReleaseBefore = true,
                     MainMouseLeftReleaseAfter = false,
+                    MainMouseRightBefore = true,
+                    MainMouseRightAfter = false,
+                    MainMouseRightReleaseBefore = true,
+                    MainMouseRightReleaseAfter = false,
+                    MainMouseScrollWheelBefore = 240,
+                    MainMouseScrollWheelAfter = 240,
+                    MainOldMouseScrollWheelBefore = 0,
+                    MainOldMouseScrollWheelAfter = 240,
                     MainMouseInterfaceBefore = false,
                     MainMouseInterfaceAfter = true,
                     MainBlockMouseBefore = false,
@@ -1585,6 +2116,23 @@ namespace JueMingZ.Tests
                     PlayerMouseInterfaceBefore = false,
                     PlayerMouseInterfaceAfter = true,
                     Utc = recordUtc.AddSeconds(3)
+                });
+                PlayerWorldFootprintDiagnostics.RecordPlaybackAfterPlayerInputGuard(new MapFootprintPlaybackAfterPlayerInputDiagnosticsData
+                {
+                    Active = true,
+                    ShouldSuppressLeftInput = true,
+                    ShouldSuppressNonLeftInput = true,
+                    ReleaseFrame = true,
+                    MainMouseLeftBefore = true,
+                    MainMouseLeftAfter = false,
+                    MainMouseLeftReleaseBefore = true,
+                    MainMouseLeftReleaseAfter = false,
+                    MainMouseRightBefore = true,
+                    MainMouseRightAfter = false,
+                    MainMouseRightReleaseBefore = true,
+                    MainMouseRightReleaseAfter = false,
+                    GameUpdateCount = 1236L,
+                    Utc = recordUtc.AddSeconds(4)
                 });
                 PlayerWorldFootprintDiagnostics.RecordPlaybackDrawInput(new MapFootprintPlaybackDrawInputDiagnosticsData
                 {
@@ -1596,11 +2144,15 @@ namespace JueMingZ.Tests
                     BarHovered = true,
                     MainMouseLeft = true,
                     MainMouseLeftRelease = true,
+                    MainMouseRight = true,
+                    MainMouseRightRelease = true,
+                    MainMouseScrollWheel = 240,
+                    MainOldMouseScrollWheel = 0,
                     MainMouseInterface = false,
                     MainBlockMouse = false,
                     PlayerMouseInterface = false,
                     GameUpdateCount = 1235L,
-                    Utc = recordUtc.AddSeconds(4)
+                    Utc = recordUtc.AddSeconds(5)
                 });
 
                 var snapshot = RuntimeDiagnosticSnapshotBuilder.Build(new RuntimeDiagnosticSnapshotContext
@@ -1633,12 +2185,36 @@ namespace JueMingZ.Tests
                     !snapshot.MapFootprintsPlaybackDrawBarHovered ||
                     snapshot.MapFootprintsPlaybackPrefixScrollDelta != -120 ||
                     !snapshot.MapFootprintsPlaybackPrefixClickConsumed ||
+                    !snapshot.MapFootprintsPlaybackPrefixShouldSuppressLeftInput ||
+                    !snapshot.MapFootprintsPlaybackPrefixShouldSuppressNonLeftInput ||
+                    !snapshot.MapFootprintsPlaybackPrefixShouldClearPanState ||
+                    !snapshot.MapFootprintsPlaybackPrefixLeftInputSuppressed ||
+                    !snapshot.MapFootprintsPlaybackPrefixNonLeftInputSuppressed ||
+                    !snapshot.MapFootprintsPlaybackPrefixScrollSuppressed ||
+                    !snapshot.MapFootprintsPlaybackPrefixPanStateClearAttempted ||
+                    !snapshot.MapFootprintsPlaybackPrefixPanStateClearSucceeded ||
                     !snapshot.MapFootprintsPlaybackPrefixLeftDown ||
                     !snapshot.MapFootprintsPlaybackPrefixLeftPressed ||
                     snapshot.MapFootprintsPlaybackPrefixLeftReleased ||
+                    snapshot.MapFootprintsPlaybackPrefixMainMouseRightAfter ||
+                    snapshot.MapFootprintsPlaybackPrefixMainMouseRightReleaseAfter ||
+                    snapshot.MapFootprintsPlaybackPrefixMainOldMouseScrollWheelAfter != 240 ||
                     !snapshot.MapFootprintsPlaybackPrefixMainBlockMouseAfter ||
+                    !snapshot.MapFootprintsPlaybackAfterPlayerInputGuardActive ||
+                    !snapshot.MapFootprintsPlaybackAfterPlayerInputShouldSuppressLeftInput ||
+                    !snapshot.MapFootprintsPlaybackAfterPlayerInputShouldSuppressNonLeftInput ||
+                    !snapshot.MapFootprintsPlaybackAfterPlayerInputReleaseFrame ||
+                    snapshot.MapFootprintsPlaybackAfterPlayerInputMainMouseLeftAfter ||
+                    snapshot.MapFootprintsPlaybackAfterPlayerInputMainMouseLeftReleaseAfter ||
+                    snapshot.MapFootprintsPlaybackAfterPlayerInputMainMouseRightAfter ||
+                    snapshot.MapFootprintsPlaybackAfterPlayerInputMainMouseRightReleaseAfter ||
+                    snapshot.MapFootprintsPlaybackAfterPlayerInputGameUpdateCount != 1236L ||
                     !snapshot.MapFootprintsPlaybackDrawMainMouseLeft ||
                     !snapshot.MapFootprintsPlaybackDrawMainMouseLeftRelease ||
+                    !snapshot.MapFootprintsPlaybackDrawMainMouseRight ||
+                    !snapshot.MapFootprintsPlaybackDrawMainMouseRightRelease ||
+                    snapshot.MapFootprintsPlaybackDrawMainMouseScrollWheel != 240 ||
+                    snapshot.MapFootprintsPlaybackDrawMainOldMouseScrollWheel != 0 ||
                     snapshot.MapFootprintsPlaybackDrawGameUpdateCount != 1235L ||
                     snapshot.MapFootprintsPlaybackAtLatest)
                 {
@@ -1683,12 +2259,31 @@ namespace JueMingZ.Tests
                 AssertContains(json, "\"MapFootprintsPlaybackPrefixHitTarget\": \"track\"");
                 AssertContains(json, "\"MapFootprintsPlaybackPrefixMouseReadMode\": \"Terraria+OsClient/FullscreenOverlayGateBypass/FullscreenUi\"");
                 AssertContains(json, "\"MapFootprintsPlaybackPrefixMouseReadAvailable\": true");
+                AssertContains(json, "\"MapFootprintsPlaybackPrefixShouldSuppressLeftInput\": true");
+                AssertContains(json, "\"MapFootprintsPlaybackPrefixShouldSuppressNonLeftInput\": true");
+                AssertContains(json, "\"MapFootprintsPlaybackPrefixShouldClearPanState\": true");
+                AssertContains(json, "\"MapFootprintsPlaybackPrefixLeftInputSuppressed\": true");
+                AssertContains(json, "\"MapFootprintsPlaybackPrefixNonLeftInputSuppressed\": true");
+                AssertContains(json, "\"MapFootprintsPlaybackPrefixScrollSuppressed\": true");
+                AssertContains(json, "\"MapFootprintsPlaybackPrefixPanStateClearSucceeded\": true");
                 AssertContains(json, "\"MapFootprintsPlaybackPrefixMainMouseLeftAfter\": false");
                 AssertContains(json, "\"MapFootprintsPlaybackPrefixMainMouseLeftReleaseAfter\": false");
+                AssertContains(json, "\"MapFootprintsPlaybackPrefixMainMouseRightAfter\": false");
+                AssertContains(json, "\"MapFootprintsPlaybackPrefixMainMouseRightReleaseAfter\": false");
+                AssertContains(json, "\"MapFootprintsPlaybackPrefixMainOldMouseScrollWheelAfter\": 240");
                 AssertContains(json, "\"MapFootprintsPlaybackPrefixMainBlockMouseAfter\": true");
+                AssertContains(json, "\"MapFootprintsPlaybackAfterPlayerInputGuardActive\": true");
+                AssertContains(json, "\"MapFootprintsPlaybackAfterPlayerInputShouldSuppressLeftInput\": true");
+                AssertContains(json, "\"MapFootprintsPlaybackAfterPlayerInputShouldSuppressNonLeftInput\": true");
+                AssertContains(json, "\"MapFootprintsPlaybackAfterPlayerInputReleaseFrame\": true");
+                AssertContains(json, "\"MapFootprintsPlaybackAfterPlayerInputMainMouseLeftAfter\": false");
+                AssertContains(json, "\"MapFootprintsPlaybackAfterPlayerInputMainMouseRightAfter\": false");
+                AssertContains(json, "\"MapFootprintsPlaybackAfterPlayerInputGameUpdateCount\": 1236");
                 AssertContains(json, "\"MapFootprintsPlaybackDrawMouseReadMode\": \"Terraria+OsClient/FullscreenUi\"");
                 AssertContains(json, "\"MapFootprintsPlaybackDrawMouseReadAvailable\": true");
                 AssertContains(json, "\"MapFootprintsPlaybackDrawMainMouseLeftRelease\": true");
+                AssertContains(json, "\"MapFootprintsPlaybackDrawMainMouseRight\": true");
+                AssertContains(json, "\"MapFootprintsPlaybackDrawMainMouseScrollWheel\": 240");
                 AssertContains(json, "\"MapFootprintsPlaybackDrawGameUpdateCount\": 1235");
             }
             finally

@@ -14,6 +14,21 @@ namespace JueMingZ.UI
     {
         internal const string FullscreenMapRoute = "fullscreenMap";
         private const float TextScale = 0.62f;
+        private static readonly string[] FullscreenMapNonLeftMouseTriggerTokens =
+        {
+            "MouseRight",
+            "MouseMiddle",
+            "Mouse4",
+            "Mouse5"
+        };
+        private static readonly object DrawFrameExtentSyncRoot = new object();
+        private static readonly object InputSuppressionSyncRoot = new object();
+        private static bool _lastDrawFrameExtentAvailable;
+        private static int _lastDrawFrameScreenWidth;
+        private static int _lastDrawFrameScreenHeight;
+        private static bool _suppressFullscreenMapLeftInput;
+        private static bool _suppressFullscreenMapLeftInputReleaseFrame;
+        private static bool _suppressFullscreenMapNonLeftInput;
 
         public static void UpdatePrefixGuard()
         {
@@ -26,18 +41,19 @@ namespace JueMingZ.UI
                 MapFootprintPlaybackState.Advance(snapshot, visible, utcNow);
                 if (!visible)
                 {
+                    ClearFullscreenMapInputSuppression();
                     return;
                 }
 
-                var frame = ReadFullscreenUiFrame(true);
+                var frame = ApplyLastDrawFrameExtent(ReadFullscreenUiFrame(true));
                 var mouse = frame.Mouse;
                 var layout = MapFootprintPlaybackState.CalculateLayout(frame.ScreenWidth, frame.ScreenHeight);
                 var beforeCapture = CaptureMouseState();
                 var interaction = MapFootprintPlaybackState.HandleInput(layout, mouse, snapshot, visible, utcNow);
-                ApplyInputCapture(interaction);
+                var captureResult = ApplyInputCapture(interaction);
                 var afterCapture = CaptureMouseState();
                 RecordOverlayDiagnostics(interaction, "prefix");
-                RecordPrefixInputDiagnostics(mouse, interaction, beforeCapture, afterCapture, utcNow);
+                RecordPrefixInputDiagnostics(mouse, interaction, captureResult, beforeCapture, afterCapture, utcNow);
             }
             catch (Exception error)
             {
@@ -48,6 +64,66 @@ namespace JueMingZ.UI
                     "MapFootprintPlaybackOverlay",
                     "Footprint playback overlay prefix input guard failed; exception swallowed.",
                     error);
+            }
+        }
+
+        public static void UpdateAfterPlayerInputGuard()
+        {
+            var shouldSuppress = false;
+            var shouldSuppressNonLeft = false;
+            var releaseFrame = false;
+            lock (InputSuppressionSyncRoot)
+            {
+                shouldSuppress = _suppressFullscreenMapLeftInput;
+                shouldSuppressNonLeft = _suppressFullscreenMapNonLeftInput;
+                releaseFrame = _suppressFullscreenMapLeftInputReleaseFrame;
+            }
+
+            if (!shouldSuppress && !shouldSuppressNonLeft)
+            {
+                return;
+            }
+
+            var beforeCapture = CaptureMouseState();
+            try
+            {
+                // PlayerInput can rewrite Main.mouseLeft after the prefix guard;
+                // keep this thin guard here so DrawMap never sees playback-owned left input.
+                if (shouldSuppressNonLeft)
+                {
+                    SuppressFullscreenMapNonLeftMouseInput();
+                }
+
+                if (shouldSuppress)
+                {
+                    string message;
+                    TerrariaUiMouseCompat.TryConsumeMouseTriggerInput("MouseLeft", out message);
+                }
+            }
+            catch (Exception error)
+            {
+                RuntimeDiagnostics.RecordError("MapFootprintPlaybackOverlay.UpdateAfterPlayerInputGuard", error);
+                LogThrottle.ErrorThrottled(
+                    "map-footprint-playback-after-player-input-error",
+                    TimeSpan.FromSeconds(10),
+                    "MapFootprintPlaybackOverlay",
+                    "Footprint playback after-PlayerInput guard failed; exception swallowed.",
+                    error);
+            }
+            finally
+            {
+                var afterCapture = CaptureMouseState();
+                RecordAfterPlayerInputGuardDiagnostics(
+                    shouldSuppress,
+                    shouldSuppressNonLeft,
+                    releaseFrame,
+                    beforeCapture,
+                    afterCapture,
+                    DateTime.UtcNow);
+                if (releaseFrame)
+                {
+                    ClearFullscreenMapInputSuppression();
+                }
             }
         }
 
@@ -79,6 +155,7 @@ namespace JueMingZ.UI
 
             UiInputFrameClock.BeginDrawFrame("MapFootprintPlaybackOverlay");
             var drawFrame = ReadFullscreenUiFrame(false);
+            RememberDrawFrameExtent(drawFrame);
             var drawMouse = drawFrame.Mouse;
             var drawLayout = MapFootprintPlaybackState.CalculateLayout(drawFrame.ScreenWidth, drawFrame.ScreenHeight);
             var drawHit = MapFootprintPlaybackState.HitTest(drawLayout, drawMouse.X, drawMouse.Y);
@@ -241,6 +318,35 @@ namespace JueMingZ.UI
             return BuildFullscreenUiFrame(raw, screenWidth, screenHeight, scaleScreenFromUiMatrix);
         }
 
+        internal static void ResetDrawFrameExtentForTesting()
+        {
+            ClearDrawFrameExtent();
+        }
+
+        internal static void ResetInputSuppressionForTesting()
+        {
+            ClearFullscreenMapInputSuppression();
+        }
+
+        internal static void UpdateAfterPlayerInputGuardForTesting()
+        {
+            UpdateAfterPlayerInputGuard();
+        }
+
+        internal static void RememberDrawFrameExtentForTesting(int screenWidth, int screenHeight)
+        {
+            RememberDrawFrameExtent(new MapFootprintFullscreenUiFrame
+            {
+                ScreenWidth = screenWidth,
+                ScreenHeight = screenHeight
+            });
+        }
+
+        internal static MapFootprintFullscreenUiFrame ApplyLastDrawFrameExtentForTesting(MapFootprintFullscreenUiFrame frame)
+        {
+            return ApplyLastDrawFrameExtent(frame);
+        }
+
         internal static int CalculateTrackFilledWidthForTesting(LegacyUiRect track, MapFootprintPlaybackSnapshot playback)
         {
             return CalculateTrackFilledWidth(track, playback);
@@ -253,6 +359,12 @@ namespace JueMingZ.UI
 
         private static bool ShouldUseOverlay(bool mapFullscreen, bool displayEnabled)
         {
+            if (!mapFullscreen || !displayEnabled)
+            {
+                ClearDrawFrameExtent();
+                return false;
+            }
+
             return mapFullscreen && displayEnabled;
         }
 
@@ -280,6 +392,52 @@ namespace JueMingZ.UI
                 ScreenWidth = ResolveFullscreenUiExtent(screenWidth, scaleX, raw.UiTranslateX, scaleScreenFromUiMatrix),
                 ScreenHeight = ResolveFullscreenUiExtent(screenHeight, scaleY, raw.UiTranslateY, scaleScreenFromUiMatrix)
             };
+        }
+
+        private static void RememberDrawFrameExtent(MapFootprintFullscreenUiFrame frame)
+        {
+            if (frame == null || frame.ScreenWidth <= 0 || frame.ScreenHeight <= 0)
+            {
+                return;
+            }
+
+            lock (DrawFrameExtentSyncRoot)
+            {
+                _lastDrawFrameScreenWidth = frame.ScreenWidth;
+                _lastDrawFrameScreenHeight = frame.ScreenHeight;
+                _lastDrawFrameExtentAvailable = true;
+            }
+        }
+
+        private static MapFootprintFullscreenUiFrame ApplyLastDrawFrameExtent(MapFootprintFullscreenUiFrame frame)
+        {
+            frame = frame ?? new MapFootprintFullscreenUiFrame();
+            lock (DrawFrameExtentSyncRoot)
+            {
+                if (_lastDrawFrameExtentAvailable &&
+                    _lastDrawFrameScreenWidth > 0 &&
+                    _lastDrawFrameScreenHeight > 0)
+                {
+                    // Terraria can expose different fullscreen UI extents between
+                    // Update prefix and the post-map draw callback. Input hit-test
+                    // must follow the last visual layout, or the drawn bar can be
+                    // hovered while prefix still reports outside.
+                    frame.ScreenWidth = _lastDrawFrameScreenWidth;
+                    frame.ScreenHeight = _lastDrawFrameScreenHeight;
+                }
+            }
+
+            return frame;
+        }
+
+        private static void ClearDrawFrameExtent()
+        {
+            lock (DrawFrameExtentSyncRoot)
+            {
+                _lastDrawFrameExtentAvailable = false;
+                _lastDrawFrameScreenWidth = 0;
+                _lastDrawFrameScreenHeight = 0;
+            }
         }
 
         private static LegacyMouseSnapshot BuildFullscreenUiMouse(DiagnosticMouseState raw, double scaleX, double scaleY)
@@ -428,23 +586,75 @@ namespace JueMingZ.UI
             return mode + "/" + source;
         }
 
-        private static void ApplyInputCapture(MapFootprintPlaybackInteraction interaction)
+        private static PlaybackInputCaptureResult ApplyInputCapture(MapFootprintPlaybackInteraction interaction)
         {
-            if (interaction == null || !interaction.MouseCaptured)
+            var result = new PlaybackInputCaptureResult();
+            UpdateFullscreenMapInputSuppression(interaction);
+            if (interaction == null ||
+                (!interaction.MouseCaptured &&
+                 !interaction.ShouldSuppressFullscreenMapLeftInput &&
+                 !interaction.ShouldSuppressFullscreenMapNonLeftInput))
             {
-                return;
+                return result;
             }
 
-            if (interaction.ClickConsumed)
+            if (interaction.ShouldSuppressFullscreenMapNonLeftInput)
+            {
+                SuppressFullscreenMapNonLeftMouseInput();
+                result.NonLeftInputSuppressed = true;
+            }
+
+            if (interaction.ShouldSuppressFullscreenMapLeftInput)
             {
                 string message;
-                TerrariaUiMouseCompat.TryConsumeMouseTriggerInput("MouseLeft", out message);
+                result.LeftInputSuppressed = TerrariaUiMouseCompat.TryConsumeMouseTriggerInput("MouseLeft", out message);
+            }
+
+            if (interaction.ShouldClearFullscreenMapPanState)
+            {
+                result.PanStateClearAttempted = true;
+                result.PanStateClearSucceeded = MapFullscreenCompat.TryClearFullscreenMapPanState();
             }
 
             TerrariaUiMouseCompat.TryMarkUiMouseCapture();
             if (interaction.ScrollConsumed)
             {
-                TerrariaUiMouseCompat.TryConsumeUiScroll();
+                result.ScrollSuppressed = TerrariaUiMouseCompat.TryConsumeUiScroll();
+            }
+
+            return result;
+        }
+
+        private static void SuppressFullscreenMapNonLeftMouseInput()
+        {
+            for (var index = 0; index < FullscreenMapNonLeftMouseTriggerTokens.Length; index++)
+            {
+                string message;
+                TerrariaUiMouseCompat.TryConsumeMouseTriggerInputOnceForUi(
+                    FullscreenMapNonLeftMouseTriggerTokens[index],
+                    out message);
+            }
+        }
+
+        private static void UpdateFullscreenMapInputSuppression(MapFootprintPlaybackInteraction interaction)
+        {
+            var shouldSuppress = interaction != null && interaction.ShouldSuppressFullscreenMapLeftInput;
+            var shouldSuppressNonLeft = interaction != null && interaction.ShouldSuppressFullscreenMapNonLeftInput;
+            lock (InputSuppressionSyncRoot)
+            {
+                _suppressFullscreenMapLeftInput = shouldSuppress;
+                _suppressFullscreenMapLeftInputReleaseFrame = shouldSuppress && interaction.LeftReleased;
+                _suppressFullscreenMapNonLeftInput = shouldSuppressNonLeft;
+            }
+        }
+
+        private static void ClearFullscreenMapInputSuppression()
+        {
+            lock (InputSuppressionSyncRoot)
+            {
+                _suppressFullscreenMapLeftInput = false;
+                _suppressFullscreenMapLeftInputReleaseFrame = false;
+                _suppressFullscreenMapNonLeftInput = false;
             }
         }
 
@@ -590,6 +800,7 @@ namespace JueMingZ.UI
         private static void RecordPrefixInputDiagnostics(
             LegacyMouseSnapshot mouse,
             MapFootprintPlaybackInteraction interaction,
+            PlaybackInputCaptureResult captureResult,
             PlaybackMouseCaptureState beforeCapture,
             PlaybackMouseCaptureState afterCapture,
             DateTime utcNow)
@@ -597,6 +808,7 @@ namespace JueMingZ.UI
             var data = new MapFootprintPlaybackPrefixInputDiagnosticsData();
             mouse = mouse ?? new LegacyMouseSnapshot();
             interaction = interaction ?? new MapFootprintPlaybackInteraction();
+            captureResult = captureResult ?? new PlaybackInputCaptureResult();
             beforeCapture = beforeCapture ?? new PlaybackMouseCaptureState();
             afterCapture = afterCapture ?? new PlaybackMouseCaptureState();
             data.HitTarget = interaction.HitTarget;
@@ -608,6 +820,14 @@ namespace JueMingZ.UI
             data.MouseCaptured = interaction.MouseCaptured;
             data.ClickConsumed = interaction.ClickConsumed;
             data.ScrollConsumed = interaction.ScrollConsumed;
+            data.ShouldSuppressLeftInput = interaction.ShouldSuppressFullscreenMapLeftInput;
+            data.ShouldSuppressNonLeftInput = interaction.ShouldSuppressFullscreenMapNonLeftInput;
+            data.ShouldClearPanState = interaction.ShouldClearFullscreenMapPanState;
+            data.LeftInputSuppressed = captureResult.LeftInputSuppressed;
+            data.NonLeftInputSuppressed = captureResult.NonLeftInputSuppressed;
+            data.ScrollSuppressed = captureResult.ScrollSuppressed;
+            data.PanStateClearAttempted = captureResult.PanStateClearAttempted;
+            data.PanStateClearSucceeded = captureResult.PanStateClearSucceeded;
             data.LeftDown = mouse.LeftDown;
             data.LeftPressed = interaction.LeftPressed;
             data.LeftReleased = interaction.LeftReleased;
@@ -617,6 +837,14 @@ namespace JueMingZ.UI
             data.MainMouseLeftAfter = afterCapture.MainMouseLeft;
             data.MainMouseLeftReleaseBefore = beforeCapture.MainMouseLeftRelease;
             data.MainMouseLeftReleaseAfter = afterCapture.MainMouseLeftRelease;
+            data.MainMouseRightBefore = beforeCapture.MainMouseRight;
+            data.MainMouseRightAfter = afterCapture.MainMouseRight;
+            data.MainMouseRightReleaseBefore = beforeCapture.MainMouseRightRelease;
+            data.MainMouseRightReleaseAfter = afterCapture.MainMouseRightRelease;
+            data.MainMouseScrollWheelBefore = beforeCapture.MainMouseScrollWheel;
+            data.MainMouseScrollWheelAfter = afterCapture.MainMouseScrollWheel;
+            data.MainOldMouseScrollWheelBefore = beforeCapture.MainOldMouseScrollWheel;
+            data.MainOldMouseScrollWheelAfter = afterCapture.MainOldMouseScrollWheel;
             data.MainMouseInterfaceBefore = beforeCapture.MainMouseInterface;
             data.MainMouseInterfaceAfter = afterCapture.MainMouseInterface;
             data.MainBlockMouseBefore = beforeCapture.MainBlockMouse;
@@ -625,6 +853,35 @@ namespace JueMingZ.UI
             data.PlayerMouseInterfaceAfter = afterCapture.PlayerMouseInterface;
             data.Utc = utcNow.ToUniversalTime();
             PlayerWorldFootprintDiagnostics.RecordPlaybackPrefixInput(data);
+        }
+
+        private static void RecordAfterPlayerInputGuardDiagnostics(
+            bool shouldSuppressLeft,
+            bool shouldSuppressNonLeft,
+            bool releaseFrame,
+            PlaybackMouseCaptureState beforeCapture,
+            PlaybackMouseCaptureState afterCapture,
+            DateTime utcNow)
+        {
+            beforeCapture = beforeCapture ?? new PlaybackMouseCaptureState();
+            afterCapture = afterCapture ?? new PlaybackMouseCaptureState();
+            PlayerWorldFootprintDiagnostics.RecordPlaybackAfterPlayerInputGuard(new MapFootprintPlaybackAfterPlayerInputDiagnosticsData
+            {
+                Active = shouldSuppressLeft || shouldSuppressNonLeft,
+                ShouldSuppressLeftInput = shouldSuppressLeft,
+                ShouldSuppressNonLeftInput = shouldSuppressNonLeft,
+                ReleaseFrame = releaseFrame,
+                MainMouseLeftBefore = beforeCapture.MainMouseLeft,
+                MainMouseLeftAfter = afterCapture.MainMouseLeft,
+                MainMouseLeftReleaseBefore = beforeCapture.MainMouseLeftRelease,
+                MainMouseLeftReleaseAfter = afterCapture.MainMouseLeftRelease,
+                MainMouseRightBefore = beforeCapture.MainMouseRight,
+                MainMouseRightAfter = afterCapture.MainMouseRight,
+                MainMouseRightReleaseBefore = beforeCapture.MainMouseRightRelease,
+                MainMouseRightReleaseAfter = afterCapture.MainMouseRightRelease,
+                GameUpdateCount = ReadGameUpdateCount(),
+                Utc = utcNow.ToUniversalTime()
+            });
         }
 
         private static void RecordDrawInputDiagnostics(
@@ -645,6 +902,10 @@ namespace JueMingZ.UI
                 BarHovered = hit.BarHovered,
                 MainMouseLeft = current.MainMouseLeft,
                 MainMouseLeftRelease = current.MainMouseLeftRelease,
+                MainMouseRight = current.MainMouseRight,
+                MainMouseRightRelease = current.MainMouseRightRelease,
+                MainMouseScrollWheel = current.MainMouseScrollWheel,
+                MainOldMouseScrollWheel = current.MainOldMouseScrollWheel,
                 MainMouseInterface = current.MainMouseInterface,
                 MainBlockMouse = current.MainBlockMouse,
                 PlayerMouseInterface = current.PlayerMouseInterface,
@@ -661,6 +922,10 @@ namespace JueMingZ.UI
             {
                 MainMouseLeft = current.MainMouseLeft,
                 MainMouseLeftRelease = current.MainMouseLeftRelease,
+                MainMouseRight = current.MainMouseRight,
+                MainMouseRightRelease = current.MainMouseRightRelease,
+                MainMouseScrollWheel = current.MainMouseScrollWheel,
+                MainOldMouseScrollWheel = current.MainOldMouseScrollWheel,
                 MainMouseInterface = current.MainMouseInterface,
                 MainBlockMouse = current.MainBlockMouse,
                 PlayerMouseInterface = current.PlayerMouseInterface
@@ -682,9 +947,22 @@ namespace JueMingZ.UI
         {
             public bool MainMouseLeft { get; set; }
             public bool MainMouseLeftRelease { get; set; }
+            public bool MainMouseRight { get; set; }
+            public bool MainMouseRightRelease { get; set; }
+            public int MainMouseScrollWheel { get; set; }
+            public int MainOldMouseScrollWheel { get; set; }
             public bool MainMouseInterface { get; set; }
             public bool MainBlockMouse { get; set; }
             public bool PlayerMouseInterface { get; set; }
+        }
+
+        private sealed class PlaybackInputCaptureResult
+        {
+            public bool LeftInputSuppressed { get; set; }
+            public bool NonLeftInputSuppressed { get; set; }
+            public bool ScrollSuppressed { get; set; }
+            public bool PanStateClearAttempted { get; set; }
+            public bool PanStateClearSucceeded { get; set; }
         }
 
         private sealed class FullscreenMouseCoordinate

@@ -50,24 +50,39 @@ namespace JueMingZ.Automation.Information
                     stack);
             }
 
-            if (context.Tile != null && context.Tile.HasAnyLayer)
+            var visibility = ResolveVisibilityDecision(context);
+            var filteredTile = FilterTileTarget(context.Tile, visibility);
+            if (filteredTile != null && filteredTile.HasAnyLayer)
             {
-                return BuildResult(
-                    MapQuickAnnouncementTargetKind.Tile,
-                    MapQuickAnnouncementTextBuilder.BuildTileText(context.Tile),
-                    BuildTileDetail(context.Tile),
-                    context.Tile.TileName,
-                    1);
+                return WithVisibilitySummary(
+                    BuildResult(
+                        MapQuickAnnouncementTargetKind.Tile,
+                        MapQuickAnnouncementTextBuilder.BuildTileText(filteredTile),
+                        BuildTileDetail(filteredTile),
+                        BuildTileTargetName(filteredTile),
+                        1),
+                    visibility,
+                    false);
             }
 
-            if (context.Wall != null && context.Wall.Active)
+            if (context.Wall != null &&
+                context.Wall.Active &&
+                AllowsWorldLayer(visibility == null ? null : visibility.Wall))
             {
-                return BuildResult(
-                    MapQuickAnnouncementTargetKind.Wall,
-                    MapQuickAnnouncementTextBuilder.BuildWallText(context.Wall),
-                    BuildWallDetail(context.Wall),
-                    context.Wall.WallName,
-                    1);
+                return WithVisibilitySummary(
+                    BuildResult(
+                        MapQuickAnnouncementTargetKind.Wall,
+                        MapQuickAnnouncementTextBuilder.BuildWallText(context.Wall),
+                        BuildWallDetail(context.Wall),
+                        context.Wall.WallName,
+                        1),
+                    visibility,
+                    false);
+            }
+
+            if (ShouldBuildVisibilityBlockedResult(context, visibility))
+            {
+                return BuildVisibilityBlockedResult(context, visibility);
             }
 
             var airText = MapQuickAnnouncementTextBuilder.BuildAirText(ResolveAirPhraseIndex(context));
@@ -249,10 +264,574 @@ namespace JueMingZ.Automation.Information
                    ";ageUpdates=" + Math.Max(0, slot.HoverAgeUpdates).ToString(CultureInfo.InvariantCulture);
         }
 
+        private static MapQuickAnnouncementVisibilityDecision ResolveVisibilityDecision(
+            MapQuickAnnouncementResolveContext context)
+        {
+            if (context == null)
+            {
+                return null;
+            }
+
+            if (context.VisibilityDecision != null)
+            {
+                return context.VisibilityDecision;
+            }
+
+            if (context.VisibilityRequest != null)
+            {
+                context.VisibilityDecision = MapQuickAnnouncementVisibilityService.Evaluate(context.VisibilityRequest);
+                return context.VisibilityDecision;
+            }
+
+            if (context.Tile == null && context.Wall == null)
+            {
+                return null;
+            }
+
+            context.VisibilityDecision = MapQuickAnnouncementVisibilityService.Evaluate(
+                new MapQuickAnnouncementVisibilityRequest
+                {
+                    TileX = context.MouseTileX,
+                    TileY = context.MouseTileY,
+                    Tile = context.Tile,
+                    Wall = context.Wall
+                });
+            return context.VisibilityDecision;
+        }
+
+        private static MapQuickAnnouncementTileTarget FilterTileTarget(
+            MapQuickAnnouncementTileTarget tile,
+            MapQuickAnnouncementVisibilityDecision visibility)
+        {
+            if (tile == null)
+            {
+                return null;
+            }
+
+            var filtered = new MapQuickAnnouncementTileTarget();
+            if (tile.Active && AllowsWorldLayer(visibility == null ? null : visibility.Tile))
+            {
+                filtered.Active = true;
+                filtered.TileType = tile.TileType;
+                filtered.TileStyle = tile.TileStyle;
+                filtered.FrameX = tile.FrameX;
+                filtered.FrameY = tile.FrameY;
+                filtered.TileName = tile.TileName;
+                filtered.NameSource = tile.NameSource;
+            }
+
+            if (tile.HasLiquid && AllowsWorldLayer(visibility == null ? null : visibility.Liquid))
+            {
+                filtered.LiquidAmount = tile.LiquidAmount;
+                filtered.LiquidType = tile.LiquidType;
+            }
+
+            if (tile.HasCircuitLayer && AllowsCircuitLayer(visibility == null ? null : visibility.Circuit))
+            {
+                // Circuit-only is a user exception, not proof that the same
+                // tile/wall/liquid is visible.
+                filtered.RedWire = tile.RedWire;
+                filtered.BlueWire = tile.BlueWire;
+                filtered.GreenWire = tile.GreenWire;
+                filtered.YellowWire = tile.YellowWire;
+                filtered.Actuator = tile.Actuator;
+            }
+
+            return filtered.HasAnyLayer ? filtered : null;
+        }
+
+        private static bool AllowsWorldLayer(MapQuickAnnouncementLayerVisibility layer)
+        {
+            return layer != null &&
+                   (layer.Verdict == MapQuickAnnouncementVisibilityVerdict.Visible ||
+                    layer.Verdict == MapQuickAnnouncementVisibilityVerdict.EchoNativeAllowed);
+        }
+
+        private static bool AllowsCircuitLayer(MapQuickAnnouncementLayerVisibility layer)
+        {
+            return layer != null &&
+                   layer.Verdict == MapQuickAnnouncementVisibilityVerdict.CircuitOnly;
+        }
+
+        private static bool ShouldBuildVisibilityBlockedResult(
+            MapQuickAnnouncementResolveContext context,
+            MapQuickAnnouncementVisibilityDecision visibility)
+        {
+            if (context == null || visibility == null || visibility.HasAnyAnnounceableLayer)
+            {
+                return false;
+            }
+
+            if (context.Tile != null && context.Tile.HasAnyLayer)
+            {
+                return true;
+            }
+
+            if (context.Wall != null && context.Wall.Active)
+            {
+                return true;
+            }
+
+            return IsInvisibleAir(context, visibility);
+        }
+
+        private static MapQuickAnnouncementResolveResult BuildVisibilityBlockedResult(
+            MapQuickAnnouncementResolveContext context,
+            MapQuickAnnouncementVisibilityDecision visibility)
+        {
+            var invisibleAir = IsInvisibleAir(context, visibility);
+            var body = MapQuickAnnouncementTextBuilder.BuildInvisibleWorldText();
+            return WithVisibilitySummary(
+                new MapQuickAnnouncementResolveResult
+                {
+                    Kind = invisibleAir ? MapQuickAnnouncementTargetKind.Air : MapQuickAnnouncementTargetKind.Tile,
+                    Body = body,
+                    Detail = BuildVisibilityBlockedDetail(visibility, invisibleAir),
+                    TargetName = body,
+                    TargetCount = 0,
+                    FailureReason = "visibilityBlocked"
+                },
+                visibility,
+                invisibleAir);
+        }
+
+        private static bool IsInvisibleAir(
+            MapQuickAnnouncementResolveContext context,
+            MapQuickAnnouncementVisibilityDecision visibility)
+        {
+            if (context == null || visibility == null || visibility.EmptyAirVisible)
+            {
+                return false;
+            }
+
+            var hasTileLayer = context.Tile != null && context.Tile.HasAnyLayer;
+            var hasWallLayer = context.Wall != null && context.Wall.Active;
+            return !hasTileLayer && !hasWallLayer &&
+                   (context.Tile != null ||
+                    context.VisibilityDecision != null ||
+                    context.VisibilityRequest != null);
+        }
+
+        private static string BuildVisibilityBlockedDetail(
+            MapQuickAnnouncementVisibilityDecision visibility,
+            bool invisibleAir)
+        {
+            return "visibilityBlocked;reason=" +
+                   (invisibleAir ? "invisible-air" : "world") +
+                   ";tile=" + FormatVisibilityLayer(visibility == null ? null : visibility.Tile) +
+                   ";wall=" + FormatVisibilityLayer(visibility == null ? null : visibility.Wall) +
+                   ";liquid=" + FormatVisibilityLayer(visibility == null ? null : visibility.Liquid) +
+                   ";circuit=" + FormatVisibilityLayer(visibility == null ? null : visibility.Circuit);
+        }
+
+        private static string FormatVisibilityLayer(MapQuickAnnouncementLayerVisibility layer)
+        {
+            if (layer == null)
+            {
+                return "none";
+            }
+
+            return layer.Verdict.ToString() + ":" + (layer.Reason ?? string.Empty);
+        }
+
+        private static MapQuickAnnouncementResolveResult WithVisibilitySummary(
+            MapQuickAnnouncementResolveResult result,
+            MapQuickAnnouncementVisibilityDecision visibility,
+            bool invisibleAir)
+        {
+            if (result == null)
+            {
+                return null;
+            }
+
+            var summary = BuildVisibilitySummary(visibility, invisibleAir);
+            result.VisibilityVerdict = summary.Verdict;
+            result.VisibilityReason = summary.Reason;
+            result.VisibleLayers = summary.VisibleLayers;
+            result.BlockedLayers = summary.BlockedLayers;
+            result.CircuitOnly = summary.CircuitOnly;
+            result.EchoGate = summary.EchoGate;
+            result.InvisibleAir = invisibleAir;
+            result.VisibilityUnavailableReason = summary.UnavailableReason;
+            return result;
+        }
+
+        private static VisibilitySummary BuildVisibilitySummary(
+            MapQuickAnnouncementVisibilityDecision visibility,
+            bool invisibleAir)
+        {
+            var summary = new VisibilitySummary();
+            if (visibility == null)
+            {
+                summary.Verdict = invisibleAir ? "Invisible" : string.Empty;
+                summary.Reason = invisibleAir ? "air:noVisibleEvidence" : string.Empty;
+                summary.EchoGate = string.Empty;
+                return summary;
+            }
+
+            var visibleLayers = new List<string>();
+            var blockedLayers = new List<string>();
+            AddLayerSummary(visibility.Tile, "tile", visibleLayers, blockedLayers);
+            AddLayerSummary(visibility.Wall, "wall", visibleLayers, blockedLayers);
+            AddLayerSummary(visibility.Liquid, "liquid", visibleLayers, blockedLayers);
+            AddLayerSummary(visibility.Circuit, "circuit", visibleLayers, blockedLayers);
+
+            summary.VisibleLayers = string.Join(",", visibleLayers.ToArray());
+            summary.BlockedLayers = string.Join(",", blockedLayers.ToArray());
+            summary.CircuitOnly = IsCircuitOnlySummary(visibility, visibleLayers);
+            summary.EchoGate = ResolveEchoGate(visibility);
+            summary.UnavailableReason = ResolveUnavailableReason(visibility);
+            summary.Verdict = ResolveOverallVisibilityVerdict(
+                visibility,
+                invisibleAir,
+                summary.CircuitOnly,
+                visibleLayers.Count > 0,
+                !string.IsNullOrWhiteSpace(summary.UnavailableReason));
+            summary.Reason = ResolveOverallVisibilityReason(
+                visibility,
+                summary.Verdict,
+                invisibleAir,
+                summary.UnavailableReason);
+            return summary;
+        }
+
+        private static void AddLayerSummary(
+            MapQuickAnnouncementLayerVisibility layer,
+            string layerName,
+            ICollection<string> visibleLayers,
+            ICollection<string> blockedLayers)
+        {
+            if (layer == null || !IsPresentLayer(layer))
+            {
+                return;
+            }
+
+            if (layer.AllowsAnnouncement)
+            {
+                visibleLayers.Add(layerName);
+                return;
+            }
+
+            if (layer.Verdict == MapQuickAnnouncementVisibilityVerdict.Invisible ||
+                layer.Verdict == MapQuickAnnouncementVisibilityVerdict.Unavailable)
+            {
+                blockedLayers.Add(layerName);
+            }
+        }
+
+        private static bool IsPresentLayer(MapQuickAnnouncementLayerVisibility layer)
+        {
+            return layer != null &&
+                   !string.Equals(layer.Reason, "tile:notPresent", StringComparison.Ordinal) &&
+                   !string.Equals(layer.Reason, "wall:notPresent", StringComparison.Ordinal) &&
+                   !string.Equals(layer.Reason, "liquid:notPresent", StringComparison.Ordinal) &&
+                   !string.Equals(layer.Reason, "circuit:notPresent", StringComparison.Ordinal);
+        }
+
+        private static bool IsCircuitOnlySummary(
+            MapQuickAnnouncementVisibilityDecision visibility,
+            ICollection<string> visibleLayers)
+        {
+            return visibility != null &&
+                   visibility.HasCircuitOnlyLayer &&
+                   visibleLayers.Count == 1 &&
+                   visibleLayers.Contains("circuit");
+        }
+
+        private static string ResolveOverallVisibilityVerdict(
+            MapQuickAnnouncementVisibilityDecision visibility,
+            bool invisibleAir,
+            bool circuitOnly,
+            bool hasVisibleLayer,
+            bool hasUnavailableLayer)
+        {
+            if (invisibleAir)
+            {
+                return MapQuickAnnouncementVisibilityVerdict.Invisible.ToString();
+            }
+
+            if (circuitOnly)
+            {
+                return MapQuickAnnouncementVisibilityVerdict.CircuitOnly.ToString();
+            }
+
+            if (HasLayerVerdict(visibility, MapQuickAnnouncementVisibilityVerdict.EchoNativeAllowed))
+            {
+                return MapQuickAnnouncementVisibilityVerdict.EchoNativeAllowed.ToString();
+            }
+
+            if (hasVisibleLayer)
+            {
+                return MapQuickAnnouncementVisibilityVerdict.Visible.ToString();
+            }
+
+            if (hasUnavailableLayer)
+            {
+                return MapQuickAnnouncementVisibilityVerdict.Unavailable.ToString();
+            }
+
+            return MapQuickAnnouncementVisibilityVerdict.Invisible.ToString();
+        }
+
+        private static string ResolveOverallVisibilityReason(
+            MapQuickAnnouncementVisibilityDecision visibility,
+            string verdict,
+            bool invisibleAir,
+            string unavailableReason)
+        {
+            if (invisibleAir)
+            {
+                return string.IsNullOrWhiteSpace(visibility == null ? null : visibility.EmptyAirReason)
+                    ? "air:noVisibleEvidence"
+                    : visibility.EmptyAirReason;
+            }
+
+            if (string.Equals(verdict, MapQuickAnnouncementVisibilityVerdict.CircuitOnly.ToString(), StringComparison.Ordinal))
+            {
+                return ReasonOrEmpty(visibility == null ? null : visibility.Circuit);
+            }
+
+            if (string.Equals(verdict, MapQuickAnnouncementVisibilityVerdict.EchoNativeAllowed.ToString(), StringComparison.Ordinal))
+            {
+                return FirstReasonWithVerdict(visibility, MapQuickAnnouncementVisibilityVerdict.EchoNativeAllowed);
+            }
+
+            if (string.Equals(verdict, MapQuickAnnouncementVisibilityVerdict.Visible.ToString(), StringComparison.Ordinal))
+            {
+                return FirstReasonWithVerdict(visibility, MapQuickAnnouncementVisibilityVerdict.Visible);
+            }
+
+            if (string.Equals(verdict, MapQuickAnnouncementVisibilityVerdict.Unavailable.ToString(), StringComparison.Ordinal))
+            {
+                return unavailableReason;
+            }
+
+            return FirstBlockedReason(visibility);
+        }
+
+        private static bool HasLayerVerdict(
+            MapQuickAnnouncementVisibilityDecision visibility,
+            MapQuickAnnouncementVisibilityVerdict verdict)
+        {
+            return LayerHasVerdict(visibility == null ? null : visibility.Tile, verdict) ||
+                   LayerHasVerdict(visibility == null ? null : visibility.Wall, verdict) ||
+                   LayerHasVerdict(visibility == null ? null : visibility.Liquid, verdict) ||
+                   LayerHasVerdict(visibility == null ? null : visibility.Circuit, verdict);
+        }
+
+        private static bool LayerHasVerdict(
+            MapQuickAnnouncementLayerVisibility layer,
+            MapQuickAnnouncementVisibilityVerdict verdict)
+        {
+            return layer != null && IsPresentLayer(layer) && layer.Verdict == verdict;
+        }
+
+        private static string FirstReasonWithVerdict(
+            MapQuickAnnouncementVisibilityDecision visibility,
+            MapQuickAnnouncementVisibilityVerdict verdict)
+        {
+            var reason = ReasonIfVerdict(visibility == null ? null : visibility.Tile, verdict);
+            if (!string.IsNullOrWhiteSpace(reason))
+            {
+                return reason;
+            }
+
+            reason = ReasonIfVerdict(visibility == null ? null : visibility.Wall, verdict);
+            if (!string.IsNullOrWhiteSpace(reason))
+            {
+                return reason;
+            }
+
+            reason = ReasonIfVerdict(visibility == null ? null : visibility.Liquid, verdict);
+            if (!string.IsNullOrWhiteSpace(reason))
+            {
+                return reason;
+            }
+
+            return ReasonIfVerdict(visibility == null ? null : visibility.Circuit, verdict);
+        }
+
+        private static string ReasonIfVerdict(
+            MapQuickAnnouncementLayerVisibility layer,
+            MapQuickAnnouncementVisibilityVerdict verdict)
+        {
+            return LayerHasVerdict(layer, verdict) ? ReasonOrEmpty(layer) : string.Empty;
+        }
+
+        private static string FirstBlockedReason(MapQuickAnnouncementVisibilityDecision visibility)
+        {
+            var reason = FirstBlockedLayerReason(visibility == null ? null : visibility.Tile);
+            if (!string.IsNullOrWhiteSpace(reason))
+            {
+                return reason;
+            }
+
+            reason = FirstBlockedLayerReason(visibility == null ? null : visibility.Wall);
+            if (!string.IsNullOrWhiteSpace(reason))
+            {
+                return reason;
+            }
+
+            reason = FirstBlockedLayerReason(visibility == null ? null : visibility.Liquid);
+            if (!string.IsNullOrWhiteSpace(reason))
+            {
+                return reason;
+            }
+
+            return FirstBlockedLayerReason(visibility == null ? null : visibility.Circuit);
+        }
+
+        private static string FirstBlockedLayerReason(MapQuickAnnouncementLayerVisibility layer)
+        {
+            if (layer == null || !IsPresentLayer(layer))
+            {
+                return string.Empty;
+            }
+
+            return layer.Verdict == MapQuickAnnouncementVisibilityVerdict.Invisible ||
+                   layer.Verdict == MapQuickAnnouncementVisibilityVerdict.Unavailable
+                ? ReasonOrEmpty(layer)
+                : string.Empty;
+        }
+
+        private static string ResolveUnavailableReason(MapQuickAnnouncementVisibilityDecision visibility)
+        {
+            return FirstReasonWithVerdict(visibility, MapQuickAnnouncementVisibilityVerdict.Unavailable);
+        }
+
+        private static string ResolveEchoGate(MapQuickAnnouncementVisibilityDecision visibility)
+        {
+            if (visibility == null)
+            {
+                return string.Empty;
+            }
+
+            if (AnyReasonContains(visibility, "echoNative"))
+            {
+                return "echoNative";
+            }
+
+            if (AnyReasonContains(visibility, "echoView"))
+            {
+                return "echoVisible";
+            }
+
+            if (AnyReasonContains(visibility, "hiddenWithoutEchoView"))
+            {
+                return "hiddenWithoutEchoView";
+            }
+
+            return "none";
+        }
+
+        private static bool AnyReasonContains(
+            MapQuickAnnouncementVisibilityDecision visibility,
+            string token)
+        {
+            return ReasonContains(visibility == null ? null : visibility.Tile, token) ||
+                   ReasonContains(visibility == null ? null : visibility.Wall, token) ||
+                   ReasonContains(visibility == null ? null : visibility.Liquid, token) ||
+                   ReasonContains(visibility == null ? null : visibility.Circuit, token) ||
+                   ReasonListContains(visibility == null ? null : visibility.Reasons, token);
+        }
+
+        private static bool ReasonContains(
+            MapQuickAnnouncementLayerVisibility layer,
+            string token)
+        {
+            return layer != null &&
+                   layer.Reason != null &&
+                   layer.Reason.IndexOf(token, StringComparison.Ordinal) >= 0;
+        }
+
+        private static bool ReasonListContains(
+            IEnumerable<string> reasons,
+            string token)
+        {
+            if (reasons == null)
+            {
+                return false;
+            }
+
+            foreach (var reason in reasons)
+            {
+                if (reason != null && reason.IndexOf(token, StringComparison.Ordinal) >= 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static string ReasonOrEmpty(MapQuickAnnouncementLayerVisibility layer)
+        {
+            return layer == null ? string.Empty : (layer.Reason ?? string.Empty);
+        }
+
+        private sealed class VisibilitySummary
+        {
+            public VisibilitySummary()
+            {
+                Verdict = string.Empty;
+                Reason = string.Empty;
+                VisibleLayers = string.Empty;
+                BlockedLayers = string.Empty;
+                EchoGate = string.Empty;
+                UnavailableReason = string.Empty;
+            }
+
+            public string Verdict { get; set; }
+            public string Reason { get; set; }
+            public string VisibleLayers { get; set; }
+            public string BlockedLayers { get; set; }
+            public bool CircuitOnly { get; set; }
+            public string EchoGate { get; set; }
+            public string UnavailableReason { get; set; }
+        }
+
+        private static string BuildTileTargetName(MapQuickAnnouncementTileTarget tile)
+        {
+            if (tile == null)
+            {
+                return string.Empty;
+            }
+
+            if (tile.Active)
+            {
+                return tile.TileName;
+            }
+
+            if (tile.HasLiquid)
+            {
+                return MapQuickAnnouncementTextBuilder.BuildLiquidName(tile.LiquidType);
+            }
+
+            return tile.HasCircuitLayer ? "电路层" : string.Empty;
+        }
+
         private static string BuildTileDetail(MapQuickAnnouncementTileTarget tile)
         {
             if (tile == null)
             {
+                return "tile";
+            }
+
+            if (!tile.Active)
+            {
+                if (tile.HasLiquid)
+                {
+                    return "tile:liquid;liquid=" +
+                           MapQuickAnnouncementTextBuilder.BuildLiquidName(tile.LiquidType) +
+                           ":" +
+                           tile.LiquidAmount.ToString(CultureInfo.InvariantCulture);
+                }
+
+                if (tile.HasCircuitLayer)
+                {
+                    return "tile:circuitOnly" + BuildCircuitDetail(tile);
+                }
+
                 return "tile";
             }
 
@@ -271,6 +850,42 @@ namespace JueMingZ.Automation.Information
             }
 
             return detail;
+        }
+
+        private static string BuildCircuitDetail(MapQuickAnnouncementTileTarget tile)
+        {
+            if (tile == null || !tile.HasCircuitLayer)
+            {
+                return string.Empty;
+            }
+
+            var parts = new List<string>(5);
+            if (tile.RedWire)
+            {
+                parts.Add("red");
+            }
+
+            if (tile.BlueWire)
+            {
+                parts.Add("blue");
+            }
+
+            if (tile.GreenWire)
+            {
+                parts.Add("green");
+            }
+
+            if (tile.YellowWire)
+            {
+                parts.Add("yellow");
+            }
+
+            if (tile.Actuator)
+            {
+                parts.Add("actuator");
+            }
+
+            return parts.Count == 0 ? string.Empty : ";circuit=" + string.Join(",", parts.ToArray());
         }
 
         private static string BuildWallDetail(MapQuickAnnouncementWallTarget wall)
@@ -710,6 +1325,7 @@ namespace JueMingZ.Automation.Information
             Tile tile;
             if (!TerrariaTileReadCompat.TryGetTile(context.MouseTileX, context.MouseTileY, out tile))
             {
+                context.VisibilityDecision = BuildUnavailableVisibilityDecision("tileReadFailed");
                 return;
             }
 
@@ -752,6 +1368,34 @@ namespace JueMingZ.Automation.Information
                     NameSource = wallNameSource
                 };
             }
+
+            context.VisibilityRequest = new MapQuickAnnouncementVisibilityRequest
+            {
+                TileX = context.MouseTileX,
+                TileY = context.MouseTileY,
+                RawTile = tile,
+                Tile = context.Tile,
+                Wall = context.Wall
+            };
+        }
+
+        private static MapQuickAnnouncementVisibilityDecision BuildUnavailableVisibilityDecision(string reason)
+        {
+            reason = string.IsNullOrWhiteSpace(reason) ? "unavailable" : reason.Trim();
+            var decision = new MapQuickAnnouncementVisibilityDecision
+            {
+                Tile = MapQuickAnnouncementVisibilityDecision.Unavailable(
+                    MapQuickAnnouncementVisibilityLayer.Tile,
+                    reason),
+                Wall = MapQuickAnnouncementVisibilityDecision.Unavailable(
+                    MapQuickAnnouncementVisibilityLayer.Wall,
+                    reason),
+                Liquid = MapQuickAnnouncementVisibilityDecision.Unavailable(
+                    MapQuickAnnouncementVisibilityLayer.Liquid,
+                    reason)
+            };
+            decision.AddReason("compat:" + reason);
+            return decision;
         }
 
         private static int GetCollectionCount(object source)

@@ -38,7 +38,7 @@ namespace JueMingZ.Compat
                 Main.mapFullscreenScale = target.Scale;
                 target.WrittenMapPosX = Main.mapFullscreenPos.X;
                 target.WrittenMapPosY = Main.mapFullscreenPos.Y;
-                target.ClearedPanState = ClearFullscreenMapPanState();
+                target.ClearedPanState = TryClearFullscreenMapPanState();
 
                 result = target;
                 result.ResultCode = "jumped";
@@ -84,7 +84,19 @@ namespace JueMingZ.Compat
             return result;
         }
 
-        private static bool ClearFullscreenMapPanState()
+        internal static bool TryClearFullscreenMapPanState()
+        {
+            try
+            {
+                return ClearFullscreenMapPanStateCore();
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool ClearFullscreenMapPanStateCore()
         {
             // Jump writes only fullscreen map UI state. Keeping vanilla pan and
             // drag anchors synchronized prevents the next draw from lerping or

@@ -9,10 +9,10 @@ namespace JueMingZ.UI.Legacy
     public static partial class LegacyMainWindow
     {
         private const int SearchChestLocatorInputRowHeight = 36;
-        private const int SearchChestLocatorLabelWidth = 96;
-        private const int SearchChestLocatorSubmitWidth = 58;
-        private const int SearchChestLocatorClearWidth = 48;
-        private const int SearchChestLocatorControlGap = 6;
+        private const int SearchChestLocatorLabelWidth = SearchSharedInputLabelWidth;
+        private const int SearchChestLocatorSubmitWidth = SearchSharedActionButtonWidth;
+        private const int SearchChestLocatorClearWidth = SearchSharedClearButtonWidth;
+        private const int SearchChestLocatorControlGap = SearchSharedControlGap;
         private const int SearchChestLocatorInnerGap = 6;
         private const int SearchChestLocatorNoticeHeight = 22;
         private const int SearchChestLocatorMoreMessageHeight = 22;
@@ -21,7 +21,7 @@ namespace JueMingZ.UI.Legacy
         private const int SearchChestLocatorCandidateColumns = 2;
         private const int SearchChestLocatorCandidateColumnGap = 6;
         private const string SearchChestLocatorInputLabelText = "定位物品";
-        private const string SearchChestLocatorSubmitButtonText = "定位";
+        private const string SearchChestLocatorSubmitButtonText = "定位容器";
 
         private static LegacyUiElement DrawSearchChestLocatorBlock(
             object spriteBatch,
@@ -93,9 +93,7 @@ namespace JueMingZ.UI.Legacy
                 255,
                 0.82f);
 
-            var inputWidth = Math.Max(
-                120,
-                row.Width - SearchChestLocatorLabelWidth - SearchChestLocatorSubmitWidth - SearchChestLocatorClearWidth - SearchChestLocatorControlGap * 3);
+            var inputWidth = CalculateSearchSharedInputWidth(row.Width);
             var inputRect = new LegacyUiRect(row.X + SearchChestLocatorLabelWidth, row.Y + 4, inputWidth, SearchChestLocatorInputRowHeight - 8);
             var inputHit = inputRect.Intersect(area.Viewport);
             var inputElementRect = inputHit.Width > 0 && inputHit.Height > 0 ? inputHit : inputRect;
@@ -408,6 +406,18 @@ namespace JueMingZ.UI.Legacy
         internal static string[] GetSearchChestLocatorInputRowTextForTesting()
         {
             return new[] { SearchChestLocatorInputLabelText, SearchChestLocatorSubmitButtonText, "清空" };
+        }
+
+        internal static int[] GetSearchChestLocatorInputRowGeometryForTesting(int rowWidth)
+        {
+            return new[]
+            {
+                SearchChestLocatorLabelWidth,
+                SearchChestLocatorSubmitWidth,
+                SearchChestLocatorClearWidth,
+                SearchChestLocatorControlGap,
+                CalculateSearchSharedInputWidth(rowWidth)
+            };
         }
 
         internal static int GetSearchChestLocatorCandidateRowsForTesting()

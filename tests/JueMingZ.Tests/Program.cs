@@ -997,6 +997,9 @@ namespace Terraria.GameInput
     {
         public bool MouseLeft;
         public bool MouseRight;
+        public bool MouseMiddle;
+        public bool Mouse4;
+        public bool Mouse5;
     }
 }
 
@@ -1750,11 +1753,18 @@ namespace JueMingZ.Tests
             Run("map quick announcement resolver treats liquid as tile layer", ref failed, MapQuickAnnouncementResolverTreatsLiquidAsTileLayer);
             Run("map quick announcement resolver uses wall before air", ref failed, MapQuickAnnouncementResolverUsesWallBeforeAir);
             Run("map quick announcement resolver falls back to air phrase", ref failed, MapQuickAnnouncementResolverFallsBackToAirPhrase);
+            Run("map quick announcement resolver blocks invisible world layers", ref failed, MapQuickAnnouncementResolverBlocksInvisibleWorldLayers);
+            Run("map quick announcement resolver circuit only does not leak hidden layers", ref failed, MapQuickAnnouncementResolverCircuitOnlyDoesNotLeakHiddenLayers);
+            Run("map quick announcement resolver allows echo native and visible echo coating", ref failed, MapQuickAnnouncementResolverAllowsEchoNativeAndVisibleEchoCoating);
+            Run("map quick announcement visibility service builds layer verdicts", ref failed, MapQuickAnnouncementVisibilityServiceBuildsLayerVerdicts);
+            Run("terraria tile visibility compat echo native allowlist matches frozen scope", ref failed, TerrariaTileVisibilityCompatEchoNativeAllowlistMatchesFrozenScope);
+            Run("terraria tile visibility compat caches danger sense predicate", ref failed, TerrariaTileVisibilityCompatCachesDangerSensePredicate);
             Run("map quick announcement text safety wraps color and blocks injection", ref failed, MapQuickAnnouncementTextSafetyWrapsColorAndBlocksInjection);
             Run("map quick announcement delivery honors cooldowns and prompt throttle", ref failed, MapQuickAnnouncementDeliveryHonorsCooldownsAndPromptThrottle);
             Run("map quick announcement delivery does not cooldown failed send", ref failed, MapQuickAnnouncementDeliveryDoesNotCooldownFailedSend);
             Run("map quick announcement runtime records recent diagnostics", ref failed, MapQuickAnnouncementRuntimeRecordsRecentDiagnostics);
             Run("map quick announcement runtime diagnostics explain target sources", ref failed, MapQuickAnnouncementRuntimeDiagnosticsExplainTargetSources);
+            Run("map quick announcement runtime diagnostics explain visibility decisions", ref failed, MapQuickAnnouncementRuntimeDiagnosticsExplainVisibilityDecisions);
             Run("map quick announcement runtime idle path keeps diagnostics cheap", ref failed, MapQuickAnnouncementRuntimeIdlePathDoesNotResolveOrRecordDiagnostics);
             Run("map quick announcement runtime records blocked trigger diagnostics", ref failed, MapQuickAnnouncementRuntimeRecordsBlockedTriggerDiagnostics);
             Run("diagnostic snapshot writes map quick announcement state", ref failed, DiagnosticSnapshotWritesMapQuickAnnouncementState);
@@ -1905,10 +1915,16 @@ namespace JueMingZ.Tests
             Run("map footprint render draw plan clips viewport edges", ref failed, MapFootprintRenderDrawPlanClipsViewportEdges);
             Run("map footprint playback defaults to latest paused and screen-space layout", ref failed, MapFootprintPlaybackDefaultsToLatestPausedAndScreenSpaceLayout);
             Run("map footprint playback fullscreen UI scale hit-test captures bar", ref failed, MapFootprintPlaybackFullscreenUiScaleHitTestCapturesBar);
+            Run("map footprint playback prefix uses last draw extent for hit-test", ref failed, MapFootprintPlaybackPrefixUsesLastDrawExtentForHitTest);
             Run("map footprint playback fullscreen mouse keeps readable click when global gate false", ref failed, MapFootprintPlaybackFullscreenMouseKeepsReadableClickWhenGlobalGateFalseSpec);
             Run("map footprint playback fullscreen mouse does not use OS fallback when global gate false", ref failed, MapFootprintPlaybackFullscreenMouseDoesNotUseOsFallbackWhenGlobalGateFalse);
             Run("map footprint playback fullscreen capture clears click when global gate false", ref failed, MapFootprintPlaybackFullscreenCaptureClearsClickWhenGlobalGateFalse);
+            Run("map footprint playback after PlayerInput guard suppresses rewritten left", ref failed, MapFootprintPlaybackAfterPlayerInputGuardSuppressesRewrittenLeft);
+            Run("map footprint playback captures wheel and non-left mouse inside bar", ref failed, MapFootprintPlaybackCapturesWheelAndNonLeftMouseInsideBar);
+            Run("map footprint playback clears pan state for playback-owned left", ref failed, MapFootprintPlaybackClearsPanStateForPlaybackOwnedLeft);
+            Run("map footprint playback outside map actions do not change playback", ref failed, MapFootprintPlaybackOutsideMapActionsDoNotChangePlayback);
             Run("map footprint playback handles rate drag and input handoff", ref failed, MapFootprintPlaybackHandlesRateDragAndInputHandoff);
+            Run("map footprint playback release frame stops before next outside drag", ref failed, MapFootprintPlaybackReleaseFrameStopsBeforeNextOutsideDrag);
             Run("map footprint playback paused progress display end stays stable", ref failed, MapFootprintPlaybackPausedProgressDisplayEndStaysStable);
             Run("map footprint playback draw plan slices current line", ref failed, MapFootprintPlaybackDrawPlanSlicesCurrentLine);
             Run("player-world footprints diagnostics written to snapshot", ref failed, PlayerWorldFootprintsDiagnosticsWrittenToSnapshot);

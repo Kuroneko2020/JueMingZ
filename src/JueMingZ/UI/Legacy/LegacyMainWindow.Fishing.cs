@@ -34,9 +34,9 @@ namespace JueMingZ.UI.Legacy
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawFishingStoreModeRow(spriteBatch, area, mouse, elements, y, settings.FishingAutoStoreMode) ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
-            hovered = DrawFishingQuickRenameRow(spriteBatch, area, mouse, elements, y) ?? hovered;
-            y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "切杆跳过", settings.FishingFilterCutRodSkipEnabled, "fishing-cut-rod-skip-mode:", "切杆跳过不要的鱼获") ?? hovered;
+            y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
+            hovered = DrawFishingQuickRenameRow(spriteBatch, area, mouse, elements, y) ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SectionGap;
 
             hovered = DrawFishingFilterLayout(spriteBatch, area, mouse, elements, y, settings) ?? hovered;
@@ -135,6 +135,27 @@ namespace JueMingZ.UI.Legacy
             return inputHovered ? inputElement : null;
         }
 
+        internal static string[] GetFishingPageTopOrderForTesting()
+        {
+            return new[]
+            {
+                "自动钓鱼",
+                "自动换装",
+                "自动配装",
+                "自动存放鱼",
+                "切杆跳过",
+                "快捷改名",
+                "过滤区"
+            };
+        }
+
+        internal static int GetFishingFilterContentYForTesting()
+        {
+            return LegacyUiMetrics.RowHeight * 5 +
+                   LegacyUiMetrics.SettingRowGap * 4 +
+                   LegacyUiMetrics.SectionGap;
+        }
+
         private static LegacyUiElement DrawFishingFilterModeRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, string mode)
         {
             var selected = FishingFilterModes.Normalize(mode);
@@ -202,6 +223,11 @@ namespace JueMingZ.UI.Legacy
             return UseStackedFishingFilterLayout(viewportWidth)
                 ? FishingFilterPanelHeight * 2 + LegacyUiMetrics.GridCellGap * 2
                 : FishingFilterPanelHeight;
+        }
+
+        internal static int CalculateFishingFilterLayoutHeightForTesting(int viewportWidth)
+        {
+            return CalculateFishingFilterLayoutHeight(viewportWidth);
         }
 
         private static LegacyUiElement DrawFishingFilterListPane(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, LegacyUiRect pane, AppSettings settings)

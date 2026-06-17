@@ -162,6 +162,39 @@ namespace JueMingZ.Tests
 
                 var miscSnapshot = LegacyMainWindow.BuildPageLayoutSnapshotForTesting("misc", window, content, 99999, settings);
                 AssertBottomRowVisibleAtMaxScroll(miscSnapshot, expectedMiscHeight, "misc");
+
+                var developerButtonWidths = LegacyMainWindow.GetDeveloperEasterEggButtonWidthsForTesting(content.Width);
+                if (developerButtonWidths.Length != 3 ||
+                    developerButtonWidths[0] != 64 ||
+                    developerButtonWidths[1] <= developerButtonWidths[0] ||
+                    developerButtonWidths[2] != 24)
+                {
+                    throw new InvalidOperationException("Expected developer menu default button to use standard width while the confirm warning stays readable.");
+                }
+
+                var fishingOrder = LegacyMainWindow.GetFishingPageTopOrderForTesting();
+                AssertStringEquals(fishingOrder[3], "自动存放鱼", "fishing page store row");
+                AssertStringEquals(fishingOrder[4], "切杆跳过", "fishing page cut-rod row");
+                AssertStringEquals(fishingOrder[5], "快捷改名", "fishing page quick rename row");
+                AssertStringEquals(fishingOrder[6], "过滤区", "fishing page filter section");
+
+                var expectedFishingFilterY =
+                    LegacyUiMetrics.RowHeight * 5 +
+                    LegacyUiMetrics.SettingRowGap * 4 +
+                    LegacyUiMetrics.SectionGap;
+                if (LegacyMainWindow.GetFishingFilterContentYForTesting() != expectedFishingFilterY)
+                {
+                    throw new InvalidOperationException("Expected fishing filter start to keep the existing five-row content offset.");
+                }
+
+                var expectedFishingHeight =
+                    expectedFishingFilterY +
+                    LegacyMainWindow.CalculateFishingFilterLayoutHeightForTesting(content.Width - LegacyUiMetrics.ContentPadding * 2 - LegacyUiMetrics.ScrollbarWidth - 8) +
+                    24;
+                if (LegacyMainWindow.CalculateFishingContentHeightForTesting(content) != expectedFishingHeight)
+                {
+                    throw new InvalidOperationException("Expected fishing content height to remain tied to the unchanged filter start.");
+                }
             }
             finally
             {

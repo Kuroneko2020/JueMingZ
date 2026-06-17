@@ -255,6 +255,74 @@ namespace JueMingZ.Tests
                 throw new InvalidOperationException("Map enhancement content height must include persistent death markers, death history, world day count, revealed area ratio, map custom markers, map footprints, quick announcement, and direction hint rows.");
             }
 
+            var expectedOrder = new[]
+            {
+                "死亡信息",
+                "世界天数",
+                "揭示区域",
+                "死亡点常驻",
+                "足迹",
+                "稀有生物显示方向",
+                "旅商显示方向",
+                "快捷宣告",
+                "地图标记"
+            };
+            var order = LegacyMainWindow.GetMapEnhancementRowOrderForTesting();
+            if (order == null || order.Length != expectedOrder.Length)
+            {
+                throw new InvalidOperationException("Map enhancement row order contract must expose all nine rows.");
+            }
+
+            for (var index = 0; index < expectedOrder.Length; index++)
+            {
+                AssertStringEquals(order[index], expectedOrder[index], "map enhancement row order " + index.ToString(CultureInfo.InvariantCulture));
+                var expectedY = LegacyUiMetrics.RowHeight * index + LegacyUiMetrics.SettingRowGap * index;
+                if (LegacyMainWindow.GetMapEnhancementRowContentYForTesting(expectedOrder[index]) != expectedY)
+                {
+                    throw new InvalidOperationException("Map enhancement row content Y must follow the frozen order for " + expectedOrder[index] + ".");
+                }
+            }
+
+            var row = new LegacyUiRect(20, 30, 520, LegacyUiMetrics.RowHeight);
+            var deathRects = LegacyMainWindow.CalculateMapDeathHistoryButtonRectsForTesting(row);
+            if (deathRects == null ||
+                deathRects.Length != 2 ||
+                deathRects[0].Width != 68 ||
+                deathRects[1].Width != 82 ||
+                deathRects[1].Right != row.Right - 10 ||
+                deathRects[0].Right + 6 != deathRects[1].X)
+            {
+                throw new InvalidOperationException("Map death history details button must sit left of the rightmost count button with the frozen widths.");
+            }
+
+            var quickLayout = LegacyMainWindow.CalculateMapQuickAnnouncementLayoutForTesting(row);
+            if (quickLayout == null || quickLayout.Length != 7)
+            {
+                throw new InvalidOperationException("Map quick announcement layout contract must expose key, separator, and mode rects.");
+            }
+
+            if (quickLayout[0].Width != 64 ||
+                quickLayout[2].Width != 64 ||
+                quickLayout[4].Width != 64 ||
+                quickLayout[1].Width != 12 ||
+                quickLayout[3].Width != 12 ||
+                quickLayout[5].Width != 64 ||
+                quickLayout[6].Width != 64)
+            {
+                throw new InvalidOperationException("Map quick announcement row must use 64px key slots, plus separators, and standard switch widths.");
+            }
+
+            if (quickLayout[0].Right + 6 != quickLayout[1].X ||
+                quickLayout[1].Right + 6 != quickLayout[2].X ||
+                quickLayout[2].Right + 6 != quickLayout[3].X ||
+                quickLayout[3].Right + 6 != quickLayout[4].X ||
+                quickLayout[4].Right + 6 != quickLayout[5].X ||
+                quickLayout[5].Right + 6 != quickLayout[6].X ||
+                quickLayout[6].Right != row.Right - 10)
+            {
+                throw new InvalidOperationException("Map quick announcement row must keep visual plus separators between the three keys without adding command rects.");
+            }
+
             var first = LegacyMainWindow.BuildPageLayoutSnapshotForTesting("map_enhancement", window, content, 0, settings);
             settings.MapPersistentDeathMarkersEnabled = true;
             var markerChanged = LegacyMainWindow.BuildPageLayoutSnapshotForTesting("map_enhancement", window, content, 0, settings);
@@ -297,7 +365,7 @@ namespace JueMingZ.Tests
             AssertStringEquals(tooltips[0], "双击进行改键，不支持鼠标按键", "map quick announcement slot1 tooltip");
             AssertStringEquals(tooltips[1], "双击进行改键，不支持鼠标按键", "map quick announcement slot2 tooltip");
             AssertStringEquals(tooltips[2], "双击进行改键，支持鼠标按键", "map quick announcement trigger tooltip");
-            AssertStringEquals(tooltips[3], "按下快捷键对鼠标位置内容进行广播", "map quick announcement on tooltip");
+            AssertStringEquals(tooltips[3], "按下三个快捷键对光标位置内容进行广播", "map quick announcement on tooltip");
             AssertStringEquals(tooltips[4], string.Empty, "map quick announcement off tooltip");
         }
 
@@ -517,6 +585,7 @@ namespace JueMingZ.Tests
                     Active = true,
                     TileName = "石块"
                 };
+                ApplyVisibleQuickAnnouncementWorld(context);
 
                 if (MapQuickAnnouncementTargetResolver.TryAddUiHoverItemForTesting(context))
                 {
@@ -641,6 +710,7 @@ namespace JueMingZ.Tests
                     TileName = "铁矿",
                     NameSource = "placementItem"
                 };
+                ApplyVisibleQuickAnnouncementWorld(context);
 
                 var result = MapQuickAnnouncementTargetResolver.Resolve(context);
                 AssertContains(result.Detail, "tile:placementItem");
@@ -858,6 +928,7 @@ namespace JueMingZ.Tests
                 Active = true,
                 WallName = "石墙"
             };
+            ApplyVisibleQuickAnnouncementWorld(context);
 
             var result = MapQuickAnnouncementTargetResolver.Resolve(context);
             if (result.Kind != MapQuickAnnouncementTargetKind.Tile)
@@ -881,6 +952,7 @@ namespace JueMingZ.Tests
                 Active = true,
                 WallName = "石墙"
             };
+            ApplyVisibleQuickAnnouncementWorld(context);
 
             var result = MapQuickAnnouncementTargetResolver.Resolve(context);
             if (result.Kind != MapQuickAnnouncementTargetKind.Tile)
@@ -898,6 +970,7 @@ namespace JueMingZ.Tests
                 LiquidType = 1,
                 RedWire = true
             };
+            ApplyVisibleQuickAnnouncementWorld(context);
             result = MapQuickAnnouncementTargetResolver.Resolve(context);
             AssertStringEquals(result.Body, "这里有 石块，熔岩，红线", "map quick announcement tile liquid wire text");
 
@@ -919,6 +992,7 @@ namespace JueMingZ.Tests
                 Active = true,
                 WallName = "石墙"
             };
+            ApplyVisibleQuickAnnouncementWorld(context);
 
             var result = MapQuickAnnouncementTargetResolver.Resolve(context);
             if (result.Kind != MapQuickAnnouncementTargetKind.Wall)
@@ -941,6 +1015,345 @@ namespace JueMingZ.Tests
             }
 
             AssertStringEquals(result.Body, "这里只有空气", "map quick announcement air text");
+        }
+
+        private static void MapQuickAnnouncementResolverBlocksInvisibleWorldLayers()
+        {
+            var tileContext = CreateQuickAnnouncementContext(20f, 20f);
+            tileContext.Tile = new MapQuickAnnouncementTileTarget
+            {
+                Active = true,
+                TileType = 1,
+                TileName = "石块",
+                NameSource = "placementItem"
+            };
+            ApplyDarkQuickAnnouncementWorld(tileContext);
+            var result = MapQuickAnnouncementTargetResolver.Resolve(tileContext);
+            AssertStringEquals(result.Body, MapQuickAnnouncementTextBuilder.InvisibleWorldText, "dark tile invisible body");
+            AssertStringEquals(result.FailureReason, "visibilityBlocked", "dark tile visibility failure reason");
+            AssertContains(result.Detail, "visibilityBlocked");
+            AssertDoesNotContain(result.Detail, "placementItem");
+            AssertDoesNotContain(result.Detail, "type=1");
+
+            var wallContext = CreateQuickAnnouncementContext(20f, 20f);
+            wallContext.Wall = new MapQuickAnnouncementWallTarget
+            {
+                Active = true,
+                WallType = 1,
+                WallName = "石墙",
+                NameSource = "placementItem"
+            };
+            ApplyDarkQuickAnnouncementWorld(wallContext);
+            result = MapQuickAnnouncementTargetResolver.Resolve(wallContext);
+            AssertStringEquals(result.Body, MapQuickAnnouncementTextBuilder.InvisibleWorldText, "dark wall invisible body");
+            AssertDoesNotContain(result.Detail, "placementItem");
+            AssertDoesNotContain(result.Detail, "type=1");
+
+            var liquidContext = CreateQuickAnnouncementContext(20f, 20f);
+            liquidContext.Tile = new MapQuickAnnouncementTileTarget
+            {
+                LiquidAmount = 255,
+                LiquidType = 2
+            };
+            ApplyDarkQuickAnnouncementWorld(liquidContext);
+            result = MapQuickAnnouncementTargetResolver.Resolve(liquidContext);
+            AssertStringEquals(result.Body, MapQuickAnnouncementTextBuilder.InvisibleWorldText, "dark honey invisible body");
+            AssertDoesNotContain(result.Body, "蜂蜜");
+
+            var airContext = CreateQuickAnnouncementContext(20f, 20f);
+            airContext.Tile = new MapQuickAnnouncementTileTarget();
+            ApplyDarkQuickAnnouncementWorld(airContext);
+            result = MapQuickAnnouncementTargetResolver.Resolve(airContext);
+            if (result.Kind != MapQuickAnnouncementTargetKind.Air)
+            {
+                throw new InvalidOperationException("Invisible air should remain an air-kind target for cooldown semantics.");
+            }
+
+            AssertStringEquals(result.Body, MapQuickAnnouncementTextBuilder.InvisibleWorldText, "dark air invisible body");
+            AssertContains(result.Detail, "invisible-air");
+
+            var visibleAirContext = CreateQuickAnnouncementContext(20f, 20f);
+            visibleAirContext.Tile = new MapQuickAnnouncementTileTarget();
+            ApplyVisibleQuickAnnouncementWorld(visibleAirContext);
+            visibleAirContext.AirPhraseIndex = 1;
+            result = MapQuickAnnouncementTargetResolver.Resolve(visibleAirContext);
+            AssertStringEquals(result.Body, "这里只有空气", "visible air keeps existing air phrase");
+        }
+
+        private static void MapQuickAnnouncementResolverCircuitOnlyDoesNotLeakHiddenLayers()
+        {
+            var wireContext = CreateQuickAnnouncementContext(20f, 20f);
+            wireContext.Tile = new MapQuickAnnouncementTileTarget
+            {
+                Active = true,
+                TileType = 6,
+                TileStyle = 2,
+                FrameX = 36,
+                FrameY = 18,
+                TileName = "铁矿",
+                NameSource = "placementItem",
+                RedWire = true
+            };
+            wireContext.Wall = new MapQuickAnnouncementWallTarget
+            {
+                Active = true,
+                WallType = 21,
+                WallName = "玻璃墙",
+                NameSource = "placementItem"
+            };
+            ApplyDarkQuickAnnouncementWorld(wireContext);
+
+            var result = MapQuickAnnouncementTargetResolver.Resolve(wireContext);
+            AssertStringEquals(result.Body, "这里有 红线", "dark tile red wire circuit-only body");
+            AssertStringEquals(result.TargetName, "电路层", "dark wire target name");
+            AssertStringEquals(result.Detail, "tile:circuitOnly;circuit=red", "dark wire detail");
+            AssertDoesNotContain(result.Body, "铁矿");
+            AssertDoesNotContain(result.Body, "玻璃墙");
+            AssertDoesNotContain(result.Detail, "placementItem");
+            AssertDoesNotContain(result.Detail, "type=");
+            AssertDoesNotContain(result.Detail, "frame=");
+
+            var actuatorContext = CreateQuickAnnouncementContext(20f, 20f);
+            actuatorContext.Tile = new MapQuickAnnouncementTileTarget
+            {
+                Active = true,
+                TileType = 1,
+                TileName = "石块",
+                LiquidAmount = 255,
+                LiquidType = 3,
+                Actuator = true
+            };
+            ApplyDarkQuickAnnouncementWorld(actuatorContext);
+
+            result = MapQuickAnnouncementTargetResolver.Resolve(actuatorContext);
+            AssertStringEquals(result.Body, "这里有 执行器", "dark tile liquid actuator circuit-only body");
+            AssertDoesNotContain(result.Body, "石块");
+            AssertDoesNotContain(result.Body, "微光");
+
+            var visibleContext = CreateQuickAnnouncementContext(20f, 20f);
+            visibleContext.Tile = new MapQuickAnnouncementTileTarget
+            {
+                Active = true,
+                TileName = "石块",
+                RedWire = true
+            };
+            ApplyVisibleQuickAnnouncementWorld(visibleContext);
+            result = MapQuickAnnouncementTargetResolver.Resolve(visibleContext);
+            AssertStringEquals(result.Body, "这里有 石块，红线", "visible tile still combines wire");
+        }
+
+        private static void MapQuickAnnouncementResolverAllowsEchoNativeAndVisibleEchoCoating()
+        {
+            var echoContext = CreateQuickAnnouncementContext(20f, 20f);
+            echoContext.Tile = new MapQuickAnnouncementTileTarget
+            {
+                Active = true,
+                TileType = 541,
+                TileName = "回声块"
+            };
+            echoContext.VisibilityDecision = MapQuickAnnouncementVisibilityService.EvaluateForTesting(
+                CreateQuickAnnouncementVisibilityRequest(echoContext.Tile),
+                CreateVisibilityEvidence(echoNativeTile: true));
+            var result = MapQuickAnnouncementTargetResolver.Resolve(echoContext);
+            AssertStringEquals(result.Body, "这里有 回声块", "echo native tile body");
+
+            var echoCoatingContext = CreateQuickAnnouncementContext(20f, 20f);
+            echoCoatingContext.Tile = new MapQuickAnnouncementTileTarget
+            {
+                Active = true,
+                TileType = 1,
+                TileName = "石块"
+            };
+            echoCoatingContext.VisibilityDecision = MapQuickAnnouncementVisibilityService.EvaluateForTesting(
+                CreateQuickAnnouncementVisibilityRequest(echoCoatingContext.Tile),
+                CreateVisibilityEvidence(tileHidden: true));
+            result = MapQuickAnnouncementTargetResolver.Resolve(echoCoatingContext);
+            AssertStringEquals(result.Body, MapQuickAnnouncementTextBuilder.InvisibleWorldText, "echo coating hidden body");
+
+            echoCoatingContext.VisibilityDecision = MapQuickAnnouncementVisibilityService.EvaluateForTesting(
+                CreateQuickAnnouncementVisibilityRequest(echoCoatingContext.Tile),
+                CreateVisibilityEvidence(showInvisible: true, tileHidden: true, lightR: 1));
+            result = MapQuickAnnouncementTargetResolver.Resolve(echoCoatingContext);
+            AssertStringEquals(result.Body, "这里有 石块", "echo coating with view and visible evidence body");
+        }
+
+        private static void MapQuickAnnouncementVisibilityServiceBuildsLayerVerdicts()
+        {
+            AssertVisibilityVerdict(
+                MapQuickAnnouncementVisibilityService.EvaluateForTesting(
+                    CreateQuickAnnouncementVisibilityRequest(new MapQuickAnnouncementTileTarget { Active = true, TileType = 1 }),
+                    CreateVisibilityEvidence()),
+                MapQuickAnnouncementVisibilityLayer.Tile,
+                MapQuickAnnouncementVisibilityVerdict.Invisible,
+                "dark ordinary active tile");
+
+            AssertVisibilityVerdict(
+                MapQuickAnnouncementVisibilityService.EvaluateForTesting(
+                    CreateQuickAnnouncementVisibilityRequest(
+                        null,
+                        new MapQuickAnnouncementWallTarget { Active = true, WallType = 1 }),
+                    CreateVisibilityEvidence()),
+                MapQuickAnnouncementVisibilityLayer.Wall,
+                MapQuickAnnouncementVisibilityVerdict.Invisible,
+                "dark ordinary wall");
+
+            AssertVisibilityVerdict(
+                MapQuickAnnouncementVisibilityService.EvaluateForTesting(
+                    CreateQuickAnnouncementVisibilityRequest(new MapQuickAnnouncementTileTarget { LiquidAmount = 255, LiquidType = 0 }),
+                    CreateVisibilityEvidence()),
+                MapQuickAnnouncementVisibilityLayer.Liquid,
+                MapQuickAnnouncementVisibilityVerdict.Invisible,
+                "dark water");
+
+            var circuitDecision = MapQuickAnnouncementVisibilityService.EvaluateForTesting(
+                CreateQuickAnnouncementVisibilityRequest(
+                    new MapQuickAnnouncementTileTarget
+                    {
+                        RedWire = true,
+                        Actuator = true
+                    }),
+                CreateVisibilityEvidence());
+            AssertVisibilityVerdict(
+                circuitDecision,
+                MapQuickAnnouncementVisibilityLayer.Circuit,
+                MapQuickAnnouncementVisibilityVerdict.CircuitOnly,
+                "dark circuit layer");
+            AssertVisibilityVerdict(
+                circuitDecision,
+                MapQuickAnnouncementVisibilityLayer.Tile,
+                MapQuickAnnouncementVisibilityVerdict.Invisible,
+                "dark circuit must not imply tile visibility");
+
+            AssertVisibilityVerdict(
+                MapQuickAnnouncementVisibilityService.EvaluateForTesting(
+                    CreateQuickAnnouncementVisibilityRequest(new MapQuickAnnouncementTileTarget { Active = true, TileType = 541 }),
+                    CreateVisibilityEvidence(echoNativeTile: true)),
+                MapQuickAnnouncementVisibilityLayer.Tile,
+                MapQuickAnnouncementVisibilityVerdict.EchoNativeAllowed,
+                "echo native tile");
+
+            AssertVisibilityVerdict(
+                MapQuickAnnouncementVisibilityService.EvaluateForTesting(
+                    CreateQuickAnnouncementVisibilityRequest(
+                        null,
+                        new MapQuickAnnouncementWallTarget { Active = true, WallType = 318 }),
+                    CreateVisibilityEvidence(echoNativeWall: true)),
+                MapQuickAnnouncementVisibilityLayer.Wall,
+                MapQuickAnnouncementVisibilityVerdict.EchoNativeAllowed,
+                "echo native wall");
+
+            AssertVisibilityVerdict(
+                MapQuickAnnouncementVisibilityService.EvaluateForTesting(
+                    CreateQuickAnnouncementVisibilityRequest(new MapQuickAnnouncementTileTarget { Active = true, TileType = 1 }),
+                    CreateVisibilityEvidence(tileHidden: true, showInvisible: false)),
+                MapQuickAnnouncementVisibilityLayer.Tile,
+                MapQuickAnnouncementVisibilityVerdict.Invisible,
+                "echo coating without echo view");
+
+            AssertVisibilityVerdict(
+                MapQuickAnnouncementVisibilityService.EvaluateForTesting(
+                    CreateQuickAnnouncementVisibilityRequest(new MapQuickAnnouncementTileTarget { Active = true, TileType = 1 }),
+                    CreateVisibilityEvidence(tileHidden: true, showInvisible: true)),
+                MapQuickAnnouncementVisibilityLayer.Tile,
+                MapQuickAnnouncementVisibilityVerdict.Invisible,
+                "echo coating with echo view still needs visible evidence");
+
+            AssertTileVisibleWithEvidence(CreateVisibilityEvidence(lightR: 1), "lighting");
+            AssertTileVisibleWithEvidence(CreateVisibilityEvidence(tileFullbright: true), "fullbright");
+            AssertTileVisibleWithEvidence(CreateVisibilityEvidence(dangerSense: true), "danger sense");
+            AssertTileVisibleWithEvidence(CreateVisibilityEvidence(spelunker: true), "spelunker");
+            AssertTileVisibleWithEvidence(CreateVisibilityEvidence(biomeSight: true), "biome sight");
+            AssertTileVisibleWithEvidence(CreateVisibilityEvidence(glowMask: true), "glow mask");
+            AssertTileVisibleWithEvidence(CreateVisibilityEvidence(flame: true), "flame");
+            AssertTileVisibleWithEvidence(CreateVisibilityEvidence(ignoreLight: true), "ignore light draw");
+
+            AssertVisibilityVerdict(
+                MapQuickAnnouncementVisibilityService.EvaluateForTesting(
+                    CreateQuickAnnouncementVisibilityRequest(
+                        null,
+                        new MapQuickAnnouncementWallTarget { Active = true, WallType = 1 }),
+                    CreateVisibilityEvidence(wallFullbright: true)),
+                MapQuickAnnouncementVisibilityLayer.Wall,
+                MapQuickAnnouncementVisibilityVerdict.Visible,
+                "fullbright wall");
+
+            AssertVisibilityVerdict(
+                MapQuickAnnouncementVisibilityService.EvaluateForTesting(
+                    CreateQuickAnnouncementVisibilityRequest(new MapQuickAnnouncementTileTarget { LiquidAmount = 255, LiquidType = 1 }),
+                    CreateVisibilityEvidence(liquidSelfVisible: true)),
+                MapQuickAnnouncementVisibilityLayer.Liquid,
+                MapQuickAnnouncementVisibilityVerdict.Visible,
+                "self visible liquid");
+
+            var unavailable = MapQuickAnnouncementVisibilityService.EvaluateForTesting(
+                CreateQuickAnnouncementVisibilityRequest(
+                    new MapQuickAnnouncementTileTarget
+                    {
+                        Active = true,
+                        RedWire = true
+                    }),
+                TerrariaTileVisibilityEvidence.Unavailable("lightingUnavailable"));
+            AssertVisibilityVerdict(
+                unavailable,
+                MapQuickAnnouncementVisibilityLayer.Tile,
+                MapQuickAnnouncementVisibilityVerdict.Unavailable,
+                "compat unavailable tile");
+            AssertVisibilityVerdict(
+                unavailable,
+                MapQuickAnnouncementVisibilityLayer.Circuit,
+                MapQuickAnnouncementVisibilityVerdict.CircuitOnly,
+                "compat unavailable circuit exception");
+        }
+
+        private static void TerrariaTileVisibilityCompatEchoNativeAllowlistMatchesFrozenScope()
+        {
+            if (!TerrariaTileVisibilityCompat.IsEchoNativeTileForTesting(541, 0) ||
+                !TerrariaTileVisibilityCompat.IsEchoNativeTileForTesting(631, 0) ||
+                !TerrariaTileVisibilityCompat.IsEchoNativeTileForTesting(707, 0) ||
+                !TerrariaTileVisibilityCompat.IsEchoNativeTileForTesting(19, 48))
+            {
+                throw new InvalidOperationException("Echo-native tile allowlist must include the frozen native echo tile family and EchoPlatform style.");
+            }
+
+            if (TerrariaTileVisibilityCompat.IsEchoNativeTileForTesting(19, 0) ||
+                TerrariaTileVisibilityCompat.IsEchoNativeTileForTesting(1, 0))
+            {
+                throw new InvalidOperationException("Echo-native tile allowlist must not treat ordinary platforms or ordinary tiles as echo-native.");
+            }
+
+            if (!TerrariaTileVisibilityCompat.IsEchoNativeWallForTesting(246) ||
+                !TerrariaTileVisibilityCompat.IsEchoNativeWallForTesting(311) ||
+                !TerrariaTileVisibilityCompat.IsEchoNativeWallForTesting(314) ||
+                !TerrariaTileVisibilityCompat.IsEchoNativeWallForTesting(318))
+            {
+                throw new InvalidOperationException("Echo-native wall allowlist must include the frozen vanilla echo wall family.");
+            }
+
+            if (TerrariaTileVisibilityCompat.IsEchoNativeWallForTesting(1) ||
+                TerrariaTileVisibilityCompat.IsEchoNativeWallForTesting(315))
+            {
+                throw new InvalidOperationException("Echo-native wall allowlist must not include ordinary or adjacent non-echo walls.");
+            }
+        }
+
+        private static void TerrariaTileVisibilityCompatCachesDangerSensePredicate()
+        {
+            TerrariaTileVisibilityCompat.ResetDangerousPredicateCacheForTesting();
+
+            if (!TerrariaTileVisibilityCompat.TryResolveDangerousPredicateForTesting())
+            {
+                throw new InvalidOperationException("Expected Terraria danger-sense predicate to be discoverable through the cached compat lookup.");
+            }
+
+            if (!TerrariaTileVisibilityCompat.TryResolveDangerousPredicateForTesting())
+            {
+                throw new InvalidOperationException("Expected cached Terraria danger-sense predicate lookup to keep working.");
+            }
+
+            if (TerrariaTileVisibilityCompat.DangerousPredicateResolveCountForTesting != 1)
+            {
+                throw new InvalidOperationException("Danger-sense reflection lookup must be cached after first resolution.");
+            }
         }
 
         private static void MapQuickAnnouncementTextSafetyWrapsColorAndBlocksInjection()
@@ -1474,6 +1887,90 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void MapQuickAnnouncementRuntimeDiagnosticsExplainVisibilityDecisions()
+        {
+            var invisibleTile = CreateQuickAnnouncementContext(20f, 20f);
+            invisibleTile.Tile = new MapQuickAnnouncementTileTarget
+            {
+                Active = true,
+                TileType = 1,
+                TileName = "石块"
+            };
+            ApplyDarkQuickAnnouncementWorld(invisibleTile);
+            var snapshot = RecordQuickAnnouncementDiagnosticsForResult(
+                MapQuickAnnouncementTargetResolver.Resolve(invisibleTile));
+            AssertStringEquals(snapshot.LastVisibilityVerdict, "Invisible", "invisible tile visibility verdict");
+            AssertStringEquals(snapshot.LastVisibilityReason, "tile:noVisibleEvidence", "invisible tile visibility reason");
+            AssertStringEquals(snapshot.LastBlockedLayers, "tile", "invisible tile blocked layers");
+            AssertStringEquals(snapshot.LastVisibleLayers, string.Empty, "invisible tile visible layers");
+            AssertStringEquals(snapshot.LastEchoGate, "none", "invisible tile echo gate");
+
+            var circuitOnly = CreateQuickAnnouncementContext(20f, 20f);
+            circuitOnly.Tile = new MapQuickAnnouncementTileTarget
+            {
+                Active = true,
+                TileType = 6,
+                TileName = "铁矿",
+                RedWire = true
+            };
+            ApplyDarkQuickAnnouncementWorld(circuitOnly);
+            snapshot = RecordQuickAnnouncementDiagnosticsForResult(
+                MapQuickAnnouncementTargetResolver.Resolve(circuitOnly));
+            AssertStringEquals(snapshot.LastVisibilityVerdict, "CircuitOnly", "circuit-only visibility verdict");
+            AssertStringEquals(snapshot.LastVisibilityReason, "circuit:userException", "circuit-only visibility reason");
+            AssertStringEquals(snapshot.LastVisibleLayers, "circuit", "circuit-only visible layers");
+            AssertStringEquals(snapshot.LastBlockedLayers, "tile", "circuit-only blocked layers");
+            if (!snapshot.LastCircuitOnly)
+            {
+                throw new InvalidOperationException("Circuit-only diagnostics must expose the circuit-only guard.");
+            }
+
+            var echoBlocked = CreateQuickAnnouncementContext(20f, 20f);
+            echoBlocked.Tile = new MapQuickAnnouncementTileTarget
+            {
+                Active = true,
+                TileType = 1,
+                TileName = "石块"
+            };
+            echoBlocked.VisibilityDecision = MapQuickAnnouncementVisibilityService.EvaluateForTesting(
+                CreateQuickAnnouncementVisibilityRequest(echoBlocked.Tile),
+                CreateVisibilityEvidence(tileHidden: true));
+            snapshot = RecordQuickAnnouncementDiagnosticsForResult(
+                MapQuickAnnouncementTargetResolver.Resolve(echoBlocked));
+            AssertStringEquals(snapshot.LastVisibilityVerdict, "Invisible", "echo coating blocked verdict");
+            AssertStringEquals(snapshot.LastVisibilityReason, "tile:hiddenWithoutEchoView", "echo coating blocked reason");
+            AssertStringEquals(snapshot.LastEchoGate, "hiddenWithoutEchoView", "echo coating blocked echo gate");
+
+            var highlighterVisible = CreateQuickAnnouncementContext(20f, 20f);
+            highlighterVisible.Tile = new MapQuickAnnouncementTileTarget
+            {
+                Active = true,
+                TileType = 1,
+                TileName = "石块"
+            };
+            highlighterVisible.VisibilityDecision = MapQuickAnnouncementVisibilityService.EvaluateForTesting(
+                CreateQuickAnnouncementVisibilityRequest(highlighterVisible.Tile),
+                CreateVisibilityEvidence(dangerSense: true));
+            snapshot = RecordQuickAnnouncementDiagnosticsForResult(
+                MapQuickAnnouncementTargetResolver.Resolve(highlighterVisible));
+            AssertStringEquals(snapshot.LastVisibilityVerdict, "Visible", "highlighter visible verdict");
+            AssertStringEquals(snapshot.LastVisibilityReason, "tile:dangerSense", "highlighter visible reason");
+            AssertStringEquals(snapshot.LastVisibleLayers, "tile", "highlighter visible layers");
+            AssertStringEquals(snapshot.LastBlockedLayers, string.Empty, "highlighter blocked layers");
+
+            var invisibleAir = CreateQuickAnnouncementContext(20f, 20f);
+            invisibleAir.Tile = new MapQuickAnnouncementTileTarget();
+            ApplyDarkQuickAnnouncementWorld(invisibleAir);
+            snapshot = RecordQuickAnnouncementDiagnosticsForResult(
+                MapQuickAnnouncementTargetResolver.Resolve(invisibleAir));
+            AssertStringEquals(snapshot.LastVisibilityVerdict, "Invisible", "invisible air visibility verdict");
+            AssertStringEquals(snapshot.LastVisibilityReason, "air:noVisibleEvidence", "invisible air visibility reason");
+            if (!snapshot.LastInvisibleAir)
+            {
+                throw new InvalidOperationException("Invisible air diagnostics must keep an explicit flag.");
+            }
+        }
+
         private static void MapQuickAnnouncementRuntimeIdlePathDoesNotResolveOrRecordDiagnostics()
         {
             MapQuickAnnouncementDiagnostics.ResetForTesting();
@@ -1496,6 +1993,7 @@ namespace JueMingZ.Tests
                 !string.IsNullOrEmpty(snapshot.LastResultCode) ||
                 !string.IsNullOrEmpty(snapshot.LastResolveDetail) ||
                 !string.IsNullOrEmpty(snapshot.LastTargetSource) ||
+                !string.IsNullOrEmpty(snapshot.LastVisibilityVerdict) ||
                 snapshot.LastHoverCacheAgeUpdates != -1)
             {
                 throw new InvalidOperationException("Map quick announcement idle path must stay cheap and leave diagnostics unchanged.");
@@ -1553,6 +2051,14 @@ namespace JueMingZ.Tests
                 MapQuickAnnouncementLastHotkeySummary = "Alt|Shift|MouseRight",
                 MapQuickAnnouncementLastInputConsumed = true,
                 MapQuickAnnouncementLastInputConsumeResult = "consumed:consumed",
+                MapQuickAnnouncementLastVisibilityVerdict = "Invisible",
+                MapQuickAnnouncementLastVisibilityReason = "air:noVisibleEvidence",
+                MapQuickAnnouncementLastVisibleLayers = string.Empty,
+                MapQuickAnnouncementLastBlockedLayers = string.Empty,
+                MapQuickAnnouncementLastCircuitOnly = false,
+                MapQuickAnnouncementLastEchoGate = "none",
+                MapQuickAnnouncementLastInvisibleAir = true,
+                MapQuickAnnouncementLastVisibilityUnavailableReason = string.Empty,
                 MapQuickAnnouncementLastDecisionUtc = new DateTime(2026, 6, 11, 2, 3, 4, DateTimeKind.Utc)
             };
 
@@ -1579,6 +2085,14 @@ namespace JueMingZ.Tests
             AssertContains(json, "\"MapQuickAnnouncementLastHotkeySummary\": \"Alt|Shift|MouseRight\"");
             AssertContains(json, "\"MapQuickAnnouncementLastInputConsumed\": true");
             AssertContains(json, "\"MapQuickAnnouncementLastInputConsumeResult\": \"consumed:consumed\"");
+            AssertContains(json, "\"MapQuickAnnouncementLastVisibilityVerdict\": \"Invisible\"");
+            AssertContains(json, "\"MapQuickAnnouncementLastVisibilityReason\": \"air:noVisibleEvidence\"");
+            AssertContains(json, "\"MapQuickAnnouncementLastVisibleLayers\": \"\"");
+            AssertContains(json, "\"MapQuickAnnouncementLastBlockedLayers\": \"\"");
+            AssertContains(json, "\"MapQuickAnnouncementLastCircuitOnly\": false");
+            AssertContains(json, "\"MapQuickAnnouncementLastEchoGate\": \"none\"");
+            AssertContains(json, "\"MapQuickAnnouncementLastInvisibleAir\": true");
+            AssertContains(json, "\"MapQuickAnnouncementLastVisibilityUnavailableReason\": \"\"");
             AssertContains(json, "\"MapQuickAnnouncementLastDecisionUtc\": \"2026-06-11T02:03:04.0000000Z\"");
         }
 
@@ -1764,7 +2278,7 @@ namespace JueMingZ.Tests
         {
             string source;
             var name = MapQuickAnnouncementNameResolver.ResolveTileName(tileType, tileStyle, string.Empty, out source);
-            return MapQuickAnnouncementTargetResolver.Resolve(new MapQuickAnnouncementResolveContext
+            var context = new MapQuickAnnouncementResolveContext
             {
                 Tile = new MapQuickAnnouncementTileTarget
                 {
@@ -1776,14 +2290,16 @@ namespace JueMingZ.Tests
                     TileName = name,
                     NameSource = source
                 }
-            });
+            };
+            ApplyVisibleQuickAnnouncementWorld(context);
+            return MapQuickAnnouncementTargetResolver.Resolve(context);
         }
 
         private static MapQuickAnnouncementResolveResult CreateWallResolveResult(int wallType)
         {
             string source;
             var name = MapQuickAnnouncementNameResolver.ResolveWallName(wallType, string.Empty, out source);
-            return MapQuickAnnouncementTargetResolver.Resolve(new MapQuickAnnouncementResolveContext
+            var context = new MapQuickAnnouncementResolveContext
             {
                 Wall = new MapQuickAnnouncementWallTarget
                 {
@@ -1792,12 +2308,14 @@ namespace JueMingZ.Tests
                     WallName = name,
                     NameSource = source
                 }
-            });
+            };
+            ApplyVisibleQuickAnnouncementWorld(context);
+            return MapQuickAnnouncementTargetResolver.Resolve(context);
         }
 
         private static MapQuickAnnouncementResolveResult CreateTileResultWithSource(string name, string source)
         {
-            return MapQuickAnnouncementTargetResolver.Resolve(new MapQuickAnnouncementResolveContext
+            var context = new MapQuickAnnouncementResolveContext
             {
                 Tile = new MapQuickAnnouncementTileTarget
                 {
@@ -1807,7 +2325,9 @@ namespace JueMingZ.Tests
                     TileName = name,
                     NameSource = source
                 }
-            });
+            };
+            ApplyVisibleQuickAnnouncementWorld(context);
+            return MapQuickAnnouncementTargetResolver.Resolve(context);
         }
 
         private static MapQuickAnnouncementDiagnosticsSnapshot RecordQuickAnnouncementDiagnosticsForResult(
@@ -1827,6 +2347,143 @@ namespace JueMingZ.Tests
             }
 
             return MapQuickAnnouncementDiagnostics.GetSnapshot();
+        }
+
+        private static MapQuickAnnouncementVisibilityRequest CreateQuickAnnouncementVisibilityRequest(
+            MapQuickAnnouncementTileTarget tile,
+            MapQuickAnnouncementWallTarget wall = null)
+        {
+            return new MapQuickAnnouncementVisibilityRequest
+            {
+                TileX = 10,
+                TileY = 12,
+                Tile = tile,
+                Wall = wall,
+                PerspectivePlayer = new Terraria.Player()
+            };
+        }
+
+        private static void ApplyVisibleQuickAnnouncementWorld(MapQuickAnnouncementResolveContext context)
+        {
+            ApplyQuickAnnouncementVisibility(context, CreateVisibilityEvidence(lightR: 1));
+        }
+
+        private static void ApplyDarkQuickAnnouncementWorld(MapQuickAnnouncementResolveContext context)
+        {
+            ApplyQuickAnnouncementVisibility(context, CreateVisibilityEvidence());
+        }
+
+        private static void ApplyQuickAnnouncementVisibility(
+            MapQuickAnnouncementResolveContext context,
+            TerrariaTileVisibilityEvidence evidence)
+        {
+            if (context == null)
+            {
+                return;
+            }
+
+            context.VisibilityDecision = MapQuickAnnouncementVisibilityService.EvaluateForTesting(
+                CreateQuickAnnouncementVisibilityRequest(context.Tile, context.Wall),
+                evidence);
+        }
+
+        private static TerrariaTileVisibilityEvidence CreateVisibilityEvidence(
+            byte lightR = 0,
+            byte lightG = 0,
+            byte lightB = 0,
+            bool showInvisible = false,
+            bool tileHidden = false,
+            bool wallHidden = false,
+            bool tileFullbright = false,
+            bool wallFullbright = false,
+            bool dangerSense = false,
+            bool spelunker = false,
+            bool biomeSight = false,
+            bool glowMask = false,
+            bool flame = false,
+            bool ignoreLight = false,
+            bool echoNativeTile = false,
+            bool echoNativeWall = false,
+            bool wallBlocked = false,
+            bool liquidSelfVisible = false)
+        {
+            return new TerrariaTileVisibilityEvidence
+            {
+                ReadSucceeded = true,
+                FailureReason = string.Empty,
+                LightingAvailable = true,
+                LightR = lightR,
+                LightG = lightG,
+                LightB = lightB,
+                EchoVisibilityAvailable = true,
+                ShouldShowInvisibleBlocksAndWalls = showInvisible,
+                TileHidden = tileHidden,
+                WallHidden = wallHidden,
+                TileFullbright = tileFullbright,
+                WallFullbright = wallFullbright,
+                DangerSenseHighlighted = dangerSense,
+                SpelunkerHighlighted = spelunker,
+                BiomeSightHighlighted = biomeSight,
+                TileHasGlowMask = glowMask,
+                TileHasFlame = flame,
+                TileIgnoresLightConditions = ignoreLight,
+                EchoNativeTile = echoNativeTile,
+                EchoNativeWall = echoNativeWall,
+                WallBlockedByFullTile = wallBlocked,
+                LiquidSelfVisible = liquidSelfVisible
+            };
+        }
+
+        private static void AssertTileVisibleWithEvidence(
+            TerrariaTileVisibilityEvidence evidence,
+            string label)
+        {
+            AssertVisibilityVerdict(
+                MapQuickAnnouncementVisibilityService.EvaluateForTesting(
+                    CreateQuickAnnouncementVisibilityRequest(new MapQuickAnnouncementTileTarget { Active = true, TileType = 1 }),
+                    evidence),
+                MapQuickAnnouncementVisibilityLayer.Tile,
+                MapQuickAnnouncementVisibilityVerdict.Visible,
+                label);
+        }
+
+        private static void AssertVisibilityVerdict(
+            MapQuickAnnouncementVisibilityDecision decision,
+            MapQuickAnnouncementVisibilityLayer layer,
+            MapQuickAnnouncementVisibilityVerdict expected,
+            string label)
+        {
+            var actual = GetVisibilityLayer(decision, layer);
+            if (actual == null || actual.Verdict != expected)
+            {
+                throw new InvalidOperationException(
+                    "Expected " + label + " visibility verdict " + expected + " but got " +
+                    (actual == null ? "null" : actual.Verdict.ToString()) + ".");
+            }
+        }
+
+        private static MapQuickAnnouncementLayerVisibility GetVisibilityLayer(
+            MapQuickAnnouncementVisibilityDecision decision,
+            MapQuickAnnouncementVisibilityLayer layer)
+        {
+            if (decision == null)
+            {
+                return null;
+            }
+
+            switch (layer)
+            {
+                case MapQuickAnnouncementVisibilityLayer.Tile:
+                    return decision.Tile;
+                case MapQuickAnnouncementVisibilityLayer.Wall:
+                    return decision.Wall;
+                case MapQuickAnnouncementVisibilityLayer.Liquid:
+                    return decision.Liquid;
+                case MapQuickAnnouncementVisibilityLayer.Circuit:
+                    return decision.Circuit;
+                default:
+                    return null;
+            }
         }
 
         private static MapQuickAnnouncementResolveResult CreateQuickAnnouncementResult(
@@ -1919,8 +2576,14 @@ namespace JueMingZ.Tests
             player.channel = true;
             Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft = true;
             Terraria.GameInput.PlayerInput.Triggers.Current.MouseRight = true;
+            Terraria.GameInput.PlayerInput.Triggers.Current.MouseMiddle = true;
+            Terraria.GameInput.PlayerInput.Triggers.Current.Mouse4 = true;
+            Terraria.GameInput.PlayerInput.Triggers.Current.Mouse5 = true;
             Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft = true;
             Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseRight = true;
+            Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseMiddle = true;
+            Terraria.GameInput.PlayerInput.Triggers.JustPressed.Mouse4 = true;
+            Terraria.GameInput.PlayerInput.Triggers.JustPressed.Mouse5 = true;
         }
 
         private static void ResetQuickAnnouncementPlacementNameFakes()

@@ -6,6 +6,8 @@ namespace JueMingZ.Automation.Information
 {
     internal static class MapQuickAnnouncementTextBuilder
     {
+        public const string InvisibleWorldText = "这里看不见东西";
+
         private static readonly string[] AirPhrases =
         {
             "这里毛都没有",
@@ -112,6 +114,11 @@ namespace JueMingZ.Automation.Information
             }
 
             return parts.Count == 0 ? string.Empty : "这里有 " + string.Join("，", parts.ToArray());
+        }
+
+        public static string BuildInvisibleWorldText()
+        {
+            return InvisibleWorldText;
         }
 
         public static string BuildLiquidName(int liquidType)

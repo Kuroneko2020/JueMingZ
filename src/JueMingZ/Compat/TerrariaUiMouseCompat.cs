@@ -56,6 +56,7 @@ namespace JueMingZ.Compat
         private static TerrariaUiHoverSlotSnapshot _lastItemSlotHoverSlotSnapshot;
         private static string _activeTriggerSuppressionToken = string.Empty;
         private static ulong _activeTriggerSuppressionStartUpdateCount;
+        private static bool _activeTriggerSuppressionObservedGameDown;
         private static bool _itemSlotHoverHookInstalled;
         private static string _itemSlotHoverHookStatus = "notAttempted";
         private static string _itemSlotHoverHookCandidateSummary = string.Empty;
@@ -536,6 +537,109 @@ namespace JueMingZ.Compat
             }
         }
 
+        // For UI overlays that recompute ownership every frame. It clears the
+        // current vanilla pulse but deliberately avoids replacing the shared
+        // active trigger suppression token used by click-start commands.
+        internal static bool TryConsumeMouseTriggerInputOnceForUi(string triggerToken, out string message)
+        {
+            message = string.Empty;
+            var normalizedToken = NormalizeMouseTriggerToken(triggerToken);
+            if (normalizedToken.Length <= 0)
+            {
+                message = "Unsupported mouse trigger token: " + (triggerToken ?? string.Empty);
+                UiMouseCaptureAvailable = false;
+                _mouseCaptureLastMessage = message;
+                return false;
+            }
+
+            try
+            {
+                bool hasMainLeft;
+                bool mainLeft;
+                bool hasMainLeftRelease;
+                bool mainLeftRelease;
+                CaptureMainLeftPulseForNonLeftToken(
+                    normalizedToken,
+                    out hasMainLeft,
+                    out mainLeft,
+                    out hasMainLeftRelease,
+                    out mainLeftRelease);
+                var consumed = ApplyMouseTriggerInputSuppression(normalizedToken, out message);
+                RestoreMainLeftPulseForNonLeftToken(
+                    normalizedToken,
+                    hasMainLeft,
+                    mainLeft,
+                    hasMainLeftRelease,
+                    mainLeftRelease);
+                UiMouseCaptureAvailable = consumed;
+                _mouseCaptureLastMessage = message;
+                message = _mouseCaptureLastMessage;
+                return consumed;
+            }
+            catch (Exception error)
+            {
+                UiMouseCaptureAvailable = false;
+                _mouseCaptureLastMessage = "Mouse trigger one-frame UI consume failed: " + error.Message;
+                message = _mouseCaptureLastMessage;
+                LogThrottle.WarnThrottled(
+                    "ui-mouse-trigger-one-frame-consume-failed",
+                    TimeSpan.FromSeconds(10),
+                    "TerrariaUiMouseCompat",
+                    _mouseCaptureLastMessage);
+                return false;
+            }
+        }
+
+        private static void CaptureMainLeftPulseForNonLeftToken(
+            string normalizedToken,
+            out bool hasMainLeft,
+            out bool mainLeft,
+            out bool hasMainLeftRelease,
+            out bool mainLeftRelease)
+        {
+            hasMainLeft = false;
+            mainLeft = false;
+            hasMainLeftRelease = false;
+            mainLeftRelease = false;
+            if (string.Equals(normalizedToken, "MouseLeft", StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            var mainType = TerrariaRuntimeTypes.MainType;
+            if (mainType == null)
+            {
+                return;
+            }
+
+            EnsureUiMouseAccessors(mainType);
+            hasMainLeft = _mainMouseLeftAccessor.TryGet(null, out mainLeft);
+            hasMainLeftRelease = _mainMouseLeftReleaseAccessor.TryGet(null, out mainLeftRelease);
+        }
+
+        private static void RestoreMainLeftPulseForNonLeftToken(
+            string normalizedToken,
+            bool hasMainLeft,
+            bool mainLeft,
+            bool hasMainLeftRelease,
+            bool mainLeftRelease)
+        {
+            if (string.Equals(normalizedToken, "MouseLeft", StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            if (hasMainLeft)
+            {
+                _mainMouseLeftAccessor.TrySet(null, mainLeft);
+            }
+
+            if (hasMainLeftRelease)
+            {
+                _mainMouseLeftReleaseAccessor.TrySet(null, mainLeftRelease);
+            }
+        }
+
         public static bool TryReleaseUiMouseCapture()
         {
             try
@@ -654,6 +758,7 @@ namespace JueMingZ.Compat
             {
                 _activeTriggerSuppressionToken = normalizedToken ?? string.Empty;
                 _activeTriggerSuppressionStartUpdateCount = updateCount;
+                _activeTriggerSuppressionObservedGameDown = false;
             }
         }
 
@@ -663,6 +768,7 @@ namespace JueMingZ.Compat
             {
                 _activeTriggerSuppressionToken = string.Empty;
                 _activeTriggerSuppressionStartUpdateCount = 0;
+                _activeTriggerSuppressionObservedGameDown = false;
             }
 
             if (!string.IsNullOrWhiteSpace(reason))
@@ -1099,48 +1205,74 @@ namespace JueMingZ.Compat
 
         private static bool IsMouseTriggerStillDown(string normalizedToken)
         {
-            if (string.Equals(normalizedToken, "MouseLeft", StringComparison.Ordinal))
+            bool gameStateRead;
+            bool gameStateDown;
+            ReadMouseTriggerGameDownState(normalizedToken, out gameStateRead, out gameStateDown);
+            if (gameStateRead)
             {
-                bool mainValue;
-                if (_mainMouseLeftAccessor.TryGet(null, out mainValue) && mainValue)
+                if (gameStateDown)
                 {
+                    MarkActiveTriggerSuppressionObservedGameDown();
                     return true;
                 }
 
-                bool triggerValue;
-                if (TryReadPlayerInputTriggerForMouseToken("Current", normalizedToken, out triggerValue) && triggerValue)
+                if (HasActiveTriggerSuppressionObservedGameDown())
                 {
-                    return true;
+                    return false;
                 }
-
-                return IsMouseButtonDownFallback(VkLeftButton);
-            }
-
-            if (string.Equals(normalizedToken, "MouseRight", StringComparison.Ordinal))
-            {
-                bool mainValue;
-                if (_mainMouseRightAccessor.TryGet(null, out mainValue) && mainValue)
-                {
-                    return true;
-                }
-
-                bool triggerValue;
-                if (TryReadPlayerInputTriggerForMouseToken("Current", normalizedToken, out triggerValue) && triggerValue)
-                {
-                    return true;
-                }
-
-                return IsMouseButtonDownFallback(VkRightButton);
-            }
-
-            bool value;
-            if (TryReadPlayerInputTriggerForMouseToken("Current", normalizedToken, out value) && value)
-            {
-                return true;
             }
 
             var virtualKey = GetMouseTriggerVirtualKey(normalizedToken);
             return virtualKey > 0 && IsMouseButtonDownFallback(virtualKey);
+        }
+
+        private static void ReadMouseTriggerGameDownState(string normalizedToken, out bool read, out bool down)
+        {
+            read = false;
+            down = false;
+
+            var mainType = TerrariaRuntimeTypes.MainType;
+            if (mainType != null)
+            {
+                EnsureUiMouseAccessors(mainType);
+            }
+
+            bool mainValue;
+            if (string.Equals(normalizedToken, "MouseLeft", StringComparison.Ordinal) &&
+                _mainMouseLeftAccessor.TryGet(null, out mainValue))
+            {
+                read = true;
+                down |= mainValue;
+            }
+            else if (string.Equals(normalizedToken, "MouseRight", StringComparison.Ordinal) &&
+                     _mainMouseRightAccessor.TryGet(null, out mainValue))
+            {
+                read = true;
+                down |= mainValue;
+            }
+
+            bool triggerValue;
+            if (TryReadPlayerInputTriggerForMouseToken("Current", normalizedToken, out triggerValue))
+            {
+                read = true;
+                down |= triggerValue;
+            }
+        }
+
+        private static void MarkActiveTriggerSuppressionObservedGameDown()
+        {
+            lock (ActiveTriggerSuppressionSyncRoot)
+            {
+                _activeTriggerSuppressionObservedGameDown = true;
+            }
+        }
+
+        private static bool HasActiveTriggerSuppressionObservedGameDown()
+        {
+            lock (ActiveTriggerSuppressionSyncRoot)
+            {
+                return _activeTriggerSuppressionObservedGameDown;
+            }
         }
 
         private static bool TryReadPlayerInputTriggerForMouseToken(string packName, string normalizedToken, out bool value)

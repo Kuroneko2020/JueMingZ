@@ -768,10 +768,10 @@ namespace JueMingZ.Tests
                 throw new InvalidOperationException("Map enhancement content height must include custom marker row.");
             }
 
-            var expectedMarkerListY = LegacyUiMetrics.RowHeight * 5 + LegacyUiMetrics.SettingRowGap * 4;
+            var expectedMarkerListY = LegacyMainWindow.GetMapEnhancementRowContentYForTesting("地图标记") + LegacyUiMetrics.RowHeight;
             if (LegacyMainWindow.CalculateMapMarkerListContentYForTesting() != expectedMarkerListY)
             {
-                throw new InvalidOperationException("Map custom marker list must start directly after the main title row without an extra setting gap.");
+                throw new InvalidOperationException("Map custom marker list must stay attached to the final map marker row without an extra setting gap.");
             }
 
             var tooltips = LegacyMainWindow.GetMapCustomMarkersButtonTooltipsForTesting();

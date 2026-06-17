@@ -6,6 +6,7 @@ using JueMingZ.Automation.Search;
 using JueMingZ.Bootstrap;
 using JueMingZ.Compat;
 using JueMingZ.Diagnostics;
+using JueMingZ.UI;
 using JueMingZ.UI.Legacy;
 
 namespace JueMingZ.Hooks
@@ -184,6 +185,7 @@ namespace JueMingZ.Hooks
             private static void Postfix(MethodBase __originalMethod)
             {
                 TerrariaUiMouseCompat.UpdateActiveTriggerSuppressionAfterPlayerInputGuard();
+                MapFootprintPlaybackOverlay.UpdateAfterPlayerInputGuard();
                 SearchItemPickRuntimeService.UpdateAfterPlayerInputGuard();
                 LegacyUiInput.UpdateAfterPlayerInputGuard("PlayerInputScrollHook.Postfix");
             }
