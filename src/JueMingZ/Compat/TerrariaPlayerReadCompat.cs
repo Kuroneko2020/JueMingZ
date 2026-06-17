@@ -125,6 +125,21 @@ namespace JueMingZ.Compat
             return player != null && player.accOreFinder;
         }
 
+        public static bool HasLifeformAnalyzer(Player player)
+        {
+            return player != null && player.accCritterGuide;
+        }
+
+        public static bool IsInfoAccessoryHidden(Player player, int index)
+        {
+            if (player == null || player.hideInfo == null || index < 0 || index >= player.hideInfo.Length)
+            {
+                return true;
+            }
+
+            return player.hideInfo[index];
+        }
+
         public static int ItemAnimation(Player player)
         {
             return player == null ? 0 : player.itemAnimation;

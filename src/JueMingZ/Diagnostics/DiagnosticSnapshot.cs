@@ -158,6 +158,66 @@ namespace JueMingZ.Diagnostics
         public DateTime? MapMarkerLastTraceEventWrittenAtUtc { get; set; }
         public string MapMarkerLastTraceEventType { get; set; }
         public string MapMarkerLastTraceMarkerId { get; set; }
+        public long MapDirectionHintTargetScanCadenceTicks { get; set; }
+        public bool MapRareCreatureDirectionEnabled { get; set; }
+        public string MapRareCreatureDirectionStatus { get; set; }
+        public string MapRareCreatureDirectionMessage { get; set; }
+        public string MapRareCreatureDirectionGateReason { get; set; }
+        public bool MapRareCreatureDirectionHasLifeformAnalyzer { get; set; }
+        public bool MapRareCreatureDirectionInfoAccessoryHidden { get; set; }
+        public bool MapRareCreatureDirectionTargetActive { get; set; }
+        public int MapRareCreatureDirectionTargetWhoAmI { get; set; }
+        public int MapRareCreatureDirectionTargetType { get; set; }
+        public string MapRareCreatureDirectionTargetName { get; set; }
+        public int MapRareCreatureDirectionTargetRarity { get; set; }
+        public double MapRareCreatureDirectionTargetWorldX { get; set; }
+        public double MapRareCreatureDirectionTargetWorldY { get; set; }
+        public bool MapRareCreatureDirectionOnScreen { get; set; }
+        public bool MapRareCreatureDirectionShouldDrawLabel { get; set; }
+        public double MapRareCreatureDirectionDistancePixels { get; set; }
+        public string MapRareCreatureDirectionDistanceText { get; set; }
+        public double MapRareCreatureDirectionArrowScreenX { get; set; }
+        public double MapRareCreatureDirectionArrowScreenY { get; set; }
+        public double MapRareCreatureDirectionDirectionX { get; set; }
+        public double MapRareCreatureDirectionDirectionY { get; set; }
+        public string MapRareCreatureDirectionArrowGlyph { get; set; }
+        public string MapRareCreatureDirectionLabelLine1 { get; set; }
+        public string MapRareCreatureDirectionLabelLine2 { get; set; }
+        public long MapRareCreatureDirectionLastScanTick { get; set; }
+        public long MapRareCreatureDirectionLastScanAgeTicks { get; set; }
+        public string MapRareCreatureDirectionDrawStatus { get; set; }
+        public DateTime? MapRareCreatureDirectionLastTargetUtc { get; set; }
+        public DateTime? MapRareCreatureDirectionLastDrawUtc { get; set; }
+        public bool MapTravellingMerchantDirectionEnabled { get; set; }
+        public string MapTravellingMerchantDirectionStatus { get; set; }
+        public string MapTravellingMerchantDirectionMessage { get; set; }
+        public bool MapTravellingMerchantDirectionTargetActive { get; set; }
+        public int MapTravellingMerchantDirectionTargetWhoAmI { get; set; }
+        public int MapTravellingMerchantDirectionTargetType { get; set; }
+        public string MapTravellingMerchantDirectionTargetName { get; set; }
+        public double MapTravellingMerchantDirectionTargetWorldX { get; set; }
+        public double MapTravellingMerchantDirectionTargetWorldY { get; set; }
+        public bool MapTravellingMerchantDirectionOnScreen { get; set; }
+        public double MapTravellingMerchantDirectionDistancePixels { get; set; }
+        public string MapTravellingMerchantDirectionDistanceText { get; set; }
+        public double MapTravellingMerchantDirectionEdgeScreenX { get; set; }
+        public double MapTravellingMerchantDirectionEdgeScreenY { get; set; }
+        public double MapTravellingMerchantDirectionDirectionX { get; set; }
+        public double MapTravellingMerchantDirectionDirectionY { get; set; }
+        public string MapTravellingMerchantDirectionLabelLine1 { get; set; }
+        public string MapTravellingMerchantDirectionLabelLine2 { get; set; }
+        public string MapTravellingMerchantDirectionLabelLine3 { get; set; }
+        public string MapTravellingMerchantDirectionTownLabel { get; set; }
+        public string MapTravellingMerchantDirectionTownLabelSource { get; set; }
+        public string MapTravellingMerchantDirectionTownLabelConfidence { get; set; }
+        public string MapTravellingMerchantDirectionMatchedPylonType { get; set; }
+        public double MapTravellingMerchantDirectionMatchedPylonDistanceTiles { get; set; }
+        public int MapTravellingMerchantDirectionNearbyTownNpcCount { get; set; }
+        public long MapTravellingMerchantDirectionLastScanTick { get; set; }
+        public long MapTravellingMerchantDirectionLastScanAgeTicks { get; set; }
+        public string MapTravellingMerchantDirectionDrawStatus { get; set; }
+        public DateTime? MapTravellingMerchantDirectionLastTargetUtc { get; set; }
+        public DateTime? MapTravellingMerchantDirectionLastDrawUtc { get; set; }
         public bool MapFootprintsDisplayEnabled { get; set; }
         public string PlayerWorldFootprintsLastStatus { get; set; }
         public string PlayerWorldFootprintsLastDecision { get; set; }
@@ -1245,6 +1305,35 @@ namespace JueMingZ.Diagnostics
             MapMarkerTraceEventsPath = string.Empty;
             MapMarkerLastTraceEventType = string.Empty;
             MapMarkerLastTraceMarkerId = string.Empty;
+            MapDirectionHintTargetScanCadenceTicks = -1L;
+            MapRareCreatureDirectionStatus = string.Empty;
+            MapRareCreatureDirectionMessage = string.Empty;
+            MapRareCreatureDirectionGateReason = string.Empty;
+            MapRareCreatureDirectionTargetWhoAmI = -1;
+            MapRareCreatureDirectionTargetName = string.Empty;
+            MapRareCreatureDirectionDistanceText = string.Empty;
+            MapRareCreatureDirectionArrowGlyph = string.Empty;
+            MapRareCreatureDirectionLabelLine1 = string.Empty;
+            MapRareCreatureDirectionLabelLine2 = string.Empty;
+            MapRareCreatureDirectionLastScanTick = -1L;
+            MapRareCreatureDirectionLastScanAgeTicks = -1L;
+            MapRareCreatureDirectionDrawStatus = string.Empty;
+            MapTravellingMerchantDirectionStatus = string.Empty;
+            MapTravellingMerchantDirectionMessage = string.Empty;
+            MapTravellingMerchantDirectionTargetWhoAmI = -1;
+            MapTravellingMerchantDirectionTargetName = string.Empty;
+            MapTravellingMerchantDirectionDistanceText = string.Empty;
+            MapTravellingMerchantDirectionLabelLine1 = string.Empty;
+            MapTravellingMerchantDirectionLabelLine2 = string.Empty;
+            MapTravellingMerchantDirectionLabelLine3 = string.Empty;
+            MapTravellingMerchantDirectionTownLabel = string.Empty;
+            MapTravellingMerchantDirectionTownLabelSource = string.Empty;
+            MapTravellingMerchantDirectionTownLabelConfidence = string.Empty;
+            MapTravellingMerchantDirectionMatchedPylonType = string.Empty;
+            MapTravellingMerchantDirectionMatchedPylonDistanceTiles = -1d;
+            MapTravellingMerchantDirectionLastScanTick = -1L;
+            MapTravellingMerchantDirectionLastScanAgeTicks = -1L;
+            MapTravellingMerchantDirectionDrawStatus = string.Empty;
             PlayerWorldFootprintsLastStatus = string.Empty;
             PlayerWorldFootprintsLastDecision = string.Empty;
             PlayerWorldFootprintsLastMessage = string.Empty;

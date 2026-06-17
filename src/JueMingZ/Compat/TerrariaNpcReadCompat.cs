@@ -52,6 +52,26 @@ namespace JueMingZ.Compat
             return npc != null && npc.townNPC;
         }
 
+        public static bool IsHomeless(NPC npc)
+        {
+            return npc != null && npc.homeless;
+        }
+
+        public static int HomeTileX(NPC npc)
+        {
+            return npc == null ? -1 : npc.homeTileX;
+        }
+
+        public static int HomeTileY(NPC npc)
+        {
+            return npc == null ? -1 : npc.homeTileY;
+        }
+
+        public static int Rarity(NPC npc)
+        {
+            return npc == null ? 0 : npc.rarity;
+        }
+
         public static bool IsBoss(NPC npc)
         {
             return npc != null && npc.boss;

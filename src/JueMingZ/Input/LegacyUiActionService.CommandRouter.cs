@@ -391,6 +391,18 @@ namespace JueMingZ.Input
                 return;
             }
 
+            if (command.ElementId.StartsWith("map-rare-creature-direction-mode:", StringComparison.Ordinal))
+            {
+                HandleMapRareCreatureDirectionMode(command, command.ElementId.Substring("map-rare-creature-direction-mode:".Length));
+                return;
+            }
+
+            if (command.ElementId.StartsWith("map-travelling-merchant-direction-mode:", StringComparison.Ordinal))
+            {
+                HandleMapTravellingMerchantDirectionMode(command, command.ElementId.Substring("map-travelling-merchant-direction-mode:".Length));
+                return;
+            }
+
             if (command.ElementId.StartsWith("map-quick-announcement-key:", StringComparison.Ordinal))
             {
                 HandleMapQuickAnnouncementKeySlot(command, command.ElementId.Substring("map-quick-announcement-key:".Length));

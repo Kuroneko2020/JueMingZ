@@ -37,7 +37,7 @@ namespace JueMingZ.Runtime
         private static long _lastRuntimeUpdateStartTimestamp;
         private static readonly RuntimeTickPipeline TickPipeline = CreateTickPipeline();
 
-        public const string Version = "0.758-map-footprints-thinner-line";
+        public const string Version = "0.769-map-page-placeholder-removal";
 
         public static RuntimeState State { get; private set; } = new RuntimeState();
         public static FeatureRegistry FeatureRegistry { get; private set; }
@@ -120,6 +120,7 @@ namespace JueMingZ.Runtime
                 new RuntimeTickStage("ui-text-resource-monitor", UpdateUiTextResources),
                 new RuntimeTickStage("post-terraria-input-guards", RunPostTerrariaInputGuards),
                 new RuntimeTickStage("game-state-read", ReadGameState),
+                new RuntimeTickStage("map-direction-hints-targeting", RunMapDirectionHintsTargeting),
                 new RuntimeTickStage("player-world-playtime-sampling", RunPlayerWorldPlaytimeSampling),
                 new RuntimeTickStage("player-world-footprints-recording", RunPlayerWorldFootprintsRecording),
                 new RuntimeTickStage("player-world-footprints-render-cache", RunPlayerWorldFootprintsRenderCache),
@@ -187,6 +188,14 @@ namespace JueMingZ.Runtime
         private static void RunSearchChestLocatorLifecycleGuards(RuntimeTickContext context)
         {
             ClearSearchChestLocatorHighlightIfChestOpen(context == null ? null : context.GameState);
+        }
+
+        private static void RunMapDirectionHintsTargeting(RuntimeTickContext context)
+        {
+            MapDirectionHintTargetService.Tick(
+                context == null ? null : context.SettingsSnapshot,
+                context == null ? null : context.GameState,
+                State == null ? 0L : State.UpdateCount);
         }
 
         private static void RunPlayerWorldPlaytimeSampling(RuntimeTickContext context)

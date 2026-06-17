@@ -114,8 +114,8 @@ namespace JueMingZ.Tests
                 throw new InvalidOperationException("Map footprints display on/off tooltip contract changed.");
             }
 
-            var expectedHeight = LegacyUiMetrics.RowHeight * 8 +
-                                 LegacyUiMetrics.SettingRowGap * 7 +
+            var expectedHeight = LegacyUiMetrics.RowHeight * 9 +
+                                 LegacyUiMetrics.SettingRowGap * 8 +
                                  LegacyMainWindow.CalculateMapMarkerListHeightForTesting(0) +
                                  24;
             if (LegacyMainWindow.CalculateMapEnhancementContentHeightForTesting() != expectedHeight)

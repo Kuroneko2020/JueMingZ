@@ -530,6 +530,8 @@ namespace JueMingZ.UI.Legacy
                     AddHash(ref hash, LegacyTextInput.IsAnyFocused);
                     AddHash(ref hash, settings.MapFootprintsDisplayEnabled);
                     AddHash(ref hash, settings.MapQuickAnnouncementEnabled);
+                    AddHash(ref hash, settings.MapRareCreatureDirectionEnabled);
+                    AddHash(ref hash, settings.MapTravellingMerchantDirectionEnabled);
                     AddHash(ref hash, settings.MapQuickAnnouncementHotkeySlot1);
                     AddHash(ref hash, settings.MapQuickAnnouncementHotkeySlot2);
                     AddHash(ref hash, settings.MapQuickAnnouncementTriggerKey);

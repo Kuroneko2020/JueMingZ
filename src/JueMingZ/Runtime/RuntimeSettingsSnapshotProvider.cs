@@ -126,6 +126,8 @@ namespace JueMingZ.Runtime
             private bool _mapPersistentDeathMarkersEnabled;
             private bool _mapCustomMarkersEnabled;
             private bool _mapFootprintsDisplayEnabled;
+            private bool _mapRareCreatureDirectionEnabled;
+            private bool _mapTravellingMerchantDirectionEnabled;
             private bool _mapQuickAnnouncementEnabled;
             private string _mapQuickAnnouncementHotkeySlot1;
             private string _mapQuickAnnouncementHotkeySlot2;
@@ -257,6 +259,8 @@ namespace JueMingZ.Runtime
                     _mapPersistentDeathMarkersEnabled = settings.MapPersistentDeathMarkersEnabled,
                     _mapCustomMarkersEnabled = settings.MapCustomMarkersEnabled,
                     _mapFootprintsDisplayEnabled = settings.MapFootprintsDisplayEnabled,
+                    _mapRareCreatureDirectionEnabled = settings.MapRareCreatureDirectionEnabled,
+                    _mapTravellingMerchantDirectionEnabled = settings.MapTravellingMerchantDirectionEnabled,
                     _mapQuickAnnouncementEnabled = settings.MapQuickAnnouncementEnabled,
                     _mapQuickAnnouncementHotkeySlot1 = settings.MapQuickAnnouncementHotkeySlot1,
                     _mapQuickAnnouncementHotkeySlot2 = settings.MapQuickAnnouncementHotkeySlot2,
@@ -383,6 +387,8 @@ namespace JueMingZ.Runtime
                        _mapPersistentDeathMarkersEnabled == other._mapPersistentDeathMarkersEnabled &&
                        _mapCustomMarkersEnabled == other._mapCustomMarkersEnabled &&
                        _mapFootprintsDisplayEnabled == other._mapFootprintsDisplayEnabled &&
+                       _mapRareCreatureDirectionEnabled == other._mapRareCreatureDirectionEnabled &&
+                       _mapTravellingMerchantDirectionEnabled == other._mapTravellingMerchantDirectionEnabled &&
                        _mapQuickAnnouncementEnabled == other._mapQuickAnnouncementEnabled &&
                        Same(_mapQuickAnnouncementHotkeySlot1, other._mapQuickAnnouncementHotkeySlot1) &&
                        Same(_mapQuickAnnouncementHotkeySlot2, other._mapQuickAnnouncementHotkeySlot2) &&

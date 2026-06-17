@@ -44,6 +44,8 @@ namespace JueMingZ.Common
         public const string MapRevealedAreaRatio = "map.revealed_area_ratio";
         public const string MapCustomMarkers = "map.custom_markers";
         public const string MapFootprints = "map.footprints";
+        public const string MapRareCreatureDirection = "map.rare_creature_direction";
+        public const string MapTravellingMerchantDirection = "map.travelling_merchant_direction";
         public const string MapQuickAnnouncement = "map.quick_announcement";
         public const string SearchMain = "search.main";
         public const string SearchChestItemLocator = "search.chest_item_locator";

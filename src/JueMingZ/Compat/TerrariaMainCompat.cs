@@ -199,6 +199,11 @@ namespace JueMingZ.Compat
             get { return Main.maxTilesY; }
         }
 
+        public static double WorldSurfaceTileY
+        {
+            get { return Main.worldSurface; }
+        }
+
         public static int MouseX
         {
             get { return Main.mouseX; }

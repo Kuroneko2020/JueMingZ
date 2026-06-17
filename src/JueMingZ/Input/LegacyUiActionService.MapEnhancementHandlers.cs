@@ -94,6 +94,48 @@ namespace JueMingZ.Input
                 "Button");
         }
 
+        private static void HandleMapRareCreatureDirectionMode(LegacyUiCommand command, string payload)
+        {
+            var before = BuildMapEnhancementUiStateJson();
+            var enabled = IsOnMode(payload);
+            var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
+            var changed = settings.MapRareCreatureDirectionEnabled != enabled;
+            settings.MapRareCreatureDirectionEnabled = enabled;
+            ConfigService.SaveAll();
+
+            Record(
+                command,
+                "Ui.Toggle.MapRareCreatureDirection",
+                "UI",
+                changed ? "Succeeded" : "NotApplicable",
+                enabled ? "Map rare creature direction enabled." : "Map rare creature direction disabled.",
+                before,
+                BuildMapEnhancementUiStateJson(),
+                "{\"submitted\":false,\"implemented\":true,\"displayOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.MapRareCreatureDirection) + "\",\"enabled\":" + BoolRaw(enabled) + ",\"changed\":" + BoolRaw(changed) + ",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                "Button");
+        }
+
+        private static void HandleMapTravellingMerchantDirectionMode(LegacyUiCommand command, string payload)
+        {
+            var before = BuildMapEnhancementUiStateJson();
+            var enabled = IsOnMode(payload);
+            var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
+            var changed = settings.MapTravellingMerchantDirectionEnabled != enabled;
+            settings.MapTravellingMerchantDirectionEnabled = enabled;
+            ConfigService.SaveAll();
+
+            Record(
+                command,
+                "Ui.Toggle.MapTravellingMerchantDirection",
+                "UI",
+                changed ? "Succeeded" : "NotApplicable",
+                enabled ? "Map travelling merchant direction enabled." : "Map travelling merchant direction disabled.",
+                before,
+                BuildMapEnhancementUiStateJson(),
+                "{\"submitted\":false,\"implemented\":true,\"displayOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.MapTravellingMerchantDirection) + "\",\"enabled\":" + BoolRaw(enabled) + ",\"changed\":" + BoolRaw(changed) + ",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                "Button");
+        }
+
         private static void HandleMapCustomMarkersPage(LegacyUiCommand command, string action)
         {
             var before = BuildMapEnhancementUiStateJson();
@@ -531,6 +573,8 @@ namespace JueMingZ.Input
                    "\"mapCustomMarkerNameInputActive\":" + BoolRaw(LegacyTextInput.IsAnyFocused) + "," +
                    "\"mapFootprintsDisplayEnabled\":" + BoolRaw(settings.MapFootprintsDisplayEnabled) + "," +
                    "\"mapQuickAnnouncementEnabled\":" + BoolRaw(settings.MapQuickAnnouncementEnabled) + "," +
+                   "\"mapRareCreatureDirectionEnabled\":" + BoolRaw(settings.MapRareCreatureDirectionEnabled) + "," +
+                   "\"mapTravellingMerchantDirectionEnabled\":" + BoolRaw(settings.MapTravellingMerchantDirectionEnabled) + "," +
                    "\"mapQuickAnnouncementHotkeySlot1\":\"" + EscapeJson(hotkey.Slot1) + "\"," +
                    "\"mapQuickAnnouncementHotkeySlot2\":\"" + EscapeJson(hotkey.Slot2) + "\"," +
                    "\"mapQuickAnnouncementTriggerKey\":\"" + EscapeJson(hotkey.TriggerKey) + "\"," +

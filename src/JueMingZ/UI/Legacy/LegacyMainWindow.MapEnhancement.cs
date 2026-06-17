@@ -16,11 +16,12 @@ namespace JueMingZ.UI.Legacy
         private const string MapRevealedAreaRatioClickTooltip = "点击打开详情";
         private const string MapCustomMarkersOnTooltip = "右键大地图试试吧";
         private const string MapFootprintsDisplayTooltip = "在大地图展示足迹";
+        private const string MapRareCreatureDirectionTooltip = "装备生命体分析仪时显示稀有生物方向";
+        private const string MapTravellingMerchantDirectionTooltip = "显示旅商方位";
         private const string MapQuickAnnouncementKeyboardSlotTooltip = "双击进行改键，不支持鼠标按键";
         private const string MapQuickAnnouncementTriggerSlotTooltip = "双击进行改键，支持鼠标按键";
         private const string MapQuickAnnouncementOnTooltip = "按下快捷键对鼠标位置内容进行广播";
         private const string MapQuickAnnouncementOffTooltip = "";
-        internal const string MapEnhancementFuturePlaceholderText = "更多功能正在开发中";
 
         private static LegacyUiElement DrawMapEnhancementPage(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements)
         {
@@ -44,7 +45,10 @@ namespace JueMingZ.UI.Legacy
             hovered = DrawMapFootprintsDisplayRow(spriteBatch, area, mouse, elements, footprintsY, settings) ?? hovered;
             var quickAnnouncementY = footprintsY + LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawMapQuickAnnouncementRow(spriteBatch, area, mouse, elements, quickAnnouncementY, settings) ?? hovered;
-            DrawMapEnhancementFuturePlaceholder(spriteBatch, area, quickAnnouncementY + LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap);
+            var rareCreatureDirectionY = quickAnnouncementY + LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
+            hovered = DrawMapRareCreatureDirectionRow(spriteBatch, area, mouse, elements, rareCreatureDirectionY, settings) ?? hovered;
+            var travellingMerchantDirectionY = rareCreatureDirectionY + LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
+            hovered = DrawMapTravellingMerchantDirectionRow(spriteBatch, area, mouse, elements, travellingMerchantDirectionY, settings) ?? hovered;
             RegisterMapDeathHistoryPopupOverlay(area);
             RegisterMapRevealedAreaDetailsPopupOverlay(area, exploration);
             return hovered;
@@ -87,6 +91,40 @@ namespace JueMingZ.UI.Legacy
                 new[] { "On", "Off" },
                 "map-footprints-display-mode:",
                 new[] { MapFootprintsDisplayTooltip, string.Empty });
+        }
+
+        private static LegacyUiElement DrawMapRareCreatureDirectionRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, AppSettings settings)
+        {
+            settings = settings ?? AppSettings.CreateDefault();
+            return DrawRightModeRow(
+                spriteBatch,
+                area,
+                mouse,
+                elements,
+                contentY,
+                "稀有生物显示方向",
+                settings.MapRareCreatureDirectionEnabled ? "On" : "Off",
+                new[] { "开启", "关闭" },
+                new[] { "On", "Off" },
+                "map-rare-creature-direction-mode:",
+                new[] { MapRareCreatureDirectionTooltip, string.Empty });
+        }
+
+        private static LegacyUiElement DrawMapTravellingMerchantDirectionRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, AppSettings settings)
+        {
+            settings = settings ?? AppSettings.CreateDefault();
+            return DrawRightModeRow(
+                spriteBatch,
+                area,
+                mouse,
+                elements,
+                contentY,
+                "旅商显示方向",
+                settings.MapTravellingMerchantDirectionEnabled ? "On" : "Off",
+                new[] { "开启", "关闭" },
+                new[] { "On", "Off" },
+                "map-travelling-merchant-direction-mode:",
+                new[] { MapTravellingMerchantDirectionTooltip, string.Empty });
         }
 
         private static LegacyUiElement DrawMapCustomMarkersRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, AppSettings settings)
@@ -645,34 +683,6 @@ namespace JueMingZ.UI.Legacy
             }
         }
 
-        private static void DrawMapEnhancementFuturePlaceholder(object spriteBatch, LegacyScrollArea area, int contentY)
-        {
-            var row = new LegacyUiRect(area.Viewport.X, area.ToScreenY(contentY), area.Viewport.Width, LegacyUiMetrics.RowHeight);
-            if (!area.IsVisible(row))
-            {
-                return;
-            }
-
-            LegacyUiTheme.DrawRowClipped(spriteBatch, row, area.Viewport);
-            UiTextRenderer.DrawAlignedTextClipped(
-                spriteBatch,
-                MapEnhancementFuturePlaceholderText,
-                row.X + 10,
-                row.Y,
-                Math.Max(1, row.Width - 20),
-                row.Height,
-                UiTextHorizontalAlignment.Left,
-                area.Viewport.X,
-                area.Viewport.Y,
-                area.Viewport.Width,
-                area.Viewport.Height,
-                205,
-                218,
-                238,
-                235,
-                0.82f);
-        }
-
         private static LegacyUiElement DrawMapQuickAnnouncementRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, AppSettings settings)
         {
             var row = new LegacyUiRect(area.Viewport.X, area.ToScreenY(contentY), area.Viewport.Width, LegacyUiMetrics.RowHeight);
@@ -892,6 +902,17 @@ namespace JueMingZ.UI.Legacy
             return new[]
             {
                 MapFootprintsDisplayTooltip,
+                string.Empty
+            };
+        }
+
+        internal static string[] GetMapDirectionHintButtonTooltipsForTesting()
+        {
+            return new[]
+            {
+                MapRareCreatureDirectionTooltip,
+                string.Empty,
+                MapTravellingMerchantDirectionTooltip,
                 string.Empty
             };
         }

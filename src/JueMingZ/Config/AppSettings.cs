@@ -167,6 +167,12 @@ namespace JueMingZ.Config
         [DataMember(Order = 198)]
         public bool MapFootprintsDisplayEnabled { get; set; }
 
+        [DataMember(Order = 199)]
+        public bool MapRareCreatureDirectionEnabled { get; set; }
+
+        [DataMember(Order = 200)]
+        public bool MapTravellingMerchantDirectionEnabled { get; set; }
+
         [DataMember(Order = 37)]
         public bool CombatPerfectRevolverEnabled { get; set; }
 
@@ -811,6 +817,8 @@ namespace JueMingZ.Config
                 CombatEquipmentWarningEnabled = false,
                 CombatAutoBossDamageReportEnabled = false,
                 MapFootprintsDisplayEnabled = false,
+                MapRareCreatureDirectionEnabled = false,
+                MapTravellingMerchantDirectionEnabled = false,
                 CombatGoblinExecutionEnabled = false,
                 AimRangeOrigin = CombatAimModes.RangeOriginPlayer,
                 AimTargetPriority = CombatAimModes.TargetPriorityNearest,

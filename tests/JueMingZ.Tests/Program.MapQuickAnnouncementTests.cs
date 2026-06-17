@@ -245,20 +245,15 @@ namespace JueMingZ.Tests
             var window = new LegacyUiRect(40, 50, LegacyUiMetrics.DefaultWidth, LegacyUiMetrics.DefaultHeight);
             var content = new LegacyUiRect(58, 134, 520, 200);
             var expectedHeight =
-                LegacyUiMetrics.RowHeight * 8 +
-                LegacyUiMetrics.SettingRowGap * 7 +
+                LegacyUiMetrics.RowHeight * 9 +
+                LegacyUiMetrics.SettingRowGap * 8 +
                 LegacyMainWindow.CalculateMapMarkerListHeightForTesting(0) +
                 24;
 
             if (LegacyMainWindow.CalculateMapEnhancementContentHeightForTesting() != expectedHeight)
             {
-                throw new InvalidOperationException("Map enhancement content height must include persistent death markers, death history, world day count, revealed area ratio, map custom markers, map footprints, quick announcement, and future placeholder rows.");
+                throw new InvalidOperationException("Map enhancement content height must include persistent death markers, death history, world day count, revealed area ratio, map custom markers, map footprints, quick announcement, and direction hint rows.");
             }
-
-            AssertStringEquals(
-                LegacyMainWindow.MapEnhancementFuturePlaceholderText,
-                "更多功能正在开发中",
-                "map enhancement future placeholder");
 
             var first = LegacyMainWindow.BuildPageLayoutSnapshotForTesting("map_enhancement", window, content, 0, settings);
             settings.MapPersistentDeathMarkersEnabled = true;

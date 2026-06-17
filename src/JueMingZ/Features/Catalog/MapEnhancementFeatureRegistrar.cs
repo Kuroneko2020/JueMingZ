@@ -104,6 +104,34 @@ namespace JueMingZ.Features.Catalog
                 .Build());
 
             registry.Register(FeatureDefinitionBuilder
+                .Create(FeatureIds.MapRareCreatureDirection, "稀有生物显示方向", "装备生命体分析仪时显示稀有生物方向。")
+                .Domain(FeatureCodeDomain.MapEnhancement)
+                .Category(FeatureUserCategory.MapEnhancement)
+                .Actions(InputActionKind.None)
+                .GameState(GameStateKind.Player, GameStateKind.Npcs, GameStateKind.World, GameStateKind.UiState)
+                .Multiplayer(FeatureMultiplayerSupport.LocalAssistPendingMultiplayerVerification)
+                .Config(FeatureConfigUiKind.None)
+                .DefaultEnabled(false)
+                .VisibleInMainUi(true)
+                .Implemented(true)
+                .Notes("地图加强页 display-only 标准开关；本阶段只接入 Feature/AppSettings/F5 入口和 runtime settings snapshot，不实现 NPC 扫描、箭头 overlay、ActionQueue 或游戏状态写入。")
+                .Build());
+
+            registry.Register(FeatureDefinitionBuilder
+                .Create(FeatureIds.MapTravellingMerchantDirection, "旅商显示方向", "显示旅商方位。")
+                .Domain(FeatureCodeDomain.MapEnhancement)
+                .Category(FeatureUserCategory.MapEnhancement)
+                .Actions(InputActionKind.None)
+                .GameState(GameStateKind.Npcs, GameStateKind.World, GameStateKind.UiState)
+                .Multiplayer(FeatureMultiplayerSupport.LocalAssistPendingMultiplayerVerification)
+                .Config(FeatureConfigUiKind.None)
+                .DefaultEnabled(false)
+                .VisibleInMainUi(true)
+                .Implemented(true)
+                .Notes("地图加强页 display-only 标准开关；本阶段只接入 Feature/AppSettings/F5 入口和 runtime settings snapshot，不实现旅商 resolver、边缘标签、位置标签、ActionQueue 或游戏状态写入。")
+                .Build());
+
+            registry.Register(FeatureDefinitionBuilder
                 .Create(FeatureIds.MapQuickAnnouncement, "快捷宣告", "把鼠标指向对象转换为聊天宣告。")
                 .Domain(FeatureCodeDomain.Information)
                 .Category(FeatureUserCategory.MapEnhancement)

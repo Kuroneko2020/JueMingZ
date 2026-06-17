@@ -131,7 +131,8 @@ namespace JueMingZ.Tests
                     "FishingStatusPromptOverlay.DrawInterfaceLayer",
                     "FirstWorldLoadPromptOverlay.DrawInterfaceLayer",
                     "CombatEquipmentWarningPromptOverlay.DrawInterfaceLayer",
-                    "CombatAimMarkerOverlay.DrawInterfaceLayer"
+                    "CombatAimMarkerOverlay.DrawInterfaceLayer",
+                    "MapDirectionHintOverlay.DrawInterfaceLayer"
                 },
                 "game overlay dispatcher routes when low information layer is active");
 
@@ -145,7 +146,8 @@ namespace JueMingZ.Tests
                     "FishingStatusPromptOverlay.DrawInterfaceLayer",
                     "FirstWorldLoadPromptOverlay.DrawInterfaceLayer",
                     "CombatEquipmentWarningPromptOverlay.DrawInterfaceLayer",
-                    "CombatAimMarkerOverlay.DrawInterfaceLayer"
+                    "CombatAimMarkerOverlay.DrawInterfaceLayer",
+                    "MapDirectionHintOverlay.DrawInterfaceLayer"
                 },
                 "game overlay fallback dispatcher routes when low information layer is missing");
         }

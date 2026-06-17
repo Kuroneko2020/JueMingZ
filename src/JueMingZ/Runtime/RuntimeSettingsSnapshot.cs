@@ -120,6 +120,8 @@ namespace JueMingZ.Runtime
                 MapPersistentDeathMarkersEnabled = settings.MapPersistentDeathMarkersEnabled,
                 MapCustomMarkersEnabled = settings.MapCustomMarkersEnabled,
                 MapFootprintsDisplayEnabled = settings.MapFootprintsDisplayEnabled,
+                MapRareCreatureDirectionEnabled = settings.MapRareCreatureDirectionEnabled,
+                MapTravellingMerchantDirectionEnabled = settings.MapTravellingMerchantDirectionEnabled,
                 MapQuickAnnouncementEnabled = settings.MapQuickAnnouncementEnabled,
                 MapQuickAnnouncementHotkeySlot1 = mapQuickAnnouncementHotkey.Slot1,
                 MapQuickAnnouncementHotkeySlot2 = mapQuickAnnouncementHotkey.Slot2,
@@ -243,6 +245,8 @@ namespace JueMingZ.Runtime
         public bool MapPersistentDeathMarkersEnabled { get; private set; }
         public bool MapCustomMarkersEnabled { get; private set; }
         public bool MapFootprintsDisplayEnabled { get; private set; }
+        public bool MapRareCreatureDirectionEnabled { get; private set; }
+        public bool MapTravellingMerchantDirectionEnabled { get; private set; }
         public bool MapQuickAnnouncementEnabled { get; private set; }
         public string MapQuickAnnouncementHotkeySlot1 { get; private set; }
         public string MapQuickAnnouncementHotkeySlot2 { get; private set; }

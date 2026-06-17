@@ -2124,6 +2124,255 @@ function Test-MapCustomMarkerGovernance {
     }
 }
 
+function Test-MapDirectionHintGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $registrarPath = Join-Path $RepoRoot "src\JueMingZ\Features\Catalog\MapEnhancementFeatureRegistrar.cs"
+    $featureIdsPath = Join-Path $RepoRoot "src\JueMingZ\Common\FeatureIds.cs"
+    $appSettingsPath = Join-Path $RepoRoot "src\JueMingZ\Config\AppSettings.cs"
+    $configServicePath = Join-Path $RepoRoot "src\JueMingZ\Config\ConfigService.cs"
+    $settingsSnapshotPath = Join-Path $RepoRoot "src\JueMingZ\Runtime\RuntimeSettingsSnapshot.cs"
+    $settingsSnapshotProviderPath = Join-Path $RepoRoot "src\JueMingZ\Runtime\RuntimeSettingsSnapshotProvider.cs"
+    $runtimePath = Join-Path $RepoRoot "src\JueMingZ\Runtime\JueMingZRuntime.cs"
+    $targetServicePath = Join-Path $RepoRoot "src\JueMingZ\Automation\MapEnhancement\MapDirectionHintTargetService.cs"
+    $targetSnapshotPath = Join-Path $RepoRoot "src\JueMingZ\Automation\MapEnhancement\MapDirectionHintTargetSnapshot.cs"
+    $rareResolverPath = Join-Path $RepoRoot "src\JueMingZ\Automation\MapEnhancement\MapRareCreatureDirectionTargetResolver.cs"
+    $merchantResolverPath = Join-Path $RepoRoot "src\JueMingZ\Automation\MapEnhancement\MapTravellingMerchantDirectionTargetResolver.cs"
+    $townResolverPath = Join-Path $RepoRoot "src\JueMingZ\Automation\MapEnhancement\MapTravellingMerchantTownResolver.cs"
+    $projectionPath = Join-Path $RepoRoot "src\JueMingZ\UI\MapDirectionHintProjection.cs"
+    $overlayPath = Join-Path $RepoRoot "src\JueMingZ\UI\MapDirectionHintOverlay.cs"
+    $diagnosticsPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\MapDirectionHintDiagnostics.cs"
+    $snapshotPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\DiagnosticSnapshot.cs"
+    $snapshotWriterPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\DiagnosticSnapshotWriter.Json.cs"
+    $snapshotBuilderPath = Join-Path $RepoRoot "src\JueMingZ\Runtime\Diagnostics\RuntimeDiagnosticSnapshotBuilder.Bootstrap.cs"
+    $handlerPath = Join-Path $RepoRoot "src\JueMingZ\Input\LegacyUiActionService.MapEnhancementHandlers.cs"
+    $uiPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.MapEnhancement.cs"
+    $testPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.MapDirectionHintTests.cs"
+    $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
+    $rareDocPath = Join-Path $RepoRoot "文档\功能介绍\地图加强页\稀有生物显示方向.md"
+    $merchantDocPath = Join-Path $RepoRoot "文档\功能介绍\地图加强页\旅商显示方向.md"
+    $featureIndexPath = Join-Path $RepoRoot "文档\功能介绍\功能索引.md"
+    $diagnosticRulesPath = Join-Path $RepoRoot "文档\项目规则\AI诊断日志说明.md"
+
+    $registrarText = Read-TextIfExists -Path $registrarPath
+    $featureIdsText = Read-TextIfExists -Path $featureIdsPath
+    $appSettingsText = Read-TextIfExists -Path $appSettingsPath
+    $configServiceText = Read-TextIfExists -Path $configServicePath
+    $settingsSnapshotText = Read-TextIfExists -Path $settingsSnapshotPath
+    $settingsSnapshotProviderText = Read-TextIfExists -Path $settingsSnapshotProviderPath
+    $runtimeText = Read-TextIfExists -Path $runtimePath
+    $targetServiceText = Read-TextIfExists -Path $targetServicePath
+    $targetSnapshotText = Read-TextIfExists -Path $targetSnapshotPath
+    $rareResolverText = Read-TextIfExists -Path $rareResolverPath
+    $merchantResolverText = Read-TextIfExists -Path $merchantResolverPath
+    $townResolverText = Read-TextIfExists -Path $townResolverPath
+    $projectionText = Read-TextIfExists -Path $projectionPath
+    $overlayText = Read-TextIfExists -Path $overlayPath
+    $diagnosticsText = Read-TextIfExists -Path $diagnosticsPath
+    $snapshotText = Read-TextIfExists -Path $snapshotPath
+    $snapshotWriterText = Read-TextIfExists -Path $snapshotWriterPath
+    $snapshotBuilderText = Read-TextIfExists -Path $snapshotBuilderPath
+    $handlerText = Read-TextIfExists -Path $handlerPath
+    $uiText = Read-TextIfExists -Path $uiPath
+    $testText = Read-TextIfExists -Path $testPath
+    $programText = Read-TextIfExists -Path $programPath
+    $rareDocText = Read-TextIfExists -Path $rareDocPath
+    $merchantDocText = Read-TextIfExists -Path $merchantDocPath
+    $featureIndexText = Read-TextIfExists -Path $featureIndexPath
+    $diagnosticRulesText = Read-TextIfExists -Path $diagnosticRulesPath
+
+    if ($null -eq $registrarText -or $null -eq $featureIdsText -or $null -eq $appSettingsText -or $null -eq $configServiceText -or $null -eq $settingsSnapshotText -or $null -eq $settingsSnapshotProviderText -or $null -eq $runtimeText -or $null -eq $targetServiceText -or $null -eq $targetSnapshotText -or $null -eq $rareResolverText -or $null -eq $merchantResolverText -or $null -eq $townResolverText -or $null -eq $projectionText -or $null -eq $overlayText -or $null -eq $diagnosticsText -or $null -eq $snapshotText -or $null -eq $snapshotWriterText -or $null -eq $snapshotBuilderText -or $null -eq $handlerText -or $null -eq $uiText -or $null -eq $testText -or $null -eq $programText -or $null -eq $rareDocText -or $null -eq $merchantDocText -or $null -eq $featureIndexText -or $null -eq $diagnosticRulesText) {
+        Write-FailHealth "Map direction hint feature, runtime, overlay, diagnostics, docs, and tests must exist as separate responsibilities."
+        return
+    }
+
+    if ($featureIdsText.Contains('MapRareCreatureDirection = "map.rare_creature_direction"') -and
+        $featureIdsText.Contains('MapTravellingMerchantDirection = "map.travelling_merchant_direction"') -and
+        $registrarText.Contains("FeatureIds.MapRareCreatureDirection") -and
+        $registrarText.Contains("FeatureIds.MapTravellingMerchantDirection") -and
+        $registrarText.Contains(".Domain(FeatureCodeDomain.MapEnhancement)") -and
+        $registrarText.Contains(".Category(FeatureUserCategory.MapEnhancement)") -and
+        $registrarText.Contains(".Actions(InputActionKind.None)") -and
+        $registrarText.Contains(".Implemented(true)") -and
+        $appSettingsText.Contains("MapRareCreatureDirectionEnabled") -and
+        $appSettingsText.Contains("MapTravellingMerchantDirectionEnabled") -and
+        $configServiceText.Contains("FeatureIds.MapRareCreatureDirection") -and
+        $configServiceText.Contains("FeatureIds.MapTravellingMerchantDirection") -and
+        $settingsSnapshotText.Contains("MapRareCreatureDirectionEnabled") -and
+        $settingsSnapshotText.Contains("MapTravellingMerchantDirectionEnabled") -and
+        $settingsSnapshotProviderText.Contains("_mapRareCreatureDirectionEnabled") -and
+        $settingsSnapshotProviderText.Contains("_mapTravellingMerchantDirectionEnabled") -and
+        $uiText.Contains("稀有生物显示方向") -and
+        $uiText.Contains("旅商显示方向") -and
+        $handlerText.Contains("displayOnly") -and
+        $handlerText.Contains("Ui.Toggle.MapRareCreatureDirection") -and
+        $handlerText.Contains("Ui.Toggle.MapTravellingMerchantDirection") -and
+        $testText.Contains("MapDirectionHintConfigDefaultsFeatureSyncAndRuntimeSnapshot") -and
+        $testText.Contains("LegacyMapDirectionHintHandlersToggleSettings")) {
+        Write-Pass "Map direction hints remain map-enhancement display features with config, runtime snapshot sync, F5 rows, and display-only UI metadata."
+    }
+    else {
+        Write-FailHealth "Map direction hint features must stay on the map enhancement page with default-off settings, RuntimeSettingsSnapshot sync, None actions, and display-only UI metadata."
+    }
+
+    $gameReadIndex = $runtimeText.IndexOf('"game-state-read"', [System.StringComparison]::Ordinal)
+    $directionIndex = $runtimeText.IndexOf('"map-direction-hints-targeting"', [System.StringComparison]::Ordinal)
+    $inputGateIndex = $runtimeText.IndexOf('"input-focus-guard"', [System.StringComparison]::Ordinal)
+    if ($gameReadIndex -ge 0 -and
+        $directionIndex -gt $gameReadIndex -and
+        $inputGateIndex -gt $directionIndex -and
+        $runtimeText.Contains("RunMapDirectionHintsTargeting") -and
+        $runtimeText.Contains("MapDirectionHintTargetService.Tick") -and
+        $targetServiceText.Contains("ScanCadenceTicks = 15") -and
+        $targetServiceText.Contains("MaxObservedNpcs = 200") -and
+        $targetServiceText.Contains("MapDirectionHintDiagnostics.RecordTravellingMerchantTarget") -and
+        $targetServiceText.Contains("MapDirectionHintDiagnostics.RecordRareCreatureTarget") -and
+        $testText.Contains("MapDirectionHintTargetServiceBuildsSnapshotAndHonorsCadence")) {
+        Write-Pass "Map direction hint targeting stays a 15-tick read-only stage after game-state-read and before input/action gates."
+    }
+    else {
+        Write-FailHealth "Map direction hint target scan must stay in a 15-tick runtime stage after game-state-read and before input/action gates."
+    }
+
+    if ($rareResolverText.Contains("LifeformAnalyzerInfoIndex = 11") -and
+        $rareResolverText.Contains("MaxDistancePixels = 1300f") -and
+        $rareResolverText.Contains("HasLifeformAnalyzer") -and
+        $rareResolverText.Contains("InfoAccessoryHidden") -and
+        $rareResolverText.Contains("npc.Rarity > rare.Rarity") -and
+        $rareResolverText.Contains("distanceSquared >= maxDistanceSquared") -and
+        $testText.Contains("MapRareCreatureGatesLifeformAnalyzerAndHiddenInfo") -and
+        $testText.Contains("MapRareCreatureResolverSelectsHighestRarityWithinRadius") -and
+        $testText.Contains("MapRareCreatureProjectionDrawsArrowAndWeakensOnScreen")) {
+        Write-Pass "Rare creature direction keeps lifeform analyzer and hideInfo[11] gates, strict 1300px radius, highest-rarity selection, and on-screen arrow-only weakening."
+    }
+    else {
+        Write-FailHealth "Rare creature direction must keep lifeform analyzer/hideInfo gates, strict 1300px target selection, highest rarity preference, and projection tests."
+    }
+
+    if ($merchantResolverText.Contains("TravellingMerchantNpcType = NPCID.TravellingMerchant") -and
+        $townResolverText.Contains('SourcePylon = "pylon"') -and
+        $townResolverText.Contains('SourceTownCluster = "townCluster"') -and
+        $townResolverText.Contains('SourcePointBiome = "pointBiome"') -and
+        $townResolverText.Contains('SourceUnknown = "unknown"') -and
+        $townResolverText.Contains('Confidence = "low"') -and
+        $townResolverText.Contains('Label = "环境未知"') -and
+        $testText.Contains("MapTravellingMerchantResolverSelectsNpcId368AndHidesOnScreen") -and
+        $testText.Contains("MapTravellingMerchantEdgeLabelUsesEllipseAndThreeLines") -and
+        $testText.Contains("MapTravellingMerchantTownResolverUsesClusterBiomeAndUnknownSources")) {
+        Write-Pass "Travelling merchant direction keeps NPCID 368 targeting, screen-edge labels, source-ranked town labels, low-confidence nearby labels, and unknown fallback."
+    }
+    else {
+        Write-FailHealth "Travelling merchant direction must keep NPCID 368 targeting and pylon/townCluster/pointBiome/unknown label source semantics."
+    }
+
+    if ($overlayText.Contains("MapDirectionHintTargetService.GetSnapshot") -and
+        $overlayText.Contains("MapDirectionHintDiagnostics.RecordTravellingMerchantProjection") -and
+        $overlayText.Contains("MapDirectionHintDiagnostics.RecordRareCreatureProjection") -and
+        $overlayText.Contains("DrawTravellingMerchantLabel") -and
+        $overlayText.Contains("DrawRareCreatureArrow") -and
+        -not ([System.Text.RegularExpressions.Regex]::IsMatch($overlayText, "Main\.npc|NPC\[|Main\.PylonSystem|Pylons|MapTravellingMerchantTownResolver")) -and
+        -not $overlayText.Contains("TryWriteJson") -and
+        -not $overlayText.Contains("DiagnosticSnapshotWriter") -and
+        -not $overlayText.Contains("PlayerWorldFeatureDataStore")) {
+        Write-Pass "Map direction hint overlay draws only from cached target snapshots and does not scan NPCs, pylons, biomes, or write JSON."
+    }
+    else {
+        Write-FailHealth "Map direction hint Draw path must only read cached snapshots; NPC/pylon/biome scans and JSON writes belong outside Draw."
+    }
+
+    $directionFiles = @($targetServicePath, $targetSnapshotPath, $rareResolverPath, $merchantResolverPath, $townResolverPath, $projectionPath, $overlayPath, $diagnosticsPath)
+    $forbiddenMutationPattern = '(Player\.Teleport|NetMessage|\.statLife\s*=|\.statMana\s*=|\.velocity\s*=|\.position\s*=|\.fallStart\s*=|\.noFallDmg\s*=|AddBuff\s*\(|\.buffType\s*=|\.buffTime\s*=|\.stack\s*=|Main\.tile|NPC\[[^\]]+\]\s*=|WorldGen\.)'
+    $mutationLeaks = @()
+    $actionBackflow = @()
+    foreach ($path in $directionFiles) {
+        $text = Read-TextIfExists -Path $path
+        if ($null -eq $text) {
+            continue
+        }
+
+        if ([System.Text.RegularExpressions.Regex]::IsMatch($text, $forbiddenMutationPattern)) {
+            $mutationLeaks += $path.Substring($RepoRoot.Length).TrimStart('\', '/').Replace('\', '/')
+        }
+
+        if ($text.Contains("InputActionQueue") -or
+            $text.Contains("InputActionRequest") -or
+            $text.Contains("ActionKind")) {
+            $actionBackflow += $path.Substring($RepoRoot.Length).TrimStart('\', '/').Replace('\', '/')
+        }
+    }
+
+    if ($mutationLeaks.Count -eq 0 -and $actionBackflow.Count -eq 0) {
+        Write-Pass "Map direction hint runtime, resolver, overlay, projection, and diagnostics files stay out of ActionQueue and player/NPC/tile/network mutations."
+    }
+    else {
+        if ($mutationLeaks.Count -gt 0) {
+            Write-FailHealth "Map direction hints must not mutate player/NPC/tile/network state: $($mutationLeaks -join ', ')"
+        }
+
+        if ($actionBackflow.Count -gt 0) {
+            Write-FailHealth "Map direction hints must not introduce ActionQueue/request backflow: $($actionBackflow -join ', ')"
+        }
+    }
+
+    $requiredSnapshotFields = @(
+        "MapDirectionHintTargetScanCadenceTicks",
+        "MapRareCreatureDirectionEnabled",
+        "MapRareCreatureDirectionGateReason",
+        "MapRareCreatureDirectionHasLifeformAnalyzer",
+        "MapRareCreatureDirectionInfoAccessoryHidden",
+        "MapRareCreatureDirectionTargetActive",
+        "MapRareCreatureDirectionTargetRarity",
+        "MapRareCreatureDirectionOnScreen",
+        "MapRareCreatureDirectionShouldDrawLabel",
+        "MapRareCreatureDirectionArrowGlyph",
+        "MapRareCreatureDirectionLastScanAgeTicks",
+        "MapTravellingMerchantDirectionEnabled",
+        "MapTravellingMerchantDirectionTargetActive",
+        "MapTravellingMerchantDirectionTownLabelSource",
+        "MapTravellingMerchantDirectionTownLabelConfidence",
+        "MapTravellingMerchantDirectionMatchedPylonDistanceTiles",
+        "MapTravellingMerchantDirectionLastScanAgeTicks"
+    )
+    $missingSnapshotFields = @()
+    foreach ($field in $requiredSnapshotFields) {
+        if (-not $snapshotText.Contains($field) -or
+            -not $snapshotWriterText.Contains($field) -or
+            -not $snapshotBuilderText.Contains($field) -or
+            -not $diagnosticRulesText.Contains($field)) {
+            $missingSnapshotFields += $field
+        }
+    }
+
+    if ($missingSnapshotFields.Count -eq 0 -and
+        $diagnosticsText.Contains("MapRareCreatureDirectionGateReason") -and
+        $diagnosticsText.Contains("MapTravellingMerchantDirectionTownLabelSource") -and
+        $testText.Contains("MapTravellingMerchantDiagnosticsWriteRuntimeSnapshotJson") -and
+        $testText.Contains("MapRareCreatureDiagnosticsWriteRuntimeSnapshotJson") -and
+        $programText.Contains("map rare creature diagnostics write runtime snapshot json") -and
+        -not $programText.Contains('RunExpectedFailure("map rare creature') -and
+        -not $programText.Contains('RunExpectedFailure("map travelling merchant')) {
+        Write-Pass "Map direction hint runtime snapshot fields are wired through diagnostics, builder, JSON writer, tests, and diagnostic docs."
+    }
+    else {
+        Write-FailHealth "Map direction hint diagnostics must keep required runtime snapshot fields in DTO, builder, writer, tests, and diagnostic docs. Missing: $($missingSnapshotFields -join ', ')"
+    }
+
+    if ($rareDocText.Contains("MapRareCreatureDirectionGateReason") -and
+        $rareDocText.Contains("lifeformAnalyzerMissing") -and
+        $rareDocText.Contains("MapDirectionHintTargetScanCadenceTicks") -and
+        $merchantDocText.Contains("MapDirectionHintTargetScanCadenceTicks") -and
+        $merchantDocText.Contains("MapTravellingMerchantDirectionTownLabelSource") -and
+        $featureIndexText.Contains("健康审计锁住两个方向提示") -and
+        $diagnosticRulesText.Contains("Map / Direction Hints") -and
+        $diagnosticRulesText.Contains("gateBlocked") -and
+        $diagnosticRulesText.Contains("onScreenArrowOnly")) {
+        Write-Pass "Map direction hint feature docs and diagnostic rules explain cadence, rare-creature gates, merchant label sources, and read-only boundaries."
+    }
+    else {
+        Write-FailHealth "Map direction hint feature docs and diagnostic rules must explain shared cadence, rare-creature gates, merchant label sources, and read-only boundaries."
+    }
+}
+
 function Test-MapFootprintGovernance {
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
 
@@ -3508,6 +3757,7 @@ Test-CombatAimDiagnosticsGovernance -RepoRoot $repoRoot
 Test-PhasebladeQuickSwitchDiagnosticsGovernance -RepoRoot $repoRoot
 Test-MapQuickAnnouncementGovernance -RepoRoot $repoRoot
 Test-MapCustomMarkerGovernance -RepoRoot $repoRoot
+Test-MapDirectionHintGovernance -RepoRoot $repoRoot
 Test-MapFootprintGovernance -RepoRoot $repoRoot
 Test-PlayerWorldExplorationGovernance -RepoRoot $repoRoot
 Test-ActionQueueDirectEnqueueGovernance -RepoRoot $repoRoot

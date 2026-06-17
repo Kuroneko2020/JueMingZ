@@ -41,7 +41,8 @@ namespace JueMingZ.Hooks
             FishingStatusPromptOverlay.DrawInterfaceLayer,
             FirstWorldLoadPromptOverlay.DrawInterfaceLayer,
             CombatEquipmentWarningPromptOverlay.DrawInterfaceLayer,
-            CombatAimMarkerOverlay.DrawInterfaceLayer
+            CombatAimMarkerOverlay.DrawInterfaceLayer,
+            MapDirectionHintOverlay.DrawInterfaceLayer
         };
 
         private static readonly Func<bool>[] GameOverlayFallbackDispatcherDrawers =
@@ -52,7 +53,8 @@ namespace JueMingZ.Hooks
             FishingStatusPromptOverlay.DrawInterfaceLayer,
             FirstWorldLoadPromptOverlay.DrawInterfaceLayer,
             CombatEquipmentWarningPromptOverlay.DrawInterfaceLayer,
-            CombatAimMarkerOverlay.DrawInterfaceLayer
+            CombatAimMarkerOverlay.DrawInterfaceLayer,
+            MapDirectionHintOverlay.DrawInterfaceLayer
         };
 
         private static readonly Func<bool>[] UiOverlayDispatcherDrawers =
