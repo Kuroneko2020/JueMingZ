@@ -160,6 +160,7 @@ namespace JueMingZ.Automation.MapEnhancement
             }
 
             var safeScreen = NormalizeScreen(screen);
+            var clipScreen = NormalizeClipScreen(screen);
             var safeLimit = Math.Max(0, maxDrawnLines);
             var minStepSquared = Math.Max(0.25f, minDrawPixelStep * minDrawPixelStep);
             var resolvedCursorTicks = ResolveCursorTicks(snapshot, cursorTicks);
@@ -225,11 +226,46 @@ namespace JueMingZ.Automation.MapEnhancement
                 if (!LineBoundsIntersectsScreen(pendingStart, end, safeScreen))
                 {
                     plan.CulledLineCount++;
+                    pendingStart = end;
                     if (line.IsSegmentEnd)
                     {
                         hasPendingStart = false;
                     }
 
+                    continue;
+                }
+
+                Vector2 clippedStart;
+                Vector2 clippedEnd;
+                if (!TryClipLineToScreen(pendingStart, end, clipScreen, out clippedStart, out clippedEnd))
+                {
+                    plan.CulledLineCount++;
+                    pendingStart = end;
+                    if (line.IsSegmentEnd)
+                    {
+                        hasPendingStart = false;
+                    }
+
+                    continue;
+                }
+
+                var clippedLengthSquared = Vector2.DistanceSquared(clippedStart, clippedEnd);
+                if (clippedLengthSquared <= 0.01f)
+                {
+                    plan.CulledLineCount++;
+                    pendingStart = end;
+                    if (line.IsSegmentEnd)
+                    {
+                        hasPendingStart = false;
+                    }
+
+                    continue;
+                }
+
+                if (!line.IsSegmentEnd && clippedLengthSquared < minStepSquared)
+                {
+                    plan.ThinnedLineCount++;
+                    pendingStart = end;
                     continue;
                 }
 
@@ -242,9 +278,15 @@ namespace JueMingZ.Automation.MapEnhancement
 
                 commands.Add(new MapFootprintDrawCommand
                 {
-                    Start = pendingStart,
-                    End = end,
-                    SegmentIndex = line.SegmentIndex
+                    Start = clippedStart,
+                    End = clippedEnd,
+                    SegmentIndex = line.SegmentIndex,
+                    LineIndex = index,
+                    StartTileX = line.StartTileX,
+                    StartTileY = line.StartTileY,
+                    EndTileX = endTileX,
+                    EndTileY = endTileY,
+                    PartialLine = partialLine
                 });
 
                 pendingStart = end;
@@ -498,6 +540,11 @@ namespace JueMingZ.Automation.MapEnhancement
                 Math.Max(1, screen.Height) + ViewportPaddingPixels * 2);
         }
 
+        private static Rectangle NormalizeClipScreen(Rectangle screen)
+        {
+            return new Rectangle(screen.X, screen.Y, Math.Max(1, screen.Width), Math.Max(1, screen.Height));
+        }
+
         private static bool LineBoundsIntersectsScreen(Vector2 start, Vector2 end, Rectangle screen)
         {
             var minX = Math.Min(start.X, end.X);
@@ -508,6 +555,70 @@ namespace JueMingZ.Automation.MapEnhancement
                    minX <= screen.Right &&
                    maxY >= screen.Top &&
                    minY <= screen.Bottom;
+        }
+
+        private static bool TryClipLineToScreen(Vector2 start, Vector2 end, Rectangle screen, out Vector2 clippedStart, out Vector2 clippedEnd)
+        {
+            clippedStart = start;
+            clippedEnd = end;
+            var dx = end.X - start.X;
+            var dy = end.Y - start.Y;
+            var t0 = 0d;
+            var t1 = 1d;
+
+            // Draw commands are screen-space; keep the cached tile endpoints for diagnostics, but never rasterize outside the visible viewport.
+            if (!ClipLineParameter(-dx, start.X - screen.Left, ref t0, ref t1) ||
+                !ClipLineParameter(dx, screen.Right - start.X, ref t0, ref t1) ||
+                !ClipLineParameter(-dy, start.Y - screen.Top, ref t0, ref t1) ||
+                !ClipLineParameter(dy, screen.Bottom - start.Y, ref t0, ref t1))
+            {
+                return false;
+            }
+
+            if (t1 < t0)
+            {
+                return false;
+            }
+
+            clippedStart = new Vector2((float)(start.X + dx * t0), (float)(start.Y + dy * t0));
+            clippedEnd = new Vector2((float)(start.X + dx * t1), (float)(start.Y + dy * t1));
+            return IsFinite(clippedStart) && IsFinite(clippedEnd);
+        }
+
+        private static bool ClipLineParameter(double p, double q, ref double t0, ref double t1)
+        {
+            if (Math.Abs(p) < 0.000001d)
+            {
+                return q >= 0d;
+            }
+
+            var r = q / p;
+            if (p < 0d)
+            {
+                if (r > t1)
+                {
+                    return false;
+                }
+
+                if (r > t0)
+                {
+                    t0 = r;
+                }
+
+                return true;
+            }
+
+            if (r < t0)
+            {
+                return false;
+            }
+
+            if (r < t1)
+            {
+                t1 = r;
+            }
+
+            return true;
         }
 
         private static long ResolveCursorTicks(MapFootprintRenderSnapshot snapshot, long cursorTicks)
@@ -713,5 +824,11 @@ namespace JueMingZ.Automation.MapEnhancement
         public Vector2 Start { get; set; }
         public Vector2 End { get; set; }
         public int SegmentIndex { get; set; }
+        public int LineIndex { get; set; }
+        public double StartTileX { get; set; }
+        public double StartTileY { get; set; }
+        public double EndTileX { get; set; }
+        public double EndTileY { get; set; }
+        public bool PartialLine { get; set; }
     }
 }

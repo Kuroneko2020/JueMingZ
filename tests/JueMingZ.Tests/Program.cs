@@ -1881,8 +1881,16 @@ namespace JueMingZ.Tests
             Run("map footprint render cache builds lines without cross-segment connection", ref failed, MapFootprintRenderCacheBuildsLinesWithoutCrossSegmentConnection);
             Run("map footprint render cache display off clears draw only", ref failed, MapFootprintRenderCacheDisplayOffClearsDrawOnly);
             Run("map footprint render draw plan culls thins and limits", ref failed, MapFootprintRenderDrawPlanCullsThinsAndLimits);
+            Run("map footprint render draw plan advances after culled line", ref failed, MapFootprintRenderDrawPlanAdvancesAfterCulledLine);
+            Run("map footprint render draw plan rejects unclipped reentry long line", ref failed, MapFootprintRenderDrawPlanRejectsUnclippedReentryLongLineSpec);
+            Run("map footprint render draw plan clips viewport edges", ref failed, MapFootprintRenderDrawPlanClipsViewportEdges);
             Run("map footprint playback defaults to latest paused and screen-space layout", ref failed, MapFootprintPlaybackDefaultsToLatestPausedAndScreenSpaceLayout);
+            Run("map footprint playback fullscreen UI scale hit-test captures bar", ref failed, MapFootprintPlaybackFullscreenUiScaleHitTestCapturesBar);
+            Run("map footprint playback fullscreen mouse keeps readable click when global gate false", ref failed, MapFootprintPlaybackFullscreenMouseKeepsReadableClickWhenGlobalGateFalseSpec);
+            Run("map footprint playback fullscreen mouse does not use OS fallback when global gate false", ref failed, MapFootprintPlaybackFullscreenMouseDoesNotUseOsFallbackWhenGlobalGateFalse);
+            Run("map footprint playback fullscreen capture clears click when global gate false", ref failed, MapFootprintPlaybackFullscreenCaptureClearsClickWhenGlobalGateFalse);
             Run("map footprint playback handles rate drag and input handoff", ref failed, MapFootprintPlaybackHandlesRateDragAndInputHandoff);
+            Run("map footprint playback paused progress display end stays stable", ref failed, MapFootprintPlaybackPausedProgressDisplayEndStaysStable);
             Run("map footprint playback draw plan slices current line", ref failed, MapFootprintPlaybackDrawPlanSlicesCurrentLine);
             Run("player-world footprints diagnostics written to snapshot", ref failed, PlayerWorldFootprintsDiagnosticsWrittenToSnapshot);
             Run("map fullscreen jump target clamps position and scale", ref failed, MapFullscreenJumpTargetClampsPositionAndScale);
@@ -1968,6 +1976,20 @@ namespace JueMingZ.Tests
             {
                 failed++;
                 Console.WriteLine("FAIL " + name + ": " + error.Message);
+            }
+        }
+
+        private static void RunExpectedFailure(string name, ref int failed, Action test)
+        {
+            try
+            {
+                test();
+                failed++;
+                Console.WriteLine("FAIL " + name + ": expected current implementation to fail this regression spec.");
+            }
+            catch (Exception error)
+            {
+                Console.WriteLine("PASS expected failure " + name + ": " + error.Message);
             }
         }
 

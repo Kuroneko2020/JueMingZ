@@ -1524,6 +1524,7 @@ function Test-MapQuickAnnouncementGovernance {
         "src/JueMingZ/Automation/MapEnhancement/MapCustomMarkerInteractionService.cs",
         "src/JueMingZ/Automation/Information/MapQuickAnnouncementRuntimeService.cs",
         "src/JueMingZ/Automation/Search/SearchItemPickRuntimeService.cs",
+        "src/JueMingZ/UI/MapFootprintPlaybackOverlay.cs",
         "src/JueMingZ/UI/UiMouseCaptureService.cs",
         "src/JueMingZ/Compat/TerrariaUiMouseCompat.cs"
     )
@@ -1558,7 +1559,7 @@ function Test-MapQuickAnnouncementGovernance {
         Write-FailHealth "Controlled UI mouse consume path changed; unexpected=$($unexpectedConsumePaths -join ', ') missing=$($missingConsumePaths -join ', ')"
     }
     else {
-        Write-Pass "Controlled UI mouse input consumption remains centralized in approved runtime services, UI capture service, and Terraria UI compat."
+        Write-Pass "Controlled UI mouse input consumption remains centralized in approved runtime services, fullscreen overlays, UI capture service, and Terraria UI compat."
     }
 
     $actionsRoot = Join-Path $RepoRoot "src\JueMingZ\Actions"
@@ -2145,6 +2146,7 @@ function Test-MapFootprintGovernance {
     $mapLayerInstallerPath = Join-Path $RepoRoot "src\JueMingZ\Hooks\PlayerWorldFootprintMapLayerInstaller.cs"
     $overlayInstallerPath = Join-Path $RepoRoot "src\JueMingZ\Hooks\MapFootprintFullscreenOverlayInstaller.cs"
     $overlayPath = Join-Path $RepoRoot "src\JueMingZ\UI\MapFootprintPlaybackOverlay.cs"
+    $diagnosticMouseReaderPath = Join-Path $RepoRoot "src\JueMingZ\UI\DiagnosticMouseStateReader.cs"
     $uiMouseCaptureServicePath = Join-Path $RepoRoot "src\JueMingZ\UI\UiMouseCaptureService.cs"
     $hookInstallerPath = Join-Path $RepoRoot "src\JueMingZ\Bootstrap\HookInstaller.cs"
     $handlerPath = Join-Path $RepoRoot "src\JueMingZ\Input\LegacyUiActionService.MapEnhancementHandlers.cs"
@@ -2175,6 +2177,7 @@ function Test-MapFootprintGovernance {
     $mapLayerInstallerText = Read-TextIfExists -Path $mapLayerInstallerPath
     $overlayInstallerText = Read-TextIfExists -Path $overlayInstallerPath
     $overlayText = Read-TextIfExists -Path $overlayPath
+    $diagnosticMouseReaderText = Read-TextIfExists -Path $diagnosticMouseReaderPath
     $uiMouseCaptureServiceText = Read-TextIfExists -Path $uiMouseCaptureServicePath
     $hookInstallerText = Read-TextIfExists -Path $hookInstallerPath
     $handlerText = Read-TextIfExists -Path $handlerPath
@@ -2186,7 +2189,7 @@ function Test-MapFootprintGovernance {
     $featureDocText = Read-TextIfExists -Path $featureDocPath
     $diagnosticRulesText = Read-TextIfExists -Path $diagnosticRulesPath
 
-    if ($null -eq $registrarText -or $null -eq $featureIdsText -or $null -eq $appSettingsText -or $null -eq $configServiceText -or $null -eq $settingsSnapshotText -or $null -eq $settingsSnapshotProviderText -or $null -eq $runtimeText -or $null -eq $rootText -or $null -eq $modelsText -or $null -eq $storeText -or $null -eq $cacheText -or $null -eq $serviceText -or $null -eq $diagnosticsText -or $null -eq $renderCacheText -or $null -eq $playbackStateText -or $null -eq $mapLayerText -or $null -eq $mapLayerInstallerText -or $null -eq $overlayInstallerText -or $null -eq $overlayText -or $null -eq $uiMouseCaptureServiceText -or $null -eq $hookInstallerText -or $null -eq $handlerText -or $null -eq $snapshotText -or $null -eq $snapshotWriterText -or $null -eq $snapshotBuilderText -or $null -eq $testText -or $null -eq $programText -or $null -eq $featureDocText -or $null -eq $diagnosticRulesText) {
+    if ($null -eq $registrarText -or $null -eq $featureIdsText -or $null -eq $appSettingsText -or $null -eq $configServiceText -or $null -eq $settingsSnapshotText -or $null -eq $settingsSnapshotProviderText -or $null -eq $runtimeText -or $null -eq $rootText -or $null -eq $modelsText -or $null -eq $storeText -or $null -eq $cacheText -or $null -eq $serviceText -or $null -eq $diagnosticsText -or $null -eq $renderCacheText -or $null -eq $playbackStateText -or $null -eq $mapLayerText -or $null -eq $mapLayerInstallerText -or $null -eq $overlayInstallerText -or $null -eq $overlayText -or $null -eq $diagnosticMouseReaderText -or $null -eq $uiMouseCaptureServiceText -or $null -eq $hookInstallerText -or $null -eq $handlerText -or $null -eq $snapshotText -or $null -eq $snapshotWriterText -or $null -eq $snapshotBuilderText -or $null -eq $testText -or $null -eq $programText -or $null -eq $featureDocText -or $null -eq $diagnosticRulesText) {
         Write-FailHealth "Map footprints registrar, config, runtime, store/cache/service, render/playback, diagnostics, docs, and tests must exist as separate responsibilities."
         return
     }
@@ -2280,22 +2283,38 @@ function Test-MapFootprintGovernance {
         $renderCacheText.Contains("PlayerWorldFootprintCache.ReadForPair") -and
         $renderCacheText.Contains("BuildDrawPlan") -and
         $renderCacheText.Contains("cursorTicks") -and
+        $renderCacheText.Contains("pendingStart = end;") -and
+        $renderCacheText.Contains("TryClipLineToScreen") -and
+        $renderCacheText.Contains("ClipLineParameter") -and
         $renderCacheText.Contains("MapFootprintsDisplayEnabled") -and
         -not $renderCacheText.Contains("TryWriteJson") -and
         -not $renderCacheText.Contains("SaveForPair") -and
         -not $renderCacheText.Contains("PlayerWorldFootprintStore") -and
         $testText.Contains("MapFootprintRenderCacheBuildsLinesWithoutCrossSegmentConnection") -and
         $testText.Contains("MapFootprintRenderDrawPlanCullsThinsAndLimits") -and
+        $testText.Contains("MapFootprintRenderDrawPlanAdvancesAfterCulledLine") -and
+        $testText.Contains("MapFootprintRenderDrawPlanRejectsUnclippedReentryLongLineSpec") -and
+        $testText.Contains("MapFootprintRenderDrawPlanClipsViewportEdges") -and
+        -not $programText.Contains('RunExpectedFailure("map footprint render draw plan rejects unclipped reentry long line"') -and
         $testText.Contains("MapFootprintPlaybackDrawPlanSlicesCurrentLine")) {
-        Write-Pass "Map footprints render cache stays read-only, display-gated, and covered for cull/thin/limit/time-slice drawing."
+        Write-Pass "Map footprints render cache stays read-only, display-gated, clips screen-space draw commands, advances culled draw starts, and covers cull/thin/limit/time-slice drawing."
     }
     else {
-        Write-FailHealth "Map footprints render cache must only read in-memory/cache snapshots, keep cursor time-slice draw planning, and avoid JSON/store writes."
+        Write-FailHealth "Map footprints render cache must only read in-memory/cache snapshots, clip screen-space draw commands, advance pending starts after culled lines, keep cursor time-slice draw planning, and avoid JSON/store writes."
     }
 
     if ($mapLayerText.Contains("MapFootprintRenderCache.GetSnapshot") -and
         $mapLayerText.Contains("MapFootprintRenderCache.BuildDrawPlan") -and
         $mapLayerText.Contains("PlayerWorldFootprintDiagnostics.RecordMapDraw") -and
+        $mapLayerText.Contains("PlayerWorldFootprintDiagnostics.RecordMapDrawDetail") -and
+        $mapLayerText.Contains("BuildDrawDiagnostics") -and
+        $mapLayerText.Contains("LineThicknessPixels = 1f") -and
+        $mapLayerText.Contains("MagicPixelSourceRectangle") -and
+        $mapLayerText.Contains("new Rectangle(0, 0, 1, 1)") -and
+        $mapLayerText.Contains("MagicPixel asset is 1x1000") -and
+        $mapLayerText.Contains("MagicPixelSourceRectangle,") -and
+        -not $mapLayerText.Contains("command.Start,`r`n                null,") -and
+        -not $mapLayerText.Contains("command.Start,`n                null,") -and
         $mapLayerText.Contains("MapFootprintRenderCache.DefaultMaxDrawnLines") -and
         $mapLayerText.Contains("MapFootprintRenderCache.DefaultMinDrawPixelStep") -and
         $renderCacheText.Contains("DefaultMaxDrawnLines = 6000") -and
@@ -2303,39 +2322,59 @@ function Test-MapFootprintGovernance {
         -not $mapLayerText.Contains("TryWriteJson") -and
         -not $mapLayerText.Contains("PlayerWorldFootprintStore") -and
         -not $mapLayerText.Contains("PlayerWorldFootprintCache.Read")) {
-        Write-Pass "Map footprint map layer draws from render cache with cull/thin/limit diagnostics and no JSON/store reads."
+        Write-Pass "Map footprint map layer draws from render cache with 1px lines, 1x1 MagicPixel source crop, cull/thin/limit diagnostics, and no JSON/store reads."
     }
     else {
-        Write-FailHealth "PlayerWorldFootprintMapLayer must draw only from render cache, keep draw limits, and avoid JSON/store/cache file reads."
+        Write-FailHealth "PlayerWorldFootprintMapLayer must draw only from render cache, keep 1px footprint lines, crop MagicPixel to a 1x1 source rectangle, keep draw limits, and avoid JSON/store/cache file reads."
     }
 
     if ($overlayInstallerText.Contains("Main.OnPostFullscreenMapDraw") -and
         $overlayText.Contains("DrawFullscreenMapLayer") -and
         $overlayText.Contains("UpdatePrefixGuard") -and
         $hookInstallerText.Contains("MapFootprintPlaybackOverlay.UpdatePrefixGuard") -and
-        $overlayText.Contains("MapFootprintPlaybackState.CalculateLayout(TerrariaMainCompat.ScreenWidth, TerrariaMainCompat.ScreenHeight)") -and
+        $overlayText.Contains("ReadFullscreenUiFrame(true)") -and
+        $overlayText.Contains("ReadFullscreenUiFrame(false)") -and
+        $overlayText.Contains("BuildFullscreenUiFrame") -and
+        $overlayText.Contains("/FullscreenUi") -and
+        -not $overlayText.Contains("LegacyUiInput.ReadMouse()") -and
         $playbackStateText.Contains("var safeWidth = Math.Max(1, screenWidth)") -and
         $playbackStateText.Contains("var safeHeight = Math.Max(1, screenHeight)") -and
         $playbackStateText.Contains("safeHeight - bottomMargin - height") -and
         -not $overlayText.Contains("MapOverlayDrawContext") -and
         -not $playbackStateText.Contains("MapOverlayDrawContext") -and
-        $testText.Contains("MapFootprintPlaybackDefaultsToLatestPausedAndScreenSpaceLayout")) {
-        Write-Pass "Map footprint playback overlay stays fullscreen screen-space and bottom-safe-margin based."
+        $testText.Contains("MapFootprintPlaybackDefaultsToLatestPausedAndScreenSpaceLayout") -and
+        $testText.Contains("MapFootprintPlaybackFullscreenUiScaleHitTestCapturesBar")) {
+        Write-Pass "Map footprint playback overlay stays fullscreen UI screen-space, UIScale-aware, and bottom-safe-margin based."
     }
     else {
-        Write-FailHealth "Map footprint playback UI must use OnPostFullscreenMapDraw plus screen-size layout, not map-content coordinates."
+        Write-FailHealth "Map footprint playback UI must use OnPostFullscreenMapDraw plus fullscreen UI-scale screen-size layout, not F5 base-logical or map-content coordinates."
     }
 
     if ($playbackStateText.Contains("interaction.MouseCaptured = hit.BarHovered || _dragging || (_lastLeftDown && leftReleased)") -and
         $playbackStateText.Contains("interaction.ScrollConsumed = interaction.MouseCaptured") -and
-        $overlayText.Contains("UiMouseCaptureService.ConsumeMouseTriggerForOperationWindow") -and
-        $overlayText.Contains("UiMouseCaptureService.ConsumeScrollForOperationWindow") -and
+        $playbackStateText.Contains("DisplayTimelineEndTicks") -and
+        $overlayText.Contains("ReadForFullscreenMapOverlay") -and
+        $overlayText.Contains("TerrariaUiMouseCompat.TryConsumeMouseTriggerInput") -and
+        $overlayText.Contains("TerrariaUiMouseCompat.TryMarkUiMouseCapture") -and
+        $overlayText.Contains("TerrariaUiMouseCompat.TryConsumeUiScroll") -and
+        $overlayText.Contains("raw.GameInputAvailable") -and
+        $overlayText.Contains("raw.TerrariaReadAvailable && raw.TerrariaLeftDown") -and
+        $diagnosticMouseReaderText.Contains("ReadForFullscreenMapOverlay") -and
+        $diagnosticMouseReaderText.Contains("FullscreenOverlayGateBypass") -and
+        $overlayText.Contains("CalculateTrackFilledWidth") -and
+        $overlayText.Contains("RecordPlaybackPrefixInput") -and
+        $overlayText.Contains("RecordPlaybackDrawInput") -and
         $uiMouseCaptureServiceText.Contains("TerrariaUiMouseCompat.TryConsumeMouseTriggerInput") -and
-        $testText.Contains("MapFootprintPlaybackHandlesRateDragAndInputHandoff")) {
-        Write-Pass "Map footprint playback input consumption remains limited to bar/drag hits through UiMouseCaptureService."
+        $testText.Contains("MapFootprintPlaybackHandlesRateDragAndInputHandoff") -and
+        $testText.Contains("MapFootprintPlaybackPausedProgressDisplayEndStaysStable") -and
+        $testText.Contains("MapFootprintPlaybackFullscreenMouseKeepsReadableClickWhenGlobalGateFalseSpec") -and
+        $testText.Contains("MapFootprintPlaybackFullscreenMouseDoesNotUseOsFallbackWhenGlobalGateFalse") -and
+        $testText.Contains("MapFootprintPlaybackFullscreenCaptureClearsClickWhenGlobalGateFalse") -and
+        -not $programText.Contains('RunExpectedFailure("map footprint playback fullscreen mouse keeps readable click when global gate false"')) {
+        Write-Pass "Map footprint playback input consumption remains limited to fullscreen bar/drag hits, gate-false Terraria mouse reads, and paused display progress uses a frozen visible timeline end."
     }
     else {
-        Write-FailHealth "Map footprint playback input must only capture bar/drag mouse and scroll through UiMouseCaptureService, with release handoff coverage."
+        Write-FailHealth "Map footprint playback input must only capture fullscreen bar/drag mouse and scroll, keep gate-false Terraria mouse reads without OS fallback, forbid expected-failure rollback, and preserve paused display-end coverage."
     }
 
     $footprintFiles = @($servicePath, $renderCachePath, $playbackStatePath, $mapLayerPath, $overlayPath, $mapLayerInstallerPath, $overlayInstallerPath, $diagnosticsPath, $storePath, $cachePath)
@@ -2399,6 +2438,51 @@ function Test-MapFootprintGovernance {
         "MapFootprintsDrawLimitSkippedLineCount",
         "MapFootprintsDrawLimitHit",
         "MapFootprintsLastDrawUtc",
+        "MapFootprintsDrawRoute",
+        "MapFootprintsDrawScreenWidth",
+        "MapFootprintsDrawScreenHeight",
+        "MapFootprintsDrawGameUpdateCount",
+        "MapFootprintsDrawMapFullscreenPosX",
+        "MapFootprintsDrawMapFullscreenPosY",
+        "MapFootprintsDrawMapFullscreenScale",
+        "MapFootprintsDrawTransformMapPositionX",
+        "MapFootprintsDrawTransformMapPositionY",
+        "MapFootprintsDrawTransformMapOffsetX",
+        "MapFootprintsDrawTransformMapOffsetY",
+        "MapFootprintsDrawTransformMapScale",
+        "MapFootprintsDrawTransformOpacity",
+        "MapFootprintsDrawCommandSampleCount",
+        "MapFootprintsDrawAbnormalLongLineCount",
+        "MapFootprintsDrawLongLineThresholdPixels",
+        "MapFootprintsDrawMaxLinePixels",
+        "MapFootprintsDrawMaxLineSegmentIndex",
+        "MapFootprintsDrawFirstSegmentIndex",
+        "MapFootprintsDrawFirstStartTileX",
+        "MapFootprintsDrawFirstStartTileY",
+        "MapFootprintsDrawFirstEndTileX",
+        "MapFootprintsDrawFirstEndTileY",
+        "MapFootprintsDrawFirstStartScreenX",
+        "MapFootprintsDrawFirstStartScreenY",
+        "MapFootprintsDrawFirstEndScreenX",
+        "MapFootprintsDrawFirstEndScreenY",
+        "MapFootprintsDrawLastSegmentIndex",
+        "MapFootprintsDrawLastStartTileX",
+        "MapFootprintsDrawLastStartTileY",
+        "MapFootprintsDrawLastEndTileX",
+        "MapFootprintsDrawLastEndTileY",
+        "MapFootprintsDrawLastStartScreenX",
+        "MapFootprintsDrawLastStartScreenY",
+        "MapFootprintsDrawLastEndScreenX",
+        "MapFootprintsDrawLastEndScreenY",
+        "MapFootprintsDrawLongestSegmentIndex",
+        "MapFootprintsDrawLongestStartTileX",
+        "MapFootprintsDrawLongestStartTileY",
+        "MapFootprintsDrawLongestEndTileX",
+        "MapFootprintsDrawLongestEndTileY",
+        "MapFootprintsDrawLongestStartScreenX",
+        "MapFootprintsDrawLongestStartScreenY",
+        "MapFootprintsDrawLongestEndScreenX",
+        "MapFootprintsDrawLongestEndScreenY",
         "MapFootprintsPlaybackOverlayStatus",
         "MapFootprintsPlaybackOverlayMessage",
         "MapFootprintsPlaybackPairId",
@@ -2413,7 +2497,45 @@ function Test-MapFootprintGovernance {
         "MapFootprintsPlaybackMouseCaptured",
         "MapFootprintsPlaybackBarHovered",
         "MapFootprintsPlaybackLastInteraction",
-        "MapFootprintsPlaybackLastUpdateUtc"
+        "MapFootprintsPlaybackLastUpdateUtc",
+        "MapFootprintsPlaybackPrefixHitTarget",
+        "MapFootprintsPlaybackPrefixMouseReadMode",
+        "MapFootprintsPlaybackPrefixMouseX",
+        "MapFootprintsPlaybackPrefixMouseY",
+        "MapFootprintsPlaybackPrefixMouseReadAvailable",
+        "MapFootprintsPlaybackPrefixBarHovered",
+        "MapFootprintsPlaybackPrefixMouseCaptured",
+        "MapFootprintsPlaybackPrefixClickConsumed",
+        "MapFootprintsPlaybackPrefixScrollConsumed",
+        "MapFootprintsPlaybackPrefixLeftDown",
+        "MapFootprintsPlaybackPrefixLeftPressed",
+        "MapFootprintsPlaybackPrefixLeftReleased",
+        "MapFootprintsPlaybackPrefixScrollDelta",
+        "MapFootprintsPlaybackPrefixGameUpdateCount",
+        "MapFootprintsPlaybackPrefixMainMouseLeftBefore",
+        "MapFootprintsPlaybackPrefixMainMouseLeftAfter",
+        "MapFootprintsPlaybackPrefixMainMouseLeftReleaseBefore",
+        "MapFootprintsPlaybackPrefixMainMouseLeftReleaseAfter",
+        "MapFootprintsPlaybackPrefixMainMouseInterfaceBefore",
+        "MapFootprintsPlaybackPrefixMainMouseInterfaceAfter",
+        "MapFootprintsPlaybackPrefixMainBlockMouseBefore",
+        "MapFootprintsPlaybackPrefixMainBlockMouseAfter",
+        "MapFootprintsPlaybackPrefixPlayerMouseInterfaceBefore",
+        "MapFootprintsPlaybackPrefixPlayerMouseInterfaceAfter",
+        "MapFootprintsPlaybackPrefixUtc",
+        "MapFootprintsPlaybackDrawHitTarget",
+        "MapFootprintsPlaybackDrawMouseReadMode",
+        "MapFootprintsPlaybackDrawMouseX",
+        "MapFootprintsPlaybackDrawMouseY",
+        "MapFootprintsPlaybackDrawMouseReadAvailable",
+        "MapFootprintsPlaybackDrawBarHovered",
+        "MapFootprintsPlaybackDrawMainMouseLeft",
+        "MapFootprintsPlaybackDrawMainMouseLeftRelease",
+        "MapFootprintsPlaybackDrawMainMouseInterface",
+        "MapFootprintsPlaybackDrawMainBlockMouse",
+        "MapFootprintsPlaybackDrawPlayerMouseInterface",
+        "MapFootprintsPlaybackDrawGameUpdateCount",
+        "MapFootprintsPlaybackDrawUtc"
     )
     $missingDiagnosticFields = @()
     foreach ($field in $requiredDiagnosticFields) {
@@ -2427,14 +2549,28 @@ function Test-MapFootprintGovernance {
     if ($diagnosticsText.Contains("RecordRuntime") -and
         $diagnosticsText.Contains("RecordRenderCache") -and
         $diagnosticsText.Contains("RecordMapDraw") -and
+        $diagnosticsText.Contains("RecordMapDrawDetail") -and
         $diagnosticsText.Contains("RecordPlaybackOverlay") -and
+        $diagnosticsText.Contains("RecordPlaybackPrefixInput") -and
+        $diagnosticsText.Contains("RecordPlaybackDrawInput") -and
         $missingDiagnosticFields.Count -eq 0 -and
         $testText.Contains("PlayerWorldFootprintsDiagnosticsWrittenToSnapshot") -and
+        $testText.Contains("MapFootprintsDrawLongLineThresholdPixels") -and
+        $testText.Contains("MapFootprintsDrawLongestStartTileX") -and
+        $testText.Contains("MapFootprintsDrawLongestStartScreenX") -and
+        $testText.Contains("MapFootprintsPlaybackPrefixMouseReadMode") -and
+        $testText.Contains("FullscreenOverlayGateBypass/FullscreenUi") -and
+        $testText.Contains("MapFootprintsPlaybackPrefixMouseReadAvailable") -and
+        $testText.Contains("MapFootprintsPlaybackPrefixMainMouseLeftAfter") -and
+        $testText.Contains("MapFootprintsPlaybackPrefixMainMouseLeftReleaseAfter") -and
+        $testText.Contains("MapFootprintsPlaybackDrawMouseReadMode") -and
+        $testText.Contains("MapFootprintsPlaybackDrawMouseReadAvailable") -and
+        $testText.Contains("MapFootprintsPlaybackDrawGameUpdateCount") -and
         $programText.Contains("player-world footprints diagnostics written to snapshot")) {
         Write-Pass "Map footprints recorder/render/playback diagnostics reach runtime snapshot JSON and console coverage."
     }
     else {
-        Write-FailHealth "Map footprints diagnostics must expose recorder, render, draw, and playback fields through DiagnosticSnapshot, JSON writer, builder, and tests. Missing=$($missingDiagnosticFields -join ', ')"
+        Write-FailHealth "Map footprints diagnostics must expose recorder, render, draw, and playback fields through DiagnosticSnapshot, JSON writer, builder, and JSON-focused tests. Missing=$($missingDiagnosticFields -join ', ')"
     }
 
     if ($featureDocText.Contains("MapFootprintsDisplayEnabled") -and
@@ -2442,9 +2578,21 @@ function Test-MapFootprintGovernance {
         $featureDocText.Contains("记录服务不读取该开关") -and
         $featureDocText.Contains("PlayerWorldFootprintsLastDecision") -and
         $featureDocText.Contains("MapFootprintsPlaybackProgress") -and
+        $featureDocText.Contains("MapFootprintsDrawMaxLinePixels") -and
+        $featureDocText.Contains("draw command 的 screen start/end 是裁剪后的最终绘制端点") -and
+        $featureDocText.Contains("tile start/end 仍保留原始缓存线段端点") -and
+        $featureDocText.Contains("MapFootprintsPlaybackDrawMouseReadMode") -and
+        $featureDocText.Contains("MapFootprintsPlaybackDrawMainMouseLeftRelease") -and
+        $featureDocText.Contains("FullscreenOverlayGateBypass") -and
         $featureDocText.Contains("Draw、UI 和 cache 读取路径不得写 JSON") -and
         $diagnosticRulesText.Contains("PlayerWorldFootprintsLastDecision") -and
         $diagnosticRulesText.Contains("MapFootprintsPlaybackProgress") -and
+        $diagnosticRulesText.Contains("MapFootprintsDrawMaxLinePixels") -and
+        $diagnosticRulesText.Contains("screen 坐标表示最终裁剪后的 draw command 端点") -and
+        $diagnosticRulesText.Contains("tile 坐标仍保留原始缓存线段端点") -and
+        $diagnosticRulesText.Contains("MapFootprintsPlaybackPrefixMainMouseLeftAfter") -and
+        $diagnosticRulesText.Contains("MapFootprintsPlaybackDrawMouseReadMode") -and
+        $diagnosticRulesText.Contains("FullscreenOverlayGateBypass") -and
         $diagnosticRulesText.Contains("display-only") -and
         $diagnosticRulesText.Contains("inputUiStillRecording")) {
         Write-Pass "Map footprints feature and diagnostics docs explain display-only recording, snapshot fields, draw/UI boundaries, and decision meanings."

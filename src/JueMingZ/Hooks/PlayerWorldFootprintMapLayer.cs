@@ -14,7 +14,9 @@ namespace JueMingZ.Hooks
 {
     internal sealed class PlayerWorldFootprintMapLayer : IMapLayer
     {
-        private const float LineThicknessPixels = 2f;
+        private const float LineThicknessPixels = 1f;
+        private const string DrawDiagnosticsRoute = "mapLayer";
+        private static readonly Rectangle MagicPixelSourceRectangle = new Rectangle(0, 0, 1, 1);
         private static readonly object TransformFieldSyncRoot = new object();
         private static bool _transformFieldsResolved;
         private static FieldInfo _mapPositionField;
@@ -77,6 +79,10 @@ namespace JueMingZ.Hooks
                 plan.ThinnedLineCount,
                 plan.DrawLimitSkippedLineCount,
                 plan.DrawLimitHit);
+            if (string.Equals(plan.Status, "ready", StringComparison.Ordinal))
+            {
+                PlayerWorldFootprintDiagnostics.RecordMapDrawDetail(BuildDrawDiagnostics(plan, transform, screen));
+            }
         }
 
         private static bool TryGetMagicPixel(out Texture2D pixel)
@@ -115,10 +121,11 @@ namespace JueMingZ.Hooks
 
             var alpha = Math.Max(0f, Math.Min(1f, opacity));
             var color = new Color(48, 255, 96, 220) * alpha;
+            // Terraria's MagicPixel asset is 1x1000; crop it to one pixel so scale.Y remains the actual line thickness.
             Main.spriteBatch.Draw(
                 pixel,
                 command.Start,
-                null,
+                MagicPixelSourceRectangle,
                 color,
                 (float)Math.Atan2(delta.Y, delta.X),
                 new Vector2(0f, 0.5f),
@@ -186,6 +193,133 @@ namespace JueMingZ.Hooks
                        _mapScaleField != null &&
                        _opacityField != null;
             }
+        }
+
+        private static MapFootprintDrawDiagnosticsData BuildDrawDiagnostics(
+            MapFootprintDrawPlan plan,
+            MapFootprintDrawTransform transform,
+            Rectangle screen)
+        {
+            var data = new MapFootprintDrawDiagnosticsData
+            {
+                Route = DrawDiagnosticsRoute,
+                ScreenWidth = screen.Width,
+                ScreenHeight = screen.Height,
+                MapFullscreenPosX = Main.mapFullscreenPos.X,
+                MapFullscreenPosY = Main.mapFullscreenPos.Y,
+                MapFullscreenScale = Main.mapFullscreenScale,
+                TransformMapPositionX = transform.MapPosition.X,
+                TransformMapPositionY = transform.MapPosition.Y,
+                TransformMapOffsetX = transform.MapOffset.X,
+                TransformMapOffsetY = transform.MapOffset.Y,
+                TransformMapScale = transform.MapScale,
+                TransformOpacity = transform.Opacity
+            };
+
+            ulong gameUpdateCount;
+            if (TerrariaMainCompat.TryReadGameUpdateCount(out gameUpdateCount))
+            {
+                data.GameUpdateCount = gameUpdateCount > long.MaxValue ? long.MaxValue : (long)gameUpdateCount;
+            }
+
+            var diagonal = Math.Sqrt((double)Math.Max(1, screen.Width) * Math.Max(1, screen.Width) +
+                                     (double)Math.Max(1, screen.Height) * Math.Max(1, screen.Height));
+            var longLineThreshold = Math.Max(512d, diagonal * 0.90d);
+            data.LongLineThresholdPixels = longLineThreshold;
+
+            var commands = plan == null ? null : plan.Commands;
+            if (commands == null || commands.Length <= 0)
+            {
+                return data;
+            }
+
+            data.CommandSampleCount = commands.Length;
+            ApplyCommandSample(commands[0], "first", data);
+            ApplyCommandSample(commands[commands.Length - 1], "last", data);
+
+            var maxLength = 0d;
+            MapFootprintDrawCommand longest = null;
+            for (var index = 0; index < commands.Length; index++)
+            {
+                var command = commands[index];
+                if (command == null)
+                {
+                    continue;
+                }
+
+                var length = (command.End - command.Start).Length();
+                if (float.IsNaN(length) || float.IsInfinity(length))
+                {
+                    data.AbnormalLongLineCount++;
+                    continue;
+                }
+
+                if (length >= longLineThreshold)
+                {
+                    data.AbnormalLongLineCount++;
+                }
+
+                if (length > maxLength)
+                {
+                    maxLength = length;
+                    longest = command;
+                }
+            }
+
+            data.MaxLinePixels = maxLength;
+            if (longest != null)
+            {
+                data.MaxLineSegmentIndex = longest.SegmentIndex;
+                ApplyCommandSample(longest, "longest", data);
+            }
+
+            return data;
+        }
+
+        private static void ApplyCommandSample(MapFootprintDrawCommand command, string slot, MapFootprintDrawDiagnosticsData data)
+        {
+            if (command == null || data == null)
+            {
+                return;
+            }
+
+            if (string.Equals(slot, "first", StringComparison.Ordinal))
+            {
+                data.FirstSegmentIndex = command.SegmentIndex;
+                data.FirstStartTileX = command.StartTileX;
+                data.FirstStartTileY = command.StartTileY;
+                data.FirstEndTileX = command.EndTileX;
+                data.FirstEndTileY = command.EndTileY;
+                data.FirstStartScreenX = command.Start.X;
+                data.FirstStartScreenY = command.Start.Y;
+                data.FirstEndScreenX = command.End.X;
+                data.FirstEndScreenY = command.End.Y;
+                return;
+            }
+
+            if (string.Equals(slot, "last", StringComparison.Ordinal))
+            {
+                data.LastSegmentIndex = command.SegmentIndex;
+                data.LastStartTileX = command.StartTileX;
+                data.LastStartTileY = command.StartTileY;
+                data.LastEndTileX = command.EndTileX;
+                data.LastEndTileY = command.EndTileY;
+                data.LastStartScreenX = command.Start.X;
+                data.LastStartScreenY = command.Start.Y;
+                data.LastEndScreenX = command.End.X;
+                data.LastEndScreenY = command.End.Y;
+                return;
+            }
+
+            data.LongestSegmentIndex = command.SegmentIndex;
+            data.LongestStartTileX = command.StartTileX;
+            data.LongestStartTileY = command.StartTileY;
+            data.LongestEndTileX = command.EndTileX;
+            data.LongestEndTileY = command.EndTileY;
+            data.LongestStartScreenX = command.Start.X;
+            data.LongestStartScreenY = command.Start.Y;
+            data.LongestEndScreenX = command.End.X;
+            data.LongestEndScreenY = command.End.Y;
         }
     }
 }

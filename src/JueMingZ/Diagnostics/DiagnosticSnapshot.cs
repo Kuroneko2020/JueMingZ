@@ -202,6 +202,51 @@ namespace JueMingZ.Diagnostics
         public int MapFootprintsDrawLimitSkippedLineCount { get; set; }
         public bool MapFootprintsDrawLimitHit { get; set; }
         public DateTime? MapFootprintsLastDrawUtc { get; set; }
+        public string MapFootprintsDrawRoute { get; set; }
+        public int MapFootprintsDrawScreenWidth { get; set; }
+        public int MapFootprintsDrawScreenHeight { get; set; }
+        public long MapFootprintsDrawGameUpdateCount { get; set; }
+        public double MapFootprintsDrawMapFullscreenPosX { get; set; }
+        public double MapFootprintsDrawMapFullscreenPosY { get; set; }
+        public double MapFootprintsDrawMapFullscreenScale { get; set; }
+        public double MapFootprintsDrawTransformMapPositionX { get; set; }
+        public double MapFootprintsDrawTransformMapPositionY { get; set; }
+        public double MapFootprintsDrawTransformMapOffsetX { get; set; }
+        public double MapFootprintsDrawTransformMapOffsetY { get; set; }
+        public double MapFootprintsDrawTransformMapScale { get; set; }
+        public double MapFootprintsDrawTransformOpacity { get; set; }
+        public int MapFootprintsDrawCommandSampleCount { get; set; }
+        public int MapFootprintsDrawAbnormalLongLineCount { get; set; }
+        public double MapFootprintsDrawLongLineThresholdPixels { get; set; }
+        public double MapFootprintsDrawMaxLinePixels { get; set; }
+        public int MapFootprintsDrawMaxLineSegmentIndex { get; set; }
+        public int MapFootprintsDrawFirstSegmentIndex { get; set; }
+        public double MapFootprintsDrawFirstStartTileX { get; set; }
+        public double MapFootprintsDrawFirstStartTileY { get; set; }
+        public double MapFootprintsDrawFirstEndTileX { get; set; }
+        public double MapFootprintsDrawFirstEndTileY { get; set; }
+        public double MapFootprintsDrawFirstStartScreenX { get; set; }
+        public double MapFootprintsDrawFirstStartScreenY { get; set; }
+        public double MapFootprintsDrawFirstEndScreenX { get; set; }
+        public double MapFootprintsDrawFirstEndScreenY { get; set; }
+        public int MapFootprintsDrawLastSegmentIndex { get; set; }
+        public double MapFootprintsDrawLastStartTileX { get; set; }
+        public double MapFootprintsDrawLastStartTileY { get; set; }
+        public double MapFootprintsDrawLastEndTileX { get; set; }
+        public double MapFootprintsDrawLastEndTileY { get; set; }
+        public double MapFootprintsDrawLastStartScreenX { get; set; }
+        public double MapFootprintsDrawLastStartScreenY { get; set; }
+        public double MapFootprintsDrawLastEndScreenX { get; set; }
+        public double MapFootprintsDrawLastEndScreenY { get; set; }
+        public int MapFootprintsDrawLongestSegmentIndex { get; set; }
+        public double MapFootprintsDrawLongestStartTileX { get; set; }
+        public double MapFootprintsDrawLongestStartTileY { get; set; }
+        public double MapFootprintsDrawLongestEndTileX { get; set; }
+        public double MapFootprintsDrawLongestEndTileY { get; set; }
+        public double MapFootprintsDrawLongestStartScreenX { get; set; }
+        public double MapFootprintsDrawLongestStartScreenY { get; set; }
+        public double MapFootprintsDrawLongestEndScreenX { get; set; }
+        public double MapFootprintsDrawLongestEndScreenY { get; set; }
         public string MapFootprintsPlaybackOverlayStatus { get; set; }
         public string MapFootprintsPlaybackOverlayMessage { get; set; }
         public string MapFootprintsPlaybackPairId { get; set; }
@@ -217,6 +262,44 @@ namespace JueMingZ.Diagnostics
         public bool MapFootprintsPlaybackBarHovered { get; set; }
         public string MapFootprintsPlaybackLastInteraction { get; set; }
         public DateTime? MapFootprintsPlaybackLastUpdateUtc { get; set; }
+        public string MapFootprintsPlaybackPrefixHitTarget { get; set; }
+        public string MapFootprintsPlaybackPrefixMouseReadMode { get; set; }
+        public int MapFootprintsPlaybackPrefixMouseX { get; set; }
+        public int MapFootprintsPlaybackPrefixMouseY { get; set; }
+        public bool MapFootprintsPlaybackPrefixMouseReadAvailable { get; set; }
+        public bool MapFootprintsPlaybackPrefixBarHovered { get; set; }
+        public bool MapFootprintsPlaybackPrefixMouseCaptured { get; set; }
+        public bool MapFootprintsPlaybackPrefixClickConsumed { get; set; }
+        public bool MapFootprintsPlaybackPrefixScrollConsumed { get; set; }
+        public bool MapFootprintsPlaybackPrefixLeftDown { get; set; }
+        public bool MapFootprintsPlaybackPrefixLeftPressed { get; set; }
+        public bool MapFootprintsPlaybackPrefixLeftReleased { get; set; }
+        public int MapFootprintsPlaybackPrefixScrollDelta { get; set; }
+        public long MapFootprintsPlaybackPrefixGameUpdateCount { get; set; }
+        public bool MapFootprintsPlaybackPrefixMainMouseLeftBefore { get; set; }
+        public bool MapFootprintsPlaybackPrefixMainMouseLeftAfter { get; set; }
+        public bool MapFootprintsPlaybackPrefixMainMouseLeftReleaseBefore { get; set; }
+        public bool MapFootprintsPlaybackPrefixMainMouseLeftReleaseAfter { get; set; }
+        public bool MapFootprintsPlaybackPrefixMainMouseInterfaceBefore { get; set; }
+        public bool MapFootprintsPlaybackPrefixMainMouseInterfaceAfter { get; set; }
+        public bool MapFootprintsPlaybackPrefixMainBlockMouseBefore { get; set; }
+        public bool MapFootprintsPlaybackPrefixMainBlockMouseAfter { get; set; }
+        public bool MapFootprintsPlaybackPrefixPlayerMouseInterfaceBefore { get; set; }
+        public bool MapFootprintsPlaybackPrefixPlayerMouseInterfaceAfter { get; set; }
+        public DateTime? MapFootprintsPlaybackPrefixUtc { get; set; }
+        public string MapFootprintsPlaybackDrawHitTarget { get; set; }
+        public string MapFootprintsPlaybackDrawMouseReadMode { get; set; }
+        public int MapFootprintsPlaybackDrawMouseX { get; set; }
+        public int MapFootprintsPlaybackDrawMouseY { get; set; }
+        public bool MapFootprintsPlaybackDrawMouseReadAvailable { get; set; }
+        public bool MapFootprintsPlaybackDrawBarHovered { get; set; }
+        public bool MapFootprintsPlaybackDrawMainMouseLeft { get; set; }
+        public bool MapFootprintsPlaybackDrawMainMouseLeftRelease { get; set; }
+        public bool MapFootprintsPlaybackDrawMainMouseInterface { get; set; }
+        public bool MapFootprintsPlaybackDrawMainBlockMouse { get; set; }
+        public bool MapFootprintsPlaybackDrawPlayerMouseInterface { get; set; }
+        public long MapFootprintsPlaybackDrawGameUpdateCount { get; set; }
+        public DateTime? MapFootprintsPlaybackDrawUtc { get; set; }
         public bool DiagnosticsOverlayVisible { get; set; }
         public long DrawCallCount { get; set; }
         public DateTime? LastDrawUtc { get; set; }
@@ -1174,11 +1257,20 @@ namespace JueMingZ.Diagnostics
             MapFootprintsLastDrawStatus = string.Empty;
             MapFootprintsLastDrawMessage = string.Empty;
             MapFootprintsLastDrawPairId = string.Empty;
+            MapFootprintsDrawRoute = string.Empty;
             MapFootprintsPlaybackOverlayStatus = string.Empty;
             MapFootprintsPlaybackOverlayMessage = string.Empty;
             MapFootprintsPlaybackPairId = string.Empty;
             MapFootprintsPlaybackRate = 1;
             MapFootprintsPlaybackLastInteraction = string.Empty;
+            MapFootprintsPlaybackPrefixHitTarget = string.Empty;
+            MapFootprintsPlaybackPrefixMouseReadMode = string.Empty;
+            MapFootprintsPlaybackPrefixMouseX = -1;
+            MapFootprintsPlaybackPrefixMouseY = -1;
+            MapFootprintsPlaybackDrawHitTarget = string.Empty;
+            MapFootprintsPlaybackDrawMouseReadMode = string.Empty;
+            MapFootprintsPlaybackDrawMouseX = -1;
+            MapFootprintsPlaybackDrawMouseY = -1;
             RunningActionKind = string.Empty;
             RunningActionSource = string.Empty;
             RunningActionStatus = string.Empty;

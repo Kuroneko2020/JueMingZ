@@ -20,6 +20,7 @@ namespace JueMingZ.Automation.MapEnhancement
         private static int _dataSignature;
         private static long _timelineStartTicks;
         private static long _timelineEndTicks;
+        private static long _displayTimelineEndTicks;
         private static string _lastInteraction = "hidden";
 
         public static MapFootprintPlaybackSnapshot Advance(
@@ -40,10 +41,12 @@ namespace JueMingZ.Automation.MapEnhancement
                 if (_isAtLatest)
                 {
                     _cursorTicks = latest;
+                    _displayTimelineEndTicks = latest;
                 }
 
                 if (!_paused && !_dragging)
                 {
+                    _displayTimelineEndTicks = latest;
                     var elapsedSeconds = _lastAdvanceUtc == DateTime.MinValue
                         ? 0d
                         : Math.Max(0d, (utcNow.ToUniversalTime() - _lastAdvanceUtc).TotalSeconds);
@@ -122,6 +125,7 @@ namespace JueMingZ.Automation.MapEnhancement
                     if (string.Equals(hit.Target, MapFootprintPlaybackHitTargets.PlayButton, StringComparison.Ordinal))
                     {
                         _paused = !_paused;
+                        _displayTimelineEndTicks = _timelineEndTicks;
                         _lastInteraction = _paused ? "pauseClicked" : "playClicked";
                         interaction.ClickConsumed = true;
                     }
@@ -135,6 +139,7 @@ namespace JueMingZ.Automation.MapEnhancement
                     {
                         _dragging = true;
                         _paused = true;
+                        _displayTimelineEndTicks = _timelineEndTicks;
                         SetCursorFromTrackXLocked(layout.Track, mouse.X);
                         _lastInteraction = "dragStarted";
                         interaction.ClickConsumed = true;
@@ -279,6 +284,7 @@ namespace JueMingZ.Automation.MapEnhancement
                 _dataSignature = 0;
                 _timelineStartTicks = 0L;
                 _timelineEndTicks = 0L;
+                _displayTimelineEndTicks = 0L;
                 _lastInteraction = "hidden";
             }
         }
@@ -305,6 +311,7 @@ namespace JueMingZ.Automation.MapEnhancement
                 _isAtLatest = true;
                 _dragging = false;
                 _lastLeftDown = false;
+                _displayTimelineEndTicks = timelineEnd;
                 _lastInteraction = "opened";
             }
             else if (dataChanged)
@@ -312,11 +319,23 @@ namespace JueMingZ.Automation.MapEnhancement
                 if (_isAtLatest)
                 {
                     _cursorTicks = timelineEnd;
+                    _displayTimelineEndTicks = timelineEnd;
                 }
                 else
                 {
                     _cursorTicks = ClampTicks(_cursorTicks, timelineStart, timelineEnd);
                     _isAtLatest = _cursorTicks >= timelineEnd;
+                    if (_isAtLatest || !_paused)
+                    {
+                        _displayTimelineEndTicks = timelineEnd;
+                    }
+                    else
+                    {
+                        _displayTimelineEndTicks = ClampTicks(
+                            Math.Max(_displayTimelineEndTicks, _cursorTicks),
+                            timelineStart,
+                            timelineEnd);
+                    }
                 }
             }
 
@@ -341,17 +360,18 @@ namespace JueMingZ.Automation.MapEnhancement
 
         private static void SetCursorFromTrackXLocked(LegacyUiRect track, int mouseX)
         {
-            var duration = Math.Max(0L, _timelineEndTicks - _timelineStartTicks);
+            var seekEnd = ResolveDisplayTimelineEndLocked(_timelineStartTicks, _timelineEndTicks, _cursorTicks);
+            var duration = Math.Max(0L, seekEnd - _timelineStartTicks);
             if (duration <= 0L || track.Width <= 0)
             {
-                _cursorTicks = _timelineEndTicks;
+                _cursorTicks = seekEnd;
                 _isAtLatest = true;
                 return;
             }
 
             var clampedX = ClampInt(mouseX, track.X, track.Right);
             var fraction = (clampedX - track.X) / (double)Math.Max(1, track.Width);
-            _cursorTicks = ClampTicks(_timelineStartTicks + (long)Math.Round(duration * fraction), _timelineStartTicks, _timelineEndTicks);
+            _cursorTicks = ClampTicks(_timelineStartTicks + (long)Math.Round(duration * fraction), _timelineStartTicks, seekEnd);
             _isAtLatest = _cursorTicks >= _timelineEndTicks;
         }
 
@@ -360,6 +380,7 @@ namespace JueMingZ.Automation.MapEnhancement
             var timelineStart = renderSnapshot == null ? _timelineStartTicks : Math.Max(0L, renderSnapshot.TimelineStartTicks);
             var timelineEnd = renderSnapshot == null ? _timelineEndTicks : Math.Max(timelineStart, renderSnapshot.TimelineEndTicks);
             var cursor = ClampTicks(_cursorTicks, timelineStart, timelineEnd);
+            var displayEnd = ResolveDisplayTimelineEndLocked(timelineStart, timelineEnd, cursor);
             return new MapFootprintPlaybackSnapshot
             {
                 Visible = _visible,
@@ -370,11 +391,34 @@ namespace JueMingZ.Automation.MapEnhancement
                 Dragging = _dragging,
                 TimelineStartTicks = timelineStart,
                 TimelineEndTicks = timelineEnd,
+                DisplayTimelineEndTicks = displayEnd,
                 PairId = renderSnapshot == null ? _pairId : renderSnapshot.PairId ?? string.Empty,
                 DataSignature = renderSnapshot == null ? _dataSignature : renderSnapshot.DataSignature,
                 Status = status ?? string.Empty,
                 LastInteraction = _lastInteraction ?? string.Empty
             };
+        }
+
+        private static long ResolveDisplayTimelineEndLocked(long timelineStart, long timelineEnd, long cursor)
+        {
+            if (timelineEnd < timelineStart)
+            {
+                timelineEnd = timelineStart;
+            }
+
+            if (!_paused || _isAtLatest || cursor >= timelineEnd)
+            {
+                return timelineEnd;
+            }
+
+            var displayEnd = _displayTimelineEndTicks <= 0L ? timelineEnd : _displayTimelineEndTicks;
+            displayEnd = ClampTicks(displayEnd, timelineStart, timelineEnd);
+            if (displayEnd < cursor)
+            {
+                displayEnd = cursor;
+            }
+
+            return displayEnd;
         }
 
         private static int NormalizeRate(int rate)
@@ -445,6 +489,7 @@ namespace JueMingZ.Automation.MapEnhancement
         public bool Dragging { get; set; }
         public long TimelineStartTicks { get; set; }
         public long TimelineEndTicks { get; set; }
+        public long DisplayTimelineEndTicks { get; set; }
         public string PairId { get; set; }
         public int DataSignature { get; set; }
         public string Status { get; set; }

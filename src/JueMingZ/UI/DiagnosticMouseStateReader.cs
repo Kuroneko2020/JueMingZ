@@ -13,8 +13,11 @@ namespace JueMingZ.UI
         private static readonly object ReadCacheSyncRoot = new object();
         private static bool _mainResolved;
         private static DiagnosticMouseState _cachedReadState;
+        private static DiagnosticMouseState _cachedFullscreenMapOverlayReadState;
         private static UiInputFrameKey _cachedFrameKey;
+        private static UiInputFrameKey _cachedFullscreenMapOverlayFrameKey;
         private static bool _cachedFrameKeyValid;
+        private static bool _cachedFullscreenMapOverlayFrameKeyValid;
         private static FieldInfo _mouseXField;
         private static FieldInfo _mouseYField;
         private static FieldInfo _mouseLeftField;
@@ -34,15 +37,34 @@ namespace JueMingZ.UI
 
         public static DiagnosticMouseState Read()
         {
+            return ReadCore(false);
+        }
+
+        internal static DiagnosticMouseState ReadForFullscreenMapOverlay()
+        {
+            return ReadCore(true);
+        }
+
+        private static DiagnosticMouseState ReadCore(bool preserveTerrariaInputWhenGateClosed)
+        {
             var frameKey = UiInputFrameClock.CurrentFrameKey;
             lock (ReadCacheSyncRoot)
             {
+                var cachedState = preserveTerrariaInputWhenGateClosed
+                    ? _cachedFullscreenMapOverlayReadState
+                    : _cachedReadState;
+                var cachedKey = preserveTerrariaInputWhenGateClosed
+                    ? _cachedFullscreenMapOverlayFrameKey
+                    : _cachedFrameKey;
+                var cachedKeyValid = preserveTerrariaInputWhenGateClosed
+                    ? _cachedFullscreenMapOverlayFrameKeyValid
+                    : _cachedFrameKeyValid;
                 if (frameKey.IsValid &&
-                    _cachedFrameKeyValid &&
-                    _cachedReadState != null &&
-                    _cachedFrameKey.Equals(frameKey))
+                    cachedKeyValid &&
+                    cachedState != null &&
+                    cachedKey.Equals(frameKey))
                 {
-                    return _cachedReadState;
+                    return cachedState;
                 }
             }
 
@@ -70,14 +92,27 @@ namespace JueMingZ.UI
 
             if (!state.GameInputAvailable)
             {
-                state.TerrariaLeftDown = false;
-                state.TerrariaLeftRelease = false;
+                if (!preserveTerrariaInputWhenGateClosed)
+                {
+                    state.TerrariaLeftDown = false;
+                    state.TerrariaLeftRelease = false;
+                }
+
                 state.OsLeftDown = false;
-                state.ScrollDelta = 0;
+                if (!preserveTerrariaInputWhenGateClosed ||
+                    !state.TerrariaScrollWheelAvailable)
+                {
+                    state.ScrollDelta = 0;
+                }
             }
 
             state.LastError = errors;
             state.ReadMode = BuildReadMode(state);
+            if (preserveTerrariaInputWhenGateClosed && !state.GameInputAvailable)
+            {
+                state.ReadMode += "/FullscreenOverlayGateBypass";
+            }
+
             if (!state.TerrariaReadAvailable &&
                 !state.OsReadAvailable &&
                 string.IsNullOrWhiteSpace(state.LastError))
@@ -89,15 +124,33 @@ namespace JueMingZ.UI
             {
                 if (frameKey.IsValid)
                 {
-                    _cachedReadState = state;
-                    _cachedFrameKey = frameKey;
-                    _cachedFrameKeyValid = true;
+                    if (preserveTerrariaInputWhenGateClosed)
+                    {
+                        _cachedFullscreenMapOverlayReadState = state;
+                        _cachedFullscreenMapOverlayFrameKey = frameKey;
+                        _cachedFullscreenMapOverlayFrameKeyValid = true;
+                    }
+                    else
+                    {
+                        _cachedReadState = state;
+                        _cachedFrameKey = frameKey;
+                        _cachedFrameKeyValid = true;
+                    }
                 }
                 else
                 {
-                    _cachedReadState = null;
-                    _cachedFrameKey = UiInputFrameKey.None;
-                    _cachedFrameKeyValid = false;
+                    if (preserveTerrariaInputWhenGateClosed)
+                    {
+                        _cachedFullscreenMapOverlayReadState = null;
+                        _cachedFullscreenMapOverlayFrameKey = UiInputFrameKey.None;
+                        _cachedFullscreenMapOverlayFrameKeyValid = false;
+                    }
+                    else
+                    {
+                        _cachedReadState = null;
+                        _cachedFrameKey = UiInputFrameKey.None;
+                        _cachedFrameKeyValid = false;
+                    }
                 }
             }
 
@@ -109,8 +162,11 @@ namespace JueMingZ.UI
             lock (ReadCacheSyncRoot)
             {
                 _cachedReadState = null;
+                _cachedFullscreenMapOverlayReadState = null;
                 _cachedFrameKey = UiInputFrameKey.None;
+                _cachedFullscreenMapOverlayFrameKey = UiInputFrameKey.None;
                 _cachedFrameKeyValid = false;
+                _cachedFullscreenMapOverlayFrameKeyValid = false;
                 _mainResolved = false;
                 _mouseXField = null;
                 _mouseYField = null;

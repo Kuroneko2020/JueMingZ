@@ -19,20 +19,25 @@ namespace JueMingZ.UI
         {
             try
             {
+                var utcNow = DateTime.UtcNow;
                 var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
                 var visible = ShouldUseOverlay(Main.mapFullscreen, settings.MapFootprintsDisplayEnabled);
                 var snapshot = MapFootprintRenderCache.GetSnapshot();
-                MapFootprintPlaybackState.Advance(snapshot, visible, DateTime.UtcNow);
+                MapFootprintPlaybackState.Advance(snapshot, visible, utcNow);
                 if (!visible)
                 {
                     return;
                 }
 
-                var mouse = LegacyUiInput.ReadMouse();
-                var layout = MapFootprintPlaybackState.CalculateLayout(TerrariaMainCompat.ScreenWidth, TerrariaMainCompat.ScreenHeight);
-                var interaction = MapFootprintPlaybackState.HandleInput(layout, mouse, snapshot, visible, DateTime.UtcNow);
+                var frame = ReadFullscreenUiFrame(true);
+                var mouse = frame.Mouse;
+                var layout = MapFootprintPlaybackState.CalculateLayout(frame.ScreenWidth, frame.ScreenHeight);
+                var beforeCapture = CaptureMouseState();
+                var interaction = MapFootprintPlaybackState.HandleInput(layout, mouse, snapshot, visible, utcNow);
                 ApplyInputCapture(interaction);
+                var afterCapture = CaptureMouseState();
                 RecordOverlayDiagnostics(interaction, "prefix");
+                RecordPrefixInputDiagnostics(mouse, interaction, beforeCapture, afterCapture, utcNow);
             }
             catch (Exception error)
             {
@@ -63,6 +68,7 @@ namespace JueMingZ.UI
                     playback.CursorTicks,
                     playback.TimelineStartTicks,
                     playback.TimelineEndTicks,
+                    playback.DisplayTimelineEndTicks,
                     playback.IsAtLatest,
                     playback.Dragging,
                     false,
@@ -72,6 +78,11 @@ namespace JueMingZ.UI
             }
 
             UiInputFrameClock.BeginDrawFrame("MapFootprintPlaybackOverlay");
+            var drawFrame = ReadFullscreenUiFrame(false);
+            var drawMouse = drawFrame.Mouse;
+            var drawLayout = MapFootprintPlaybackState.CalculateLayout(drawFrame.ScreenWidth, drawFrame.ScreenHeight);
+            var drawHit = MapFootprintPlaybackState.HitTest(drawLayout, drawMouse.X, drawMouse.Y);
+            RecordDrawInputDiagnostics(drawMouse, drawHit, DateTime.UtcNow);
 
             SpriteBatch spriteBatch;
             if (!TerrariaDrawCompat.TryGetSpriteBatch(out spriteBatch))
@@ -85,6 +96,7 @@ namespace JueMingZ.UI
                     playback.CursorTicks,
                     playback.TimelineStartTicks,
                     playback.TimelineEndTicks,
+                    playback.DisplayTimelineEndTicks,
                     playback.IsAtLatest,
                     playback.Dragging,
                     false,
@@ -105,6 +117,7 @@ namespace JueMingZ.UI
                     playback.CursorTicks,
                     playback.TimelineStartTicks,
                     playback.TimelineEndTicks,
+                    playback.DisplayTimelineEndTicks,
                     playback.IsAtLatest,
                     playback.Dragging,
                     false,
@@ -125,11 +138,8 @@ namespace JueMingZ.UI
                     null,
                     Main.UIScaleMatrix);
                 begun = true;
-                var mouse = LegacyUiInput.ReadMouse();
-                var layout = MapFootprintPlaybackState.CalculateLayout(TerrariaMainCompat.ScreenWidth, TerrariaMainCompat.ScreenHeight);
-                var hit = MapFootprintPlaybackState.HitTest(layout, mouse.X, mouse.Y);
                 playback = MapFootprintPlaybackState.GetSnapshotForRender(renderSnapshot, visible, DateTime.UtcNow);
-                DrawOverlay(spriteBatch, layout, playback, hit);
+                DrawOverlay(spriteBatch, drawLayout, playback, drawHit);
                 PlayerWorldFootprintDiagnostics.RecordPlaybackOverlay(
                     "ready",
                     "playback overlay ready",
@@ -139,10 +149,11 @@ namespace JueMingZ.UI
                     playback.CursorTicks,
                     playback.TimelineStartTicks,
                     playback.TimelineEndTicks,
+                    playback.DisplayTimelineEndTicks,
                     playback.IsAtLatest,
                     playback.Dragging,
-                    hit.BarHovered || playback.Dragging,
-                    hit.BarHovered,
+                    drawHit.BarHovered || playback.Dragging,
+                    drawHit.BarHovered,
                     playback.LastInteraction);
             }
             catch (Exception error)
@@ -156,6 +167,7 @@ namespace JueMingZ.UI
                     playback.CursorTicks,
                     playback.TimelineStartTicks,
                     playback.TimelineEndTicks,
+                    playback.DisplayTimelineEndTicks,
                     playback.IsAtLatest,
                     playback.Dragging,
                     false,
@@ -188,6 +200,7 @@ namespace JueMingZ.UI
                             playback.CursorTicks,
                             playback.TimelineStartTicks,
                             playback.TimelineEndTicks,
+                            playback.DisplayTimelineEndTicks,
                             playback.IsAtLatest,
                             playback.Dragging,
                             false,
@@ -219,9 +232,200 @@ namespace JueMingZ.UI
             return MapFootprintPlaybackState.HitTest(layout, x, y);
         }
 
+        internal static MapFootprintFullscreenUiFrame BuildFullscreenUiFrameForTesting(
+            DiagnosticMouseState raw,
+            int screenWidth,
+            int screenHeight,
+            bool scaleScreenFromUiMatrix)
+        {
+            return BuildFullscreenUiFrame(raw, screenWidth, screenHeight, scaleScreenFromUiMatrix);
+        }
+
+        internal static int CalculateTrackFilledWidthForTesting(LegacyUiRect track, MapFootprintPlaybackSnapshot playback)
+        {
+            return CalculateTrackFilledWidth(track, playback);
+        }
+
+        internal static void ApplyInputCaptureForTesting(MapFootprintPlaybackInteraction interaction)
+        {
+            ApplyInputCapture(interaction);
+        }
+
         private static bool ShouldUseOverlay(bool mapFullscreen, bool displayEnabled)
         {
             return mapFullscreen && displayEnabled;
+        }
+
+        private static MapFootprintFullscreenUiFrame ReadFullscreenUiFrame(bool scaleScreenFromUiMatrix)
+        {
+            return BuildFullscreenUiFrame(
+                DiagnosticMouseStateReader.ReadForFullscreenMapOverlay(),
+                TerrariaMainCompat.ScreenWidth,
+                TerrariaMainCompat.ScreenHeight,
+                scaleScreenFromUiMatrix);
+        }
+
+        private static MapFootprintFullscreenUiFrame BuildFullscreenUiFrame(
+            DiagnosticMouseState raw,
+            int screenWidth,
+            int screenHeight,
+            bool scaleScreenFromUiMatrix)
+        {
+            raw = raw ?? new DiagnosticMouseState();
+            var scaleX = ResolveUiScale(raw.UiScaleX, raw.UiScale);
+            var scaleY = ResolveUiScale(raw.UiScaleY, raw.UiScale);
+            return new MapFootprintFullscreenUiFrame
+            {
+                Mouse = BuildFullscreenUiMouse(raw, scaleX, scaleY),
+                ScreenWidth = ResolveFullscreenUiExtent(screenWidth, scaleX, raw.UiTranslateX, scaleScreenFromUiMatrix),
+                ScreenHeight = ResolveFullscreenUiExtent(screenHeight, scaleY, raw.UiTranslateY, scaleScreenFromUiMatrix)
+            };
+        }
+
+        private static LegacyMouseSnapshot BuildFullscreenUiMouse(DiagnosticMouseState raw, double scaleX, double scaleY)
+        {
+            raw = raw ?? new DiagnosticMouseState();
+            var coordinate = ResolveFullscreenUiMouse(raw, scaleX, scaleY);
+            var inputAvailable = raw.GameInputAvailable || raw.TerrariaReadAvailable;
+            // Fullscreen map already owns vanilla UI input; when the global
+            // automation gate is closed, trust only Terraria's in-process mouse
+            // state and keep OS physical fallback disabled.
+            var down = raw.GameInputAvailable
+                ? raw.TerrariaLeftDown || raw.OsLeftDown
+                : raw.TerrariaReadAvailable && raw.TerrariaLeftDown;
+            var scrollDelta = raw.GameInputAvailable || raw.TerrariaScrollWheelAvailable
+                ? raw.ScrollDelta
+                : 0;
+            return new LegacyMouseSnapshot
+            {
+                X = coordinate.X,
+                Y = coordinate.Y,
+                LeftDown = down,
+                LeftPressed = down,
+                LeftReleased = inputAvailable && !down,
+                ScrollDelta = scrollDelta,
+                ReadAvailable = raw.TerrariaReadAvailable || raw.OsReadAvailable,
+                ReadMode = coordinate.Mode + "/FullscreenUi",
+                WindowHit = false
+            };
+        }
+
+        private static FullscreenMouseCoordinate ResolveFullscreenUiMouse(DiagnosticMouseState raw, double scaleX, double scaleY)
+        {
+            var scaleActive = raw.UiScaleAvailable &&
+                              (Math.Abs(scaleX - 1d) > 0.01d ||
+                               Math.Abs(scaleY - 1d) > 0.01d ||
+                               Math.Abs(raw.UiTranslateX) > 0.01d ||
+                               Math.Abs(raw.UiTranslateY) > 0.01d);
+            var hasTerraria = raw.TerrariaReadAvailable && raw.TerrariaMouseX >= 0 && raw.TerrariaMouseY >= 0;
+            var hasOs = raw.OsReadAvailable && raw.OsClientMouseX >= 0 && raw.OsClientMouseY >= 0;
+            if (hasTerraria && hasOs && scaleActive)
+            {
+                var osLogicalX = ScreenToUiCoordinate(raw.OsClientMouseX, scaleX, raw.UiTranslateX);
+                var osLogicalY = ScreenToUiCoordinate(raw.OsClientMouseY, scaleY, raw.UiTranslateY);
+                var rawDistance = DistanceSquared(raw.TerrariaMouseX, raw.TerrariaMouseY, raw.OsClientMouseX, raw.OsClientMouseY);
+                var logicalDistance = DistanceSquared(raw.TerrariaMouseX, raw.TerrariaMouseY, osLogicalX, osLogicalY);
+                var close = CloseDistanceSquared(scaleX, scaleY);
+                if (logicalDistance <= close && logicalDistance <= rawDistance)
+                {
+                    return new FullscreenMouseCoordinate(raw.TerrariaMouseX, raw.TerrariaMouseY, BuildMouseMode(raw, "TerrariaLogical"));
+                }
+
+                if (rawDistance <= close || rawDistance < logicalDistance)
+                {
+                    return new FullscreenMouseCoordinate(
+                        ScreenToUiCoordinate(raw.TerrariaMouseX, scaleX, raw.UiTranslateX),
+                        ScreenToUiCoordinate(raw.TerrariaMouseY, scaleY, raw.UiTranslateY),
+                        BuildMouseMode(raw, "TerrariaScreenToUi"));
+                }
+            }
+
+            if (hasTerraria)
+            {
+                return new FullscreenMouseCoordinate(raw.TerrariaMouseX, raw.TerrariaMouseY, BuildMouseMode(raw, "TerrariaRaw"));
+            }
+
+            if (hasOs)
+            {
+                if (scaleActive)
+                {
+                    return new FullscreenMouseCoordinate(
+                        ScreenToUiCoordinate(raw.OsClientMouseX, scaleX, raw.UiTranslateX),
+                        ScreenToUiCoordinate(raw.OsClientMouseY, scaleY, raw.UiTranslateY),
+                        BuildMouseMode(raw, "OsClientScreenToUi"));
+                }
+
+                return new FullscreenMouseCoordinate(raw.OsClientMouseX, raw.OsClientMouseY, BuildMouseMode(raw, "OsClientRaw"));
+            }
+
+            return new FullscreenMouseCoordinate(-1, -1, BuildMouseMode(raw, "none"));
+        }
+
+        private static double ResolveUiScale(double axisScale, double fallbackScale)
+        {
+            if (axisScale > 0.01d)
+            {
+                return axisScale;
+            }
+
+            return fallbackScale > 0.01d ? fallbackScale : 1d;
+        }
+
+        private static int ResolveFullscreenUiExtent(int screenSize, double scale, double translate, bool scaleScreenFromUiMatrix)
+        {
+            var safeSize = Math.Max(1, screenSize);
+            if (!scaleScreenFromUiMatrix || scale <= 0.01d || Math.Abs(scale - 1d) <= 0.01d)
+            {
+                return safeSize;
+            }
+
+            var scaled = (int)Math.Round((safeSize - translate) / scale);
+            return scaled > 0 ? scaled : safeSize;
+        }
+
+        private static int ScreenToUiCoordinate(int value, double scale, double translate)
+        {
+            if (value < 0)
+            {
+                return value;
+            }
+
+            if (scale <= 0.01d)
+            {
+                return value;
+            }
+
+            return (int)Math.Round((value - translate) / scale);
+        }
+
+        private static int DistanceSquared(int ax, int ay, int bx, int by)
+        {
+            var dx = ax - bx;
+            var dy = ay - by;
+            return dx * dx + dy * dy;
+        }
+
+        private static int CloseDistanceSquared(double scaleX, double scaleY)
+        {
+            var scale = Math.Max(Math.Abs(scaleX), Math.Abs(scaleY));
+            var tolerance = Math.Max(4, (int)Math.Ceiling(scale * 3d));
+            return tolerance * tolerance;
+        }
+
+        private static string BuildMouseMode(DiagnosticMouseState raw, string source)
+        {
+            var mode = raw == null ? string.Empty : raw.ReadMode ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(mode))
+            {
+                mode = "none";
+            }
+
+            if (raw != null && !string.IsNullOrWhiteSpace(raw.UiScaleSource))
+            {
+                return mode + "/" + source + "/" + raw.UiScaleSource;
+            }
+
+            return mode + "/" + source;
         }
 
         private static void ApplyInputCapture(MapFootprintPlaybackInteraction interaction)
@@ -234,13 +438,13 @@ namespace JueMingZ.UI
             if (interaction.ClickConsumed)
             {
                 string message;
-                UiMouseCaptureService.ConsumeMouseTriggerForOperationWindow("MouseLeft", out message);
+                TerrariaUiMouseCompat.TryConsumeMouseTriggerInput("MouseLeft", out message);
             }
 
-            UiMouseCaptureService.CaptureForOperationWindow();
+            TerrariaUiMouseCompat.TryMarkUiMouseCapture();
             if (interaction.ScrollConsumed)
             {
-                UiMouseCaptureService.ConsumeScrollForOperationWindow();
+                TerrariaUiMouseCompat.TryConsumeUiScroll();
             }
         }
 
@@ -339,13 +543,15 @@ namespace JueMingZ.UI
                 return 0;
             }
 
-            var duration = Math.Max(0L, playback.TimelineEndTicks - playback.TimelineStartTicks);
+            var displayEnd = playback.DisplayTimelineEndTicks > 0L ? playback.DisplayTimelineEndTicks : playback.TimelineEndTicks;
+            displayEnd = Math.Max(playback.TimelineStartTicks, Math.Min(playback.TimelineEndTicks, displayEnd));
+            var duration = Math.Max(0L, displayEnd - playback.TimelineStartTicks);
             if (duration <= 0L)
             {
                 return track.Width;
             }
 
-            var cursor = Math.Max(playback.TimelineStartTicks, Math.Min(playback.TimelineEndTicks, playback.CursorTicks));
+            var cursor = Math.Max(playback.TimelineStartTicks, Math.Min(displayEnd, playback.CursorTicks));
             var fraction = (cursor - playback.TimelineStartTicks) / (double)duration;
             return Math.Max(0, Math.Min(track.Width, (int)Math.Round(track.Width * fraction)));
         }
@@ -373,11 +579,140 @@ namespace JueMingZ.UI
                 state == null ? 0L : state.CursorTicks,
                 state == null ? 0L : state.TimelineStartTicks,
                 state == null ? 0L : state.TimelineEndTicks,
+                state == null ? 0L : state.DisplayTimelineEndTicks,
                 state != null && state.IsAtLatest,
                 state != null && state.Dragging,
                 interaction != null && interaction.MouseCaptured,
                 interaction != null && interaction.BarHovered,
                 state == null ? string.Empty : state.LastInteraction);
+        }
+
+        private static void RecordPrefixInputDiagnostics(
+            LegacyMouseSnapshot mouse,
+            MapFootprintPlaybackInteraction interaction,
+            PlaybackMouseCaptureState beforeCapture,
+            PlaybackMouseCaptureState afterCapture,
+            DateTime utcNow)
+        {
+            var data = new MapFootprintPlaybackPrefixInputDiagnosticsData();
+            mouse = mouse ?? new LegacyMouseSnapshot();
+            interaction = interaction ?? new MapFootprintPlaybackInteraction();
+            beforeCapture = beforeCapture ?? new PlaybackMouseCaptureState();
+            afterCapture = afterCapture ?? new PlaybackMouseCaptureState();
+            data.HitTarget = interaction.HitTarget;
+            data.MouseReadMode = mouse.ReadMode;
+            data.MouseX = mouse.X;
+            data.MouseY = mouse.Y;
+            data.MouseReadAvailable = mouse.ReadAvailable;
+            data.BarHovered = interaction.BarHovered;
+            data.MouseCaptured = interaction.MouseCaptured;
+            data.ClickConsumed = interaction.ClickConsumed;
+            data.ScrollConsumed = interaction.ScrollConsumed;
+            data.LeftDown = mouse.LeftDown;
+            data.LeftPressed = interaction.LeftPressed;
+            data.LeftReleased = interaction.LeftReleased;
+            data.ScrollDelta = mouse.ScrollDelta;
+            data.GameUpdateCount = ReadGameUpdateCount();
+            data.MainMouseLeftBefore = beforeCapture.MainMouseLeft;
+            data.MainMouseLeftAfter = afterCapture.MainMouseLeft;
+            data.MainMouseLeftReleaseBefore = beforeCapture.MainMouseLeftRelease;
+            data.MainMouseLeftReleaseAfter = afterCapture.MainMouseLeftRelease;
+            data.MainMouseInterfaceBefore = beforeCapture.MainMouseInterface;
+            data.MainMouseInterfaceAfter = afterCapture.MainMouseInterface;
+            data.MainBlockMouseBefore = beforeCapture.MainBlockMouse;
+            data.MainBlockMouseAfter = afterCapture.MainBlockMouse;
+            data.PlayerMouseInterfaceBefore = beforeCapture.PlayerMouseInterface;
+            data.PlayerMouseInterfaceAfter = afterCapture.PlayerMouseInterface;
+            data.Utc = utcNow.ToUniversalTime();
+            PlayerWorldFootprintDiagnostics.RecordPlaybackPrefixInput(data);
+        }
+
+        private static void RecordDrawInputDiagnostics(
+            LegacyMouseSnapshot mouse,
+            MapFootprintPlaybackHitTest hit,
+            DateTime utcNow)
+        {
+            var current = CaptureMouseState();
+            mouse = mouse ?? new LegacyMouseSnapshot();
+            hit = hit ?? new MapFootprintPlaybackHitTest();
+            PlayerWorldFootprintDiagnostics.RecordPlaybackDrawInput(new MapFootprintPlaybackDrawInputDiagnosticsData
+            {
+                HitTarget = hit.Target,
+                MouseReadMode = mouse.ReadMode,
+                MouseX = mouse.X,
+                MouseY = mouse.Y,
+                MouseReadAvailable = mouse.ReadAvailable,
+                BarHovered = hit.BarHovered,
+                MainMouseLeft = current.MainMouseLeft,
+                MainMouseLeftRelease = current.MainMouseLeftRelease,
+                MainMouseInterface = current.MainMouseInterface,
+                MainBlockMouse = current.MainBlockMouse,
+                PlayerMouseInterface = current.PlayerMouseInterface,
+                GameUpdateCount = ReadGameUpdateCount(),
+                Utc = utcNow.ToUniversalTime()
+            });
+        }
+
+        private static PlaybackMouseCaptureState CaptureMouseState()
+        {
+            var current = TerrariaUiMouseCompat.ReadCaptureDiagnosticsSnapshot();
+            current = current ?? new TerrariaUiMouseCaptureDiagnosticsSnapshot();
+            return new PlaybackMouseCaptureState
+            {
+                MainMouseLeft = current.MainMouseLeft,
+                MainMouseLeftRelease = current.MainMouseLeftRelease,
+                MainMouseInterface = current.MainMouseInterface,
+                MainBlockMouse = current.MainBlockMouse,
+                PlayerMouseInterface = current.PlayerMouseInterface
+            };
+        }
+
+        private static long ReadGameUpdateCount()
+        {
+            ulong updateCount;
+            if (!TerrariaMainCompat.TryReadGameUpdateCount(out updateCount))
+            {
+                return 0L;
+            }
+
+            return updateCount > long.MaxValue ? long.MaxValue : (long)updateCount;
+        }
+
+        private sealed class PlaybackMouseCaptureState
+        {
+            public bool MainMouseLeft { get; set; }
+            public bool MainMouseLeftRelease { get; set; }
+            public bool MainMouseInterface { get; set; }
+            public bool MainBlockMouse { get; set; }
+            public bool PlayerMouseInterface { get; set; }
+        }
+
+        private sealed class FullscreenMouseCoordinate
+        {
+            public int X { get; private set; }
+            public int Y { get; private set; }
+            public string Mode { get; private set; }
+
+            public FullscreenMouseCoordinate(int x, int y, string mode)
+            {
+                X = x;
+                Y = y;
+                Mode = mode ?? string.Empty;
+            }
+        }
+    }
+
+    internal sealed class MapFootprintFullscreenUiFrame
+    {
+        public LegacyMouseSnapshot Mouse { get; set; }
+        public int ScreenWidth { get; set; }
+        public int ScreenHeight { get; set; }
+
+        public MapFootprintFullscreenUiFrame()
+        {
+            Mouse = new LegacyMouseSnapshot();
+            ScreenWidth = 1;
+            ScreenHeight = 1;
         }
     }
 }

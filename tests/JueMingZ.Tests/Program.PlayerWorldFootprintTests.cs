@@ -6,6 +6,7 @@ using System.Text;
 using JueMingZ.Actions;
 using JueMingZ.Automation.MapEnhancement;
 using JueMingZ.Common;
+using JueMingZ.Compat;
 using JueMingZ.Config;
 using JueMingZ.Diagnostics;
 using JueMingZ.Features;
@@ -783,6 +784,177 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void MapFootprintRenderDrawPlanAdvancesAfterCulledLine()
+        {
+            var read = new PlayerWorldFootprintReadResult
+            {
+                Succeeded = true,
+                IdentityResolved = true,
+                Status = "memory",
+                PairId = "pair-footprint-render-cull-advance",
+                SegmentCount = 1,
+                PointCount = 3,
+                Segments = new List<PlayerWorldFootprintSegment>
+                {
+                    CreateFootprintSegment(
+                        "segment-reenter",
+                        "seed",
+                        CreateFootprintPoint(-1000d, 10d, 0L, 6L),
+                        CreateFootprintPoint(-900d, 10d, 6L, 6L),
+                        CreateFootprintPoint(10d, 10d, 12L, 6L))
+                }
+            };
+
+            var snapshot = MapFootprintRenderCache.BuildSnapshotForTesting(read, true, "memory", 124);
+            var transform = new MapFootprintDrawTransform
+            {
+                MapPosition = Microsoft.Xna.Framework.Vector2.Zero,
+                MapOffset = Microsoft.Xna.Framework.Vector2.Zero,
+                MapScale = 1f,
+                Opacity = 1f
+            };
+            var plan = MapFootprintRenderCache.BuildDrawPlanForTesting(
+                snapshot,
+                transform,
+                new Rectangle(0, 0, 100, 100),
+                10,
+                0.5f);
+            if (plan.DrawnLineCount != 1 ||
+                plan.CulledLineCount != 1 ||
+                plan.Commands == null ||
+                plan.Commands.Length != 1)
+            {
+                throw new InvalidOperationException("Footprint draw plan must cull only the first offscreen line before drawing reentry.");
+            }
+
+            AssertNear(plan.Commands[0].Start.X, 0d, "culled line clipped reentry start x");
+            AssertNear(plan.Commands[0].Start.Y, 10d, "culled line clipped reentry start y");
+            AssertNear(plan.Commands[0].End.X, 10d, "culled line reentry end x");
+            AssertNear(plan.Commands[0].StartTileX, -900d, "culled line original start tile x");
+        }
+
+        private static void MapFootprintRenderDrawPlanRejectsUnclippedReentryLongLineSpec()
+        {
+            var read = new PlayerWorldFootprintReadResult
+            {
+                Succeeded = true,
+                IdentityResolved = true,
+                Status = "memory",
+                PairId = "pair-footprint-render-reentry-spec",
+                SegmentCount = 1,
+                PointCount = 3,
+                Segments = new List<PlayerWorldFootprintSegment>
+                {
+                    CreateFootprintSegment(
+                        "segment-reenter",
+                        "seed",
+                        CreateFootprintPoint(-1000d, 10d, 0L, 6L),
+                        CreateFootprintPoint(-900d, 10d, 6L, 6L),
+                        CreateFootprintPoint(10d, 10d, 12L, 6L))
+                }
+            };
+
+            var snapshot = MapFootprintRenderCache.BuildSnapshotForTesting(read, true, "memory", 125);
+            var transform = new MapFootprintDrawTransform
+            {
+                MapPosition = Microsoft.Xna.Framework.Vector2.Zero,
+                MapOffset = Microsoft.Xna.Framework.Vector2.Zero,
+                MapScale = 1f,
+                Opacity = 1f
+            };
+            var screen = new Rectangle(0, 0, 100, 100);
+            var plan = MapFootprintRenderCache.BuildDrawPlanForTesting(snapshot, transform, screen, 10, 0.5f);
+            if (plan.Commands == null)
+            {
+                throw new InvalidOperationException("Footprint draw plan must return an empty command array instead of null.");
+            }
+
+            if (plan.Commands.Length == 0)
+            {
+                if (plan.CulledLineCount < 2)
+                {
+                    throw new InvalidOperationException("A conservative skip strategy must count both offscreen/reentry lines as culled.");
+                }
+
+                return;
+            }
+
+            if (plan.Commands.Length != 1)
+            {
+                throw new InvalidOperationException("Footprint reentry spec expects either one clipped command or a conservative skip.");
+            }
+
+            var command = plan.Commands[0];
+            if (command.Start.X < screen.Left - 0.01f ||
+                command.Start.X > screen.Right + 0.01f ||
+                command.End.X < screen.Left - 0.01f ||
+                command.End.X > screen.Right + 0.01f ||
+                command.Start.Y < screen.Top - 0.01f ||
+                command.Start.Y > screen.Bottom + 0.01f ||
+                command.End.Y < screen.Top - 0.01f ||
+                command.End.Y > screen.Bottom + 0.01f)
+            {
+                throw new InvalidOperationException("Footprint draw plan must not emit an unclipped reentry command from far outside the viewport.");
+            }
+        }
+
+        private static void MapFootprintRenderDrawPlanClipsViewportEdges()
+        {
+            var read = new PlayerWorldFootprintReadResult
+            {
+                Succeeded = true,
+                IdentityResolved = true,
+                Status = "memory",
+                PairId = "pair-footprint-render-clip-edges",
+                SegmentCount = 3,
+                PointCount = 6,
+                Segments = new List<PlayerWorldFootprintSegment>
+                {
+                    CreateFootprintSegment(
+                        "segment-enter",
+                        "seed",
+                        CreateFootprintPoint(-10d, 50d, 0L, 6L),
+                        CreateFootprintPoint(20d, 50d, 6L, 6L)),
+                    CreateFootprintSegment(
+                        "segment-leave",
+                        "seed",
+                        CreateFootprintPoint(80d, 60d, 12L, 6L),
+                        CreateFootprintPoint(140d, 60d, 18L, 6L)),
+                    CreateFootprintSegment(
+                        "segment-cross",
+                        "seed",
+                        CreateFootprintPoint(-10d, 70d, 24L, 6L),
+                        CreateFootprintPoint(140d, 70d, 30L, 6L))
+                }
+            };
+
+            var snapshot = MapFootprintRenderCache.BuildSnapshotForTesting(read, true, "memory", 126);
+            var transform = new MapFootprintDrawTransform
+            {
+                MapPosition = Microsoft.Xna.Framework.Vector2.Zero,
+                MapOffset = Microsoft.Xna.Framework.Vector2.Zero,
+                MapScale = 1f,
+                Opacity = 1f
+            };
+            var screen = new Rectangle(0, 0, 100, 100);
+            var plan = MapFootprintRenderCache.BuildDrawPlanForTesting(snapshot, transform, screen, 10, 0.5f);
+            if (plan.DrawnLineCount != 3 ||
+                plan.Commands == null ||
+                plan.Commands.Length != 3)
+            {
+                throw new InvalidOperationException("Footprint draw plan must keep visible entering, leaving, and crossing viewport lines.");
+            }
+
+            AssertNear(plan.Commands[0].Start.X, 0d, "entering line clipped start x");
+            AssertNear(plan.Commands[0].End.X, 20d, "entering line end x");
+            AssertNear(plan.Commands[1].Start.X, 80d, "leaving line start x");
+            AssertNear(plan.Commands[1].End.X, 100d, "leaving line clipped end x");
+            AssertNear(plan.Commands[2].Start.X, 0d, "crossing line clipped start x");
+            AssertNear(plan.Commands[2].End.X, 100d, "crossing line clipped end x");
+            AssertNear(plan.Commands[2].StartTileX, -10d, "crossing line original start tile x");
+            AssertNear(plan.Commands[2].EndTileX, 140d, "crossing line original end tile x");
+        }
+
         private static void MapFootprintPlaybackDefaultsToLatestPausedAndScreenSpaceLayout()
         {
             MapFootprintPlaybackState.ResetForTesting();
@@ -827,6 +999,203 @@ namespace JueMingZ.Tests
             if (outside.BarHovered || !string.Equals(outside.Target, MapFootprintPlaybackHitTargets.Outside, StringComparison.Ordinal))
             {
                 throw new InvalidOperationException("Playback overlay hit-test must leave outside fullscreen map input untouched.");
+            }
+        }
+
+        private static void MapFootprintPlaybackFullscreenUiScaleHitTestCapturesBar()
+        {
+            MapFootprintPlaybackState.ResetForTesting();
+            var scale = 1.2d;
+            var logicalWidth = (int)Math.Round(2560d / scale);
+            var logicalHeight = (int)Math.Round(1370d / scale);
+            var logicalLayout = MapFootprintPlaybackOverlay.CalculateLayoutForTesting(logicalWidth, logicalHeight);
+            var physicalMouseX = (int)Math.Round(logicalLayout.Track.CenterX * scale);
+            var physicalMouseY = (int)Math.Round(logicalLayout.Track.CenterY * scale);
+            var frame = MapFootprintPlaybackOverlay.BuildFullscreenUiFrameForTesting(
+                new DiagnosticMouseState
+                {
+                    GameInputAvailable = true,
+                    TerrariaReadAvailable = true,
+                    TerrariaMouseX = physicalMouseX,
+                    TerrariaMouseY = physicalMouseY,
+                    TerrariaLeftDown = true,
+                    OsReadAvailable = true,
+                    OsClientMouseX = physicalMouseX,
+                    OsClientMouseY = physicalMouseY,
+                    OsLeftDown = true,
+                    UiScaleAvailable = true,
+                    UiScaleMatrixAvailable = true,
+                    UiScale = scale,
+                    UiScaleX = scale,
+                    UiScaleY = scale,
+                    UiScaleSource = "UIScaleMatrix",
+                    ReadMode = "Terraria+OsClient"
+                },
+                2560,
+                1370,
+                true);
+
+            if (frame.ScreenWidth != logicalWidth || frame.ScreenHeight != logicalHeight)
+            {
+                throw new InvalidOperationException("Fullscreen playback input frame must use UI-scale logical screen dimensions in update prefix.");
+            }
+
+            var layout = MapFootprintPlaybackOverlay.CalculateLayoutForTesting(frame.ScreenWidth, frame.ScreenHeight);
+            var hit = MapFootprintPlaybackOverlay.HitTestForTesting(layout, frame.Mouse.X, frame.Mouse.Y);
+            if (!hit.BarHovered ||
+                !string.Equals(hit.Target, MapFootprintPlaybackHitTargets.Track, StringComparison.Ordinal) ||
+                !frame.Mouse.LeftDown ||
+                !frame.Mouse.ReadMode.Contains("FullscreenUi"))
+            {
+                throw new InvalidOperationException("Fullscreen playback UI-scale mouse must hit and capture the progress track.");
+            }
+
+            var snapshot = CreatePlaybackRenderSnapshot("pair-footprint-playback-scale", 0L, 100L);
+            MapFootprintPlaybackState.Advance(snapshot, true, new DateTime(2026, 6, 16, 13, 3, 0, DateTimeKind.Utc));
+            var interaction = MapFootprintPlaybackState.HandleInput(
+                layout,
+                frame.Mouse,
+                snapshot,
+                true,
+                new DateTime(2026, 6, 16, 13, 3, 0, 16, DateTimeKind.Utc));
+            if (!interaction.MouseCaptured ||
+                !interaction.ClickConsumed ||
+                !string.Equals(interaction.HitTarget, MapFootprintPlaybackHitTargets.Track, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Fullscreen playback bar must consume scaled track clicks before vanilla map input sees them.");
+            }
+        }
+
+        private static void MapFootprintPlaybackFullscreenMouseKeepsReadableClickWhenGlobalGateFalseSpec()
+        {
+            MapFootprintPlaybackState.ResetForTesting();
+            var scale = 1.2d;
+            var logicalWidth = (int)Math.Round(2560d / scale);
+            var logicalHeight = (int)Math.Round(1370d / scale);
+            var logicalLayout = MapFootprintPlaybackOverlay.CalculateLayoutForTesting(logicalWidth, logicalHeight);
+            var physicalMouseX = (int)Math.Round(logicalLayout.Track.CenterX * scale);
+            var physicalMouseY = (int)Math.Round(logicalLayout.Track.CenterY * scale);
+            var frame = MapFootprintPlaybackOverlay.BuildFullscreenUiFrameForTesting(
+                new DiagnosticMouseState
+                {
+                    GameInputAvailable = false,
+                    TerrariaReadAvailable = true,
+                    TerrariaMouseX = physicalMouseX,
+                    TerrariaMouseY = physicalMouseY,
+                    TerrariaLeftDown = true,
+                    OsReadAvailable = true,
+                    OsClientMouseX = physicalMouseX,
+                    OsClientMouseY = physicalMouseY,
+                    OsLeftDown = true,
+                    UiScaleAvailable = true,
+                    UiScaleMatrixAvailable = true,
+                    UiScale = scale,
+                    UiScaleX = scale,
+                    UiScaleY = scale,
+                    UiScaleSource = "UIScaleMatrix",
+                    ReadMode = "Terraria+OsClient"
+                },
+                2560,
+                1370,
+                true);
+            var layout = MapFootprintPlaybackOverlay.CalculateLayoutForTesting(frame.ScreenWidth, frame.ScreenHeight);
+            var hit = MapFootprintPlaybackOverlay.HitTestForTesting(layout, frame.Mouse.X, frame.Mouse.Y);
+            if (!hit.BarHovered || !string.Equals(hit.Target, MapFootprintPlaybackHitTargets.Track, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Fullscreen playback gate-false spec must still hit the visible track.");
+            }
+
+            var snapshot = CreatePlaybackRenderSnapshot("pair-footprint-playback-gate-false", 0L, 100L);
+            MapFootprintPlaybackState.Advance(snapshot, true, new DateTime(2026, 6, 17, 10, 20, 0, DateTimeKind.Utc));
+            var interaction = MapFootprintPlaybackState.HandleInput(
+                layout,
+                frame.Mouse,
+                snapshot,
+                true,
+                new DateTime(2026, 6, 17, 10, 20, 0, 16, DateTimeKind.Utc));
+            if (!frame.Mouse.ReadAvailable ||
+                !frame.Mouse.LeftDown ||
+                !interaction.MouseCaptured ||
+                !interaction.ClickConsumed)
+            {
+                throw new InvalidOperationException("Visible fullscreen playback UI must not become unclickable solely because GameInputAvailable is false.");
+            }
+        }
+
+        private static void MapFootprintPlaybackFullscreenMouseDoesNotUseOsFallbackWhenGlobalGateFalse()
+        {
+            var scale = 1.2d;
+            var logicalWidth = (int)Math.Round(2560d / scale);
+            var logicalHeight = (int)Math.Round(1370d / scale);
+            var logicalLayout = MapFootprintPlaybackOverlay.CalculateLayoutForTesting(logicalWidth, logicalHeight);
+            var physicalMouseX = (int)Math.Round(logicalLayout.Track.CenterX * scale);
+            var physicalMouseY = (int)Math.Round(logicalLayout.Track.CenterY * scale);
+            var frame = MapFootprintPlaybackOverlay.BuildFullscreenUiFrameForTesting(
+                new DiagnosticMouseState
+                {
+                    GameInputAvailable = false,
+                    TerrariaReadAvailable = false,
+                    TerrariaMouseX = -1,
+                    TerrariaMouseY = -1,
+                    TerrariaLeftDown = false,
+                    OsReadAvailable = true,
+                    OsClientMouseX = physicalMouseX,
+                    OsClientMouseY = physicalMouseY,
+                    OsLeftDown = true,
+                    UiScaleAvailable = true,
+                    UiScaleMatrixAvailable = true,
+                    UiScale = scale,
+                    UiScaleX = scale,
+                    UiScaleY = scale,
+                    UiScaleSource = "UIScaleMatrix",
+                    ReadMode = "OsClientOnly"
+                },
+                2560,
+                1370,
+                true);
+
+            var layout = MapFootprintPlaybackOverlay.CalculateLayoutForTesting(frame.ScreenWidth, frame.ScreenHeight);
+            var hit = MapFootprintPlaybackOverlay.HitTestForTesting(layout, frame.Mouse.X, frame.Mouse.Y);
+            if (!hit.BarHovered ||
+                !string.Equals(hit.Target, MapFootprintPlaybackHitTargets.Track, StringComparison.Ordinal) ||
+                frame.Mouse.LeftDown)
+            {
+                throw new InvalidOperationException("Fullscreen playback may use OS coordinates for hit-test, but must not revive OS left-button fallback while the global input gate is false.");
+            }
+        }
+
+        private static void MapFootprintPlaybackFullscreenCaptureClearsClickWhenGlobalGateFalse()
+        {
+            var restoreRuntimeTypes = PushFakeTerrariaMainType();
+            try
+            {
+                ResetUiInputFrameTestState();
+                TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(false);
+                Terraria.Main.mouseLeft = true;
+                Terraria.Main.mouseLeftRelease = true;
+                Terraria.Main.mouseInterface = false;
+                Terraria.Main.blockMouse = false;
+
+                MapFootprintPlaybackOverlay.ApplyInputCaptureForTesting(new MapFootprintPlaybackInteraction
+                {
+                    MouseCaptured = true,
+                    ClickConsumed = true,
+                    ScrollConsumed = false
+                });
+
+                if (Terraria.Main.mouseLeft ||
+                    Terraria.Main.mouseLeftRelease ||
+                    !Terraria.Main.mouseInterface ||
+                    !Terraria.Main.blockMouse)
+                {
+                    throw new InvalidOperationException("Fullscreen playback capture must clear the consumed click even when the global input gate is false.");
+                }
+            }
+            finally
+            {
+                ResetUiInputFrameTestState();
+                TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(null);
+                restoreRuntimeTypes();
             }
         }
 
@@ -957,6 +1326,59 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void MapFootprintPlaybackPausedProgressDisplayEndStaysStable()
+        {
+            MapFootprintPlaybackState.ResetForTesting();
+            var snapshot = CreatePlaybackRenderSnapshot("pair-footprint-playback-pause-display", 0L, 100L);
+            var now = new DateTime(2026, 6, 16, 13, 8, 0, DateTimeKind.Utc);
+            MapFootprintPlaybackState.Advance(snapshot, true, now);
+            var layout = MapFootprintPlaybackOverlay.CalculateLayoutForTesting(900, 600);
+            var trackMiddleX = layout.Track.X + layout.Track.Width / 2;
+
+            MapFootprintPlaybackState.HandleInput(
+                layout,
+                new LegacyMouseSnapshot
+                {
+                    X = trackMiddleX,
+                    Y = layout.Track.CenterY,
+                    LeftDown = true
+                },
+                snapshot,
+                true,
+                now.AddMilliseconds(16));
+            var dragRelease = MapFootprintPlaybackState.HandleInput(
+                layout,
+                new LegacyMouseSnapshot
+                {
+                    X = trackMiddleX,
+                    Y = layout.Track.CenterY,
+                    LeftDown = false
+                },
+                snapshot,
+                true,
+                now.AddMilliseconds(32));
+            if (!dragRelease.State.Paused ||
+                dragRelease.State.IsAtLatest ||
+                dragRelease.State.DisplayTimelineEndTicks != 100L)
+            {
+                throw new InvalidOperationException("Playback history drag must pause and freeze the visible timeline end.");
+            }
+
+            var filledBefore = MapFootprintPlaybackOverlay.CalculateTrackFilledWidthForTesting(layout.Track, dragRelease.State);
+            var updatedSnapshot = CreatePlaybackRenderSnapshot("pair-footprint-playback-pause-display", 0L, 200L);
+            var updatedState = MapFootprintPlaybackState.Advance(
+                updatedSnapshot,
+                true,
+                now.AddSeconds(1));
+            var filledAfter = MapFootprintPlaybackOverlay.CalculateTrackFilledWidthForTesting(layout.Track, updatedState);
+            if (updatedState.TimelineEndTicks != 200L ||
+                updatedState.DisplayTimelineEndTicks != 100L ||
+                filledAfter != filledBefore)
+            {
+                throw new InvalidOperationException("Paused playback progress must not drift left when live footprints append new latest ticks.");
+            }
+        }
+
         private static void MapFootprintPlaybackDrawPlanSlicesCurrentLine()
         {
             var read = new PlayerWorldFootprintReadResult
@@ -1009,6 +1431,12 @@ namespace JueMingZ.Tests
             AssertNear(slicedPlan.Commands[1].Start.X, 10d, "sliced line start x");
             AssertNear(slicedPlan.Commands[1].End.X, 15d, "sliced line interpolated end x");
             AssertNear(slicedPlan.Commands[1].End.Y, 0d, "sliced line interpolated end y");
+            AssertNear(slicedPlan.Commands[1].StartTileX, 10d, "sliced line start tile x");
+            AssertNear(slicedPlan.Commands[1].EndTileX, 15d, "sliced line end tile x");
+            if (!slicedPlan.Commands[1].PartialLine)
+            {
+                throw new InvalidOperationException("Draw command diagnostics must mark a playback-sliced current line as partial.");
+            }
 
             var latestPlan = MapFootprintRenderCache.BuildDrawPlanForTesting(snapshot, transform, screen, 10, 0.5f, 120L);
             if (latestPlan.DrawnLineCount != 2 || latestPlan.DrawLimitHit)
@@ -1067,6 +1495,54 @@ namespace JueMingZ.Tests
                     1,
                     3,
                     true);
+                PlayerWorldFootprintDiagnostics.RecordMapDrawDetail(new MapFootprintDrawDiagnosticsData
+                {
+                    Route = "mapLayer",
+                    ScreenWidth = 1280,
+                    ScreenHeight = 720,
+                    GameUpdateCount = 1234L,
+                    MapFullscreenPosX = 4000.5d,
+                    MapFullscreenPosY = 500.25d,
+                    MapFullscreenScale = 8d,
+                    TransformMapPositionX = 3980d,
+                    TransformMapPositionY = 480d,
+                    TransformMapOffsetX = 120d,
+                    TransformMapOffsetY = 64d,
+                    TransformMapScale = 8d,
+                    TransformOpacity = 0.75d,
+                    CommandSampleCount = 5,
+                    AbnormalLongLineCount = 2,
+                    LongLineThresholdPixels = 1320d,
+                    MaxLinePixels = 2048d,
+                    MaxLineSegmentIndex = 7,
+                    FirstSegmentIndex = 1,
+                    FirstStartTileX = 4000d,
+                    FirstStartTileY = 500d,
+                    FirstEndTileX = 4004d,
+                    FirstEndTileY = 502d,
+                    FirstStartScreenX = 10d,
+                    FirstStartScreenY = 20d,
+                    FirstEndScreenX = 42d,
+                    FirstEndScreenY = 36d,
+                    LastSegmentIndex = 2,
+                    LastStartTileX = 4100d,
+                    LastStartTileY = 520d,
+                    LastEndTileX = 4104d,
+                    LastEndTileY = 526d,
+                    LastStartScreenX = 810d,
+                    LastStartScreenY = 180d,
+                    LastEndScreenX = 842d,
+                    LastEndScreenY = 228d,
+                    LongestSegmentIndex = 7,
+                    LongestStartTileX = 4200d,
+                    LongestStartTileY = 600d,
+                    LongestEndTileX = 4500d,
+                    LongestEndTileY = 700d,
+                    LongestStartScreenX = -600d,
+                    LongestStartScreenY = 100d,
+                    LongestEndScreenX = 1448d,
+                    LongestEndScreenY = 100d
+                });
                 PlayerWorldFootprintDiagnostics.RecordPlaybackOverlay(
                     "ready",
                     "overlay ready",
@@ -1076,11 +1552,56 @@ namespace JueMingZ.Tests
                     160L,
                     100L,
                     200L,
+                    180L,
                     false,
                     true,
                     true,
                     true,
                     "dragging");
+                PlayerWorldFootprintDiagnostics.RecordPlaybackPrefixInput(new MapFootprintPlaybackPrefixInputDiagnosticsData
+                {
+                    HitTarget = MapFootprintPlaybackHitTargets.Track,
+                    MouseReadMode = "Terraria+OsClient/FullscreenOverlayGateBypass/FullscreenUi",
+                    MouseX = 640,
+                    MouseY = 690,
+                    MouseReadAvailable = true,
+                    BarHovered = true,
+                    MouseCaptured = true,
+                    ClickConsumed = true,
+                    ScrollConsumed = true,
+                    LeftDown = true,
+                    LeftPressed = true,
+                    LeftReleased = false,
+                    ScrollDelta = -120,
+                    GameUpdateCount = 1234L,
+                    MainMouseLeftBefore = true,
+                    MainMouseLeftAfter = false,
+                    MainMouseLeftReleaseBefore = true,
+                    MainMouseLeftReleaseAfter = false,
+                    MainMouseInterfaceBefore = false,
+                    MainMouseInterfaceAfter = true,
+                    MainBlockMouseBefore = false,
+                    MainBlockMouseAfter = true,
+                    PlayerMouseInterfaceBefore = false,
+                    PlayerMouseInterfaceAfter = true,
+                    Utc = recordUtc.AddSeconds(3)
+                });
+                PlayerWorldFootprintDiagnostics.RecordPlaybackDrawInput(new MapFootprintPlaybackDrawInputDiagnosticsData
+                {
+                    HitTarget = MapFootprintPlaybackHitTargets.Track,
+                    MouseReadMode = "Terraria+OsClient/FullscreenUi",
+                    MouseX = 641,
+                    MouseY = 690,
+                    MouseReadAvailable = true,
+                    BarHovered = true,
+                    MainMouseLeft = true,
+                    MainMouseLeftRelease = true,
+                    MainMouseInterface = false,
+                    MainBlockMouse = false,
+                    PlayerMouseInterface = false,
+                    GameUpdateCount = 1235L,
+                    Utc = recordUtc.AddSeconds(4)
+                });
 
                 var snapshot = RuntimeDiagnosticSnapshotBuilder.Build(new RuntimeDiagnosticSnapshotContext
                 {
@@ -1102,6 +1623,23 @@ namespace JueMingZ.Tests
                     snapshot.MapFootprintsPlaybackCursorTicks != 160L ||
                     snapshot.MapFootprintsPlaybackTimelineStartTicks != 100L ||
                     snapshot.MapFootprintsPlaybackLatestTicks != 200L ||
+                    snapshot.MapFootprintsDrawCommandSampleCount != 5 ||
+                    snapshot.MapFootprintsDrawAbnormalLongLineCount != 2 ||
+                    snapshot.MapFootprintsPlaybackPrefixMouseReadMode.IndexOf("FullscreenOverlayGateBypass", StringComparison.Ordinal) < 0 ||
+                    snapshot.MapFootprintsPlaybackDrawMouseReadMode.IndexOf("FullscreenUi", StringComparison.Ordinal) < 0 ||
+                    !snapshot.MapFootprintsPlaybackPrefixMouseReadAvailable ||
+                    !snapshot.MapFootprintsPlaybackDrawMouseReadAvailable ||
+                    !snapshot.MapFootprintsPlaybackPrefixBarHovered ||
+                    !snapshot.MapFootprintsPlaybackDrawBarHovered ||
+                    snapshot.MapFootprintsPlaybackPrefixScrollDelta != -120 ||
+                    !snapshot.MapFootprintsPlaybackPrefixClickConsumed ||
+                    !snapshot.MapFootprintsPlaybackPrefixLeftDown ||
+                    !snapshot.MapFootprintsPlaybackPrefixLeftPressed ||
+                    snapshot.MapFootprintsPlaybackPrefixLeftReleased ||
+                    !snapshot.MapFootprintsPlaybackPrefixMainBlockMouseAfter ||
+                    !snapshot.MapFootprintsPlaybackDrawMainMouseLeft ||
+                    !snapshot.MapFootprintsPlaybackDrawMainMouseLeftRelease ||
+                    snapshot.MapFootprintsPlaybackDrawGameUpdateCount != 1235L ||
                     snapshot.MapFootprintsPlaybackAtLatest)
                 {
                     throw new InvalidOperationException("Footprint diagnostics snapshot did not expose recorder/render/playback state.");
@@ -1113,7 +1651,17 @@ namespace JueMingZ.Tests
                 AssertNear(snapshot.PlayerWorldFootprintsRetainedHours, 1d, "footprint retained hours");
                 AssertNear(snapshot.PlayerWorldFootprintsLastPointTileX, 123.5d, "footprint last point x");
                 AssertNear(snapshot.PlayerWorldFootprintsLastPointTileY, 456.25d, "footprint last point y");
-                AssertNear(snapshot.MapFootprintsPlaybackProgress, 0.6d, "footprint playback progress");
+                AssertNear(snapshot.MapFootprintsPlaybackProgress, 0.75d, "footprint playback progress");
+                AssertNear(snapshot.MapFootprintsDrawTransformMapScale, 8d, "footprint draw transform scale");
+                AssertNear(snapshot.MapFootprintsDrawLongLineThresholdPixels, 1320d, "footprint draw long line threshold");
+                AssertNear(snapshot.MapFootprintsDrawLongestStartTileX, 4200d, "footprint longest start tile x");
+                AssertNear(snapshot.MapFootprintsDrawLongestStartScreenX, -600d, "footprint longest start screen x");
+                AssertNear(snapshot.MapFootprintsDrawLongestEndScreenX, 1448d, "footprint longest end screen x");
+                AssertStringEquals(snapshot.MapFootprintsDrawRoute, "mapLayer", "footprint draw route");
+                AssertStringEquals(snapshot.MapFootprintsPlaybackPrefixHitTarget, MapFootprintPlaybackHitTargets.Track, "footprint prefix hit target");
+                AssertStringEquals(snapshot.MapFootprintsPlaybackPrefixMouseReadMode, "Terraria+OsClient/FullscreenOverlayGateBypass/FullscreenUi", "footprint prefix read mode");
+                AssertStringEquals(snapshot.MapFootprintsPlaybackDrawHitTarget, MapFootprintPlaybackHitTargets.Track, "footprint draw hit target");
+                AssertStringEquals(snapshot.MapFootprintsPlaybackDrawMouseReadMode, "Terraria+OsClient/FullscreenUi", "footprint draw read mode");
 
                 var json = InvokeDiagnosticSnapshotJson(snapshot);
                 AssertContains(json, "\"MapFootprintsDisplayEnabled\": true");
@@ -1123,9 +1671,25 @@ namespace JueMingZ.Tests
                 AssertContains(json, "\"PlayerWorldFootprintsRetainedHours\": 1");
                 AssertContains(json, "\"MapFootprintsRenderCacheStatus\": \"ready\"");
                 AssertContains(json, "\"MapFootprintsDrawLimitSkippedLineCount\": 3");
+                AssertContains(json, "\"MapFootprintsDrawTransformMapScale\": 8");
+                AssertContains(json, "\"MapFootprintsDrawLongLineThresholdPixels\": 1320");
+                AssertContains(json, "\"MapFootprintsDrawMaxLinePixels\": 2048");
+                AssertContains(json, "\"MapFootprintsDrawLongestStartTileX\": 4200");
+                AssertContains(json, "\"MapFootprintsDrawLongestStartScreenX\": -600");
+                AssertContains(json, "\"MapFootprintsDrawLongestEndScreenX\": 1448");
                 AssertContains(json, "\"MapFootprintsPlaybackTimelineStartTicks\": 100");
-                AssertContains(json, "\"MapFootprintsPlaybackProgress\": 0.6");
+                AssertContains(json, "\"MapFootprintsPlaybackProgress\": 0.75");
                 AssertContains(json, "\"MapFootprintsPlaybackAtLatest\": false");
+                AssertContains(json, "\"MapFootprintsPlaybackPrefixHitTarget\": \"track\"");
+                AssertContains(json, "\"MapFootprintsPlaybackPrefixMouseReadMode\": \"Terraria+OsClient/FullscreenOverlayGateBypass/FullscreenUi\"");
+                AssertContains(json, "\"MapFootprintsPlaybackPrefixMouseReadAvailable\": true");
+                AssertContains(json, "\"MapFootprintsPlaybackPrefixMainMouseLeftAfter\": false");
+                AssertContains(json, "\"MapFootprintsPlaybackPrefixMainMouseLeftReleaseAfter\": false");
+                AssertContains(json, "\"MapFootprintsPlaybackPrefixMainBlockMouseAfter\": true");
+                AssertContains(json, "\"MapFootprintsPlaybackDrawMouseReadMode\": \"Terraria+OsClient/FullscreenUi\"");
+                AssertContains(json, "\"MapFootprintsPlaybackDrawMouseReadAvailable\": true");
+                AssertContains(json, "\"MapFootprintsPlaybackDrawMainMouseLeftRelease\": true");
+                AssertContains(json, "\"MapFootprintsPlaybackDrawGameUpdateCount\": 1235");
             }
             finally
             {
