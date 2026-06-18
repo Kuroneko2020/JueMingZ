@@ -30,7 +30,7 @@ namespace JueMingZ.UI.Legacy
                 active = !string.IsNullOrWhiteSpace(_activeMode);
             }
 
-            return active || LegacyTextInput.IsAnyFocused || LegacyHexColorInput.IsAnyFocused;
+            return active || LegacyTextInput.IsAnyFocused || LegacyMultilineTextInput.IsAnyFocused || LegacyHexColorInput.IsAnyFocused;
         }
 
         public static bool IsMouseInWindow(LegacyMouseSnapshot mouse)
@@ -80,7 +80,13 @@ namespace JueMingZ.UI.Legacy
                 _lastClickY = -1;
             }
 
+            UserNotesUiState.SaveActiveEditor("uiReset");
             LegacyTextInput.ClearFocus();
+            if (!UserNotesUiState.HasActiveEditor)
+            {
+                LegacyMultilineTextInput.ClearFocus();
+            }
+
             LegacyHexColorInput.ClearFocus();
         }
 

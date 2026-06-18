@@ -95,6 +95,13 @@ namespace JueMingZ.UI.Legacy
                             LegacyHotbarScrollGuard.RestoreLateUiWheelIfNeeded(scrollSnapshot, inWindow, LegacyUiInput.IsActiveInteraction());
                             LegacyUiInput.SuppressHotbarScroll();
                         }
+                        else if (string.Equals(selectedPage, "hotkeys", StringComparison.Ordinal) &&
+                            UserNotesUiState.TryConsumeNestedScroll(mouse, mouse.ScrollDelta))
+                        {
+                            LegacyUiInput.CaptureIfNeeded(true);
+                            LegacyHotbarScrollGuard.RestoreLateUiWheelIfNeeded(scrollSnapshot, inWindow, LegacyUiInput.IsActiveInteraction());
+                            LegacyUiInput.SuppressHotbarScroll();
+                        }
                         else
                         {
                             var before = LegacyMainUiState.ScrollOffset;
@@ -175,6 +182,10 @@ namespace JueMingZ.UI.Legacy
                     else if (string.Equals(selectedPage, "search", StringComparison.Ordinal))
                     {
                         hoveredElement = DrawSearchPage(spriteBatch, scrollArea, mouse, elements);
+                    }
+                    else if (string.Equals(selectedPage, "hotkeys", StringComparison.Ordinal))
+                    {
+                        hoveredElement = DrawNotesPage(spriteBatch, scrollArea, mouse, elements);
                     }
                     else
                     {

@@ -59,6 +59,7 @@ namespace JueMingZ.Hooks
 
         private static readonly Func<bool>[] UiOverlayDispatcherDrawers =
         {
+            UserNotesPinnedOverlay.DrawInterfaceLayer,
             LegacyMainWindow.DrawInterfaceLayer,
             // The map marker style picker uses screen/UI coordinates; keeping it
             // in the UI-scale dispatcher prevents fullscreen map clicks from
@@ -69,6 +70,7 @@ namespace JueMingZ.Hooks
         private static readonly Func<bool>[] UiOverlayFallbackDispatcherDrawers =
         {
             InformationStatusPanelOverlay.DrawInterfaceLayer,
+            UserNotesPinnedOverlay.DrawInterfaceLayer,
             LegacyMainWindow.DrawInterfaceLayer,
             MapCustomMarkerStylePickerOverlay.DrawInterfaceLayer
         };

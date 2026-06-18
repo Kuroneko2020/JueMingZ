@@ -11,6 +11,7 @@ namespace JueMingZ.UI.Legacy
         public bool HasActiveSlider { get; private set; }
         public bool HasPendingSlider { get; private set; }
         public bool HasFocusedTextInput { get; private set; }
+        public bool HasFocusedMultilineTextInput { get; private set; }
         public bool HasFocusedHexInput { get; private set; }
         public bool HasScrollNeed { get; private set; }
         public bool HasCaptureNeed { get; private set; }
@@ -45,6 +46,7 @@ namespace JueMingZ.UI.Legacy
             bool hasActiveSlider,
             bool hasPendingSlider,
             bool hasFocusedTextInput,
+            bool hasFocusedMultilineTextInput,
             bool hasFocusedHexInput,
             bool hasScrollNeed,
             bool hasCaptureNeed)
@@ -56,6 +58,7 @@ namespace JueMingZ.UI.Legacy
             HasActiveSlider = hasActiveSlider;
             HasPendingSlider = hasPendingSlider;
             HasFocusedTextInput = hasFocusedTextInput;
+            HasFocusedMultilineTextInput = hasFocusedMultilineTextInput;
             HasFocusedHexInput = hasFocusedHexInput;
             HasScrollNeed = hasScrollNeed;
             HasCaptureNeed = hasCaptureNeed;
@@ -101,10 +104,12 @@ namespace JueMingZ.UI.Legacy
             }
 
             var hasFocusedTextInput = LegacyTextInput.IsAnyFocused;
+            var hasFocusedMultilineTextInput = LegacyMultilineTextInput.IsAnyFocused;
             var hasFocusedHexInput = LegacyHexColorInput.IsAnyFocused;
             var hasActiveInteraction =
                 !string.IsNullOrWhiteSpace(activeMode) ||
                 hasFocusedTextInput ||
+                hasFocusedMultilineTextInput ||
                 hasFocusedHexInput;
 
             return new LegacyUiActionUpdateGateSnapshot(
@@ -115,6 +120,7 @@ namespace JueMingZ.UI.Legacy
                 hasActiveSlider,
                 hasPendingSlider,
                 hasFocusedTextInput,
+                hasFocusedMultilineTextInput,
                 hasFocusedHexInput,
                 hasScrollNeed,
                 hasCaptureNeed);

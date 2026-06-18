@@ -20,6 +20,11 @@ namespace JueMingZ.UI.Legacy
             return BuildMouseSnapshot(raw, true, scale);
         }
 
+        internal static LegacyMouseSnapshot ReadMouseForOverlay(DiagnosticMouseState raw, LegacyMainUiScaleSnapshot scale)
+        {
+            return BuildMouseSnapshot(raw, false, scale);
+        }
+
         private static LegacyMouseSnapshot BuildMouseSnapshot(DiagnosticMouseState raw, bool consumePendingScroll)
         {
             return BuildMouseSnapshot(raw, consumePendingScroll, LegacyMainUiScale.Resolve(raw));

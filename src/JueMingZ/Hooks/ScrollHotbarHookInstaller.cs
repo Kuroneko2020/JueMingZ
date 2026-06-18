@@ -5,6 +5,7 @@ using System.Threading;
 using JueMingZ.Bootstrap;
 using JueMingZ.Compat;
 using JueMingZ.Diagnostics;
+using JueMingZ.UI;
 using JueMingZ.UI.Legacy;
 
 namespace JueMingZ.Hooks
@@ -139,7 +140,8 @@ namespace JueMingZ.Hooks
         {
             private static bool Prefix()
             {
-                var suppress = LegacyUiInput.ShouldSuppressHotbarScrollFromHook();
+                var suppress = UserNotesPinnedOverlay.ShouldSuppressHotbarScrollFromHook() ||
+                               LegacyUiInput.ShouldSuppressHotbarScrollFromHook();
                 if (suppress)
                 {
                     TerrariaUiMouseCompat.MarkScrollHotbarHookSuppressed();

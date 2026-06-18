@@ -1,5 +1,7 @@
 ﻿using JueMingZ.Actions;
 
+using JueMingZ.Common;
+
 namespace JueMingZ.Features.Catalog
 {
     public static class InformationFeatureRegistrar
@@ -90,6 +92,17 @@ namespace JueMingZ.Features.Catalog
                 .Config(FeatureConfigUiKind.StyleConfigWindow)
                 .GameState(GameStateKind.Npcs, GameStateKind.World)
                 .Notes("不需要渔夫活着，而是在这个世界已存在渔夫。"));
+
+            registry.Register(FeatureDefinitionBuilder.Create(FeatureIds.InformationUserNotes, "笔记", "全局用户笔记与悬挂便签")
+                .Domain(FeatureCodeDomain.Information)
+                .Category(FeatureUserCategory.MoreInformation)
+                .Actions(InputActionKind.None)
+                .GameState(GameStateKind.UiState)
+                .Multiplayer(FeatureMultiplayerSupport.Unknown)
+                .VisibleInMainUi(false)
+                .Implemented(false)
+                .Notes("本阶段只登记稳定 feature id 与存储底座；F5 笔记页、正文编辑器和悬挂 overlay 后续阶段实现后再打开 visible / implemented。")
+                .Build());
         }
 
         private static void Add(FeatureRegistry registry, FeatureDefinitionBuilder builder)

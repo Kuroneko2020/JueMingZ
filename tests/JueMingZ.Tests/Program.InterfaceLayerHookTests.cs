@@ -166,6 +166,7 @@ namespace JueMingZ.Tests
                 InterfaceLayerHookCallbacks.GetUiOverlayDispatcherRouteNamesForTesting(true),
                 new[]
                 {
+                    "UserNotesPinnedOverlay.DrawInterfaceLayer",
                     "LegacyMainWindow.DrawInterfaceLayer",
                     "MapCustomMarkerStylePickerOverlay.DrawInterfaceLayer"
                 },
@@ -176,6 +177,7 @@ namespace JueMingZ.Tests
                 new[]
                 {
                     "InformationStatusPanelOverlay.DrawInterfaceLayer",
+                    "UserNotesPinnedOverlay.DrawInterfaceLayer",
                     "LegacyMainWindow.DrawInterfaceLayer",
                     "MapCustomMarkerStylePickerOverlay.DrawInterfaceLayer"
                 },

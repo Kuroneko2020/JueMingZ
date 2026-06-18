@@ -351,6 +351,9 @@ namespace JueMingZ.UI.Legacy.Controls
                 case "keyboard":
                     DrawKeyboard(mask);
                     break;
+                case "note":
+                    DrawNote(mask);
+                    break;
                 case "blueprint":
                     DrawBlueprint(mask);
                     break;
@@ -424,6 +427,15 @@ namespace JueMingZ.UI.Legacy.Controls
             AddSegment(mask, 8.0, 7.5, 8.9, 7.5, 1.1d);
             AddSegment(mask, 11.0, 7.5, 11.9, 7.5, 1.1d);
             AddSegment(mask, 5.0, 10.2, 13.0, 10.2, 1.05d);
+        }
+
+        private static void DrawNote(double[] mask)
+        {
+            AddRoundedRectOutline(mask, 4.0, 3.6, 10.0, 11.2, 1.0, 1.15d);
+            AddPolyline(mask, 1.05d, false, 10.8, 3.8, 14.0, 7.0, 10.8, 7.0, 10.8, 3.8);
+            AddSegment(mask, 6.1, 8.2, 11.7, 8.2, 1.0d);
+            AddSegment(mask, 6.1, 10.6, 11.7, 10.6, 1.0d);
+            AddSegment(mask, 6.1, 13.0, 9.6, 13.0, 1.0d);
         }
 
         private static void DrawBlueprint(double[] mask)

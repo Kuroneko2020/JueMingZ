@@ -38,6 +38,7 @@ namespace JueMingZ.Common
         public const string FishingFilter = "fishing.filter";
         public const string FishingQuickRename = "fishing.quick_rename";
         public const string InformationHighlightDigtoise = "information.highlight_digtoise";
+        public const string InformationUserNotes = "information.user_notes";
         public const string MapPersistentDeathMarkers = "map.persistent_death_markers";
         public const string MapDeathHistory = "map.death_history";
         public const string MapWorldDayCount = "map.world_day_count";

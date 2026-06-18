@@ -124,8 +124,10 @@ namespace JueMingZ.Runtime
             snapshot.LegacyMainUiLastF5HotkeyDebounceRemainingMs = f5Hotkey.DebounceRemainingMs;
             snapshot.LegacyMainUiLastF5HotkeyUtc = f5Hotkey.Utc;
             var imePanel = TerrariaTextInputCompat.GetImePanelDiagnosticsForSnapshot();
-            snapshot.LegacyImePanelFocused = LegacyTextInput.IsAnyFocused;
-            snapshot.LegacyImePanelDiagnosticMessage = LegacyTextInput.DiagnosticMessage;
+            snapshot.LegacyImePanelFocused = LegacyTextInput.IsAnyFocused || LegacyMultilineTextInput.IsAnyFocused;
+            snapshot.LegacyImePanelDiagnosticMessage = LegacyMultilineTextInput.IsAnyFocused
+                ? LegacyMultilineTextInput.DiagnosticMessage
+                : LegacyTextInput.DiagnosticMessage;
             snapshot.LegacyImePanelLastStatus = imePanel.LastStatus ?? string.Empty;
             snapshot.LegacyImePanelLastMessage = imePanel.LastMessage ?? string.Empty;
             snapshot.LegacyImePanelAnchorAttachedThisFrame = imePanel.AnchorAttachedThisFrame;

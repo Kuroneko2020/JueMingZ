@@ -2053,6 +2053,229 @@ function Test-F5MultiPageUiLayoutGovernance {
     }
 }
 
+function Test-UserNotesGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $tabBarPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyTabBar.cs"
+    $vectorIconPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\Controls\LegacyVectorIconRenderer.cs"
+    $featureIdsPath = Join-Path $RepoRoot "src\JueMingZ\Common\FeatureIds.cs"
+    $registrarPath = Join-Path $RepoRoot "src\JueMingZ\Features\Catalog\InformationFeatureRegistrar.cs"
+    $categoryPath = Join-Path $RepoRoot "src\JueMingZ\Features\FeatureUserCategory.cs"
+    $storePath = Join-Path $RepoRoot "src\JueMingZ\Automation\Information\Notes\UserNotesStore.cs"
+    $cachePath = Join-Path $RepoRoot "src\JueMingZ\Automation\Information\Notes\UserNotesCache.cs"
+    $diagnosticsPath = Join-Path $RepoRoot "src\JueMingZ\Automation\Information\Notes\UserNotesDiagnostics.cs"
+    $notesWindowPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.Notes.cs"
+    $notesStatePath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\UserNotesUiState.cs"
+    $multilineInputPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMultilineTextInput.cs"
+    $legacyTextInputPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyTextInput.cs"
+    $scrollPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyUiInput.Scroll.cs"
+    $layersPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.Layers.cs"
+    $userNotesActionPath = Join-Path $RepoRoot "src\JueMingZ\Input\LegacyUiActionService.UserNotes.cs"
+    $pinnedOverlayPath = Join-Path $RepoRoot "src\JueMingZ\UI\UserNotesPinnedOverlay.cs"
+    $pinnedOverlayStatePath = Join-Path $RepoRoot "src\JueMingZ\UI\UserNotesPinnedOverlayState.cs"
+    $hookInstallerPath = Join-Path $RepoRoot "src\JueMingZ\Bootstrap\HookInstaller.cs"
+    $playerInputHookPath = Join-Path $RepoRoot "src\JueMingZ\Hooks\PlayerInputScrollHookInstaller.cs"
+    $hotbarHookPath = Join-Path $RepoRoot "src\JueMingZ\Hooks\ScrollHotbarHookInstaller.cs"
+    $storeTestsPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.UserNotesStoreTests.cs"
+    $uiTestsPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.UserNotesUiTests.cs"
+    $overlayTestsPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.UserNotesOverlayTests.cs"
+    $interfaceLayerTestsPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.InterfaceLayerHookTests.cs"
+    $programTestsPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
+    $featureDocPath = Join-Path $RepoRoot "文档\功能介绍\F5通用\笔记页.md"
+    $featureIndexPath = Join-Path $RepoRoot "文档\功能介绍\功能索引.md"
+    $diagnosticRulesPath = Join-Path $RepoRoot "文档\项目规则\AI诊断日志说明.md"
+    $plan06Path = Join-Path $RepoRoot "文档\归档历史计划\笔记页与悬挂便签实现\06-诊断测试文档审计护栏.md"
+
+    $tabBarText = Read-TextIfExists -Path $tabBarPath
+    $vectorIconText = Read-TextIfExists -Path $vectorIconPath
+    $featureIdsText = Read-TextIfExists -Path $featureIdsPath
+    $registrarText = Read-TextIfExists -Path $registrarPath
+    $categoryText = Read-TextIfExists -Path $categoryPath
+    $storeText = Read-TextIfExists -Path $storePath
+    $cacheText = Read-TextIfExists -Path $cachePath
+    $diagnosticsText = Read-TextIfExists -Path $diagnosticsPath
+    $notesWindowText = Read-TextIfExists -Path $notesWindowPath
+    $notesStateText = Read-TextIfExists -Path $notesStatePath
+    $multilineInputText = Read-TextIfExists -Path $multilineInputPath
+    $legacyTextInputText = Read-TextIfExists -Path $legacyTextInputPath
+    $scrollText = Read-TextIfExists -Path $scrollPath
+    $layersText = Read-TextIfExists -Path $layersPath
+    $userNotesActionText = Read-TextIfExists -Path $userNotesActionPath
+    $pinnedOverlayText = Read-TextIfExists -Path $pinnedOverlayPath
+    $pinnedOverlayStateText = Read-TextIfExists -Path $pinnedOverlayStatePath
+    $hookInstallerText = Read-TextIfExists -Path $hookInstallerPath
+    $playerInputHookText = Read-TextIfExists -Path $playerInputHookPath
+    $hotbarHookText = Read-TextIfExists -Path $hotbarHookPath
+    $storeTestsText = Read-TextIfExists -Path $storeTestsPath
+    $uiTestsText = Read-TextIfExists -Path $uiTestsPath
+    $overlayTestsText = Read-TextIfExists -Path $overlayTestsPath
+    $interfaceLayerTestsText = Read-TextIfExists -Path $interfaceLayerTestsPath
+    $programTestsText = Read-TextIfExists -Path $programTestsPath
+    $featureDocText = Read-TextIfExists -Path $featureDocPath
+    $featureIndexText = Read-TextIfExists -Path $featureIndexPath
+    $diagnosticRulesText = Read-TextIfExists -Path $diagnosticRulesPath
+    $plan06Text = Read-TextIfExists -Path $plan06Path
+
+    if ($null -eq $tabBarText -or $null -eq $vectorIconText -or $null -eq $featureIdsText -or
+        $null -eq $registrarText -or $null -eq $categoryText -or $null -eq $storeText -or
+        $null -eq $cacheText -or $null -eq $diagnosticsText -or $null -eq $notesWindowText -or
+        $null -eq $notesStateText -or $null -eq $multilineInputText -or $null -eq $legacyTextInputText -or
+        $null -eq $scrollText -or $null -eq $layersText -or $null -eq $userNotesActionText -or
+        $null -eq $pinnedOverlayText -or $null -eq $pinnedOverlayStateText -or $null -eq $hookInstallerText -or
+        $null -eq $playerInputHookText -or $null -eq $hotbarHookText -or $null -eq $storeTestsText -or
+        $null -eq $uiTestsText -or $null -eq $overlayTestsText -or $null -eq $interfaceLayerTestsText -or
+        $null -eq $programTestsText -or $null -eq $featureDocText -or $null -eq $featureIndexText -or
+        $null -eq $diagnosticRulesText -or $null -eq $plan06Text) {
+        Write-FailHealth "User notes source, tests, feature docs, diagnostics rules, and plan coverage matrix must exist before governance can be audited."
+        return
+    }
+
+    if ($tabBarText.Contains('new LegacyTabDefinition("hotkeys", "笔记", "note"') -and
+        $vectorIconText.Contains('case "note":') -and
+        $vectorIconText.Contains("DrawNote(mask)") -and
+        $uiTestsText.Contains("UserNotesTabKeepsHotkeysPageIdAndUsesNoteIcon") -and
+        $featureDocText.Contains('page id 仍是 `hotkeys`') -and
+        $featureIndexText.Contains("F5通用/笔记页.md")) {
+        Write-Pass "User notes keep the stable hotkeys page id with the note display/icon contract."
+    }
+    else {
+        Write-FailHealth "User notes must keep page id hotkeys, display 笔记, use the built-in note vector icon, and document that boundary."
+    }
+
+    if ($featureIdsText.Contains('InformationUserNotes = "information.user_notes"') -and
+        $registrarText.Contains("FeatureIds.InformationUserNotes") -and
+        $registrarText.Contains(".Domain(FeatureCodeDomain.Information)") -and
+        $registrarText.Contains(".Category(FeatureUserCategory.MoreInformation)") -and
+        $registrarText.Contains(".Actions(InputActionKind.None)") -and
+        $registrarText.Contains(".GameState(GameStateKind.UiState)") -and
+        $registrarText.Contains(".VisibleInMainUi(false)") -and
+        $registrarText.Contains(".Implemented(false)") -and
+        -not $categoryText.Contains("UserNotes") -and
+        $storeTestsText.Contains("FeatureCatalogExposesUserNotesAsPlannedHiddenInformation")) {
+        Write-Pass "User notes FeatureId and registrar stay information/ui-only without adding a user category."
+    }
+    else {
+        Write-FailHealth "User notes FeatureId/registrar must remain information.user_notes, Information/MoreInformation, Actions=None, UiState, planned hidden, with no new FeatureUserCategory."
+    }
+
+    if ($storeText.Contains('Path.Combine(ConfigService.ConfigDirectory, "notes")') -and
+        $storeText.Contains('get { return Path.Combine(_notesDirectory, "index.json"); }') -and
+        $storeText.Contains('NormalizeNoteId') -and
+        $storeText.Contains('CreateTempPath') -and
+        $storeText.Contains('File.Replace(_tempPath, _targetPath, null, true)') -and
+        $storeText.Contains('File.Move(_tempPath, _targetPath)') -and
+        $storeText.Contains('RollbackCommitted') -and
+        $cacheText.Contains('UserNotesSnapshot') -and
+        $storeTestsText.Contains('AssertPathUnderConfigDirectory(UserNotesStore.GetDefaultNotesDirectory()') -and
+        $storeTestsText.Contains('UserNotesCacheSnapshotDoesNotTouchDisk') -and
+        -not $storeText.Contains("player-worlds")) {
+        Write-Pass "User notes storage stays under ConfigService notes with safe writes and cache-only draw snapshots."
+    }
+    else {
+        Write-FailHealth "User notes storage must use ConfigService.ConfigDirectory\\notes, index/body files, safe temp commit, delete/save failure protection, and cache snapshots without player-world storage."
+    }
+
+    $hotPathLeaks = @()
+    $hotPathTexts = @(
+        @{ Name = "LegacyMainWindow.Notes"; Text = $notesWindowText },
+        @{ Name = "UserNotesUiState"; Text = $notesStateText },
+        @{ Name = "UserNotesPinnedOverlay"; Text = $pinnedOverlayText },
+        @{ Name = "UserNotesPinnedOverlayState"; Text = $pinnedOverlayStateText }
+    )
+    foreach ($hotPath in $hotPathTexts) {
+        foreach ($token in @("File.", "Directory.", "index.json", ".txt")) {
+            if ($hotPath.Text.Contains($token)) {
+                $hotPathLeaks += "$($hotPath.Name):$token"
+            }
+        }
+    }
+
+    if ($hotPathLeaks.Count -eq 0 -and
+        $notesWindowText.Contains("UserNotesUiState.BuildLayout") -and
+        $notesStateText.Contains("GetCache().Snapshot") -and
+        $layersText.Contains('string.Equals(selectedPage, "hotkeys", StringComparison.Ordinal)') -and
+        $scrollText.Contains("UserNotesUiState.TryConsumeNestedScroll")) {
+        Write-Pass "User notes F5 and pinned draw/layout hot paths avoid file IO and route through cache/nested-scroll state."
+    }
+    else {
+        Write-FailHealth "User notes draw/hover/layout hot paths must avoid File/Directory/index/body IO and use cache snapshots; leaks=$($hotPathLeaks -join ', ')"
+    }
+
+    if ($multilineInputText.Contains("allowNewLine") -and
+        $multilineInputText.Contains('InsertTextLocked("\n", allowNewLine, maxLength)') -and
+        $multilineInputText.Contains("TryAttachImeCompositionPanel") -and
+        $legacyTextInputText.Contains('Replace("\n", string.Empty)') -and
+        $notesStateText.Contains("LegacyMultilineTextInput") -and
+        $uiTestsText.Contains("UserNotesBodyEditorSavesNewlinesAndKeepsDraftOnFailure") -and
+        $uiTestsText.Contains("UserNotesMultilineTextInputHandlesCursorSubmitAndCancel")) {
+        Write-Pass "User notes body editor uses the dedicated multiline input path instead of the newline-stripping short input."
+    }
+    else {
+        Write-FailHealth "User notes body editor must keep a dedicated multiline editor with newline, cursor, IME, save-failure, and cancel tests."
+    }
+
+    $mutationLeaks = @()
+    $notesBehaviorTexts = @(
+        @{ Name = "LegacyUiActionService.UserNotes"; Text = $userNotesActionText },
+        @{ Name = "UserNotesPinnedOverlay"; Text = $pinnedOverlayText },
+        @{ Name = "UserNotesPinnedOverlayState"; Text = $pinnedOverlayStateText },
+        @{ Name = "UserNotesUiState"; Text = $notesStateText },
+        @{ Name = "UserNotesStore"; Text = $storeText }
+    )
+    foreach ($behavior in $notesBehaviorTexts) {
+        foreach ($token in @("InputActionQueue", "TryEnqueue", "controlUseItem", "selectedItem", "statLife", "statMana", "buffType", "buffTime", "AddBuff", "QuickStack")) {
+            if ($behavior.Text.Contains($token)) {
+                $mutationLeaks += "$($behavior.Name):$token"
+            }
+        }
+    }
+
+    if ($mutationLeaks.Count -eq 0 -and
+        $pinnedOverlayText.Contains("UiMouseCaptureService.CaptureForOperationWindow") -and
+        $pinnedOverlayText.Contains("UiMouseCaptureService.ConsumeScrollForOperationWindow") -and
+        $pinnedOverlayText.Contains("TerrariaUiMouseCompat.TryConsumeMouseTriggerInputOnceForUi") -and
+        $hookInstallerText.Contains("UserNotesPinnedOverlay.UpdatePrefixGuard") -and
+        $playerInputHookText.Contains("UserNotesPinnedOverlay.UpdateAfterPlayerInputGuard") -and
+        $hotbarHookText.Contains("UserNotesPinnedOverlay.ShouldSuppressHotbarScrollFromHook") -and
+        $overlayTestsText.Contains("UserNotesPinnedOverlayScrollDragOpacityAndCloseUsePinnedState") -and
+        $interfaceLayerTestsText.Contains("UserNotesPinnedOverlay.DrawInterfaceLayer")) {
+        Write-Pass "User notes pinned overlay stays UI-only and uses controlled mouse/scroll consumption guards."
+    }
+    else {
+        Write-FailHealth "User notes pinned overlay must not submit actions or mutate game state, and must use prefix/after-player-input/hotbar scroll guards; leaks=$($mutationLeaks -join ', ')"
+    }
+
+    if ($diagnosticsText.Contains("DiagnosticActionRecorder.RecordCustomEvent") -and
+        $diagnosticsText.Contains('\"featureId\":\"information.user_notes\"') -and
+        $userNotesActionText.Contains("Ui.Notes.DeleteConfirm") -and
+        $pinnedOverlayText.Contains("Ui.Notes.Wheel") -and
+        $pinnedOverlayText.Contains("Ui.Notes.Drag") -and
+        $pinnedOverlayText.Contains("Ui.Notes.Opacity") -and
+        $diagnosticRulesText.Contains("scenario=Ui.Notes.*") -and
+        $diagnosticRulesText.Contains("不新增 runtime snapshot 字段") -and
+        $featureDocText.Contains("## 诊断字段") -and
+        $featureDocText.Contains("Ui.Notes.Opacity") -and
+        $featureDocText.Contains("仍需用户实机确认") -and
+        $plan06Text.Contains("## 覆盖矩阵")) {
+        Write-Pass "User notes docs and diagnostics describe real Ui.Notes action events without inventing runtime snapshot fields."
+    }
+    else {
+        Write-FailHealth "User notes feature docs, diagnostics rules, and plan coverage matrix must describe actual Ui.Notes events, no runtime snapshot fields, and remaining real-machine checks."
+    }
+
+    if ($programTestsText.Contains("user notes store missing index uses config notes directory") -and
+        $programTestsText.Contains("user notes body editor saves newlines and keeps draft on failure") -and
+        $programTestsText.Contains("user notes pinned overlay scroll drag opacity and close use pinned state") -and
+        $storeTestsText.Contains("UserNotesSaveIndexFailureRollsBackBody") -and
+        $uiTestsText.Contains("UserNotesNestedScrollConsumesOnlyScrollableBody") -and
+        $overlayTestsText.Contains("UserNotesPinnedOverlayStoreReloadAndDeleteSync")) {
+        Write-Pass "User notes console tests keep storage, UI, editor, nested scroll, and pinned overlay coverage anchored."
+    }
+    else {
+        Write-FailHealth "User notes console tests must cover store isolation/safe write, UI layout/nested scroll, multiline editor, and pinned overlay behavior."
+    }
+}
+
 function Test-MapCustomMarkerGovernance {
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
 
@@ -4332,6 +4555,7 @@ Test-PhasebladeQuickSwitchDiagnosticsGovernance -RepoRoot $repoRoot
 Test-MapQuickAnnouncementGovernance -RepoRoot $repoRoot
 Test-FeatureToggleHotkeyGovernance -RepoRoot $repoRoot
 Test-F5MultiPageUiLayoutGovernance -RepoRoot $repoRoot
+Test-UserNotesGovernance -RepoRoot $repoRoot
 Test-MapCustomMarkerGovernance -RepoRoot $repoRoot
 Test-MapDirectionHintGovernance -RepoRoot $repoRoot
 Test-MapFootprintGovernance -RepoRoot $repoRoot

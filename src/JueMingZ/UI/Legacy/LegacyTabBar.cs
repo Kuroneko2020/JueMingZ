@@ -11,7 +11,7 @@ namespace JueMingZ.UI.Legacy
             new LegacyTabDefinition("misc", "杂项", "grid", 0, 1),
             new LegacyTabDefinition("map_enhancement", "地图", "map_pin", 0, 2),
             new LegacyTabDefinition("search", "查询", "search", 0, 3),
-            new LegacyTabDefinition("hotkeys", "按键", "keyboard", 0, 4),
+            new LegacyTabDefinition("hotkeys", "笔记", "note", 0, 4),
             new LegacyTabDefinition("about", "关于", "info", 0, 5),
             new LegacyTabDefinition("blueprint", "蓝图", "blueprint", 1, 0),
             new LegacyTabDefinition("fishing", "钓鱼", "fish", 1, 1),

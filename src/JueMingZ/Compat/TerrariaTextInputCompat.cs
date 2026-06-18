@@ -26,7 +26,14 @@ namespace JueMingZ.Compat
 
         public static bool TryGetInputText(string currentText, out string updatedText, out string message)
         {
+            TextInputControlState controlState;
+            return TryGetInputText(currentText, false, out updatedText, out controlState, out message);
+        }
+
+        public static bool TryGetInputText(string currentText, bool allowMultiLine, out string updatedText, out TextInputControlState controlState, out string message)
+        {
             updatedText = currentText ?? string.Empty;
+            controlState = new TextInputControlState();
             message = string.Empty;
 
             try
@@ -65,9 +72,10 @@ namespace JueMingZ.Compat
 
                 TrySetNativeInputCapture(true);
                 TryInvokeHandleIme(mainType);
-                var args = BuildGetInputTextArgs(method, updatedText);
+                var args = BuildGetInputTextArgs(method, updatedText, allowMultiLine);
                 var result = method.Invoke(null, args);
                 updatedText = result as string ?? updatedText;
+                controlState = ReadTextInputControlState(mainType);
                 message = "Terraria native text input OK.";
                 LastMessage = message;
                 NativeInputAvailable = true;
@@ -336,7 +344,7 @@ namespace JueMingZ.Compat
             }
         }
 
-        private static object[] BuildGetInputTextArgs(MethodInfo method, string currentText)
+        private static object[] BuildGetInputTextArgs(MethodInfo method, string currentText, bool allowMultiLine)
         {
             var parameters = method.GetParameters();
             var args = new object[parameters.Length];
@@ -344,10 +352,56 @@ namespace JueMingZ.Compat
             for (var index = 1; index < parameters.Length; index++)
             {
                 var name = parameters[index].Name ?? string.Empty;
-                args[index] = name.IndexOf("allowEmpty", StringComparison.OrdinalIgnoreCase) >= 0 || parameters.Length == 2;
+                args[index] = name.IndexOf("allowEmpty", StringComparison.OrdinalIgnoreCase) >= 0
+                    ? true
+                    : allowMultiLine;
             }
 
             return args;
+        }
+
+        private static TextInputControlState ReadTextInputControlState(Type mainType)
+        {
+            if (mainType == null)
+            {
+                return new TextInputControlState();
+            }
+
+            return new TextInputControlState
+            {
+                EnterPressed = TryReadStaticBool(mainType, "inputTextEnter"),
+                EscapePressed = TryReadStaticBool(mainType, "inputTextEscape")
+            };
+        }
+
+        private static bool TryReadStaticBool(Type type, string name)
+        {
+            if (type == null || string.IsNullOrWhiteSpace(name))
+            {
+                return false;
+            }
+
+            try
+            {
+                FieldInfo field;
+                if (TerrariaMemberCache.TryGetField(type, name, true, out field) && field.FieldType == typeof(bool))
+                {
+                    return (bool)field.GetValue(null);
+                }
+
+                PropertyInfo property;
+                if (TerrariaMemberCache.TryGetProperty(type, name, true, out property) &&
+                    property.CanRead &&
+                    property.PropertyType == typeof(bool))
+                {
+                    return (bool)property.GetValue(null, null);
+                }
+            }
+            catch
+            {
+            }
+
+            return false;
         }
 
         private static void TrySetNativeInputCapture(bool active)
@@ -417,5 +471,11 @@ namespace JueMingZ.Compat
 
             return null;
         }
+    }
+
+    public struct TextInputControlState
+    {
+        public bool EnterPressed { get; set; }
+        public bool EscapePressed { get; set; }
     }
 }

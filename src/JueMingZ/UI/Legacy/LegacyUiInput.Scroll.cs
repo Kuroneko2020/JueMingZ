@@ -245,8 +245,10 @@ namespace JueMingZ.UI.Legacy
             var before = LegacyMainUiState.ScrollOffset;
             var overlayScrollBlocked = LegacyUiOverlayCoordinator.Current.ShouldBlockMainScroll(mouse, rawScrollDelta);
             var nestedScrollConsumed = !overlayScrollBlocked &&
-                                       string.Equals(LegacyMainUiState.SelectedPageId, "fishing", StringComparison.Ordinal) &&
-                                       FishingFilterUiState.TryConsumeNestedScroll(mouse, rawScrollDelta);
+                                       ((string.Equals(LegacyMainUiState.SelectedPageId, "fishing", StringComparison.Ordinal) &&
+                                         FishingFilterUiState.TryConsumeNestedScroll(mouse, rawScrollDelta)) ||
+                                        (string.Equals(LegacyMainUiState.SelectedPageId, "hotkeys", StringComparison.Ordinal) &&
+                                         UserNotesUiState.TryConsumeNestedScroll(mouse, rawScrollDelta)));
             var after = before;
             if (!overlayScrollBlocked && !nestedScrollConsumed)
             {

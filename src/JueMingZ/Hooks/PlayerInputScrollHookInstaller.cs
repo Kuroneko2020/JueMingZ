@@ -186,6 +186,7 @@ namespace JueMingZ.Hooks
             {
                 TerrariaUiMouseCompat.UpdateActiveTriggerSuppressionAfterPlayerInputGuard();
                 MapFootprintPlaybackOverlay.UpdateAfterPlayerInputGuard();
+                UserNotesPinnedOverlay.UpdateAfterPlayerInputGuard();
                 SearchItemPickRuntimeService.UpdateAfterPlayerInputGuard();
                 LegacyUiInput.UpdateAfterPlayerInputGuard("PlayerInputScrollHook.Postfix");
             }

@@ -16,6 +16,21 @@ namespace JueMingZ.UI.Legacy
         public static bool ToggleVisible()
         {
             EnsureLoaded();
+            bool closing;
+            lock (SyncRoot)
+            {
+                closing = _visible;
+            }
+
+            if (closing)
+            {
+                var save = UserNotesUiState.SaveActiveEditor("close");
+                if (!save.Succeeded)
+                {
+                    return true;
+                }
+            }
+
             bool visible;
             lock (SyncRoot)
             {
@@ -46,6 +61,15 @@ namespace JueMingZ.UI.Legacy
         public static void SetVisible(bool visible)
         {
             EnsureLoaded();
+            if (!visible)
+            {
+                var save = UserNotesUiState.SaveActiveEditor("setHidden");
+                if (!save.Succeeded)
+                {
+                    return;
+                }
+            }
+
             lock (SyncRoot)
             {
                 _visible = visible;

@@ -140,6 +140,16 @@ namespace JueMingZ.UI.Legacy
                 }
             }
 
+            return TryAttachFocusedImeCompositionPanel(anchor, SetDiagnosticMessage);
+        }
+
+        internal static bool TryAttachFocusedImeCompositionPanel(LegacyUiRect anchor, Action<string> setDiagnosticMessage)
+        {
+            if (anchor.Width <= 0 || anchor.Height <= 0)
+            {
+                return false;
+            }
+
             string message;
             // Terraria draws the native IME candidate strip 32 px above the anchor.
             // Anchoring at the input bottom would overlap the text box itself.
@@ -150,7 +160,10 @@ namespace JueMingZ.UI.Legacy
                 out message);
             if (!attached)
             {
-                SetDiagnosticMessage("原生 IME 候选面板不可用。 " + message);
+                if (setDiagnosticMessage != null)
+                {
+                    setDiagnosticMessage("原生 IME 候选面板不可用。 " + message);
+                }
             }
 
             return attached;

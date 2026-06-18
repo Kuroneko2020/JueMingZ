@@ -22,7 +22,24 @@ namespace JueMingZ.Input
             {
                 var pageId = command.ElementId.StartsWith("tab:", StringComparison.Ordinal) ? command.ElementId.Substring(4) : "buff";
                 var before = LegacyMainUiState.BuildUiStateJson();
+                var notesSave = UserNotesUiState.SaveActiveEditor("pageSelect");
+                if (!notesSave.Succeeded)
+                {
+                    Record(
+                        command,
+                        "Ui.Notes.Save",
+                        "UserNotes",
+                        "Failed",
+                        notesSave.Message,
+                        before,
+                        LegacyMainUiState.BuildUiStateJson(),
+                        "{\"pageId\":\"" + EscapeJson(LegacyMainUiState.SelectedPageId) + "\",\"resultCode\":\"" + EscapeJson(notesSave.ResultCode) + "\"}",
+                        "Button");
+                    return;
+                }
+
                 LegacyTextInput.ClearFocus();
+                LegacyMultilineTextInput.ClearFocus();
                 LegacyMainWindow.CloseFeatureToggleHotkeyModal();
                 LegacyMainUiState.SelectPage(pageId);
                 Record(
@@ -263,6 +280,12 @@ namespace JueMingZ.Input
             if (command.ElementId.StartsWith("search-query:", StringComparison.Ordinal))
             {
                 HandleSearchQueryCommand(command);
+                return;
+            }
+
+            if (command.ElementId.StartsWith("notes:", StringComparison.Ordinal))
+            {
+                HandleUserNotesCommand(command);
                 return;
             }
 

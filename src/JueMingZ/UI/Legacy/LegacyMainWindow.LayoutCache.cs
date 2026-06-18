@@ -264,6 +264,11 @@ namespace JueMingZ.UI.Legacy
                 return CalculateSearchContentHeight(contentRect);
             }
 
+            if (string.Equals(selectedPage, "hotkeys", StringComparison.Ordinal))
+            {
+                return CalculateNotesContentHeight(contentRect);
+            }
+
             return contentRect.Height - LegacyUiMetrics.ContentPadding * 2;
         }
 
@@ -309,6 +314,10 @@ namespace JueMingZ.UI.Legacy
                     AddHash(ref hash, LegacyTextInput.IsFocused(SearchChestLocatorUiState.InputId));
                     AddHash(ref hash, SearchItemQueryUiState.BuildStateSignature());
                     AddHash(ref hash, LegacyTextInput.IsFocused(SearchItemQueryUiState.InputId));
+                }
+                else if (string.Equals(selectedPage, "hotkeys", StringComparison.Ordinal))
+                {
+                    AddHash(ref hash, UserNotesUiState.BuildStateSignature());
                 }
                 else if (string.Equals(selectedPage, "map_enhancement", StringComparison.Ordinal))
                 {
@@ -543,6 +552,10 @@ namespace JueMingZ.UI.Legacy
                     AddHash(ref hash, LegacyTextInput.IsFocused(SearchChestLocatorUiState.InputId));
                     AddHash(ref hash, SearchItemQueryUiState.BuildStateSignature());
                     AddHash(ref hash, LegacyTextInput.IsFocused(SearchItemQueryUiState.InputId));
+                }
+                else if (string.Equals(selectedPage, "hotkeys", StringComparison.Ordinal))
+                {
+                    AddHash(ref hash, UserNotesUiState.BuildStateSignature());
                 }
 
                 return hash;
