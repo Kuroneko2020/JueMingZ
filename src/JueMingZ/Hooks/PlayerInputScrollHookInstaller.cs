@@ -184,11 +184,23 @@ namespace JueMingZ.Hooks
         {
             private static void Postfix(MethodBase __originalMethod)
             {
+                var phase = "PlayerInputScrollHook.Postfix." + SafeMethodName(__originalMethod);
+                UiInputFrameClock.BeginInputFrame(phase);
                 TerrariaUiMouseCompat.UpdateActiveTriggerSuppressionAfterPlayerInputGuard();
                 MapFootprintPlaybackOverlay.UpdateAfterPlayerInputGuard();
                 UserNotesPinnedOverlay.UpdateAfterPlayerInputGuard();
                 SearchItemPickRuntimeService.UpdateAfterPlayerInputGuard();
-                LegacyUiInput.UpdateAfterPlayerInputGuard("PlayerInputScrollHook.Postfix");
+                LegacyUiInput.UpdateAfterPlayerInputGuard(phase);
+            }
+
+            private static string SafeMethodName(MethodBase method)
+            {
+                if (method == null || string.IsNullOrWhiteSpace(method.Name))
+                {
+                    return "unknown";
+                }
+
+                return method.Name;
             }
         }
     }

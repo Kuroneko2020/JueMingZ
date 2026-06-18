@@ -36,6 +36,8 @@ namespace JueMingZ.UI.Legacy
                 _diagnosticMessage = string.Empty;
                 _lastKeyboardStateValid = TryReadKeyboardState(out _lastKeyboardState);
             }
+
+            TerrariaTextInputCompat.BeginTextInput();
         }
 
         public static void ClearFocus()
@@ -125,6 +127,16 @@ namespace JueMingZ.UI.Legacy
                 RefreshCompositionPreviewLocked(allowNewLine, maxLength);
                 return result;
             }
+        }
+
+        public static void UpdateInputCaptureGuard()
+        {
+            if (!IsAnyFocused)
+            {
+                return;
+            }
+
+            TerrariaTextInputCompat.BeginTextInput();
         }
 
         public static void SetCursorIndex(string id, int cursorIndex)

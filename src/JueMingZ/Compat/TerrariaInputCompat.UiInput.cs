@@ -11,11 +11,18 @@ namespace JueMingZ.Compat
 {
     public static partial class TerrariaInputCompat
     {
+        private static Type _uiInputMainTypeOverrideForTesting;
+
+        internal static void SetUiInputMainTypeForTesting(Type mainType)
+        {
+            _uiInputMainTypeOverrideForTesting = mainType;
+        }
+
         public static bool TryReadTextInputFocus(out bool focused, out string reason)
         {
             focused = false;
             reason = string.Empty;
-            var mainType = TerrariaRuntimeTypes.MainType;
+            var mainType = _uiInputMainTypeOverrideForTesting ?? TerrariaRuntimeTypes.MainType ?? FindType("Terraria.Main");
             if (mainType == null)
             {
                 focused = true;

@@ -15,16 +15,19 @@ namespace JueMingZ.UI
         internal const int MaxWidth = 360;
         internal const int MaxHeight = 300;
         internal const int HeaderHeight = 24;
+        internal const int ToolbarHeight = HeaderHeight;
+        internal const int ToolbarGap = 4;
         internal const int BodyPadding = 8;
         internal const int LineHeight = 18;
         internal const int ScreenPadding = 12;
         internal const int AvoidanceStep = 28;
         internal const int OpacityStep = 5;
+        internal const float BodyTextScale = 0.62f;
 
         private static readonly object SyncRoot = new object();
         private static readonly Dictionary<string, int> BodyScrollOffsets = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         private static UserNotesPinnedOverlayDragState _drag;
-        private static UserNotesPinnedOverlayInteraction _lastInteraction = UserNotesPinnedOverlayInteraction.None;
+        private static UserNotesPinnedOverlayInteraction _lastInteraction = new UserNotesPinnedOverlayInteraction();
 
         public static UserNotesPinnedOverlayFrame BuildFrame(UserNotesSnapshot snapshot, int screenWidth, int screenHeight)
         {
@@ -68,27 +71,26 @@ namespace JueMingZ.UI
                 var rect = ConstrainAndAvoid(desired, safeScreenWidth, safeScreenHeight, occupied, string.Equals(draggingNoteId, note.NoteId, StringComparison.OrdinalIgnoreCase));
                 occupied.Add(rect);
 
-                var bodyRect = new LegacyUiRect(
-                    rect.X + BodyPadding,
-                    rect.Y + HeaderHeight + BodyPadding,
-                    Math.Max(1, rect.Width - BodyPadding * 2),
-                    Math.Max(1, rect.Height - HeaderHeight - BodyPadding * 2));
-                var lines = BuildBodyLines(note.Body, Math.Max(1, bodyRect.Width - BodyPadding));
-                var contentHeight = Math.Max(bodyRect.Height, Math.Max(1, lines.Length) * LineHeight + BodyPadding);
+                var bodyRect = ResolveBodyRect(rect);
+                var toolbarRect = ResolveToolbarRect(rect);
+                var lines = BuildBodyLines(note.Body, bodyRect.Width);
+                var contentHeight = Math.Max(bodyRect.Height, Math.Max(1, lines.Length) * LineHeight);
                 var maxScroll = Math.Max(0, contentHeight - bodyRect.Height);
                 var offset = Clamp(GetScrollOffset(note.NoteId), 0, maxScroll);
                 SetScrollOffset(note.NoteId, offset);
-                var hovered = rect.Contains(mouseX, mouseY);
+                var hovered = rect.Contains(mouseX, mouseY) || toolbarRect.Contains(mouseX, mouseY);
+                var buttonY = toolbarRect.Y + Math.Max(2, (toolbarRect.Height - 16) / 2);
                 items.Add(new UserNotesPinnedOverlayItem
                 {
                     NoteId = note.NoteId ?? string.Empty,
                     Body = note.Body ?? string.Empty,
                     Rect = rect,
-                    HeaderRect = new LegacyUiRect(rect.X, rect.Y, rect.Width, HeaderHeight),
-                    DragHandleRect = new LegacyUiRect(rect.X + 8, rect.Y + 7, 38, 10),
-                    DecreaseOpacityRect = new LegacyUiRect(rect.Right - 70, rect.Y + 4, 18, 16),
-                    IncreaseOpacityRect = new LegacyUiRect(rect.Right - 47, rect.Y + 4, 18, 16),
-                    CloseRect = new LegacyUiRect(rect.Right - 24, rect.Y + 4, 18, 16),
+                    HeaderRect = toolbarRect,
+                    ToolbarRect = toolbarRect,
+                    DragHandleRect = new LegacyUiRect(toolbarRect.X + 5, toolbarRect.Y + Math.Max(0, (toolbarRect.Height - 10) / 2), 38, 10),
+                    DecreaseOpacityRect = new LegacyUiRect(toolbarRect.Right - 66, buttonY, 18, 16),
+                    IncreaseOpacityRect = new LegacyUiRect(toolbarRect.Right - 43, buttonY, 18, 16),
+                    CloseRect = new LegacyUiRect(toolbarRect.Right - 20, buttonY, 18, 16),
                     BodyRect = bodyRect,
                     BodyLines = lines,
                     BodyContentHeight = contentHeight,
@@ -142,7 +144,7 @@ namespace JueMingZ.UI
         {
             frame = frame ?? new UserNotesPinnedOverlayFrame(new List<UserNotesPinnedOverlayItem>(), string.Empty, false);
             persist = persist ?? ((noteId, state) => UserNotesOperationResult.Failure("persistUnavailable", "persist unavailable"));
-            var interaction = UserNotesPinnedOverlayInteraction.None;
+            var interaction = new UserNotesPinnedOverlayInteraction();
             var hit = HitTest(frame, mouseX, mouseY);
             interaction.HitNoteId = hit == null ? string.Empty : hit.NoteId;
             interaction.MouseInside = hit != null;
@@ -302,7 +304,7 @@ namespace JueMingZ.UI
             {
                 BodyScrollOffsets.Clear();
                 _drag = null;
-                _lastInteraction = UserNotesPinnedOverlayInteraction.None;
+                _lastInteraction = new UserNotesPinnedOverlayInteraction();
             }
         }
 
@@ -401,7 +403,7 @@ namespace JueMingZ.UI
             for (var index = frame.Items.Count - 1; index >= 0; index--)
             {
                 var item = frame.Items[index];
-                if (item != null && item.Rect.Contains(mouseX, mouseY))
+                if (item != null && (item.Rect.Contains(mouseX, mouseY) || item.ToolbarRect.Contains(mouseX, mouseY)))
                 {
                     return item;
                 }
@@ -432,8 +434,87 @@ namespace JueMingZ.UI
         private static string[] BuildBodyLines(string body, int width)
         {
             var text = string.IsNullOrWhiteSpace(body) ? string.Empty : body.Replace("\r\n", "\n").Replace('\r', '\n');
-            var lines = UserNotesUiState.BuildBodyLinesForDrawing(text, Math.Max(1, width));
-            return lines.Length <= 0 ? new[] { string.Empty } : lines;
+            if (text.Length <= 0)
+            {
+                return new[] { string.Empty };
+            }
+
+            var lines = new List<string>();
+            var paragraphStart = 0;
+            while (paragraphStart <= text.Length)
+            {
+                var newline = text.IndexOf('\n', paragraphStart);
+                var paragraphEnd = newline >= 0 ? newline : text.Length;
+                AddWrappedParagraph(lines, text, paragraphStart, paragraphEnd, Math.Max(1, width));
+                if (newline < 0)
+                {
+                    break;
+                }
+
+                paragraphStart = newline + 1;
+                if (paragraphStart == text.Length)
+                {
+                    lines.Add(string.Empty);
+                    break;
+                }
+            }
+
+            return lines.Count <= 0 ? new[] { string.Empty } : lines.ToArray();
+        }
+
+        private static void AddWrappedParagraph(List<string> lines, string text, int start, int end, int width)
+        {
+            if (end <= start)
+            {
+                lines.Add(string.Empty);
+                return;
+            }
+
+            var currentStart = start;
+            var currentLength = 0;
+            for (var index = start; index < end; index++)
+            {
+                var candidateLength = currentLength + 1;
+                var candidate = text.Substring(currentStart, candidateLength);
+                if (currentLength <= 0 || UiTextRenderer.EstimateTextWidth(candidate, BodyTextScale) <= width)
+                {
+                    currentLength = candidateLength;
+                    continue;
+                }
+
+                lines.Add(text.Substring(currentStart, currentLength));
+                currentStart = index;
+                currentLength = 1;
+            }
+
+            if (currentLength > 0)
+            {
+                lines.Add(text.Substring(currentStart, currentLength));
+            }
+        }
+
+        private static LegacyUiRect ResolveBodyRect(LegacyUiRect rect)
+        {
+            return new LegacyUiRect(
+                rect.X + BodyPadding,
+                rect.Y + BodyPadding,
+                Math.Max(1, rect.Width - BodyPadding * 2),
+                Math.Max(1, rect.Height - BodyPadding * 2));
+        }
+
+        private static LegacyUiRect ResolveToolbarRect(LegacyUiRect rect)
+        {
+            var y = rect.Y - ToolbarHeight - ToolbarGap;
+            if (y < ScreenPadding)
+            {
+                y = rect.Y + BodyPadding / 2;
+            }
+
+            return new LegacyUiRect(
+                rect.X + BodyPadding / 2,
+                y,
+                Math.Max(1, rect.Width - BodyPadding),
+                ToolbarHeight);
         }
 
         private static int GetScrollOffset(string noteId)
@@ -564,6 +645,7 @@ namespace JueMingZ.UI
         public string Body { get; set; }
         public LegacyUiRect Rect { get; set; }
         public LegacyUiRect HeaderRect { get; set; }
+        public LegacyUiRect ToolbarRect { get; set; }
         public LegacyUiRect DragHandleRect { get; set; }
         public LegacyUiRect DecreaseOpacityRect { get; set; }
         public LegacyUiRect IncreaseOpacityRect { get; set; }
@@ -579,8 +661,6 @@ namespace JueMingZ.UI
 
     internal sealed class UserNotesPinnedOverlayInteraction
     {
-        public static readonly UserNotesPinnedOverlayInteraction None = new UserNotesPinnedOverlayInteraction();
-
         public string HitNoteId { get; set; }
         public bool MouseInside { get; set; }
         public bool CapturedMouse { get; set; }

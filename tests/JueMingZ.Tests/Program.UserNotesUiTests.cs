@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using JueMingZ.Automation.Information.Notes;
 using JueMingZ.Compat;
@@ -86,6 +87,99 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void UserNotesCardBodyViewportMatchesLayoutAndScroll()
+        {
+            var restore = PushTemporaryConfigDirectory("user-notes-body-viewport");
+            try
+            {
+                DisableUserNotesDiagnosticsForTesting();
+                var cache = new UserNotesCache(new UserNotesStore());
+                UserNoteSnapshot note;
+                RequireSuccess(cache.CreateDefaultNote(out note), "create note");
+                var longBody = BuildRepeatedText("长正文", 100);
+                RequireSuccess(cache.SaveNote(note.NoteId, "标题", longBody, out note), "seed long body");
+                UserNotesUiState.SetCacheForTesting(cache, true);
+
+                var layout = LegacyMainWindow.BuildNotesLayoutForTesting(560, 500);
+                var card = layout.Cards[0];
+                var bodyPanel = new LegacyUiRect(24, 48 + card.BodyY, Math.Max(1, card.Width - 16), card.BodyHeight);
+                var textViewport = UserNotesUiState.ResolveBodyTextViewport(bodyPanel);
+                var inset = UserNotesUiState.BodyTextInsetForTesting;
+                if (textViewport.X != bodyPanel.X + inset ||
+                    textViewport.Y != bodyPanel.Y + inset ||
+                    textViewport.Width != bodyPanel.Width - inset * 2 ||
+                    textViewport.Height != bodyPanel.Height - inset * 2)
+                {
+                    throw new InvalidOperationException("Expected the note body text viewport to apply the shared inset on every side.");
+                }
+
+                if (UserNotesUiState.BodyTextScaleForTesting <= 0.58f ||
+                    UserNotesUiState.BodyLineHeightForTesting <= 18)
+                {
+                    throw new InvalidOperationException("Expected F5 note body text scale and line height to be enlarged together.");
+                }
+
+                var lines = UserNotesUiState.BuildWrappedBodyLinesForTesting(longBody, textViewport.Width);
+                var expectedContentHeight = UserNotesUiState.CalculateBodyTextContentHeightForTesting(lines.Length);
+                if (card.BodyContentHeight != expectedContentHeight)
+                {
+                    throw new InvalidOperationException("Expected layout content height to use the same text viewport width and line height as drawing.");
+                }
+
+                if (card.BodyContentHeight <= textViewport.Height)
+                {
+                    throw new InvalidOperationException("Expected the long note body to remain internally scrollable after layout.");
+                }
+
+                UserNotesUiState.BeginBodyViewportFrame();
+                UserNotesUiState.SetBodyViewportForTesting(note.NoteId, textViewport, card.BodyContentHeight);
+                var paddingMouse = new LegacyMouseSnapshot
+                {
+                    X = bodyPanel.X + 1,
+                    Y = textViewport.Y + 2,
+                    ScrollDelta = -120
+                };
+                if (UserNotesUiState.TryConsumeNestedScroll(paddingMouse, -120))
+                {
+                    throw new InvalidOperationException("Expected note body padding outside the text viewport to bubble wheel input.");
+                }
+
+                var textMouse = new LegacyMouseSnapshot
+                {
+                    X = textViewport.X + 2,
+                    Y = textViewport.Y + 2,
+                    ScrollDelta = -120
+                };
+                if (!UserNotesUiState.TryConsumeNestedScroll(textMouse, -120))
+                {
+                    throw new InvalidOperationException("Expected the text viewport to own internal body scrolling.");
+                }
+
+                LegacyUiActionService.HandleUserNotesCommandForTesting(new LegacyUiCommand
+                {
+                    ElementId = UserNotesUiState.BodyElementPrefix + note.NoteId,
+                    Label = "笔记:正文",
+                    Kind = "button",
+                    Rect = textViewport,
+                    MouseX = textViewport.X + 4,
+                    MouseY = textViewport.Y + 4,
+                    IsDoubleClick = true,
+                    MouseCaptured = true
+                });
+                var anchorY = UserNotesUiState.ResolveBodyEditorImeLineY(note.NoteId, textViewport);
+                if (anchorY < textViewport.Y || anchorY + UserNotesUiState.BodyLineHeightForTesting > textViewport.Bottom)
+                {
+                    throw new InvalidOperationException("Expected body IME anchor to stay inside the shared text viewport.");
+                }
+            }
+            finally
+            {
+                UserNotesUiState.ResetForTesting();
+                ResetUserNotesTestingHooks();
+                restore();
+            }
+        }
+
         private static void UserNotesNestedScrollConsumesOnlyScrollableBody()
         {
             UserNotesUiState.ResetForTesting();
@@ -130,6 +224,67 @@ namespace JueMingZ.Tests
             }
 
             UserNotesUiState.ResetForTesting();
+        }
+
+        private static void UserNotesMultilineFocusAllowsButtonClickResolution()
+        {
+            var elements = new List<LegacyUiElement>
+            {
+                new LegacyUiElement
+                {
+                    Id = UserNotesUiState.PinButtonPrefix + "note-a",
+                    Label = "笔记:悬挂",
+                    Kind = "button",
+                    Rect = new LegacyUiRect(10, 10, 80, 24),
+                    Enabled = true
+                }
+            };
+            var mouse = new LegacyMouseSnapshot
+            {
+                X = 20,
+                Y = 20,
+                LeftDown = true,
+                LeftPressed = true,
+                ReadAvailable = true,
+                WindowHit = true
+            };
+
+            try
+            {
+                LegacyUiInput.ResetInteractionState();
+                LegacyMultilineTextInput.Focus("notes:editor:body:note-a", "正文", 2);
+                bool blocked;
+                var resolved = LegacyMainWindow.ResolveClickableElementIdForTesting(elements, mouse, out blocked);
+                if (blocked || !string.Equals(resolved, UserNotesUiState.PinButtonPrefix + "note-a", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected multiline editor focus to allow note card buttons to resolve for enqueue.");
+                }
+
+                LegacyMultilineTextInput.ClearFocus();
+                LegacyUiInput.HandleWindowFrame(
+                    new LegacyMouseSnapshot
+                    {
+                        X = 4,
+                        Y = 4,
+                        LeftDown = true,
+                        LeftPressed = true,
+                        ReadAvailable = true,
+                        WindowHit = true
+                    },
+                    new LegacyUiRect(0, 0, 120, 24),
+                    new LegacyUiRect());
+                resolved = LegacyMainWindow.ResolveClickableElementIdForTesting(elements, mouse, out blocked);
+                if (!string.IsNullOrEmpty(resolved) || blocked)
+                {
+                    throw new InvalidOperationException("Expected non-text active interactions to keep blocking card button click resolution.");
+                }
+            }
+            finally
+            {
+                LegacyMultilineTextInput.ClearFocus();
+                LegacyUiInput.ResetInteractionState();
+                UserNotesUiState.ResetForTesting();
+            }
         }
 
         private static void UserNotesCommandsCreatePinAndTwoStepDelete()
@@ -222,6 +377,122 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void UserNotesEditingCommandsSaveThenContinueOrStopOnFailure()
+        {
+            var restore = PushTemporaryConfigDirectory("user-notes-editing-commands");
+            try
+            {
+                DisableUserNotesDiagnosticsForTesting();
+                var store = new UserNotesStore();
+                var cache = new UserNotesCache(store);
+                UserNoteSnapshot note;
+                RequireSuccess(cache.CreateDefaultNote(out note), "create note");
+                RequireSuccess(cache.SaveNote(note.NoteId, "标题", "正文", out note), "seed note");
+                UserNotesUiState.SetCacheForTesting(cache, true);
+
+                var bodyRect = new LegacyUiRect(10, 40, 260, 120);
+                var inputId = UserNotesUiState.BuildEditorInputIdForTesting(note.NoteId, "body");
+
+                OpenUserNoteBodyEditorForTesting(note.NoteId, bodyRect);
+                LegacyMultilineTextInput.SetCursorIndex(inputId, int.MaxValue);
+                LegacyMultilineTextInput.InsertTextForTesting(inputId, " pinned", true, 0);
+                LegacyUiActionService.HandleUserNotesCommandForTesting(new LegacyUiCommand
+                {
+                    ElementId = UserNotesUiState.PinButtonPrefix + note.NoteId,
+                    Label = "笔记:悬挂",
+                    Kind = "button",
+                    Rect = new LegacyUiRect(180, 8, 52, 24),
+                    MouseCaptured = true
+                });
+
+                var saved = FindUserNote(cache.Snapshot, note.NoteId);
+                if (saved == null ||
+                    !string.Equals(saved.Body, "正文 pinned", StringComparison.Ordinal) ||
+                    saved.PinnedState == null ||
+                    !saved.PinnedState.Pinned ||
+                    UserNotesUiState.HasActiveEditor)
+                {
+                    throw new InvalidOperationException("Expected Pin to save the active body editor and continue in the same command.");
+                }
+
+                OpenUserNoteBodyEditorForTesting(note.NoteId, bodyRect);
+                LegacyMultilineTextInput.SetCursorIndex(inputId, int.MaxValue);
+                LegacyMultilineTextInput.InsertTextForTesting(inputId, " delete", true, 0);
+                LegacyUiActionService.HandleUserNotesCommandForTesting(new LegacyUiCommand
+                {
+                    ElementId = UserNotesUiState.DeleteButtonPrefix + note.NoteId,
+                    Label = "笔记:删除",
+                    Kind = "button",
+                    Rect = new LegacyUiRect(236, 8, 44, 24),
+                    MouseCaptured = true
+                });
+
+                saved = FindUserNote(cache.Snapshot, note.NoteId);
+                if (saved == null ||
+                    !string.Equals(saved.Body, "正文 pinned delete", StringComparison.Ordinal) ||
+                    !UserNotesUiState.IsDeleteConfirming(note.NoteId) ||
+                    UserNotesUiState.HasActiveEditor)
+                {
+                    throw new InvalidOperationException("Expected Delete to save the active body editor before arming confirmation.");
+                }
+
+                OpenUserNoteBodyEditorForTesting(note.NoteId, bodyRect);
+                LegacyMultilineTextInput.SetCursorIndex(inputId, int.MaxValue);
+                LegacyMultilineTextInput.InsertTextForTesting(inputId, " add", true, 0);
+                var beforeAddCount = cache.Snapshot.Notes.Count;
+                LegacyUiActionService.HandleUserNotesCommandForTesting(new LegacyUiCommand
+                {
+                    ElementId = UserNotesUiState.AddButtonId,
+                    Label = "笔记:新增",
+                    Kind = "button",
+                    Rect = new LegacyUiRect(0, 0, 280, 34),
+                    MouseCaptured = true
+                });
+
+                saved = FindUserNote(cache.Snapshot, note.NoteId);
+                if (saved == null ||
+                    !string.Equals(saved.Body, "正文 pinned delete add", StringComparison.Ordinal) ||
+                    cache.Snapshot.Notes.Count != beforeAddCount + 1 ||
+                    UserNotesUiState.HasActiveEditor)
+                {
+                    throw new InvalidOperationException("Expected Add to save the active body editor and then create the new note.");
+                }
+
+                OpenUserNoteBodyEditorForTesting(note.NoteId, bodyRect);
+                LegacyMultilineTextInput.SetCursorIndex(inputId, int.MaxValue);
+                LegacyMultilineTextInput.InsertTextForTesting(inputId, " blocked", true, 0);
+                var beforeFailedAddCount = cache.Snapshot.Notes.Count;
+                var bodyPath = store.GetBodyPath(note.NoteId);
+                UserNotesStore.SetCommitFailurePredicateForTesting(path => string.Equals(path, bodyPath, StringComparison.OrdinalIgnoreCase));
+                LegacyUiActionService.HandleUserNotesCommandForTesting(new LegacyUiCommand
+                {
+                    ElementId = UserNotesUiState.AddButtonId,
+                    Label = "笔记:新增",
+                    Kind = "button",
+                    Rect = new LegacyUiRect(0, 0, 280, 34),
+                    MouseCaptured = true
+                });
+
+                saved = FindUserNote(cache.Snapshot, note.NoteId);
+                var draft = LegacyMultilineTextInput.GetSnapshot(inputId).Draft;
+                if (saved == null ||
+                    !string.Equals(saved.Body, "正文 pinned delete add", StringComparison.Ordinal) ||
+                    cache.Snapshot.Notes.Count != beforeFailedAddCount ||
+                    !UserNotesUiState.HasActiveEditor ||
+                    draft == null ||
+                    draft.IndexOf("blocked", StringComparison.Ordinal) < 0)
+                {
+                    throw new InvalidOperationException("Expected failed save to stop Add and keep the body editor active.");
+                }
+            }
+            finally
+            {
+                UserNotesUiState.ResetForTesting();
+                ResetUserNotesTestingHooks();
+                restore();
+            }
+        }
+
         private static void UserNotesTitleEditorSavesAndCancels()
         {
             var restore = PushTemporaryConfigDirectory("user-notes-title-editor");
@@ -255,7 +526,9 @@ namespace JueMingZ.Tests
                 var inputId = UserNotesUiState.BuildEditorInputIdForTesting(note.NoteId, "title");
                 LegacyMultilineTextInput.SetCursorIndex(inputId, int.MaxValue);
                 LegacyMultilineTextInput.InsertTextForTesting(inputId, " edited", false, 80);
-                RequireSuccess(UserNotesUiState.SaveActiveEditor("test-title-save"), "save edited title");
+                RequireSuccess(
+                    UserNotesUiState.ApplyActiveEditorControlForTesting(new TextInputControlState { EnterPressed = true }),
+                    "submit edited title");
 
                 var saved = FindUserNote(cache.Snapshot, note.NoteId);
                 if (saved == null ||
@@ -278,11 +551,45 @@ namespace JueMingZ.Tests
                     MouseCaptured = true
                 });
                 LegacyMultilineTextInput.SetCursorIndex(inputId, int.MaxValue);
-                LegacyMultilineTextInput.InsertTextForTesting(inputId, " discarded", false, 80);
-                RequireSuccess(UserNotesUiState.CancelActiveEditor(), "cancel title edit");
+                LegacyMultilineTextInput.InsertTextForTesting(inputId, " outside", false, 80);
+                LegacyUiActionService.HandleUserNotesCommandForTesting(new LegacyUiCommand
+                {
+                    ElementId = UserNotesUiState.EditOutsideElementId,
+                    Label = "笔记:保存编辑",
+                    Kind = "button",
+                    Rect = new LegacyUiRect(0, 0, 320, 240),
+                    MouseX = titleRect.Right + 12,
+                    MouseY = titleRect.Y + 8,
+                    MouseCaptured = true
+                });
 
                 saved = FindUserNote(cache.Snapshot, note.NoteId);
-                if (saved == null || !string.Equals(saved.Title, "原标题 edited", StringComparison.Ordinal))
+                if (saved == null ||
+                    !string.Equals(saved.Title, "原标题 edited outside", StringComparison.Ordinal) ||
+                    UserNotesUiState.HasActiveEditor)
+                {
+                    throw new InvalidOperationException("Expected clicking outside the title editor to save and close the editor.");
+                }
+
+                LegacyUiActionService.HandleUserNotesCommandForTesting(new LegacyUiCommand
+                {
+                    ElementId = UserNotesUiState.TitleElementPrefix + note.NoteId,
+                    Label = "笔记:标题",
+                    Kind = "button",
+                    Rect = titleRect,
+                    MouseX = titleRect.Right - 1,
+                    MouseY = titleRect.Y + 8,
+                    IsDoubleClick = true,
+                    MouseCaptured = true
+                });
+                LegacyMultilineTextInput.SetCursorIndex(inputId, int.MaxValue);
+                LegacyMultilineTextInput.InsertTextForTesting(inputId, " discarded", false, 80);
+                RequireSuccess(
+                    UserNotesUiState.ApplyActiveEditorControlForTesting(new TextInputControlState { EscapePressed = true }),
+                    "cancel title edit");
+
+                saved = FindUserNote(cache.Snapshot, note.NoteId);
+                if (saved == null || !string.Equals(saved.Title, "原标题 edited outside", StringComparison.Ordinal))
                 {
                     throw new InvalidOperationException("Expected cancelling title edit to keep the persisted title.");
                 }
@@ -469,6 +776,83 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void UserNotesMultilineTextInputArmsAndReleasesNativeCapture()
+        {
+            var inputId = "notes:editor:capture";
+            var foreignTextTaker = new object();
+            try
+            {
+                ResetTextInputCaptureForTesting();
+                TerrariaTextInputCompat.SetMainTypeForTesting(typeof(Terraria.Main));
+                TerrariaInputCompat.SetUiInputMainTypeForTesting(typeof(Terraria.Main));
+
+                LegacyMultilineTextInput.Focus(inputId, "body", 4);
+                if (!Terraria.Main.blockInput ||
+                    !Terraria.GameInput.PlayerInput.WritingText ||
+                    Terraria.Main.CurrentInputTextTakerOverride == null)
+                {
+                    throw new InvalidOperationException("Expected focused multiline editor to arm native text input capture.");
+                }
+
+                var noteTextTaker = Terraria.Main.CurrentInputTextTakerOverride;
+                Terraria.GameInput.PlayerInput.WritingText = false;
+                bool textFocused;
+                string textFocusReason;
+                if (!TerrariaInputCompat.TryReadTextInputFocus(out textFocused, out textFocusReason) ||
+                    !textFocused ||
+                    !string.Equals(textFocusReason, "currentInputTextTakerOverride", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected note text taker to keep shared text input focus gates active.");
+                }
+
+                LegacyMultilineTextInput.UpdateInputCaptureGuard();
+                if (!Terraria.GameInput.PlayerInput.WritingText ||
+                    !ReferenceEquals(Terraria.Main.CurrentInputTextTakerOverride, noteTextTaker))
+                {
+                    throw new InvalidOperationException("Expected multiline editor guard to re-arm capture after PlayerInput reset.");
+                }
+
+                LegacyMultilineTextInput.ClearFocus();
+                if (Terraria.Main.blockInput ||
+                    Terraria.GameInput.PlayerInput.WritingText ||
+                    Terraria.Main.CurrentInputTextTakerOverride != null)
+                {
+                    throw new InvalidOperationException("Expected multiline editor to release native capture when focus clears.");
+                }
+
+                Terraria.Main.CurrentInputTextTakerOverride = foreignTextTaker;
+                TerrariaTextInputCompat.BeginTextInput();
+                if (!ReferenceEquals(Terraria.Main.CurrentInputTextTakerOverride, foreignTextTaker))
+                {
+                    throw new InvalidOperationException("Expected native capture to preserve an existing Terraria text taker.");
+                }
+
+                TerrariaTextInputCompat.EndTextInput();
+                if (!ReferenceEquals(Terraria.Main.CurrentInputTextTakerOverride, foreignTextTaker))
+                {
+                    throw new InvalidOperationException("Expected native capture release to avoid clearing a foreign text taker.");
+                }
+            }
+            finally
+            {
+                ResetTextInputCaptureForTesting();
+                TerrariaTextInputCompat.SetMainTypeForTesting(null);
+                TerrariaInputCompat.SetUiInputMainTypeForTesting(null);
+                LegacyMultilineTextInput.ClearFocus();
+            }
+        }
+
+        private static void ResetTextInputCaptureForTesting()
+        {
+            LegacyMultilineTextInput.ClearFocus();
+            TerrariaTextInputCompat.EndTextInput();
+            Terraria.Main.blockInput = false;
+            Terraria.Main.inputTextEnter = false;
+            Terraria.Main.inputTextEscape = false;
+            Terraria.Main.CurrentInputTextTakerOverride = null;
+            Terraria.GameInput.PlayerInput.WritingText = false;
+        }
+
         private static UserNoteSnapshot FindUserNote(UserNotesSnapshot snapshot, string noteId)
         {
             if (snapshot == null || snapshot.Notes == null)
@@ -486,6 +870,26 @@ namespace JueMingZ.Tests
             }
 
             return null;
+        }
+
+        private static void OpenUserNoteBodyEditorForTesting(string noteId, LegacyUiRect bodyRect)
+        {
+            LegacyUiActionService.HandleUserNotesCommandForTesting(new LegacyUiCommand
+            {
+                ElementId = UserNotesUiState.BodyElementPrefix + noteId,
+                Label = "笔记:正文",
+                Kind = "button",
+                Rect = bodyRect,
+                MouseX = bodyRect.X + 4,
+                MouseY = bodyRect.Y + 4,
+                IsDoubleClick = true,
+                MouseCaptured = true
+            });
+
+            if (!UserNotesUiState.HasActiveEditor || !UserNotesUiState.IsEditingBody(noteId))
+            {
+                throw new InvalidOperationException("Expected double-clicking the note body to open the body editor.");
+            }
         }
 
         private static string BuildRepeatedText(string text, int count)

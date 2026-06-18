@@ -2065,10 +2065,13 @@ function Test-UserNotesGovernance {
     $cachePath = Join-Path $RepoRoot "src\JueMingZ\Automation\Information\Notes\UserNotesCache.cs"
     $diagnosticsPath = Join-Path $RepoRoot "src\JueMingZ\Automation\Information\Notes\UserNotesDiagnostics.cs"
     $notesWindowPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.Notes.cs"
+    $notesSharedPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.Shared.cs"
     $notesStatePath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\UserNotesUiState.cs"
     $multilineInputPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMultilineTextInput.cs"
     $legacyTextInputPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyTextInput.cs"
+    $textInputCompatPath = Join-Path $RepoRoot "src\JueMingZ\Compat\TerrariaTextInputCompat.cs"
     $scrollPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyUiInput.Scroll.cs"
+    $mouseInputPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyUiInput.Mouse.cs"
     $layersPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.Layers.cs"
     $userNotesActionPath = Join-Path $RepoRoot "src\JueMingZ\Input\LegacyUiActionService.UserNotes.cs"
     $pinnedOverlayPath = Join-Path $RepoRoot "src\JueMingZ\UI\UserNotesPinnedOverlay.cs"
@@ -2084,7 +2087,8 @@ function Test-UserNotesGovernance {
     $featureDocPath = Join-Path $RepoRoot "文档\功能介绍\F5通用\笔记页.md"
     $featureIndexPath = Join-Path $RepoRoot "文档\功能介绍\功能索引.md"
     $diagnosticRulesPath = Join-Path $RepoRoot "文档\项目规则\AI诊断日志说明.md"
-    $plan06Path = Join-Path $RepoRoot "文档\归档历史计划\笔记页与悬挂便签实现\06-诊断测试文档审计护栏.md"
+    $legacyPlan06Path = Join-Path $RepoRoot "文档\归档历史计划\笔记页与悬挂便签实现\06-诊断测试文档审计护栏.md"
+    $feedbackPlan06Path = Join-Path $RepoRoot "文档\归档历史计划\笔记页实机反馈修复\06-诊断测试文档审计护栏.md"
 
     $tabBarText = Read-TextIfExists -Path $tabBarPath
     $vectorIconText = Read-TextIfExists -Path $vectorIconPath
@@ -2095,10 +2099,13 @@ function Test-UserNotesGovernance {
     $cacheText = Read-TextIfExists -Path $cachePath
     $diagnosticsText = Read-TextIfExists -Path $diagnosticsPath
     $notesWindowText = Read-TextIfExists -Path $notesWindowPath
+    $notesSharedText = Read-TextIfExists -Path $notesSharedPath
     $notesStateText = Read-TextIfExists -Path $notesStatePath
     $multilineInputText = Read-TextIfExists -Path $multilineInputPath
     $legacyTextInputText = Read-TextIfExists -Path $legacyTextInputPath
+    $textInputCompatText = Read-TextIfExists -Path $textInputCompatPath
     $scrollText = Read-TextIfExists -Path $scrollPath
+    $mouseInputText = Read-TextIfExists -Path $mouseInputPath
     $layersText = Read-TextIfExists -Path $layersPath
     $userNotesActionText = Read-TextIfExists -Path $userNotesActionPath
     $pinnedOverlayText = Read-TextIfExists -Path $pinnedOverlayPath
@@ -2114,18 +2121,20 @@ function Test-UserNotesGovernance {
     $featureDocText = Read-TextIfExists -Path $featureDocPath
     $featureIndexText = Read-TextIfExists -Path $featureIndexPath
     $diagnosticRulesText = Read-TextIfExists -Path $diagnosticRulesPath
-    $plan06Text = Read-TextIfExists -Path $plan06Path
+    $legacyPlan06Text = Read-TextIfExists -Path $legacyPlan06Path
+    $feedbackPlan06Text = Read-TextIfExists -Path $feedbackPlan06Path
 
     if ($null -eq $tabBarText -or $null -eq $vectorIconText -or $null -eq $featureIdsText -or
         $null -eq $registrarText -or $null -eq $categoryText -or $null -eq $storeText -or
         $null -eq $cacheText -or $null -eq $diagnosticsText -or $null -eq $notesWindowText -or
-        $null -eq $notesStateText -or $null -eq $multilineInputText -or $null -eq $legacyTextInputText -or
-        $null -eq $scrollText -or $null -eq $layersText -or $null -eq $userNotesActionText -or
+        $null -eq $notesSharedText -or $null -eq $notesStateText -or $null -eq $multilineInputText -or
+        $null -eq $legacyTextInputText -or $null -eq $textInputCompatText -or $null -eq $scrollText -or
+        $null -eq $mouseInputText -or $null -eq $layersText -or $null -eq $userNotesActionText -or
         $null -eq $pinnedOverlayText -or $null -eq $pinnedOverlayStateText -or $null -eq $hookInstallerText -or
         $null -eq $playerInputHookText -or $null -eq $hotbarHookText -or $null -eq $storeTestsText -or
         $null -eq $uiTestsText -or $null -eq $overlayTestsText -or $null -eq $interfaceLayerTestsText -or
         $null -eq $programTestsText -or $null -eq $featureDocText -or $null -eq $featureIndexText -or
-        $null -eq $diagnosticRulesText -or $null -eq $plan06Text) {
+        $null -eq $diagnosticRulesText -or $null -eq $legacyPlan06Text -or $null -eq $feedbackPlan06Text) {
         Write-FailHealth "User notes source, tests, feature docs, diagnostics rules, and plan coverage matrix must exist before governance can be audited."
         return
     }
@@ -2214,6 +2223,46 @@ function Test-UserNotesGovernance {
         Write-FailHealth "User notes body editor must keep a dedicated multiline editor with newline, cursor, IME, save-failure, and cancel tests."
     }
 
+    if ($notesStateText.Contains("private const int BodyTextInset = 10;") -and
+        $notesStateText.Contains("private const int BodyLineHeight = 21;") -and
+        $notesStateText.Contains("private const float BodyTextScale = 0.66f;") -and
+        $notesStateText.Contains("ResolveBodyTextViewport") -and
+        $notesStateText.Contains("ResolveBodyEditorImeLineY") -and
+        $notesWindowText.Contains("UserNotesUiState.ResolveBodyTextViewport(bodyRect)") -and
+        $notesWindowText.Contains("UserNotesUiState.BodyLineHeightForLayout") -and
+        $notesWindowText.Contains("UserNotesUiState.BodyTextScaleForLayout") -and
+        $uiTestsText.Contains("UserNotesCardBodyViewportMatchesLayoutAndScroll")) {
+        Write-Pass "User notes F5 card body text viewport keeps shared inset, line-height, scale, scroll, hit-test, and IME geometry."
+    }
+    else {
+        Write-FailHealth "User notes F5 card body must keep 10px inset, 21px line height, 0.66 scale, and shared draw/scroll/click/IME viewport geometry."
+    }
+
+    if ($notesSharedText.Contains("IsTextEditorFocusAllowedForClickResolution") -and
+        $notesSharedText.Contains("LegacyMultilineTextInput.IsAnyFocused") -and
+        $userNotesActionText.Contains('SaveActiveEditor("pin")') -and
+        $userNotesActionText.Contains('SaveActiveEditor("add")') -and
+        $userNotesActionText.Contains('SaveActiveEditor("delete")') -and
+        $uiTestsText.Contains("UserNotesMultilineFocusAllowsButtonClickResolution") -and
+        $uiTestsText.Contains("UserNotesEditingCommandsSaveThenContinueOrStopOnFailure") -and
+        $uiTestsText.Contains("UserNotesTitleEditorSavesAndCancels")) {
+        Write-Pass "User notes active multiline editor clicks keep save-then-continue behavior for card commands."
+    }
+    else {
+        Write-FailHealth "User notes active multiline editor must allow card command hit-test and keep save-success-then-continue / save-failure-stop coverage."
+    }
+
+    if ($multilineInputText.Contains("TerrariaTextInputCompat.BeginTextInput();") -and
+        $multilineInputText.Contains("UpdateInputCaptureGuard") -and
+        $textInputCompatText.Contains("CurrentInputTextTakerOverride") -and
+        $textInputCompatText.Contains("TrySetCurrentInputTextTakerOverride") -and
+        $uiTestsText.Contains("UserNotesMultilineTextInputArmsAndReleasesNativeCapture")) {
+        Write-Pass "User notes multiline editor keeps native text input capture/re-arm/release protection."
+    }
+    else {
+        Write-FailHealth "User notes multiline editor must keep native text input capture, CurrentInputTextTakerOverride sentinel handling, and capture/release tests."
+    }
+
     $mutationLeaks = @()
     $notesBehaviorTexts = @(
         @{ Name = "LegacyUiActionService.UserNotes"; Text = $userNotesActionText },
@@ -2236,13 +2285,49 @@ function Test-UserNotesGovernance {
         $pinnedOverlayText.Contains("TerrariaUiMouseCompat.TryConsumeMouseTriggerInputOnceForUi") -and
         $hookInstallerText.Contains("UserNotesPinnedOverlay.UpdatePrefixGuard") -and
         $playerInputHookText.Contains("UserNotesPinnedOverlay.UpdateAfterPlayerInputGuard") -and
+        $playerInputHookText.Contains('UiInputFrameClock.BeginInputFrame(phase)') -and
+        $playerInputHookText.Contains('"PlayerInputScrollHook.Postfix."') -and
+        $pinnedOverlayText.Contains('UpdateInputGuard("UserNotesPinnedOverlay.UpdateAfterPlayerInputGuard", true, false, null)') -and
+        $pinnedOverlayStateText.Contains('var interaction = new UserNotesPinnedOverlayInteraction()') -and
+        $pinnedOverlayStateText.Contains('_lastInteraction = new UserNotesPinnedOverlayInteraction()') -and
+        -not $pinnedOverlayStateText.Contains('UserNotesPinnedOverlayInteraction.None') -and
         $hotbarHookText.Contains("UserNotesPinnedOverlay.ShouldSuppressHotbarScrollFromHook") -and
         $overlayTestsText.Contains("UserNotesPinnedOverlayScrollDragOpacityAndCloseUsePinnedState") -and
+        $overlayTestsText.Contains("UserNotesPinnedOverlayProcessesClickAfterPlayerInput") -and
+        $programTestsText.Contains("user notes pinned overlay processes click after player input") -and
         $interfaceLayerTestsText.Contains("UserNotesPinnedOverlay.DrawInterfaceLayer")) {
-        Write-Pass "User notes pinned overlay stays UI-only and uses controlled mouse/scroll consumption guards."
+        Write-Pass "User notes pinned overlay stays UI-only and uses controlled prefix/post-PlayerInput mouse/scroll consumption guards without mutable static interaction state."
     }
     else {
-        Write-FailHealth "User notes pinned overlay must not submit actions or mutate game state, and must use prefix/after-player-input/hotbar scroll guards; leaks=$($mutationLeaks -join ', ')"
+        Write-FailHealth "User notes pinned overlay must not submit actions or mutate game state, must avoid mutable static interaction state, and must use prefix/post-PlayerInput/hotbar scroll guards with a real postfix-click test; leaks=$($mutationLeaks -join ', ')"
+    }
+
+    if ($pinnedOverlayStateText.Contains("ToolbarRect") -and
+        $pinnedOverlayStateText.Contains("ResolveToolbarRect") -and
+        $pinnedOverlayStateText.Contains("ResolveBodyRect") -and
+        $pinnedOverlayStateText.Contains("rect.Y + BodyPadding") -and
+        $pinnedOverlayStateText.Contains("internal const float BodyTextScale = 0.62f;") -and
+        $pinnedOverlayStateText.Contains("BuildBodyLines(note.Body, bodyRect.Width)") -and
+        $pinnedOverlayText.Contains("item.ToolbarRect") -and
+        $pinnedOverlayText.Contains("UserNotesPinnedOverlayState.BodyTextScale") -and
+        $notesStateText.Contains("PinnedOverlayBodyWrapTextScale = UserNotesPinnedOverlayState.BodyTextScale") -and
+        $overlayTestsText.Contains("UserNotesPinnedOverlayBodyStartsAtContentTopWhenToolbarHidden") -and
+        $overlayTestsText.Contains("UserNotesPinnedOverlayBodyWrapMatchesDrawScaleWithoutEllipsis")) {
+        Write-Pass "User notes pinned overlay keeps toolbar/content separation and wrap/draw scale consistency."
+    }
+    else {
+        Write-FailHealth "User notes pinned overlay must keep BodyRect/ToolbarRect separation, no invisible header reservation, 0.62 wrap/draw scale, and no-ellipsis tests."
+    }
+
+    if ($mouseInputText.Contains("ReadMouseForInterfaceOverlay") -and
+        $mouseInputText.Contains("applyMainDrawScale") -and
+        $mouseInputText.Contains("AppendInterfaceOverlayMode") -and
+        $pinnedOverlayText.Contains("LegacyUiInput.ReadMouseForInterfaceOverlay") -and
+        $overlayTestsText.Contains("UserNotesPinnedOverlayScaledMouseHitsVisualControls")) {
+        Write-Pass "User notes pinned overlay keeps interface-coordinate hit-test coverage under UI scale."
+    }
+    else {
+        Write-FailHealth "User notes pinned overlay must use interface overlay mouse coordinates and keep scaled close/opacity/drag hit-test coverage."
     }
 
     if ($diagnosticsText.Contains("DiagnosticActionRecorder.RecordCustomEvent") -and
@@ -2255,8 +2340,12 @@ function Test-UserNotesGovernance {
         $diagnosticRulesText.Contains("不新增 runtime snapshot 字段") -and
         $featureDocText.Contains("## 诊断字段") -and
         $featureDocText.Contains("Ui.Notes.Opacity") -and
+        $featureDocText.Contains('同一次命令链路继续执行的 `Ui.Notes.Pin`') -and
+        $diagnosticRulesText.Contains('同一时间窗口先看 `Ui.Notes.Save` 是否成功') -and
+        $diagnosticRulesText.Contains('`Ui.Notes.Wheel` 只表示正文滚轮实际改变 offset') -and
         $featureDocText.Contains("仍需用户实机确认") -and
-        $plan06Text.Contains("## 覆盖矩阵")) {
+        $legacyPlan06Text.Contains("## 覆盖矩阵") -and
+        $feedbackPlan06Text.Contains("## 覆盖矩阵")) {
         Write-Pass "User notes docs and diagnostics describe real Ui.Notes action events without inventing runtime snapshot fields."
     }
     else {
@@ -2265,6 +2354,7 @@ function Test-UserNotesGovernance {
 
     if ($programTestsText.Contains("user notes store missing index uses config notes directory") -and
         $programTestsText.Contains("user notes body editor saves newlines and keeps draft on failure") -and
+        $programTestsText.Contains("user notes pinned overlay processes click after player input") -and
         $programTestsText.Contains("user notes pinned overlay scroll drag opacity and close use pinned state") -and
         $storeTestsText.Contains("UserNotesSaveIndexFailureRollsBackBody") -and
         $uiTestsText.Contains("UserNotesNestedScrollConsumesOnlyScrollableBody") -and

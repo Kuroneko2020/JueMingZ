@@ -25,6 +25,8 @@ namespace JueMingZ.UI.Legacy
                     return;
                 }
 
+                LegacyMultilineTextInput.UpdateInputCaptureGuard();
+
                 var raw = DiagnosticMouseStateReader.Read();
                 var mouse = BuildMouseSnapshot(raw, false);
                 var inWindow = IsMouseInWindow(mouse);
@@ -82,6 +84,8 @@ namespace JueMingZ.UI.Legacy
                 {
                     return;
                 }
+
+                LegacyMultilineTextInput.UpdateInputCaptureGuard();
 
                 var raw = DiagnosticMouseStateReader.Read();
                 var mouse = BuildMouseSnapshot(raw, false);

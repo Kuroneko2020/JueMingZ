@@ -19,6 +19,7 @@ namespace JueMingZ.UI
         };
         private static readonly object SyncRoot = new object();
         private static bool _wasLeftDown;
+        private static bool? _shouldUseOverlayOverrideForTesting;
 
         public static bool DrawInterfaceLayer()
         {
@@ -60,12 +61,12 @@ namespace JueMingZ.UI
 
         public static void UpdatePrefixGuard()
         {
-            UpdateInputGuard("UserNotesPinnedOverlay.UpdatePrefixGuard", true);
+            UpdateInputGuard("UserNotesPinnedOverlay.UpdatePrefixGuard", true, true, null);
         }
 
         public static void UpdateAfterPlayerInputGuard()
         {
-            UpdateInputGuard("UserNotesPinnedOverlay.UpdateAfterPlayerInputGuard", false);
+            UpdateInputGuard("UserNotesPinnedOverlay.UpdateAfterPlayerInputGuard", true, false, null);
         }
 
         public static bool ShouldSuppressHotbarScrollFromHook()
@@ -150,9 +151,25 @@ namespace JueMingZ.UI
         {
             UserNotesPinnedOverlayState.ResetForTesting();
             ResetTrackedMouseButtons();
+            _shouldUseOverlayOverrideForTesting = null;
         }
 
-        private static void UpdateInputGuard(string source, bool handleState)
+        internal static LegacyMouseSnapshot ReadOverlayMouseForTesting(DiagnosticMouseState raw)
+        {
+            return LegacyUiInput.ReadMouseForInterfaceOverlay(raw);
+        }
+
+        internal static void UpdateInputGuardForTesting(string source, bool handleState, bool handleScroll, DiagnosticMouseState raw)
+        {
+            UpdateInputGuard(source, handleState, handleScroll, raw);
+        }
+
+        internal static void SetShouldUseOverlayOverrideForTesting(bool? value)
+        {
+            _shouldUseOverlayOverrideForTesting = value;
+        }
+
+        private static void UpdateInputGuard(string source, bool handleState, bool handleScroll, DiagnosticMouseState raw)
         {
             try
             {
@@ -166,7 +183,7 @@ namespace JueMingZ.UI
                     return;
                 }
 
-                var mouse = handleState ? ReadOverlayMouseForInput() : ReadOverlayMouse();
+                var mouse = handleState ? ReadOverlayMouseForInput(raw) : ReadOverlayMouse(raw);
                 var frame = BuildFrame(mouse);
                 if (ShouldLegacyWindowOwnMouse(mouse, frame))
                 {
@@ -177,6 +194,7 @@ namespace JueMingZ.UI
                 var rawScrollDelta = scroll == null ? 0 : scroll.EffectiveScrollDelta;
                 if (handleState)
                 {
+                    var stateScrollDelta = handleScroll ? rawScrollDelta : 0;
                     var interaction = UserNotesPinnedOverlayState.HandleInput(
                         frame,
                         mouse.X,
@@ -184,11 +202,12 @@ namespace JueMingZ.UI
                         mouse.LeftDown,
                         mouse.LeftPressed,
                         mouse.LeftReleased,
-                        rawScrollDelta,
+                        stateScrollDelta,
                         SafeScreenWidth(),
                         SafeScreenHeight(),
                         PersistPinnedState);
-                    ApplyInputSuppression(frame, mouse, interaction, rawScrollDelta);
+                    ApplyInputSuppression(frame, mouse, interaction, stateScrollDelta);
+                    SuppressScrollOnly(frame, mouse, handleScroll ? 0 : rawScrollDelta);
                     RecordInteraction(ResolveInteractionScenario(interaction), interaction);
                     return;
                 }
@@ -201,7 +220,7 @@ namespace JueMingZ.UI
 
                 if (rawScrollDelta != 0 && UserNotesPinnedOverlayState.ShouldSuppressHotbarScroll(frame, mouse.X, mouse.Y))
                 {
-                    UiMouseCaptureService.ConsumeScrollForOperationWindow();
+                    SuppressScrollOnly(frame, mouse, rawScrollDelta);
                 }
             }
             catch (Exception error)
@@ -213,6 +232,14 @@ namespace JueMingZ.UI
                     "UserNotesPinnedOverlay",
                     "User notes pinned overlay input guard failed; exception swallowed.",
                     error);
+            }
+        }
+
+        private static void SuppressScrollOnly(UserNotesPinnedOverlayFrame frame, LegacyMouseSnapshot mouse, int rawScrollDelta)
+        {
+            if (rawScrollDelta != 0 && UserNotesPinnedOverlayState.ShouldSuppressHotbarScroll(frame, mouse.X, mouse.Y))
+            {
+                UiMouseCaptureService.ConsumeScrollForOperationWindow();
             }
         }
 
@@ -337,6 +364,11 @@ namespace JueMingZ.UI
 
         private static bool ShouldUseOverlay()
         {
+            if (_shouldUseOverlayOverrideForTesting.HasValue)
+            {
+                return _shouldUseOverlayOverrideForTesting.Value;
+            }
+
             return !TerrariaMainCompat.IsInMainMenu && !TerrariaMainCompat.IsMapFullscreenOpen;
         }
 
@@ -351,13 +383,17 @@ namespace JueMingZ.UI
 
         private static LegacyMouseSnapshot ReadOverlayMouse()
         {
-            var raw = DiagnosticMouseStateReader.Read();
-            return LegacyUiInput.ReadMouseForOverlay(raw, LegacyMainUiScale.Resolve(raw));
+            return ReadOverlayMouse(null);
         }
 
-        private static LegacyMouseSnapshot ReadOverlayMouseForInput()
+        private static LegacyMouseSnapshot ReadOverlayMouse(DiagnosticMouseState raw)
         {
-            var mouse = ReadOverlayMouse();
+            return ReadOverlayMouseForTesting(raw ?? DiagnosticMouseStateReader.Read());
+        }
+
+        private static LegacyMouseSnapshot ReadOverlayMouseForInput(DiagnosticMouseState raw)
+        {
+            var mouse = ReadOverlayMouse(raw);
             TrackMouseButtonEdges(mouse);
             return mouse;
         }
@@ -454,13 +490,13 @@ namespace JueMingZ.UI
                     236,
                     218,
                     246,
-                    0.62f);
+                    UserNotesPinnedOverlayState.BodyTextScale);
             }
         }
 
         private static void DrawControls(object spriteBatch, UserNotesPinnedOverlayItem item)
         {
-            UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, item.HeaderRect.X + 4, item.HeaderRect.Y + 3, item.HeaderRect.Width - 8, item.HeaderRect.Height - 5, 5, 22, 28, 38, 178);
+            UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, item.ToolbarRect.X, item.ToolbarRect.Y, item.ToolbarRect.Width, item.ToolbarRect.Height, 5, 22, 28, 38, 178);
             UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, item.DragHandleRect.X, item.DragHandleRect.Y + 3, item.DragHandleRect.Width, 3, 2, 226, 232, 220, 245);
             DrawControlButton(spriteBatch, item.DecreaseOpacityRect, "<");
             DrawControlButton(spriteBatch, item.IncreaseOpacityRect, ">");

@@ -25,12 +25,22 @@ namespace JueMingZ.UI.Legacy
             return BuildMouseSnapshot(raw, false, scale);
         }
 
+        internal static LegacyMouseSnapshot ReadMouseForInterfaceOverlay(DiagnosticMouseState raw)
+        {
+            return BuildMouseSnapshot(raw, false, LegacyMainUiScale.Resolve(raw), false);
+        }
+
         private static LegacyMouseSnapshot BuildMouseSnapshot(DiagnosticMouseState raw, bool consumePendingScroll)
         {
             return BuildMouseSnapshot(raw, consumePendingScroll, LegacyMainUiScale.Resolve(raw));
         }
 
         private static LegacyMouseSnapshot BuildMouseSnapshot(DiagnosticMouseState raw, bool consumePendingScroll, LegacyMainUiScaleSnapshot scale)
+        {
+            return BuildMouseSnapshot(raw, consumePendingScroll, scale, true);
+        }
+
+        private static LegacyMouseSnapshot BuildMouseSnapshot(DiagnosticMouseState raw, bool consumePendingScroll, LegacyMainUiScaleSnapshot scale, bool applyMainDrawScale)
         {
             if (raw == null)
             {
@@ -43,9 +53,9 @@ namespace JueMingZ.UI.Legacy
             }
 
             var coordinate = ResolveLogicalMouse(raw);
-            var x = scale.ToBaseLogicalX(coordinate.X);
-            var y = scale.ToBaseLogicalY(coordinate.Y);
-            var readMode = AppendLegacyScaleMode(coordinate.Mode, scale);
+            var x = applyMainDrawScale ? scale.ToBaseLogicalX(coordinate.X) : coordinate.X;
+            var y = applyMainDrawScale ? scale.ToBaseLogicalY(coordinate.Y) : coordinate.Y;
+            var readMode = applyMainDrawScale ? AppendLegacyScaleMode(coordinate.Mode, scale) : AppendInterfaceOverlayMode(coordinate.Mode);
 
             var inputAvailable = raw.GameInputAvailable;
             var down = inputAvailable && (raw.TerrariaLeftDown || raw.OsLeftDown);
@@ -247,6 +257,16 @@ namespace JueMingZ.UI.Legacy
             }
 
             return (mode ?? string.Empty) + "/LegacyScaleCap";
+        }
+
+        private static string AppendInterfaceOverlayMode(string mode)
+        {
+            if (string.IsNullOrWhiteSpace(mode))
+            {
+                mode = "none";
+            }
+
+            return mode + "/InterfaceOverlay";
         }
     }
 }

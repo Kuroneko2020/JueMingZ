@@ -123,7 +123,7 @@ namespace JueMingZ.UI.Legacy
         {
             blocked = false;
             if (elements == null || mouse == null || !mouse.LeftPressed ||
-                (LegacyUiInput.IsActiveInteraction() && !LegacyTextInput.IsAnyFocused))
+                (LegacyUiInput.IsActiveInteraction() && !IsTextEditorFocusAllowedForClickResolution()))
             {
                 return null;
             }
@@ -156,6 +156,11 @@ namespace JueMingZ.UI.Legacy
             }
 
             return null;
+        }
+
+        private static bool IsTextEditorFocusAllowedForClickResolution()
+        {
+            return LegacyTextInput.IsAnyFocused || LegacyMultilineTextInput.IsAnyFocused;
         }
 
         internal static string ResolveClickableElementIdForTesting(List<LegacyUiElement> elements, LegacyMouseSnapshot mouse, out bool blocked)

@@ -71,6 +71,10 @@ namespace Terraria
         public static float grabMapY;
         public static bool chatMode;
         public static bool drawingPlayerChat;
+        public static bool blockInput;
+        public static bool inputTextEnter;
+        public static bool inputTextEscape;
+        public static object CurrentInputTextTakerOverride;
         public static string npcChatText = string.Empty;
         public static object ActivePlayerFileData;
         public static object ActiveWorldFileData;
@@ -109,6 +113,10 @@ namespace Terraria
     {
         public int invBottom = 258;
         public object[] shop = new object[10];
+
+        public void HandleIME()
+        {
+        }
 
         public void OpenShop(int shopIndex)
         {
@@ -985,6 +993,7 @@ namespace Terraria.GameInput
     internal static class PlayerInput
     {
         public static TestTriggersPack Triggers = new TestTriggersPack();
+        public static bool WritingText;
     }
 
     internal sealed class TestTriggersPack
@@ -1050,14 +1059,22 @@ namespace JueMingZ.Tests
             Run("user notes cache snapshot does not touch disk", ref failed, UserNotesCacheSnapshotDoesNotTouchDisk);
             Run("user notes tab keeps hotkeys page id and note icon", ref failed, UserNotesTabKeepsHotkeysPageIdAndUsesNoteIcon);
             Run("user notes layout uses two columns and caps card height", ref failed, UserNotesLayoutUsesTwoColumnsAndCapsCardHeight);
+            Run("user notes card body viewport matches layout and scroll", ref failed, UserNotesCardBodyViewportMatchesLayoutAndScroll);
             Run("user notes nested scroll consumes only scrollable body", ref failed, UserNotesNestedScrollConsumesOnlyScrollableBody);
+            Run("user notes multiline focus allows button click resolution", ref failed, UserNotesMultilineFocusAllowsButtonClickResolution);
             Run("user notes commands create pin and two step delete", ref failed, UserNotesCommandsCreatePinAndTwoStepDelete);
+            Run("user notes editing commands save then continue or stop on failure", ref failed, UserNotesEditingCommandsSaveThenContinueOrStopOnFailure);
             Run("user notes title editor saves and cancels", ref failed, UserNotesTitleEditorSavesAndCancels);
             Run("user notes body editor saves newlines and keeps draft on failure", ref failed, UserNotesBodyEditorSavesNewlinesAndKeepsDraftOnFailure);
             Run("user notes body editor draft invalidates layout", ref failed, UserNotesBodyEditorDraftInvalidatesLayout);
             Run("user notes multiline text input handles cursor submit and cancel", ref failed, UserNotesMultilineTextInputHandlesCursorSubmitAndCancel);
+            Run("user notes multiline text input arms and releases native capture", ref failed, UserNotesMultilineTextInputArmsAndReleasesNativeCapture);
             Run("user notes pinned overlay initial placement avoids overlap and clamps", ref failed, UserNotesPinnedOverlayInitialPlacementAvoidsOverlapAndClamps);
             Run("user notes pinned overlay frame restores pinned notes and hover controls", ref failed, UserNotesPinnedOverlayFrameRestoresPinnedNotesAndHoverControls);
+            Run("user notes pinned overlay body starts at content top when toolbar hidden", ref failed, UserNotesPinnedOverlayBodyStartsAtContentTopWhenToolbarHidden);
+            Run("user notes pinned overlay body wrap matches draw scale without ellipsis", ref failed, UserNotesPinnedOverlayBodyWrapMatchesDrawScaleWithoutEllipsis);
+            Run("user notes pinned overlay scaled mouse hits visual controls", ref failed, UserNotesPinnedOverlayScaledMouseHitsVisualControls);
+            Run("user notes pinned overlay processes click after player input", ref failed, UserNotesPinnedOverlayProcessesClickAfterPlayerInput);
             Run("user notes pinned overlay scroll drag opacity and close use pinned state", ref failed, UserNotesPinnedOverlayScrollDragOpacityAndCloseUsePinnedState);
             Run("user notes pinned overlay store reload and delete sync", ref failed, UserNotesPinnedOverlayStoreReloadAndDeleteSync);
             Run("feature toggle hotkey settings default empty", ref failed, FeatureToggleHotkeySettingsDefaultEmpty);

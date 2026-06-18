@@ -18,6 +18,8 @@ namespace JueMingZ.Compat
         private static MethodInfo _platformGetImeServiceMethod;
         private static PropertyInfo _imeCompositionStringProperty;
         private static bool _captureArmed;
+        private static readonly object InputTextTakerOverride = new object();
+        private static Type _mainTypeOverrideForTesting;
         private static Func<string, string> _inputTextOverrideForTesting;
         private static string _imeCompositionOverrideForTesting;
 
@@ -70,7 +72,7 @@ namespace JueMingZ.Compat
                     return false;
                 }
 
-                TrySetNativeInputCapture(true);
+                BeginTextInput();
                 TryInvokeHandleIme(mainType);
                 var args = BuildGetInputTextArgs(method, updatedText, allowMultiLine);
                 var result = method.Invoke(null, args);
@@ -142,6 +144,28 @@ namespace JueMingZ.Compat
         {
             _inputTextOverrideForTesting = inputTextOverride;
             _imeCompositionOverrideForTesting = imeCompositionOverride;
+        }
+
+        internal static void SetMainTypeForTesting(Type mainType)
+        {
+            _mainTypeOverrideForTesting = mainType;
+        }
+
+        public static void BeginTextInput()
+        {
+            try
+            {
+                TrySetNativeInputCapture(true);
+            }
+            catch (Exception error)
+            {
+                LastMessage = "Begin native text input failed: " + error.Message;
+                LogThrottle.WarnThrottled(
+                    "terraria-text-input-native-capture-failed",
+                    TimeSpan.FromSeconds(10),
+                    "TerrariaTextInputCompat",
+                    LastMessage);
+            }
         }
 
         public static void EndTextInput()
@@ -407,8 +431,9 @@ namespace JueMingZ.Compat
         private static void TrySetNativeInputCapture(bool active)
         {
             var changed = false;
-            var mainType = TerrariaRuntimeTypes.MainType;
+            var mainType = ResolveMainType();
             changed |= TrySetStaticBool(mainType, "blockInput", active);
+            changed |= TrySetCurrentInputTextTakerOverride(mainType, active);
 
             var playerInputType = FindType("Terraria.GameInput.PlayerInput");
             changed |= TrySetStaticBool(playerInputType, "WritingText", active);
@@ -449,6 +474,76 @@ namespace JueMingZ.Compat
             }
 
             return false;
+        }
+
+        private static bool TrySetCurrentInputTextTakerOverride(Type mainType, bool active)
+        {
+            if (mainType == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                FieldInfo field;
+                if (TerrariaMemberCache.TryGetField(mainType, "CurrentInputTextTakerOverride", true, out field))
+                {
+                    return TrySetCurrentInputTextTakerOverride(field.GetValue(null), value => field.SetValue(null, value), active);
+                }
+
+                PropertyInfo property;
+                if (TerrariaMemberCache.TryGetProperty(mainType, "CurrentInputTextTakerOverride", true, out property) &&
+                    property.CanRead &&
+                    property.CanWrite)
+                {
+                    return TrySetCurrentInputTextTakerOverride(
+                        property.GetValue(null, null),
+                        value => property.SetValue(null, value, null),
+                        active);
+                }
+            }
+            catch
+            {
+            }
+
+            return false;
+        }
+
+        private static bool TrySetCurrentInputTextTakerOverride(object current, Action<object> setValue, bool active)
+        {
+            if (setValue == null)
+            {
+                return false;
+            }
+
+            if (active)
+            {
+                if (ReferenceEquals(current, InputTextTakerOverride))
+                {
+                    return false;
+                }
+
+                if (current != null)
+                {
+                    return false;
+                }
+
+                setValue(InputTextTakerOverride);
+                return true;
+            }
+
+            if (!ReferenceEquals(current, InputTextTakerOverride))
+            {
+                return false;
+            }
+
+            setValue(null);
+            return true;
+        }
+
+        private static Type ResolveMainType()
+        {
+            return _mainTypeOverrideForTesting ?? TerrariaRuntimeTypes.MainType ?? FindType("Terraria.Main");
         }
 
         private static Type FindType(string fullName)

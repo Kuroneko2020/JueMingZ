@@ -11,7 +11,6 @@ namespace JueMingZ.UI.Legacy
         private const int NotesHeaderButtonWidth = 52;
         private const int NotesDeleteButtonWidth = 44;
         private const int NotesCardButtonGap = 5;
-        private const int NotesBodyLineHeight = 18;
 
         private static LegacyUiElement DrawNotesPage(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements)
         {
@@ -186,10 +185,11 @@ namespace JueMingZ.UI.Legacy
                 Math.Max(1, card.Width - 16),
                 layout.BodyHeight);
             LegacyUiTheme.DrawSubPanelClipped(spriteBatch, bodyRect, area.Viewport);
-            UserNotesUiState.SetBodyViewport(note.NoteId, bodyRect.Intersect(area.Viewport), layout.BodyContentHeight);
+            var bodyTextViewport = UserNotesUiState.ResolveBodyTextViewport(bodyRect);
+            UserNotesUiState.SetBodyViewport(note.NoteId, bodyTextViewport.Intersect(area.Viewport), layout.BodyContentHeight);
             DrawNotesBodyPreview(spriteBatch, area, note, layout, bodyRect);
 
-            var bodyHit = bodyRect.Intersect(area.Viewport);
+            var bodyHit = bodyTextViewport.Intersect(area.Viewport);
             if (bodyHit.Width > 0 && bodyHit.Height > 0)
             {
                 var bodyEditing = UserNotesUiState.IsEditingBody(note.NoteId);
@@ -252,10 +252,17 @@ namespace JueMingZ.UI.Legacy
         {
             var scrollOffset = UserNotesUiState.GetBodyScrollOffset(note == null ? string.Empty : note.NoteId);
             var bodyEditing = UserNotesUiState.IsEditingBody(note == null ? string.Empty : note.NoteId);
+            var textViewport = UserNotesUiState.ResolveBodyTextViewport(bodyRect);
+            var textClip = textViewport.Intersect(area.Viewport);
+            if (textClip.Width <= 0 || textClip.Height <= 0)
+            {
+                return;
+            }
+
             var lines = bodyEditing
-                ? UserNotesUiState.BuildBodyLinesForDrawing(
+                ? UserNotesUiState.BuildCardBodyLinesForDrawing(
                     UserNotesUiState.GetBodyDisplayText(note),
-                    Math.Max(1, bodyRect.Width - 12))
+                    textViewport.Width)
                 : layout.BodyLines ?? new string[0];
             var textR = string.IsNullOrWhiteSpace(note == null ? null : note.Body) ? 182 : 218;
             var textG = string.IsNullOrWhiteSpace(note == null ? null : note.Body) ? 194 : 226;
@@ -269,8 +276,8 @@ namespace JueMingZ.UI.Legacy
 
             for (var index = 0; index < lines.Length; index++)
             {
-                var lineY = bodyRect.Y + 6 + index * 18 - scrollOffset;
-                if (lineY + 18 < bodyRect.Y || lineY > bodyRect.Bottom)
+                var lineY = textViewport.Y + index * UserNotesUiState.BodyLineHeightForLayout - scrollOffset;
+                if (lineY + UserNotesUiState.BodyLineHeightForLayout < textClip.Y || lineY > textClip.Bottom)
                 {
                     continue;
                 }
@@ -278,28 +285,28 @@ namespace JueMingZ.UI.Legacy
                 UiTextRenderer.DrawTextClipped(
                     spriteBatch,
                     lines[index],
-                    bodyRect.X + 6,
+                    textViewport.X,
                     lineY,
-                    bodyRect.Width - 12,
-                    18,
-                    bodyRect.X,
-                    bodyRect.Y,
-                    bodyRect.Width,
-                    bodyRect.Height,
+                    textViewport.Width,
+                    UserNotesUiState.BodyLineHeightForLayout,
+                    textClip.X,
+                    textClip.Y,
+                    textClip.Width,
+                    textClip.Height,
                     textR,
                     textG,
                     textB,
                     238,
-                    0.58f);
+                    UserNotesUiState.BodyTextScaleForLayout);
             }
 
             if (bodyEditing)
             {
-                var anchorY = UserNotesUiState.ResolveBodyEditorImeLineY(note == null ? string.Empty : note.NoteId, bodyRect);
+                var anchorY = UserNotesUiState.ResolveBodyEditorImeLineY(note == null ? string.Empty : note.NoteId, textViewport);
                 UserNotesUiState.TryAttachActiveEditorImePanel(
                     note == null ? string.Empty : note.NoteId,
                     "body",
-                    new LegacyUiRect(bodyRect.X + 6, anchorY, Math.Max(1, bodyRect.Width - 12), NotesBodyLineHeight));
+                    new LegacyUiRect(textViewport.X, anchorY, textViewport.Width, UserNotesUiState.BodyLineHeightForLayout));
             }
         }
 

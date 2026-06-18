@@ -22,15 +22,17 @@ namespace JueMingZ.UI.Legacy
         private const int CardPadding = 8;
         private const int CardHeaderHeight = 28;
         private const int HeaderBodyGap = 5;
-        private const int BodyPadding = 6;
-        private const int BodyLineHeight = 18;
-        private const int BodyMinHeight = 42;
+        private const int BodyTextInset = 10;
+        private const int BodyLineHeight = 21;
+        private const int BodyMinTextHeight = BodyLineHeight * 2;
+        private const int BodyMinHeight = BodyMinTextHeight + BodyTextInset * 2;
         private const int SingleColumnThreshold = 360;
         private const int TitleMaxLength = 80;
         private const string EditModeTitle = "title";
         private const string EditModeBody = "body";
         private const float TitleTextScale = 0.76f;
-        private const float BodyTextScale = 0.58f;
+        private const float BodyTextScale = 0.66f;
+        private const float PinnedOverlayBodyWrapTextScale = UserNotesPinnedOverlayState.BodyTextScale;
 
         private static readonly object SyncRoot = new object();
         private static readonly Dictionary<string, int> BodyScrollOffsets = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -466,7 +468,7 @@ namespace JueMingZ.UI.Legacy
             return LegacyMultilineTextInput.TryAttachImeCompositionPanel(editor.InputId, anchor);
         }
 
-        public static int ResolveBodyEditorImeLineY(string noteId, LegacyUiRect bodyRect)
+        public static int ResolveBodyEditorImeLineY(string noteId, LegacyUiRect textViewport)
         {
             var normalizedId = UserNotesStore.NormalizeNoteId(noteId);
             UserNotesEditTransaction editor;
@@ -479,15 +481,15 @@ namespace JueMingZ.UI.Legacy
                 !string.Equals(editor.Mode, EditModeBody, StringComparison.Ordinal) ||
                 !string.Equals(editor.NoteId, normalizedId, StringComparison.OrdinalIgnoreCase))
             {
-                return bodyRect.Y;
+                return textViewport.Y;
             }
 
             var snapshot = LegacyMultilineTextInput.GetSnapshot(editor.InputId);
-            var lines = BuildWrappedBodyLineModels(snapshot == null ? string.Empty : snapshot.Draft, Math.Max(1, bodyRect.Width - BodyPadding * 2));
+            var lines = BuildWrappedBodyLineModels(snapshot == null ? string.Empty : snapshot.Draft, Math.Max(1, textViewport.Width));
             var cursor = snapshot == null ? 0 : snapshot.CursorIndex;
             var lineIndex = FindLineIndexForCursor(lines, cursor);
-            var y = bodyRect.Y + BodyPadding + lineIndex * BodyLineHeight - GetBodyScrollOffset(normalizedId);
-            return Clamp(y, bodyRect.Y, Math.Max(bodyRect.Y, bodyRect.Bottom - BodyLineHeight));
+            var y = textViewport.Y + lineIndex * BodyLineHeight - GetBodyScrollOffset(normalizedId);
+            return Clamp(y, textViewport.Y, Math.Max(textViewport.Y, textViewport.Bottom - BodyLineHeight));
         }
 
         public static UserNotesPageLayout BuildLayout(int viewportWidth, int viewportHeight)
@@ -672,9 +674,53 @@ namespace JueMingZ.UI.Legacy
             return BuildWrappedBodyLines(NormalizeBodyPreview(body), width).ToArray();
         }
 
+        internal static string[] BuildCardBodyLinesForDrawing(string body, int textWidth)
+        {
+            return BuildWrappedBodyLines(body ?? string.Empty, Math.Max(1, textWidth)).ToArray();
+        }
+
         internal static string[] BuildBodyLinesForDrawing(string body, int width)
         {
-            return BuildWrappedBodyLines(body ?? string.Empty, width).ToArray();
+            return BuildWrappedBodyLines(body ?? string.Empty, Math.Max(1, width), PinnedOverlayBodyWrapTextScale).ToArray();
+        }
+
+        internal static LegacyUiRect ResolveBodyTextViewport(LegacyUiRect bodyPanel)
+        {
+            return new LegacyUiRect(
+                bodyPanel.X + BodyTextInset,
+                bodyPanel.Y + BodyTextInset,
+                Math.Max(1, bodyPanel.Width - BodyTextInset * 2),
+                Math.Max(1, bodyPanel.Height - BodyTextInset * 2));
+        }
+
+        internal static int BodyTextInsetForTesting
+        {
+            get { return BodyTextInset; }
+        }
+
+        internal static int BodyLineHeightForLayout
+        {
+            get { return BodyLineHeight; }
+        }
+
+        internal static float BodyTextScaleForLayout
+        {
+            get { return BodyTextScale; }
+        }
+
+        internal static int BodyLineHeightForTesting
+        {
+            get { return BodyLineHeight; }
+        }
+
+        internal static float BodyTextScaleForTesting
+        {
+            get { return BodyTextScale; }
+        }
+
+        internal static int CalculateBodyTextContentHeightForTesting(int lineCount)
+        {
+            return CalculateBodyTextContentHeight(lineCount);
         }
 
         internal static void SetBodyViewportForTesting(string noteId, LegacyUiRect viewport, int contentHeight)
@@ -685,6 +731,39 @@ namespace JueMingZ.UI.Legacy
         internal static string BuildEditorInputIdForTesting(string noteId, string mode)
         {
             return BuildEditorInputId(UserNotesStore.NormalizeNoteId(noteId), NormalizeEditMode(mode));
+        }
+
+        internal static UserNotesOperationResult ApplyActiveEditorControlForTesting(TextInputControlState controlState)
+        {
+            UserNotesEditTransaction editor;
+            lock (SyncRoot)
+            {
+                editor = _editor == null ? null : _editor.Clone();
+            }
+
+            if (editor == null)
+            {
+                return UserNotesOperationResult.Success("noActiveEditor", "no active editor");
+            }
+
+            var isBody = string.Equals(editor.Mode, EditModeBody, StringComparison.Ordinal);
+            var update = LegacyMultilineTextInput.ApplyControlForTesting(editor.InputId, isBody, isBody ? 0 : TitleMaxLength, controlState);
+            if (update.Changed)
+            {
+                MarkEditorChanged(editor.InputId);
+            }
+
+            if (update.CancelRequested)
+            {
+                return CancelActiveEditor();
+            }
+
+            if (update.SubmitRequested)
+            {
+                return SaveActiveEditor("submit");
+            }
+
+            return UserNotesOperationResult.Success("updated", "updated");
         }
 
         internal static void SetCacheForTesting(UserNotesCache cache, bool loaded)
@@ -780,11 +859,13 @@ namespace JueMingZ.UI.Legacy
 
                 var column = FindShortestColumn(columnHeights);
                 var bodyText = GetBodyMeasurementText(note);
-                var bodyLines = BuildWrappedBodyLineModels(bodyText, Math.Max(1, columnWidth - CardPadding * 2 - BodyPadding * 2));
-                var bodyContentHeight = Math.Max(BodyMinHeight, bodyLines.Count * BodyLineHeight + BodyPadding * 2);
+                var bodyPanelWidth = Math.Max(1, columnWidth - CardPadding * 2);
+                var bodyTextWidth = Math.Max(1, bodyPanelWidth - BodyTextInset * 2);
+                var bodyLines = BuildWrappedBodyLineModels(bodyText, bodyTextWidth);
+                var bodyContentHeight = CalculateBodyTextContentHeight(bodyLines.Count);
                 var maxCardHeight = Math.Max(CardHeaderHeight + HeaderBodyGap + BodyMinHeight + CardPadding * 2, safeHeight / 2);
                 var maxBodyHeight = Math.Max(BodyMinHeight, maxCardHeight - CardPadding * 2 - CardHeaderHeight - HeaderBodyGap);
-                var bodyViewportHeight = Math.Min(bodyContentHeight, maxBodyHeight);
+                var bodyViewportHeight = Math.Min(CalculateBodyPanelHeight(bodyContentHeight), maxBodyHeight);
                 var cardHeight = CardPadding * 2 + CardHeaderHeight + HeaderBodyGap + bodyViewportHeight;
                 if (cardHeight > maxCardHeight)
                 {
@@ -822,6 +903,16 @@ namespace JueMingZ.UI.Legacy
                 ContentHeight = contentHeight,
                 Cards = cards
             };
+        }
+
+        private static int CalculateBodyTextContentHeight(int lineCount)
+        {
+            return Math.Max(BodyMinTextHeight, Math.Max(1, lineCount) * BodyLineHeight);
+        }
+
+        private static int CalculateBodyPanelHeight(int textContentHeight)
+        {
+            return Math.Max(BodyMinHeight, Math.Max(0, textContentHeight) + BodyTextInset * 2);
         }
 
         private static int FindShortestColumn(int[] columnHeights)
@@ -891,10 +982,20 @@ namespace JueMingZ.UI.Legacy
 
         private static List<string> BuildWrappedBodyLines(string text, int width)
         {
-            return ToTextList(BuildWrappedBodyLineModels(text, width));
+            return ToTextList(BuildWrappedBodyLineModels(text, width, BodyTextScale));
+        }
+
+        private static List<string> BuildWrappedBodyLines(string text, int width, float scale)
+        {
+            return ToTextList(BuildWrappedBodyLineModels(text, width, scale));
         }
 
         private static List<UserNotesTextLine> BuildWrappedBodyLineModels(string text, int width)
+        {
+            return BuildWrappedBodyLineModels(text, width, BodyTextScale);
+        }
+
+        private static List<UserNotesTextLine> BuildWrappedBodyLineModels(string text, int width, float scale)
         {
             var lines = new List<UserNotesTextLine>();
             var normalized = (text ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n');
@@ -909,7 +1010,7 @@ namespace JueMingZ.UI.Legacy
             {
                 var newline = normalized.IndexOf('\n', paragraphStart);
                 var paragraphEnd = newline >= 0 ? newline : normalized.Length;
-                AddWrappedParagraph(lines, normalized, paragraphStart, paragraphEnd, width);
+                AddWrappedParagraph(lines, normalized, paragraphStart, paragraphEnd, width, scale);
                 if (newline < 0)
                 {
                     break;
@@ -926,7 +1027,7 @@ namespace JueMingZ.UI.Legacy
             return lines;
         }
 
-        private static void AddWrappedParagraph(List<UserNotesTextLine> lines, string text, int start, int end, int width)
+        private static void AddWrappedParagraph(List<UserNotesTextLine> lines, string text, int start, int end, int width, float scale)
         {
             if (end <= start)
             {
@@ -940,7 +1041,7 @@ namespace JueMingZ.UI.Legacy
             {
                 var candidateLength = currentLength + 1;
                 var candidate = text.Substring(currentStart, candidateLength);
-                if (currentLength <= 0 || UiTextRenderer.EstimateTextWidth(candidate, BodyTextScale) <= width)
+                if (currentLength <= 0 || UiTextRenderer.EstimateTextWidth(candidate, scale) <= width)
                 {
                     currentLength = candidateLength;
                     continue;
@@ -1146,12 +1247,11 @@ namespace JueMingZ.UI.Legacy
 
         private static int CalculateBodyCursorIndexFromPoint(string noteId, string draft, LegacyUiRect rect, int mouseX, int mouseY)
         {
-            var width = Math.Max(1, rect.Width - BodyPadding * 2);
-            var lines = BuildWrappedBodyLineModels(draft ?? string.Empty, width);
+            var lines = BuildWrappedBodyLineModels(draft ?? string.Empty, Math.Max(1, rect.Width));
             var offset = GetBodyScrollOffset(noteId);
-            var lineIndex = Clamp((mouseY - rect.Y + offset - BodyPadding) / BodyLineHeight, 0, Math.Max(0, lines.Count - 1));
+            var lineIndex = Clamp((mouseY - rect.Y + offset) / BodyLineHeight, 0, Math.Max(0, lines.Count - 1));
             var line = lines[lineIndex];
-            var x = mouseX - rect.X - BodyPadding;
+            var x = mouseX - rect.X;
             return line.StartIndex + CalculateCursorIndexOnLine(line.Text, x, BodyTextScale);
         }
 
