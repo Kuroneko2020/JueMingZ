@@ -31,7 +31,8 @@ namespace JueMingZ.UI.Legacy
                 "自动增益",
                 enabled,
                 "auto-buff-mode:",
-                "缺失的已选 Buff 会自动补充；已选列表为空时不会消耗药水。");
+                "缺失的已选 Buff 会自动补充；已选列表为空时不会消耗药水。",
+                featureToggleTargetId: "buff.auto_buff");
         }
 
         private static LegacyUiElement DrawAutoBuffCooldownRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, int cooldown)

@@ -318,7 +318,7 @@ namespace JueMingZ.Tests
                 quickLayout[3].Right + 6 != quickLayout[4].X ||
                 quickLayout[4].Right + 6 != quickLayout[5].X ||
                 quickLayout[5].Right + 6 != quickLayout[6].X ||
-                quickLayout[6].Right != row.Right - 10)
+                quickLayout[6].Right != row.Right - 10 - LegacyMainWindow.GetFeatureToggleHotkeyReserveWidthForTesting())
             {
                 throw new InvalidOperationException("Map quick announcement row must keep visual plus separators between the three keys without adding command rects.");
             }

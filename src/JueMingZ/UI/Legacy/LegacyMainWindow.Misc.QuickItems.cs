@@ -30,7 +30,8 @@ namespace JueMingZ.UI.Legacy
                     "新增一条快捷物品配置。",
                     "启用快捷物品功能。",
                     "关闭快捷物品功能。"
-                });
+                },
+                featureToggleTargetId: "inventory.quick_item_hotkeys");
         }
 
         private static LegacyUiElement DrawQuickItemHotkeysPanel(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, out int consumedHeight)

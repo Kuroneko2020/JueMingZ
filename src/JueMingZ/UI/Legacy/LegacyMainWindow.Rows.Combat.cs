@@ -92,6 +92,7 @@ namespace JueMingZ.UI.Legacy
 
         private static LegacyUiElement DrawCombatPhasebladeQuickSwitchRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, AppSettings settings)
         {
+            const string targetId = "combat.phaseblade_quick_switch";
             var row = new LegacyUiRect(area.Viewport.X, area.ToScreenY(contentY), area.Viewport.Width, LegacyUiMetrics.RowHeight);
             if (!area.IsVisible(row))
             {
@@ -128,7 +129,7 @@ namespace JueMingZ.UI.Legacy
             var buttonValues = new[] { "On", "Off" };
             var selectedMode = settings.CombatPhasebladeQuickSwitchEnabled ? "On" : "Off";
             var buttonGroupWidth = ModeButtonWidth(buttonLabels[0]) + buttonGap + ModeButtonWidth(buttonLabels[1]);
-            var buttonX = row.Right - buttonGroupWidth - rowPadding;
+            var buttonX = row.Right - buttonGroupWidth - rowPadding - GetFeatureToggleHotkeyReserveWidth(targetId);
             var inlineLeft = row.X + rowPadding + titleWidth + 12;
             var inlineRight = buttonX - 12;
             var inlineWidth = Math.Max(1, inlineRight - inlineLeft);
@@ -214,7 +215,8 @@ namespace JueMingZ.UI.Legacy
                 buttonX += width + buttonGap;
             }
 
-            return hovered;
+            hovered = DrawFeatureToggleHotkeyButton(context, row, targetId) ?? hovered;
+            return context.HoveredElement ?? hovered;
         }
 
         private static LegacyUiElement DrawCombatSmallToggle(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, LegacyUiRect rect, string id, string label, bool selected)

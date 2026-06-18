@@ -26,7 +26,8 @@ namespace JueMingZ.UI.Legacy
             var offWidth = ModeButtonWidth("关闭");
             var onWidth = ModeButtonWidth("开启");
             var addWidth = ModeButtonWidth("添加");
-            var offRect = new LegacyUiRect(row.Right - offWidth - 10, buttonY, offWidth, RowModeButtonHeight);
+            const string targetId = "npc.auto_reforge";
+            var offRect = new LegacyUiRect(row.Right - offWidth - 10 - GetFeatureToggleHotkeyReserveWidth(targetId), buttonY, offWidth, RowModeButtonHeight);
             var onRect = new LegacyUiRect(offRect.X - gap - onWidth, buttonY, onWidth, RowModeButtonHeight);
             var addRect = new LegacyUiRect(onRect.X - gap - addWidth, buttonY, addWidth, RowModeButtonHeight);
             var inputX = row.X + 120;
@@ -48,7 +49,9 @@ namespace JueMingZ.UI.Legacy
             hovered = DrawQuickReforgeActionButton(spriteBatch, mouse, elements, area.Viewport, addRect, "misc-quick-reforge:add", "快速重铸:添加", "添加", false, "把输入框的词缀加入名单。") ?? hovered;
             hovered = DrawQuickReforgeActionButton(spriteBatch, mouse, elements, area.Viewport, onRect, "misc-quick-reforge-mode:On", "快速重铸:开启", "开启", enabled, "按住重铸键直到名单的词缀停下") ?? hovered;
             hovered = DrawQuickReforgeActionButton(spriteBatch, mouse, elements, area.Viewport, offRect, "misc-quick-reforge-mode:Off", "快速重铸:关闭", "关闭", !enabled, "关闭快速重铸功能。") ?? hovered;
-            return hovered;
+            var context = LegacyUiContext.ForScrollArea(spriteBatch, mouse, area, elements, settings);
+            hovered = DrawFeatureToggleHotkeyButton(context, row, targetId) ?? hovered;
+            return context.HoveredElement ?? hovered;
         }
 
         private static LegacyUiElement DrawQuickReforgeInputElement(object spriteBatch, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, LegacyUiRect clip, LegacyUiRect rect, bool selected, string text)

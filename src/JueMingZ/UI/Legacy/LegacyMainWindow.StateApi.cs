@@ -258,6 +258,7 @@ namespace JueMingZ.UI.Legacy
             _quickItemHotkeyCaptureBindingIndex = bindingIndex;
             _autoMiningHotkeyCaptureActive = false;
             _mapQuickAnnouncementHotkeyCaptureSlot = string.Empty;
+            CloseFeatureToggleHotkeyModal();
             AutoMiningCaptureWasDown.Clear();
             QuickItemCaptureWasDown.Clear();
             MapQuickAnnouncementCaptureWasDown.Clear();
@@ -277,6 +278,7 @@ namespace JueMingZ.UI.Legacy
             CloseAutoDiscardPicker();
             StopQuickItemHotkeyCapture();
             StopMapQuickAnnouncementHotkeyCapture();
+            CloseFeatureToggleHotkeyModal();
             _autoMiningHotkeyCaptureActive = true;
             AutoMiningCaptureWasDown.Clear();
         }
@@ -301,6 +303,7 @@ namespace JueMingZ.UI.Legacy
             CloseAutoDiscardPicker();
             StopQuickItemHotkeyCapture();
             StopAutoMiningHotkeyCapture();
+            CloseFeatureToggleHotkeyModal();
             _mapQuickAnnouncementHotkeyCaptureSlot = slotId;
             // Seed held keys so the double-click that starts capture cannot become the captured trigger.
             MapQuickAnnouncementHotkeyTokens.SeedCaptureState(MapQuickAnnouncementCaptureWasDown, IsKeyDown);

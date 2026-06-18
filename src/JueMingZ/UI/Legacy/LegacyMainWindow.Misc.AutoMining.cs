@@ -33,7 +33,8 @@ namespace JueMingZ.UI.Legacy
             var offWidth = ModeButtonWidth("关闭");
             var autoWidth = ModeButtonWidth("自动");
             var hotkeyWidth = ModeButtonWidth("快捷键");
-            var offRect = new LegacyUiRect(row.Right - offWidth - 10, buttonY, offWidth, RowModeButtonHeight);
+            const string targetId = "automation.auto_mining";
+            var offRect = new LegacyUiRect(row.Right - offWidth - 10 - GetFeatureToggleHotkeyReserveWidth(targetId), buttonY, offWidth, RowModeButtonHeight);
             var autoRect = new LegacyUiRect(offRect.X - gap - autoWidth, buttonY, autoWidth, RowModeButtonHeight);
             var hotkeyRect = new LegacyUiRect(autoRect.X - gap - hotkeyWidth, buttonY, hotkeyWidth, RowModeButtonHeight);
             var inputX = row.X + 106;
@@ -45,7 +46,9 @@ namespace JueMingZ.UI.Legacy
             hovered = DrawAutoMiningModeButton(spriteBatch, mouse, elements, area.Viewport, hotkeyRect, "Hotkey", "快捷键", string.Equals(mode, AutoMiningModes.Hotkey, StringComparison.Ordinal), "光标指到矿物上按快捷键选中挖矿区域") ?? hovered;
             hovered = DrawAutoMiningModeButton(spriteBatch, mouse, elements, area.Viewport, autoRect, "Auto", "自动", string.Equals(mode, AutoMiningModes.Auto, StringComparison.Ordinal), "挖下第一个矿物开始接管") ?? hovered;
             hovered = DrawAutoMiningModeButton(spriteBatch, mouse, elements, area.Viewport, offRect, "Off", "关闭", string.Equals(mode, AutoMiningModes.Off, StringComparison.Ordinal), "关闭自动挖矿。") ?? hovered;
-            return hovered;
+            var context = LegacyUiContext.ForScrollArea(spriteBatch, mouse, area, elements, settings);
+            hovered = DrawFeatureToggleHotkeyButton(context, row, targetId) ?? hovered;
+            return context.HoveredElement ?? hovered;
         }
 
         private static LegacyUiElement DrawAutoMiningHotkeyInput(object spriteBatch, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, LegacyUiRect clip, LegacyUiRect rect, string text)

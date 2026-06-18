@@ -1657,6 +1657,206 @@ function Test-MapQuickAnnouncementGovernance {
     }
 }
 
+function Test-FeatureToggleHotkeyGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $hotkeySettingsPath = Join-Path $RepoRoot "src\JueMingZ\Config\HotkeySettings.cs"
+    $configServicePath = Join-Path $RepoRoot "src\JueMingZ\Config\ConfigService.cs"
+    $chordPath = Join-Path $RepoRoot "src\JueMingZ\Config\FeatureToggleHotkeyChord.cs"
+    $targetCatalogPath = Join-Path $RepoRoot "src\JueMingZ\Config\FeatureToggleHotkeyTargetCatalog.cs"
+    $conflictRegistryPath = Join-Path $RepoRoot "src\JueMingZ\Config\FeatureToggleHotkeyConflictRegistry.cs"
+    $runtimeServicePath = Join-Path $RepoRoot "src\JueMingZ\Input\FeatureToggleHotkeyService.cs"
+    $dispatcherPath = Join-Path $RepoRoot "src\JueMingZ\Runtime\RuntimeAutomationDispatcher.cs"
+    $uiPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.FeatureToggleHotkeys.cs"
+    $vectorIconPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\Controls\LegacyVectorIconRenderer.cs"
+    $testPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.FeatureToggleHotkeyTests.cs"
+    $dispatchTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.RuntimeDiagnosticsAndDispatchTests.cs"
+    $featureDocPath = Join-Path $RepoRoot "文档\功能介绍\F5通用\功能主开关快捷键.md"
+    $featureIndexPath = Join-Path $RepoRoot "文档\功能介绍\功能索引.md"
+    $diagnosticRulesPath = Join-Path $RepoRoot "文档\项目规则\AI诊断日志说明.md"
+    $quickItemDocPath = Join-Path $RepoRoot "文档\功能介绍\物品页\快捷物品.md"
+    $autoMiningDocPath = Join-Path $RepoRoot "文档\功能介绍\杂项页\自动挖矿.md"
+    $quickAnnouncementDocPath = Join-Path $RepoRoot "文档\功能介绍\地图加强页\快捷宣告.md"
+    $continuousDashDocPath = Join-Path $RepoRoot "文档\功能介绍\移动页\连续冲刺.md"
+
+    $hotkeySettingsText = Read-TextIfExists -Path $hotkeySettingsPath
+    $configServiceText = Read-TextIfExists -Path $configServicePath
+    $chordText = Read-TextIfExists -Path $chordPath
+    $targetCatalogText = Read-TextIfExists -Path $targetCatalogPath
+    $conflictRegistryText = Read-TextIfExists -Path $conflictRegistryPath
+    $runtimeServiceText = Read-TextIfExists -Path $runtimeServicePath
+    $dispatcherText = Read-TextIfExists -Path $dispatcherPath
+    $uiText = Read-TextIfExists -Path $uiPath
+    $vectorIconText = Read-TextIfExists -Path $vectorIconPath
+    $testText = Read-TextIfExists -Path $testPath
+    $dispatchTestText = Read-TextIfExists -Path $dispatchTestPath
+    $featureDocText = Read-TextIfExists -Path $featureDocPath
+    $featureIndexText = Read-TextIfExists -Path $featureIndexPath
+    $diagnosticRulesText = Read-TextIfExists -Path $diagnosticRulesPath
+    $quickItemDocText = Read-TextIfExists -Path $quickItemDocPath
+    $autoMiningDocText = Read-TextIfExists -Path $autoMiningDocPath
+    $quickAnnouncementDocText = Read-TextIfExists -Path $quickAnnouncementDocPath
+    $continuousDashDocText = Read-TextIfExists -Path $continuousDashDocPath
+
+    if ($null -eq $hotkeySettingsText -or $null -eq $configServiceText -or $null -eq $chordText -or
+        $null -eq $targetCatalogText -or $null -eq $conflictRegistryText -or $null -eq $runtimeServiceText -or
+        $null -eq $dispatcherText -or $null -eq $uiText -or $null -eq $vectorIconText -or
+        $null -eq $testText -or $null -eq $dispatchTestText -or $null -eq $featureDocText -or
+        $null -eq $featureIndexText -or $null -eq $diagnosticRulesText) {
+        Write-FailHealth "Feature toggle hotkey source, tests, diagnostics rules, and feature docs must exist before governance can be audited."
+        return
+    }
+
+    if ($hotkeySettingsText.Contains("public int ConfigVersion { get; set; } = 4") -and
+        $hotkeySettingsText.Contains("ToggleHotkeysByTargetId = new Dictionary<string, string>()") -and
+        $hotkeySettingsText.Contains("LastNonOffModeByTargetId = new Dictionary<string, string>()") -and
+        $configServiceText.Contains("NormalizeFeatureToggleHotkeys") -and
+        $configServiceText.Contains("NormalizeFeatureToggleLastModes") -and
+        $testText.Contains("FeatureToggleHotkeySettingsDefaultEmpty")) {
+        Write-Pass "Feature toggle hotkey config fields default empty and migrate through dedicated normalization."
+    }
+    else {
+        Write-FailHealth "Feature toggle hotkey config must keep ToggleHotkeysByTargetId/LastNonOffModeByTargetId default empty and normalized during migration."
+    }
+
+    if ($chordText.Contains("key.Length <= 0") -and
+        $chordText.Contains("Escape") -and
+        $chordText.Contains("modifier.Length > 0") -and
+        $chordText.Contains("IsMouseToken") -and
+        $testText.Contains('AssertInvalidFeatureToggleChord("Ctrl+Alt+K")') -and
+        $testText.Contains('AssertInvalidFeatureToggleChord("MouseLeft")') -and
+        $testText.Contains('AssertInvalidFeatureToggleChord("Esc")')) {
+        Write-Pass "Feature toggle hotkey parser keeps the single-main-key or one-modifier grammar."
+    }
+    else {
+        Write-FailHealth "Feature toggle hotkey parser/tests must reject pure modifiers, Esc, mouse keys, and multi-modifier chords."
+    }
+
+    $requiredTargets = @(
+        "buff.auto_heal",
+        "FeatureIds.InventoryQuickItemHotkeys",
+        "FeatureIds.WorldAutomationAutoMining",
+        "FeatureIds.MapQuickAnnouncement",
+        "fishing.cut_rod_skip",
+        "information.chest_name_labels",
+        "FeatureIds.CombatAutoClicker",
+        "FeatureIds.MovementContinuousDash"
+    )
+    $missingTargets = @()
+    foreach ($target in $requiredTargets) {
+        if (-not $targetCatalogText.Contains($target)) {
+            $missingTargets += $target
+        }
+    }
+
+    $excludedTargets = @(
+        "FeatureIds.SearchMain",
+        "FeatureIds.CombatAutoAim",
+        "FeatureIds.MapDeathHistory",
+        "FeatureIds.MapWorldDayCount",
+        "FeatureIds.MapRevealedAreaRatio",
+        "FeatureIds.FishingQuickRename",
+        "FeatureIds.FishingFilter",
+        "information.info_panel_position"
+    )
+    $catalogExcludedLeaks = @()
+    foreach ($target in $excludedTargets) {
+        if ($targetCatalogText.Contains($target)) {
+            $catalogExcludedLeaks += $target
+        }
+    }
+
+    if ($missingTargets.Count -eq 0 -and
+        $catalogExcludedLeaks.Count -eq 0 -and
+        $testText.Contains("FeatureToggleHotkeyEligibleAndExcludedTargets") -and
+        $featureDocText.Contains("## 支持目标") -and
+        $featureDocText.Contains("## 排除项") -and
+        $featureDocText.Contains("search.main") -and
+        $featureDocText.Contains("combat.auto_aim")) {
+        Write-Pass "Feature toggle hotkey target catalog and docs keep eligible/excluded coverage."
+    }
+    else {
+        Write-FailHealth "Feature toggle hotkey target catalog/docs incomplete; missing=$($missingTargets -join ', ') excludedLeaks=$($catalogExcludedLeaks -join ', ')"
+    }
+
+    if ($hotkeySettingsText.Contains("automation.auto_mining already uses that legacy table as its mining trigger") -and
+        $conflictRegistryText.Contains("FeatureToggleHotkeyConflictType.AutoMiningTrigger") -and
+        $conflictRegistryText.Contains("自动挖矿 的采集按键") -and
+        $runtimeServiceText.Contains("ValidateAutoMiningMode") -and
+        $runtimeServiceText.Contains("missingMiningTriggerHotkey") -and
+        $testText.Contains("FeatureToggleHotkeyRuntimeBlocksAutoMiningHotkeyWithoutTrigger") -and
+        $autoMiningDocText.Contains("采集触发键") -and
+        $autoMiningDocText.Contains("ToggleHotkeysByTargetId[automation.auto_mining]")) {
+        Write-Pass "Feature toggle hotkey keeps auto-mining trigger hotkeys separate from master-toggle hotkeys."
+    }
+    else {
+        Write-FailHealth "Auto-mining collection trigger and feature-toggle hotkey separation must remain in source, tests, and docs."
+    }
+
+    $forbiddenRuntimeTokens = @(
+        "InputActionQueue",
+        "TryEnqueue",
+        "MapQuickAnnouncementRuntimeService",
+        "QuickItemHotkeyService",
+        "TerrariaInputCompat",
+        "TryConsumeMouseTriggerInput",
+        "controlUseItem",
+        "selectedItem"
+    )
+    $runtimeBackflowLeaks = @()
+    foreach ($token in $forbiddenRuntimeTokens) {
+        if ($runtimeServiceText.Contains($token)) {
+            $runtimeBackflowLeaks += $token
+        }
+    }
+
+    $legacyIndex = $dispatcherText.IndexOf("TargetingLegacyUiActions", [System.StringComparison]::Ordinal)
+    $featureToggleIndex = $dispatcherText.IndexOf("TargetingFeatureToggleHotkeys", [System.StringComparison]::Ordinal)
+    $mapMarkerIndex = $dispatcherText.IndexOf("TargetingMapCustomMarkers", [System.StringComparison]::Ordinal)
+    $diagnosticHotkeyIndex = $dispatcherText.IndexOf("TargetingDiagnosticHotkeys", [System.StringComparison]::Ordinal)
+    if ($runtimeBackflowLeaks.Count -eq 0 -and
+        $runtimeServiceText.Contains('private const string Scenario = "Hotkey.FeatureToggle"') -and
+        $runtimeServiceText.Contains("DiagnosticActionRecorder.RecordHotkeyEvent") -and
+        $testText.Contains("FeatureToggleHotkeyRuntimeDoesNotMutateActionHotkeyPayloads") -and
+        $dispatchTestText.Contains("targeting.feature-toggle-hotkeys|targeting.feature-toggle-hotkeys|1") -and
+        $legacyIndex -ge 0 -and $featureToggleIndex -gt $legacyIndex -and
+        $mapMarkerIndex -gt $featureToggleIndex -and $diagnosticHotkeyIndex -gt $mapMarkerIndex) {
+        Write-Pass "Feature toggle hotkey runtime remains an event-level settings toggle between Legacy UI actions and map marker targeting."
+    }
+    else {
+        Write-FailHealth "Feature toggle hotkey runtime must not submit actions or enter quick-item/quick-announcement/Compat input paths; leaks=$($runtimeBackflowLeaks -join ', ')"
+    }
+
+    if ($uiText.Contains('FeatureToggleHotkeyIconId = "keyboard"') -and
+        $uiText.Contains("FeatureToggleHotkeyReserveWidth = 30") -and
+        $vectorIconText.Contains('case "keyboard":') -and
+        $testText.Contains("FeatureToggleHotkeyUiReserveAndIconContract") -and
+        -not $uiText.Contains(".svg") -and
+        -not $uiText.Contains(".png") -and
+        -not $uiText.Contains(".bmp")) {
+        Write-Pass "Feature toggle hotkey UI keeps the shared keyboard icon and 30px reserve without external image assets."
+    }
+    else {
+        Write-FailHealth "Feature toggle hotkey UI must use the shared keyboard vector icon, reserve 30px, and avoid external bitmap/SVG assets."
+    }
+
+    if ($featureIndexText.Contains("F5通用") -and
+        $featureIndexText.Contains("功能主开关快捷键.md") -and
+        $featureDocText.Contains("默认全部未绑定") -and
+        $featureDocText.Contains("Hotkey.FeatureToggle") -and
+        $featureDocText.Contains("仍需用户实机确认") -and
+        $diagnosticRulesText.Contains("scenario=Hotkey.FeatureToggle") -and
+        $diagnosticRulesText.Contains("它不新增 runtime snapshot 字段") -and
+        $quickItemDocText.Contains('只切换 `inventory.quick_item_hotkeys` 主开关') -and
+        $quickAnnouncementDocText.Contains('只切换 `map.quick_announcement` 主开关') -and
+        $continuousDashDocText.Contains("noLastNonOffMode")) {
+        Write-Pass "Feature toggle hotkey docs describe diagnostics, exclusions, internal-hotkey separation, and user real-machine confirmation scope."
+    }
+    else {
+        Write-FailHealth "Feature toggle hotkey feature docs/index/diagnostic rules must describe Hotkey.FeatureToggle, no snapshot fields, exclusions, special internal-hotkey boundaries, and remaining real-machine checks."
+    }
+}
+
 function Test-F5MultiPageUiLayoutGovernance {
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
 
@@ -4130,6 +4330,7 @@ Test-LegacyUiOverlayGovernance -RepoRoot $repoRoot
 Test-CombatAimDiagnosticsGovernance -RepoRoot $repoRoot
 Test-PhasebladeQuickSwitchDiagnosticsGovernance -RepoRoot $repoRoot
 Test-MapQuickAnnouncementGovernance -RepoRoot $repoRoot
+Test-FeatureToggleHotkeyGovernance -RepoRoot $repoRoot
 Test-F5MultiPageUiLayoutGovernance -RepoRoot $repoRoot
 Test-MapCustomMarkerGovernance -RepoRoot $repoRoot
 Test-MapDirectionHintGovernance -RepoRoot $repoRoot

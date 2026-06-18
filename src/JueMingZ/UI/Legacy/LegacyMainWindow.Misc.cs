@@ -23,9 +23,9 @@ namespace JueMingZ.UI.Legacy
             y += MiscExpandableRowHeight(quickReforgePanelHeight);
             hovered = DrawAutoMiningRow(spriteBatch, area, mouse, elements, y, settings) ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
-            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "自动收税", settings.NpcAutoTaxCollectEnabled, "misc-auto-tax-collect-mode:", "靠近税收官自动收钱") ?? hovered;
+            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "自动收税", settings.NpcAutoTaxCollectEnabled, "misc-auto-tax-collect-mode:", "靠近税收官自动收钱", featureToggleTargetId: "npc.auto_tax_collect") ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
-            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "旅行菜单", settings.WorldAutomationTravelMenuEnabled, "misc-travel-menu-mode:", "单机临时开启原版旅行菜单") ?? hovered;
+            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "旅行菜单", settings.WorldAutomationTravelMenuEnabled, "misc-travel-menu-mode:", "单机临时开启原版旅行菜单", featureToggleTargetId: "misc.travel_menu") ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawWorldGenerationDetailsRow(spriteBatch, area, mouse, elements, y) ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
@@ -55,7 +55,8 @@ namespace JueMingZ.UI.Legacy
                 }
             }
 
-            var x = row.Right - totalWidth - 10;
+            const string targetId = "automation.auto_capture_critter";
+            var x = row.Right - totalWidth - 10 - GetFeatureToggleHotkeyReserveWidth(targetId);
             var context = LegacyUiContext.ForScrollArea(spriteBatch, mouse, area, elements, settings);
             LegacySettingRowControl.DrawBackgroundAndLabel(context, row, "自动捕捉", x);
 
@@ -98,7 +99,8 @@ namespace JueMingZ.UI.Legacy
                 x += width + 6;
             }
 
-            return hovered;
+            hovered = DrawFeatureToggleHotkeyButton(context, row, targetId) ?? hovered;
+            return context.HoveredElement ?? hovered;
         }
 
         private static string[] BuildAutoCaptureCritterRowTooltip(int index, AppSettings settings)

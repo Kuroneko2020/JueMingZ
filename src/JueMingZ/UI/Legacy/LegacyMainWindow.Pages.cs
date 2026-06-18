@@ -31,9 +31,9 @@ namespace JueMingZ.UI.Legacy
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawManaModeRow(spriteBatch, area, mouse, elements, y, settings) ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
-            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "自动护士", settings.AutoNurseEnabled, "auto-nurse-mode:", "靠近可交互护士且需要治疗或清除 Debuff 时尝试自动治疗。") ?? hovered;
+            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "自动护士", settings.AutoNurseEnabled, "auto-nurse-mode:", "靠近可交互护士且需要治疗或清除 Debuff 时尝试自动治疗。", featureToggleTargetId: "buff.nurse_auto_heal") ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
-            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "自动家具", settings.AutoStationBuffEnabled, "auto-station-buff-mode:", "靠近可交互增益家具且缺少对应 Buff 时尝试自动交互。") ?? hovered;
+            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "自动家具", settings.AutoStationBuffEnabled, "auto-station-buff-mode:", "靠近可交互增益家具且缺少对应 Buff 时尝试自动交互。", featureToggleTargetId: "buff.auto_station_buff") ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawAutoBuffToggleRow(spriteBatch, area, mouse, elements, y, settings.AutoBuffEnabled) ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SectionGap;
@@ -54,23 +54,23 @@ namespace JueMingZ.UI.Legacy
 
             hovered = DrawCombatAimAssistRow(spriteBatch, area, mouse, elements, y, settings) ?? hovered;
             y += CombatAimRowHeight + LegacyUiMetrics.SettingRowGap;
-            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "自动连点", settings.CombatAutoClickerEnabled, "combat-auto-clicker-mode:", "补全原版不支持连点的物品") ?? hovered;
+            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "自动连点", settings.CombatAutoClickerEnabled, "combat-auto-clicker-mode:", "补全原版不支持连点的物品", featureToggleTargetId: "combat.auto_clicker") ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
-            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "链球连击", settings.CombatFlailComboEnabled, "combat-flail-combo-mode:", "长按右键触发连击") ?? hovered;
+            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "链球连击", settings.CombatFlailComboEnabled, "combat-flail-combo-mode:", "长按右键触发连击", featureToggleTargetId: "combat.flail_combo") ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawCombatPhasebladeQuickSwitchRow(spriteBatch, area, mouse, elements, y, settings) ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
-            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "完美左轮", settings.CombatPerfectRevolverEnabled, "combat-perfect-revolver-mode:", "最大程度发挥左轮威力") ?? hovered;
+            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "完美左轮", settings.CombatPerfectRevolverEnabled, "combat-perfect-revolver-mode:", "最大程度发挥左轮威力", featureToggleTargetId: "combat.perfect_revolver") ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
-            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "省力魔法绳", settings.CombatMagicStringClickerEnabled, "combat-magic-string-clicker-mode:", "长按实现装备魔法绳连点的效果") ?? hovered;
+            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "省力魔法绳", settings.CombatMagicStringClickerEnabled, "combat-magic-string-clicker-mode:", "长按实现装备魔法绳连点的效果", featureToggleTargetId: "combat.magic_string_clicker") ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
-            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "自动转向", settings.CombatAutoFacingEnabled, "combat-auto-facing-mode:", "什么叫毁灭刃不能转头？") ?? hovered;
+            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "自动转向", settings.CombatAutoFacingEnabled, "combat-auto-facing-mode:", "什么叫毁灭刃不能转头？", featureToggleTargetId: "combat.auto_facing") ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
-            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "装备提示", settings.CombatEquipmentWarningEnabled, "combat-equipment-warning-mode:", "又忘了换装备了？") ?? hovered;
+            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "装备提示", settings.CombatEquipmentWarningEnabled, "combat-equipment-warning-mode:", "又忘了换装备了？", featureToggleTargetId: "combat.equipment_warning") ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
-            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "自动汇报", settings.CombatAutoBossDamageReportEnabled, "combat-auto-boss-damage-report-mode:", "boss战结束后自动汇报") ?? hovered;
+            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "自动汇报", settings.CombatAutoBossDamageReportEnabled, "combat-auto-boss-damage-report-mode:", "boss战结束后自动汇报", featureToggleTargetId: "combat.auto_boss_damage_report") ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
-            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "哥布林必死", settings.CombatGoblinExecutionEnabled, "combat-goblin-execution-mode:", "rnm 还钱！！") ?? hovered;
+            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "哥布林必死", settings.CombatGoblinExecutionEnabled, "combat-goblin-execution-mode:", "rnm 还钱！！", featureToggleTargetId: "combat.goblin_execution") ?? hovered;
 
             return hovered;
         }

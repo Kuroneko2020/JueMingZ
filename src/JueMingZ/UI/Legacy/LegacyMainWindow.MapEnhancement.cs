@@ -86,7 +86,8 @@ namespace JueMingZ.UI.Legacy
                 new[] { "开启", "关闭" },
                 new[] { "On", "Off" },
                 "map-persistent-death-markers-mode:",
-                new[] { MapPersistentDeathMarkersTooltip, string.Empty });
+                new[] { MapPersistentDeathMarkersTooltip, string.Empty },
+                featureToggleTargetId: "map.persistent_death_markers");
         }
 
         private static LegacyUiElement DrawMapFootprintsDisplayRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, AppSettings settings)
@@ -103,7 +104,8 @@ namespace JueMingZ.UI.Legacy
                 new[] { "开启", "关闭" },
                 new[] { "On", "Off" },
                 "map-footprints-display-mode:",
-                new[] { MapFootprintsDisplayTooltip, string.Empty });
+                new[] { MapFootprintsDisplayTooltip, string.Empty },
+                featureToggleTargetId: "map.footprints");
         }
 
         private static LegacyUiElement DrawMapRareCreatureDirectionRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, AppSettings settings)
@@ -120,7 +122,8 @@ namespace JueMingZ.UI.Legacy
                 new[] { "开启", "关闭" },
                 new[] { "On", "Off" },
                 "map-rare-creature-direction-mode:",
-                new[] { MapRareCreatureDirectionTooltip, string.Empty });
+                new[] { MapRareCreatureDirectionTooltip, string.Empty },
+                featureToggleTargetId: "map.rare_creature_direction");
         }
 
         private static LegacyUiElement DrawMapTravellingMerchantDirectionRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, AppSettings settings)
@@ -137,11 +140,13 @@ namespace JueMingZ.UI.Legacy
                 new[] { "开启", "关闭" },
                 new[] { "On", "Off" },
                 "map-travelling-merchant-direction-mode:",
-                new[] { MapTravellingMerchantDirectionTooltip, string.Empty });
+                new[] { MapTravellingMerchantDirectionTooltip, string.Empty },
+                featureToggleTargetId: "map.travelling_merchant_direction");
         }
 
         private static LegacyUiElement DrawMapCustomMarkersRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, AppSettings settings)
         {
+            const string targetId = "map.custom_markers";
             settings = settings ?? AppSettings.CreateDefault();
             var read = PlayerWorldMapMarkerCache.ReadCurrent();
             var markerCount = read == null || read.Markers == null ? 0 : read.Markers.Count;
@@ -162,7 +167,7 @@ namespace JueMingZ.UI.Legacy
             var switchWidth = onWidth + offWidth + gap;
             var pageWidth = pageCount > 1 ? pageButtonWidth * 2 + gap : 0;
             var totalWidth = switchWidth + (pageWidth > 0 ? pageWidth + gap : 0);
-            var x = row.Right - totalWidth - 10;
+            var x = row.Right - totalWidth - 10 - GetFeatureToggleHotkeyReserveWidth(targetId);
             var label = BuildMapCustomMarkersLabel(markerCount);
             LegacySettingRowControl.DrawBackgroundAndLabel(context, row, label, x);
 
@@ -202,6 +207,7 @@ namespace JueMingZ.UI.Legacy
                 "关闭",
                 !settings.MapCustomMarkersEnabled,
                 string.Empty) ?? hovered;
+            hovered = DrawFeatureToggleHotkeyButton(context, row, targetId) ?? hovered;
             return context.HoveredElement ?? hovered;
         }
 
@@ -705,6 +711,7 @@ namespace JueMingZ.UI.Legacy
 
         private static LegacyUiElement DrawMapQuickAnnouncementRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, AppSettings settings)
         {
+            const string targetId = "map.quick_announcement";
             var row = new LegacyUiRect(area.Viewport.X, area.ToScreenY(contentY), area.Viewport.Width, LegacyUiMetrics.RowHeight);
             if (!area.IsVisible(row))
             {
@@ -791,7 +798,8 @@ namespace JueMingZ.UI.Legacy
                 !settings.MapQuickAnnouncementEnabled,
                 MapQuickAnnouncementOffTooltip) ?? hovered;
 
-            return hovered;
+            hovered = DrawFeatureToggleHotkeyButton(context, row, targetId) ?? hovered;
+            return context.HoveredElement ?? hovered;
         }
 
         private static LegacyUiRect[] CalculateMapQuickAnnouncementLayout(LegacyUiRect row)
@@ -805,7 +813,7 @@ namespace JueMingZ.UI.Legacy
                 onWidth +
                 offWidth +
                 MapQuickAnnouncementGap * 6;
-            var x = row.Right - totalWidth - 10;
+            var x = row.Right - totalWidth - 10 - GetFeatureToggleHotkeyReserveWidth("map.quick_announcement");
             var rects = new LegacyUiRect[7];
             rects[0] = new LegacyUiRect(x, buttonY, MapQuickAnnouncementSlotWidth, RowModeButtonHeight);
             x += MapQuickAnnouncementSlotWidth + MapQuickAnnouncementGap;

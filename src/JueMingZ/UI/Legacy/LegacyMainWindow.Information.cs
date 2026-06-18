@@ -96,7 +96,8 @@ namespace JueMingZ.UI.Legacy
                 enabled,
                 "information-toggle:" + featureId + ":",
                 enabledTooltip,
-                styleFeatureId);
+                styleFeatureId,
+                featureId);
         }
 
         private static LegacyUiElement DrawInformationNpcNameModeRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, string mode)
@@ -113,7 +114,8 @@ namespace JueMingZ.UI.Legacy
                 new[] { "Name", "Type", "Off" },
                 "information-npc-name-label-mode:",
                 new[] { "NPC头顶显示名字", "NPC头顶显示类型", null },
-                InformationStyleHelper.NpcNameFeatureId);
+                InformationStyleHelper.NpcNameFeatureId,
+                "information.npc_name_labels");
         }
 
         private static LegacyUiElement DrawInformationChestNameModeRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, string mode)
@@ -130,7 +132,8 @@ namespace JueMingZ.UI.Legacy
                 new[] { "Always", "Opened", "Off" },
                 "information-chest-name-label-mode:",
                 new[] { "始终显示宝箱名字，需要金属探测器", "显示开过的宝箱名称，无需金属探测器", null },
-                InformationStyleHelper.ChestNameFeatureId);
+                InformationStyleHelper.ChestNameFeatureId,
+                "information.chest_name_labels");
         }
 
         private static LegacyUiElement DrawInformationSignTextModeRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, string mode)
@@ -147,7 +150,8 @@ namespace JueMingZ.UI.Legacy
                 new[] { InformationSignTextModes.All, InformationSignTextModes.Lines, InformationSignTextModes.Characters, InformationSignTextModes.Off },
                 "information-sign-text-label-mode:",
                 new[] { "显示最多十行内容", "只显示前几行，用加减按钮调整", "只显示前几个字，用加减按钮调整", null },
-                InformationStyleHelper.SignTextFeatureId);
+                InformationStyleHelper.SignTextFeatureId,
+                "information.sign_text_labels");
         }
 
         private static LegacyUiElement DrawInformationTombstoneTextModeRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, string mode)
@@ -164,7 +168,8 @@ namespace JueMingZ.UI.Legacy
                 new[] { InformationSignTextModes.All, InformationSignTextModes.Lines, InformationSignTextModes.Characters, InformationSignTextModes.Off },
                 "information-tombstone-text-label-mode:",
                 new[] { "显示最多十行内容", "只显示前几行，用加减按钮调整", "只显示前几个字，用加减按钮调整", null },
-                InformationStyleHelper.TombstoneTextFeatureId);
+                InformationStyleHelper.TombstoneTextFeatureId,
+                "information.tombstone_text_labels");
         }
 
         private static bool ShouldDrawInformationSignTextLimitRow(string mode)

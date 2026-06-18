@@ -41,6 +41,7 @@ namespace JueMingZ.UI.Legacy
 
         private static LegacyUiElement DrawMovementSafeLandingRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, bool enabled)
         {
+            const string targetId = "movement.fall_protection";
             var row = new LegacyUiRect(area.Viewport.X, area.ToScreenY(contentY), area.Viewport.Width, LegacyUiMetrics.RowHeight);
             if (!area.IsVisible(row))
             {
@@ -59,7 +60,7 @@ namespace JueMingZ.UI.Legacy
                 }
             }
 
-            var x = row.Right - totalWidth - 10;
+            var x = row.Right - totalWidth - 10 - GetFeatureToggleHotkeyReserveWidth(targetId);
             var context = LegacyUiContext.ForScrollArea(spriteBatch, mouse, area, elements, ConfigService.AppSettings ?? AppSettings.CreateDefault());
             LegacySettingRowControl.DrawBackgroundAndLabel(context, row, "智能防摔", x);
 
@@ -100,7 +101,8 @@ namespace JueMingZ.UI.Legacy
                 x += width + 6;
             }
 
-            return hovered;
+            hovered = DrawFeatureToggleHotkeyButton(context, row, targetId) ?? hovered;
+            return context.HoveredElement ?? hovered;
         }
 
         private static bool RegisterMovementSafeLandingConfigPopupOverlay(LegacyScrollArea area, AppSettings settings)
@@ -337,7 +339,8 @@ namespace JueMingZ.UI.Legacy
                 label,
                 enabled,
                 "movement-toggle:" + featureId + ":",
-                tooltip);
+                tooltip,
+                featureToggleTargetId: featureId);
         }
 
         private static LegacyUiElement DrawContinuousDashModeRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, bool enabled, string mode)
@@ -354,7 +357,8 @@ namespace JueMingZ.UI.Legacy
                 new[] { "按住", "双击", "关闭" },
                 new[] { MovementContinuousDashModes.HoldDirection, MovementContinuousDashModes.DoubleTapAndHold, MovementContinuousDashModes.Off },
                 "movement-continuous-dash-mode:",
-                new[] { "按住方向键冲刺", "双击并按住冲刺", "关闭连续冲刺" });
+                new[] { "按住方向键冲刺", "双击并按住冲刺", "关闭连续冲刺" },
+                featureToggleTargetId: "movement.continuous_dash");
         }
     }
 }

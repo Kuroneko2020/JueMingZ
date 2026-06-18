@@ -35,7 +35,7 @@ namespace JueMingZ.UI.Legacy
             }.Draw(LegacyUiContext.ForScrollArea(spriteBatch, null, area, null, ConfigService.AppSettings ?? AppSettings.CreateDefault()));
         }
 
-        private static LegacyUiElement DrawBinaryModeRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, string label, bool enabled, string elementPrefix, string tooltip, string styleFeatureId = null)
+        private static LegacyUiElement DrawBinaryModeRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, string label, bool enabled, string elementPrefix, string tooltip, string styleFeatureId = null, string featureToggleTargetId = null)
         {
             return DrawRightModeRow(
                 spriteBatch,
@@ -49,10 +49,11 @@ namespace JueMingZ.UI.Legacy
                 new[] { "On", "Off" },
                 elementPrefix,
                 string.IsNullOrWhiteSpace(tooltip) ? null : new[] { tooltip, null },
-                styleFeatureId);
+                styleFeatureId,
+                featureToggleTargetId);
         }
 
-        private static LegacyUiElement DrawRightModeRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, string label, string selectedMode, string[] labels, string[] values, string elementPrefix, string[] tooltips, string styleFeatureId = null)
+        private static LegacyUiElement DrawRightModeRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, string label, string selectedMode, string[] labels, string[] values, string elementPrefix, string[] tooltips, string styleFeatureId = null, string featureToggleTargetId = null)
         {
             var row = new LegacyUiRect(area.Viewport.X, area.ToScreenY(contentY), area.Viewport.Width, LegacyUiMetrics.RowHeight);
             if (!area.IsVisible(row))
@@ -60,9 +61,12 @@ namespace JueMingZ.UI.Legacy
                 return null;
             }
 
+            var context = LegacyUiContext.ForScrollArea(spriteBatch, mouse, area, elements, ConfigService.AppSettings ?? AppSettings.CreateDefault());
+            var reserveWidth = GetFeatureToggleHotkeyReserveWidth(featureToggleTargetId);
+            var hovered = (LegacyUiElement)null;
             if (!InformationStyleHelper.IsConfigurable(styleFeatureId))
             {
-                return new LegacyModeButtonGroup
+                hovered = new LegacyModeButtonGroup
                 {
                     Bounds = row,
                     Label = label,
@@ -71,12 +75,14 @@ namespace JueMingZ.UI.Legacy
                     ButtonValues = values,
                     ElementPrefix = elementPrefix,
                     ButtonTooltips = tooltips,
-                    ElementLabelPrefix = label
-                }.Draw(LegacyUiContext.ForScrollArea(spriteBatch, mouse, area, elements, ConfigService.AppSettings ?? AppSettings.CreateDefault()));
+                    ElementLabelPrefix = label,
+                    RightReserveWidth = reserveWidth
+                }.Draw(context);
+                hovered = DrawFeatureToggleHotkeyButton(context, row, featureToggleTargetId) ?? hovered;
+                return context.HoveredElement ?? hovered;
             }
 
             LegacyUiTheme.DrawRowClipped(spriteBatch, row, area.Viewport);
-            var hovered = (LegacyUiElement)null;
             var buttonY = RowModeButtonY(row);
             var totalWidth = 0;
             for (var index = 0; index < labels.Length; index++)
@@ -88,7 +94,7 @@ namespace JueMingZ.UI.Legacy
                 }
             }
 
-            var x = row.Right - totalWidth - 10;
+            var x = row.Right - totalWidth - 10 - reserveWidth;
             var configRect = new LegacyUiRect(x, buttonY, 0, 0);
             if (InformationStyleHelper.IsConfigurable(styleFeatureId))
             {
@@ -167,7 +173,8 @@ namespace JueMingZ.UI.Legacy
                 x += width + 6;
             }
 
-            return hovered;
+            hovered = DrawFeatureToggleHotkeyButton(context, row, featureToggleTargetId) ?? hovered;
+            return context.HoveredElement ?? hovered;
         }
 
         private static int RowModeButtonY(LegacyUiRect row)

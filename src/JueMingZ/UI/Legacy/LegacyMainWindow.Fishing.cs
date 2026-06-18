@@ -34,7 +34,7 @@ namespace JueMingZ.UI.Legacy
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawFishingStoreModeRow(spriteBatch, area, mouse, elements, y, settings.FishingAutoStoreMode) ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
-            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "切杆跳过", settings.FishingFilterCutRodSkipEnabled, "fishing-cut-rod-skip-mode:", "切杆跳过不要的鱼获") ?? hovered;
+            hovered = DrawBinaryModeRow(spriteBatch, area, mouse, elements, y, "切杆跳过", settings.FishingFilterCutRodSkipEnabled, "fishing-cut-rod-skip-mode:", "切杆跳过不要的鱼获", featureToggleTargetId: "fishing.cut_rod_skip") ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawFishingQuickRenameRow(spriteBatch, area, mouse, elements, y) ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SectionGap;
@@ -55,7 +55,8 @@ namespace JueMingZ.UI.Legacy
                 label,
                 enabled,
                 "fishing-toggle:" + featureId + ":",
-                enabledTooltip);
+                enabledTooltip,
+                featureToggleTargetId: featureId);
         }
 
         private static LegacyUiElement DrawFishingStoreModeRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, string mode)
@@ -72,7 +73,8 @@ namespace JueMingZ.UI.Legacy
                 new[] { "所有", "任务鱼", "关闭" },
                 new[] { FishingAutoStoreModes.All, FishingAutoStoreModes.QuestFish, FishingAutoStoreModes.Off },
                 "fishing-store-mode:",
-                new[] { "每次钓上来东西后，点一次堆叠到附近箱子", "只在钓上当前渔夫任务鱼时存放", null });
+                new[] { "每次钓上来东西后，点一次堆叠到附近箱子", "只在钓上当前渔夫任务鱼时存放", null },
+                featureToggleTargetId: "fishing.auto_store_quest_fish");
         }
 
         private static LegacyUiElement DrawFishingQuickRenameRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY)

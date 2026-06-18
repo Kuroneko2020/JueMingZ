@@ -38,7 +38,8 @@ namespace JueMingZ.UI.Legacy
                 new[] { "Smart", "Quick", "Off" },
                 "auto-heal-mode:",
                 new[] { "根据掉血量智能的选择回血物品，可能会推迟回血", "检测到掉血立即使用回血量最高的物品", string.Empty },
-                AutoRecoveryItemFilter.CountBlockedHealItems(settings));
+                AutoRecoveryItemFilter.CountBlockedHealItems(settings),
+                "buff.auto_heal");
         }
 
         private static LegacyUiElement DrawManaModeRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, AppSettings settings)
@@ -59,7 +60,8 @@ namespace JueMingZ.UI.Legacy
                 new[] { "ManaFlower", "Off" },
                 "auto-mana-mode:",
                 null,
-                AutoRecoveryItemFilter.CountBlockedManaItems(settings));
+                AutoRecoveryItemFilter.CountBlockedManaItems(settings),
+                "buff.auto_mana");
         }
 
         private static LegacyUiElement DrawAutoRecoveryModeRow(
@@ -75,7 +77,8 @@ namespace JueMingZ.UI.Legacy
             string[] values,
             string elementPrefix,
             string[] tooltips,
-            int blockedCount)
+            int blockedCount,
+            string featureToggleTargetId)
         {
             var row = new LegacyUiRect(area.Viewport.X, area.ToScreenY(contentY), area.Viewport.Width, LegacyUiMetrics.RowHeight);
             if (!area.IsVisible(row))
@@ -96,7 +99,7 @@ namespace JueMingZ.UI.Legacy
                 }
             }
 
-            var x = row.Right - totalWidth - 10;
+            var x = row.Right - totalWidth - 10 - GetFeatureToggleHotkeyReserveWidth(featureToggleTargetId);
             var labelWidth = Math.Max(60, x - row.X - 20);
             UiTextRenderer.DrawAlignedTextClipped(spriteBatch, label, row.X + 10, row.Y, labelWidth, row.Height, UiTextHorizontalAlignment.Left, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 238, 226, 255, 0.86f);
 
@@ -161,6 +164,13 @@ namespace JueMingZ.UI.Legacy
                 }
 
                 x += width + 6;
+            }
+
+            var context = LegacyUiContext.ForScrollArea(spriteBatch, mouse, area, elements, ConfigService.AppSettings ?? AppSettings.CreateDefault());
+            hovered = DrawFeatureToggleHotkeyButton(context, row, featureToggleTargetId) ?? hovered;
+            if (context.HoveredElement != null)
+            {
+                hovered = context.HoveredElement;
             }
 
             return hovered;

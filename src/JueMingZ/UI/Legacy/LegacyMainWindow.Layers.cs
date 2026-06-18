@@ -191,6 +191,7 @@ namespace JueMingZ.UI.Legacy
                         DrawFooter(spriteBatch, window);
                     }
 
+                    RegisterFeatureToggleHotkeyModalOverlay(scrollArea, contentRect, settings);
                     LegacyUiOverlayCoordinator.Current.DrawOverlays(spriteBatch, mouse, window, selectedPage, settings, elements);
                     hoveredElement = ResolveFrameHoveredElement(hoveredElement, elements, mouse);
                     if (hoveredElement != null)

@@ -7,10 +7,10 @@
     <Platforms>AnyCPU;x86</Platforms>
     <PlatformTarget>x86</PlatformTarget>
     <LangVersion>7.3</LangVersion>
-    <Version>0.792</Version>
-    <AssemblyVersion>0.792.0</AssemblyVersion>
-    <FileVersion>0.792.0</FileVersion>
-    <InformationalVersion>0.792-f5-about-blueprint-tab-swap</InformationalVersion>
+    <Version>0.799</Version>
+    <AssemblyVersion>0.799.0</AssemblyVersion>
+    <FileVersion>0.799.0</FileVersion>
+    <InformationalVersion>0.799-feature-toggle-hotkey-closeout</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Deterministic>true</Deterministic>
     <RestoreConfigFile>$(MSBuildThisFileDirectory)..\..\NuGet.Config</RestoreConfigFile>

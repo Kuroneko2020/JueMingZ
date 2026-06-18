@@ -23,6 +23,7 @@ namespace JueMingZ.Input
                 var pageId = command.ElementId.StartsWith("tab:", StringComparison.Ordinal) ? command.ElementId.Substring(4) : "buff";
                 var before = LegacyMainUiState.BuildUiStateJson();
                 LegacyTextInput.ClearFocus();
+                LegacyMainWindow.CloseFeatureToggleHotkeyModal();
                 LegacyMainUiState.SelectPage(pageId);
                 Record(
                     command,
@@ -34,6 +35,30 @@ namespace JueMingZ.Input
                     LegacyMainUiState.BuildUiStateJson(),
                     "{\"pageId\":\"" + EscapeJson(pageId) + "\"}",
                     "Button");
+                return;
+            }
+
+            if (command.ElementId.StartsWith("feature-toggle-hotkey-open:", StringComparison.Ordinal))
+            {
+                HandleFeatureToggleHotkeyOpen(command, command.ElementId.Substring("feature-toggle-hotkey-open:".Length));
+                return;
+            }
+
+            if (string.Equals(command.ElementId, "feature-toggle-hotkey-capture:start", StringComparison.Ordinal))
+            {
+                HandleFeatureToggleHotkeyCaptureStart(command);
+                return;
+            }
+
+            if (string.Equals(command.ElementId, "feature-toggle-hotkey-clear", StringComparison.Ordinal))
+            {
+                HandleFeatureToggleHotkeyClear(command);
+                return;
+            }
+
+            if (string.Equals(command.ElementId, "feature-toggle-hotkey-close", StringComparison.Ordinal))
+            {
+                HandleFeatureToggleHotkeyClose(command);
                 return;
             }
 

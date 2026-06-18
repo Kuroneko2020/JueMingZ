@@ -1149,10 +1149,60 @@ namespace JueMingZ.Config
             }
 
             settings.QuickItemHotkeyBindings = NormalizeQuickItemHotkeyBindings(settings.QuickItemHotkeyBindings);
-            if (settings.ConfigVersion < 3)
+            settings.ToggleHotkeysByTargetId = NormalizeFeatureToggleHotkeys(settings.ToggleHotkeysByTargetId);
+            settings.LastNonOffModeByTargetId = NormalizeFeatureToggleLastModes(settings.LastNonOffModeByTargetId);
+            if (settings.ConfigVersion < 4)
             {
-                settings.ConfigVersion = 3;
+                settings.ConfigVersion = 4;
             }
+        }
+
+        private static Dictionary<string, string> NormalizeFeatureToggleHotkeys(Dictionary<string, string> bindings)
+        {
+            var normalized = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (bindings == null || bindings.Count <= 0)
+            {
+                return normalized;
+            }
+
+            foreach (var pair in bindings)
+            {
+                string targetId;
+                string chord;
+                if (!FeatureToggleHotkeyTargetCatalog.TryNormalizeTargetId(pair.Key, out targetId) ||
+                    !FeatureToggleHotkeyChord.TryNormalize(pair.Value, out chord))
+                {
+                    continue;
+                }
+
+                normalized[targetId] = chord;
+            }
+
+            return normalized;
+        }
+
+        private static Dictionary<string, string> NormalizeFeatureToggleLastModes(Dictionary<string, string> modes)
+        {
+            var normalized = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (modes == null || modes.Count <= 0)
+            {
+                return normalized;
+            }
+
+            foreach (var pair in modes)
+            {
+                string targetId;
+                string mode;
+                if (!FeatureToggleHotkeyTargetCatalog.TryNormalizeTargetId(pair.Key, out targetId) ||
+                    !FeatureToggleHotkeyTargetCatalog.TryNormalizeLastNonOffMode(targetId, pair.Value, out mode))
+                {
+                    continue;
+                }
+
+                normalized[targetId] = mode;
+            }
+
+            return normalized;
         }
 
         private static List<QuickItemHotkeyBinding> NormalizeQuickItemHotkeyBindings(List<QuickItemHotkeyBinding> bindings)

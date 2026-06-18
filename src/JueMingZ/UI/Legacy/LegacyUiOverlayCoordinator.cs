@@ -196,6 +196,12 @@ namespace JueMingZ.UI.Legacy
                    (_requests.Count <= 0 && HasModalAt(_lastRequests, mouse));
         }
 
+        public bool HasAnyActiveModal()
+        {
+            return HasAnyModal(_requests) ||
+                   (_requests.Count <= 0 && HasAnyModal(_lastRequests));
+        }
+
         public void EndFrame()
         {
             _lastStackSignature = BuildStackSignature(_requests);
@@ -333,6 +339,25 @@ namespace JueMingZ.UI.Legacy
             {
                 var request = requests[index];
                 if (request != null && request.Modal && request.Bounds.Contains(mouse.X, mouse.Y))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasAnyModal(IList<LegacyUiOverlayRequest> requests)
+        {
+            if (requests == null)
+            {
+                return false;
+            }
+
+            for (var index = 0; index < requests.Count; index++)
+            {
+                var request = requests[index];
+                if (request != null && request.Modal)
                 {
                     return true;
                 }

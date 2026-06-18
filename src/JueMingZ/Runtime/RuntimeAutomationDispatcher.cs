@@ -33,6 +33,8 @@ namespace JueMingZ.Runtime
             new RuntimeDispatchStep("targeting.diagnostic-button-actions", "targeting.diagnostic-button-actions", 1);
         private static readonly RuntimeDispatchStep TargetingLegacyUiActions =
             new RuntimeDispatchStep("targeting.legacy-ui-actions", "targeting.legacy-ui-actions", 1);
+        private static readonly RuntimeDispatchStep TargetingFeatureToggleHotkeys =
+            new RuntimeDispatchStep("targeting.feature-toggle-hotkeys", "targeting.feature-toggle-hotkeys", 1);
         private static readonly RuntimeDispatchStep TargetingMapCustomMarkers =
             new RuntimeDispatchStep("targeting.map-custom-markers", "targeting.map-custom-markers", 1);
         private static readonly RuntimeDispatchStep TargetingDiagnosticHotkeys =
@@ -121,6 +123,7 @@ namespace JueMingZ.Runtime
             TargetingStartupDiagnosticNoop,
             TargetingDiagnosticButtonActions,
             TargetingLegacyUiActions,
+            TargetingFeatureToggleHotkeys,
             TargetingMapCustomMarkers,
             TargetingDiagnosticHotkeys
         };
@@ -209,6 +212,14 @@ namespace JueMingZ.Runtime
             operationStart = Stopwatch.GetTimestamp();
             LegacyUiActionService.Update(actionQueue, gameState);
             RecordOperationTiming(context, TargetingLegacyUiActions, operationStart);
+
+            operationStart = Stopwatch.GetTimestamp();
+            if (ShouldRun(TargetingFeatureToggleHotkeys, FeatureToggleHotkeyService.HasActiveBindings, context.UpdateTick))
+            {
+                FeatureToggleHotkeyService.Tick(gameState);
+                RecordOperationTiming(context, TargetingFeatureToggleHotkeys, operationStart);
+            }
+
             operationStart = Stopwatch.GetTimestamp();
             if (ShouldRun(TargetingMapCustomMarkers, settings.MapCustomMarkersEnabled || MapCustomMarkerInteractionService.IsPickerOpen, context.UpdateTick))
             {

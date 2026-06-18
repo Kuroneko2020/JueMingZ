@@ -11,6 +11,7 @@ namespace JueMingZ.UI.Legacy.Controls
         public string[] ButtonValues { get; set; }
         public string[] ButtonTooltips { get; set; }
         public int ButtonGap { get; set; }
+        public int RightReserveWidth { get; set; }
         public string ElementLabelPrefix { get; set; }
 
         public LegacyModeButtonGroup()
@@ -20,6 +21,7 @@ namespace JueMingZ.UI.Legacy.Controls
             ButtonLabels = new string[0];
             ButtonValues = new string[0];
             ButtonGap = 6;
+            RightReserveWidth = 0;
             ElementLabelPrefix = string.Empty;
         }
 
@@ -31,7 +33,7 @@ namespace JueMingZ.UI.Legacy.Controls
             }
 
             var totalWidth = LegacyUiLayout.TotalModeButtonWidth(ButtonLabels, ButtonGap);
-            var x = Bounds.Right - totalWidth - 10;
+            var x = Bounds.Right - totalWidth - 10 - Math.Max(0, RightReserveWidth);
             LegacySettingRowControl.DrawBackgroundAndLabel(context, Bounds, Label, x);
             var hovered = (LegacyUiElement)null;
             var y = LegacyUiLayout.RowModeButtonY(Bounds);

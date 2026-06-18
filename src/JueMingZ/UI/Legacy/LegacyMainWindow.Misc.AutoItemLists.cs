@@ -30,7 +30,8 @@ namespace JueMingZ.UI.Legacy
                     "从背包批量选择要加入自动出售名单的物品。",
                     "尝试出售名单里的物品",
                     "关闭自动出售功能。"
-                });
+                },
+                featureToggleTargetId: "inventory.auto_sell");
         }
 
         private static LegacyUiElement DrawAutoDiscardRow(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, AppSettings settings)
@@ -52,7 +53,8 @@ namespace JueMingZ.UI.Legacy
                     "从背包批量选择要加入自动丢弃名单的物品。",
                     "尝试丢弃名单里的物品",
                     "关闭自动丢弃功能。"
-                });
+                },
+                featureToggleTargetId: "inventory.auto_discard");
         }
 
         private static LegacyUiElement DrawAutoSellListPanel(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements, int contentY, out int consumedHeight)
