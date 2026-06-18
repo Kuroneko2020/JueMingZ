@@ -7,10 +7,10 @@
     <Platforms>AnyCPU;x86</Platforms>
     <PlatformTarget>x86</PlatformTarget>
     <LangVersion>7.3</LangVersion>
-    <Version>0.799</Version>
-    <AssemblyVersion>0.799.0</AssemblyVersion>
-    <FileVersion>0.799.0</FileVersion>
-    <InformationalVersion>0.799-feature-toggle-hotkey-closeout</InformationalVersion>
+    <Version>0.801</Version>
+    <AssemblyVersion>0.801.0</AssemblyVersion>
+    <FileVersion>0.801.0</FileVersion>
+    <InformationalVersion>0.801-feature-toggle-hotkey-tooltip-polish</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Deterministic>true</Deterministic>
     <RestoreConfigFile>$(MSBuildThisFileDirectory)..\..\NuGet.Config</RestoreConfigFile>

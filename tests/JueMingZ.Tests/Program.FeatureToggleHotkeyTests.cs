@@ -293,6 +293,14 @@ namespace JueMingZ.Tests
                 LegacyMainWindow.GetFeatureToggleHotkeyOpenElementIdForTesting("automation.auto_mining"),
                 "feature-toggle-hotkey-open:automation.auto_mining",
                 "feature toggle hotkey open element id");
+
+            var tooltip = LegacyMainWindow.GetFeatureToggleHotkeyIconTooltipForTesting("buff.auto_heal");
+            if (tooltip.Length != 1)
+            {
+                throw new InvalidOperationException("Expected feature toggle hotkey icon tooltip to use one short line.");
+            }
+
+            AssertStringEquals(tooltip[0], "双击打开", "feature toggle hotkey icon tooltip");
         }
 
         private static void FeatureToggleHotkeyModalCopyAndCaptureMutualExclusion()
@@ -303,9 +311,14 @@ namespace JueMingZ.Tests
             LegacyMainWindow.StopMapQuickAnnouncementHotkeyCapture();
 
             var copy = LegacyMainWindow.GetFeatureToggleHotkeyModalCopyForTesting();
-            AssertStringEquals(copy[0], "此快捷仅做为功能主开关", "feature toggle modal intro");
+            AssertStringEquals(copy[0], "只切换功能开启/关闭，不执行功能动作。", "feature toggle modal intro");
             AssertStringEquals(copy[1], "单击开始录入按钮", "feature toggle modal idle text");
-            AssertStringEquals(copy[2], "请按下按键", "feature toggle modal capture text");
+            AssertStringEquals(copy[2], "请按下按键，按esc退出", "feature toggle modal capture text");
+
+            var tooltipCopy = LegacyMainWindow.GetFeatureToggleHotkeyModalTooltipCopyForTesting();
+            AssertStringEquals(tooltipCopy[0], null, "feature toggle close button tooltip");
+            AssertStringEquals(tooltipCopy[1], "支持Ctrl，Alt，Shift + ", "feature toggle capture button tooltip");
+            AssertStringEquals(tooltipCopy[2], null, "feature toggle clear button tooltip");
 
             LegacyMainWindow.StartQuickItemHotkeyCapture(0);
             LegacyMainWindow.OpenFeatureToggleHotkeyModalForTesting("buff.auto_heal", new LegacyUiRect(400, 100, 24, 24));

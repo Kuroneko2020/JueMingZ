@@ -20,9 +20,10 @@ namespace JueMingZ.UI.Legacy
         private const string FeatureToggleHotkeyCaptureElementId = "feature-toggle-hotkey-capture:start";
         private const string FeatureToggleHotkeyClearElementId = "feature-toggle-hotkey-clear";
         private const string FeatureToggleHotkeyCloseElementId = "feature-toggle-hotkey-close";
-        private const string FeatureToggleHotkeyIntroText = "此快捷仅做为功能主开关";
+        private const string FeatureToggleHotkeyIntroText = "只切换功能开启/关闭，不执行功能动作。";
         private const string FeatureToggleHotkeyIdleText = "单击开始录入按钮";
-        private const string FeatureToggleHotkeyCapturingText = "请按下按键";
+        private const string FeatureToggleHotkeyCapturingText = "请按下按键，按esc退出";
+        private const string FeatureToggleHotkeyCaptureTooltip = "支持Ctrl，Alt，Shift + ";
 
         private static string _featureToggleHotkeyModalTargetId = string.Empty;
         private static LegacyUiRect _featureToggleHotkeyModalAnchor;
@@ -207,9 +208,7 @@ namespace JueMingZ.UI.Legacy
         {
             return new[]
             {
-                "双击配置功能主开关快捷键。",
-                "只切换功能开启 / 关闭，不执行功能动作。",
-                "独立于快捷物品绑定、自动挖矿采集键和快捷宣告组合。"
+                "双击打开"
             };
         }
 
@@ -267,15 +266,15 @@ namespace JueMingZ.UI.Legacy
             context.RegisterElement(FeatureToggleHotkeyModalId, displayName + " 快捷键小窗", "blocker", popup, true, false, 0, 0, 0, null);
 
             UiTextRenderer.DrawText(context.SpriteBatch, displayName + " 快捷键", popup.X + 14, popup.Y + 11, 246, 242, 220, 255, 0.82f);
-            DrawFeatureToggleHotkeyModalButton(context, new LegacyUiRect(popup.Right - 54, popup.Y + 8, 40, 20), FeatureToggleHotkeyCloseElementId, "关闭", false, "关闭小窗");
+            DrawFeatureToggleHotkeyModalButton(context, new LegacyUiRect(popup.Right - 54, popup.Y + 8, 40, 20), FeatureToggleHotkeyCloseElementId, "关闭", false, null);
 
             UiTextRenderer.DrawText(context.SpriteBatch, FeatureToggleHotkeyIntroText, popup.X + 18, popup.Y + 48, 238, 238, 226, 245, 0.72f);
             UiTextRenderer.DrawText(context.SpriteBatch, "当前：" + (string.IsNullOrWhiteSpace(current) ? "未绑定" : current), popup.X + 18, popup.Y + 75, 206, 218, 238, 240, 0.68f);
 
             var captureRect = new LegacyUiRect(popup.X + 18, popup.Y + 102, popup.Width - 36, 30);
-            DrawFeatureToggleHotkeyModalButton(context, captureRect, FeatureToggleHotkeyCaptureElementId, captureText, _featureToggleHotkeyCaptureActive, "单击开始录入功能主开关快捷键；Esc 取消录入。");
+            DrawFeatureToggleHotkeyModalButton(context, captureRect, FeatureToggleHotkeyCaptureElementId, captureText, _featureToggleHotkeyCaptureActive, FeatureToggleHotkeyCaptureTooltip);
 
-            DrawFeatureToggleHotkeyModalButton(context, new LegacyUiRect(popup.X + 18, popup.Y + 144, 78, 24), FeatureToggleHotkeyClearElementId, "清除", false, "清除当前功能主开关快捷键绑定。");
+            DrawFeatureToggleHotkeyModalButton(context, new LegacyUiRect(popup.X + 18, popup.Y + 144, 78, 24), FeatureToggleHotkeyClearElementId, "清除", false, null);
             if (!string.IsNullOrWhiteSpace(_featureToggleHotkeyMessage))
             {
                 UiTextRenderer.DrawText(context.SpriteBatch, _featureToggleHotkeyMessage, popup.X + 110, popup.Y + 148, 238, 196, 180, 245, 0.64f);
@@ -634,6 +633,16 @@ namespace JueMingZ.UI.Legacy
         internal static string[] GetFeatureToggleHotkeyModalCopyForTesting()
         {
             return new[] { FeatureToggleHotkeyIntroText, FeatureToggleHotkeyIdleText, FeatureToggleHotkeyCapturingText };
+        }
+
+        internal static string[] GetFeatureToggleHotkeyIconTooltipForTesting(string targetId)
+        {
+            return BuildFeatureToggleHotkeyIconTooltip(targetId);
+        }
+
+        internal static string[] GetFeatureToggleHotkeyModalTooltipCopyForTesting()
+        {
+            return new string[] { null, FeatureToggleHotkeyCaptureTooltip, null };
         }
 
         internal static LegacyUiRect CalculateFeatureToggleHotkeyButtonRectForTesting(LegacyUiRect row, string targetId)
