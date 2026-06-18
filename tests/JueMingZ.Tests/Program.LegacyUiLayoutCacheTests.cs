@@ -325,6 +325,40 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void LegacyUiAboutAndBlueprintTabsKeepRequestedOrder()
+        {
+            if (LegacyTabBar.Tabs.Length < 7)
+            {
+                throw new InvalidOperationException("Expected the F5 tab bar to contain the about and blueprint entries.");
+            }
+
+            var about = LegacyTabBar.Tabs[5];
+            var blueprint = LegacyTabBar.Tabs[6];
+            if (!string.Equals(about.Id, "about", StringComparison.Ordinal) ||
+                !string.Equals(about.DisplayName, "关于", StringComparison.Ordinal) ||
+                about.Row != 0 ||
+                about.Column != 5)
+            {
+                throw new InvalidOperationException("Expected the About tab to occupy the top-row position formerly used by Blueprint.");
+            }
+
+            if (!string.Equals(blueprint.Id, "blueprint", StringComparison.Ordinal) ||
+                !string.Equals(blueprint.DisplayName, "蓝图", StringComparison.Ordinal) ||
+                blueprint.Row != 1 ||
+                blueprint.Column != 0)
+            {
+                throw new InvalidOperationException("Expected the Blueprint tab to move to the second-row first position.");
+            }
+
+            var window = new LegacyUiRect(40, 50, LegacyUiMetrics.DefaultWidth, LegacyUiMetrics.DefaultHeight);
+            var aboutRect = LegacyTabBar.GetTabRect(window, 5);
+            var blueprintRect = LegacyTabBar.GetTabRect(window, 6);
+            if (aboutRect.Y >= blueprintRect.Y || aboutRect.X <= blueprintRect.X)
+            {
+                throw new InvalidOperationException("Expected About to render on the top row after Hotkeys and Blueprint to render at the start of the second row.");
+            }
+        }
+
         private static void LegacyUiTabsIgnoreContentScrollClip()
         {
             var settings = AppSettings.CreateDefault();

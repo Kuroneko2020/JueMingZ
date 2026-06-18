@@ -1771,6 +1771,7 @@ namespace JueMingZ.Tests
             Run("legacy UI hover layout token ignores window and content position", ref failed, LegacyUiHoverLayoutTokenIgnoresWindowAndContentPosition);
             Run("legacy UI hover layout token dirties on page size scroll settings and font", ref failed, LegacyUiHoverLayoutTokenDirtiesOnPageSizeScrollSettingsAndFont);
             Run("legacy UI empty page prompt and item tab icon match current UI", ref failed, LegacyUiEmptyPagePromptAndItemTabIconMatchCurrentUi);
+            Run("legacy UI about and blueprint tabs keep requested order", ref failed, LegacyUiAboutAndBlueprintTabsKeepRequestedOrder);
             Run("legacy UI tabs ignore content scroll clip", ref failed, LegacyUiTabsIgnoreContentScrollClip);
             Run("legacy UI selected button content offset requires enabled selection", ref failed, LegacyUiSelectedButtonContentOffsetRequiresEnabledSelection);
             Run("legacy UI retained frame model reuses window translation", ref failed, LegacyUiRetainedFrameModelReusesWindowTranslation);
