@@ -1076,11 +1076,14 @@ namespace JueMingZ.Tests
             Run("user notes pinned overlay body starts at content top when toolbar hidden", ref failed, UserNotesPinnedOverlayBodyStartsAtContentTopWhenToolbarHidden);
             Run("user notes pinned overlay body wrap matches draw scale without ellipsis", ref failed, UserNotesPinnedOverlayBodyWrapMatchesDrawScaleWithoutEllipsis);
             Run("user notes pinned overlay scaled mouse hits visual controls", ref failed, UserNotesPinnedOverlayScaledMouseHitsVisualControls);
+            Run("user notes pinned overlay right edge uses interface mouse and clamps", ref failed, UserNotesPinnedOverlayRightEdgeUsesInterfaceMouseAndClamps);
             Run("user notes pinned overlay processes click after player input", ref failed, UserNotesPinnedOverlayProcessesClickAfterPlayerInput);
             Run("user notes pinned overlay transfers prefix press to player input toolbar hit", ref failed, UserNotesPinnedOverlayTransfersPrefixPressToPlayerInputToolbarHit);
+            Run("user notes pinned overlay transfers prefix press when Terraria coordinates miss note", ref failed, UserNotesPinnedOverlayTransfersPrefixPressWhenTerrariaCoordinatesMissNote);
             Run("user notes pinned overlay transfers prefix press to player input drag and keeps held left", ref failed, UserNotesPinnedOverlayTransfersPrefixPressToPlayerInputDragAndKeepsHeldLeft);
             Run("user notes pinned overlay opacity defaults and clamps without wrap", ref failed, UserNotesPinnedOverlayOpacityDefaultsAndClampsWithoutWrap);
             Run("user notes pinned overlay post player input wheel scrolls body", ref failed, UserNotesPinnedOverlayPostPlayerInputWheelScrollsBody);
+            Run("user notes pinned overlay repeated toolbar clicks keep edges and wheel", ref failed, UserNotesPinnedOverlayRepeatedToolbarClicksKeepEdgesAndWheel);
             Run("user notes pinned overlay scroll drag opacity and close use pinned state", ref failed, UserNotesPinnedOverlayScrollDragOpacityAndCloseUsePinnedState);
             Run("user notes pinned overlay store reload and delete sync", ref failed, UserNotesPinnedOverlayStoreReloadAndDeleteSync);
             Run("feature toggle hotkey settings default empty", ref failed, FeatureToggleHotkeySettingsDefaultEmpty);

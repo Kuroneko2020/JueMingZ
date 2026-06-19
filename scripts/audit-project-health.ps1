@@ -2293,7 +2293,11 @@ function Test-UserNotesGovernance {
         $pinnedOverlayText.Contains("TryResolveOsClientOverlayPoint") -and
         $pinnedOverlayText.Contains("ScaleAlphaForTesting") -and
         $pinnedOverlayText.Contains("ForegroundAlphaForTesting") -and
-        $pinnedOverlayText.Contains("ShouldPreserveLeftHoldForPendingDrag") -and
+        $pinnedOverlayText.Contains("PremultiplyForAlphaBlendForTesting") -and
+        $pinnedOverlayText.Contains("DrawOpacitySurfaceRoundedRect") -and
+        $pinnedOverlayText.Contains("capturePendingToolbarPress") -and
+        $pinnedOverlayText.Contains("IsPendingDragPress") -and
+        $pinnedOverlayText.Contains("!hit.MouseInside ||") -and
         $pinnedOverlayText.Contains("interaction.ScrollConsumed ? 0 : rawScrollDelta") -and
         $pinnedOverlayStateText.Contains("nextOpacity == hit.OpacityPercent") -and
         $pinnedOverlayStateText.Contains('var interaction = new UserNotesPinnedOverlayInteraction()') -and
@@ -2303,19 +2307,25 @@ function Test-UserNotesGovernance {
         $overlayTestsText.Contains("UserNotesPinnedOverlayScrollDragOpacityAndCloseUsePinnedState") -and
         $overlayTestsText.Contains("UserNotesPinnedOverlayProcessesClickAfterPlayerInput") -and
         $overlayTestsText.Contains("UserNotesPinnedOverlayTransfersPrefixPressToPlayerInputToolbarHit") -and
+        $overlayTestsText.Contains("UserNotesPinnedOverlayTransfersPrefixPressWhenTerrariaCoordinatesMissNote") -and
         $overlayTestsText.Contains("UserNotesPinnedOverlayTransfersPrefixPressToPlayerInputDragAndKeepsHeldLeft") -and
         $overlayTestsText.Contains("UserNotesPinnedOverlayOpacityDefaultsAndClampsWithoutWrap") -and
         $overlayTestsText.Contains("UserNotesPinnedOverlayPostPlayerInputWheelScrollsBody") -and
+        $overlayTestsText.Contains("UserNotesPinnedOverlayRepeatedToolbarClicksKeepEdgesAndWheel") -and
+        $overlayTestsText.Contains("UserNotesPinnedOverlayRightEdgeUsesInterfaceMouseAndClamps") -and
         $programTestsText.Contains("user notes pinned overlay processes click after player input") -and
         $programTestsText.Contains("user notes pinned overlay transfers prefix press to player input toolbar hit") -and
+        $programTestsText.Contains("user notes pinned overlay transfers prefix press when Terraria coordinates miss note") -and
         $programTestsText.Contains("user notes pinned overlay transfers prefix press to player input drag and keeps held left") -and
         $programTestsText.Contains("user notes pinned overlay opacity defaults and clamps without wrap") -and
         $programTestsText.Contains("user notes pinned overlay post player input wheel scrolls body") -and
+        $programTestsText.Contains("user notes pinned overlay repeated toolbar clicks keep edges and wheel") -and
+        $programTestsText.Contains("user notes pinned overlay right edge uses interface mouse and clamps") -and
         $interfaceLayerTestsText.Contains("UserNotesPinnedOverlay.DrawInterfaceLayer")) {
-        Write-Pass "User notes pinned overlay stays UI-only and uses controlled prefix/post-PlayerInput mouse/scroll consumption guards, one-shot toolbar press transfer, drag held-left preservation, non-wrapping background opacity, and post-PlayerInput body wheel coverage."
+        Write-Pass "User notes pinned overlay stays UI-only and uses controlled prefix/post-PlayerInput mouse/scroll consumption guards, one-shot toolbar press transfer including stale Terraria coordinate misses, right-edge interface mouse coverage, drag held-left preservation, premultiplied non-wrapping background opacity, repeated toolbar edge coverage, and post-PlayerInput body wheel coverage."
     }
     else {
-        Write-FailHealth "User notes pinned overlay must not submit actions or mutate game state, must avoid mutable static interaction state, and must use prefix/post-PlayerInput/hotbar scroll guards with postfix-click, toolbar press-transfer, drag held-left preservation, foreground alpha separation, opacity clamp, and post-PlayerInput wheel tests; leaks=$($mutationLeaks -join ', ')"
+        Write-FailHealth "User notes pinned overlay must not submit actions or mutate game state, must avoid mutable static interaction state, and must use prefix/post-PlayerInput/hotbar scroll guards with postfix-click, toolbar press-transfer including stale Terraria coordinate misses, right-edge interface mouse coverage, drag held-left preservation, premultiplied foreground-separated opacity clamp, repeated toolbar edge, and post-PlayerInput wheel tests; leaks=$($mutationLeaks -join ', ')"
     }
 
     if ($pinnedOverlayStateText.Contains("ToolbarRect") -and
@@ -2337,13 +2347,18 @@ function Test-UserNotesGovernance {
 
     if ($mouseInputText.Contains("ReadMouseForInterfaceOverlay") -and
         $mouseInputText.Contains("applyMainDrawScale") -and
+        $mouseInputText.Contains("ResolveInterfaceOverlayMouse") -and
+        $mouseInputText.Contains("OsClientScreenToUi") -and
         $mouseInputText.Contains("AppendInterfaceOverlayMode") -and
         $pinnedOverlayText.Contains("LegacyUiInput.ReadMouseForInterfaceOverlay") -and
+        $pinnedOverlayText.Contains("SafeOverlayScreenWidth") -and
+        $pinnedOverlayText.Contains("ResolveOverlayExtent") -and
+        $overlayTestsText.Contains("UserNotesPinnedOverlayRightEdgeUsesInterfaceMouseAndClamps") -and
         $overlayTestsText.Contains("UserNotesPinnedOverlayScaledMouseHitsVisualControls")) {
-        Write-Pass "User notes pinned overlay keeps interface-coordinate hit-test coverage under UI scale."
+        Write-Pass "User notes pinned overlay keeps interface-coordinate hit-test and right-edge clamp coverage under UI scale."
     }
     else {
-        Write-FailHealth "User notes pinned overlay must use interface overlay mouse coordinates and keep scaled close/opacity/drag hit-test coverage."
+        Write-FailHealth "User notes pinned overlay must use interface overlay mouse coordinates, prefer OS screen-to-UI coordinates for scaled overlays, clamp by overlay extents, and keep scaled close/opacity/drag/right-edge hit-test coverage."
     }
 
     if ($diagnosticsText.Contains("DiagnosticActionRecorder.RecordCustomEvent") -and
@@ -2373,9 +2388,11 @@ function Test-UserNotesGovernance {
         $programTestsText.Contains("user notes body editor auto scrolls caret into viewport") -and
         $programTestsText.Contains("user notes pinned overlay processes click after player input") -and
         $programTestsText.Contains("user notes pinned overlay transfers prefix press to player input toolbar hit") -and
+        $programTestsText.Contains("user notes pinned overlay transfers prefix press when Terraria coordinates miss note") -and
         $programTestsText.Contains("user notes pinned overlay transfers prefix press to player input drag and keeps held left") -and
         $programTestsText.Contains("user notes pinned overlay opacity defaults and clamps without wrap") -and
         $programTestsText.Contains("user notes pinned overlay post player input wheel scrolls body") -and
+        $programTestsText.Contains("user notes pinned overlay repeated toolbar clicks keep edges and wheel") -and
         $programTestsText.Contains("user notes pinned overlay scroll drag opacity and close use pinned state") -and
         $storeTestsText.Contains("UserNotesSaveIndexFailureRollsBackBody") -and
         $uiTestsText.Contains("UserNotesNestedScrollConsumesOnlyScrollableBody") -and

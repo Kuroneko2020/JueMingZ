@@ -31,8 +31,9 @@ namespace JueMingZ.UI
                     return true;
                 }
 
-                var mouse = ReadOverlayMouse();
-                var frame = BuildFrame(mouse);
+                var rawState = DiagnosticMouseStateReader.Read();
+                var mouse = ReadOverlayMouse(rawState);
+                var frame = BuildFrame(mouse, rawState);
                 if (frame.Items.Count <= 0)
                 {
                     return true;
@@ -79,8 +80,9 @@ namespace JueMingZ.UI
                     return false;
                 }
 
-                var mouse = ReadOverlayMouse();
-                var frame = BuildFrame(mouse);
+                var rawState = DiagnosticMouseStateReader.Read();
+                var mouse = ReadOverlayMouse(rawState);
+                var frame = BuildFrame(mouse, rawState);
                 if (ShouldLegacyWindowOwnMouse(mouse, frame) ||
                     !UserNotesPinnedOverlayState.ShouldSuppressHotbarScroll(frame, mouse.X, mouse.Y))
                 {
@@ -101,8 +103,8 @@ namespace JueMingZ.UI
                     false,
                     false,
                     scroll.EffectiveScrollDelta,
-                    SafeScreenWidth(),
-                    SafeScreenHeight(),
+                    SafeOverlayScreenWidth(rawState),
+                    SafeOverlayScreenHeight(rawState),
                     PersistPinnedState);
                 UiMouseCaptureService.CaptureForOperationWindow();
                 UiMouseCaptureService.ConsumeScrollForOperationWindow();
@@ -161,6 +163,22 @@ namespace JueMingZ.UI
             return LegacyUiInput.ReadMouseForInterfaceOverlay(raw);
         }
 
+        internal static UserNotesPinnedOverlayFrame BuildOverlayFrameForTesting(DiagnosticMouseState raw)
+        {
+            var mouse = ReadOverlayMouse(raw);
+            return BuildFrame(mouse, raw);
+        }
+
+        internal static int OverlayScreenWidthForTesting(DiagnosticMouseState raw)
+        {
+            return SafeOverlayScreenWidth(raw);
+        }
+
+        internal static int OverlayScreenHeightForTesting(DiagnosticMouseState raw)
+        {
+            return SafeOverlayScreenHeight(raw);
+        }
+
         internal static void UpdateInputGuardForTesting(string source, bool handleState, bool handleScroll, DiagnosticMouseState raw)
         {
             UpdateInputGuard(source, handleState, handleScroll, raw);
@@ -187,7 +205,7 @@ namespace JueMingZ.UI
 
                 var rawState = raw ?? DiagnosticMouseStateReader.Read();
                 var mouse = handleState ? ReadOverlayMouseForInput(rawState) : ReadOverlayMouse(rawState);
-                var frame = BuildFrame(mouse);
+                var frame = BuildFrame(mouse, rawState);
                 var hitDiagnostics = UserNotesPinnedOverlayState.BuildHitDiagnostics(frame, mouse.X, mouse.Y);
                 var legacyWindowOwnsMouse = ShouldLegacyWindowOwnMouse(mouse, frame);
                 var scroll = TerrariaUiMouseCompat.ReadScrollSnapshot(mouse.ScrollDelta);
@@ -225,12 +243,14 @@ namespace JueMingZ.UI
                         mouse.LeftPressed,
                         mouse.LeftReleased,
                         rawScrollDelta,
-                        SafeScreenWidth(),
-                        SafeScreenHeight(),
+                        SafeOverlayScreenWidth(rawState),
+                        SafeOverlayScreenHeight(rawState),
                         PersistPinnedState);
+                    UserNotesPinnedOverlayHitDiagnostics pendingToolbarPressHit;
+                    var pendingToolbarPressCandidate = TryResolvePendingToolbarPressCandidate(source, rawState, mouse, frame, hitDiagnostics, interaction, out pendingToolbarPressHit);
                     var preserveLeftHold = ShouldPreserveLeftHoldForDrag(frame, interaction) ||
-                                           ShouldPreserveLeftHoldForPendingDrag(source, rawState, mouse, frame, hitDiagnostics, interaction);
-                    var suppression = ApplyInputSuppression(frame, mouse, interaction, rawScrollDelta, preserveLeftHold);
+                                           IsPendingDragPress(pendingToolbarPressHit);
+                    var suppression = ApplyInputSuppression(frame, mouse, interaction, rawScrollDelta, preserveLeftHold, pendingToolbarPressCandidate);
                     var scrollOnlySuppressed = SuppressScrollOnly(frame, mouse, interaction.ScrollConsumed ? 0 : rawScrollDelta);
                     if (scrollOnlySuppressed)
                     {
@@ -238,7 +258,7 @@ namespace JueMingZ.UI
                         suppression.ScrollConsumeSucceeded = true;
                     }
 
-                    UpdatePendingToolbarPress(source, rawState, mouse, frame, hitDiagnostics, interaction);
+                    UpdatePendingToolbarPress(pendingToolbarPressHit);
                     RecordInteraction(ResolveInteractionScenario(interaction), interaction);
                     UserNotesPinnedOverlayInputDiagnostics.Record(
                         source,
@@ -312,7 +332,8 @@ namespace JueMingZ.UI
             LegacyMouseSnapshot mouse,
             UserNotesPinnedOverlayInteraction interaction,
             int rawScrollDelta,
-            bool preserveLeftHold)
+            bool preserveLeftHold,
+            bool capturePendingToolbarPress)
         {
             var diagnostics = new UserNotesPinnedOverlaySuppressionDiagnostics();
             if (interaction == null)
@@ -320,7 +341,7 @@ namespace JueMingZ.UI
                 return diagnostics;
             }
 
-            if (interaction.CapturedMouse || UserNotesPinnedOverlayState.ShouldCaptureMouse(frame, mouse.X, mouse.Y))
+            if (interaction.CapturedMouse || capturePendingToolbarPress || UserNotesPinnedOverlayState.ShouldCaptureMouse(frame, mouse.X, mouse.Y))
             {
                 diagnostics.MouseCaptureRequested = true;
                 diagnostics.MouseCaptureSucceeded = preserveLeftHold
@@ -350,17 +371,9 @@ namespace JueMingZ.UI
                    interaction != null && (interaction.DragStarted || interaction.Dragging);
         }
 
-        private static bool ShouldPreserveLeftHoldForPendingDrag(
-            string source,
-            DiagnosticMouseState raw,
-            LegacyMouseSnapshot mouse,
-            UserNotesPinnedOverlayFrame frame,
-            UserNotesPinnedOverlayHitDiagnostics hit,
-            UserNotesPinnedOverlayInteraction interaction)
+        private static bool IsPendingDragPress(UserNotesPinnedOverlayHitDiagnostics pendingHit)
         {
-            UserNotesPinnedOverlayHitDiagnostics pendingHit;
-            return TryResolvePendingToolbarPressCandidate(source, raw, mouse, frame, hit, interaction, out pendingHit) &&
-                   pendingHit != null &&
+            return pendingHit != null &&
                    string.Equals(pendingHit.ControlId, "drag", StringComparison.Ordinal);
         }
 
@@ -511,11 +524,16 @@ namespace JueMingZ.UI
 
         private static UserNotesPinnedOverlayFrame BuildFrame(LegacyMouseSnapshot mouse)
         {
+            return BuildFrame(mouse, null);
+        }
+
+        private static UserNotesPinnedOverlayFrame BuildFrame(LegacyMouseSnapshot mouse, DiagnosticMouseState raw)
+        {
             var snapshot = UserNotesUiState.Snapshot;
             return UserNotesPinnedOverlayState.BuildFrame(
                 snapshot,
-                SafeScreenWidth(),
-                SafeScreenHeight(),
+                SafeOverlayScreenWidth(raw),
+                SafeOverlayScreenHeight(raw),
                 mouse == null ? -1 : mouse.X,
                 mouse == null ? -1 : mouse.Y);
         }
@@ -617,16 +635,9 @@ namespace JueMingZ.UI
             }
         }
 
-        private static void UpdatePendingToolbarPress(
-            string source,
-            DiagnosticMouseState raw,
-            LegacyMouseSnapshot mouse,
-            UserNotesPinnedOverlayFrame frame,
-            UserNotesPinnedOverlayHitDiagnostics hit,
-            UserNotesPinnedOverlayInteraction interaction)
+        private static void UpdatePendingToolbarPress(UserNotesPinnedOverlayHitDiagnostics osHit)
         {
-            UserNotesPinnedOverlayHitDiagnostics osHit;
-            if (!TryResolvePendingToolbarPressCandidate(source, raw, mouse, frame, hit, interaction, out osHit))
+            if (osHit == null)
             {
                 return;
             }
@@ -660,7 +671,6 @@ namespace JueMingZ.UI
             if (!IsPrefixSource(source) ||
                 !mouse.LeftPressed ||
                 hit == null ||
-                !hit.MouseInside ||
                 IsToolbarActionControl(hit.ControlId))
             {
                 return false;
@@ -673,9 +683,24 @@ namespace JueMingZ.UI
                 return false;
             }
 
-            osHit = UserNotesPinnedOverlayState.BuildHitDiagnostics(frame, osX, osY);
-            return IsToolbarActionControl(osHit.ControlId) &&
-                   string.Equals(osHit.HitNoteId ?? string.Empty, hit.HitNoteId ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+            var candidateHit = UserNotesPinnedOverlayState.BuildHitDiagnostics(frame, osX, osY);
+            if (!IsToolbarActionControl(candidateHit.ControlId))
+            {
+                return false;
+            }
+
+            // Prefix Terraria coordinates can lag behind OS/post-PlayerInput coordinates.
+            // When the stale prefix hit is still inside a note, keep the older same-note
+            // guard; when it misses the note entirely, defer the safety check to postfix,
+            // which must hit the same note/control before the pending press is replayed.
+            if (!hit.MouseInside ||
+                string.Equals(candidateHit.HitNoteId ?? string.Empty, hit.HitNoteId ?? string.Empty, StringComparison.OrdinalIgnoreCase))
+            {
+                osHit = candidateHit;
+                return true;
+            }
+
+            return false;
         }
 
         private static void ClearPendingToolbarPressIfReleased(LegacyMouseSnapshot mouse)
@@ -729,8 +754,43 @@ namespace JueMingZ.UI
                 return false;
             }
 
-            var scaleX = raw.UiScaleX > 0.01d ? raw.UiScaleX : raw.UiScale;
-            var scaleY = raw.UiScaleY > 0.01d ? raw.UiScaleY : raw.UiScale;
+            double scaleX;
+            double scaleY;
+            var scaleActive = TryResolveUiScaleTransform(raw, out scaleX, out scaleY);
+            x = scaleActive ? ScreenToUiCoordinate(raw.OsClientMouseX, scaleX, raw.UiTranslateX) : raw.OsClientMouseX;
+            y = scaleActive ? ScreenToUiCoordinate(raw.OsClientMouseY, scaleY, raw.UiTranslateY) : raw.OsClientMouseY;
+            return true;
+        }
+
+        private static int SafeOverlayScreenWidth(DiagnosticMouseState raw)
+        {
+            return ResolveOverlayExtent(SafeScreenWidth(), raw, true);
+        }
+
+        private static int SafeOverlayScreenHeight(DiagnosticMouseState raw)
+        {
+            return ResolveOverlayExtent(SafeScreenHeight(), raw, false);
+        }
+
+        private static int ResolveOverlayExtent(int screenExtent, DiagnosticMouseState raw, bool horizontal)
+        {
+            screenExtent = Math.Max(1, screenExtent);
+            double scaleX;
+            double scaleY;
+            if (!TryResolveUiScaleTransform(raw, out scaleX, out scaleY))
+            {
+                return screenExtent;
+            }
+
+            var scale = horizontal ? scaleX : scaleY;
+            var translate = raw == null ? 0d : (horizontal ? raw.UiTranslateX : raw.UiTranslateY);
+            return Math.Max(1, ScreenToUiCoordinate(screenExtent, scale, translate));
+        }
+
+        private static bool TryResolveUiScaleTransform(DiagnosticMouseState raw, out double scaleX, out double scaleY)
+        {
+            scaleX = raw != null && raw.UiScaleX > 0.01d ? raw.UiScaleX : raw == null ? 1d : raw.UiScale;
+            scaleY = raw != null && raw.UiScaleY > 0.01d ? raw.UiScaleY : raw == null ? 1d : raw.UiScale;
             if (scaleX <= 0.01d)
             {
                 scaleX = 1d;
@@ -741,14 +801,12 @@ namespace JueMingZ.UI
                 scaleY = 1d;
             }
 
-            var scaleActive = raw.UiScaleAvailable &&
-                              (Math.Abs(scaleX - 1d) > 0.01d ||
-                               Math.Abs(scaleY - 1d) > 0.01d ||
-                               Math.Abs(raw.UiTranslateX) > 0.01d ||
-                               Math.Abs(raw.UiTranslateY) > 0.01d);
-            x = scaleActive ? ScreenToUiCoordinate(raw.OsClientMouseX, scaleX, raw.UiTranslateX) : raw.OsClientMouseX;
-            y = scaleActive ? ScreenToUiCoordinate(raw.OsClientMouseY, scaleY, raw.UiTranslateY) : raw.OsClientMouseY;
-            return true;
+            return raw != null &&
+                   raw.UiScaleAvailable &&
+                   (Math.Abs(scaleX - 1d) > 0.01d ||
+                    Math.Abs(scaleY - 1d) > 0.01d ||
+                    Math.Abs(raw.UiTranslateX) > 0.01d ||
+                    Math.Abs(raw.UiTranslateY) > 0.01d);
         }
 
         private static int ScreenToUiCoordinate(int value, double scale, double translate)
@@ -787,8 +845,8 @@ namespace JueMingZ.UI
             }
 
             var opacity = Clamp(item.OpacityPercent, 0, 100);
-            UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, item.Rect.X, item.Rect.Y, item.Rect.Width, item.Rect.Height, 6, 96, 112, 132, ScaleAlpha(168, opacity));
-            UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, item.Rect.X + 1, item.Rect.Y + 1, item.Rect.Width - 2, item.Rect.Height - 2, 5, 18, 22, 30, ScaleAlpha(218, opacity));
+            DrawOpacitySurfaceRoundedRect(spriteBatch, item.Rect.X, item.Rect.Y, item.Rect.Width, item.Rect.Height, 6, 96, 112, 132, 168, opacity);
+            DrawOpacitySurfaceRoundedRect(spriteBatch, item.Rect.X + 1, item.Rect.Y + 1, item.Rect.Width - 2, item.Rect.Height - 2, 5, 18, 22, 30, 218, opacity);
             DrawBody(spriteBatch, item);
             if (item.Hovered)
             {
@@ -834,7 +892,7 @@ namespace JueMingZ.UI
         private static void DrawControls(object spriteBatch, UserNotesPinnedOverlayItem item)
         {
             var opacity = Clamp(item.OpacityPercent, 0, 100);
-            UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, item.ToolbarRect.X, item.ToolbarRect.Y, item.ToolbarRect.Width, item.ToolbarRect.Height, 5, 22, 28, 38, ScaleAlpha(178, opacity));
+            DrawOpacitySurfaceRoundedRect(spriteBatch, item.ToolbarRect.X, item.ToolbarRect.Y, item.ToolbarRect.Width, item.ToolbarRect.Height, 5, 22, 28, 38, 178, opacity);
             UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, item.DragHandleRect.X, item.DragHandleRect.Y + 3, item.DragHandleRect.Width, 3, 2, 226, 232, 220, ForegroundAlpha(245));
             DrawControlButton(spriteBatch, item.DecreaseOpacityRect, "<", opacity);
             DrawControlButton(spriteBatch, item.IncreaseOpacityRect, ">", opacity);
@@ -843,9 +901,38 @@ namespace JueMingZ.UI
 
         private static void DrawControlButton(object spriteBatch, LegacyUiRect rect, string label, int opacityPercent)
         {
-            UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, rect.X, rect.Y, rect.Width, rect.Height, 4, 96, 112, 146, ScaleAlpha(218, opacityPercent));
-            UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, rect.X + 1, rect.Y + 1, rect.Width - 2, rect.Height - 2, 3, 32, 38, 52, ScaleAlpha(220, opacityPercent));
+            DrawOpacitySurfaceRoundedRect(spriteBatch, rect.X, rect.Y, rect.Width, rect.Height, 4, 96, 112, 146, 218, opacityPercent);
+            DrawOpacitySurfaceRoundedRect(spriteBatch, rect.X + 1, rect.Y + 1, rect.Width - 2, rect.Height - 2, 3, 32, 38, 52, 220, opacityPercent);
             UiTextRenderer.DrawCenteredText(spriteBatch, label, rect.X, rect.Y - 1, rect.Width, rect.Height, 244, 238, 212, ForegroundAlpha(255), 0.58f);
+        }
+
+        private static bool DrawOpacitySurfaceRoundedRect(
+            object spriteBatch,
+            int x,
+            int y,
+            int width,
+            int height,
+            int radius,
+            int r,
+            int g,
+            int b,
+            int baseAlpha,
+            int opacityPercent)
+        {
+            var alpha = ScaleAlpha(baseAlpha, opacityPercent);
+            // Terraria's active interface SpriteBatch uses premultiplied AlphaBlend semantics.
+            // Premultiply only these translucent note surfaces so low opacity fades out instead of tinting the world.
+            return UiPrimitiveRenderer.DrawRoundedRect(
+                spriteBatch,
+                x,
+                y,
+                width,
+                height,
+                radius,
+                PremultiplyForAlphaBlend(r, alpha),
+                PremultiplyForAlphaBlend(g, alpha),
+                PremultiplyForAlphaBlend(b, alpha),
+                alpha);
         }
 
         private static string BuildOverlayStateJson()
@@ -919,6 +1006,11 @@ namespace JueMingZ.UI
             return ForegroundAlpha(baseAlpha);
         }
 
+        internal static int PremultiplyForAlphaBlendForTesting(int component, int alpha)
+        {
+            return PremultiplyForAlphaBlend(component, alpha);
+        }
+
         private static int ScaleAlpha(int baseAlpha, int opacityPercent)
         {
             return Clamp((int)Math.Round(Clamp(baseAlpha, 0, 255) * Clamp(opacityPercent, 0, 100) / 100d), 0, 255);
@@ -927,6 +1019,13 @@ namespace JueMingZ.UI
         private static int ForegroundAlpha(int baseAlpha)
         {
             return Clamp(baseAlpha, 0, 255);
+        }
+
+        private static int PremultiplyForAlphaBlend(int component, int alpha)
+        {
+            var clampedComponent = Clamp(component, 0, 255);
+            var clampedAlpha = Clamp(alpha, 0, 255);
+            return (clampedComponent * clampedAlpha + 127) / 255;
         }
 
         private static string EscapeJson(string value)

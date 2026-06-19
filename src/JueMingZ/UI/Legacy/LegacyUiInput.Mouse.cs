@@ -27,7 +27,7 @@ namespace JueMingZ.UI.Legacy
 
         internal static LegacyMouseSnapshot ReadMouseForInterfaceOverlay(DiagnosticMouseState raw)
         {
-            return BuildMouseSnapshot(raw, false, LegacyMainUiScale.Resolve(raw), false);
+            return BuildInterfaceOverlayMouseSnapshot(raw);
         }
 
         private static LegacyMouseSnapshot BuildMouseSnapshot(DiagnosticMouseState raw, bool consumePendingScroll)
@@ -92,6 +92,31 @@ namespace JueMingZ.UI.Legacy
                 ReadAvailable = raw.TerrariaReadAvailable || raw.OsReadAvailable,
                 ReadMode = readMode,
                 WindowHit = IsWindowHit(raw, x, y, scale)
+            };
+        }
+
+        private static LegacyMouseSnapshot BuildInterfaceOverlayMouseSnapshot(DiagnosticMouseState raw)
+        {
+            if (raw == null)
+            {
+                raw = new DiagnosticMouseState();
+            }
+
+            var scale = LegacyMainUiScale.Resolve(raw);
+            var coordinate = ResolveInterfaceOverlayMouse(raw);
+            var inputAvailable = raw.GameInputAvailable;
+            var down = inputAvailable && (raw.TerrariaLeftDown || raw.OsLeftDown);
+            return new LegacyMouseSnapshot
+            {
+                X = coordinate.X,
+                Y = coordinate.Y,
+                LeftDown = down,
+                LeftPressed = inputAvailable && down && !_wasLeftDown,
+                LeftReleased = inputAvailable && !down && _wasLeftDown,
+                ScrollDelta = inputAvailable ? raw.ScrollDelta : 0,
+                ReadAvailable = raw.TerrariaReadAvailable || raw.OsReadAvailable,
+                ReadMode = AppendInterfaceOverlayMode(coordinate.Mode),
+                WindowHit = IsWindowHit(raw, coordinate.X, coordinate.Y, scale)
             };
         }
 
@@ -198,6 +223,63 @@ namespace JueMingZ.UI.Legacy
                         BuildMouseMode(raw, "OsClientScreenToUi"));
                 }
 
+                return new MouseCoordinate(raw.OsClientMouseX, raw.OsClientMouseY, BuildMouseMode(raw, "OsClientRaw"));
+            }
+
+            return new MouseCoordinate(-1, -1, BuildMouseMode(raw, "none"));
+        }
+
+        private static MouseCoordinate ResolveInterfaceOverlayMouse(DiagnosticMouseState raw)
+        {
+            var scaleX = raw.UiScaleX > 0.01d ? raw.UiScaleX : raw.UiScale;
+            var scaleY = raw.UiScaleY > 0.01d ? raw.UiScaleY : raw.UiScale;
+            if (scaleX <= 0.01d)
+            {
+                scaleX = 1d;
+            }
+
+            if (scaleY <= 0.01d)
+            {
+                scaleY = 1d;
+            }
+
+            var scaleActive = raw.UiScaleAvailable &&
+                              (Math.Abs(scaleX - 1d) > 0.01d ||
+                               Math.Abs(scaleY - 1d) > 0.01d ||
+                               Math.Abs(raw.UiTranslateX) > 0.01d ||
+                               Math.Abs(raw.UiTranslateY) > 0.01d);
+            var hasTerraria = raw.TerrariaReadAvailable && raw.TerrariaMouseX >= 0 && raw.TerrariaMouseY >= 0;
+            var hasOs = raw.OsReadAvailable && raw.OsClientMouseX >= 0 && raw.OsClientMouseY >= 0;
+            if (scaleActive)
+            {
+                // Interface overlays draw in Terraria's scaled UI coordinate space.
+                // Prefer the OS client cursor when available so stale Terraria mouse
+                // fields near right-edge vanilla UI controls cannot move hit-test back
+                // into raw screen coordinates.
+                if (hasOs)
+                {
+                    return new MouseCoordinate(
+                        ScreenToUiCoordinate(raw.OsClientMouseX, scaleX, raw.UiTranslateX),
+                        ScreenToUiCoordinate(raw.OsClientMouseY, scaleY, raw.UiTranslateY),
+                        BuildMouseMode(raw, "OsClientScreenToUi"));
+                }
+
+                if (hasTerraria)
+                {
+                    return new MouseCoordinate(
+                        ScreenToUiCoordinate(raw.TerrariaMouseX, scaleX, raw.UiTranslateX),
+                        ScreenToUiCoordinate(raw.TerrariaMouseY, scaleY, raw.UiTranslateY),
+                        BuildMouseMode(raw, "TerrariaScreenToUi"));
+                }
+            }
+
+            if (hasTerraria)
+            {
+                return new MouseCoordinate(raw.TerrariaMouseX, raw.TerrariaMouseY, BuildMouseMode(raw, "TerrariaRaw"));
+            }
+
+            if (hasOs)
+            {
                 return new MouseCoordinate(raw.OsClientMouseX, raw.OsClientMouseY, BuildMouseMode(raw, "OsClientRaw"));
             }
 

@@ -13,6 +13,8 @@ namespace JueMingZ.Compat
         // writes stay in the dedicated Compat helpers.
         private static bool? _allowsInputProcessingOverrideForTesting;
         private static ulong? _gameUpdateCountOverrideForTesting;
+        private static int? _screenWidthOverrideForTesting;
+        private static int? _screenHeightOverrideForTesting;
 
         internal static void SetAllowsInputProcessingOverrideForTesting(bool? value)
         {
@@ -22,6 +24,12 @@ namespace JueMingZ.Compat
         internal static void SetGameUpdateCountOverrideForTesting(ulong? value)
         {
             _gameUpdateCountOverrideForTesting = value;
+        }
+
+        internal static void SetScreenSizeOverrideForTesting(int? width, int? height)
+        {
+            _screenWidthOverrideForTesting = width;
+            _screenHeightOverrideForTesting = height;
         }
 
         public static bool IsInMainMenu
@@ -216,12 +224,12 @@ namespace JueMingZ.Compat
 
         public static int ScreenWidth
         {
-            get { return Main.screenWidth; }
+            get { return _screenWidthOverrideForTesting.HasValue ? _screenWidthOverrideForTesting.Value : Main.screenWidth; }
         }
 
         public static int ScreenHeight
         {
-            get { return Main.screenHeight; }
+            get { return _screenHeightOverrideForTesting.HasValue ? _screenHeightOverrideForTesting.Value : Main.screenHeight; }
         }
 
         public static Vector2 ScreenPosition
