@@ -67,7 +67,7 @@ namespace JueMingZ.UI.Legacy
 
         private static LegacyUiElement DrawNotesAddButton(object spriteBatch, LegacyScrollArea area, LegacyMouseSnapshot mouse, List<LegacyUiElement> elements)
         {
-            var rect = new LegacyUiRect(area.Viewport.X, area.ToScreenY(0), area.Viewport.Width, 34);
+            var rect = new LegacyUiRect(area.Viewport.X, area.ToScreenY(0), area.Viewport.Width, UserNotesUiState.AddButtonHeightForLayout);
             if (!area.IsVisible(rect))
             {
                 return null;
@@ -92,7 +92,7 @@ namespace JueMingZ.UI.Legacy
                 238,
                 226,
                 255,
-                0.92f);
+                1.02f);
 
             var element = AddFrameElement(elements, UserNotesUiState.AddButtonId, "笔记:新增", "button", elementRect);
             RecordFrameElementHover(element, hovered);
@@ -115,16 +115,16 @@ namespace JueMingZ.UI.Legacy
             var deleteRect = new LegacyUiRect(card.Right - NotesDeleteButtonWidth - 7, buttonY, NotesDeleteButtonWidth, RowModeButtonHeight);
             var pinRect = new LegacyUiRect(deleteRect.X - NotesHeaderButtonWidth - NotesCardButtonGap, buttonY, NotesHeaderButtonWidth, RowModeButtonHeight);
             var titleWidth = Math.Max(1, pinRect.X - card.X - 14);
-            var titleRect = new LegacyUiRect(card.X + 8, card.Y + 7, titleWidth, 22);
+            var titleRect = new LegacyUiRect(card.X + 8, card.Y + 7, titleWidth, UserNotesUiState.TitleLineHeightForLayout);
             var title = UserNotesUiState.GetTitleDisplayText(note);
             var titleEditing = UserNotesUiState.IsEditingTitle(note.NoteId);
             UiTextRenderer.DrawTextClipped(
                 spriteBatch,
-                titleEditing ? title : UiTextRenderer.Ellipsize(title, titleWidth, 0.76f),
+                titleEditing ? title : UiTextRenderer.Ellipsize(title, titleWidth, UserNotesUiState.TitleTextScaleForLayout),
                 titleRect.X,
                 titleRect.Y,
                 titleWidth,
-                22,
+                UserNotesUiState.TitleLineHeightForLayout,
                 area.Viewport.X,
                 area.Viewport.Y,
                 area.Viewport.Width,
@@ -133,7 +133,7 @@ namespace JueMingZ.UI.Legacy
                 238,
                 210,
                 255,
-                0.76f);
+                UserNotesUiState.TitleTextScaleForLayout);
             var titleHit = titleRect.Intersect(area.Viewport);
             if (titleHit.Width > 0 && titleHit.Height > 0)
             {
@@ -339,9 +339,9 @@ namespace JueMingZ.UI.Legacy
 
         private static float FitNotesButtonTextScale(string label, int width)
         {
-            var scale = width <= 44 ? 0.56f : 0.60f;
+            var scale = width <= 44 ? 0.66f : 0.70f;
             var measured = UiTextRenderer.EstimateTextWidth(label, scale);
-            return measured <= width - 4 ? scale : Math.Max(0.46f, scale * (width - 4) / Math.Max(1, measured));
+            return measured <= width - 4 ? scale : Math.Max(0.52f, scale * (width - 4) / Math.Max(1, measured));
         }
 
         internal static int CalculateNotesContentHeightForTesting(LegacyUiRect contentRect)

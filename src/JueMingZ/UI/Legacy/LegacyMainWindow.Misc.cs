@@ -81,7 +81,7 @@ namespace JueMingZ.UI.Legacy
                     Kind = "button",
                     Bounds = rect,
                     Selected = selected,
-                    TextScale = 0.78f,
+                    TextScale = LegacyUiMetrics.RowButtonTextScale,
                     TooltipLines = BuildAutoCaptureCritterRowTooltip(index, settings)
                 }.Draw(context);
 
@@ -236,7 +236,7 @@ namespace JueMingZ.UI.Legacy
                 Kind = "button",
                 Bounds = rect,
                 Selected = enabled,
-                TextScale = 0.70f
+                TextScale = LegacyUiMetrics.SmallButtonTextScale
             }.Draw(context);
             if (element != null)
             {
@@ -403,7 +403,7 @@ namespace JueMingZ.UI.Legacy
             var buttonWidth = CalculateSingleMiscActionButtonWidth(buttonLabel, row.Width, buttonWidthOverride);
             var buttonX = row.Right - buttonWidth - 10;
             var labelWidth = Math.Max(60, buttonX - row.X - 20);
-            UiTextRenderer.DrawAlignedTextClipped(spriteBatch, label, row.X + 10, row.Y, labelWidth, row.Height, UiTextHorizontalAlignment.Left, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 238, 226, 255, 0.86f);
+            UiTextRenderer.DrawAlignedTextClipped(spriteBatch, label, row.X + 10, row.Y, labelWidth, row.Height, UiTextHorizontalAlignment.Left, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 238, 226, 255, LegacyUiMetrics.RowLabelTextScale);
 
             var rect = new LegacyUiRect(buttonX, RowModeButtonY(row), buttonWidth, RowModeButtonHeight);
             var hit = rect.Intersect(area.Viewport);

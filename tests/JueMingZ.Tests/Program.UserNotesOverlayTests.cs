@@ -155,6 +155,7 @@ namespace JueMingZ.Tests
 
             AssertContains(json, "\"source\":\"test-playerinput-postfix\"");
             AssertContains(json, "\"controlId\":\"close\"");
+            AssertContains(json, "\"mouseX\":" + closeX);
             AssertContains(json, "\"leftPressed\":true");
             AssertContains(json, "\"legacyWindowOwnsMouse\":false");
             AssertContains(json, "\"mouseCaptureRequested\":true");
@@ -257,6 +258,83 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void UserNotesPinnedOverlayToolbarHandleIsCenteredAndSeparatedFromButtons()
+        {
+            UserNotesPinnedOverlay.ResetForTesting();
+            var snapshot = BuildPinnedNotesSnapshot(
+                new UserNoteSnapshot
+                {
+                    NoteId = "note-a",
+                    Body = BuildRepeatedText("toolbar layout", 20),
+                    PinnedState = new UserNotePinnedState
+                    {
+                        Pinned = true,
+                        X = 100,
+                        Y = 80,
+                        Width = 220,
+                        Height = 140,
+                        OpacityPercent = 100
+                    }
+                });
+
+            var frame = UserNotesPinnedOverlay.BuildFrameForTesting(snapshot, 800, 480, 120, 120);
+            var item = frame.Items[0];
+            if (UserNotesPinnedOverlayState.BodyTextScale < 1.20f ||
+                UserNotesPinnedOverlayState.LineHeight < 36 ||
+                UserNotesPinnedOverlayState.ToolbarHeight < 28)
+            {
+                throw new InvalidOperationException("Expected pinned overlay body text and toolbar metrics to be enlarged together.");
+            }
+
+            if (item.DragHandleRect.Width < 84)
+            {
+                throw new InvalidOperationException("Expected the pinned overlay drag handle to be visibly longer than the old short handle.");
+            }
+
+            var toolbarCenter = item.ToolbarRect.X + item.ToolbarRect.Width / 2;
+            var handleCenter = item.DragHandleRect.X + item.DragHandleRect.Width / 2;
+            if (Math.Abs(handleCenter - toolbarCenter) > 8)
+            {
+                throw new InvalidOperationException("Expected the pinned overlay drag handle to stay near the toolbar center.");
+            }
+
+            if (RectsIntersect(item.DragHandleRect, item.DecreaseOpacityRect) ||
+                RectsIntersect(item.DragHandleRect, item.IncreaseOpacityRect) ||
+                RectsIntersect(item.DragHandleRect, item.CloseRect) ||
+                RectsIntersect(item.DecreaseOpacityRect, item.IncreaseOpacityRect) ||
+                RectsIntersect(item.IncreaseOpacityRect, item.CloseRect))
+            {
+                throw new InvalidOperationException("Expected the centered drag handle, opacity buttons, and close button to keep non-overlapping hit rects.");
+            }
+
+            var dragHit = UserNotesPinnedOverlayState.BuildHitDiagnostics(
+                frame,
+                item.DragHandleRect.X + item.DragHandleRect.Width / 2,
+                item.DragHandleRect.Y + item.DragHandleRect.Height / 2);
+            if (!dragHit.DragHandleHit || !string.Equals(dragHit.ControlId, "drag", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected centered drag handle hit diagnostics to resolve drag.");
+            }
+
+            var opacityHit = UserNotesPinnedOverlayState.BuildHitDiagnostics(
+                frame,
+                item.IncreaseOpacityRect.X + item.IncreaseOpacityRect.Width / 2,
+                item.IncreaseOpacityRect.Y + item.IncreaseOpacityRect.Height / 2);
+            if (!opacityHit.IncreaseOpacityHit || !string.Equals(opacityHit.ControlId, "opacity-increase", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected enlarged opacity button hit diagnostics to resolve opacity-increase.");
+            }
+
+            var closeHit = UserNotesPinnedOverlayState.BuildHitDiagnostics(
+                frame,
+                item.CloseRect.X + item.CloseRect.Width / 2,
+                item.CloseRect.Y + item.CloseRect.Height / 2);
+            if (!closeHit.CloseHit || !string.Equals(closeHit.ControlId, "close", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected enlarged close button hit diagnostics to resolve close.");
+            }
+        }
+
         private static void UserNotesPinnedOverlayScaledMouseHitsVisualControls()
         {
             UserNotesPinnedOverlay.ResetForTesting();
@@ -289,9 +367,12 @@ namespace JueMingZ.Tests
             var closeX = item.CloseRect.X + item.CloseRect.Width / 2;
             var closeY = item.CloseRect.Y + item.CloseRect.Height / 2;
             var closeMouse = BuildScaledPinnedOverlayMouseAtUiPoint(closeX, closeY, true);
-            if (closeMouse.X != closeX || closeMouse.Y != closeY || !closeMouse.ReadMode.Contains("InterfaceOverlay"))
+            if (closeMouse.X != closeX ||
+                closeMouse.Y != closeY ||
+                closeMouse.ReadMode.IndexOf("OsClientScreen", StringComparison.Ordinal) < 0 ||
+                !closeMouse.ReadMode.Contains("InterfaceOverlay"))
             {
-                throw new InvalidOperationException("Expected pinned overlay mouse reads to stay in visual interface coordinates under capped UI scale.");
+                throw new InvalidOperationException("Expected pinned overlay mouse reads to stay in visual screen coordinates under capped UI scale.");
             }
 
             var closeFrame = UserNotesPinnedOverlay.BuildFrameForTesting(snapshot, 1280, 720, closeMouse.X, closeMouse.Y);
@@ -387,7 +468,7 @@ namespace JueMingZ.Tests
             }
         }
 
-        private static void UserNotesPinnedOverlayRightEdgeUsesInterfaceMouseAndClamps()
+        private static void UserNotesPinnedOverlayRightEdgeUsesScreenMouseAndClamps()
         {
             var restore = PushTemporaryConfigDirectory("user-notes-overlay-right-edge-interface");
             var restoreRuntimeTypes = PushFakeTerrariaMainType();
@@ -420,7 +501,7 @@ namespace JueMingZ.Tests
                     new UserNotePinnedState
                     {
                         Pinned = true,
-                        X = 2100,
+                        X = 2500,
                         Y = 420,
                         Width = 280,
                         Height = 180,
@@ -431,8 +512,8 @@ namespace JueMingZ.Tests
                 UserNotesUiState.SetCacheForTesting(cache, true);
 
                 const double scale = 1.2d;
-                var overlayWidth = (int)Math.Round(Terraria.Main.screenWidth / scale);
-                var overlayHeight = (int)Math.Round(Terraria.Main.screenHeight / scale);
+                var overlayWidth = Terraria.Main.screenWidth;
+                var overlayHeight = Terraria.Main.screenHeight;
                 var frame = UserNotesPinnedOverlay.BuildFrameForTesting(cache.Snapshot, overlayWidth, overlayHeight, 0, 0);
                 var item = frame.Items[0];
                 var expectedClampedX = overlayWidth - item.Rect.Width - UserNotesPinnedOverlayState.ScreenPadding;
@@ -447,9 +528,9 @@ namespace JueMingZ.Tests
                 var mouse = UserNotesPinnedOverlay.ReadOverlayMouseForTesting(raw);
                 if (mouse.X != opacityX ||
                     mouse.Y != opacityY ||
-                    mouse.ReadMode.IndexOf("OsClientScreenToUi", StringComparison.Ordinal) < 0)
+                    mouse.ReadMode.IndexOf("OsClientScreen", StringComparison.Ordinal) < 0)
                 {
-                    throw new InvalidOperationException("Expected interface overlay to prefer OS client screen-to-UI coordinates at the right edge; mouse=" + mouse.X + "," + mouse.Y + " mode=" + mouse.ReadMode + ".");
+                    throw new InvalidOperationException("Expected pinned overlay to prefer OS client screen coordinates at the right edge; mouse=" + mouse.X + "," + mouse.Y + " mode=" + mouse.ReadMode + ".");
                 }
 
                 var overlayScreenWidth = UserNotesPinnedOverlay.OverlayScreenWidthForTesting(raw);
@@ -458,6 +539,7 @@ namespace JueMingZ.Tests
                 var inputItem = inputFrame.Items[0];
                 if (overlayScreenWidth != overlayWidth ||
                     overlayScreenHeight != overlayHeight ||
+                    !string.Equals(UserNotesPinnedOverlay.OverlayCoordinateModeForTesting(raw), "ScreenUnscaled", StringComparison.Ordinal) ||
                     inputItem.Rect.X != expectedClampedX ||
                     !inputItem.DecreaseOpacityRect.Contains(mouse.X, mouse.Y))
                 {
@@ -494,15 +576,29 @@ namespace JueMingZ.Tests
                     true,
                     raw);
 
-                var interaction = UserNotesPinnedOverlayState.LastInteraction;
+                var prefixInteraction = UserNotesPinnedOverlayState.LastInteraction;
+                if (prefixInteraction.OpacityChanged || prefixInteraction.Unpinned || prefixInteraction.DragStarted)
+                {
+                    throw new InvalidOperationException(
+                        "Expected right-edge stale prefix coordinates to arm but not execute a toolbar command. Interaction=" +
+                        prefixInteraction.ToVerificationJson());
+                }
+
+                UserNotesPinnedOverlay.UpdateInputGuardForTesting(
+                    "UserNotesPinnedOverlay.UpdateAfterPlayerInputGuard",
+                    true,
+                    false,
+                    BuildScaledPinnedOverlayRawMouseWithTerrariaAndOs(opacityX, opacityY, opacityX, opacityY, true, scale));
+
+                var postfixInteraction = UserNotesPinnedOverlayState.LastInteraction;
                 var pinned = cache.Snapshot.Notes[0].PinnedState;
-                if (!interaction.OpacityChanged ||
+                if (!postfixInteraction.OpacityChanged ||
                     pinned.OpacityPercent != 95 ||
                     (int)Math.Round(pinned.X) != expectedClampedX)
                 {
                     throw new InvalidOperationException(
-                        "Expected right-edge visual opacity button to hit and persist the clamped interface position. Interaction=" +
-                        interaction.ToVerificationJson() +
+                        "Expected right-edge visual opacity button to hit and persist the clamped screen position. Interaction=" +
+                        postfixInteraction.ToVerificationJson() +
                         ", opacity=" + pinned.OpacityPercent +
                         ", x=" + pinned.X +
                         ", expectedX=" + expectedClampedX);
@@ -523,6 +619,124 @@ namespace JueMingZ.Tests
                 ResetUserNotesTestingHooks();
                 restoreRuntimeTypes();
                 restore();
+            }
+        }
+
+        private static void UserNotesPinnedOverlayScreenCoordinatesMatchFrozenRightSideSample()
+        {
+            var restore = PushTemporaryConfigDirectory("user-notes-overlay-frozen-right-side-sample");
+            var restoreRuntimeTypes = PushFakeTerrariaMainType();
+            var previousGameMenu = Terraria.Main.gameMenu;
+            var previousMapFullscreen = Terraria.Main.mapFullscreen;
+            var previousScreenWidth = Terraria.Main.screenWidth;
+            var previousScreenHeight = Terraria.Main.screenHeight;
+            try
+            {
+                DisableUserNotesDiagnosticsForTesting();
+                UserNotesUiState.ResetForTesting();
+                LegacyMainUiState.SetVisible(false);
+                Terraria.Main.gameMenu = false;
+                Terraria.Main.mapFullscreen = false;
+                Terraria.Main.screenWidth = 2560;
+                Terraria.Main.screenHeight = 1440;
+                TerrariaMainCompat.SetScreenSizeOverrideForTesting(2560, 1440);
+                UserNotesPinnedOverlay.ResetForTesting();
+                UserNotesPinnedOverlay.SetShouldUseOverlayOverrideForTesting(true);
+
+                var cache = new UserNotesCache(new UserNotesStore());
+                UserNoteSnapshot note;
+                RequireSuccess(cache.CreateDefaultNote(out note), "create pinned note");
+                UserNoteSnapshot updated;
+                RequireSuccess(cache.UpdatePinnedState(
+                    note.NoteId,
+                    new UserNotePinnedState
+                    {
+                        Pinned = true,
+                        X = 1567,
+                        Y = 111,
+                        Width = 280,
+                        Height = 180,
+                        OpacityPercent = 100
+                    },
+                    out updated),
+                    "seed frozen right-side pinned note");
+                UserNotesUiState.SetCacheForTesting(cache, true);
+
+                const double scale = 1.2d;
+                var raw = BuildScaledPinnedOverlayRawMouseWithTerrariaAndOs(1337, 252, 1604, 250, false, scale);
+                var mouse = UserNotesPinnedOverlay.ReadOverlayMouseForTesting(raw);
+                var frame = UserNotesPinnedOverlay.BuildOverlayFrameForTesting(raw);
+                var hit = UserNotesPinnedOverlayState.BuildHitDiagnostics(frame, mouse.X, mouse.Y);
+                if (mouse.X != 1604 ||
+                    mouse.Y != 250 ||
+                    frame.ScreenWidth != 2560 ||
+                    !string.Equals(frame.CoordinateMode, "ScreenUnscaled", StringComparison.Ordinal) ||
+                    frame.Items.Count != 1 ||
+                    frame.Items[0].Rect.X != 1567 ||
+                    !hit.MouseInside)
+                {
+                    throw new InvalidOperationException(
+                        "Expected frozen right-side sample to keep OS client coordinates in the visual screen rect; mouse=" +
+                        mouse.X +
+                        "," +
+                        mouse.Y +
+                        ", mode=" +
+                        mouse.ReadMode +
+                        ", screen=" +
+                        frame.ScreenWidth +
+                        "x" +
+                        frame.ScreenHeight +
+                        ", coordinateMode=" +
+                        frame.CoordinateMode +
+                        ", itemX=" +
+                        (frame.Items.Count <= 0 ? -1 : frame.Items[0].Rect.X) +
+                        ", hit=" +
+                        hit.MouseInside);
+                }
+            }
+            finally
+            {
+                TerrariaMainCompat.SetScreenSizeOverrideForTesting(null, null);
+                Terraria.Main.gameMenu = previousGameMenu;
+                Terraria.Main.mapFullscreen = previousMapFullscreen;
+                Terraria.Main.screenWidth = previousScreenWidth;
+                Terraria.Main.screenHeight = previousScreenHeight;
+                UserNotesUiState.ResetForTesting();
+                UserNotesPinnedOverlay.ResetForTesting();
+                ResetUserNotesTestingHooks();
+                restoreRuntimeTypes();
+                restore();
+            }
+        }
+
+        private static void UserNotesPinnedOverlayInitialPlacementUsesScreenExtentUnderUiScale()
+        {
+            UserNotesPinnedOverlay.ResetForTesting();
+            const double scale = 1.2d;
+            var raw = BuildScaledPinnedOverlayRawMouseWithTerrariaAndOs(0, 0, 0, 0, false, scale);
+            var context = UserNotesPinnedOverlayCoordinates.ResolveScreenContext(raw, 2560, 1440);
+            var snapshot = BuildPinnedNotesSnapshot();
+            var state = UserNotesPinnedOverlay.BuildInitialPinnedStateForTesting(
+                snapshot,
+                "note-a",
+                new LegacyUiRect(1900, 80, 80, 40),
+                context.ScreenWidth,
+                context.ScreenHeight);
+
+            if (context.ScreenWidth != 2560 ||
+                context.ScreenHeight != 1440 ||
+                !string.Equals(context.CoordinateMode, "ScreenUnscaled", StringComparison.Ordinal) ||
+                (int)Math.Round(state.X) != 1992)
+            {
+                throw new InvalidOperationException(
+                    "Expected initial pinned placement to use the unscaled screen extent under UI scale; screen=" +
+                    context.ScreenWidth +
+                    "x" +
+                    context.ScreenHeight +
+                    ", mode=" +
+                    context.CoordinateMode +
+                    ", x=" +
+                    state.X);
             }
         }
 
@@ -1045,6 +1259,98 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void UserNotesPinnedOverlayDragCaptureBlocksNonLeftMouseAndKeepsHeldLeft()
+        {
+            var restore = PushTemporaryConfigDirectory("user-notes-overlay-drag-non-left-block");
+            var restoreRuntimeTypes = PushFakeTerrariaMainType();
+            var previousGameMenu = Terraria.Main.gameMenu;
+            var previousMapFullscreen = Terraria.Main.mapFullscreen;
+            try
+            {
+                ResetUiInputFrameTestState();
+                TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(true);
+                DisableUserNotesDiagnosticsForTesting();
+                UserNotesUiState.ResetForTesting();
+                LegacyMainUiState.SetVisible(false);
+                Terraria.Main.gameMenu = false;
+                Terraria.Main.mapFullscreen = false;
+                UserNotesPinnedOverlay.ResetForTesting();
+                UserNotesPinnedOverlay.SetShouldUseOverlayOverrideForTesting(true);
+                var player = new Terraria.Player();
+                Terraria.Main.LocalPlayer = player;
+                Terraria.Main.player[0] = player;
+                Terraria.Main.myPlayer = 0;
+
+                var cache = new UserNotesCache(new UserNotesStore());
+                UserNoteSnapshot note;
+                RequireSuccess(cache.CreateDefaultNote(out note), "create pinned note");
+                UserNoteSnapshot updated;
+                RequireSuccess(cache.UpdatePinnedState(
+                    note.NoteId,
+                    new UserNotePinnedState
+                    {
+                        Pinned = true,
+                        X = 100,
+                        Y = 80,
+                        Width = 280,
+                        Height = 150,
+                        OpacityPercent = 100
+                    },
+                    out updated),
+                    "seed pinned note");
+                UserNotesUiState.SetCacheForTesting(cache, true);
+
+                var frame = UserNotesPinnedOverlay.BuildFrameForTesting(cache.Snapshot, 1280, 800, 0, 0);
+                var item = frame.Items[0];
+                var dragX = item.DragHandleRect.X + item.DragHandleRect.Width / 2;
+                var dragY = item.DragHandleRect.Y + item.DragHandleRect.Height / 2;
+
+                SeedPinnedOverlayMouseButtonsForPointThroughTest();
+                UserNotesPinnedOverlay.UpdateInputGuardForTesting(
+                    "UserNotesPinnedOverlay.UpdateAfterPlayerInputGuard",
+                    true,
+                    false,
+                    BuildPinnedOverlayRawMouseAtUiPoint(dragX, dragY, true));
+
+                var dragStart = UserNotesPinnedOverlayState.LastInteraction;
+                if (!dragStart.DragStarted || !dragStart.Dragging)
+                {
+                    throw new InvalidOperationException("Expected drag handle press to start a captured drag.");
+                }
+
+                AssertPinnedOverlayDragInputIsolationPreservedLeftAndBlockedNonLeft("drag start");
+
+                SeedPinnedOverlayMouseButtonsForPointThroughTest();
+                UserNotesPinnedOverlay.UpdateInputGuardForTesting(
+                    "UserNotesPinnedOverlay.UpdateAfterPlayerInputGuard",
+                    true,
+                    false,
+                    BuildPinnedOverlayRawMouseAtUiPoint(dragX + 40, dragY + 22, true));
+
+                var dragging = UserNotesPinnedOverlayState.LastInteraction;
+                if (!dragging.Dragging || dragging.PendingState == null || dragging.PendingState.X <= 100)
+                {
+                    throw new InvalidOperationException("Expected active drag to keep moving while preserving held left.");
+                }
+
+                AssertPinnedOverlayDragInputIsolationPreservedLeftAndBlockedNonLeft("drag move");
+            }
+            finally
+            {
+                ResetUiInputFrameTestState();
+                TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(null);
+                Terraria.Main.gameMenu = previousGameMenu;
+                Terraria.Main.mapFullscreen = previousMapFullscreen;
+                Terraria.Main.LocalPlayer = null;
+                Terraria.Main.player[0] = null;
+                UserNotesUiState.ResetForTesting();
+                UserNotesPinnedOverlay.ResetForTesting();
+                ResetUserNotesTestingHooks();
+                restoreRuntimeTypes();
+                restore();
+            }
+        }
+
         private static void UserNotesPinnedOverlayPostPlayerInputWheelScrollsBody()
         {
             var restore = PushTemporaryConfigDirectory("user-notes-overlay-post-playerinput-wheel");
@@ -1110,6 +1416,98 @@ namespace JueMingZ.Tests
                 ResetUiInputFrameTestState();
                 Terraria.Main.gameMenu = previousGameMenu;
                 Terraria.Main.mapFullscreen = previousMapFullscreen;
+                UserNotesUiState.ResetForTesting();
+                UserNotesPinnedOverlay.ResetForTesting();
+                ResetUserNotesTestingHooks();
+                restoreRuntimeTypes();
+                restore();
+            }
+        }
+
+        private static void UserNotesPinnedOverlayVisualSurfaceWheelBlocksHotbarWithoutFakeWheel()
+        {
+            var restore = PushTemporaryConfigDirectory("user-notes-overlay-surface-wheel-block");
+            var restoreRuntimeTypes = PushFakeTerrariaMainType();
+            var previousGameMenu = Terraria.Main.gameMenu;
+            var previousMapFullscreen = Terraria.Main.mapFullscreen;
+            try
+            {
+                ResetUiInputFrameTestState();
+                TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(true);
+                DisableUserNotesDiagnosticsForTesting();
+                UserNotesUiState.ResetForTesting();
+                LegacyMainUiState.SetVisible(false);
+                Terraria.Main.gameMenu = false;
+                Terraria.Main.mapFullscreen = false;
+                UserNotesPinnedOverlay.ResetForTesting();
+                UserNotesPinnedOverlay.SetShouldUseOverlayOverrideForTesting(true);
+                var player = new Terraria.Player();
+                Terraria.Main.LocalPlayer = player;
+                Terraria.Main.player[0] = player;
+                Terraria.Main.myPlayer = 0;
+
+                var cache = new UserNotesCache(new UserNotesStore());
+                UserNoteSnapshot note;
+                RequireSuccess(cache.CreateDefaultNote(out note), "create pinned note");
+                RequireSuccess(cache.SaveNote(note.NoteId, "title", "short body", out note), "seed short body");
+                UserNoteSnapshot updated;
+                RequireSuccess(cache.UpdatePinnedState(
+                    note.NoteId,
+                    new UserNotePinnedState
+                    {
+                        Pinned = true,
+                        X = 100,
+                        Y = 80,
+                        Width = 280,
+                        Height = 150,
+                        OpacityPercent = 100
+                    },
+                    out updated),
+                    "seed pinned note");
+                UserNotesUiState.SetCacheForTesting(cache, true);
+
+                var frame = UserNotesPinnedOverlay.BuildFrameForTesting(cache.Snapshot, 1280, 800, 0, 0);
+                var item = frame.Items[0];
+                var toolbarX = item.DecreaseOpacityRect.X + item.DecreaseOpacityRect.Width / 2;
+                var toolbarY = item.DecreaseOpacityRect.Y + item.DecreaseOpacityRect.Height / 2;
+                if (item.BodyRect.Contains(toolbarX, toolbarY))
+                {
+                    throw new InvalidOperationException("Expected toolbar wheel sample to be outside the body rect.");
+                }
+
+                Terraria.Main.mouseX = toolbarX;
+                Terraria.Main.mouseY = toolbarY;
+                Terraria.Main.mouseLeft = false;
+                Terraria.Main.mouseLeftRelease = false;
+                Terraria.Main.mouseScrollWheel = 240;
+                Terraria.Main.oldMouseScrollWheel = 0;
+                UiInputFrameClock.BeginInputFrame("user-notes-overlay-toolbar-wheel-test");
+
+                var suppressed = UserNotesPinnedOverlay.ShouldSuppressHotbarScrollFromHook();
+                var interaction = UserNotesPinnedOverlayState.LastInteraction;
+                if (!suppressed ||
+                    !TerrariaUiMouseCompat.LastScrollHotbarHookSuppressed ||
+                    Terraria.Main.mouseScrollWheel != Terraria.Main.oldMouseScrollWheel ||
+                    !Terraria.Main.mouseInterface ||
+                    !Terraria.Main.blockMouse ||
+                    !player.mouseInterface)
+                {
+                    throw new InvalidOperationException("Expected wheel over the pinned toolbar surface to be captured and suppressed before reaching the hotbar.");
+                }
+
+                if (interaction.ScrollConsumed || interaction.BodyScrollAfter != interaction.BodyScrollBefore)
+                {
+                    throw new InvalidOperationException("Expected toolbar wheel isolation to avoid recording a fake body wheel success.");
+                }
+            }
+            finally
+            {
+                ResetUiInputFrameTestState();
+                TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(null);
+                Terraria.Main.gameMenu = previousGameMenu;
+                Terraria.Main.mapFullscreen = previousMapFullscreen;
+                Terraria.Main.LocalPlayer = null;
+                Terraria.Main.player[0] = null;
                 UserNotesUiState.ResetForTesting();
                 UserNotesPinnedOverlay.ResetForTesting();
                 ResetUserNotesTestingHooks();
@@ -1455,6 +1853,48 @@ namespace JueMingZ.Tests
                 BuildPinnedOverlayRawMouseAtUiPoint(uiX, uiY, false));
         }
 
+        private static void SeedPinnedOverlayMouseButtonsForPointThroughTest()
+        {
+            Terraria.Main.mouseLeft = true;
+            Terraria.Main.mouseLeftRelease = true;
+            Terraria.Main.mouseRight = true;
+            Terraria.Main.mouseRightRelease = true;
+            Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft = true;
+            Terraria.GameInput.PlayerInput.Triggers.Current.MouseRight = true;
+            Terraria.GameInput.PlayerInput.Triggers.Current.MouseMiddle = true;
+            Terraria.GameInput.PlayerInput.Triggers.Current.Mouse4 = true;
+            Terraria.GameInput.PlayerInput.Triggers.Current.Mouse5 = true;
+            Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft = true;
+            Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseRight = true;
+            Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseMiddle = true;
+            Terraria.GameInput.PlayerInput.Triggers.JustPressed.Mouse4 = true;
+            Terraria.GameInput.PlayerInput.Triggers.JustPressed.Mouse5 = true;
+        }
+
+        private static void AssertPinnedOverlayDragInputIsolationPreservedLeftAndBlockedNonLeft(string phase)
+        {
+            if (!Terraria.Main.mouseLeft ||
+                !Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft ||
+                !Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft)
+            {
+                throw new InvalidOperationException("Expected pinned overlay " + phase + " capture to preserve held left for dragging.");
+            }
+
+            if (Terraria.Main.mouseRight ||
+                Terraria.Main.mouseRightRelease ||
+                Terraria.GameInput.PlayerInput.Triggers.Current.MouseRight ||
+                Terraria.GameInput.PlayerInput.Triggers.Current.MouseMiddle ||
+                Terraria.GameInput.PlayerInput.Triggers.Current.Mouse4 ||
+                Terraria.GameInput.PlayerInput.Triggers.Current.Mouse5 ||
+                Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseRight ||
+                Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseMiddle ||
+                Terraria.GameInput.PlayerInput.Triggers.JustPressed.Mouse4 ||
+                Terraria.GameInput.PlayerInput.Triggers.JustPressed.Mouse5)
+            {
+                throw new InvalidOperationException("Expected pinned overlay " + phase + " capture to clear right, middle, and side mouse inputs inside the visual surface.");
+            }
+        }
+
         private static DiagnosticMouseState BuildPinnedOverlayRawMouseWithTerrariaAndOs(int terrariaX, int terrariaY, int osX, int osY, bool leftDown)
         {
             return new DiagnosticMouseState
@@ -1475,18 +1915,18 @@ namespace JueMingZ.Tests
         private static LegacyMouseSnapshot BuildScaledPinnedOverlayMouseAtUiPoint(int uiX, int uiY, bool leftDown)
         {
             const double scale = 1.5d;
-            var screenX = (int)Math.Round(uiX * scale);
-            var screenY = (int)Math.Round(uiY * scale);
+            var staleTerrariaX = (int)Math.Round(uiX * scale);
+            var staleTerrariaY = (int)Math.Round(uiY * scale);
             return UserNotesPinnedOverlay.ReadOverlayMouseForTesting(new DiagnosticMouseState
             {
                 GameInputAvailable = true,
                 TerrariaReadAvailable = true,
-                TerrariaMouseX = screenX,
-                TerrariaMouseY = screenY,
+                TerrariaMouseX = staleTerrariaX,
+                TerrariaMouseY = staleTerrariaY,
                 TerrariaLeftDown = leftDown,
                 OsReadAvailable = true,
-                OsClientMouseX = screenX,
-                OsClientMouseY = screenY,
+                OsClientMouseX = uiX,
+                OsClientMouseY = uiY,
                 OsLeftDown = leftDown,
                 UiScaleAvailable = true,
                 UiScaleMatrixAvailable = true,
@@ -1503,8 +1943,8 @@ namespace JueMingZ.Tests
             var raw = BuildPinnedOverlayRawMouseWithTerrariaAndOs(
                 terrariaX,
                 terrariaY,
-                (int)Math.Round(uiX * scale),
-                (int)Math.Round(uiY * scale),
+                uiX,
+                uiY,
                 leftDown);
             raw.UiScaleAvailable = true;
             raw.UiScaleMatrixAvailable = true;

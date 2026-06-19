@@ -2064,6 +2064,7 @@ function Test-UserNotesGovernance {
     $storePath = Join-Path $RepoRoot "src\JueMingZ\Automation\Information\Notes\UserNotesStore.cs"
     $cachePath = Join-Path $RepoRoot "src\JueMingZ\Automation\Information\Notes\UserNotesCache.cs"
     $diagnosticsPath = Join-Path $RepoRoot "src\JueMingZ\Automation\Information\Notes\UserNotesDiagnostics.cs"
+    $metricsPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyUiMetrics.cs"
     $notesWindowPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.Notes.cs"
     $notesSharedPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.Shared.cs"
     $notesStatePath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\UserNotesUiState.cs"
@@ -2075,7 +2076,9 @@ function Test-UserNotesGovernance {
     $layersPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.Layers.cs"
     $userNotesActionPath = Join-Path $RepoRoot "src\JueMingZ\Input\LegacyUiActionService.UserNotes.cs"
     $pinnedOverlayPath = Join-Path $RepoRoot "src\JueMingZ\UI\UserNotesPinnedOverlay.cs"
+    $pinnedOverlayCoordinatesPath = Join-Path $RepoRoot "src\JueMingZ\UI\UserNotesPinnedOverlayCoordinates.cs"
     $pinnedOverlayStatePath = Join-Path $RepoRoot "src\JueMingZ\UI\UserNotesPinnedOverlayState.cs"
+    $interfaceLayerCallbacksPath = Join-Path $RepoRoot "src\JueMingZ\Hooks\InterfaceLayerHookCallbacks.cs"
     $hookInstallerPath = Join-Path $RepoRoot "src\JueMingZ\Bootstrap\HookInstaller.cs"
     $playerInputHookPath = Join-Path $RepoRoot "src\JueMingZ\Hooks\PlayerInputScrollHookInstaller.cs"
     $hotbarHookPath = Join-Path $RepoRoot "src\JueMingZ\Hooks\ScrollHotbarHookInstaller.cs"
@@ -2089,6 +2092,7 @@ function Test-UserNotesGovernance {
     $diagnosticRulesPath = Join-Path $RepoRoot "文档\项目规则\AI诊断日志说明.md"
     $legacyPlan06Path = Join-Path $RepoRoot "文档\归档历史计划\笔记页与悬挂便签实现\06-诊断测试文档审计护栏.md"
     $feedbackPlan06Path = Join-Path $RepoRoot "文档\归档历史计划\笔记页实机反馈修复\06-诊断测试文档审计护栏.md"
+    $systemPlan05Path = Join-Path $RepoRoot "文档\归档历史计划\悬挂浮窗系统性修复\05-诊断测试文档审计护栏.md"
 
     $tabBarText = Read-TextIfExists -Path $tabBarPath
     $vectorIconText = Read-TextIfExists -Path $vectorIconPath
@@ -2098,6 +2102,7 @@ function Test-UserNotesGovernance {
     $storeText = Read-TextIfExists -Path $storePath
     $cacheText = Read-TextIfExists -Path $cachePath
     $diagnosticsText = Read-TextIfExists -Path $diagnosticsPath
+    $metricsText = Read-TextIfExists -Path $metricsPath
     $notesWindowText = Read-TextIfExists -Path $notesWindowPath
     $notesSharedText = Read-TextIfExists -Path $notesSharedPath
     $notesStateText = Read-TextIfExists -Path $notesStatePath
@@ -2109,7 +2114,9 @@ function Test-UserNotesGovernance {
     $layersText = Read-TextIfExists -Path $layersPath
     $userNotesActionText = Read-TextIfExists -Path $userNotesActionPath
     $pinnedOverlayText = Read-TextIfExists -Path $pinnedOverlayPath
+    $pinnedOverlayCoordinatesText = Read-TextIfExists -Path $pinnedOverlayCoordinatesPath
     $pinnedOverlayStateText = Read-TextIfExists -Path $pinnedOverlayStatePath
+    $interfaceLayerCallbacksText = Read-TextIfExists -Path $interfaceLayerCallbacksPath
     $hookInstallerText = Read-TextIfExists -Path $hookInstallerPath
     $playerInputHookText = Read-TextIfExists -Path $playerInputHookPath
     $hotbarHookText = Read-TextIfExists -Path $hotbarHookPath
@@ -2123,18 +2130,21 @@ function Test-UserNotesGovernance {
     $diagnosticRulesText = Read-TextIfExists -Path $diagnosticRulesPath
     $legacyPlan06Text = Read-TextIfExists -Path $legacyPlan06Path
     $feedbackPlan06Text = Read-TextIfExists -Path $feedbackPlan06Path
+    $systemPlan05Text = Read-TextIfExists -Path $systemPlan05Path
 
     if ($null -eq $tabBarText -or $null -eq $vectorIconText -or $null -eq $featureIdsText -or
         $null -eq $registrarText -or $null -eq $categoryText -or $null -eq $storeText -or
-        $null -eq $cacheText -or $null -eq $diagnosticsText -or $null -eq $notesWindowText -or
+        $null -eq $cacheText -or $null -eq $diagnosticsText -or $null -eq $metricsText -or $null -eq $notesWindowText -or
         $null -eq $notesSharedText -or $null -eq $notesStateText -or $null -eq $multilineInputText -or
         $null -eq $legacyTextInputText -or $null -eq $textInputCompatText -or $null -eq $scrollText -or
         $null -eq $mouseInputText -or $null -eq $layersText -or $null -eq $userNotesActionText -or
-        $null -eq $pinnedOverlayText -or $null -eq $pinnedOverlayStateText -or $null -eq $hookInstallerText -or
+        $null -eq $pinnedOverlayText -or $null -eq $pinnedOverlayCoordinatesText -or
+        $null -eq $pinnedOverlayStateText -or $null -eq $interfaceLayerCallbacksText -or $null -eq $hookInstallerText -or
         $null -eq $playerInputHookText -or $null -eq $hotbarHookText -or $null -eq $storeTestsText -or
         $null -eq $uiTestsText -or $null -eq $overlayTestsText -or $null -eq $interfaceLayerTestsText -or
         $null -eq $programTestsText -or $null -eq $featureDocText -or $null -eq $featureIndexText -or
-        $null -eq $diagnosticRulesText -or $null -eq $legacyPlan06Text -or $null -eq $feedbackPlan06Text) {
+        $null -eq $diagnosticRulesText -or $null -eq $legacyPlan06Text -or $null -eq $feedbackPlan06Text -or
+        $null -eq $systemPlan05Text) {
         Write-FailHealth "User notes source, tests, feature docs, diagnostics rules, and plan coverage matrix must exist before governance can be audited."
         return
     }
@@ -2223,19 +2233,23 @@ function Test-UserNotesGovernance {
         Write-FailHealth "User notes body editor must keep a dedicated multiline editor with newline, cursor, IME, save-failure, and cancel tests."
     }
 
-    if ($notesStateText.Contains("private const int BodyTextInset = 10;") -and
-        $notesStateText.Contains("private const int BodyLineHeight = 21;") -and
-        $notesStateText.Contains("private const float BodyTextScale = 0.66f;") -and
+    if ($metricsText.Contains("public const float ButtonTextScale = 0.88f;") -and
+        $metricsText.Contains("public const float TabTextScale = 0.96f;") -and
+        $notesStateText.Contains("private const int BodyTextInset = 10;") -and
+        $notesStateText.Contains("private const int BodyLineHeight = 24;") -and
+        $notesStateText.Contains("private const float TitleTextScale = 0.86f;") -and
+        $notesStateText.Contains("private const float BodyTextScale = 0.76f;") -and
         $notesStateText.Contains("ResolveBodyTextViewport") -and
         $notesStateText.Contains("ResolveBodyEditorImeLineY") -and
         $notesWindowText.Contains("UserNotesUiState.ResolveBodyTextViewport(bodyRect)") -and
         $notesWindowText.Contains("UserNotesUiState.BodyLineHeightForLayout") -and
         $notesWindowText.Contains("UserNotesUiState.BodyTextScaleForLayout") -and
+        $uiTestsText.Contains("LegacyUiMetrics.TabTextScale") -and
         $uiTestsText.Contains("UserNotesCardBodyViewportMatchesLayoutAndScroll")) {
-        Write-Pass "User notes F5 card body text viewport keeps shared inset, line-height, scale, scroll, hit-test, and IME geometry."
+        Write-Pass "User notes F5 card and shared menu text keep enlarged scale, line-height, scroll, hit-test, and IME geometry."
     }
     else {
-        Write-FailHealth "User notes F5 card body must keep 10px inset, 21px line height, 0.66 scale, and shared draw/scroll/click/IME viewport geometry."
+        Write-FailHealth "User notes F5 card body and shared menu metrics must keep enlarged scale with shared draw/scroll/click/IME viewport geometry."
     }
 
     if ($notesSharedText.Contains("IsTextEditorFocusAllowedForClickResolution") -and
@@ -2297,9 +2311,12 @@ function Test-UserNotesGovernance {
         $pinnedOverlayText.Contains("DrawOpacitySurfaceRoundedRect") -and
         $pinnedOverlayText.Contains("capturePendingToolbarPress") -and
         $pinnedOverlayText.Contains("IsPendingDragPress") -and
+        $pinnedOverlayText.Contains("ConsumeMouseButtonsForUi(!preserveLeftHold") -and
+        $pinnedOverlayText.Contains("ConsumeMouseButtonsForUi(bool includeLeftButton") -and
         $pinnedOverlayText.Contains("!hit.MouseInside ||") -and
         $pinnedOverlayText.Contains("interaction.ScrollConsumed ? 0 : rawScrollDelta") -and
         $pinnedOverlayStateText.Contains("nextOpacity == hit.OpacityPercent") -and
+        $pinnedOverlayStateText.Contains("return ShouldCaptureMouse(frame, mouseX, mouseY);") -and
         $pinnedOverlayStateText.Contains('var interaction = new UserNotesPinnedOverlayInteraction()') -and
         $pinnedOverlayStateText.Contains('_lastInteraction = new UserNotesPinnedOverlayInteraction()') -and
         -not $pinnedOverlayStateText.Contains('UserNotesPinnedOverlayInteraction.None') -and
@@ -2310,55 +2327,76 @@ function Test-UserNotesGovernance {
         $overlayTestsText.Contains("UserNotesPinnedOverlayTransfersPrefixPressWhenTerrariaCoordinatesMissNote") -and
         $overlayTestsText.Contains("UserNotesPinnedOverlayTransfersPrefixPressToPlayerInputDragAndKeepsHeldLeft") -and
         $overlayTestsText.Contains("UserNotesPinnedOverlayOpacityDefaultsAndClampsWithoutWrap") -and
+        $overlayTestsText.Contains("UserNotesPinnedOverlayDragCaptureBlocksNonLeftMouseAndKeepsHeldLeft") -and
         $overlayTestsText.Contains("UserNotesPinnedOverlayPostPlayerInputWheelScrollsBody") -and
+        $overlayTestsText.Contains("UserNotesPinnedOverlayVisualSurfaceWheelBlocksHotbarWithoutFakeWheel") -and
         $overlayTestsText.Contains("UserNotesPinnedOverlayRepeatedToolbarClicksKeepEdgesAndWheel") -and
-        $overlayTestsText.Contains("UserNotesPinnedOverlayRightEdgeUsesInterfaceMouseAndClamps") -and
+        $overlayTestsText.Contains("UserNotesPinnedOverlayRightEdgeUsesScreenMouseAndClamps") -and
+        $overlayTestsText.Contains("UserNotesPinnedOverlayScreenCoordinatesMatchFrozenRightSideSample") -and
+        $overlayTestsText.Contains("UserNotesPinnedOverlayInitialPlacementUsesScreenExtentUnderUiScale") -and
         $programTestsText.Contains("user notes pinned overlay processes click after player input") -and
         $programTestsText.Contains("user notes pinned overlay transfers prefix press to player input toolbar hit") -and
         $programTestsText.Contains("user notes pinned overlay transfers prefix press when Terraria coordinates miss note") -and
         $programTestsText.Contains("user notes pinned overlay transfers prefix press to player input drag and keeps held left") -and
         $programTestsText.Contains("user notes pinned overlay opacity defaults and clamps without wrap") -and
+        $programTestsText.Contains("user notes pinned overlay drag capture blocks non-left mouse and keeps held left") -and
         $programTestsText.Contains("user notes pinned overlay post player input wheel scrolls body") -and
+        $programTestsText.Contains("user notes pinned overlay visual surface wheel blocks hotbar without fake wheel") -and
         $programTestsText.Contains("user notes pinned overlay repeated toolbar clicks keep edges and wheel") -and
-        $programTestsText.Contains("user notes pinned overlay right edge uses interface mouse and clamps") -and
-        $interfaceLayerTestsText.Contains("UserNotesPinnedOverlay.DrawInterfaceLayer")) {
-        Write-Pass "User notes pinned overlay stays UI-only and uses controlled prefix/post-PlayerInput mouse/scroll consumption guards, one-shot toolbar press transfer including stale Terraria coordinate misses, right-edge interface mouse coverage, drag held-left preservation, premultiplied non-wrapping background opacity, repeated toolbar edge coverage, and post-PlayerInput body wheel coverage."
+        $programTestsText.Contains("user notes pinned overlay right edge uses screen mouse and clamps") -and
+        $programTestsText.Contains("user notes pinned overlay screen coordinates match frozen right side sample") -and
+        $programTestsText.Contains("user notes pinned overlay initial placement uses screen extent under UI scale") -and
+        $interfaceLayerTestsText.Contains("UserNotesPinnedOverlay.DrawInterfaceLayer") -and
+        $interfaceLayerTestsText.Contains("GetUserNotesPinnedOverlayScaleTypeNameForTesting")) {
+        Write-Pass "User notes pinned overlay stays UI-only and uses controlled prefix/post-PlayerInput mouse/scroll consumption guards, one-shot toolbar press transfer including stale Terraria coordinate misses, right-edge screen mouse coverage, drag held-left preservation with non-left mouse blocking, premultiplied non-wrapping background opacity, repeated toolbar edge coverage, visual-surface wheel isolation, and post-PlayerInput body wheel coverage."
     }
     else {
-        Write-FailHealth "User notes pinned overlay must not submit actions or mutate game state, must avoid mutable static interaction state, and must use prefix/post-PlayerInput/hotbar scroll guards with postfix-click, toolbar press-transfer including stale Terraria coordinate misses, right-edge interface mouse coverage, drag held-left preservation, premultiplied foreground-separated opacity clamp, repeated toolbar edge, and post-PlayerInput wheel tests; leaks=$($mutationLeaks -join ', ')"
+        Write-FailHealth "User notes pinned overlay must not submit actions or mutate game state, must avoid mutable static interaction state, and must use prefix/post-PlayerInput/hotbar scroll guards with postfix-click, toolbar press-transfer including stale Terraria coordinate misses, right-edge screen mouse coverage, drag held-left preservation plus non-left mouse blocking, premultiplied foreground-separated opacity clamp, visual-surface wheel isolation, repeated toolbar edge, and post-PlayerInput wheel tests; leaks=$($mutationLeaks -join ', ')"
     }
 
     if ($pinnedOverlayStateText.Contains("ToolbarRect") -and
         $pinnedOverlayStateText.Contains("ResolveToolbarRect") -and
         $pinnedOverlayStateText.Contains("ResolveBodyRect") -and
         $pinnedOverlayStateText.Contains("rect.Y + BodyPadding") -and
-        $pinnedOverlayStateText.Contains("internal const float BodyTextScale = 0.62f;") -and
+        $pinnedOverlayStateText.Contains("internal const int LineHeight = 36;") -and
+        $pinnedOverlayStateText.Contains("internal const float BodyTextScale = 1.20f;") -and
+        $pinnedOverlayStateText.Contains("DragHandleMinWidth = 84") -and
         $pinnedOverlayStateText.Contains("BuildBodyLines(note.Body, bodyRect.Width)") -and
         $pinnedOverlayText.Contains("item.ToolbarRect") -and
         $pinnedOverlayText.Contains("UserNotesPinnedOverlayState.BodyTextScale") -and
         $notesStateText.Contains("PinnedOverlayBodyWrapTextScale = UserNotesPinnedOverlayState.BodyTextScale") -and
         $overlayTestsText.Contains("UserNotesPinnedOverlayBodyStartsAtContentTopWhenToolbarHidden") -and
-        $overlayTestsText.Contains("UserNotesPinnedOverlayBodyWrapMatchesDrawScaleWithoutEllipsis")) {
-        Write-Pass "User notes pinned overlay keeps toolbar/content separation and wrap/draw scale consistency."
+        $overlayTestsText.Contains("UserNotesPinnedOverlayBodyWrapMatchesDrawScaleWithoutEllipsis") -and
+        $overlayTestsText.Contains("UserNotesPinnedOverlayToolbarHandleIsCenteredAndSeparatedFromButtons") -and
+        $programTestsText.Contains("user notes pinned overlay toolbar handle is centered and separated from buttons")) {
+        Write-Pass "User notes pinned overlay keeps readable enlarged body text, toolbar/content separation, centered long drag handle, and wrap/draw scale consistency."
     }
     else {
-        Write-FailHealth "User notes pinned overlay must keep BodyRect/ToolbarRect separation, no invisible header reservation, 0.62 wrap/draw scale, and no-ellipsis tests."
+        Write-FailHealth "User notes pinned overlay must keep BodyRect/ToolbarRect separation, no invisible header reservation, 1.20 wrap/draw scale, 36 line height, centered long drag handle, and no-ellipsis tests."
     }
 
     if ($mouseInputText.Contains("ReadMouseForInterfaceOverlay") -and
         $mouseInputText.Contains("applyMainDrawScale") -and
         $mouseInputText.Contains("ResolveInterfaceOverlayMouse") -and
-        $mouseInputText.Contains("OsClientScreenToUi") -and
+        $mouseInputText.Contains("OsClientScreen") -and
         $mouseInputText.Contains("AppendInterfaceOverlayMode") -and
         $pinnedOverlayText.Contains("LegacyUiInput.ReadMouseForInterfaceOverlay") -and
-        $pinnedOverlayText.Contains("SafeOverlayScreenWidth") -and
-        $pinnedOverlayText.Contains("ResolveOverlayExtent") -and
-        $overlayTestsText.Contains("UserNotesPinnedOverlayRightEdgeUsesInterfaceMouseAndClamps") -and
+        $pinnedOverlayText.Contains("ResolveCoordinateContext") -and
+        $pinnedOverlayCoordinatesText.Contains("ScreenUnscaled") -and
+        $pinnedOverlayCoordinatesText.Contains("ResolveScreenContext") -and
+        $notesStateText.Contains("UserNotesPinnedOverlayCoordinates.ResolveCurrentScreenContext") -and
+        $pinnedOverlayStateText.Contains("CoordinateMode") -and
+        $interfaceLayerCallbacksText.Contains("UserNotesPinnedOverlayDispatcherLayerName") -and
+        $interfaceLayerCallbacksText.Contains('ParseScaleValue(_scaleType, "None")') -and
+        $interfaceLayerTestsText.Contains("GetUserNotesPinnedOverlayDispatcherRouteNamesForTesting") -and
+        $overlayTestsText.Contains("UserNotesPinnedOverlayRightEdgeUsesScreenMouseAndClamps") -and
+        $overlayTestsText.Contains("UserNotesPinnedOverlayScreenCoordinatesMatchFrozenRightSideSample") -and
+        $overlayTestsText.Contains("UserNotesPinnedOverlayInitialPlacementUsesScreenExtentUnderUiScale") -and
         $overlayTestsText.Contains("UserNotesPinnedOverlayScaledMouseHitsVisualControls")) {
-        Write-Pass "User notes pinned overlay keeps interface-coordinate hit-test and right-edge clamp coverage under UI scale."
+        Write-Pass "User notes pinned overlay keeps screen-coordinate draw, hit-test, initial placement, right-edge clamp, and high unscaled layer coverage under UI scale."
     }
     else {
-        Write-FailHealth "User notes pinned overlay must use interface overlay mouse coordinates, prefer OS screen-to-UI coordinates for scaled overlays, clamp by overlay extents, and keep scaled close/opacity/drag/right-edge hit-test coverage."
+        Write-FailHealth "User notes pinned overlay must use screen-space overlay mouse coordinates, prefer OS client coordinates for scaled overlays, clamp by the unscaled screen extent, use a dedicated None-scale high layer, and keep scaled close/opacity/drag/right-edge/frozen-sample hit-test coverage."
     }
 
     if ($diagnosticsText.Contains("DiagnosticActionRecorder.RecordCustomEvent") -and
@@ -2372,15 +2410,23 @@ function Test-UserNotesGovernance {
         $featureDocText.Contains("## 诊断字段") -and
         $featureDocText.Contains("Ui.Notes.Opacity") -and
         $featureDocText.Contains('同一次命令链路继续执行的 `Ui.Notes.Pin`') -and
+        $featureDocText.Contains('05-诊断测试文档审计护栏') -and
         $diagnosticRulesText.Contains('同一时间窗口先看 `Ui.Notes.Save` 是否成功') -and
         $diagnosticRulesText.Contains('`Ui.Notes.Wheel` 只表示正文滚轮实际改变 offset') -and
+        $diagnosticRulesText.Contains('overlayScreenWidth/Height') -and
+        $diagnosticRulesText.Contains('buttonConsumeMessage') -and
         $featureDocText.Contains("仍需用户实机确认") -and
         $legacyPlan06Text.Contains("## 覆盖矩阵") -and
-        $feedbackPlan06Text.Contains("## 覆盖矩阵")) {
-        Write-Pass "User notes docs and diagnostics describe real Ui.Notes action events without inventing runtime snapshot fields."
+        $feedbackPlan06Text.Contains("## 覆盖矩阵") -and
+        $systemPlan05Text.Contains("## 覆盖矩阵") -and
+        $systemPlan05Text.Contains("ScreenUnscaled") -and
+        $systemPlan05Text.Contains("视觉区域滚轮") -and
+        $systemPlan05Text.Contains("held-left") -and
+        $systemPlan05Text.Contains("居中长拖动 handle")) {
+        Write-Pass "User notes docs, diagnostics, and archived coverage matrix describe real Ui.Notes action events and pinned-overlay guardrails without inventing runtime snapshot fields."
     }
     else {
-        Write-FailHealth "User notes feature docs, diagnostics rules, and plan coverage matrix must describe actual Ui.Notes events, no runtime snapshot fields, and remaining real-machine checks."
+        Write-FailHealth "User notes feature docs, diagnostics rules, and plan coverage matrix must describe actual Ui.Notes events, no runtime snapshot fields, ScreenUnscaled coordinates, visual-surface wheel isolation, held-left drag capture, centered long handle, and remaining real-machine checks."
     }
 
     if ($programTestsText.Contains("user notes store missing index uses config notes directory") -and
@@ -2391,8 +2437,14 @@ function Test-UserNotesGovernance {
         $programTestsText.Contains("user notes pinned overlay transfers prefix press when Terraria coordinates miss note") -and
         $programTestsText.Contains("user notes pinned overlay transfers prefix press to player input drag and keeps held left") -and
         $programTestsText.Contains("user notes pinned overlay opacity defaults and clamps without wrap") -and
+        $programTestsText.Contains("user notes pinned overlay drag capture blocks non-left mouse and keeps held left") -and
         $programTestsText.Contains("user notes pinned overlay post player input wheel scrolls body") -and
+        $programTestsText.Contains("user notes pinned overlay visual surface wheel blocks hotbar without fake wheel") -and
         $programTestsText.Contains("user notes pinned overlay repeated toolbar clicks keep edges and wheel") -and
+        $programTestsText.Contains("user notes pinned overlay right edge uses screen mouse and clamps") -and
+        $programTestsText.Contains("user notes pinned overlay screen coordinates match frozen right side sample") -and
+        $programTestsText.Contains("user notes pinned overlay initial placement uses screen extent under UI scale") -and
+        $programTestsText.Contains("user notes pinned overlay toolbar handle is centered and separated from buttons") -and
         $programTestsText.Contains("user notes pinned overlay scroll drag opacity and close use pinned state") -and
         $storeTestsText.Contains("UserNotesSaveIndexFailureRollsBackBody") -and
         $uiTestsText.Contains("UserNotesNestedScrollConsumesOnlyScrollableBody") -and

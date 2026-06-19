@@ -1,12 +1,13 @@
 using System;
 using JueMingZ.UI;
+using JueMingZ.UI.Legacy;
 
 namespace JueMingZ.UI.Legacy.Framework
 {
     public static class LegacyUiLayout
     {
         public const int RowModeButtonHeight = 24;
-        public const int RowLabelTextHeight = 20;
+        public const int RowLabelTextHeight = 22;
 
         public static int RowModeButtonY(LegacyUiRect row)
         {
@@ -25,7 +26,7 @@ namespace JueMingZ.UI.Legacy.Framework
                 return 64;
             }
 
-            return Math.Max(64, Math.Min(180, UiTextRenderer.EstimateTextWidth(label, 0.78f) + 18));
+            return Math.Max(64, Math.Min(190, UiTextRenderer.EstimateTextWidth(label, LegacyUiMetrics.RowButtonTextScale) + 22));
         }
 
         public static int TotalModeButtonWidth(string[] labels, int gap)

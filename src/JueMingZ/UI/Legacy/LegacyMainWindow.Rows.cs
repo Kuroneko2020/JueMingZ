@@ -103,7 +103,7 @@ namespace JueMingZ.UI.Legacy
 
             var labelRight = configRect.Width > 0 ? configRect.X : x;
             var labelWidth = Math.Max(60, labelRight - row.X - 20);
-            UiTextRenderer.DrawAlignedTextClipped(spriteBatch, label, row.X + 10, row.Y, labelWidth, row.Height, UiTextHorizontalAlignment.Left, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 238, 226, 255, 0.86f);
+            UiTextRenderer.DrawAlignedTextClipped(spriteBatch, label, row.X + 10, row.Y, labelWidth, row.Height, UiTextHorizontalAlignment.Left, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 238, 226, 255, LegacyUiMetrics.RowLabelTextScale);
             if (configRect.Width > 0)
             {
                 var hit = configRect.Intersect(area.Viewport);
@@ -148,10 +148,10 @@ namespace JueMingZ.UI.Legacy
                 var isHovered = IsFrameElementHovered(elementId, elementRect, mouse);
                 LegacyUiTheme.DrawButtonClipped(spriteBatch, rect, isHovered, isHovered && mouse.LeftDown, selected, true, area.Viewport);
                 var contentRect = LegacyUiTheme.GetSelectedButtonContentRect(rect, selected, true);
-                UiTextRenderer.DrawCenteredTextClipped(spriteBatch, labels[index], rect.X + 3, contentRect.Y, rect.Width - 6, contentRect.Height, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, selected ? LegacyUiTheme.SelectedTextR : 230, selected ? LegacyUiTheme.SelectedTextG : 232, selected ? LegacyUiTheme.SelectedTextB : 224, 255, 0.78f);
+                UiTextRenderer.DrawCenteredTextClipped(spriteBatch, labels[index], rect.X + 3, contentRect.Y, rect.Width - 6, contentRect.Height, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, selected ? LegacyUiTheme.SelectedTextR : 230, selected ? LegacyUiTheme.SelectedTextG : 232, selected ? LegacyUiTheme.SelectedTextB : 224, 255, LegacyUiMetrics.RowButtonTextScale);
                 if (selected)
                 {
-                    LegacyUiTheme.DrawSelectedTextMarkersClipped(spriteBatch, new LegacyUiRect(rect.X + 3, contentRect.Y, rect.Width - 6, contentRect.Height), area.Viewport, labels[index], 0.78f);
+                    LegacyUiTheme.DrawSelectedTextMarkersClipped(spriteBatch, new LegacyUiRect(rect.X + 3, contentRect.Y, rect.Width - 6, contentRect.Height), area.Viewport, labels[index], LegacyUiMetrics.RowButtonTextScale);
                 }
 
                 var element = AddFrameElement(
@@ -194,7 +194,7 @@ namespace JueMingZ.UI.Legacy
                 return 64;
             }
 
-            return Math.Max(64, Math.Min(180, UiTextRenderer.EstimateTextWidth(label, 0.78f) + 18));
+            return Math.Max(64, Math.Min(190, UiTextRenderer.EstimateTextWidth(label, LegacyUiMetrics.RowButtonTextScale) + 22));
         }
 
     }

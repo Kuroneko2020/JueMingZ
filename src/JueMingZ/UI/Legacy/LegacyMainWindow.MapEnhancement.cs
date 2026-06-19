@@ -229,7 +229,7 @@ namespace JueMingZ.UI.Legacy
                 Kind = "button",
                 Bounds = rect,
                 Enabled = enabled,
-                TextScale = 0.70f,
+                TextScale = LegacyUiMetrics.SmallButtonTextScale,
                 TooltipLines = string.IsNullOrWhiteSpace(tooltip) ? null : new[] { tooltip }
             };
             var element = button.Draw(context);
@@ -247,7 +247,7 @@ namespace JueMingZ.UI.Legacy
                 Kind = "button",
                 Bounds = rect,
                 Selected = selected,
-                TextScale = 0.78f,
+                TextScale = LegacyUiMetrics.RowButtonTextScale,
                 TooltipLines = string.IsNullOrWhiteSpace(tooltip) ? null : new[] { tooltip }
             };
             var element = button.Draw(context);
@@ -285,7 +285,7 @@ namespace JueMingZ.UI.Legacy
                 238,
                 226,
                 255,
-                0.86f);
+                LegacyUiMetrics.RowLabelTextScale);
 
             LegacyUiTheme.DrawButtonClipped(spriteBatch, countRect, false, false, true, false, area.Viewport);
             UiTextRenderer.DrawCenteredTextClipped(
@@ -314,7 +314,7 @@ namespace JueMingZ.UI.Legacy
                 Kind = "button",
                 Bounds = detailsRect,
                 Selected = _mapDeathHistoryPopupOpen,
-                TextScale = 0.76f,
+                TextScale = LegacyUiMetrics.ButtonTextScale,
                 TooltipLines = null
             }.Draw(context);
 
@@ -378,7 +378,7 @@ namespace JueMingZ.UI.Legacy
                 238,
                 226,
                 255,
-                0.86f);
+                LegacyUiMetrics.RowLabelTextScale);
 
             LegacyUiTheme.DrawButtonClipped(spriteBatch, countRect, false, false, true, false, area.Viewport);
             UiTextRenderer.DrawCenteredTextClipped(
@@ -469,7 +469,7 @@ namespace JueMingZ.UI.Legacy
                 238,
                 226,
                 255,
-                0.86f);
+                LegacyUiMetrics.RowLabelTextScale);
 
             var hit = countRect.Intersect(area.Viewport);
             var elementRect = hit.Width > 0 && hit.Height > 0 ? hit : countRect;
@@ -482,7 +482,7 @@ namespace JueMingZ.UI.Legacy
                 Kind = "button",
                 Bounds = elementRect,
                 Selected = _mapRevealedAreaDetailsPopupOpen,
-                TextScale = 0.76f,
+                TextScale = LegacyUiMetrics.ButtonTextScale,
                 TooltipLines = BuildMapRevealedAreaRatioTooltipLines(exploration)
             }.Draw(context);
 
@@ -741,7 +741,7 @@ namespace JueMingZ.UI.Legacy
                 238,
                 226,
                 255,
-                0.86f);
+                LegacyUiMetrics.RowLabelTextScale);
 
             var layout = CalculateMapQuickAnnouncementLayout(row);
             var hovered = (LegacyUiElement)null;

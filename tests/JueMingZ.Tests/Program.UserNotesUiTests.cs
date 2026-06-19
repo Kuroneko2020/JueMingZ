@@ -4,6 +4,7 @@ using System.IO;
 using JueMingZ.Automation.Information.Notes;
 using JueMingZ.Compat;
 using JueMingZ.Input;
+using JueMingZ.UI;
 using JueMingZ.UI.Legacy;
 
 namespace JueMingZ.Tests
@@ -35,6 +36,15 @@ namespace JueMingZ.Tests
             if (!hasHotkeys)
             {
                 throw new InvalidOperationException("Expected the stable hotkeys page id to remain present.");
+            }
+
+            if (LegacyUiMetrics.TabTextScale < 0.96f ||
+                LegacyUiMetrics.ButtonTextScale < 0.88f ||
+                LegacyUiMetrics.SmallButtonTextScale < 0.80f ||
+                LegacyUiMetrics.TabButtonHeight < 34 ||
+                LegacyUiMetrics.ButtonHeight < 30)
+            {
+                throw new InvalidOperationException("Expected F5 menu tabs and shared buttons to keep the enlarged text metrics.");
             }
         }
 
@@ -113,13 +123,23 @@ namespace JueMingZ.Tests
                     throw new InvalidOperationException("Expected the note body text viewport to apply the shared inset on every side.");
                 }
 
-                if (UserNotesUiState.BodyTextScaleForTesting <= 0.58f ||
-                    UserNotesUiState.BodyLineHeightForTesting <= 18)
+                if (UserNotesUiState.TitleTextScaleForLayout < 0.86f ||
+                    UserNotesUiState.BodyTextScaleForTesting < 0.76f ||
+                    UserNotesUiState.BodyLineHeightForTesting < 24)
                 {
-                    throw new InvalidOperationException("Expected F5 note body text scale and line height to be enlarged together.");
+                    throw new InvalidOperationException("Expected F5 note title/body text scale and line height to be enlarged together.");
                 }
 
                 var lines = UserNotesUiState.BuildWrappedBodyLinesForTesting(longBody, textViewport.Width);
+                var continuousLines = UserNotesUiState.BuildWrappedBodyLinesForTesting(new string('W', 64), textViewport.Width);
+                for (var index = 0; index < continuousLines.Length; index++)
+                {
+                    if (UiTextRenderer.EstimateTextWidth(continuousLines[index], UserNotesUiState.BodyTextScaleForTesting) > textViewport.Width)
+                    {
+                        throw new InvalidOperationException("Expected enlarged F5 note body text to wrap continuous long runs within the text viewport.");
+                    }
+                }
+
                 var expectedContentHeight = UserNotesUiState.CalculateBodyTextContentHeightForTesting(lines.Length);
                 if (card.BodyContentHeight != expectedContentHeight)
                 {

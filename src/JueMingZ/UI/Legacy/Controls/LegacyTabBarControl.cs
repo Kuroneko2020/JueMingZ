@@ -1,4 +1,5 @@
 using JueMingZ.UI.Legacy.Framework;
+using JueMingZ.UI.Legacy;
 
 namespace JueMingZ.UI.Legacy.Controls
 {
@@ -32,7 +33,7 @@ namespace JueMingZ.UI.Legacy.Controls
                     Kind = "tab",
                     Bounds = rect,
                     Selected = tab.Id == SelectedPageId,
-                    TextScale = 0.86f
+                    TextScale = LegacyUiMetrics.TabTextScale
                 };
                 var element = button.Draw(context);
                 if (element != null && context.IsElementHovered(element.Id, rect))

@@ -32,8 +32,9 @@ namespace JueMingZ.UI
                 }
 
                 var rawState = DiagnosticMouseStateReader.Read();
+                var coordinateContext = ResolveCoordinateContext(rawState);
                 var mouse = ReadOverlayMouse(rawState);
-                var frame = BuildFrame(mouse, rawState);
+                var frame = BuildFrame(mouse, coordinateContext);
                 if (frame.Items.Count <= 0)
                 {
                     return true;
@@ -81,8 +82,9 @@ namespace JueMingZ.UI
                 }
 
                 var rawState = DiagnosticMouseStateReader.Read();
+                var coordinateContext = ResolveCoordinateContext(rawState);
                 var mouse = ReadOverlayMouse(rawState);
-                var frame = BuildFrame(mouse, rawState);
+                var frame = BuildFrame(mouse, coordinateContext);
                 if (ShouldLegacyWindowOwnMouse(mouse, frame) ||
                     !UserNotesPinnedOverlayState.ShouldSuppressHotbarScroll(frame, mouse.X, mouse.Y))
                 {
@@ -103,8 +105,8 @@ namespace JueMingZ.UI
                     false,
                     false,
                     scroll.EffectiveScrollDelta,
-                    SafeOverlayScreenWidth(rawState),
-                    SafeOverlayScreenHeight(rawState),
+                    coordinateContext.ScreenWidth,
+                    coordinateContext.ScreenHeight,
                     PersistPinnedState);
                 UiMouseCaptureService.CaptureForOperationWindow();
                 UiMouseCaptureService.ConsumeScrollForOperationWindow();
@@ -165,18 +167,24 @@ namespace JueMingZ.UI
 
         internal static UserNotesPinnedOverlayFrame BuildOverlayFrameForTesting(DiagnosticMouseState raw)
         {
+            var coordinateContext = ResolveCoordinateContext(raw);
             var mouse = ReadOverlayMouse(raw);
-            return BuildFrame(mouse, raw);
+            return BuildFrame(mouse, coordinateContext);
         }
 
         internal static int OverlayScreenWidthForTesting(DiagnosticMouseState raw)
         {
-            return SafeOverlayScreenWidth(raw);
+            return ResolveCoordinateContext(raw).ScreenWidth;
         }
 
         internal static int OverlayScreenHeightForTesting(DiagnosticMouseState raw)
         {
-            return SafeOverlayScreenHeight(raw);
+            return ResolveCoordinateContext(raw).ScreenHeight;
+        }
+
+        internal static string OverlayCoordinateModeForTesting(DiagnosticMouseState raw)
+        {
+            return ResolveCoordinateContext(raw).CoordinateMode;
         }
 
         internal static void UpdateInputGuardForTesting(string source, bool handleState, bool handleScroll, DiagnosticMouseState raw)
@@ -204,8 +212,9 @@ namespace JueMingZ.UI
                 }
 
                 var rawState = raw ?? DiagnosticMouseStateReader.Read();
+                var coordinateContext = ResolveCoordinateContext(rawState);
                 var mouse = handleState ? ReadOverlayMouseForInput(rawState) : ReadOverlayMouse(rawState);
-                var frame = BuildFrame(mouse, rawState);
+                var frame = BuildFrame(mouse, coordinateContext);
                 var hitDiagnostics = UserNotesPinnedOverlayState.BuildHitDiagnostics(frame, mouse.X, mouse.Y);
                 var legacyWindowOwnsMouse = ShouldLegacyWindowOwnMouse(mouse, frame);
                 var scroll = TerrariaUiMouseCompat.ReadScrollSnapshot(mouse.ScrollDelta);
@@ -235,19 +244,26 @@ namespace JueMingZ.UI
 
                 if (handleState)
                 {
+                    var prefixPendingToolbarPressHit = TryResolvePrefixPendingToolbarPressCandidate(rawState, mouse, frame, hitDiagnostics, source);
+                    var leftPressedForInput = prefixPendingToolbarPressHit == null ? mouse.LeftPressed : false;
                     var interaction = UserNotesPinnedOverlayState.HandleInput(
                         frame,
                         mouse.X,
                         mouse.Y,
                         mouse.LeftDown,
-                        mouse.LeftPressed,
+                        leftPressedForInput,
                         mouse.LeftReleased,
                         rawScrollDelta,
-                        SafeOverlayScreenWidth(rawState),
-                        SafeOverlayScreenHeight(rawState),
+                        coordinateContext.ScreenWidth,
+                        coordinateContext.ScreenHeight,
                         PersistPinnedState);
-                    UserNotesPinnedOverlayHitDiagnostics pendingToolbarPressHit;
-                    var pendingToolbarPressCandidate = TryResolvePendingToolbarPressCandidate(source, rawState, mouse, frame, hitDiagnostics, interaction, out pendingToolbarPressHit);
+                    var pendingToolbarPressHit = prefixPendingToolbarPressHit;
+                    var pendingToolbarPressCandidate = pendingToolbarPressHit != null;
+                    if (!pendingToolbarPressCandidate)
+                    {
+                        pendingToolbarPressCandidate = TryResolvePendingToolbarPressCandidate(source, rawState, coordinateContext, mouse, frame, hitDiagnostics, interaction, out pendingToolbarPressHit);
+                    }
+
                     var preserveLeftHold = ShouldPreserveLeftHoldForDrag(frame, interaction) ||
                                            IsPendingDragPress(pendingToolbarPressHit);
                     var suppression = ApplyInputSuppression(frame, mouse, interaction, rawScrollDelta, preserveLeftHold, pendingToolbarPressCandidate);
@@ -347,13 +363,10 @@ namespace JueMingZ.UI
                 diagnostics.MouseCaptureSucceeded = preserveLeftHold
                     ? UiMouseCaptureService.CaptureForOperationWindowPreserveMouseButtons()
                     : UiMouseCaptureService.CaptureForOperationWindow();
-                if (!preserveLeftHold)
-                {
-                    diagnostics.ButtonConsumeRequested = true;
-                    string buttonConsumeMessage;
-                    diagnostics.ButtonConsumeSucceeded = ConsumeMouseButtonsForUi(out buttonConsumeMessage);
-                    diagnostics.ButtonConsumeMessage = buttonConsumeMessage;
-                }
+                diagnostics.ButtonConsumeRequested = true;
+                string buttonConsumeMessage;
+                diagnostics.ButtonConsumeSucceeded = ConsumeMouseButtonsForUi(!preserveLeftHold, out buttonConsumeMessage);
+                diagnostics.ButtonConsumeMessage = buttonConsumeMessage;
             }
 
             if (interaction.ScrollConsumed || (rawScrollDelta != 0 && UserNotesPinnedOverlayState.ShouldSuppressHotbarScroll(frame, mouse.X, mouse.Y)))
@@ -379,12 +392,23 @@ namespace JueMingZ.UI
 
         private static bool ConsumeMouseButtonsForUi(out string message)
         {
+            return ConsumeMouseButtonsForUi(true, out message);
+        }
+
+        private static bool ConsumeMouseButtonsForUi(bool includeLeftButton, out string message)
+        {
             var consumedAny = false;
             message = string.Empty;
             for (var index = 0; index < MouseTriggerTokens.Length; index++)
             {
+                var token = MouseTriggerTokens[index];
+                if (!includeLeftButton && string.Equals(token, "MouseLeft", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
                 string currentMessage;
-                var consumed = TerrariaUiMouseCompat.TryConsumeMouseTriggerInputOnceForUi(MouseTriggerTokens[index], out currentMessage);
+                var consumed = TerrariaUiMouseCompat.TryConsumeMouseTriggerInputOnceForUi(token, out currentMessage);
                 consumedAny |= consumed;
                 if (!string.IsNullOrWhiteSpace(currentMessage))
                 {
@@ -524,18 +548,24 @@ namespace JueMingZ.UI
 
         private static UserNotesPinnedOverlayFrame BuildFrame(LegacyMouseSnapshot mouse)
         {
-            return BuildFrame(mouse, null);
+            return BuildFrame(mouse, ResolveCoordinateContext(null));
         }
 
-        private static UserNotesPinnedOverlayFrame BuildFrame(LegacyMouseSnapshot mouse, DiagnosticMouseState raw)
+        private static UserNotesPinnedOverlayFrame BuildFrame(LegacyMouseSnapshot mouse, UserNotesPinnedOverlayCoordinateContext coordinateContext)
         {
             var snapshot = UserNotesUiState.Snapshot;
             return UserNotesPinnedOverlayState.BuildFrame(
                 snapshot,
-                SafeOverlayScreenWidth(raw),
-                SafeOverlayScreenHeight(raw),
+                coordinateContext.ScreenWidth,
+                coordinateContext.ScreenHeight,
                 mouse == null ? -1 : mouse.X,
-                mouse == null ? -1 : mouse.Y);
+                mouse == null ? -1 : mouse.Y,
+                coordinateContext.CoordinateMode);
+        }
+
+        private static UserNotesPinnedOverlayCoordinateContext ResolveCoordinateContext(DiagnosticMouseState raw)
+        {
+            return UserNotesPinnedOverlayCoordinates.ResolveScreenContext(raw);
         }
 
         private static bool ShouldUseOverlay()
@@ -550,11 +580,17 @@ namespace JueMingZ.UI
 
         private static bool ShouldLegacyWindowOwnMouse(LegacyMouseSnapshot mouse, UserNotesPinnedOverlayFrame frame)
         {
-            return mouse != null &&
-                   frame != null &&
-                   !frame.Dragging &&
-                   LegacyMainUiState.Visible &&
-                   LegacyUiInput.IsMouseInWindow(mouse);
+            if (mouse == null || frame == null || !LegacyMainUiState.Visible)
+            {
+                return false;
+            }
+
+            if (frame.Dragging || UserNotesPinnedOverlayState.ShouldCaptureMouse(frame, mouse.X, mouse.Y))
+            {
+                return false;
+            }
+
+            return LegacyUiInput.IsMouseInWindow(mouse);
         }
 
         private static LegacyMouseSnapshot ReadOverlayMouse()
@@ -655,6 +691,7 @@ namespace JueMingZ.UI
         private static bool TryResolvePendingToolbarPressCandidate(
             string source,
             DiagnosticMouseState raw,
+            UserNotesPinnedOverlayCoordinateContext coordinateContext,
             LegacyMouseSnapshot mouse,
             UserNotesPinnedOverlayFrame frame,
             UserNotesPinnedOverlayHitDiagnostics hit,
@@ -678,7 +715,7 @@ namespace JueMingZ.UI
 
             int osX;
             int osY;
-            if (!TryResolveOsClientOverlayPoint(raw, out osX, out osY))
+            if (!TryResolveOsClientOverlayPoint(raw, coordinateContext, out osX, out osY))
             {
                 return false;
             }
@@ -701,6 +738,41 @@ namespace JueMingZ.UI
             }
 
             return false;
+        }
+
+        private static UserNotesPinnedOverlayHitDiagnostics TryResolvePrefixPendingToolbarPressCandidate(
+            DiagnosticMouseState raw,
+            LegacyMouseSnapshot mouse,
+            UserNotesPinnedOverlayFrame frame,
+            UserNotesPinnedOverlayHitDiagnostics hit,
+            string source)
+        {
+            if (!IsPrefixSource(source) ||
+                raw == null ||
+                mouse == null ||
+                !mouse.LeftDown ||
+                !mouse.LeftPressed ||
+                mouse.LeftReleased ||
+                hit == null ||
+                !IsToolbarActionControl(hit.ControlId) ||
+                !raw.TerrariaReadAvailable ||
+                raw.TerrariaMouseX < 0 ||
+                raw.TerrariaMouseY < 0)
+            {
+                return null;
+            }
+
+            var terrariaHit = UserNotesPinnedOverlayState.BuildHitDiagnostics(frame, raw.TerrariaMouseX, raw.TerrariaMouseY);
+            if (string.Equals(terrariaHit.HitNoteId ?? string.Empty, hit.HitNoteId ?? string.Empty, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(terrariaHit.ControlId ?? string.Empty, hit.ControlId ?? string.Empty, StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            // Prefix can run before Terraria has reconciled its mouse fields. Defer
+            // toolbar actions when raw Terraria coordinates disagree with the visual
+            // OS-client hit so the postfix guard replays the same press edge once.
+            return hit;
         }
 
         private static void ClearPendingToolbarPressIfReleased(LegacyMouseSnapshot mouse)
@@ -745,83 +817,13 @@ namespace JueMingZ.UI
                    string.Equals(controlId, "drag", StringComparison.Ordinal);
         }
 
-        private static bool TryResolveOsClientOverlayPoint(DiagnosticMouseState raw, out int x, out int y)
+        private static bool TryResolveOsClientOverlayPoint(
+            DiagnosticMouseState raw,
+            UserNotesPinnedOverlayCoordinateContext coordinateContext,
+            out int x,
+            out int y)
         {
-            x = -1;
-            y = -1;
-            if (raw == null || !raw.OsReadAvailable || raw.OsClientMouseX < 0 || raw.OsClientMouseY < 0)
-            {
-                return false;
-            }
-
-            double scaleX;
-            double scaleY;
-            var scaleActive = TryResolveUiScaleTransform(raw, out scaleX, out scaleY);
-            x = scaleActive ? ScreenToUiCoordinate(raw.OsClientMouseX, scaleX, raw.UiTranslateX) : raw.OsClientMouseX;
-            y = scaleActive ? ScreenToUiCoordinate(raw.OsClientMouseY, scaleY, raw.UiTranslateY) : raw.OsClientMouseY;
-            return true;
-        }
-
-        private static int SafeOverlayScreenWidth(DiagnosticMouseState raw)
-        {
-            return ResolveOverlayExtent(SafeScreenWidth(), raw, true);
-        }
-
-        private static int SafeOverlayScreenHeight(DiagnosticMouseState raw)
-        {
-            return ResolveOverlayExtent(SafeScreenHeight(), raw, false);
-        }
-
-        private static int ResolveOverlayExtent(int screenExtent, DiagnosticMouseState raw, bool horizontal)
-        {
-            screenExtent = Math.Max(1, screenExtent);
-            double scaleX;
-            double scaleY;
-            if (!TryResolveUiScaleTransform(raw, out scaleX, out scaleY))
-            {
-                return screenExtent;
-            }
-
-            var scale = horizontal ? scaleX : scaleY;
-            var translate = raw == null ? 0d : (horizontal ? raw.UiTranslateX : raw.UiTranslateY);
-            return Math.Max(1, ScreenToUiCoordinate(screenExtent, scale, translate));
-        }
-
-        private static bool TryResolveUiScaleTransform(DiagnosticMouseState raw, out double scaleX, out double scaleY)
-        {
-            scaleX = raw != null && raw.UiScaleX > 0.01d ? raw.UiScaleX : raw == null ? 1d : raw.UiScale;
-            scaleY = raw != null && raw.UiScaleY > 0.01d ? raw.UiScaleY : raw == null ? 1d : raw.UiScale;
-            if (scaleX <= 0.01d)
-            {
-                scaleX = 1d;
-            }
-
-            if (scaleY <= 0.01d)
-            {
-                scaleY = 1d;
-            }
-
-            return raw != null &&
-                   raw.UiScaleAvailable &&
-                   (Math.Abs(scaleX - 1d) > 0.01d ||
-                    Math.Abs(scaleY - 1d) > 0.01d ||
-                    Math.Abs(raw.UiTranslateX) > 0.01d ||
-                    Math.Abs(raw.UiTranslateY) > 0.01d);
-        }
-
-        private static int ScreenToUiCoordinate(int value, double scale, double translate)
-        {
-            if (value < 0)
-            {
-                return value;
-            }
-
-            if (scale <= 0.01d)
-            {
-                return value;
-            }
-
-            return (int)Math.Round((value - translate) / scale);
+            return coordinateContext.TryResolveOsClientPoint(raw, out x, out y);
         }
 
         private static void DrawFrame(object spriteBatch, UserNotesPinnedOverlayFrame frame)
@@ -893,7 +895,9 @@ namespace JueMingZ.UI
         {
             var opacity = Clamp(item.OpacityPercent, 0, 100);
             DrawOpacitySurfaceRoundedRect(spriteBatch, item.ToolbarRect.X, item.ToolbarRect.Y, item.ToolbarRect.Width, item.ToolbarRect.Height, 5, 22, 28, 38, 178, opacity);
-            UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, item.DragHandleRect.X, item.DragHandleRect.Y + 3, item.DragHandleRect.Width, 3, 2, 226, 232, 220, ForegroundAlpha(245));
+            var handleVisualHeight = 4;
+            var handleVisualY = item.DragHandleRect.Y + Math.Max(0, (item.DragHandleRect.Height - handleVisualHeight) / 2);
+            UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, item.DragHandleRect.X + 4, handleVisualY, Math.Max(1, item.DragHandleRect.Width - 8), handleVisualHeight, 2, 226, 232, 220, ForegroundAlpha(245));
             DrawControlButton(spriteBatch, item.DecreaseOpacityRect, "<", opacity);
             DrawControlButton(spriteBatch, item.IncreaseOpacityRect, ">", opacity);
             DrawControlButton(spriteBatch, item.CloseRect, "x", opacity);
@@ -903,7 +907,7 @@ namespace JueMingZ.UI
         {
             DrawOpacitySurfaceRoundedRect(spriteBatch, rect.X, rect.Y, rect.Width, rect.Height, 4, 96, 112, 146, 218, opacityPercent);
             DrawOpacitySurfaceRoundedRect(spriteBatch, rect.X + 1, rect.Y + 1, rect.Width - 2, rect.Height - 2, 3, 32, 38, 52, 220, opacityPercent);
-            UiTextRenderer.DrawCenteredText(spriteBatch, label, rect.X, rect.Y - 1, rect.Width, rect.Height, 244, 238, 212, ForegroundAlpha(255), 0.58f);
+            UiTextRenderer.DrawCenteredText(spriteBatch, label, rect.X, rect.Y - 1, rect.Width, rect.Height, 244, 238, 212, ForegroundAlpha(255), 0.68f);
         }
 
         private static bool DrawOpacitySurfaceRoundedRect(
@@ -955,30 +959,6 @@ namespace JueMingZ.UI
                    "\"featureId\":\"information.user_notes\"," +
                    "\"pinnedCount\":" + pinned.ToString(CultureInfo.InvariantCulture) +
                    "}";
-        }
-
-        private static int SafeScreenWidth()
-        {
-            try
-            {
-                return TerrariaMainCompat.ScreenWidth;
-            }
-            catch
-            {
-                return 1280;
-            }
-        }
-
-        private static int SafeScreenHeight()
-        {
-            try
-            {
-                return TerrariaMainCompat.ScreenHeight;
-            }
-            catch
-            {
-                return 720;
-            }
         }
 
         private static int Clamp(int value, int min, int max)

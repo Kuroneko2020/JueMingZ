@@ -17,21 +17,22 @@ namespace JueMingZ.UI.Legacy
         public const string EditOutsideElementId = "notes:edit-outside";
         public const string EmptyBodyPromptText = "双击进入编辑";
 
-        private const int AddButtonHeight = 34;
+        private const int AddButtonHeight = 36;
         private const int CardGap = 8;
         private const int CardPadding = 8;
-        private const int CardHeaderHeight = 28;
+        private const int CardHeaderHeight = 30;
         private const int HeaderBodyGap = 5;
         private const int BodyTextInset = 10;
-        private const int BodyLineHeight = 21;
+        private const int TitleLineHeight = 24;
+        private const int BodyLineHeight = 24;
         private const int BodyMinTextHeight = BodyLineHeight * 2;
         private const int BodyMinHeight = BodyMinTextHeight + BodyTextInset * 2;
         private const int SingleColumnThreshold = 360;
         private const int TitleMaxLength = 80;
         private const string EditModeTitle = "title";
         private const string EditModeBody = "body";
-        private const float TitleTextScale = 0.76f;
-        private const float BodyTextScale = 0.66f;
+        private const float TitleTextScale = 0.86f;
+        private const float BodyTextScale = 0.76f;
         private const float PinnedOverlayBodyWrapTextScale = UserNotesPinnedOverlayState.BodyTextScale;
 
         private static readonly object SyncRoot = new object();
@@ -125,12 +126,13 @@ namespace JueMingZ.UI.Legacy
             pinnedState.Pinned = true;
             if (current == null || current.PinnedState == null || !current.PinnedState.Pinned || pinnedState.Width <= 0f || pinnedState.Height <= 0f)
             {
+                var overlayContext = UserNotesPinnedOverlayCoordinates.ResolveCurrentScreenContext();
                 pinnedState = UserNotesPinnedOverlayState.BuildInitialPinnedState(
                     Snapshot,
                     normalizedId,
                     LegacyMainUiState.WindowRect,
-                    SafeScreenWidth(),
-                    SafeScreenHeight());
+                    overlayContext.ScreenWidth,
+                    overlayContext.ScreenHeight);
             }
 
             if (pinnedState.Width <= 0f)
@@ -776,9 +778,24 @@ namespace JueMingZ.UI.Legacy
             get { return BodyLineHeight; }
         }
 
+        internal static int TitleLineHeightForLayout
+        {
+            get { return TitleLineHeight; }
+        }
+
+        internal static float TitleTextScaleForLayout
+        {
+            get { return TitleTextScale; }
+        }
+
         internal static float BodyTextScaleForLayout
         {
             get { return BodyTextScale; }
+        }
+
+        internal static int AddButtonHeightForLayout
+        {
+            get { return AddButtonHeight; }
         }
 
         internal static int BodyLineHeightForTesting
@@ -1385,30 +1402,6 @@ namespace JueMingZ.UI.Legacy
         private static string BuildEditorInputId(string noteId, string mode)
         {
             return "notes:editor:" + mode + ":" + noteId;
-        }
-
-        private static int SafeScreenWidth()
-        {
-            try
-            {
-                return TerrariaMainCompat.ScreenWidth;
-            }
-            catch
-            {
-                return 1280;
-            }
-        }
-
-        private static int SafeScreenHeight()
-        {
-            try
-            {
-                return TerrariaMainCompat.ScreenHeight;
-            }
-            catch
-            {
-                return 720;
-            }
         }
 
         private static string[] ToTextArray(List<UserNotesTextLine> lines)

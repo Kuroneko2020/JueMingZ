@@ -152,7 +152,7 @@ namespace JueMingZ.Tests
                 "game overlay fallback dispatcher routes when low information layer is missing");
         }
 
-        private static void InformationStatusPanelRoutesUnderVanillaUiAndLegacyMainWindowStaysAbove()
+        private static void InformationStatusPanelRoutesUnderVanillaUiAndPinnedOverlayStaysAboveLegacyMainWindow()
         {
             AssertStringArrayEquals(
                 InterfaceLayerHookCallbacks.GetInformationStatusPanelUnderVanillaUiDispatcherRouteNamesForTesting(),
@@ -166,7 +166,6 @@ namespace JueMingZ.Tests
                 InterfaceLayerHookCallbacks.GetUiOverlayDispatcherRouteNamesForTesting(true),
                 new[]
                 {
-                    "UserNotesPinnedOverlay.DrawInterfaceLayer",
                     "LegacyMainWindow.DrawInterfaceLayer",
                     "MapCustomMarkerStylePickerOverlay.DrawInterfaceLayer"
                 },
@@ -177,11 +176,23 @@ namespace JueMingZ.Tests
                 new[]
                 {
                     "InformationStatusPanelOverlay.DrawInterfaceLayer",
-                    "UserNotesPinnedOverlay.DrawInterfaceLayer",
                     "LegacyMainWindow.DrawInterfaceLayer",
                     "MapCustomMarkerStylePickerOverlay.DrawInterfaceLayer"
                 },
                 "UI overlay fallback dispatcher routes when low status panel layer is missing");
+
+            AssertStringArrayEquals(
+                InterfaceLayerHookCallbacks.GetUserNotesPinnedOverlayDispatcherRouteNamesForTesting(),
+                new[]
+                {
+                    "UserNotesPinnedOverlay.DrawInterfaceLayer"
+                },
+                "user notes pinned overlay high dispatcher routes");
+
+            if (!string.Equals(InterfaceLayerHookCallbacks.GetUserNotesPinnedOverlayScaleTypeNameForTesting(), "None", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected pinned overlay dispatcher to use unscaled screen coordinates.");
+            }
         }
 
         private static void AssertIntEquals(int actual, int expected, string label)

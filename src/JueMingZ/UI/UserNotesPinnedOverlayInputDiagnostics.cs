@@ -181,6 +181,9 @@ namespace JueMingZ.UI
                    "\"noteId\":\"" + EscapeJson(hit.HitNoteId) + "\"," +
                    "\"mouseX\":" + IntRaw(hit.MouseX) + "," +
                    "\"mouseY\":" + IntRaw(hit.MouseY) + "," +
+                   "\"overlayScreenWidth\":" + IntRaw(hit.OverlayScreenWidth) + "," +
+                   "\"overlayScreenHeight\":" + IntRaw(hit.OverlayScreenHeight) + "," +
+                   "\"coordinateMode\":\"" + EscapeJson(hit.CoordinateMode) + "\"," +
                    "\"mouseInside\":" + BoolRaw(hit.MouseInside) + "," +
                    "\"controlId\":\"" + EscapeJson(hit.ControlId) + "\"," +
                    "\"bodyHit\":" + BoolRaw(hit.BodyHit) + "," +

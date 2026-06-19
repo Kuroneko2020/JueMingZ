@@ -16,7 +16,7 @@ namespace JueMingZ.UI.Legacy
         public const int DragRecoverableVisibleWidth = 96;
         public const int DragRecoverableVisibleHeight = TitleHeight;
         public const int TabBlockYOffset = 4;
-        public const int TabButtonHeight = 31;
+        public const int TabButtonHeight = 34;
         public const int TabButtonGap = 4;
         public const int TabRowGap = 5;
         public const int ContentGap = 8;
@@ -29,8 +29,15 @@ namespace JueMingZ.UI.Legacy
         public const int ScrollbarWidth = 10;
         public const int ResizeGripSize = 0;
         public const int ContentPadding = 8;
-        public const int ButtonHeight = 28;
+        public const int ButtonHeight = 30;
         public const int SliderHeight = 28;
-        public const int SectionHeaderHeight = 24;
+        public const int SectionHeaderHeight = 26;
+        public const float ButtonTextScale = 0.88f;
+        public const float SmallButtonTextScale = 0.80f;
+        public const float RowButtonTextScale = 0.88f;
+        public const float RowLabelTextScale = 0.96f;
+        public const float TabTextScale = 0.96f;
+        public const float TooltipTextScale = 0.80f;
+        public const float SectionHeaderTextScale = 0.98f;
     }
 }

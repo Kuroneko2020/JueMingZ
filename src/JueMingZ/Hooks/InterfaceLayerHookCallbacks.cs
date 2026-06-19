@@ -20,6 +20,7 @@ namespace JueMingZ.Hooks
         private const string InformationStatusPanelUnderVanillaUiDispatcherLayerName = "JueMing-Z: Information Status Panel Under Vanilla UI Dispatcher";
         private const string GameOverlayDispatcherLayerName = "JueMing-Z: Game Overlay Dispatcher";
         private const string UiOverlayDispatcherLayerName = "JueMing-Z: UI Overlay Dispatcher";
+        private const string UserNotesPinnedOverlayDispatcherLayerName = "JueMing-Z: User Notes Pinned Overlay Dispatcher";
         private const string LegacyFinalMouseTextGuardLayerName = "JueMing-Z: Legacy Final MouseText Guard";
 
         private static readonly object ReflectionCacheSyncRoot = new object();
@@ -59,7 +60,6 @@ namespace JueMingZ.Hooks
 
         private static readonly Func<bool>[] UiOverlayDispatcherDrawers =
         {
-            UserNotesPinnedOverlay.DrawInterfaceLayer,
             LegacyMainWindow.DrawInterfaceLayer,
             // The map marker style picker uses screen/UI coordinates; keeping it
             // in the UI-scale dispatcher prevents fullscreen map clicks from
@@ -70,9 +70,13 @@ namespace JueMingZ.Hooks
         private static readonly Func<bool>[] UiOverlayFallbackDispatcherDrawers =
         {
             InformationStatusPanelOverlay.DrawInterfaceLayer,
-            UserNotesPinnedOverlay.DrawInterfaceLayer,
             LegacyMainWindow.DrawInterfaceLayer,
             MapCustomMarkerStylePickerOverlay.DrawInterfaceLayer
+        };
+
+        private static readonly Func<bool>[] UserNotesPinnedOverlayDispatcherDrawers =
+        {
+            UserNotesPinnedOverlay.DrawInterfaceLayer
         };
 
         private static int _firstLegacyInputGuardInsertLogged;
@@ -80,6 +84,7 @@ namespace JueMingZ.Hooks
         private static int _firstInformationStatusPanelUnderVanillaUiDispatcherInsertLogged;
         private static int _firstGameOverlayDispatcherInsertLogged;
         private static int _firstUiOverlayDispatcherInsertLogged;
+        private static int _firstUserNotesPinnedOverlayDispatcherInsertLogged;
         private static int _firstLegacyFinalMouseTextGuardInsertLogged;
         private static int _informationWorldUnderVanillaUiDispatcherActive;
         private static int _informationStatusPanelUnderVanillaUiDispatcherActive;
@@ -91,6 +96,7 @@ namespace JueMingZ.Hooks
         private static ConstructorInfo _legacyLayerConstructor;
         private static object _uiScaleValue;
         private static object _gameScaleValue;
+        private static object _noneScaleValue;
 
         private static Type _layerListOwnerType;
         private static FieldInfo _layerListField;
@@ -212,6 +218,16 @@ namespace JueMingZ.Hooks
                 "UI overlay dispatcher interface layer inserted.",
                 -1);
 
+            InsertLayerIfMissing(
+                layers,
+                layerState,
+                UserNotesPinnedOverlayDispatcherLayerName,
+                typeof(InterfaceLayerHookCallbacks).GetMethod("DrawUserNotesPinnedOverlayDispatcherLayer", BindingFlags.Public | BindingFlags.Static),
+                _noneScaleValue,
+                ref _firstUserNotesPinnedOverlayDispatcherInsertLogged,
+                "User notes pinned overlay dispatcher interface layer inserted.",
+                -1);
+
             // This guard is intentionally late: vanilla Mouse Over has already
             // populated pending MouseText/NPC hover caches, but final UI text is
             // still ahead of us.
@@ -247,6 +263,12 @@ namespace JueMingZ.Hooks
         {
             UiInputFrameClock.BeginDrawFrame("UiOverlayDispatcher");
             return DrawDispatcher(SelectUiOverlayDispatcherDrawers());
+        }
+
+        public static bool DrawUserNotesPinnedOverlayDispatcherLayer()
+        {
+            UiInputFrameClock.BeginDrawFrame("UserNotesPinnedOverlayDispatcher");
+            return DrawDispatcher(UserNotesPinnedOverlayDispatcherDrawers);
         }
 
         private static Func<bool>[] SelectGameOverlayDispatcherDrawers()
@@ -420,7 +442,8 @@ namespace JueMingZ.Hooks
                 _drawDelegateType != null &&
                 _legacyLayerConstructor != null &&
                 _uiScaleValue != null &&
-                _gameScaleValue != null)
+                _gameScaleValue != null &&
+                _noneScaleValue != null)
             {
                 return true;
             }
@@ -473,6 +496,11 @@ namespace JueMingZ.Hooks
                 {
                     _gameScaleValue = ParseScaleValue(_scaleType, "Game");
                 }
+
+                if (_noneScaleValue == null && _scaleType != null)
+                {
+                    _noneScaleValue = ParseScaleValue(_scaleType, "None");
+                }
             }
 
             return _gameInterfaceLayerType != null &&
@@ -481,7 +509,8 @@ namespace JueMingZ.Hooks
                    _drawDelegateType != null &&
                    _legacyLayerConstructor != null &&
                    _uiScaleValue != null &&
-                   _gameScaleValue != null;
+                   _gameScaleValue != null &&
+                   _noneScaleValue != null;
         }
 
         private static string GetLayerName(object layer)
@@ -640,6 +669,16 @@ namespace JueMingZ.Hooks
                 informationStatusPanelUnderVanillaUiDispatcherActive
                     ? UiOverlayDispatcherDrawers
                     : UiOverlayFallbackDispatcherDrawers);
+        }
+
+        internal static string[] GetUserNotesPinnedOverlayDispatcherRouteNamesForTesting()
+        {
+            return GetDispatcherRouteNamesForTesting(UserNotesPinnedOverlayDispatcherDrawers);
+        }
+
+        internal static string GetUserNotesPinnedOverlayScaleTypeNameForTesting()
+        {
+            return "None";
         }
 
         private static string[] GetDispatcherRouteNamesForTesting(Func<bool>[] drawers)

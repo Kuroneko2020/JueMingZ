@@ -1,4 +1,5 @@
 using System;
+using JueMingZ.UI.Legacy;
 using JueMingZ.UI.Legacy.Framework;
 
 namespace JueMingZ.UI.Legacy.Controls
@@ -54,7 +55,7 @@ namespace JueMingZ.UI.Legacy.Controls
                     Kind = "button",
                     Bounds = rect,
                     Selected = selected,
-                    TextScale = 0.78f,
+                    TextScale = LegacyUiMetrics.RowButtonTextScale,
                     TooltipLines = ButtonTooltips != null && index < ButtonTooltips.Length && !string.IsNullOrWhiteSpace(ButtonTooltips[index])
                         ? new[] { ButtonTooltips[index] }
                         : null

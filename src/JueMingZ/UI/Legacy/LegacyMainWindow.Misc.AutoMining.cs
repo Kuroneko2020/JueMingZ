@@ -26,7 +26,7 @@ namespace JueMingZ.UI.Legacy
                 : (string.IsNullOrWhiteSpace(hotkey) ? "双击采集按键" : hotkey);
 
             LegacyUiTheme.DrawRowClipped(spriteBatch, row, area.Viewport);
-            UiTextRenderer.DrawAlignedTextClipped(spriteBatch, "自动挖矿", row.X + 10, row.Y, 92, row.Height, UiTextHorizontalAlignment.Left, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 238, 226, 255, 0.86f);
+            UiTextRenderer.DrawAlignedTextClipped(spriteBatch, "自动挖矿", row.X + 10, row.Y, 92, row.Height, UiTextHorizontalAlignment.Left, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 238, 226, 255, LegacyUiMetrics.RowLabelTextScale);
 
             var gap = 6;
             var buttonY = RowModeButtonY(row);
@@ -98,10 +98,10 @@ namespace JueMingZ.UI.Legacy
             var hovered = IsFrameElementHovered(elementId, elementRect, mouse);
             LegacyUiTheme.DrawButtonClipped(spriteBatch, rect, hovered, hovered && mouse.LeftDown, selected, true, clip);
             var contentRect = LegacyUiTheme.GetSelectedButtonContentRect(rect, selected, true);
-            UiTextRenderer.DrawCenteredTextClipped(spriteBatch, text, rect.X + 3, contentRect.Y, rect.Width - 6, contentRect.Height, clip.X, clip.Y, clip.Width, clip.Height, selected ? LegacyUiTheme.SelectedTextR : 230, selected ? LegacyUiTheme.SelectedTextG : 232, selected ? LegacyUiTheme.SelectedTextB : 224, 255, 0.78f);
+            UiTextRenderer.DrawCenteredTextClipped(spriteBatch, text, rect.X + 3, contentRect.Y, rect.Width - 6, contentRect.Height, clip.X, clip.Y, clip.Width, clip.Height, selected ? LegacyUiTheme.SelectedTextR : 230, selected ? LegacyUiTheme.SelectedTextG : 232, selected ? LegacyUiTheme.SelectedTextB : 224, 255, LegacyUiMetrics.RowButtonTextScale);
             if (selected)
             {
-                LegacyUiTheme.DrawSelectedTextMarkersClipped(spriteBatch, new LegacyUiRect(rect.X + 3, contentRect.Y, rect.Width - 6, contentRect.Height), clip, text, 0.78f);
+                LegacyUiTheme.DrawSelectedTextMarkersClipped(spriteBatch, new LegacyUiRect(rect.X + 3, contentRect.Y, rect.Width - 6, contentRect.Height), clip, text, LegacyUiMetrics.RowButtonTextScale);
             }
 
             var element = AddFrameElement(elements, elementId, "自动挖矿:" + text, "button", elementRect, selected: selected, tooltipLines: string.IsNullOrWhiteSpace(tooltip) ? null : new[] { tooltip });

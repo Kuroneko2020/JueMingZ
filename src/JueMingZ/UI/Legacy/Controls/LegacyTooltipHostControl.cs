@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using JueMingZ.UI;
+using JueMingZ.UI.Legacy;
 using JueMingZ.UI.Legacy.Framework;
 
 namespace JueMingZ.UI.Legacy.Controls
@@ -14,7 +15,7 @@ namespace JueMingZ.UI.Legacy.Controls
                 return;
             }
 
-            const float scale = 0.70f;
+            const float scale = LegacyUiMetrics.TooltipTextScale;
             var maxTextWidth = Math.Max(140, Math.Min(500, window.Width - 72));
             var wrapped = WrapTooltipLines(model.Lines, maxTextWidth, scale);
             if (wrapped.Count <= 0)

@@ -118,7 +118,7 @@ namespace JueMingZ.UI.Legacy
         private const int VkAlt = 0x12;
         private const string FishingQuickRenameTextInputId = "fishing-quick-rename:name";
         private const string MiscQuickReforgeTextInputId = "misc-quick-reforge:prefix";
-        private const int RowLabelTextHeight = 20;
+        private const int RowLabelTextHeight = 22;
         private static readonly int[] QuickItemCaptureAdditionalKeys =
         {
             0x14,

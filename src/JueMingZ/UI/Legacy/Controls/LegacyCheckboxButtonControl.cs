@@ -1,4 +1,5 @@
 using JueMingZ.UI;
+using JueMingZ.UI.Legacy;
 using JueMingZ.UI.Legacy.Framework;
 
 namespace JueMingZ.UI.Legacy.Controls
@@ -9,7 +10,7 @@ namespace JueMingZ.UI.Legacy.Controls
 
         public LegacyCheckboxButtonControl()
         {
-            TextScale = 0.76f;
+            TextScale = LegacyUiMetrics.ButtonTextScale;
         }
 
         protected override void DrawSelf(LegacyUiContext context)

@@ -1,4 +1,5 @@
 using JueMingZ.UI;
+using JueMingZ.UI.Legacy;
 using JueMingZ.UI.Legacy.Framework;
 
 namespace JueMingZ.UI.Legacy.Controls
@@ -29,7 +30,7 @@ namespace JueMingZ.UI.Legacy.Controls
                 238,
                 210,
                 255,
-                0.88f);
+                LegacyUiMetrics.SectionHeaderTextScale);
         }
 
         protected override LegacyUiElement RegisterSelf(LegacyUiContext context)

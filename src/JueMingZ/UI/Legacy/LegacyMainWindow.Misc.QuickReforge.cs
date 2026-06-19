@@ -19,7 +19,7 @@ namespace JueMingZ.UI.Legacy
 
             var enabled = settings != null && settings.NpcAutoReforgeEnabled;
             LegacyUiTheme.DrawRowClipped(spriteBatch, row, area.Viewport);
-            UiTextRenderer.DrawAlignedTextClipped(spriteBatch, "自动重铸", row.X + 10, row.Y, 110, row.Height, UiTextHorizontalAlignment.Left, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 238, 226, 255, 0.86f);
+            UiTextRenderer.DrawAlignedTextClipped(spriteBatch, "自动重铸", row.X + 10, row.Y, 110, row.Height, UiTextHorizontalAlignment.Left, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 238, 226, 255, LegacyUiMetrics.RowLabelTextScale);
 
             var gap = 6;
             var buttonY = RowModeButtonY(row);
@@ -110,10 +110,10 @@ namespace JueMingZ.UI.Legacy
                 selected ? LegacyUiTheme.SelectedTextG : 232,
                 selected ? LegacyUiTheme.SelectedTextB : 224,
                 255,
-                0.78f);
+                LegacyUiMetrics.RowButtonTextScale);
             if (selected)
             {
-                LegacyUiTheme.DrawSelectedTextMarkersClipped(spriteBatch, new LegacyUiRect(rect.X + 3, contentRect.Y, rect.Width - 6, contentRect.Height), clip, text, 0.78f);
+                LegacyUiTheme.DrawSelectedTextMarkersClipped(spriteBatch, new LegacyUiRect(rect.X + 3, contentRect.Y, rect.Width - 6, contentRect.Height), clip, text, LegacyUiMetrics.RowButtonTextScale);
             }
 
             var element = AddFrameElement(elements, id, label, "button", elementRect, selected: selected, tooltipLines: string.IsNullOrWhiteSpace(tooltip) ? null : new[] { tooltip });

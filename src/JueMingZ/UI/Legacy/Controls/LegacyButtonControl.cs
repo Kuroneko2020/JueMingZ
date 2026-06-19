@@ -1,5 +1,6 @@
 using System;
 using JueMingZ.UI;
+using JueMingZ.UI.Legacy;
 using JueMingZ.UI.Legacy.Framework;
 
 namespace JueMingZ.UI.Legacy.Controls
@@ -22,7 +23,7 @@ namespace JueMingZ.UI.Legacy.Controls
             Text = string.Empty;
             ElementLabel = string.Empty;
             IconId = string.Empty;
-            TextScale = 0.78f;
+            TextScale = LegacyUiMetrics.ButtonTextScale;
             TextR = 230;
             TextG = 232;
             TextB = 224;
@@ -165,7 +166,7 @@ namespace JueMingZ.UI.Legacy.Controls
     {
         public LegacySmallButtonControl()
         {
-            TextScale = 0.70f;
+            TextScale = LegacyUiMetrics.SmallButtonTextScale;
         }
     }
 }

@@ -1,4 +1,5 @@
 using JueMingZ.UI;
+using JueMingZ.UI.Legacy;
 using JueMingZ.UI.Legacy.Framework;
 
 namespace JueMingZ.UI.Legacy.Controls
@@ -47,7 +48,7 @@ namespace JueMingZ.UI.Legacy.Controls
                 238,
                 226,
                 255,
-                0.86f);
+                LegacyUiMetrics.RowLabelTextScale);
         }
     }
 }

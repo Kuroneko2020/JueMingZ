@@ -14,15 +14,22 @@ namespace JueMingZ.UI
         internal const int MinHeight = 120;
         internal const int MaxWidth = 360;
         internal const int MaxHeight = 300;
-        internal const int HeaderHeight = 24;
+        internal const int HeaderHeight = 28;
         internal const int ToolbarHeight = HeaderHeight;
         internal const int ToolbarGap = 4;
         internal const int BodyPadding = 8;
-        internal const int LineHeight = 18;
+        internal const int LineHeight = 36;
         internal const int ScreenPadding = 12;
         internal const int AvoidanceStep = 28;
         internal const int OpacityStep = 5;
-        internal const float BodyTextScale = 0.62f;
+        internal const float BodyTextScale = 1.20f;
+        private const int ToolbarButtonWidth = 20;
+        private const int ToolbarButtonHeight = 18;
+        private const int ToolbarButtonGap = 5;
+        private const int ToolbarHorizontalPadding = 6;
+        private const int DragHandleMinWidth = 84;
+        private const int DragHandleMaxWidth = 112;
+        private const int DragHandleHeight = 14;
 
         private static readonly object SyncRoot = new object();
         private static readonly Dictionary<string, int> BodyScrollOffsets = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -34,7 +41,13 @@ namespace JueMingZ.UI
             return BuildFrame(snapshot, screenWidth, screenHeight, -1, -1);
         }
 
-        public static UserNotesPinnedOverlayFrame BuildFrame(UserNotesSnapshot snapshot, int screenWidth, int screenHeight, int mouseX, int mouseY)
+        public static UserNotesPinnedOverlayFrame BuildFrame(
+            UserNotesSnapshot snapshot,
+            int screenWidth,
+            int screenHeight,
+            int mouseX,
+            int mouseY,
+            string coordinateMode = null)
         {
             var notes = snapshot == null ? null : snapshot.Notes;
             var items = new List<UserNotesPinnedOverlayItem>();
@@ -42,7 +55,7 @@ namespace JueMingZ.UI
             var safeScreenHeight = Math.Max(1, screenHeight);
             if (notes == null || notes.Count <= 0)
             {
-                return new UserNotesPinnedOverlayFrame(items, string.Empty, false);
+                return new UserNotesPinnedOverlayFrame(items, string.Empty, false, safeScreenWidth, safeScreenHeight, coordinateMode);
             }
 
             var occupied = new List<LegacyUiRect>();
@@ -79,7 +92,31 @@ namespace JueMingZ.UI
                 var offset = Clamp(GetScrollOffset(note.NoteId), 0, maxScroll);
                 SetScrollOffset(note.NoteId, offset);
                 var hovered = rect.Contains(mouseX, mouseY) || toolbarRect.Contains(mouseX, mouseY);
-                var buttonY = toolbarRect.Y + Math.Max(2, (toolbarRect.Height - 16) / 2);
+                var buttonY = toolbarRect.Y + Math.Max(0, (toolbarRect.Height - ToolbarButtonHeight) / 2);
+                var decreaseOpacityRect = new LegacyUiRect(
+                    toolbarRect.X + ToolbarHorizontalPadding,
+                    buttonY,
+                    ToolbarButtonWidth,
+                    ToolbarButtonHeight);
+                var increaseOpacityRect = new LegacyUiRect(
+                    decreaseOpacityRect.Right + ToolbarButtonGap,
+                    buttonY,
+                    ToolbarButtonWidth,
+                    ToolbarButtonHeight);
+                var closeRect = new LegacyUiRect(
+                    toolbarRect.Right - ToolbarHorizontalPadding - ToolbarButtonWidth,
+                    buttonY,
+                    ToolbarButtonWidth,
+                    ToolbarButtonHeight);
+                var dragReservedLeft = increaseOpacityRect.Right + ToolbarHorizontalPadding + 2;
+                var dragReservedRight = closeRect.X - ToolbarHorizontalPadding - 2;
+                var dragMaxWidth = Math.Max(1, dragReservedRight - dragReservedLeft);
+                var desiredDragWidth = Clamp(toolbarRect.Width / 2, DragHandleMinWidth, DragHandleMaxWidth);
+                var dragWidth = Math.Min(desiredDragWidth, dragMaxWidth);
+                var dragX = Clamp(
+                    toolbarRect.X + Math.Max(0, (toolbarRect.Width - dragWidth) / 2),
+                    dragReservedLeft,
+                    Math.Max(dragReservedLeft, dragReservedRight - dragWidth));
                 items.Add(new UserNotesPinnedOverlayItem
                 {
                     NoteId = note.NoteId ?? string.Empty,
@@ -87,10 +124,10 @@ namespace JueMingZ.UI
                     Rect = rect,
                     HeaderRect = toolbarRect,
                     ToolbarRect = toolbarRect,
-                    DragHandleRect = new LegacyUiRect(toolbarRect.X + 5, toolbarRect.Y + Math.Max(0, (toolbarRect.Height - 10) / 2), 38, 10),
-                    DecreaseOpacityRect = new LegacyUiRect(toolbarRect.Right - 66, buttonY, 18, 16),
-                    IncreaseOpacityRect = new LegacyUiRect(toolbarRect.Right - 43, buttonY, 18, 16),
-                    CloseRect = new LegacyUiRect(toolbarRect.Right - 20, buttonY, 18, 16),
+                    DragHandleRect = new LegacyUiRect(dragX, toolbarRect.Y + Math.Max(0, (toolbarRect.Height - DragHandleHeight) / 2), dragWidth, DragHandleHeight),
+                    DecreaseOpacityRect = decreaseOpacityRect,
+                    IncreaseOpacityRect = increaseOpacityRect,
+                    CloseRect = closeRect,
                     BodyRect = bodyRect,
                     BodyLines = lines,
                     BodyContentHeight = contentHeight,
@@ -101,7 +138,7 @@ namespace JueMingZ.UI
                 });
             }
 
-            return new UserNotesPinnedOverlayFrame(items, draggingNoteId, !string.IsNullOrWhiteSpace(draggingNoteId));
+            return new UserNotesPinnedOverlayFrame(items, draggingNoteId, !string.IsNullOrWhiteSpace(draggingNoteId), safeScreenWidth, safeScreenHeight, coordinateMode);
         }
 
         public static UserNotePinnedState BuildInitialPinnedState(UserNotesSnapshot snapshot, string noteId, LegacyUiRect anchor, int screenWidth, int screenHeight)
@@ -291,8 +328,7 @@ namespace JueMingZ.UI
 
         public static bool ShouldSuppressHotbarScroll(UserNotesPinnedOverlayFrame frame, int mouseX, int mouseY)
         {
-            var hit = HitTest(frame, mouseX, mouseY);
-            return hit != null && hit.BodyRect.Contains(mouseX, mouseY);
+            return ShouldCaptureMouse(frame, mouseX, mouseY);
         }
 
         internal static UserNotesPinnedOverlayHitDiagnostics BuildHitDiagnostics(UserNotesPinnedOverlayFrame frame, int mouseX, int mouseY)
@@ -301,7 +337,10 @@ namespace JueMingZ.UI
             {
                 MouseX = mouseX,
                 MouseY = mouseY,
-                ControlId = "none"
+                ControlId = "none",
+                OverlayScreenWidth = frame == null ? 0 : frame.ScreenWidth,
+                OverlayScreenHeight = frame == null ? 0 : frame.ScreenHeight,
+                CoordinateMode = frame == null ? string.Empty : frame.CoordinateMode
             };
             var hit = HitTest(frame, mouseX, mouseY);
             if (hit == null)
@@ -745,15 +784,26 @@ namespace JueMingZ.UI
     internal sealed class UserNotesPinnedOverlayFrame
     {
         public UserNotesPinnedOverlayFrame(List<UserNotesPinnedOverlayItem> items, string draggingNoteId, bool dragging)
+            : this(items, draggingNoteId, dragging, 0, 0, string.Empty)
+        {
+        }
+
+        public UserNotesPinnedOverlayFrame(List<UserNotesPinnedOverlayItem> items, string draggingNoteId, bool dragging, int screenWidth, int screenHeight, string coordinateMode)
         {
             Items = items ?? new List<UserNotesPinnedOverlayItem>();
             DraggingNoteId = draggingNoteId ?? string.Empty;
             Dragging = dragging;
+            ScreenWidth = Math.Max(0, screenWidth);
+            ScreenHeight = Math.Max(0, screenHeight);
+            CoordinateMode = coordinateMode ?? string.Empty;
         }
 
         public List<UserNotesPinnedOverlayItem> Items { get; private set; }
         public string DraggingNoteId { get; private set; }
         public bool Dragging { get; private set; }
+        public int ScreenWidth { get; private set; }
+        public int ScreenHeight { get; private set; }
+        public string CoordinateMode { get; private set; }
     }
 
     internal sealed class UserNotesPinnedOverlayItem
@@ -867,11 +917,15 @@ namespace JueMingZ.UI
         public LegacyUiRect IncreaseOpacityRect { get; set; }
         public LegacyUiRect CloseRect { get; set; }
         public LegacyUiRect ControlRect { get; set; }
+        public int OverlayScreenWidth { get; set; }
+        public int OverlayScreenHeight { get; set; }
+        public string CoordinateMode { get; set; }
 
         public UserNotesPinnedOverlayHitDiagnostics()
         {
             HitNoteId = string.Empty;
             ControlId = "none";
+            CoordinateMode = string.Empty;
         }
     }
 

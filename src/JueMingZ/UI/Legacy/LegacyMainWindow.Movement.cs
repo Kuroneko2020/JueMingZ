@@ -80,7 +80,7 @@ namespace JueMingZ.UI.Legacy
                     Kind = "button",
                     Bounds = rect,
                     Selected = selected,
-                    TextScale = 0.78f,
+                    TextScale = LegacyUiMetrics.RowButtonTextScale,
                     TooltipLines = index == 0
                         ? null
                         : index == 1
@@ -248,7 +248,7 @@ namespace JueMingZ.UI.Legacy
                 Kind = "button",
                 Bounds = rect,
                 Selected = enabled,
-                TextScale = 0.70f,
+                TextScale = LegacyUiMetrics.SmallButtonTextScale,
                 TooltipLines = IsMovementSafeLandingGrappleOption(option) && !string.IsNullOrWhiteSpace(option.Tooltip)
                     ? new[] { option.Tooltip }
                     : null

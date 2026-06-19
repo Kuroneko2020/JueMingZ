@@ -198,19 +198,19 @@ namespace JueMingZ.UI.Legacy
             LegacyUiTheme.DrawRowClipped(spriteBatch, row, area.Viewport);
             var buttonY = RowModeButtonY(row);
             var smallWidth = 34;
-            var valueWidth = Math.Max(92, UiTextRenderer.EstimateTextWidth(valueText, 0.78f) + 20);
+            var valueWidth = Math.Max(92, UiTextRenderer.EstimateTextWidth(valueText, LegacyUiMetrics.RowButtonTextScale) + 22);
             var gap = 6;
             var totalWidth = smallWidth + gap + valueWidth + gap + smallWidth;
             var x = row.Right - totalWidth - 10;
             var labelWidth = Math.Max(60, x - row.X - 20);
-            UiTextRenderer.DrawAlignedTextClipped(spriteBatch, label, row.X + 10, row.Y, labelWidth, row.Height, UiTextHorizontalAlignment.Left, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 238, 226, 255, 0.86f);
+            UiTextRenderer.DrawAlignedTextClipped(spriteBatch, label, row.X + 10, row.Y, labelWidth, row.Height, UiTextHorizontalAlignment.Left, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 238, 226, 255, LegacyUiMetrics.RowLabelTextScale);
 
             var hovered = (LegacyUiElement)null;
             var decreaseRect = new LegacyUiRect(x, buttonY, smallWidth, RowModeButtonHeight);
             hovered = DrawInformationSignTextLimitButton(spriteBatch, area, mouse, elements, decreaseRect, "information-sign-text-limit-decrease", label + ":减少", "-", "减少显示上限") ?? hovered;
             var valueRect = new LegacyUiRect(decreaseRect.Right + gap, buttonY, valueWidth, RowModeButtonHeight);
             LegacyUiTheme.DrawButtonClipped(spriteBatch, valueRect, false, false, true, false, area.Viewport);
-            UiTextRenderer.DrawCenteredTextClipped(spriteBatch, valueText, valueRect.X + 3, valueRect.Y, valueRect.Width - 6, valueRect.Height, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 255, 245, 205, 255, 0.78f);
+            UiTextRenderer.DrawCenteredTextClipped(spriteBatch, valueText, valueRect.X + 3, valueRect.Y, valueRect.Width - 6, valueRect.Height, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 255, 245, 205, 255, LegacyUiMetrics.RowButtonTextScale);
             var increaseRect = new LegacyUiRect(valueRect.Right + gap, buttonY, smallWidth, RowModeButtonHeight);
             hovered = DrawInformationSignTextLimitButton(spriteBatch, area, mouse, elements, increaseRect, "information-sign-text-limit-increase", label + ":增加", "+", isLineMode ? "增加显示行数，原版悬停最多 10 行" : "增加显示字数，最多 1200 字") ?? hovered;
             return hovered;
@@ -235,19 +235,19 @@ namespace JueMingZ.UI.Legacy
             LegacyUiTheme.DrawRowClipped(spriteBatch, row, area.Viewport);
             var buttonY = RowModeButtonY(row);
             var smallWidth = 34;
-            var valueWidth = Math.Max(92, UiTextRenderer.EstimateTextWidth(valueText, 0.78f) + 20);
+            var valueWidth = Math.Max(92, UiTextRenderer.EstimateTextWidth(valueText, LegacyUiMetrics.RowButtonTextScale) + 22);
             var gap = 6;
             var totalWidth = smallWidth + gap + valueWidth + gap + smallWidth;
             var x = row.Right - totalWidth - 10;
             var labelWidth = Math.Max(60, x - row.X - 20);
-            UiTextRenderer.DrawAlignedTextClipped(spriteBatch, label, row.X + 10, row.Y, labelWidth, row.Height, UiTextHorizontalAlignment.Left, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 238, 226, 255, 0.86f);
+            UiTextRenderer.DrawAlignedTextClipped(spriteBatch, label, row.X + 10, row.Y, labelWidth, row.Height, UiTextHorizontalAlignment.Left, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 238, 226, 255, LegacyUiMetrics.RowLabelTextScale);
 
             var hovered = (LegacyUiElement)null;
             var decreaseRect = new LegacyUiRect(x, buttonY, smallWidth, RowModeButtonHeight);
             hovered = DrawInformationSignTextLimitButton(spriteBatch, area, mouse, elements, decreaseRect, "information-tombstone-text-limit-decrease", label + ":减少", "-", "减少显示上限") ?? hovered;
             var valueRect = new LegacyUiRect(decreaseRect.Right + gap, buttonY, valueWidth, RowModeButtonHeight);
             LegacyUiTheme.DrawButtonClipped(spriteBatch, valueRect, false, false, true, false, area.Viewport);
-            UiTextRenderer.DrawCenteredTextClipped(spriteBatch, valueText, valueRect.X + 3, valueRect.Y, valueRect.Width - 6, valueRect.Height, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 255, 245, 205, 255, 0.78f);
+            UiTextRenderer.DrawCenteredTextClipped(spriteBatch, valueText, valueRect.X + 3, valueRect.Y, valueRect.Width - 6, valueRect.Height, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 255, 245, 205, 255, LegacyUiMetrics.RowButtonTextScale);
             var increaseRect = new LegacyUiRect(valueRect.Right + gap, buttonY, smallWidth, RowModeButtonHeight);
             hovered = DrawInformationSignTextLimitButton(spriteBatch, area, mouse, elements, increaseRect, "information-tombstone-text-limit-increase", label + ":增加", "+", isLineMode ? "增加显示行数，最多 10 行" : "增加显示字数，最多 1200 字") ?? hovered;
             return hovered;
@@ -291,13 +291,13 @@ namespace JueMingZ.UI.Legacy
             const int buttonWidth = 76;
             var buttonRect = new LegacyUiRect(row.Right - buttonWidth - 10, RowModeButtonY(row), buttonWidth, RowModeButtonHeight);
             var labelWidth = Math.Max(60, buttonRect.X - row.X - 20);
-            UiTextRenderer.DrawAlignedTextClipped(spriteBatch, label, row.X + 10, row.Y, labelWidth, row.Height, UiTextHorizontalAlignment.Left, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 238, 226, 255, 0.86f);
+            UiTextRenderer.DrawAlignedTextClipped(spriteBatch, label, row.X + 10, row.Y, labelWidth, row.Height, UiTextHorizontalAlignment.Left, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 238, 226, 255, LegacyUiMetrics.RowLabelTextScale);
 
             var hit = buttonRect.Intersect(area.Viewport);
             var elementRect = hit.Width > 0 && hit.Height > 0 ? hit : buttonRect;
             var hovered = IsFrameElementHovered("information-info-panel-position-start", elementRect, mouse);
             LegacyUiTheme.DrawButtonClipped(spriteBatch, buttonRect, hovered, hovered && mouse.LeftDown, false, true, area.Viewport);
-            UiTextRenderer.DrawCenteredTextClipped(spriteBatch, buttonLabel, buttonRect.X + 3, buttonRect.Y, buttonRect.Width - 6, buttonRect.Height, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 230, 232, 224, 255, 0.78f);
+            UiTextRenderer.DrawCenteredTextClipped(spriteBatch, buttonLabel, buttonRect.X + 3, buttonRect.Y, buttonRect.Width - 6, buttonRect.Height, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 230, 232, 224, 255, LegacyUiMetrics.RowButtonTextScale);
 
             var element = AddFrameElement(elements, "information-info-panel-position-start", label + ":" + buttonLabel, "button", elementRect, tooltipLines: new[] { "点击开始拖动信息窗口" });
             RecordFrameElementHover(element, hovered);
@@ -489,7 +489,7 @@ namespace JueMingZ.UI.Legacy
                 hovered ? 245 : 235,
                 210,
                 255,
-                0.78f);
+                LegacyUiMetrics.RowButtonTextScale);
             UiTextRenderer.DrawAlignedText(
                 spriteBatch,
                 value.ToString(CultureInfo.InvariantCulture) + (suffix ?? string.Empty),

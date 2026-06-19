@@ -31,9 +31,9 @@ namespace JueMingZ.UI.Legacy
             LegacyUiTheme.DrawRowClipped(spriteBatch, row, area.Viewport);
             var hovered = (LegacyUiElement)null;
             var title = "辅助瞄准";
-            var titleWidth = Math.Max(76, UiTextRenderer.EstimateTextWidth(title, 0.86f) + 8);
+            var titleWidth = Math.Max(76, UiTextRenderer.EstimateTextWidth(title, LegacyUiMetrics.RowLabelTextScale) + 8);
             var titleRect = new LegacyUiRect(row.X + 10, row.Y + 7, titleWidth, 22);
-            UiTextRenderer.DrawTextClipped(spriteBatch, title, titleRect.X, titleRect.Y + 2, titleRect.Width, titleRect.Height, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 238, 226, 255, 0.86f);
+            UiTextRenderer.DrawTextClipped(spriteBatch, title, titleRect.X, titleRect.Y + 2, titleRect.Width, titleRect.Height, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 238, 226, 255, LegacyUiMetrics.RowLabelTextScale);
             var titleHit = titleRect.Intersect(area.Viewport);
             var titleElementRect = titleHit.Width > 0 && titleHit.Height > 0 ? titleHit : titleRect;
             var titleHovered = IsFrameElementHovered("combat-aim-assist-title", titleElementRect, mouse);
@@ -106,7 +106,7 @@ namespace JueMingZ.UI.Legacy
             const int rowPadding = 10;
             const int buttonGap = 6;
             var title = "光剑快切";
-            var titleWidth = Math.Max(78, UiTextRenderer.EstimateTextWidth(title, 0.86f) + 8);
+            var titleWidth = Math.Max(78, UiTextRenderer.EstimateTextWidth(title, LegacyUiMetrics.RowLabelTextScale) + 8);
             UiTextRenderer.DrawAlignedTextClipped(
                 spriteBatch,
                 title,
@@ -123,7 +123,7 @@ namespace JueMingZ.UI.Legacy
                 238,
                 226,
                 255,
-                0.86f);
+                LegacyUiMetrics.RowLabelTextScale);
 
             var buttonLabels = new[] { "开启", "关闭" };
             var buttonValues = new[] { "On", "Off" };
@@ -203,7 +203,7 @@ namespace JueMingZ.UI.Legacy
                     Kind = "button",
                     Bounds = rect,
                     Selected = selected,
-                    TextScale = 0.78f,
+                    TextScale = LegacyUiMetrics.RowButtonTextScale,
                     TooltipLines = index == 0 ? new[] { "按住右键快切快捷栏的光剑" } : null
                 }.Draw(context);
 

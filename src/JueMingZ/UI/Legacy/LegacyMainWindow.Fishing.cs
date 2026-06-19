@@ -86,7 +86,7 @@ namespace JueMingZ.UI.Legacy
             }
 
             LegacyUiTheme.DrawRowClipped(spriteBatch, row, area.Viewport);
-            UiTextRenderer.DrawAlignedTextClipped(spriteBatch, "快捷改名", row.X + 10, row.Y, 110, row.Height, UiTextHorizontalAlignment.Left, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 238, 226, 255, 0.86f);
+            UiTextRenderer.DrawAlignedTextClipped(spriteBatch, "快捷改名", row.X + 10, row.Y, 110, row.Height, UiTextHorizontalAlignment.Left, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 238, 226, 255, LegacyUiMetrics.RowLabelTextScale);
 
             var buttonWidth = 96;
             var gap = 6;
