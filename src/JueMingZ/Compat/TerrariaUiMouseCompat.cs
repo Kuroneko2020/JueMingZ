@@ -379,6 +379,16 @@ namespace JueMingZ.Compat
         // it must not execute world, inventory, or item actions.
         public static bool TryMarkUiMouseCapture()
         {
+            return TryMarkUiMouseCaptureCore(false);
+        }
+
+        internal static bool TryMarkUiMouseCapturePreserveButtonsForUi()
+        {
+            return TryMarkUiMouseCaptureCore(true);
+        }
+
+        private static bool TryMarkUiMouseCaptureCore(bool preserveButtons)
+        {
             try
             {
                 object player;
@@ -394,16 +404,19 @@ namespace JueMingZ.Compat
                     EnsureUiMouseAccessors(mainType);
                     captured |= _mainMouseInterfaceAccessor.TrySet(null, true);
                     captured |= _mainBlockMouseAccessor.TrySet(null, true);
-                    _mainMouseLeftAccessor.TrySet(null, false);
-                    _mainMouseRightAccessor.TrySet(null, false);
-                    _mainMouseLeftReleaseAccessor.TrySet(null, false);
-                    _mainMouseRightReleaseAccessor.TrySet(null, false);
+                    if (!preserveButtons)
+                    {
+                        _mainMouseLeftAccessor.TrySet(null, false);
+                        _mainMouseRightAccessor.TrySet(null, false);
+                        _mainMouseLeftReleaseAccessor.TrySet(null, false);
+                        _mainMouseRightReleaseAccessor.TrySet(null, false);
+                    }
                 }
 
                 TrySuppressMouseText();
                 UiMouseCaptureAvailable = captured;
                 _mouseCaptureLastMessage = captured
-                    ? "UI mouse capture marked."
+                    ? (preserveButtons ? "UI mouse capture marked with mouse buttons preserved." : "UI mouse capture marked.")
                     : "UI mouse capture unavailable.";
 
                 if (!captured)

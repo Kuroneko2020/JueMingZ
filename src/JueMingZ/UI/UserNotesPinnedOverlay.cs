@@ -19,6 +19,7 @@ namespace JueMingZ.UI
         };
         private static readonly object SyncRoot = new object();
         private static bool _wasLeftDown;
+        private static PendingToolbarPress _pendingToolbarPress;
         private static bool? _shouldUseOverlayOverrideForTesting;
 
         public static bool DrawInterfaceLayer()
@@ -150,6 +151,7 @@ namespace JueMingZ.UI
         internal static void ResetForTesting()
         {
             UserNotesPinnedOverlayState.ResetForTesting();
+            UserNotesPinnedOverlayInputDiagnostics.ResetForTesting();
             ResetTrackedMouseButtons();
             _shouldUseOverlayOverrideForTesting = null;
         }
@@ -183,18 +185,38 @@ namespace JueMingZ.UI
                     return;
                 }
 
-                var mouse = handleState ? ReadOverlayMouseForInput(raw) : ReadOverlayMouse(raw);
+                var rawState = raw ?? DiagnosticMouseStateReader.Read();
+                var mouse = handleState ? ReadOverlayMouseForInput(rawState) : ReadOverlayMouse(rawState);
                 var frame = BuildFrame(mouse);
-                if (ShouldLegacyWindowOwnMouse(mouse, frame))
-                {
-                    return;
-                }
-
+                var hitDiagnostics = UserNotesPinnedOverlayState.BuildHitDiagnostics(frame, mouse.X, mouse.Y);
+                var legacyWindowOwnsMouse = ShouldLegacyWindowOwnMouse(mouse, frame);
                 var scroll = TerrariaUiMouseCompat.ReadScrollSnapshot(mouse.ScrollDelta);
                 var rawScrollDelta = scroll == null ? 0 : scroll.EffectiveScrollDelta;
                 if (handleState)
                 {
-                    var stateScrollDelta = handleScroll ? rawScrollDelta : 0;
+                    TryApplyPendingToolbarPress(source, mouse, hitDiagnostics);
+                }
+
+                if (legacyWindowOwnsMouse)
+                {
+                    ClearPendingToolbarPressIfReleased(mouse);
+                    UserNotesPinnedOverlayInputDiagnostics.Record(
+                        source,
+                        handleState,
+                        handleScroll,
+                        rawState,
+                        mouse,
+                        hitDiagnostics,
+                        null,
+                        null,
+                        rawScrollDelta,
+                        true,
+                        "legacyWindowOwnsMouse");
+                    return;
+                }
+
+                if (handleState)
+                {
                     var interaction = UserNotesPinnedOverlayState.HandleInput(
                         frame,
                         mouse.X,
@@ -202,26 +224,66 @@ namespace JueMingZ.UI
                         mouse.LeftDown,
                         mouse.LeftPressed,
                         mouse.LeftReleased,
-                        stateScrollDelta,
+                        rawScrollDelta,
                         SafeScreenWidth(),
                         SafeScreenHeight(),
                         PersistPinnedState);
-                    ApplyInputSuppression(frame, mouse, interaction, stateScrollDelta);
-                    SuppressScrollOnly(frame, mouse, handleScroll ? 0 : rawScrollDelta);
+                    var preserveLeftHold = ShouldPreserveLeftHoldForDrag(frame, interaction) ||
+                                           ShouldPreserveLeftHoldForPendingDrag(source, rawState, mouse, frame, hitDiagnostics, interaction);
+                    var suppression = ApplyInputSuppression(frame, mouse, interaction, rawScrollDelta, preserveLeftHold);
+                    var scrollOnlySuppressed = SuppressScrollOnly(frame, mouse, interaction.ScrollConsumed ? 0 : rawScrollDelta);
+                    if (scrollOnlySuppressed)
+                    {
+                        suppression.ScrollConsumeRequested = true;
+                        suppression.ScrollConsumeSucceeded = true;
+                    }
+
+                    UpdatePendingToolbarPress(source, rawState, mouse, frame, hitDiagnostics, interaction);
                     RecordInteraction(ResolveInteractionScenario(interaction), interaction);
+                    UserNotesPinnedOverlayInputDiagnostics.Record(
+                        source,
+                        handleState,
+                        handleScroll,
+                        rawState,
+                        mouse,
+                        hitDiagnostics,
+                        interaction,
+                        suppression,
+                        rawScrollDelta,
+                        false,
+                        ResolveTraceResultCode(hitDiagnostics, interaction, suppression, rawScrollDelta));
                     return;
                 }
 
+                var captureOnlySuppression = new UserNotesPinnedOverlaySuppressionDiagnostics();
                 if (UserNotesPinnedOverlayState.ShouldCaptureMouse(frame, mouse.X, mouse.Y))
                 {
-                    UiMouseCaptureService.CaptureForOperationWindow();
-                    ConsumeMouseButtonsForUi();
+                    captureOnlySuppression.MouseCaptureRequested = true;
+                    captureOnlySuppression.MouseCaptureSucceeded = UiMouseCaptureService.CaptureForOperationWindow();
+                    captureOnlySuppression.ButtonConsumeRequested = true;
+                    string buttonConsumeMessage;
+                    captureOnlySuppression.ButtonConsumeSucceeded = ConsumeMouseButtonsForUi(out buttonConsumeMessage);
+                    captureOnlySuppression.ButtonConsumeMessage = buttonConsumeMessage;
                 }
 
                 if (rawScrollDelta != 0 && UserNotesPinnedOverlayState.ShouldSuppressHotbarScroll(frame, mouse.X, mouse.Y))
                 {
-                    SuppressScrollOnly(frame, mouse, rawScrollDelta);
+                    captureOnlySuppression.ScrollConsumeRequested = true;
+                    captureOnlySuppression.ScrollConsumeSucceeded = SuppressScrollOnly(frame, mouse, rawScrollDelta);
                 }
+
+                UserNotesPinnedOverlayInputDiagnostics.Record(
+                    source,
+                    handleState,
+                    handleScroll,
+                    rawState,
+                    mouse,
+                    hitDiagnostics,
+                    null,
+                    captureOnlySuppression,
+                    rawScrollDelta,
+                    false,
+                    ResolveTraceResultCode(hitDiagnostics, null, captureOnlySuppression, rawScrollDelta));
             }
             catch (Exception error)
             {
@@ -235,40 +297,89 @@ namespace JueMingZ.UI
             }
         }
 
-        private static void SuppressScrollOnly(UserNotesPinnedOverlayFrame frame, LegacyMouseSnapshot mouse, int rawScrollDelta)
+        private static bool SuppressScrollOnly(UserNotesPinnedOverlayFrame frame, LegacyMouseSnapshot mouse, int rawScrollDelta)
         {
             if (rawScrollDelta != 0 && UserNotesPinnedOverlayState.ShouldSuppressHotbarScroll(frame, mouse.X, mouse.Y))
             {
-                UiMouseCaptureService.ConsumeScrollForOperationWindow();
+                return UiMouseCaptureService.ConsumeScrollForOperationWindow();
             }
+
+            return false;
         }
 
-        private static void ApplyInputSuppression(UserNotesPinnedOverlayFrame frame, LegacyMouseSnapshot mouse, UserNotesPinnedOverlayInteraction interaction, int rawScrollDelta)
+        private static UserNotesPinnedOverlaySuppressionDiagnostics ApplyInputSuppression(
+            UserNotesPinnedOverlayFrame frame,
+            LegacyMouseSnapshot mouse,
+            UserNotesPinnedOverlayInteraction interaction,
+            int rawScrollDelta,
+            bool preserveLeftHold)
         {
+            var diagnostics = new UserNotesPinnedOverlaySuppressionDiagnostics();
             if (interaction == null)
             {
-                return;
+                return diagnostics;
             }
 
             if (interaction.CapturedMouse || UserNotesPinnedOverlayState.ShouldCaptureMouse(frame, mouse.X, mouse.Y))
             {
-                UiMouseCaptureService.CaptureForOperationWindow();
-                ConsumeMouseButtonsForUi();
+                diagnostics.MouseCaptureRequested = true;
+                diagnostics.MouseCaptureSucceeded = preserveLeftHold
+                    ? UiMouseCaptureService.CaptureForOperationWindowPreserveMouseButtons()
+                    : UiMouseCaptureService.CaptureForOperationWindow();
+                if (!preserveLeftHold)
+                {
+                    diagnostics.ButtonConsumeRequested = true;
+                    string buttonConsumeMessage;
+                    diagnostics.ButtonConsumeSucceeded = ConsumeMouseButtonsForUi(out buttonConsumeMessage);
+                    diagnostics.ButtonConsumeMessage = buttonConsumeMessage;
+                }
             }
 
             if (interaction.ScrollConsumed || (rawScrollDelta != 0 && UserNotesPinnedOverlayState.ShouldSuppressHotbarScroll(frame, mouse.X, mouse.Y)))
             {
-                UiMouseCaptureService.ConsumeScrollForOperationWindow();
+                diagnostics.ScrollConsumeRequested = true;
+                diagnostics.ScrollConsumeSucceeded = UiMouseCaptureService.ConsumeScrollForOperationWindow();
             }
+
+            return diagnostics;
         }
 
-        private static void ConsumeMouseButtonsForUi()
+        private static bool ShouldPreserveLeftHoldForDrag(UserNotesPinnedOverlayFrame frame, UserNotesPinnedOverlayInteraction interaction)
         {
+            return frame != null && frame.Dragging ||
+                   interaction != null && (interaction.DragStarted || interaction.Dragging);
+        }
+
+        private static bool ShouldPreserveLeftHoldForPendingDrag(
+            string source,
+            DiagnosticMouseState raw,
+            LegacyMouseSnapshot mouse,
+            UserNotesPinnedOverlayFrame frame,
+            UserNotesPinnedOverlayHitDiagnostics hit,
+            UserNotesPinnedOverlayInteraction interaction)
+        {
+            UserNotesPinnedOverlayHitDiagnostics pendingHit;
+            return TryResolvePendingToolbarPressCandidate(source, raw, mouse, frame, hit, interaction, out pendingHit) &&
+                   pendingHit != null &&
+                   string.Equals(pendingHit.ControlId, "drag", StringComparison.Ordinal);
+        }
+
+        private static bool ConsumeMouseButtonsForUi(out string message)
+        {
+            var consumedAny = false;
+            message = string.Empty;
             for (var index = 0; index < MouseTriggerTokens.Length; index++)
             {
-                string message;
-                TerrariaUiMouseCompat.TryConsumeMouseTriggerInputOnceForUi(MouseTriggerTokens[index], out message);
+                string currentMessage;
+                var consumed = TerrariaUiMouseCompat.TryConsumeMouseTriggerInputOnceForUi(MouseTriggerTokens[index], out currentMessage);
+                consumedAny |= consumed;
+                if (!string.IsNullOrWhiteSpace(currentMessage))
+                {
+                    message = currentMessage;
+                }
             }
+
+            return consumedAny;
         }
 
         private static UserNotesOperationResult PersistPinnedState(string noteId, UserNotePinnedState state)
@@ -315,6 +426,53 @@ namespace JueMingZ.UI
             }
 
             return string.Empty;
+        }
+
+        private static string ResolveTraceResultCode(
+            UserNotesPinnedOverlayHitDiagnostics hit,
+            UserNotesPinnedOverlayInteraction interaction,
+            UserNotesPinnedOverlaySuppressionDiagnostics suppression,
+            int rawScrollDelta)
+        {
+            if (interaction != null)
+            {
+                if (interaction.Unpinned)
+                {
+                    return "unpin";
+                }
+
+                if (interaction.OpacityChanged)
+                {
+                    return "opacity";
+                }
+
+                if (interaction.DragStarted)
+                {
+                    return "dragStart";
+                }
+
+                if (interaction.DragSaved)
+                {
+                    return "dragSaved";
+                }
+
+                if (interaction.ScrollConsumed)
+                {
+                    return "scroll";
+                }
+            }
+
+            if (suppression != null && suppression.ButtonConsumeRequested)
+            {
+                return "captured";
+            }
+
+            if (rawScrollDelta != 0)
+            {
+                return "scrollObserved";
+            }
+
+            return hit != null && hit.MouseInside ? "hover" : "idle";
         }
 
         private static void RecordInteraction(string scenario, UserNotesPinnedOverlayInteraction interaction)
@@ -405,6 +563,7 @@ namespace JueMingZ.UI
                 if (mouse == null || !mouse.ReadAvailable)
                 {
                     _wasLeftDown = false;
+                    _pendingToolbarPress = null;
                     if (mouse != null)
                     {
                         mouse.LeftPressed = false;
@@ -426,7 +585,185 @@ namespace JueMingZ.UI
             lock (SyncRoot)
             {
                 _wasLeftDown = false;
+                _pendingToolbarPress = null;
             }
+        }
+
+        private static bool TryApplyPendingToolbarPress(string source, LegacyMouseSnapshot mouse, UserNotesPinnedOverlayHitDiagnostics hit)
+        {
+            if (!IsAfterPlayerInputSource(source) ||
+                mouse == null ||
+                !mouse.LeftDown ||
+                mouse.LeftPressed ||
+                hit == null ||
+                !IsToolbarActionControl(hit.ControlId))
+            {
+                ClearPendingToolbarPressIfReleased(mouse);
+                return false;
+            }
+
+            lock (SyncRoot)
+            {
+                if (_pendingToolbarPress == null ||
+                    !string.Equals(_pendingToolbarPress.NoteId, hit.HitNoteId ?? string.Empty, StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(_pendingToolbarPress.ControlId, hit.ControlId ?? string.Empty, StringComparison.Ordinal))
+                {
+                    return false;
+                }
+
+                mouse.LeftPressed = true;
+                _pendingToolbarPress = null;
+                return true;
+            }
+        }
+
+        private static void UpdatePendingToolbarPress(
+            string source,
+            DiagnosticMouseState raw,
+            LegacyMouseSnapshot mouse,
+            UserNotesPinnedOverlayFrame frame,
+            UserNotesPinnedOverlayHitDiagnostics hit,
+            UserNotesPinnedOverlayInteraction interaction)
+        {
+            UserNotesPinnedOverlayHitDiagnostics osHit;
+            if (!TryResolvePendingToolbarPressCandidate(source, raw, mouse, frame, hit, interaction, out osHit))
+            {
+                return;
+            }
+
+            lock (SyncRoot)
+            {
+                _pendingToolbarPress = new PendingToolbarPress
+                {
+                    NoteId = osHit.HitNoteId ?? string.Empty,
+                    ControlId = osHit.ControlId ?? string.Empty
+                };
+            }
+        }
+
+        private static bool TryResolvePendingToolbarPressCandidate(
+            string source,
+            DiagnosticMouseState raw,
+            LegacyMouseSnapshot mouse,
+            UserNotesPinnedOverlayFrame frame,
+            UserNotesPinnedOverlayHitDiagnostics hit,
+            UserNotesPinnedOverlayInteraction interaction,
+            out UserNotesPinnedOverlayHitDiagnostics osHit)
+        {
+            osHit = null;
+            if (mouse == null || !mouse.LeftDown || mouse.LeftReleased || DidExecuteToolbarPressCommand(interaction))
+            {
+                ClearPendingToolbarPress();
+                return false;
+            }
+
+            if (!IsPrefixSource(source) ||
+                !mouse.LeftPressed ||
+                hit == null ||
+                !hit.MouseInside ||
+                IsToolbarActionControl(hit.ControlId))
+            {
+                return false;
+            }
+
+            int osX;
+            int osY;
+            if (!TryResolveOsClientOverlayPoint(raw, out osX, out osY))
+            {
+                return false;
+            }
+
+            osHit = UserNotesPinnedOverlayState.BuildHitDiagnostics(frame, osX, osY);
+            return IsToolbarActionControl(osHit.ControlId) &&
+                   string.Equals(osHit.HitNoteId ?? string.Empty, hit.HitNoteId ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static void ClearPendingToolbarPressIfReleased(LegacyMouseSnapshot mouse)
+        {
+            if (mouse == null || !mouse.LeftDown || mouse.LeftReleased)
+            {
+                ClearPendingToolbarPress();
+            }
+        }
+
+        private static void ClearPendingToolbarPress()
+        {
+            lock (SyncRoot)
+            {
+                _pendingToolbarPress = null;
+            }
+        }
+
+        private static bool DidExecuteToolbarPressCommand(UserNotesPinnedOverlayInteraction interaction)
+        {
+            return interaction != null &&
+                   (interaction.Unpinned || interaction.OpacityChanged || interaction.DragStarted);
+        }
+
+        private static bool IsPrefixSource(string source)
+        {
+            return !string.IsNullOrWhiteSpace(source) &&
+                   source.IndexOf("UpdatePrefixGuard", StringComparison.Ordinal) >= 0;
+        }
+
+        private static bool IsAfterPlayerInputSource(string source)
+        {
+            return !string.IsNullOrWhiteSpace(source) &&
+                   source.IndexOf("UpdateAfterPlayerInputGuard", StringComparison.Ordinal) >= 0;
+        }
+
+        private static bool IsToolbarActionControl(string controlId)
+        {
+            return string.Equals(controlId, "close", StringComparison.Ordinal) ||
+                   string.Equals(controlId, "opacity-increase", StringComparison.Ordinal) ||
+                   string.Equals(controlId, "opacity-decrease", StringComparison.Ordinal) ||
+                   string.Equals(controlId, "drag", StringComparison.Ordinal);
+        }
+
+        private static bool TryResolveOsClientOverlayPoint(DiagnosticMouseState raw, out int x, out int y)
+        {
+            x = -1;
+            y = -1;
+            if (raw == null || !raw.OsReadAvailable || raw.OsClientMouseX < 0 || raw.OsClientMouseY < 0)
+            {
+                return false;
+            }
+
+            var scaleX = raw.UiScaleX > 0.01d ? raw.UiScaleX : raw.UiScale;
+            var scaleY = raw.UiScaleY > 0.01d ? raw.UiScaleY : raw.UiScale;
+            if (scaleX <= 0.01d)
+            {
+                scaleX = 1d;
+            }
+
+            if (scaleY <= 0.01d)
+            {
+                scaleY = 1d;
+            }
+
+            var scaleActive = raw.UiScaleAvailable &&
+                              (Math.Abs(scaleX - 1d) > 0.01d ||
+                               Math.Abs(scaleY - 1d) > 0.01d ||
+                               Math.Abs(raw.UiTranslateX) > 0.01d ||
+                               Math.Abs(raw.UiTranslateY) > 0.01d);
+            x = scaleActive ? ScreenToUiCoordinate(raw.OsClientMouseX, scaleX, raw.UiTranslateX) : raw.OsClientMouseX;
+            y = scaleActive ? ScreenToUiCoordinate(raw.OsClientMouseY, scaleY, raw.UiTranslateY) : raw.OsClientMouseY;
+            return true;
+        }
+
+        private static int ScreenToUiCoordinate(int value, double scale, double translate)
+        {
+            if (value < 0)
+            {
+                return value;
+            }
+
+            if (scale <= 0.01d)
+            {
+                return value;
+            }
+
+            return (int)Math.Round((value - translate) / scale);
         }
 
         private static void DrawFrame(object spriteBatch, UserNotesPinnedOverlayFrame frame)
@@ -449,9 +786,9 @@ namespace JueMingZ.UI
                 return;
             }
 
-            var backgroundAlpha = Clamp(item.OpacityPercent, 0, 100) * 2;
-            UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, item.Rect.X, item.Rect.Y, item.Rect.Width, item.Rect.Height, 6, 96, 112, 132, 168);
-            UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, item.Rect.X + 1, item.Rect.Y + 1, item.Rect.Width - 2, item.Rect.Height - 2, 5, 18, 22, 30, backgroundAlpha);
+            var opacity = Clamp(item.OpacityPercent, 0, 100);
+            UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, item.Rect.X, item.Rect.Y, item.Rect.Width, item.Rect.Height, 6, 96, 112, 132, ScaleAlpha(168, opacity));
+            UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, item.Rect.X + 1, item.Rect.Y + 1, item.Rect.Width - 2, item.Rect.Height - 2, 5, 18, 22, 30, ScaleAlpha(218, opacity));
             DrawBody(spriteBatch, item);
             if (item.Hovered)
             {
@@ -489,25 +826,26 @@ namespace JueMingZ.UI
                     238,
                     236,
                     218,
-                    246,
+                    ForegroundAlpha(246),
                     UserNotesPinnedOverlayState.BodyTextScale);
             }
         }
 
         private static void DrawControls(object spriteBatch, UserNotesPinnedOverlayItem item)
         {
-            UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, item.ToolbarRect.X, item.ToolbarRect.Y, item.ToolbarRect.Width, item.ToolbarRect.Height, 5, 22, 28, 38, 178);
-            UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, item.DragHandleRect.X, item.DragHandleRect.Y + 3, item.DragHandleRect.Width, 3, 2, 226, 232, 220, 245);
-            DrawControlButton(spriteBatch, item.DecreaseOpacityRect, "<");
-            DrawControlButton(spriteBatch, item.IncreaseOpacityRect, ">");
-            DrawControlButton(spriteBatch, item.CloseRect, "x");
+            var opacity = Clamp(item.OpacityPercent, 0, 100);
+            UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, item.ToolbarRect.X, item.ToolbarRect.Y, item.ToolbarRect.Width, item.ToolbarRect.Height, 5, 22, 28, 38, ScaleAlpha(178, opacity));
+            UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, item.DragHandleRect.X, item.DragHandleRect.Y + 3, item.DragHandleRect.Width, 3, 2, 226, 232, 220, ForegroundAlpha(245));
+            DrawControlButton(spriteBatch, item.DecreaseOpacityRect, "<", opacity);
+            DrawControlButton(spriteBatch, item.IncreaseOpacityRect, ">", opacity);
+            DrawControlButton(spriteBatch, item.CloseRect, "x", opacity);
         }
 
-        private static void DrawControlButton(object spriteBatch, LegacyUiRect rect, string label)
+        private static void DrawControlButton(object spriteBatch, LegacyUiRect rect, string label, int opacityPercent)
         {
-            UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, rect.X, rect.Y, rect.Width, rect.Height, 4, 96, 112, 146, 218);
-            UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, rect.X + 1, rect.Y + 1, rect.Width - 2, rect.Height - 2, 3, 32, 38, 52, 220);
-            UiTextRenderer.DrawCenteredText(spriteBatch, label, rect.X, rect.Y - 1, rect.Width, rect.Height, 244, 238, 212, 255, 0.58f);
+            UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, rect.X, rect.Y, rect.Width, rect.Height, 4, 96, 112, 146, ScaleAlpha(218, opacityPercent));
+            UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, rect.X + 1, rect.Y + 1, rect.Width - 2, rect.Height - 2, 3, 32, 38, 52, ScaleAlpha(220, opacityPercent));
+            UiTextRenderer.DrawCenteredText(spriteBatch, label, rect.X, rect.Y - 1, rect.Width, rect.Height, 244, 238, 212, ForegroundAlpha(255), 0.58f);
         }
 
         private static string BuildOverlayStateJson()
@@ -571,6 +909,26 @@ namespace JueMingZ.UI
             return value > max ? max : value;
         }
 
+        internal static int ScaleAlphaForTesting(int baseAlpha, int opacityPercent)
+        {
+            return ScaleAlpha(baseAlpha, opacityPercent);
+        }
+
+        internal static int ForegroundAlphaForTesting(int baseAlpha)
+        {
+            return ForegroundAlpha(baseAlpha);
+        }
+
+        private static int ScaleAlpha(int baseAlpha, int opacityPercent)
+        {
+            return Clamp((int)Math.Round(Clamp(baseAlpha, 0, 255) * Clamp(opacityPercent, 0, 100) / 100d), 0, 255);
+        }
+
+        private static int ForegroundAlpha(int baseAlpha)
+        {
+            return Clamp(baseAlpha, 0, 255);
+        }
+
         private static string EscapeJson(string value)
         {
             return (value ?? string.Empty)
@@ -579,6 +937,12 @@ namespace JueMingZ.UI
                 .Replace("\r", "\\r")
                 .Replace("\n", "\\n")
                 .Replace("\t", "\\t");
+        }
+
+        private sealed class PendingToolbarPress
+        {
+            public string NoteId { get; set; }
+            public string ControlId { get; set; }
         }
     }
 }

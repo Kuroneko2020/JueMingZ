@@ -290,6 +290,7 @@ namespace JueMingZ.Tests
         private static void DisableUserNotesDiagnosticsForTesting()
         {
             UserNotesDiagnostics.SetRecordActionEventsForTesting(false);
+            JueMingZ.UI.UserNotesPinnedOverlayInputDiagnostics.SetRecordActionEventsForTesting(false);
         }
 
         private static void ResetUserNotesTestingHooks()
@@ -297,6 +298,8 @@ namespace JueMingZ.Tests
             UserNotesStore.ResetTestingHooks();
             UserNotesDiagnostics.SetObserverForTesting(null);
             UserNotesDiagnostics.SetRecordActionEventsForTesting(true);
+            JueMingZ.UI.UserNotesPinnedOverlayInputDiagnostics.ResetForTesting();
+            JueMingZ.UI.UserNotesPinnedOverlayInputDiagnostics.SetRecordActionEventsForTesting(true);
         }
 
         private static void RequireSuccess(UserNotesOperationResult result, string label)

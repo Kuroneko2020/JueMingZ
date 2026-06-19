@@ -2288,18 +2288,34 @@ function Test-UserNotesGovernance {
         $playerInputHookText.Contains('UiInputFrameClock.BeginInputFrame(phase)') -and
         $playerInputHookText.Contains('"PlayerInputScrollHook.Postfix."') -and
         $pinnedOverlayText.Contains('UpdateInputGuard("UserNotesPinnedOverlay.UpdateAfterPlayerInputGuard", true, false, null)') -and
+        $pinnedOverlayText.Contains("PendingToolbarPress") -and
+        $pinnedOverlayText.Contains("TryApplyPendingToolbarPress") -and
+        $pinnedOverlayText.Contains("TryResolveOsClientOverlayPoint") -and
+        $pinnedOverlayText.Contains("ScaleAlphaForTesting") -and
+        $pinnedOverlayText.Contains("ForegroundAlphaForTesting") -and
+        $pinnedOverlayText.Contains("ShouldPreserveLeftHoldForPendingDrag") -and
+        $pinnedOverlayText.Contains("interaction.ScrollConsumed ? 0 : rawScrollDelta") -and
+        $pinnedOverlayStateText.Contains("nextOpacity == hit.OpacityPercent") -and
         $pinnedOverlayStateText.Contains('var interaction = new UserNotesPinnedOverlayInteraction()') -and
         $pinnedOverlayStateText.Contains('_lastInteraction = new UserNotesPinnedOverlayInteraction()') -and
         -not $pinnedOverlayStateText.Contains('UserNotesPinnedOverlayInteraction.None') -and
         $hotbarHookText.Contains("UserNotesPinnedOverlay.ShouldSuppressHotbarScrollFromHook") -and
         $overlayTestsText.Contains("UserNotesPinnedOverlayScrollDragOpacityAndCloseUsePinnedState") -and
         $overlayTestsText.Contains("UserNotesPinnedOverlayProcessesClickAfterPlayerInput") -and
+        $overlayTestsText.Contains("UserNotesPinnedOverlayTransfersPrefixPressToPlayerInputToolbarHit") -and
+        $overlayTestsText.Contains("UserNotesPinnedOverlayTransfersPrefixPressToPlayerInputDragAndKeepsHeldLeft") -and
+        $overlayTestsText.Contains("UserNotesPinnedOverlayOpacityDefaultsAndClampsWithoutWrap") -and
+        $overlayTestsText.Contains("UserNotesPinnedOverlayPostPlayerInputWheelScrollsBody") -and
         $programTestsText.Contains("user notes pinned overlay processes click after player input") -and
+        $programTestsText.Contains("user notes pinned overlay transfers prefix press to player input toolbar hit") -and
+        $programTestsText.Contains("user notes pinned overlay transfers prefix press to player input drag and keeps held left") -and
+        $programTestsText.Contains("user notes pinned overlay opacity defaults and clamps without wrap") -and
+        $programTestsText.Contains("user notes pinned overlay post player input wheel scrolls body") -and
         $interfaceLayerTestsText.Contains("UserNotesPinnedOverlay.DrawInterfaceLayer")) {
-        Write-Pass "User notes pinned overlay stays UI-only and uses controlled prefix/post-PlayerInput mouse/scroll consumption guards without mutable static interaction state."
+        Write-Pass "User notes pinned overlay stays UI-only and uses controlled prefix/post-PlayerInput mouse/scroll consumption guards, one-shot toolbar press transfer, drag held-left preservation, non-wrapping background opacity, and post-PlayerInput body wheel coverage."
     }
     else {
-        Write-FailHealth "User notes pinned overlay must not submit actions or mutate game state, must avoid mutable static interaction state, and must use prefix/post-PlayerInput/hotbar scroll guards with a real postfix-click test; leaks=$($mutationLeaks -join ', ')"
+        Write-FailHealth "User notes pinned overlay must not submit actions or mutate game state, must avoid mutable static interaction state, and must use prefix/post-PlayerInput/hotbar scroll guards with postfix-click, toolbar press-transfer, drag held-left preservation, foreground alpha separation, opacity clamp, and post-PlayerInput wheel tests; leaks=$($mutationLeaks -join ', ')"
     }
 
     if ($pinnedOverlayStateText.Contains("ToolbarRect") -and
@@ -2354,7 +2370,12 @@ function Test-UserNotesGovernance {
 
     if ($programTestsText.Contains("user notes store missing index uses config notes directory") -and
         $programTestsText.Contains("user notes body editor saves newlines and keeps draft on failure") -and
+        $programTestsText.Contains("user notes body editor auto scrolls caret into viewport") -and
         $programTestsText.Contains("user notes pinned overlay processes click after player input") -and
+        $programTestsText.Contains("user notes pinned overlay transfers prefix press to player input toolbar hit") -and
+        $programTestsText.Contains("user notes pinned overlay transfers prefix press to player input drag and keeps held left") -and
+        $programTestsText.Contains("user notes pinned overlay opacity defaults and clamps without wrap") -and
+        $programTestsText.Contains("user notes pinned overlay post player input wheel scrolls body") -and
         $programTestsText.Contains("user notes pinned overlay scroll drag opacity and close use pinned state") -and
         $storeTestsText.Contains("UserNotesSaveIndexFailureRollsBackBody") -and
         $uiTestsText.Contains("UserNotesNestedScrollConsumesOnlyScrollableBody") -and

@@ -37,7 +37,7 @@ namespace JueMingZ.Runtime
         private static long _lastRuntimeUpdateStartTimestamp;
         private static readonly RuntimeTickPipeline TickPipeline = CreateTickPipeline();
 
-        public const string Version = "0.818-notes-pinned-post-playerinput-click";
+        public const string Version = "0.822-notes-drag-editor-opacity-fix";
 
         public static RuntimeState State { get; private set; } = new RuntimeState();
         public static FeatureRegistry FeatureRegistry { get; private set; }

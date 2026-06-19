@@ -187,6 +187,7 @@ namespace JueMingZ.UI.Legacy
             LegacyUiTheme.DrawSubPanelClipped(spriteBatch, bodyRect, area.Viewport);
             var bodyTextViewport = UserNotesUiState.ResolveBodyTextViewport(bodyRect);
             UserNotesUiState.SetBodyViewport(note.NoteId, bodyTextViewport.Intersect(area.Viewport), layout.BodyContentHeight);
+            UserNotesUiState.EnsureActiveBodyEditorCaretVisible(note.NoteId);
             DrawNotesBodyPreview(spriteBatch, area, note, layout, bodyRect);
 
             var bodyHit = bodyTextViewport.Intersect(area.Viewport);

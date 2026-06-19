@@ -143,7 +143,11 @@ namespace JueMingZ.UI.Legacy
                 pinnedState.Height = UserNotesPinnedOverlayState.DefaultHeight;
             }
 
-            if (pinnedState.OpacityPercent < 0 || pinnedState.OpacityPercent > 100)
+            if (pinnedState.OpacityPercent < 0)
+            {
+                pinnedState.OpacityPercent = 0;
+            }
+            else if (pinnedState.OpacityPercent > 100)
             {
                 pinnedState.OpacityPercent = 100;
             }
@@ -647,6 +651,75 @@ namespace JueMingZ.UI.Legacy
             return false;
         }
 
+        public static bool EnsureActiveBodyEditorCaretVisible(string noteId)
+        {
+            var normalizedId = UserNotesStore.NormalizeNoteId(noteId);
+            if (string.IsNullOrEmpty(normalizedId))
+            {
+                return false;
+            }
+
+            UserNotesEditTransaction editor;
+            lock (SyncRoot)
+            {
+                editor = _editor == null ? null : _editor.Clone();
+            }
+
+            if (editor == null ||
+                !string.Equals(editor.Mode, EditModeBody, StringComparison.Ordinal) ||
+                !string.Equals(editor.NoteId, normalizedId, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            var snapshot = LegacyMultilineTextInput.GetSnapshot(editor.InputId);
+            if (snapshot == null)
+            {
+                return false;
+            }
+
+            lock (SyncRoot)
+            {
+                UserNotesBodyScrollState state;
+                if (!BodyScrollStates.TryGetValue(normalizedId, out state) ||
+                    state == null ||
+                    state.Viewport.Width <= 0 ||
+                    state.Viewport.Height <= 0 ||
+                    state.MaxScroll <= 0)
+                {
+                    return false;
+                }
+
+                var lines = BuildWrappedBodyLineModels(snapshot.Draft ?? string.Empty, Math.Max(1, state.Viewport.Width));
+                var lineIndex = FindLineIndexForCursor(lines, snapshot.CursorIndex);
+                var caretTop = lineIndex * BodyLineHeight;
+                var caretBottom = caretTop + BodyLineHeight;
+                int current;
+                BodyScrollOffsets.TryGetValue(normalizedId, out current);
+                current = Clamp(current, 0, state.MaxScroll);
+
+                var next = current;
+                if (caretTop < current)
+                {
+                    next = caretTop;
+                }
+                else if (caretBottom > current + state.Viewport.Height)
+                {
+                    next = caretBottom - state.Viewport.Height;
+                }
+
+                next = Clamp(next, 0, state.MaxScroll);
+                if (next == current)
+                {
+                    return false;
+                }
+
+                BodyScrollOffsets[normalizedId] = next;
+                _layoutCacheValid = false;
+                return true;
+            }
+        }
+
         public static string BuildUiStateJson()
         {
             var snapshot = Snapshot;
@@ -726,6 +799,11 @@ namespace JueMingZ.UI.Legacy
         internal static void SetBodyViewportForTesting(string noteId, LegacyUiRect viewport, int contentHeight)
         {
             SetBodyViewport(noteId, viewport, contentHeight);
+        }
+
+        internal static bool EnsureActiveBodyEditorCaretVisibleForTesting(string noteId)
+        {
+            return EnsureActiveBodyEditorCaretVisible(noteId);
         }
 
         internal static string BuildEditorInputIdForTesting(string noteId, string mode)

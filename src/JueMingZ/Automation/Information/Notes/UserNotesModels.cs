@@ -56,6 +56,11 @@ namespace JueMingZ.Automation.Information.Notes
 
     public sealed class UserNotePinnedState
     {
+        public UserNotePinnedState()
+        {
+            OpacityPercent = 100;
+        }
+
         public bool Pinned { get; set; }
         public float X { get; set; }
         public float Y { get; set; }

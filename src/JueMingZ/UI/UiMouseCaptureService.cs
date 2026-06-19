@@ -17,6 +17,18 @@ namespace JueMingZ.UI
         {
             // Capture marks vanilla UI ownership for this frame; it is not permission
             // to execute a gameplay action.
+            return CaptureForOperationWindowCore(false);
+        }
+
+        public static bool CaptureForOperationWindowPreserveMouseButtons()
+        {
+            // Dragging UI controls must keep the physical held state available to
+            // the owner while still marking Terraria's UI capture flags.
+            return CaptureForOperationWindowCore(true);
+        }
+
+        private static bool CaptureForOperationWindowCore(bool preserveMouseButtons)
+        {
             if (!TerrariaMainCompat.AllowsInputProcessing)
             {
                 InvalidateCache();
@@ -36,7 +48,9 @@ namespace JueMingZ.UI
                 }
             }
 
-            var captured = TerrariaUiMouseCompat.TryMarkUiMouseCapture();
+            var captured = preserveMouseButtons
+                ? TerrariaUiMouseCompat.TryMarkUiMouseCapturePreserveButtonsForUi()
+                : TerrariaUiMouseCompat.TryMarkUiMouseCapture();
             var suppressed = TerrariaUiMouseCompat.TrySuppressMouseText();
             lock (SyncRoot)
             {

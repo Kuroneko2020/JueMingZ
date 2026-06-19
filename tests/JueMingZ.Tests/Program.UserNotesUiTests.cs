@@ -724,6 +724,73 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void UserNotesBodyEditorAutoScrollsCaretIntoViewport()
+        {
+            var restore = PushTemporaryConfigDirectory("user-notes-body-editor-auto-scroll");
+            try
+            {
+                DisableUserNotesDiagnosticsForTesting();
+                var cache = new UserNotesCache(new UserNotesStore());
+                UserNoteSnapshot note;
+                RequireSuccess(cache.CreateDefaultNote(out note), "create note");
+                RequireSuccess(cache.SaveNote(note.NoteId, "标题", "开头", out note), "seed body");
+                UserNotesUiState.SetCacheForTesting(cache, true);
+
+                var bodyRect = new LegacyUiRect(10, 40, 180, 90);
+                LegacyUiActionService.HandleUserNotesCommandForTesting(new LegacyUiCommand
+                {
+                    ElementId = UserNotesUiState.BodyElementPrefix + note.NoteId,
+                    Label = "笔记:正文",
+                    Kind = "button",
+                    Rect = bodyRect,
+                    MouseX = bodyRect.X + 12,
+                    MouseY = bodyRect.Y + 12,
+                    IsDoubleClick = true,
+                    MouseCaptured = true
+                });
+
+                var inputId = UserNotesUiState.BuildEditorInputIdForTesting(note.NoteId, "body");
+                LegacyMultilineTextInput.SetCursorIndex(inputId, int.MaxValue);
+                LegacyMultilineTextInput.InsertTextForTesting(inputId, BuildLineSeparatedText("输入预览", 10), true, 0);
+                var snapshot = LegacyMultilineTextInput.GetSnapshot(inputId);
+                var viewport = new LegacyUiRect(20, 60, 150, UserNotesUiState.BodyLineHeightForTesting * 2);
+                var lines = UserNotesUiState.BuildWrappedBodyLinesForTesting(snapshot.Draft, viewport.Width);
+                var contentHeight = UserNotesUiState.CalculateBodyTextContentHeightForTesting(lines.Length);
+                UserNotesUiState.BeginBodyViewportFrame();
+                UserNotesUiState.SetBodyViewportForTesting(note.NoteId, viewport, contentHeight);
+
+                if (!UserNotesUiState.EnsureActiveBodyEditorCaretVisibleForTesting(note.NoteId))
+                {
+                    throw new InvalidOperationException("Expected active body editor to scroll down when the caret leaves the viewport.");
+                }
+
+                var offset = UserNotesUiState.GetBodyScrollOffset(note.NoteId);
+                if (offset <= 0)
+                {
+                    throw new InvalidOperationException("Expected active body editor scroll offset to increase.");
+                }
+
+                var anchorY = UserNotesUiState.ResolveBodyEditorImeLineY(note.NoteId, viewport);
+                if (anchorY < viewport.Y || anchorY + UserNotesUiState.BodyLineHeightForTesting > viewport.Bottom)
+                {
+                    throw new InvalidOperationException("Expected active body editor caret preview to stay inside the visible viewport.");
+                }
+
+                LegacyMultilineTextInput.SetCursorIndex(inputId, 0);
+                if (!UserNotesUiState.EnsureActiveBodyEditorCaretVisibleForTesting(note.NoteId) ||
+                    UserNotesUiState.GetBodyScrollOffset(note.NoteId) != 0)
+                {
+                    throw new InvalidOperationException("Expected moving the body editor caret to the first line to scroll back to the top.");
+                }
+            }
+            finally
+            {
+                UserNotesUiState.ResetForTesting();
+                ResetUserNotesTestingHooks();
+                restore();
+            }
+        }
+
         private static void UserNotesMultilineTextInputHandlesCursorSubmitAndCancel()
         {
             var inputId = "notes:editor:test";
@@ -898,6 +965,17 @@ namespace JueMingZ.Tests
             for (var index = 0; index < count; index++)
             {
                 result += text;
+            }
+
+            return result;
+        }
+
+        private static string BuildLineSeparatedText(string text, int count)
+        {
+            var result = string.Empty;
+            for (var index = 0; index < count; index++)
+            {
+                result += "\n" + text + index.ToString(System.Globalization.CultureInfo.InvariantCulture);
             }
 
             return result;

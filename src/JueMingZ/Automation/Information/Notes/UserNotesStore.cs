@@ -699,7 +699,7 @@ namespace JueMingZ.Automation.Information.Notes
         {
             if (value < 0)
             {
-                return 100;
+                return 0;
             }
 
             if (value > 100)

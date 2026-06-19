@@ -244,7 +244,15 @@ namespace JueMingZ.UI
             {
                 var state = BuildStateFromItem(hit);
                 var delta = hit.IncreaseOpacityRect.Contains(mouseX, mouseY) ? OpacityStep : -OpacityStep;
-                state.OpacityPercent = ClampOpacity(hit.OpacityPercent + delta);
+                var nextOpacity = ClampOpacity(hit.OpacityPercent + delta);
+                if (nextOpacity == hit.OpacityPercent)
+                {
+                    interaction.CapturedMouse = true;
+                    SetLastInteraction(interaction);
+                    return interaction;
+                }
+
+                state.OpacityPercent = nextOpacity;
                 interaction.PersistResult = persist(hit.NoteId, state);
                 interaction.OpacityChanged = interaction.PersistResult != null && interaction.PersistResult.Succeeded;
                 interaction.CapturedMouse = true;
@@ -285,6 +293,40 @@ namespace JueMingZ.UI
         {
             var hit = HitTest(frame, mouseX, mouseY);
             return hit != null && hit.BodyRect.Contains(mouseX, mouseY);
+        }
+
+        internal static UserNotesPinnedOverlayHitDiagnostics BuildHitDiagnostics(UserNotesPinnedOverlayFrame frame, int mouseX, int mouseY)
+        {
+            var result = new UserNotesPinnedOverlayHitDiagnostics
+            {
+                MouseX = mouseX,
+                MouseY = mouseY,
+                ControlId = "none"
+            };
+            var hit = HitTest(frame, mouseX, mouseY);
+            if (hit == null)
+            {
+                return result;
+            }
+
+            result.HitNoteId = hit.NoteId ?? string.Empty;
+            result.MouseInside = true;
+            result.ItemRect = hit.Rect;
+            result.ToolbarRect = hit.ToolbarRect;
+            result.BodyRect = hit.BodyRect;
+            result.DragHandleRect = hit.DragHandleRect;
+            result.DecreaseOpacityRect = hit.DecreaseOpacityRect;
+            result.IncreaseOpacityRect = hit.IncreaseOpacityRect;
+            result.CloseRect = hit.CloseRect;
+            result.BodyHit = hit.BodyRect.Contains(mouseX, mouseY);
+            result.ToolbarHit = hit.ToolbarRect.Contains(mouseX, mouseY);
+            result.DragHandleHit = hit.DragHandleRect.Contains(mouseX, mouseY);
+            result.DecreaseOpacityHit = hit.DecreaseOpacityRect.Contains(mouseX, mouseY);
+            result.IncreaseOpacityHit = hit.IncreaseOpacityRect.Contains(mouseX, mouseY);
+            result.CloseHit = hit.CloseRect.Contains(mouseX, mouseY);
+            result.ControlId = ResolveHitControlId(result);
+            result.ControlRect = ResolveHitControlRect(hit, result.ControlId);
+            return result;
         }
 
         public static UserNotesPinnedOverlayInteraction LastInteraction
@@ -429,6 +471,81 @@ namespace JueMingZ.UI
             }
 
             return null;
+        }
+
+        private static string ResolveHitControlId(UserNotesPinnedOverlayHitDiagnostics hit)
+        {
+            if (hit.CloseHit)
+            {
+                return "close";
+            }
+
+            if (hit.IncreaseOpacityHit)
+            {
+                return "opacity-increase";
+            }
+
+            if (hit.DecreaseOpacityHit)
+            {
+                return "opacity-decrease";
+            }
+
+            if (hit.DragHandleHit)
+            {
+                return "drag";
+            }
+
+            if (hit.BodyHit)
+            {
+                return "body";
+            }
+
+            if (hit.ToolbarHit)
+            {
+                return "toolbar";
+            }
+
+            return hit.MouseInside ? "note" : "none";
+        }
+
+        private static LegacyUiRect ResolveHitControlRect(UserNotesPinnedOverlayItem item, string controlId)
+        {
+            if (item == null)
+            {
+                return new LegacyUiRect();
+            }
+
+            if (string.Equals(controlId, "close", StringComparison.Ordinal))
+            {
+                return item.CloseRect;
+            }
+
+            if (string.Equals(controlId, "opacity-increase", StringComparison.Ordinal))
+            {
+                return item.IncreaseOpacityRect;
+            }
+
+            if (string.Equals(controlId, "opacity-decrease", StringComparison.Ordinal))
+            {
+                return item.DecreaseOpacityRect;
+            }
+
+            if (string.Equals(controlId, "drag", StringComparison.Ordinal))
+            {
+                return item.DragHandleRect;
+            }
+
+            if (string.Equals(controlId, "body", StringComparison.Ordinal))
+            {
+                return item.BodyRect;
+            }
+
+            if (string.Equals(controlId, "toolbar", StringComparison.Ordinal))
+            {
+                return item.ToolbarRect;
+            }
+
+            return item.Rect;
         }
 
         private static string[] BuildBodyLines(string body, int width)
@@ -598,7 +715,7 @@ namespace JueMingZ.UI
         {
             if (value < 0)
             {
-                return 100;
+                return 0;
             }
 
             if (value > 100)
@@ -726,6 +843,35 @@ namespace JueMingZ.UI
                 .Replace("\r", "\\r")
                 .Replace("\n", "\\n")
                 .Replace("\t", "\\t");
+        }
+    }
+
+    internal sealed class UserNotesPinnedOverlayHitDiagnostics
+    {
+        public int MouseX { get; set; }
+        public int MouseY { get; set; }
+        public string HitNoteId { get; set; }
+        public string ControlId { get; set; }
+        public bool MouseInside { get; set; }
+        public bool BodyHit { get; set; }
+        public bool ToolbarHit { get; set; }
+        public bool DragHandleHit { get; set; }
+        public bool DecreaseOpacityHit { get; set; }
+        public bool IncreaseOpacityHit { get; set; }
+        public bool CloseHit { get; set; }
+        public LegacyUiRect ItemRect { get; set; }
+        public LegacyUiRect ToolbarRect { get; set; }
+        public LegacyUiRect BodyRect { get; set; }
+        public LegacyUiRect DragHandleRect { get; set; }
+        public LegacyUiRect DecreaseOpacityRect { get; set; }
+        public LegacyUiRect IncreaseOpacityRect { get; set; }
+        public LegacyUiRect CloseRect { get; set; }
+        public LegacyUiRect ControlRect { get; set; }
+
+        public UserNotesPinnedOverlayHitDiagnostics()
+        {
+            HitNoteId = string.Empty;
+            ControlId = "none";
         }
     }
 
