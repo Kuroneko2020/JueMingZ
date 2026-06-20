@@ -34,10 +34,10 @@ namespace JueMingZ.Runtime
             new RuntimeDispatchStep("targeting.diagnostic-button-actions", "targeting.diagnostic-button-actions", 1);
         private static readonly RuntimeDispatchStep TargetingLegacyUiActions =
             new RuntimeDispatchStep("targeting.legacy-ui-actions", "targeting.legacy-ui-actions", 1);
+        private static readonly RuntimeDispatchStep TargetingBlueprintActionHotkeys =
+            new RuntimeDispatchStep("targeting.blueprint-action-hotkeys", "targeting.blueprint-action-hotkeys", 1);
         private static readonly RuntimeDispatchStep TargetingFeatureToggleHotkeys =
             new RuntimeDispatchStep("targeting.feature-toggle-hotkeys", "targeting.feature-toggle-hotkeys", 1);
-        private static readonly RuntimeDispatchStep TargetingBlueprintEntryHotkey =
-            new RuntimeDispatchStep("targeting.blueprint-entry-hotkey", "targeting.blueprint-entry-hotkey", 1);
         private static readonly RuntimeDispatchStep TargetingMapCustomMarkers =
             new RuntimeDispatchStep("targeting.map-custom-markers", "targeting.map-custom-markers", 1);
         private static readonly RuntimeDispatchStep TargetingDiagnosticHotkeys =
@@ -128,8 +128,8 @@ namespace JueMingZ.Runtime
             TargetingStartupDiagnosticNoop,
             TargetingDiagnosticButtonActions,
             TargetingLegacyUiActions,
+            TargetingBlueprintActionHotkeys,
             TargetingFeatureToggleHotkeys,
-            TargetingBlueprintEntryHotkey,
             TargetingMapCustomMarkers,
             TargetingDiagnosticHotkeys
         };
@@ -221,17 +221,17 @@ namespace JueMingZ.Runtime
             RecordOperationTiming(context, TargetingLegacyUiActions, operationStart);
 
             operationStart = Stopwatch.GetTimestamp();
+            if (ShouldRun(TargetingBlueprintActionHotkeys, BlueprintEntryHotkeyService.HasActiveBinding, context.UpdateTick))
+            {
+                BlueprintEntryHotkeyService.Tick(gameState);
+                RecordOperationTiming(context, TargetingBlueprintActionHotkeys, operationStart);
+            }
+
+            operationStart = Stopwatch.GetTimestamp();
             if (ShouldRun(TargetingFeatureToggleHotkeys, FeatureToggleHotkeyService.HasActiveBindings, context.UpdateTick))
             {
                 FeatureToggleHotkeyService.Tick(gameState);
                 RecordOperationTiming(context, TargetingFeatureToggleHotkeys, operationStart);
-            }
-
-            operationStart = Stopwatch.GetTimestamp();
-            if (ShouldRun(TargetingBlueprintEntryHotkey, BlueprintEntryHotkeyService.HasActiveBinding, context.UpdateTick))
-            {
-                BlueprintEntryHotkeyService.Tick(gameState);
-                RecordOperationTiming(context, TargetingBlueprintEntryHotkey, operationStart);
             }
 
             operationStart = Stopwatch.GetTimestamp();
@@ -321,6 +321,7 @@ namespace JueMingZ.Runtime
                 operationStart = Stopwatch.GetTimestamp();
             }
 
+            RecordAutoMiningHotkeyRuntimeGate(settings, gameState);
             if (ShouldRun(DispatchAutoMining, settings.WorldAutomationAutoMiningEnabled, gameState, tick))
             {
                 AutoMiningService.Tick(actionQueue, gameState, state, settings);
@@ -588,6 +589,58 @@ namespace JueMingZ.Runtime
             // Chest and NPC dialogs are service-specific contexts for inventory
             // and NPC actions, so they remain inside each service's business gate.
             return true;
+        }
+
+        private static void RecordAutoMiningHotkeyRuntimeGate(RuntimeSettingsSnapshot settings, GameStateSnapshot gameState)
+        {
+            if (settings == null ||
+                !settings.WorldAutomationAutoMiningEnabled ||
+                !string.Equals(settings.WorldAutomationAutoMiningMode, AutoMiningModes.Hotkey, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            var reason = GetAutomationActionGateBlockedReason(gameState);
+            if (reason.Length > 0)
+            {
+                AutoMiningService.RecordRuntimeHotkeyGateSkipped(reason);
+            }
+        }
+
+        private static string GetAutomationActionGateBlockedReason(GameStateSnapshot gameState)
+        {
+            if (gameState == null)
+            {
+                return "gameStateUnavailable";
+            }
+
+            if (!gameState.IsInWorld)
+            {
+                return "worldUnavailable";
+            }
+
+            if (gameState.IsInMainMenu)
+            {
+                return "mainMenu";
+            }
+
+            var ui = gameState.Ui;
+            if (ui == null)
+            {
+                return "uiUnavailable";
+            }
+
+            if (ui.IsInMainMenu)
+            {
+                return "mainMenu";
+            }
+
+            if (ui.ChatOpen)
+            {
+                return "chatOpen";
+            }
+
+            return ui.GameInputAvailable ? string.Empty : "gameInputUnavailable";
         }
 
         private static void ClearActionQueueForTravelMenu(InputActionQueue actionQueue)

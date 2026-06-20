@@ -30,6 +30,12 @@ namespace JueMingZ.Automation.Blueprint
         public const string HiddenReasonSelectedItemMismatch = "selected-item-mismatch";
         public const string HiddenReasonScreenUnavailable = "screen-unavailable";
         public const string ResultCodeUiOnlyNotImplemented = "uiOnlyNotImplemented";
+        public const string ButtonIdCreate = "create";
+        public const string ButtonIdSave = "save";
+        public const string ButtonIdOpenLibrary = "open-library";
+        public const string ButtonIdDelete = "delete";
+        public const string ButtonIdMove = "move";
+        public const string ButtonIdRedMap = "red-map";
 
         private const int PanelHeight = 48;
         private const int PanelPadding = 8;
@@ -44,11 +50,12 @@ namespace JueMingZ.Automation.Blueprint
         private static readonly object InteractionSyncRoot = new object();
         private static readonly BlueprintHandheldActionBarButtonDefinition[] ButtonDefinitions =
         {
-            new BlueprintHandheldActionBarButtonDefinition("create", "创建蓝图", 0),
-            new BlueprintHandheldActionBarButtonDefinition("open-library", "打开蓝图库", 1),
-            new BlueprintHandheldActionBarButtonDefinition("delete", "删除蓝图", 2),
-            new BlueprintHandheldActionBarButtonDefinition("move", "移动蓝图", 3),
-            new BlueprintHandheldActionBarButtonDefinition("red-map", "红图", 4)
+            new BlueprintHandheldActionBarButtonDefinition(ButtonIdCreate, "创建蓝图", 0, "创建新的蓝图选区"),
+            new BlueprintHandheldActionBarButtonDefinition(ButtonIdSave, "保存蓝图", 0, "保存当前蓝图选区"),
+            new BlueprintHandheldActionBarButtonDefinition(ButtonIdOpenLibrary, "打开蓝图库", 1, "打开蓝图库"),
+            new BlueprintHandheldActionBarButtonDefinition(ButtonIdDelete, "删除蓝图", 2, "删除已经放置的蓝图或已经选区待创建的区域"),
+            new BlueprintHandheldActionBarButtonDefinition(ButtonIdMove, "移动蓝图", 3, "移动已经放置的蓝图或已经选区待创建的区域"),
+            new BlueprintHandheldActionBarButtonDefinition(ButtonIdRedMap, "红图", 4, "对已放置的蓝图区域进行修改")
         };
         private static string _hoveredButtonId = string.Empty;
         private static string _pressedButtonId = string.Empty;
@@ -94,11 +101,6 @@ namespace JueMingZ.Automation.Blueprint
                 return Hidden(HiddenReasonWorldNotReady, toolItemId, ReadSelectedItemType(gameState));
             }
 
-            if (!ui.GameInputAvailable || !environment.GameInputAvailable)
-            {
-                return Hidden(HiddenReasonGameInputUnavailable, toolItemId, ReadSelectedItemType(gameState));
-            }
-
             if (!environment.VanillaMenuReadAvailable)
             {
                 return Hidden(HiddenReasonVanillaMenuUnavailable, toolItemId, ReadSelectedItemType(gameState));
@@ -141,7 +143,7 @@ namespace JueMingZ.Automation.Blueprint
                 return Hidden(HiddenReasonScreenUnavailable, toolItemId, selectedSnapshot.Type);
             }
 
-            return BuildVisibleFrame(environment.ScreenWidth, environment.ScreenHeight, toolItemId, selectedSnapshot.Type);
+            return BuildVisibleFrame(environment.ScreenWidth, environment.ScreenHeight, toolItemId, selectedSnapshot.Type, environment);
         }
 
         public static string HitTest(BlueprintHandheldActionBarFrame frame, int x, int y)
@@ -252,6 +254,37 @@ namespace JueMingZ.Automation.Blueprint
                 mouseCaptured);
         }
 
+        internal static BlueprintHandheldActionBarCommandResult RecordCommandResultClick(
+            string buttonId,
+            int heldItemType,
+            bool mouseCaptured,
+            string resultCode,
+            string message)
+        {
+            var definition = FindButtonDefinition(buttonId);
+            var normalizedButtonId = definition == null ? buttonId ?? string.Empty : definition.Id;
+            var label = definition == null ? buttonId ?? string.Empty : definition.Label;
+            resultCode = resultCode ?? string.Empty;
+            message = string.IsNullOrWhiteSpace(message) ? label + " 已执行。" : message;
+            lock (InteractionSyncRoot)
+            {
+                _lastClickedButtonId = normalizedButtonId;
+                _lastClickedButtonLabel = label;
+                _lastHeldItemType = heldItemType;
+                _lastResultCode = resultCode;
+                _lastNotice = message;
+            }
+
+            return new BlueprintHandheldActionBarCommandResult(
+                true,
+                normalizedButtonId,
+                label,
+                resultCode,
+                message,
+                heldItemType,
+                mouseCaptured);
+        }
+
         internal static BlueprintHandheldActionBarInteractionSnapshot GetInteractionSnapshotForTesting()
         {
             lock (InteractionSyncRoot)
@@ -296,9 +329,11 @@ namespace JueMingZ.Automation.Blueprint
             int screenWidth,
             int screenHeight,
             int toolItemId,
-            int selectedItemType)
+            int selectedItemType,
+            BlueprintHandheldActionBarEnvironment environment)
         {
-            var count = ButtonDefinitions.Length;
+            var visibleButtons = SelectVisibleButtonDefinitions(environment);
+            var count = Math.Max(1, visibleButtons.Count);
             var compact = screenWidth < 480;
             var gap = compact ? CompactButtonGap : ButtonGap;
             var padding = compact ? CompactPanelPadding : PanelPadding;
@@ -328,14 +363,15 @@ namespace JueMingZ.Automation.Blueprint
             var bounds = new LegacyUiRect(barX, barY, Math.Min(barWidth, Math.Max(1, screenWidth - barX)), Math.Min(PanelHeight, Math.Max(1, screenHeight - barY)));
             var buttons = new List<BlueprintHandheldActionBarButtonFrame>(count);
             var buttonY = bounds.Y + Math.Max(0, (bounds.Height - ButtonHeight) / 2);
-            for (var index = 0; index < count; index++)
+            for (var index = 0; index < visibleButtons.Count; index++)
             {
-                var definition = ButtonDefinitions[index];
+                var definition = visibleButtons[index];
                 var x = bounds.X + padding + index * (buttonWidth + gap);
                 buttons.Add(new BlueprintHandheldActionBarButtonFrame(
                     definition.Id,
                     definition.Label,
                     definition.Order,
+                    definition.Tooltip,
                     new LegacyUiRect(x, buttonY, buttonWidth, Math.Min(ButtonHeight, bounds.Height))));
             }
 
@@ -354,6 +390,39 @@ namespace JueMingZ.Automation.Blueprint
                 CurrentLastNotice(),
                 CurrentLastResultCode(),
                 CurrentLastClickedButtonId());
+        }
+
+        private static IReadOnlyList<BlueprintHandheldActionBarButtonDefinition> SelectVisibleButtonDefinitions(BlueprintHandheldActionBarEnvironment environment)
+        {
+            environment = environment ?? new BlueprintHandheldActionBarEnvironment();
+            var definitions = new List<BlueprintHandheldActionBarButtonDefinition>();
+            var hasPendingSelection = environment.BlueprintCreationHasPendingSelection;
+            var creating = environment.BlueprintCreationActive || hasPendingSelection;
+
+            definitions.Add(FindButtonDefinition(creating ? ButtonIdSave : ButtonIdCreate));
+            definitions.Add(FindButtonDefinition(ButtonIdOpenLibrary));
+
+            if (hasPendingSelection)
+            {
+                definitions.Add(FindButtonDefinition(ButtonIdDelete));
+                definitions.Add(FindButtonDefinition(ButtonIdMove));
+            }
+            else if (environment.BlueprintHasPlacedInstances)
+            {
+                definitions.Add(FindButtonDefinition(ButtonIdDelete));
+                definitions.Add(FindButtonDefinition(ButtonIdMove));
+                definitions.Add(FindButtonDefinition(ButtonIdRedMap));
+            }
+
+            for (var index = definitions.Count - 1; index >= 0; index--)
+            {
+                if (definitions[index] == null)
+                {
+                    definitions.RemoveAt(index);
+                }
+            }
+
+            return definitions;
         }
 
         private static BlueprintHandheldActionBarFrame Hidden(string reason, int toolItemId, int selectedItemType)
@@ -378,19 +447,9 @@ namespace JueMingZ.Automation.Blueprint
 
         private static string GetUiHiddenReason(UiStateSnapshot ui)
         {
-            if (ui.PlayerInventoryOpen)
-            {
-                return HiddenReasonPlayerInventoryOpen;
-            }
-
             if (ui.ChatOpen)
             {
                 return HiddenReasonChatOpen;
-            }
-
-            if (ui.ChestOpen)
-            {
-                return HiddenReasonChestOpen;
             }
 
             if (ui.NpcChatOpen)
@@ -528,6 +587,11 @@ namespace JueMingZ.Automation.Blueprint
         public string VanillaMenuReason { get; set; }
         public bool MapFullscreenOpen { get; set; }
         public bool LegacyMainUiVisible { get; set; }
+        public bool BlueprintCreationActive { get; set; }
+        public bool BlueprintCreationHasPendingSelection { get; set; }
+        public int BlueprintCreationSelectedCount { get; set; }
+        public bool BlueprintHasPlacedInstances { get; set; }
+        public int BlueprintPlacedInstanceCount { get; set; }
         public int ScreenWidth { get; set; }
         public int ScreenHeight { get; set; }
 
@@ -553,31 +617,35 @@ namespace JueMingZ.Automation.Blueprint
 
     public sealed class BlueprintHandheldActionBarButtonDefinition
     {
-        public BlueprintHandheldActionBarButtonDefinition(string id, string label, int order)
+        public BlueprintHandheldActionBarButtonDefinition(string id, string label, int order, string tooltip)
         {
             Id = id ?? string.Empty;
             Label = label ?? string.Empty;
             Order = order;
+            Tooltip = tooltip ?? string.Empty;
         }
 
         public string Id { get; private set; }
         public string Label { get; private set; }
         public int Order { get; private set; }
+        public string Tooltip { get; private set; }
     }
 
     public sealed class BlueprintHandheldActionBarButtonFrame
     {
-        public BlueprintHandheldActionBarButtonFrame(string id, string label, int order, LegacyUiRect rect)
+        public BlueprintHandheldActionBarButtonFrame(string id, string label, int order, string tooltip, LegacyUiRect rect)
         {
             Id = id ?? string.Empty;
             Label = label ?? string.Empty;
             Order = order;
+            Tooltip = tooltip ?? string.Empty;
             Rect = rect;
         }
 
         public string Id { get; private set; }
         public string Label { get; private set; }
         public int Order { get; private set; }
+        public string Tooltip { get; private set; }
         public LegacyUiRect Rect { get; private set; }
     }
 

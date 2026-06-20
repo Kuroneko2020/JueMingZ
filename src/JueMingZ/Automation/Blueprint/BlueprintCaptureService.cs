@@ -218,6 +218,43 @@ namespace JueMingZ.Automation.Blueprint
                 useAfterSave);
         }
 
+        internal static bool TryHasSelectableContent(
+            IBlueprintWorldTileReader reader,
+            int tileX,
+            int tileY,
+            out bool hasContent)
+        {
+            hasContent = false;
+            if (reader == null || !reader.IsWorldReady)
+            {
+                return false;
+            }
+
+            BlueprintWorldTileSnapshot sample;
+            if (!reader.TryReadTile(tileX, tileY, out sample) || sample == null)
+            {
+                return false;
+            }
+
+            sample.TileX = tileX;
+            sample.TileY = tileY;
+            hasContent = HasSelectableContent(sample);
+            return true;
+        }
+
+        internal static bool HasSelectableContent(BlueprintWorldTileSnapshot sample)
+        {
+            if (sample == null)
+            {
+                return false;
+            }
+
+            return (sample.Active && sample.TileType >= 0) ||
+                   sample.WallType > 0 ||
+                   BuildWireFlags(sample) != 0 ||
+                   sample.HasActuator;
+        }
+
         private static BlueprintCellRecord BuildCell(BlueprintWorldTileSnapshot sample, BlueprintCaptureBuildState state)
         {
             var cell = new BlueprintCellRecord

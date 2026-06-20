@@ -29,21 +29,15 @@ namespace JueMingZ.Tests
             AssertBlueprintHandheldHidden(unavailable, BlueprintHandheldActionBarState.HiddenReasonSelectedItemUnavailable);
 
             var visible = BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId);
-            if (!visible.Visible || visible.Buttons.Count != 5)
+            if (!visible.Visible)
             {
-                throw new InvalidOperationException("Expected blueprint handheld action bar to show five buttons for enabled gel-in-hand world play.");
+                throw new InvalidOperationException("Expected blueprint handheld action bar to show empty-state commands for enabled gel-in-hand world play.");
             }
 
-            AssertStringEquals(visible.Buttons[0].Id, "create", "handheld button 0 id");
-            AssertStringEquals(visible.Buttons[0].Label, "创建蓝图", "handheld button 0 label");
-            AssertStringEquals(visible.Buttons[1].Id, "open-library", "handheld button 1 id");
-            AssertStringEquals(visible.Buttons[1].Label, "打开蓝图库", "handheld button 1 label");
-            AssertStringEquals(visible.Buttons[2].Id, "delete", "handheld button 2 id");
-            AssertStringEquals(visible.Buttons[2].Label, "删除蓝图", "handheld button 2 label");
-            AssertStringEquals(visible.Buttons[3].Id, "move", "handheld button 3 id");
-            AssertStringEquals(visible.Buttons[3].Label, "移动蓝图", "handheld button 3 label");
-            AssertStringEquals(visible.Buttons[4].Id, "red-map", "handheld button 4 id");
-            AssertStringEquals(visible.Buttons[4].Label, "红图", "handheld button 4 label");
+            AssertBlueprintHandheldButtons(
+                visible,
+                BlueprintHandheldActionBarState.ButtonIdCreate,
+                BlueprintHandheldActionBarState.ButtonIdOpenLibrary);
 
             AssertBlueprintHandheldHidden(
                 BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId, BlueprintHandheldEnvironment(1280, 720, mapFullscreenOpen: true)),
@@ -51,9 +45,9 @@ namespace JueMingZ.Tests
             AssertBlueprintHandheldHidden(
                 BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId, BlueprintHandheldEnvironment(1280, 720, legacyMainUiVisible: true)),
                 BlueprintHandheldActionBarState.HiddenReasonLegacyMainUiVisible);
-            AssertBlueprintHandheldHidden(
-                BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId, BlueprintHandheldEnvironment(1280, 720, gameInputAvailable: false)),
-                BlueprintHandheldActionBarState.HiddenReasonGameInputUnavailable);
+            AssertBlueprintHandheldVisible(
+                BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId, BlueprintHandheldEnvironment(1280, 720, gameInputAvailable: false), gameInputAvailable: false),
+                "game-input-unavailable display gate");
             AssertBlueprintHandheldHidden(
                 BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId, BlueprintHandheldEnvironment(1280, 720, vanillaBlocked: true, vanillaReason: "gameMenu")),
                 BlueprintHandheldActionBarState.HiddenReasonVanillaMenuGameMenu);
@@ -64,18 +58,62 @@ namespace JueMingZ.Tests
                 BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId, BlueprintHandheldEnvironment(1280, 720, vanillaBlocked: true, vanillaReason: "inFancyUI")),
                 BlueprintHandheldActionBarState.HiddenReasonVanillaMenuFancyUi);
 
-            AssertBlueprintHandheldHidden(
+            AssertBlueprintHandheldVisible(
                 BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId, BlueprintHandheldEnvironment(1280, 720), playerInventoryOpen: true),
-                BlueprintHandheldActionBarState.HiddenReasonPlayerInventoryOpen);
+                "player-inventory-open display gate");
             AssertBlueprintHandheldHidden(
                 BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId, BlueprintHandheldEnvironment(1280, 720), chatOpen: true),
                 BlueprintHandheldActionBarState.HiddenReasonChatOpen);
-            AssertBlueprintHandheldHidden(
+            AssertBlueprintHandheldVisible(
                 BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId, BlueprintHandheldEnvironment(1280, 720), chestOpen: true),
-                BlueprintHandheldActionBarState.HiddenReasonChestOpen);
+                "chest-open display gate");
             AssertBlueprintHandheldHidden(
                 BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId, BlueprintHandheldEnvironment(1280, 720), npcChatOpen: true),
                 BlueprintHandheldActionBarState.HiddenReasonNpcChatOpen);
+            AssertBlueprintHandheldHidden(
+                BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId, BlueprintHandheldEnvironment(1280, 720), isInMainMenu: true, isInWorld: false),
+                BlueprintHandheldActionBarState.HiddenReasonWorldNotReady);
+        }
+
+        private static void BlueprintHandheldActionBarDynamicButtonMatrix()
+        {
+            AssertBlueprintHandheldButtons(
+                BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId),
+                BlueprintHandheldActionBarState.ButtonIdCreate,
+                BlueprintHandheldActionBarState.ButtonIdOpenLibrary);
+
+            var placed = BuildBlueprintHandheldFrame(
+                true,
+                BlueprintSettings.DefaultToolItemId,
+                BlueprintHandheldEnvironment(1280, 720, blueprintHasPlacedInstances: true, blueprintPlacedInstanceCount: 2));
+            AssertBlueprintHandheldButtons(
+                placed,
+                BlueprintHandheldActionBarState.ButtonIdCreate,
+                BlueprintHandheldActionBarState.ButtonIdOpenLibrary,
+                BlueprintHandheldActionBarState.ButtonIdDelete,
+                BlueprintHandheldActionBarState.ButtonIdMove,
+                BlueprintHandheldActionBarState.ButtonIdRedMap);
+            AssertBlueprintHandheldButton(placed, BlueprintHandheldActionBarState.ButtonIdDelete, "删除蓝图", "删除已经放置的蓝图或已经选区待创建的区域");
+            AssertBlueprintHandheldButton(placed, BlueprintHandheldActionBarState.ButtonIdMove, "移动蓝图", "移动已经放置的蓝图或已经选区待创建的区域");
+            AssertBlueprintHandheldButton(placed, BlueprintHandheldActionBarState.ButtonIdRedMap, "红图", "对已放置的蓝图区域进行修改");
+
+            AssertBlueprintHandheldButtons(
+                BuildBlueprintHandheldFrame(
+                    true,
+                    BlueprintSettings.DefaultToolItemId,
+                    BlueprintHandheldEnvironment(1280, 720, blueprintCreationActive: true)),
+                BlueprintHandheldActionBarState.ButtonIdSave,
+                BlueprintHandheldActionBarState.ButtonIdOpenLibrary);
+
+            AssertBlueprintHandheldButtons(
+                BuildBlueprintHandheldFrame(
+                    true,
+                    BlueprintSettings.DefaultToolItemId,
+                    BlueprintHandheldEnvironment(1280, 720, blueprintCreationActive: true, blueprintCreationHasPendingSelection: true, blueprintCreationSelectedCount: 3, blueprintHasPlacedInstances: true, blueprintPlacedInstanceCount: 2)),
+                BlueprintHandheldActionBarState.ButtonIdSave,
+                BlueprintHandheldActionBarState.ButtonIdOpenLibrary,
+                BlueprintHandheldActionBarState.ButtonIdDelete,
+                BlueprintHandheldActionBarState.ButtonIdMove);
         }
 
         private static void BlueprintHandheldActionBarLayoutKeepsButtonsStable()
@@ -112,6 +150,52 @@ namespace JueMingZ.Tests
             AssertStringEquals(repeated.LayoutSignature, frame.LayoutSignature, "handheld action bar layout signature");
         }
 
+        private static void BlueprintHandheldActionBarVisualStyleUsesLegacyThemeAndStableTextScale()
+        {
+            var contract = BlueprintHandheldActionBarOverlay.GetVisualContractForTesting();
+            AssertContains(contract, "legacy-ui-theme");
+            AssertContains(contract, "vanilla-ui-skin");
+            AssertContains(contract, "button-text-scale-0.78");
+
+            if (Math.Abs(BlueprintHandheldActionBarOverlay.ButtonTextScale - 0.78f) > 0.001f)
+            {
+                throw new InvalidOperationException("Expected blueprint handheld button text scale to be old 0.58 + 0.2.");
+            }
+
+            var normal = BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId, BlueprintHandheldEnvironment(1280, 720));
+            foreach (var button in normal.Buttons)
+            {
+                var available = Math.Max(1, button.Rect.Width - 8);
+                var scale = BlueprintHandheldActionBarOverlay.ResolveButtonTextScaleForTesting(button.Label, available);
+                if (Math.Abs(scale - BlueprintHandheldActionBarOverlay.ButtonTextScale) > 0.001f)
+                {
+                    throw new InvalidOperationException("Expected normal blueprint handheld button text to use the enlarged base scale.");
+                }
+
+                if (UiTextRenderer.EstimateTextWidth(button.Label, scale) > available)
+                {
+                    throw new InvalidOperationException("Expected normal blueprint handheld button text to fit inside fixed geometry.");
+                }
+            }
+
+            var compact = BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId, BlueprintHandheldEnvironment(320, 180));
+            AssertStringEquals(compact.LayoutSignature, BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId, BlueprintHandheldEnvironment(320, 180)).LayoutSignature, "compact handheld text scale must not mutate layout");
+            foreach (var button in compact.Buttons)
+            {
+                var available = Math.Max(1, button.Rect.Width - 8);
+                var scale = BlueprintHandheldActionBarOverlay.ResolveButtonTextScaleForTesting(button.Label, available);
+                if (scale > BlueprintHandheldActionBarOverlay.ButtonTextScale)
+                {
+                    throw new InvalidOperationException("Expected compact blueprint handheld text scale never to grow beyond the enlarged base scale.");
+                }
+
+                if (UiTextRenderer.EstimateTextWidth(button.Label, scale) > available)
+                {
+                    throw new InvalidOperationException("Expected compact blueprint handheld button text to shrink before it overflows.");
+                }
+            }
+        }
+
         private static void BlueprintHandheldActionBarOverlayStaysUiOnlyAndNoScan()
         {
             BlueprintProjectionService.ResetForTesting();
@@ -143,10 +227,15 @@ namespace JueMingZ.Tests
                 }
 
                 var contract = BlueprintHandheldActionBarOverlay.GetVisualContractForTesting();
-                AssertContains(contract, "ui-only-placeholder-click");
+                AssertContains(contract, "dynamic-buttons");
+                AssertContains(contract, "create-enters-mask");
+                AssertContains(contract, "save-captures-mask");
+                AssertContains(contract, "open-library-real");
+                AssertContains(contract, "unimplemented-buttons-ui-only");
                 AssertContains(contract, "no-blueprint-refresh");
                 AssertContains(contract, "mouse-consume");
                 AssertContains(contract, "no-input-action-queue");
+                AssertContains(contract, "legacy-ui-theme");
                 AssertDoesNotContain(contract, "InputActionQueue");
             }
             finally
@@ -202,35 +291,120 @@ namespace JueMingZ.Tests
             }
         }
 
-        private static void BlueprintHandheldActionBarCommandsStayUiOnly()
+        private static void BlueprintHandheldActionBarDisplayGatesStayVisibleAndUiOnly()
         {
             BlueprintHandheldActionBarState.ResetInteractionForTesting();
-            BlueprintEntryState.ResetForTesting();
-            var settings = AppSettings.CreateDefault();
-            var before = BlueprintEntryState.GetSnapshot(settings);
-            foreach (var definition in BlueprintHandheldActionBarState.GetButtonDefinitions())
-            {
-                LegacyUiActionService.HandleBlueprintHandheldActionBarCommandForTesting(new LegacyUiCommand
-                {
-                    ElementId = BlueprintHandheldActionBarState.BuildCommandElementId(definition.Id),
-                    Label = definition.Label,
-                    Kind = "button",
-                    IntValue = BlueprintSettings.DefaultToolItemId,
-                    MouseCaptured = true,
-                    Rect = new LegacyUiRect(10, 20, 80, 24)
-                });
+            var inventory = BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId, BlueprintHandheldEnvironment(1280, 720), playerInventoryOpen: true);
+            var chest = BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId, BlueprintHandheldEnvironment(1280, 720), chestOpen: true);
+            var noInput = BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId, BlueprintHandheldEnvironment(1280, 720, gameInputAvailable: false), gameInputAvailable: false);
+            AssertBlueprintHandheldVisible(inventory, "player inventory display gate");
+            AssertBlueprintHandheldVisible(chest, "chest display gate");
+            AssertBlueprintHandheldVisible(noInput, "game input unavailable display gate");
 
-                var interaction = BlueprintHandheldActionBarState.GetInteractionSnapshotForTesting();
-                AssertStringEquals(interaction.LastClickedButtonId, definition.Id, "handheld command clicked id");
-                AssertStringEquals(interaction.LastClickedButtonLabel, definition.Label, "handheld command clicked label");
-                AssertStringEquals(interaction.LastResultCode, BlueprintHandheldActionBarState.ResultCodeUiOnlyNotImplemented, "handheld command result");
-                AssertIntEquals(interaction.LastHeldItemType, BlueprintSettings.DefaultToolItemId, "handheld command held item type");
-                AssertContains(interaction.LastNotice, definition.Label);
+            var button = inventory.Buttons[0];
+            var limitedPress = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
+                inventory,
+                BlueprintHandheldPointer(button.Rect.CenterX, button.Rect.CenterY, true, 0, false));
+            if (!limitedPress.ShouldCaptureMouse || !limitedPress.ShouldConsumeLeftInput || limitedPress.Clicked)
+            {
+                throw new InvalidOperationException("Expected visible-but-limited handheld bar press to capture and consume without submitting a command.");
             }
 
-            var after = BlueprintEntryState.GetSnapshot(settings);
-            AssertStringEquals(after.Mode, before.Mode, "handheld command must not change blueprint entry mode");
-            AssertStringEquals(after.SelectedTemplateId, before.SelectedTemplateId, "handheld command must not select a template");
+            var wheel = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
+                chest,
+                BlueprintHandheldPointer(chest.Bounds.CenterX, chest.Bounds.CenterY, false, -120, false));
+            if (!wheel.ShouldCaptureMouse || !wheel.ShouldConsumeScroll || wheel.Clicked)
+            {
+                throw new InvalidOperationException("Expected chest-visible handheld bar hover to consume wheel without submitting a command.");
+            }
+
+            var interaction = BlueprintHandheldActionBarState.GetInteractionSnapshotForTesting();
+            AssertStringEquals(interaction.LastResultCode, string.Empty, "display gate must not submit a command");
+        }
+
+        private static void BlueprintHandheldActionBarRealCommandsAndUnimplementedButtons()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-handheld-real-commands");
+            BlueprintHandheldActionBarState.ResetInteractionForTesting();
+            BlueprintEntryState.ResetForTesting();
+            BlueprintCreationMaskState.ResetForTesting();
+            try
+            {
+                var settings = AppSettings.CreateDefault();
+                var store = new BlueprintTemplateLibraryStore();
+                var reader = new FakeBlueprintWorldTileReader();
+                reader.Set(5, 6, new BlueprintWorldTileSnapshot
+                {
+                    Active = true,
+                    TileType = 2,
+                    TileMaterialItemId = 101,
+                    TileDisplayName = "Dirt Block"
+                });
+                BlueprintCaptureService.SetCaptureDependenciesForTesting(reader, store);
+                BlueprintLibraryUiState.SetStoreForTesting(store, true);
+
+                LegacyUiActionService.HandleBlueprintHandheldActionBarCommandForTesting(BuildBlueprintHandheldCommand(BlueprintHandheldActionBarState.ButtonIdCreate, "创建蓝图"));
+                var createInteraction = BlueprintHandheldActionBarState.GetInteractionSnapshotForTesting();
+                AssertStringEquals(createInteraction.LastClickedButtonId, BlueprintHandheldActionBarState.ButtonIdCreate, "handheld create clicked id");
+                AssertStringEquals(createInteraction.LastResultCode, "entryStateChanged", "handheld create command result");
+                AssertStringEquals(BlueprintEntryState.GetSnapshot(settings).Mode, BlueprintEntryModes.Creating, "handheld create entry mode");
+                if (!BlueprintCreationMaskState.GetSnapshot().Active)
+                {
+                    throw new InvalidOperationException("Expected handheld create action to enter blueprint creation mask mode.");
+                }
+
+                LegacyUiActionService.HandleBlueprintHandheldActionBarCommandForTesting(BuildBlueprintHandheldCommand(BlueprintHandheldActionBarState.ButtonIdSave, "保存蓝图"));
+                var failedSave = BlueprintHandheldActionBarState.GetInteractionSnapshotForTesting();
+                AssertStringEquals(failedSave.LastClickedButtonId, BlueprintHandheldActionBarState.ButtonIdSave, "handheld empty save clicked id");
+                AssertStringEquals(failedSave.LastResultCode, "emptySelection", "handheld empty save result");
+                AssertStringEquals(BlueprintEntryState.GetSnapshot(settings).Mode, BlueprintEntryModes.Creating, "handheld failed save keeps creating mode");
+                if (!BlueprintCreationMaskState.GetSnapshot().Active)
+                {
+                    throw new InvalidOperationException("Expected failed handheld save without selection to keep creation mask active.");
+                }
+
+                ClickTileForBlueprintCreation(5, 6);
+                LegacyUiActionService.HandleBlueprintHandheldActionBarCommandForTesting(BuildBlueprintHandheldCommand(BlueprintHandheldActionBarState.ButtonIdSave, "保存蓝图"));
+                var saved = BlueprintHandheldActionBarState.GetInteractionSnapshotForTesting();
+                AssertStringEquals(saved.LastClickedButtonId, BlueprintHandheldActionBarState.ButtonIdSave, "handheld save clicked id");
+                AssertStringEquals(saved.LastResultCode, "templateSaved", "handheld save command result");
+
+                BlueprintTemplateLibrarySnapshot snapshot;
+                RequireBlueprintSuccess(store.TryLoad(out snapshot), "load blueprint handheld save result");
+                if (snapshot.Templates.Count != 1 || snapshot.Templates[0].Cells.Count != 1)
+                {
+                    throw new InvalidOperationException("Expected handheld save command to write one captured blueprint template.");
+                }
+
+                AssertStringEquals(BlueprintEntryState.GetSnapshot(settings).Mode, BlueprintEntryModes.Tool, "handheld successful save returns to tool mode");
+                if (BlueprintCreationMaskState.GetSnapshot().CompletedPendingCapture)
+                {
+                    throw new InvalidOperationException("Expected successful handheld save to clear pending mask.");
+                }
+
+                LegacyUiActionService.HandleBlueprintHandheldActionBarCommandForTesting(BuildBlueprintHandheldCommand(BlueprintHandheldActionBarState.ButtonIdOpenLibrary, "打开蓝图库"));
+                var openLibrary = BlueprintHandheldActionBarState.GetInteractionSnapshotForTesting();
+                AssertStringEquals(openLibrary.LastClickedButtonId, BlueprintHandheldActionBarState.ButtonIdOpenLibrary, "handheld open-library clicked id");
+                AssertStringEquals(openLibrary.LastResultCode, "libraryOpened", "handheld open-library command result");
+
+                var before = BlueprintEntryState.GetSnapshot(settings);
+                AssertBlueprintHandheldPlaceholderCommand(BlueprintHandheldActionBarState.ButtonIdDelete, "删除蓝图");
+                AssertBlueprintHandheldPlaceholderCommand(BlueprintHandheldActionBarState.ButtonIdMove, "移动蓝图");
+                AssertBlueprintHandheldPlaceholderCommand(BlueprintHandheldActionBarState.ButtonIdRedMap, "红图");
+                var after = BlueprintEntryState.GetSnapshot(settings);
+                AssertStringEquals(after.Mode, before.Mode, "handheld unimplemented command must not change blueprint entry mode");
+                AssertStringEquals(after.SelectedTemplateId, before.SelectedTemplateId, "handheld unimplemented command must not select a template");
+            }
+            finally
+            {
+                BlueprintCaptureService.ResetForTesting();
+                BlueprintLibraryUiState.ResetForTesting();
+                BlueprintTemplateLibraryStore.ResetTestingHooks();
+                BlueprintEntryState.ResetForTesting();
+                BlueprintCreationMaskState.ResetForTesting();
+                BlueprintHandheldActionBarState.ResetInteractionForTesting();
+                restore();
+            }
         }
 
         private static void BlueprintHandheldActionBarDiagnosticsSnapshotJson()
@@ -259,7 +433,7 @@ namespace JueMingZ.Tests
             AssertIntEquals(visible.ToolItemId, BlueprintSettings.DefaultToolItemId, "handheld diagnostics tool item");
             AssertIntEquals(visible.SelectedItemType, BlueprintSettings.DefaultToolItemId, "handheld diagnostics selected item");
             AssertStringEquals(visible.LastAction, "create", "handheld diagnostics last action");
-            AssertStringEquals(visible.LastResultCode, BlueprintHandheldActionBarState.ResultCodeUiOnlyNotImplemented, "handheld diagnostics result");
+            AssertStringEquals(visible.LastResultCode, "entryStateChanged", "handheld diagnostics result");
 
             var hidden = BlueprintHandheldActionBarState.BuildDiagnostics(
                 BlueprintHandheldSettings(false),
@@ -287,7 +461,9 @@ namespace JueMingZ.Tests
             AssertContains(json, "\"BlueprintHandheldActionBarToolItemId\": 23");
             AssertContains(json, "\"BlueprintHandheldActionBarSelectedItemType\": 23");
             AssertContains(json, "\"BlueprintHandheldActionBarLastAction\": \"create\"");
-            AssertContains(json, "\"BlueprintHandheldActionBarLastResultCode\": \"uiOnlyNotImplemented\"");
+            AssertContains(json, "\"BlueprintHandheldActionBarLastResultCode\": \"entryStateChanged\"");
+            BlueprintEntryState.ResetForTesting();
+            BlueprintCreationMaskState.ResetForTesting();
         }
 
         private static void BlueprintHandheldActionBarHiddenClearsInputState()
@@ -316,6 +492,30 @@ namespace JueMingZ.Tests
             AssertStringEquals(interaction.LastNotice, string.Empty, "hidden handheld notice clear");
         }
 
+        private static LegacyUiCommand BuildBlueprintHandheldCommand(string buttonId, string label)
+        {
+            return new LegacyUiCommand
+            {
+                ElementId = BlueprintHandheldActionBarState.BuildCommandElementId(buttonId),
+                Label = label,
+                Kind = "button",
+                IntValue = BlueprintSettings.DefaultToolItemId,
+                MouseCaptured = true,
+                Rect = new LegacyUiRect(10, 20, 80, 24)
+            };
+        }
+
+        private static void AssertBlueprintHandheldPlaceholderCommand(string buttonId, string label)
+        {
+            LegacyUiActionService.HandleBlueprintHandheldActionBarCommandForTesting(BuildBlueprintHandheldCommand(buttonId, label));
+            var interaction = BlueprintHandheldActionBarState.GetInteractionSnapshotForTesting();
+            AssertStringEquals(interaction.LastClickedButtonId, buttonId, "handheld placeholder clicked id");
+            AssertStringEquals(interaction.LastClickedButtonLabel, label, "handheld placeholder clicked label");
+            AssertStringEquals(interaction.LastResultCode, BlueprintHandheldActionBarState.ResultCodeUiOnlyNotImplemented, "handheld placeholder command result");
+            AssertIntEquals(interaction.LastHeldItemType, BlueprintSettings.DefaultToolItemId, "handheld placeholder held item type");
+            AssertContains(interaction.LastNotice, label);
+        }
+
         private static BlueprintHandheldActionBarFrame BuildBlueprintHandheldFrame(
             bool enabled,
             int selectedItemType,
@@ -323,11 +523,14 @@ namespace JueMingZ.Tests
             bool playerInventoryOpen = false,
             bool chatOpen = false,
             bool chestOpen = false,
-            bool npcChatOpen = false)
+            bool npcChatOpen = false,
+            bool gameInputAvailable = true,
+            bool isInMainMenu = false,
+            bool isInWorld = true)
         {
             return BlueprintHandheldActionBarOverlay.BuildFrameForTesting(
                 BlueprintHandheldSettings(enabled),
-                BlueprintHandheldSnapshot(selectedItemType, playerInventoryOpen, chatOpen, chestOpen, npcChatOpen),
+                BlueprintHandheldSnapshot(selectedItemType, playerInventoryOpen, chatOpen, chestOpen, npcChatOpen, gameInputAvailable, isInMainMenu, isInWorld),
                 environment ?? BlueprintHandheldEnvironment(1280, 720));
         }
 
@@ -344,13 +547,16 @@ namespace JueMingZ.Tests
             bool playerInventoryOpen = false,
             bool chatOpen = false,
             bool chestOpen = false,
-            bool npcChatOpen = false)
+            bool npcChatOpen = false,
+            bool gameInputAvailable = true,
+            bool isInMainMenu = false,
+            bool isInWorld = true)
         {
             return new GameStateSnapshot
             {
                 TerrariaDetected = true,
-                IsInMainMenu = false,
-                IsInWorld = true,
+                IsInMainMenu = isInMainMenu,
+                IsInWorld = isInWorld,
                 Inventory = new InventorySnapshot
                 {
                     SelectedItemSlot = selectedItemType > 0 ? 0 : -1,
@@ -364,7 +570,7 @@ namespace JueMingZ.Tests
                 },
                 Ui = new UiStateSnapshot
                 {
-                    GameInputAvailable = true,
+                    GameInputAvailable = gameInputAvailable,
                     PlayerInventoryOpen = playerInventoryOpen,
                     ChatOpen = chatOpen,
                     ChestOpen = chestOpen,
@@ -382,7 +588,12 @@ namespace JueMingZ.Tests
             bool legacyMainUiVisible = false,
             bool vanillaReadAvailable = true,
             bool vanillaBlocked = false,
-            string vanillaReason = "")
+            string vanillaReason = "",
+            bool blueprintCreationActive = false,
+            bool blueprintCreationHasPendingSelection = false,
+            int blueprintCreationSelectedCount = 0,
+            bool blueprintHasPlacedInstances = false,
+            int blueprintPlacedInstanceCount = 0)
         {
             return new BlueprintHandheldActionBarEnvironment
             {
@@ -393,6 +604,11 @@ namespace JueMingZ.Tests
                 VanillaMenuReadAvailable = vanillaReadAvailable,
                 VanillaMenuBlocked = vanillaBlocked,
                 VanillaMenuReason = vanillaReason ?? string.Empty,
+                BlueprintCreationActive = blueprintCreationActive,
+                BlueprintCreationHasPendingSelection = blueprintCreationHasPendingSelection,
+                BlueprintCreationSelectedCount = blueprintCreationSelectedCount,
+                BlueprintHasPlacedInstances = blueprintHasPlacedInstances,
+                BlueprintPlacedInstanceCount = blueprintPlacedInstanceCount,
                 ScreenWidth = screenWidth,
                 ScreenHeight = screenHeight
             };
@@ -424,6 +640,59 @@ namespace JueMingZ.Tests
             }
 
             AssertStringEquals(frame.HiddenReason, expectedReason, "blueprint handheld hidden reason");
+        }
+
+        private static void AssertBlueprintHandheldVisible(BlueprintHandheldActionBarFrame frame, string context)
+        {
+            if (frame == null || !frame.Visible)
+            {
+                throw new InvalidOperationException("Expected blueprint handheld action bar to be visible for " + context + ".");
+            }
+
+            AssertStringEquals(frame.HiddenReason, BlueprintHandheldActionBarState.HiddenReasonNone, "blueprint handheld visible reason " + context);
+            if (frame.Buttons.Count <= 0)
+            {
+                throw new InvalidOperationException("Expected visible blueprint handheld action bar to expose at least one command button for " + context + ".");
+            }
+        }
+
+        private static void AssertBlueprintHandheldButtons(BlueprintHandheldActionBarFrame frame, params string[] expectedIds)
+        {
+            if (frame == null || !frame.Visible)
+            {
+                throw new InvalidOperationException("Expected blueprint handheld action bar to be visible before checking button ids.");
+            }
+
+            if (frame.Buttons.Count != expectedIds.Length)
+            {
+                throw new InvalidOperationException("Expected " + expectedIds.Length + " handheld buttons, got " + frame.Buttons.Count + ".");
+            }
+
+            for (var index = 0; index < expectedIds.Length; index++)
+            {
+                AssertStringEquals(frame.Buttons[index].Id, expectedIds[index], "handheld dynamic button id " + index);
+            }
+        }
+
+        private static void AssertBlueprintHandheldButton(BlueprintHandheldActionBarFrame frame, string buttonId, string label, string tooltip)
+        {
+            if (frame == null || frame.Buttons == null)
+            {
+                throw new InvalidOperationException("Expected blueprint handheld frame before checking button.");
+            }
+
+            for (var index = 0; index < frame.Buttons.Count; index++)
+            {
+                var button = frame.Buttons[index];
+                if (button != null && string.Equals(button.Id, buttonId, StringComparison.Ordinal))
+                {
+                    AssertStringEquals(button.Label, label, "handheld button label " + buttonId);
+                    AssertStringEquals(button.Tooltip, tooltip, "handheld button tooltip " + buttonId);
+                    return;
+                }
+            }
+
+            throw new InvalidOperationException("Expected blueprint handheld button " + buttonId + " to exist.");
         }
     }
 }

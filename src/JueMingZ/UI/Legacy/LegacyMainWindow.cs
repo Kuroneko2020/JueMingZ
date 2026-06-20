@@ -171,6 +171,7 @@ namespace JueMingZ.UI.Legacy
         private static int _quickItemHotkeyCaptureBindingIndex = -1;
         private static bool _autoMiningHotkeyCaptureActive;
         private static bool _blueprintEntryHotkeyCaptureActive;
+        private static string _blueprintHotkeyCaptureTargetId = string.Empty;
         private static string _blueprintEntryHotkeyMessage = string.Empty;
         private static string _mapQuickAnnouncementHotkeyCaptureSlot = string.Empty;
         private static bool _mapDeathHistoryPopupOpen;

@@ -15,7 +15,7 @@ namespace JueMingZ.Tests
             var started = BlueprintEntryState.ApplyCommand(BlueprintEntryCommands.StartCreate, AppSettings.CreateDefault());
             if (!started.Succeeded || started.PlaceholderOnly)
             {
-                throw new InvalidOperationException("Expected 05 start-create to be implemented.");
+                throw new InvalidOperationException("Expected 06 start-create to be implemented.");
             }
 
             ClickTileForBlueprintCreation(10, 20);
@@ -70,6 +70,83 @@ namespace JueMingZ.Tests
                 snapshot.MaxY != 7)
             {
                 throw new InvalidOperationException("Expected drag selection to toggle the full inclusive rectangle.");
+            }
+        }
+
+        private static void BlueprintCreationMaskSkipsAirAndTracksHover()
+        {
+            BlueprintCreationMaskState.ResetForTesting();
+            BlueprintCreationMaskState.BeginCreate();
+
+            Func<int, int, bool> selectable = (x, y) =>
+                (x == 4 && y == 6) ||
+                (x == 6 && y == 7);
+            var hover = BlueprintCreationMaskState.HandlePointer(new BlueprintCreationPointerInput
+            {
+                WorldTileHit = true,
+                TileX = 4,
+                TileY = 6,
+                IsSelectableTile = selectable
+            });
+            if (hover == null ||
+                hover.Snapshot == null ||
+                !hover.Snapshot.HoverTileHit ||
+                hover.Snapshot.HoverTileX != 4 ||
+                hover.Snapshot.HoverTileY != 6)
+            {
+                throw new InvalidOperationException("Expected creation mask hover to track selectable world content.");
+            }
+
+            var air = BlueprintCreationMaskState.HandlePointer(new BlueprintCreationPointerInput
+            {
+                WorldTileHit = true,
+                TileX = 5,
+                TileY = 6,
+                ContentKnown = true,
+                HasSelectableContent = false,
+                LeftDown = true,
+                LeftPressed = true
+            });
+            if (air == null ||
+                !air.ShouldConsumeLeftInput ||
+                !string.Equals(air.ResultCode, "airSkipped", StringComparison.Ordinal) ||
+                BlueprintCreationMaskState.GetSnapshot().SelectedCount != 0)
+            {
+                throw new InvalidOperationException("Expected creation mask to skip air while still consuming world left-click.");
+            }
+
+            BlueprintCreationMaskState.HandlePointer(new BlueprintCreationPointerInput
+            {
+                WorldTileHit = true,
+                TileX = 4,
+                TileY = 6,
+                IsSelectableTile = selectable,
+                LeftDown = true,
+                LeftPressed = true
+            });
+            BlueprintCreationMaskState.HandlePointer(new BlueprintCreationPointerInput
+            {
+                WorldTileHit = true,
+                TileX = 6,
+                TileY = 7,
+                IsSelectableTile = selectable,
+                LeftDown = true
+            });
+            BlueprintCreationMaskState.HandlePointer(new BlueprintCreationPointerInput
+            {
+                WorldTileHit = true,
+                TileX = 6,
+                TileY = 7,
+                IsSelectableTile = selectable,
+                LeftReleased = true
+            });
+            var snapshot = BlueprintCreationMaskState.GetSnapshot();
+            if (snapshot.SelectedCount != 2 ||
+                !HasBlueprintCell(snapshot, 4, 6) ||
+                !HasBlueprintCell(snapshot, 6, 7) ||
+                HasBlueprintCell(snapshot, 5, 6))
+            {
+                throw new InvalidOperationException("Expected drag selection to keep selectable content and skip air cells.");
             }
         }
 
@@ -163,6 +240,17 @@ namespace JueMingZ.Tests
             if (!pointer.UiOwned || !pointer.LeftPressed || !pointer.WorldTileHit)
             {
                 throw new InvalidOperationException("Expected blueprint pointer contract to preserve UI ownership and world hit metadata.");
+            }
+
+            var visual = BlueprintCreationOverlay.GetVisualContractForTesting();
+            AssertContains(visual, "low-alpha-no-border");
+            AssertContains(visual, "continuous-row-runs");
+            AssertContains(visual, "content-hover");
+            if (BlueprintCreationOverlay.GetSelectedMaskAlphaForTesting() >= 64 ||
+                BlueprintCreationOverlay.GetHoverMaskAlphaForTesting() >= 64 ||
+                BlueprintCreationOverlay.GetDragMaskAlphaForTesting() >= 64)
+            {
+                throw new InvalidOperationException("Expected blueprint creation overlay mask alpha to stay low for 06.");
             }
 
             if (BlueprintCreationOverlay.ShouldConsumeAfterPlayerInputForTesting(true, true, true) ||

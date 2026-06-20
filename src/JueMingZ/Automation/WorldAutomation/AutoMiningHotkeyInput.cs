@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
+using JueMingZ.Actions;
 using JueMingZ.Compat;
 using JueMingZ.UI.Legacy;
 
@@ -19,31 +20,112 @@ namespace JueMingZ.Automation.WorldAutomation
 
         public static bool TryConsumePressed(string text, out string display)
         {
-            display = string.Empty;
+            var result = ConsumePressed(text);
+            display = result.Display;
+            return result.Accepted;
+        }
+
+        internal static AutoMiningHotkeyInputResult ConsumePressed(string text)
+        {
+            return ConsumePressedCore(
+                text,
+                IsPhysicalKeyDown,
+                GetRuntimeBlockReason,
+                IsCurrentProcessForeground,
+                DateTime.UtcNow);
+        }
+
+        internal static AutoMiningHotkeyInputResult ConsumePressedForTesting(
+            string text,
+            IDictionary<int, bool> downKeys,
+            bool inputBlocked,
+            string blockReason,
+            bool foreground,
+            DateTime utcNow)
+        {
+            return ConsumePressedCore(
+                text,
+                keyCode =>
+                {
+                    bool down;
+                    return downKeys != null && downKeys.TryGetValue(keyCode, out down) && down;
+                },
+                () => inputBlocked ? NormalizeBlockReason(blockReason, "inputBlocked") : string.Empty,
+                () => foreground,
+                utcNow);
+        }
+
+        internal static void ResetForTesting()
+        {
+            WasDownByHotkey.Clear();
+            _lastTriggerUtc = DateTime.MinValue;
+        }
+
+        private static AutoMiningHotkeyInputResult ConsumePressedCore(
+            string text,
+            Func<int, bool> keyDown,
+            Func<string> getBlockReason,
+            Func<bool> isForeground,
+            DateTime utcNow)
+        {
+            var result = new AutoMiningHotkeyInputResult();
             HotkeyChord chord;
             if (!TryParseHotkey(text, out chord))
             {
                 SyncSingleState(string.Empty, false);
-                return false;
+                result.Reason = string.IsNullOrWhiteSpace(text) ? "unbound" : "invalidHotkey";
+                return result;
             }
 
-            display = chord.Display;
-            var isDown = IsChordDown(chord);
+            result.Display = chord.Display;
+            result.Normalized = chord.Normalized;
+            keyDown = keyDown ?? IsPhysicalKeyDown;
+            var isDown = IsChordDown(chord, keyDown);
+            result.Down = isDown;
             bool wasDown;
             WasDownByHotkey.TryGetValue(chord.Normalized, out wasDown);
             SyncSingleState(chord.Normalized, isDown);
-            if (!isDown || wasDown || DateTime.UtcNow - _lastTriggerUtc < TriggerDebounce)
+            if (!isDown)
             {
-                return false;
+                result.Reason = "notPressed";
+                return result;
             }
 
-            if (IsInputBlocked() || !IsCurrentProcessForeground())
+            if (wasDown)
             {
-                return false;
+                result.Reason = "held";
+                return result;
             }
 
-            _lastTriggerUtc = DateTime.UtcNow;
-            return true;
+            result.PressedEdge = true;
+            if (utcNow - _lastTriggerUtc < TriggerDebounce)
+            {
+                result.Reason = "debounce";
+                return result;
+            }
+
+            if (isForeground != null && !isForeground())
+            {
+                result.Reason = "notForeground";
+                result.DiagnosticResultCode = DiagnosticResultCode.BlockedByEnvironment;
+                return result;
+            }
+
+            var blockReason = getBlockReason == null ? string.Empty : getBlockReason();
+            if (!string.IsNullOrWhiteSpace(blockReason))
+            {
+                result.Reason = NormalizeBlockReason(blockReason, "inputBlocked");
+                result.DiagnosticResultCode = IsUiBlockReason(result.Reason)
+                    ? DiagnosticResultCode.BlockedByUi
+                    : DiagnosticResultCode.BlockedByEnvironment;
+                return result;
+            }
+
+            _lastTriggerUtc = utcNow;
+            result.Accepted = true;
+            result.Reason = "accepted";
+            result.DiagnosticResultCode = DiagnosticResultCode.Succeeded;
+            return result;
         }
 
         private static void SyncSingleState(string liveKey, bool isDown)
@@ -230,40 +312,67 @@ namespace JueMingZ.Automation.WorldAutomation
             return false;
         }
 
-        private static bool IsChordDown(HotkeyChord chord)
+        private static bool IsChordDown(HotkeyChord chord, Func<int, bool> keyDown)
         {
             return chord != null &&
-                   (!chord.Ctrl || IsKeyDown(VkControl)) &&
-                   (!chord.Alt || IsKeyDown(VkAlt)) &&
-                   (!chord.Shift || IsKeyDown(VkShift)) &&
-                   IsKeyDown(chord.KeyCode);
+                   keyDown != null &&
+                   (!chord.Ctrl || keyDown(VkControl)) &&
+                   (!chord.Alt || keyDown(VkAlt)) &&
+                   (!chord.Shift || keyDown(VkShift)) &&
+                   keyDown(chord.KeyCode);
         }
 
-        private static bool IsInputBlocked()
+        private static string GetRuntimeBlockReason()
         {
-            if (LegacyMainUiState.Visible || LegacyUiInput.IsActiveInteraction() || LegacyTextInput.IsAnyFocused)
+            if (LegacyMainUiState.Visible)
             {
-                return true;
+                return "legacyMainUiVisible";
+            }
+
+            if (LegacyUiInput.IsActiveInteraction())
+            {
+                return "legacyUiActive";
+            }
+
+            if (LegacyTextInput.IsAnyFocused)
+            {
+                return "textInputFocused";
             }
 
             bool focused;
             string reason;
             if (TerrariaInputCompat.TryReadTextInputFocus(out focused, out reason) && focused)
             {
-                return true;
+                return NormalizeBlockReason(reason, "textInputFocused");
             }
 
-            return false;
-        }
-
-        private static bool IsKeyDown(int keyCode)
-        {
             if (!TerrariaMainCompat.AllowsInputProcessing)
             {
-                return false;
+                return "gameInputUnavailable";
             }
 
+            return string.Empty;
+        }
+
+        private static bool IsPhysicalKeyDown(int keyCode)
+        {
             return (GetAsyncKeyState(keyCode) & 0x8000) != 0;
+        }
+
+        private static string NormalizeBlockReason(string reason, string fallback)
+        {
+            reason = reason == null ? string.Empty : reason.Trim();
+            return reason.Length <= 0 ? fallback : reason;
+        }
+
+        private static bool IsUiBlockReason(string reason)
+        {
+            return string.Equals(reason, "legacyMainUiVisible", StringComparison.Ordinal) ||
+                   string.Equals(reason, "legacyUiActive", StringComparison.Ordinal) ||
+                   string.Equals(reason, "textInputFocused", StringComparison.Ordinal) ||
+                   reason.IndexOf("text", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   reason.IndexOf("chat", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   reason.IndexOf("inventory", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private static bool IsCurrentProcessForeground()

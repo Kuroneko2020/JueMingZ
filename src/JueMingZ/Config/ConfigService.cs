@@ -1143,10 +1143,7 @@ namespace JueMingZ.Config
             {
                 settings.HotkeysByFeatureId = new System.Collections.Generic.Dictionary<string, string>();
             }
-            else
-            {
-                NormalizeBlueprintEntryHotkey(settings.HotkeysByFeatureId);
-            }
+            RemoveBlueprintEntryHotkey(settings.HotkeysByFeatureId);
 
             if (settings.ConfigVersion < 3 &&
                 IsLegacyDefaultQuickItemHotkeyBindings(settings.QuickItemHotkeyBindings))
@@ -1163,23 +1160,10 @@ namespace JueMingZ.Config
             }
         }
 
-        private static void NormalizeBlueprintEntryHotkey(Dictionary<string, string> hotkeys)
+        private static void RemoveBlueprintEntryHotkey(Dictionary<string, string> hotkeys)
         {
             if (hotkeys == null)
             {
-                return;
-            }
-
-            string value;
-            if (!hotkeys.TryGetValue(FeatureIds.BlueprintMain, out value))
-            {
-                return;
-            }
-
-            string normalized;
-            if (FeatureToggleHotkeyChord.TryNormalize(value, out normalized))
-            {
-                hotkeys[FeatureIds.BlueprintMain] = normalized;
                 return;
             }
 

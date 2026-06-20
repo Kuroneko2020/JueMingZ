@@ -5,6 +5,7 @@ using JueMingZ.Automation.Blueprint;
 using JueMingZ.Automation.Information;
 using JueMingZ.Automation.Movement;
 using JueMingZ.Automation.WorldAutomation;
+using JueMingZ.Common;
 using JueMingZ.Config;
 using JueMingZ.Records;
 using JueMingZ.UI;
@@ -585,6 +586,9 @@ namespace JueMingZ.UI.Legacy
         {
             settings = settings ?? AppSettings.CreateDefault();
             AddHash(ref hash, _blueprintEntryHotkeyCaptureActive);
+            AddHash(ref hash, _blueprintHotkeyCaptureTargetId);
+            AddHash(ref hash, GetBlueprintHotkeyDisplay(ConfigService.HotkeySettings, FeatureIds.BlueprintCreateAction));
+            AddHash(ref hash, GetBlueprintHotkeyDisplay(ConfigService.HotkeySettings, FeatureIds.BlueprintSaveAction));
             if (includeTransientMessage)
             {
                 AddHash(ref hash, _blueprintEntryHotkeyMessage);

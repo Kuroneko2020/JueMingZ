@@ -754,6 +754,12 @@ namespace JueMingZ.Diagnostics
             Append(builder, "AutoCaptureCritterTargetNpcIndex", snapshot.AutoCaptureCritterTargetNpcIndex, true);
             Append(builder, "AutoCaptureCritterTargetNpcType", snapshot.AutoCaptureCritterTargetNpcType, true);
             Append(builder, "AutoCaptureCritterFishingProtectionState", snapshot.AutoCaptureCritterFishingProtectionState, true);
+            Append(builder, "AutoMiningLastDecision", snapshot.AutoMiningLastDecision, true);
+            Append(builder, "AutoMiningLastDecisionUtc", FormatDate(snapshot.AutoMiningLastDecisionUtc), true);
+            Append(builder, "AutoMiningLastHotkey", snapshot.AutoMiningLastHotkey, true);
+            Append(builder, "AutoMiningLastHotkeyResultCode", snapshot.AutoMiningLastHotkeyResultCode, true);
+            Append(builder, "AutoMiningLastHotkeyBlockedReason", snapshot.AutoMiningLastHotkeyBlockedReason, true);
+            Append(builder, "AutoMiningLastHotkeyDecisionUtc", FormatDate(snapshot.AutoMiningLastHotkeyDecisionUtc), true);
             Append(builder, "AutoHarvestLastDecision", snapshot.AutoHarvestLastDecision, true);
             Append(builder, "AutoHarvestLastDecisionUtc", FormatDate(snapshot.AutoHarvestLastDecisionUtc), true);
             Append(builder, "AutoHarvestLastAction", snapshot.AutoHarvestLastAction, true);

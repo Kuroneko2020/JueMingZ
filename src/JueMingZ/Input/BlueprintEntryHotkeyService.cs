@@ -15,19 +15,23 @@ namespace JueMingZ.Input
 {
     internal static class BlueprintEntryHotkeyService
     {
-        private const string Scenario = "Hotkey.BlueprintEntry";
         private const int VkAlt = 0x12;
         private const int VkControl = 0x11;
         private const int VkShift = 0x10;
 
         private static readonly object SyncRoot = new object();
-        private static string _sourceChord = string.Empty;
-        private static FeatureToggleHotkeyChord _chord;
-        private static bool _wasDown;
+        private static readonly Dictionary<string, bool> WasDownByTargetId =
+            new Dictionary<string, bool>(StringComparer.Ordinal);
 
         public static bool HasActiveBinding
         {
-            get { return TryReadBinding(ConfigService.HotkeySettings ?? HotkeySettings.CreateDefault(), out _); }
+            get
+            {
+                var settings = ConfigService.HotkeySettings;
+                FeatureToggleHotkeyChord chord;
+                return TryGetActionChord(settings, FeatureIds.BlueprintCreateAction, out chord) ||
+                       TryGetActionChord(settings, FeatureIds.BlueprintSaveAction, out chord);
+            }
         }
 
         public static void Tick(GameStateSnapshot gameState)
@@ -38,15 +42,16 @@ namespace JueMingZ.Input
                 gameState,
                 IsRuntimeGateAvailable(gameState, out var gateReason),
                 gateReason,
-                false,
                 IsCurrentProcessForeground(),
-                IsKeyDown,
-                true,
-                true,
-                true);
-            if (result != null)
+                false,
+                IsKeyDown);
+            if (result != null && result.Triggered)
             {
-                // Runtime records event diagnostics; tests inspect the returned decision.
+                DiagnosticActionRecorder.RecordHotkeyEvent(
+                    result.Chord,
+                    ScenarioNames.BlueprintActionHotkey,
+                    result.DiagnosticResultCode,
+                    result.Message);
             }
         }
 
@@ -64,21 +69,16 @@ namespace JueMingZ.Input
                 null,
                 gameInputAvailable,
                 gateReason,
+                true,
                 textInputFocused,
-                true,
-                key => downKeys != null && downKeys.TryGetValue(key, out var down) && down,
-                true,
-                false,
-                false);
+                key => downKeys != null && downKeys.TryGetValue(key, out var down) && down);
         }
 
         internal static void ResetForTesting()
         {
             lock (SyncRoot)
             {
-                _sourceChord = string.Empty;
-                _chord = null;
-                _wasDown = false;
+                WasDownByTargetId.Clear();
             }
         }
 
@@ -88,118 +88,121 @@ namespace JueMingZ.Input
             GameStateSnapshot gameState,
             bool gameInputAvailable,
             string gateReason,
-            bool textInputFocused,
             bool foreground,
-            Func<int, bool> isKeyDown,
-            bool applyEntryState,
-            bool applyUi,
-            bool recordDiagnostic)
+            bool textInputFocused,
+            Func<int, bool> isKeyDown)
+        {
+            var result = TryTickTarget(
+                appSettings,
+                hotkeySettings,
+                gameState,
+                FeatureIds.BlueprintCreateAction,
+                BlueprintEntryCommands.StartCreate,
+                gameInputAvailable,
+                gateReason,
+                foreground,
+                textInputFocused,
+                isKeyDown);
+            if (result.Triggered)
+            {
+                return result;
+            }
+
+            return TryTickTarget(
+                appSettings,
+                hotkeySettings,
+                gameState,
+                FeatureIds.BlueprintSaveAction,
+                BlueprintEntryCommands.FinishCreateSave,
+                gameInputAvailable,
+                gateReason,
+                foreground,
+                textInputFocused,
+                isKeyDown);
+        }
+
+        private static BlueprintEntryHotkeyDispatchResult TryTickTarget(
+            AppSettings appSettings,
+            HotkeySettings hotkeySettings,
+            GameStateSnapshot gameState,
+            string targetId,
+            string action,
+            bool gameInputAvailable,
+            string gateReason,
+            bool foreground,
+            bool textInputFocused,
+            Func<int, bool> isKeyDown)
         {
             FeatureToggleHotkeyChord chord;
-            if (!TryReadBinding(hotkeySettings, out chord))
+            if (!TryGetActionChord(hotkeySettings, targetId, out chord))
             {
-                SetWasDown(false);
+                SetWasDown(targetId, false);
                 return BlueprintEntryHotkeyDispatchResult.NoOp;
             }
 
             var down = IsChordDown(chord, isKeyDown);
-            var wasDown = GetWasDown();
-            SetWasDown(down);
+            var wasDown = GetWasDown(targetId);
+            SetWasDown(targetId, down);
             if (!down || wasDown)
             {
                 return BlueprintEntryHotkeyDispatchResult.NoOp;
             }
 
-            var effectiveGateReason = ResolveGateReason(gameState, gameInputAvailable, gateReason, textInputFocused, foreground);
-            BlueprintEntryHotkeyDispatchResult result;
+            var effectiveGateReason = ResolveGateReason(gameState, gameInputAvailable, gateReason, foreground, textInputFocused);
             if (!string.IsNullOrWhiteSpace(effectiveGateReason))
             {
-                result = BlueprintEntryHotkeyDispatchResult.Blocked(
-                    chord,
+                return BlueprintEntryHotkeyDispatchResult.Blocked(
+                    targetId,
+                    action,
+                    chord.Display,
                     effectiveGateReason,
                     IsUiGateReason(effectiveGateReason)
                         ? DiagnosticResultCode.BlockedByUi
                         : DiagnosticResultCode.BlockedByEnvironment);
             }
-            else
-            {
-                var entry = applyEntryState
-                    ? BlueprintEntryState.ApplyCommand(BlueprintEntryCommands.OpenEntryHotkey, appSettings)
-                    : BlueprintEntryCommandResult.Create(true, false, true, "opened", "蓝图入口已打开。", BlueprintEntryModes.Tool);
-                if (applyUi)
-                {
-                    LegacyMainUiState.SetVisible(true);
-                    LegacyMainUiState.SelectPage("blueprint");
-                }
 
-                result = BlueprintEntryHotkeyDispatchResult.FromEntry(chord, entry);
-            }
-
-            if (recordDiagnostic)
-            {
-                DiagnosticActionRecorder.RecordHotkeyEvent(
-                    chord.Display,
-                    Scenario,
-                    result.DiagnosticResultCode,
-                    result.Message);
-            }
-
-            return result;
+            return ApplyBlueprintAction(appSettings, targetId, action, chord.Display);
         }
 
-        private static bool TryReadBinding(HotkeySettings hotkeySettings, out FeatureToggleHotkeyChord chord)
+        private static BlueprintEntryHotkeyDispatchResult ApplyBlueprintAction(
+            AppSettings appSettings,
+            string targetId,
+            string action,
+            string chord)
+        {
+            var result = BlueprintEntryState.ApplyCommand(action, appSettings ?? AppSettings.CreateDefault());
+            BlueprintCaptureResult capture = null;
+            if (result.Succeeded &&
+                string.Equals(action, BlueprintEntryCommands.FinishCreateSave, StringComparison.Ordinal))
+            {
+                capture = BlueprintCaptureService.CapturePendingMaskAndSave(false);
+                if (capture.Succeeded)
+                {
+                    BlueprintLibraryUiState.NotifyTemplateCreated(capture.SavedTemplate);
+                    result = BlueprintEntryState.MarkCaptureSaved(capture);
+                }
+                else
+                {
+                    result = BlueprintEntryState.RecordCaptureFailure(capture);
+                }
+            }
+
+            return BlueprintEntryHotkeyDispatchResult.FromApply(targetId, action, chord, result, capture);
+        }
+
+        private static bool TryGetActionChord(HotkeySettings settings, string targetId, out FeatureToggleHotkeyChord chord)
         {
             chord = null;
-            var hotkeys = hotkeySettings == null ? null : hotkeySettings.HotkeysByFeatureId;
-            if (hotkeys == null || hotkeys.Count <= 0)
+            if (settings == null ||
+                settings.HotkeysByFeatureId == null ||
+                string.IsNullOrWhiteSpace(targetId))
             {
                 return false;
             }
 
-            string source;
-            if (!hotkeys.TryGetValue(FeatureIds.BlueprintMain, out source) ||
-                string.IsNullOrWhiteSpace(source))
-            {
-                return false;
-            }
-
-            lock (SyncRoot)
-            {
-                if (string.Equals(_sourceChord, source, StringComparison.Ordinal) && _chord != null)
-                {
-                    chord = _chord;
-                    return true;
-                }
-
-                FeatureToggleHotkeyChord parsed;
-                if (!FeatureToggleHotkeyChord.TryParse(source, out parsed))
-                {
-                    _sourceChord = string.Empty;
-                    _chord = null;
-                    return false;
-                }
-
-                _sourceChord = source;
-                _chord = parsed;
-                chord = parsed;
-                return true;
-            }
-        }
-
-        private static bool GetWasDown()
-        {
-            lock (SyncRoot)
-            {
-                return _wasDown;
-            }
-        }
-
-        private static void SetWasDown(bool value)
-        {
-            lock (SyncRoot)
-            {
-                _wasDown = value;
-            }
+            string value;
+            return settings.HotkeysByFeatureId.TryGetValue(targetId, out value) &&
+                   FeatureToggleHotkeyChord.TryParse(value, out chord);
         }
 
         private static bool IsRuntimeGateAvailable(GameStateSnapshot gameState, out string reason)
@@ -210,7 +213,7 @@ namespace JueMingZ.Input
                 return false;
             }
 
-            if (LegacyTextInput.IsAnyFocused || LegacyHexColorInput.IsAnyFocused || LegacyMultilineTextInput.IsAnyFocused)
+            if (LegacyTextInput.IsAnyFocused || LegacyHexColorInput.IsAnyFocused)
             {
                 reason = "textInputFocused";
                 return false;
@@ -241,22 +244,22 @@ namespace JueMingZ.Input
             GameStateSnapshot gameState,
             bool gameInputAvailable,
             string gateReason,
-            bool textInputFocused,
-            bool foreground)
+            bool foreground,
+            bool textInputFocused)
         {
             if (!foreground)
             {
                 return "notForeground";
             }
 
-            if (!gameInputAvailable)
-            {
-                return string.IsNullOrWhiteSpace(gateReason) ? "gameInputUnavailable" : gateReason;
-            }
-
             if (textInputFocused)
             {
                 return "textInputFocused";
+            }
+
+            if (!gameInputAvailable)
+            {
+                return string.IsNullOrWhiteSpace(gateReason) ? "gameInputUnavailable" : gateReason;
             }
 
             return ResolveGameStateGateReason(gameState);
@@ -371,6 +374,27 @@ namespace JueMingZ.Input
             return 0;
         }
 
+        private static bool GetWasDown(string targetId)
+        {
+            lock (SyncRoot)
+            {
+                return WasDownByTargetId.TryGetValue(targetId, out var value) && value;
+            }
+        }
+
+        private static void SetWasDown(string targetId, bool down)
+        {
+            lock (SyncRoot)
+            {
+                if (string.IsNullOrWhiteSpace(targetId))
+                {
+                    return;
+                }
+
+                WasDownByTargetId[targetId] = down;
+            }
+        }
+
         private static bool IsKeyDown(int virtualKey)
         {
             return virtualKey > 0 && (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
@@ -412,49 +436,71 @@ namespace JueMingZ.Input
             new BlueprintEntryHotkeyDispatchResult
             {
                 Triggered = false,
+                Applied = false,
                 DiagnosticResultCode = DiagnosticResultCode.NotApplicable,
                 Message = string.Empty,
-                Reason = string.Empty,
-                Chord = string.Empty
+                Reason = "directEntryHotkeyDisabled",
+                Chord = string.Empty,
+                TargetId = string.Empty,
+                Action = string.Empty,
+                ResultCode = string.Empty
             };
 
         public bool Triggered { get; private set; }
         public bool Applied { get; private set; }
         public string Chord { get; private set; }
+        public string TargetId { get; private set; }
+        public string Action { get; private set; }
+        public string ResultCode { get; private set; }
         public string Reason { get; private set; }
         public string Message { get; private set; }
         public DiagnosticResultCode DiagnosticResultCode { get; private set; }
 
-        public static BlueprintEntryHotkeyDispatchResult FromEntry(
-            FeatureToggleHotkeyChord chord,
-            BlueprintEntryCommandResult entry)
-        {
-            return new BlueprintEntryHotkeyDispatchResult
-            {
-                Triggered = true,
-                Applied = entry != null && entry.Succeeded,
-                Chord = chord == null ? string.Empty : chord.Display,
-                Reason = entry == null ? "unknown" : entry.ResultCode,
-                DiagnosticResultCode = entry != null && entry.Succeeded
-                    ? DiagnosticResultCode.Succeeded
-                    : DiagnosticResultCode.NotApplicable,
-                Message = entry == null ? "Blueprint entry hotkey ignored." : entry.Message
-            };
-        }
-
         public static BlueprintEntryHotkeyDispatchResult Blocked(
-            FeatureToggleHotkeyChord chord,
+            string targetId,
+            string action,
+            string chord,
             string reason,
-            DiagnosticResultCode resultCode)
+            DiagnosticResultCode diagnosticResultCode)
         {
             return new BlueprintEntryHotkeyDispatchResult
             {
                 Triggered = true,
                 Applied = false,
-                Chord = chord == null ? string.Empty : chord.Display,
+                Chord = chord ?? string.Empty,
+                TargetId = targetId ?? string.Empty,
+                Action = action ?? string.Empty,
+                ResultCode = reason ?? string.Empty,
                 Reason = reason ?? string.Empty,
-                DiagnosticResultCode = resultCode,
-                Message = "Blueprint entry hotkey blocked: " + (reason ?? string.Empty) + "."
+                Message = "蓝图动作快捷键被阻止：" + (reason ?? string.Empty) + "。",
+                DiagnosticResultCode = diagnosticResultCode
+            };
+        }
+
+        public static BlueprintEntryHotkeyDispatchResult FromApply(
+            string targetId,
+            string action,
+            string chord,
+            BlueprintEntryCommandResult entry,
+            BlueprintCaptureResult capture)
+        {
+            entry = entry ?? BlueprintEntryCommandResult.Create(false, false, false, "invalidResult", "蓝图动作快捷键执行失败。", BlueprintEntryModes.Tool);
+            var resultCode = capture == null ? entry.ResultCode : capture.ResultCode;
+            var applied = entry.Succeeded && !entry.PlaceholderOnly && (capture == null || capture.Succeeded);
+            var diagnostic = applied
+                ? DiagnosticResultCode.Succeeded
+                : entry.Succeeded ? DiagnosticResultCode.NotApplicable : DiagnosticResultCode.Failed;
+            return new BlueprintEntryHotkeyDispatchResult
+            {
+                Triggered = true,
+                Applied = applied,
+                Chord = chord ?? string.Empty,
+                TargetId = targetId ?? string.Empty,
+                Action = action ?? string.Empty,
+                ResultCode = resultCode ?? string.Empty,
+                Reason = resultCode ?? string.Empty,
+                Message = entry.Message ?? string.Empty,
+                DiagnosticResultCode = diagnostic
             };
         }
     }

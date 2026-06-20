@@ -193,7 +193,31 @@ namespace JueMingZ.Runtime
                 environment.VanillaMenuReason = "unavailable";
             }
 
+            PopulateBlueprintHandheldDynamicState(environment);
             return environment;
+        }
+
+        private static void PopulateBlueprintHandheldDynamicState(BlueprintHandheldActionBarEnvironment environment)
+        {
+            if (environment == null)
+            {
+                return;
+            }
+
+            var creation = BlueprintCreationMaskState.GetSnapshot();
+            environment.BlueprintCreationActive = creation != null && creation.Active;
+            environment.BlueprintCreationSelectedCount = creation == null ? 0 : creation.SelectedCount;
+            environment.BlueprintCreationHasPendingSelection =
+                creation != null &&
+                (creation.CompletedPendingCapture || creation.SelectedCount > 0);
+
+            var placed = BlueprintPlacedInstanceUiState.GetCachedSummary();
+            var projection = BlueprintProjectionService.GetDiagnostics();
+            var placedCount = System.Math.Max(
+                placed == null ? 0 : placed.InstanceCount,
+                projection == null ? 0 : projection.InstanceCount);
+            environment.BlueprintPlacedInstanceCount = placedCount;
+            environment.BlueprintHasPlacedInstances = placedCount > 0;
         }
     }
 }

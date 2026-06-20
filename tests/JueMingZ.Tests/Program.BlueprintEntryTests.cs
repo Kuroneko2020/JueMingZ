@@ -142,7 +142,7 @@ namespace JueMingZ.Tests
             }
         }
 
-        private static void BlueprintEntryHotkeyBlocksTextInputAndDebounces()
+        private static void BlueprintDirectEntryHotkeyIsDisabled()
         {
             BlueprintEntryHotkeyService.ResetForTesting();
             BlueprintEntryState.ResetForTesting();
@@ -156,65 +156,49 @@ namespace JueMingZ.Tests
                 BlueprintEntryDownKeys(BlueprintVkAlt, BlueprintVkB),
                 true,
                 string.Empty,
-                true);
-            if (!result.Triggered || result.Applied || !string.Equals(result.Reason, "textInputFocused", StringComparison.Ordinal))
+                false);
+            if (result.Triggered ||
+                result.Applied ||
+                !string.Equals(result.Reason, "directEntryHotkeyDisabled", StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("Expected blueprint entry hotkey to be blocked while text input is focused.");
+                throw new InvalidOperationException("Expected blueprint direct entry hotkey service to stay disabled.");
             }
 
-            BlueprintEntryHotkeyService.TickForTesting(settings, hotkeys, BlueprintEntryDownKeys(), true, string.Empty, false);
-            result = BlueprintEntryHotkeyService.TickForTesting(
-                settings,
-                hotkeys,
-                BlueprintEntryDownKeys(BlueprintVkAlt, BlueprintVkB),
-                true,
-                string.Empty,
-                false);
-            if (!result.Triggered || !result.Applied || !string.Equals(result.Reason, "opened", StringComparison.Ordinal))
+            var applied = BlueprintEntryState.ApplyCommand(BlueprintEntryCommands.OpenEntryHotkey, settings);
+            if (applied.Succeeded ||
+                !string.Equals(applied.ResultCode, "directEntryHotkeyDisabled", StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("Expected blueprint entry hotkey to open the entry shell after gate clears.");
-            }
-
-            var held = BlueprintEntryHotkeyService.TickForTesting(
-                settings,
-                hotkeys,
-                BlueprintEntryDownKeys(BlueprintVkAlt, BlueprintVkB),
-                true,
-                string.Empty,
-                false);
-            if (held.Triggered)
-            {
-                throw new InvalidOperationException("Expected blueprint entry hotkey to debounce held keys.");
+                throw new InvalidOperationException("Expected blueprint direct entry command to reject old hotkey opens.");
             }
         }
 
-        private static void BlueprintEntryHotkeyConflictRegistryReportsEntryOwner()
+        private static void BlueprintDirectEntryHotkeyIsNotAConflictSource()
         {
             var hotkeys = HotkeySettings.CreateDefault();
             hotkeys.HotkeysByFeatureId[FeatureIds.BlueprintMain] = "Alt+B";
             FeatureToggleHotkeyConflict conflict;
-            if (!FeatureToggleHotkeyConflictRegistry.TryFindConflict(
+            if (FeatureToggleHotkeyConflictRegistry.TryFindConflict(
                     hotkeys,
                     AppSettings.CreateDefault(),
                     FeatureIds.InventoryAutoStack,
                     "Alt+B",
-                    out conflict) ||
-                conflict.ConflictType != FeatureToggleHotkeyConflictType.BlueprintEntry)
+                    out conflict))
             {
-                throw new InvalidOperationException("Expected feature toggle hotkey conflicts to include the blueprint entry hotkey.");
+                throw new InvalidOperationException("Disabled blueprint direct entry hotkeys must not block other hotkey bindings.");
             }
 
             string message;
             bool changed;
-            if (!LegacyMainWindow.TryApplyBlueprintEntryHotkeyForTesting(
+            if (LegacyMainWindow.TryApplyBlueprintEntryHotkeyForTesting(
                     hotkeys,
                     AppSettings.CreateDefault(),
                     "Alt+B",
                     out message,
                     out changed) ||
-                changed)
+                changed ||
+                !message.Contains("已停用"))
             {
-                throw new InvalidOperationException("Expected blueprint entry hotkey self-save to be accepted as unchanged.");
+                throw new InvalidOperationException("Expected blueprint direct entry hotkey save to be rejected as disabled.");
             }
         }
 
@@ -250,17 +234,305 @@ namespace JueMingZ.Tests
                 throw new InvalidOperationException("Expected blueprint menu to keep library and placed-blueprint open rows.");
             }
 
+            if (LegacyMainWindow.GetBlueprintActionShortcutRowCountForTesting() != 2)
+            {
+                throw new InvalidOperationException("Expected blueprint menu to expose create/save action shortcut rows.");
+            }
+
+            AssertStringEquals(
+                LegacyMainWindow.GetBlueprintCreateActionHotkeyElementIdForTesting(),
+                "blueprint-action-hotkey:" + FeatureIds.BlueprintCreateAction,
+                "blueprint create action hotkey field id");
+            AssertStringEquals(
+                LegacyMainWindow.GetBlueprintSaveActionHotkeyElementIdForTesting(),
+                "blueprint-action-hotkey:" + FeatureIds.BlueprintSaveAction,
+                "blueprint save action hotkey field id");
+            AssertStringEquals(
+                LegacyMainWindow.GetBlueprintCreateActionElementIdForTesting(),
+                "blueprint-action-entry:" + BlueprintEntryCommands.StartCreate,
+                "blueprint create action button id");
+            AssertStringEquals(
+                LegacyMainWindow.GetBlueprintSaveActionElementIdForTesting(),
+                "blueprint-action-entry:" + BlueprintEntryCommands.FinishCreateSave,
+                "blueprint save action button id");
+            AssertContains(LegacyMainWindow.GetBlueprintActionShortcutVisualContractForTesting(), "auto-mining-hotkey-shape");
+            AssertContains(LegacyMainWindow.GetBlueprintActionShortcutVisualContractForTesting(), "real-create-save-mask-entry");
+
+            var hotkeyTooltips = LegacyMainWindow.GetBlueprintActionHotkeyTooltipLinesForTesting();
+            if (hotkeyTooltips == null ||
+                hotkeyTooltips.Length != 2 ||
+                !string.Equals(hotkeyTooltips[0], "双击录入采集按键。", StringComparison.Ordinal) ||
+                !string.Equals(hotkeyTooltips[1], "Esc 取消录入。", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected blueprint action hotkey fields to keep the auto-mining trigger capture tooltip shape.");
+            }
+
+            var buttonTooltips = LegacyMainWindow.GetBlueprintCreateSaveButtonTooltipsForTesting();
+            if (buttonTooltips == null ||
+                buttonTooltips.Length != 2 ||
+                !string.Equals(buttonTooltips[0], "左键按住滑动选区，可多选", StringComparison.Ordinal) ||
+                !string.Equals(buttonTooltips[1], "保存当前选区为蓝图", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected blueprint create/save action button tooltips to match the stage-03 contract.");
+            }
+
             LegacyMainWindow.StartAutoMiningHotkeyCapture();
             LegacyMainWindow.StartBlueprintEntryHotkeyCapture();
-            if (LegacyMainWindow.IsAutoMiningHotkeyCaptureActiveForTesting() ||
-                !LegacyMainWindow.IsBlueprintEntryHotkeyCaptureActiveForTesting() ||
+            if (!LegacyMainWindow.IsAutoMiningHotkeyCaptureActiveForTesting() ||
+                LegacyMainWindow.IsBlueprintEntryHotkeyCaptureActiveForTesting() ||
                 !LegacyMainWindow.IsAnyHotkeyCaptureActive())
             {
-                throw new InvalidOperationException("Expected blueprint hotkey capture to be mutually exclusive with auto mining capture.");
+                throw new InvalidOperationException("Disabled blueprint direct entry capture must not steal auto mining capture.");
+            }
+
+            LegacyMainWindow.StopAutoMiningHotkeyCapture();
+            LegacyMainWindow.StartBlueprintActionHotkeyCapture(FeatureIds.BlueprintCreateAction);
+            if (!LegacyMainWindow.IsBlueprintEntryHotkeyCaptureActiveForTesting() ||
+                !string.Equals(LegacyMainWindow.GetBlueprintHotkeyCaptureTargetIdForTesting(), FeatureIds.BlueprintCreateAction, StringComparison.Ordinal) ||
+                !LegacyMainWindow.IsAnyHotkeyCaptureActive())
+            {
+                throw new InvalidOperationException("Expected blueprint action hotkey capture to reuse the blueprint capture lane with an action target id.");
             }
 
             LegacyMainWindow.StopBlueprintEntryHotkeyCapture();
             LegacyMainWindow.StopAutoMiningHotkeyCapture();
+        }
+
+        private static void BlueprintActionHotkeysUseSeparateKeysAndConflictSources()
+        {
+            var hotkeys = HotkeySettings.CreateDefault();
+            string message;
+            bool changed;
+            if (!LegacyMainWindow.TryApplyBlueprintActionHotkeyForTesting(
+                    hotkeys,
+                    AppSettings.CreateDefault(),
+                    FeatureIds.BlueprintCreateAction,
+                    "Alt+C",
+                    out message,
+                    out changed) ||
+                !changed ||
+                !string.Equals(hotkeys.HotkeysByFeatureId[FeatureIds.BlueprintCreateAction], "Alt+C", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected blueprint create action hotkey to save under its own action key.");
+            }
+
+            if (hotkeys.HotkeysByFeatureId.ContainsKey(FeatureIds.BlueprintMain) ||
+                hotkeys.HotkeysByFeatureId.ContainsKey(FeatureIds.WorldAutomationAutoMining))
+            {
+                throw new InvalidOperationException("Blueprint action hotkey save must not overwrite blueprint.main or auto-mining trigger hotkeys.");
+            }
+
+            AssertStringEquals(
+                LegacyMainWindow.GetBlueprintActionHotkeyDisplayForTesting(hotkeys, FeatureIds.BlueprintCreateAction),
+                "Alt+C",
+                "blueprint create action hotkey display");
+
+            if (LegacyMainWindow.TryApplyBlueprintActionHotkeyForTesting(
+                    hotkeys,
+                    AppSettings.CreateDefault(),
+                    FeatureIds.BlueprintSaveAction,
+                    "Alt+C",
+                    out message,
+                    out changed) ||
+                !message.Contains("蓝图创建快捷键"))
+            {
+                throw new InvalidOperationException("Expected blueprint save action hotkey to conflict with the create action hotkey.");
+            }
+
+            if (!LegacyMainWindow.TryApplyBlueprintActionHotkeyForTesting(
+                    hotkeys,
+                    AppSettings.CreateDefault(),
+                    FeatureIds.BlueprintSaveAction,
+                    "Alt+S",
+                    out message,
+                    out changed) ||
+                !changed)
+            {
+                throw new InvalidOperationException("Expected blueprint save action hotkey to save under its own action key.");
+            }
+
+            FeatureToggleHotkeyConflict conflict;
+            if (!FeatureToggleHotkeyConflictRegistry.TryFindConflict(
+                    hotkeys,
+                    AppSettings.CreateDefault(),
+                    "buff.auto_heal",
+                    "Alt+S",
+                    out conflict) ||
+                conflict.ConflictType != FeatureToggleHotkeyConflictType.BlueprintAction ||
+                !string.Equals(conflict.OwnerTargetId, FeatureIds.BlueprintSaveAction, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected feature toggle conflict registry to report blueprint action hotkeys.");
+            }
+
+            var autoMiningSettings = HotkeySettings.CreateDefault();
+            autoMiningSettings.HotkeysByFeatureId[FeatureIds.WorldAutomationAutoMining] = "Ctrl+F8";
+            if (LegacyMainWindow.TryApplyBlueprintActionHotkeyForTesting(
+                    autoMiningSettings,
+                    AppSettings.CreateDefault(),
+                    FeatureIds.BlueprintCreateAction,
+                    "Ctrl+F8",
+                    out message,
+                    out changed) ||
+                !message.Contains("自动挖矿 的采集按键"))
+            {
+                throw new InvalidOperationException("Expected blueprint action hotkeys to respect the auto-mining trigger conflict source.");
+            }
+        }
+
+        private static void BlueprintCreateSaveActionCommandsEnterMaskAndSaveWithoutProjectionScan()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-action-shortcuts-real");
+            try
+            {
+                ConfigService.Initialize();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintEntryState.ResetForTesting();
+                BlueprintCreationMaskState.ResetForTesting();
+                BlueprintEntryHotkeyService.ResetForTesting();
+
+                var projectionReader = new FakeBlueprintWorldTileReader();
+                var captureReader = new FakeBlueprintWorldTileReader();
+                captureReader.Set(10, 20, new BlueprintWorldTileSnapshot
+                {
+                    Active = true,
+                    TileType = 1,
+                    TileMaterialItemId = 3,
+                    TileDisplayName = "Dirt Block"
+                });
+                var inventoryReader = new FakeBlueprintMaterialInventoryReader();
+                BlueprintProjectionService.SetDependenciesForTesting(
+                    new BlueprintWorldInstanceStore(),
+                    BlueprintPlacementWorldContext.Success("pair-action-shortcut", "world-action-shortcut"),
+                    projectionReader,
+                    true);
+                BlueprintMaterialService.SetInventoryReaderForTesting(inventoryReader, true);
+                BlueprintCaptureService.SetCaptureDependenciesForTesting(captureReader, new BlueprintTemplateLibraryStore());
+
+                LegacyUiActionService.HandleBlueprintActionEntryCommandForTesting(new LegacyUiCommand
+                {
+                    ElementId = LegacyMainWindow.GetBlueprintCreateActionElementIdForTesting(),
+                    Label = "蓝图:创建蓝图:开始",
+                    Kind = "button",
+                    MouseCaptured = true
+                });
+                var entry = BlueprintEntryState.GetSnapshot(AppSettings.CreateDefault());
+                var creation = BlueprintCreationMaskState.GetSnapshot();
+                if (!string.Equals(entry.Mode, BlueprintEntryModes.Creating, StringComparison.Ordinal) ||
+                    !creation.Active ||
+                    creation.SelectedCount != 0)
+                {
+                    throw new InvalidOperationException("Expected stage-06 F5 create action to enter real mask creation mode.");
+                }
+
+                ClickTileForBlueprintCreation(10, 20);
+                LegacyUiActionService.HandleBlueprintActionEntryCommandForTesting(new LegacyUiCommand
+                {
+                    ElementId = LegacyMainWindow.GetBlueprintSaveActionElementIdForTesting(),
+                    Label = "蓝图:保存蓝图:保存",
+                    Kind = "button",
+                    MouseCaptured = true
+                });
+
+                entry = BlueprintEntryState.GetSnapshot(AppSettings.CreateDefault());
+                creation = BlueprintCreationMaskState.GetSnapshot();
+                if (!string.Equals(entry.Mode, BlueprintEntryModes.Tool, StringComparison.Ordinal) ||
+                    creation.Active ||
+                    creation.CompletedPendingCapture ||
+                    string.IsNullOrWhiteSpace(entry.SelectedTemplateId) ||
+                    captureReader.ReadCount <= 0)
+                {
+                    throw new InvalidOperationException("Expected stage-06 F5 save action to capture the pending mask and return to tool mode.");
+                }
+
+                if (projectionReader.ReadCount != 0 || inventoryReader.ReadCount != 0)
+                {
+                    throw new InvalidOperationException("Stage-06 create/save actions must not refresh blueprint projection or material inventory caches.");
+                }
+
+                BlueprintEntryState.ResetForTesting();
+                BlueprintCreationMaskState.ResetForTesting();
+                BlueprintEntryHotkeyService.ResetForTesting();
+
+                var hotkeys = HotkeySettings.CreateDefault();
+                hotkeys.HotkeysByFeatureId[FeatureIds.BlueprintCreateAction] = "Alt+C";
+                hotkeys.HotkeysByFeatureId[FeatureIds.BlueprintSaveAction] = "Alt+S";
+                var downKeys = new Dictionary<int, bool>
+                {
+                    [0x12] = true,
+                    ['C'] = true
+                };
+                var createHotkey = BlueprintEntryHotkeyService.TickForTesting(
+                    AppSettings.CreateDefault(),
+                    hotkeys,
+                    downKeys,
+                    true,
+                    string.Empty,
+                    false);
+                if (!createHotkey.Triggered ||
+                    !createHotkey.Applied ||
+                    !string.Equals(createHotkey.Action, BlueprintEntryCommands.StartCreate, StringComparison.Ordinal) ||
+                    !BlueprintCreationMaskState.GetSnapshot().Active)
+                {
+                    throw new InvalidOperationException("Expected blueprint create action hotkey to enter real mask creation mode.");
+                }
+
+                var heldHotkey = BlueprintEntryHotkeyService.TickForTesting(
+                    AppSettings.CreateDefault(),
+                    hotkeys,
+                    downKeys,
+                    true,
+                    string.Empty,
+                    false);
+                if (heldHotkey.Triggered)
+                {
+                    throw new InvalidOperationException("Expected blueprint action hotkey to fire only on the press edge.");
+                }
+
+                ClickTileForBlueprintCreation(10, 20);
+                downKeys['C'] = false;
+                downKeys['S'] = true;
+                var saveHotkey = BlueprintEntryHotkeyService.TickForTesting(
+                    AppSettings.CreateDefault(),
+                    hotkeys,
+                    downKeys,
+                    true,
+                    string.Empty,
+                    false);
+                if (!saveHotkey.Triggered ||
+                    !saveHotkey.Applied ||
+                    !string.Equals(saveHotkey.Action, BlueprintEntryCommands.FinishCreateSave, StringComparison.Ordinal) ||
+                    BlueprintCreationMaskState.GetSnapshot().CompletedPendingCapture)
+                {
+                    throw new InvalidOperationException("Expected blueprint save action hotkey to capture and save the pending mask.");
+                }
+
+                downKeys['S'] = false;
+                var blocked = BlueprintEntryHotkeyService.TickForTesting(
+                    AppSettings.CreateDefault(),
+                    hotkeys,
+                    new Dictionary<int, bool> { [0x12] = true, ['C'] = true },
+                    true,
+                    string.Empty,
+                    true);
+                if (!blocked.Triggered ||
+                    blocked.Applied ||
+                    blocked.DiagnosticResultCode != DiagnosticResultCode.BlockedByUi)
+                {
+                    throw new InvalidOperationException("Expected blueprint action hotkey to be blocked while text input is focused.");
+                }
+            }
+            finally
+            {
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintCaptureService.ResetForTesting();
+                BlueprintEntryState.ResetForTesting();
+                BlueprintCreationMaskState.ResetForTesting();
+                BlueprintEntryHotkeyService.ResetForTesting();
+                ConfigService.ResetSettingsForTesting();
+                restore();
+            }
         }
 
         private static void BlueprintMenuUiStateDoesNotRefreshProjectionOrMaterials()

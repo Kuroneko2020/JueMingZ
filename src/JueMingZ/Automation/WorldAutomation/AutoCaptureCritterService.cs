@@ -329,7 +329,7 @@ namespace JueMingZ.Automation.WorldAutomation
                 return;
             }
 
-            var blockedReason = GetExecutionBlockedReason(gameState);
+            var blockedReason = GetExecutionBlockedReason(gameState, mode);
             if (!string.IsNullOrEmpty(blockedReason))
             {
                 RecordFairnessUnavailable(tick, blockedReason);
@@ -1111,7 +1111,7 @@ namespace JueMingZ.Automation.WorldAutomation
                    !snapshot.Player.Ghost;
         }
 
-        private static string GetExecutionBlockedReason(GameStateSnapshot snapshot)
+        private static string GetExecutionBlockedReason(GameStateSnapshot snapshot, string mode)
         {
             if (snapshot == null || !snapshot.IsInWorld)
             {
@@ -1148,12 +1148,33 @@ namespace JueMingZ.Automation.WorldAutomation
                 return "blocked: chest UI open";
             }
 
-            if (snapshot.Ui.PlayerInventoryOpen)
+            if (snapshot.Ui.PlayerInventoryOpen &&
+                !CanRunManualCaptureWithInventoryOpen(snapshot, mode))
             {
                 return "blocked: player inventory UI open";
             }
 
             return string.Empty;
+        }
+
+        private static bool CanRunManualCaptureWithInventoryOpen(GameStateSnapshot snapshot, string mode)
+        {
+            mode = AutoCaptureCritterModes.Normalize(mode);
+            if (!string.Equals(mode, AutoCaptureCritterModes.Manual, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            BugNetCandidate bugNet;
+            string message;
+            if (!TryFindHeldBugNet(snapshot, out bugNet, out message) || bugNet == null)
+            {
+                return false;
+            }
+
+            // Inventory-open capture is only safe when the player already selected a hotbar bug net.
+            // Auto mode still needs inventory slot switching and remains fail-closed while the bag is open.
+            return bugNet.Slot >= 0 && bugNet.Slot < 10;
         }
 
         private static bool IsQueueBusy(InputActionQueue queue)

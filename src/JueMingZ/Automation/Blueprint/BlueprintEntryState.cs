@@ -171,12 +171,12 @@ namespace JueMingZ.Automation.Blueprint
                 case BlueprintEntryCommands.OpenEntryHotkey:
                     return RecordNotice(
                         "hotkey",
-                        "opened",
-                        "蓝图入口已打开。",
+                        "directEntryHotkeyDisabled",
+                        "蓝图页直接打开快捷键已停用。",
                         _mode,
                         false,
                         false,
-                        true);
+                        false);
                 case BlueprintEntryCommands.StartCreate:
                     BlueprintPlacementPreviewState.Cancel();
                     BlueprintEraseRegionState.Cancel();

@@ -10,6 +10,7 @@ using JueMingZ.Automation.Fishing.Filtering;
 using JueMingZ.Automation.Information;
 using JueMingZ.Automation.Movement;
 using JueMingZ.Compat;
+using JueMingZ.Common;
 using JueMingZ.Config;
 using JueMingZ.Diagnostics;
 using JueMingZ.Runtime;
@@ -268,6 +269,8 @@ namespace JueMingZ.UI.Legacy
             _quickItemHotkeyCaptureBindingIndex = bindingIndex;
             _autoMiningHotkeyCaptureActive = false;
             _blueprintEntryHotkeyCaptureActive = false;
+            _blueprintHotkeyCaptureTargetId = string.Empty;
+            _blueprintEntryHotkeyMessage = string.Empty;
             _mapQuickAnnouncementHotkeyCaptureSlot = string.Empty;
             CloseFeatureToggleHotkeyModal();
             AutoMiningCaptureWasDown.Clear();
@@ -304,6 +307,24 @@ namespace JueMingZ.UI.Legacy
 
         public static void StartBlueprintEntryHotkeyCapture()
         {
+            StopBlueprintEntryHotkeyCapture();
+            _blueprintEntryHotkeyMessage = "直接打开蓝图页快捷键已停用";
+        }
+
+        public static void StartBlueprintActionHotkeyCapture(string targetId)
+        {
+            StartBlueprintHotkeyCapture(targetId);
+        }
+
+        private static void StartBlueprintHotkeyCapture(string targetId)
+        {
+            var normalizedTargetId = NormalizeBlueprintHotkeyTargetId(targetId);
+            if (normalizedTargetId.Length <= 0)
+            {
+                StopBlueprintEntryHotkeyCapture();
+                return;
+            }
+
             CloseQuickItemPicker();
             CloseAutoSellPicker();
             CloseAutoDiscardPicker();
@@ -312,6 +333,7 @@ namespace JueMingZ.UI.Legacy
             StopMapQuickAnnouncementHotkeyCapture();
             CloseFeatureToggleHotkeyModal();
             _blueprintEntryHotkeyCaptureActive = true;
+            _blueprintHotkeyCaptureTargetId = normalizedTargetId;
             _blueprintEntryHotkeyMessage = string.Empty;
             BlueprintEntryCaptureWasDown.Clear();
             SeedBlueprintEntryHotkeyCaptureState();
@@ -320,6 +342,8 @@ namespace JueMingZ.UI.Legacy
         public static void StopBlueprintEntryHotkeyCapture()
         {
             _blueprintEntryHotkeyCaptureActive = false;
+            _blueprintHotkeyCaptureTargetId = string.Empty;
+            _blueprintEntryHotkeyMessage = string.Empty;
             BlueprintEntryCaptureWasDown.Clear();
         }
 

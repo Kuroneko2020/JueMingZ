@@ -296,6 +296,18 @@ namespace JueMingZ.Input
                 return;
             }
 
+            if (command.ElementId.StartsWith("blueprint-action-hotkey:", StringComparison.Ordinal))
+            {
+                HandleBlueprintActionHotkeyCommand(command, command.ElementId.Substring("blueprint-action-hotkey:".Length));
+                return;
+            }
+
+            if (command.ElementId.StartsWith("blueprint-action-entry:", StringComparison.Ordinal))
+            {
+                HandleBlueprintActionEntryCommand(command, command.ElementId.Substring("blueprint-action-entry:".Length));
+                return;
+            }
+
             if (command.ElementId.StartsWith("blueprint-tool-item:", StringComparison.Ordinal))
             {
                 HandleBlueprintToolItemCommand(command, command.ElementId.Substring("blueprint-tool-item:".Length));

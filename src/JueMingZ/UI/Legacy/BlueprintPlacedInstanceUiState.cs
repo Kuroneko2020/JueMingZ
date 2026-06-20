@@ -40,6 +40,23 @@ namespace JueMingZ.UI.Legacy
         }
     }
 
+    internal sealed class BlueprintPlacedInstanceCachedSummary
+    {
+        public bool Loaded { get; set; }
+        public bool LoadSucceeded { get; set; }
+        public string LoadResultCode { get; set; }
+        public string WorldPairKey { get; set; }
+        public string WorldKey { get; set; }
+        public int InstanceCount { get; set; }
+
+        public BlueprintPlacedInstanceCachedSummary()
+        {
+            LoadResultCode = string.Empty;
+            WorldPairKey = string.Empty;
+            WorldKey = string.Empty;
+        }
+    }
+
     internal sealed class BlueprintPlacedInstanceCommandResult
     {
         private BlueprintPlacedInstanceCommandResult()
@@ -108,6 +125,22 @@ namespace JueMingZ.UI.Legacy
             {
                 EnsureLoadedLocked();
                 return BuildSnapshotLocked();
+            }
+        }
+
+        public static BlueprintPlacedInstanceCachedSummary GetCachedSummary()
+        {
+            lock (SyncRoot)
+            {
+                return new BlueprintPlacedInstanceCachedSummary
+                {
+                    Loaded = _loaded,
+                    LoadSucceeded = _lastLoadResult == null || _lastLoadResult.Succeeded,
+                    LoadResultCode = _lastLoadResult == null ? string.Empty : _lastLoadResult.ResultCode,
+                    WorldPairKey = _worldPairKey,
+                    WorldKey = _worldKey,
+                    InstanceCount = _loaded ? GetInstanceCountLocked() : 0
+                };
             }
         }
 

@@ -33,6 +33,9 @@ namespace JueMingZ.Tests
 {
     internal static partial class Program
     {
+        private const int AutoMiningVkAlt = 0x12;
+        private const int AutoMiningVkK = 0x4B;
+
         private static void AutoMiningScannerLinksThreeTileGaps()
         {
             var points = new HashSet<string>(StringComparer.Ordinal)
@@ -226,6 +229,130 @@ namespace JueMingZ.Tests
                 !AutoMiningCompat.IsPickPowerSufficientForTileForTesting(56, 400, 55))
             {
                 throw new InvalidOperationException("Auto mining must preserve Terraria's 55 pick power gate for obsidian.");
+            }
+        }
+
+        private static void AutoMiningHotkeyInputTriggersAndDebounces()
+        {
+            AutoMiningHotkeyInput.ResetForTesting();
+            var now = new DateTime(2026, 6, 20, 0, 0, 0, DateTimeKind.Utc);
+
+            var first = AutoMiningHotkeyInput.ConsumePressedForTesting(
+                "Alt+K",
+                AutoMiningDownKeys(AutoMiningVkAlt, AutoMiningVkK),
+                false,
+                string.Empty,
+                true,
+                now);
+            if (!first.PressedEdge ||
+                !first.Accepted ||
+                !string.Equals(first.Display, "Alt+K", StringComparison.Ordinal) ||
+                !string.Equals(first.Reason, "accepted", StringComparison.Ordinal) ||
+                first.DiagnosticResultCode != DiagnosticResultCode.Succeeded)
+            {
+                throw new InvalidOperationException("Auto mining hotkey input should accept a fresh trigger edge.");
+            }
+
+            var held = AutoMiningHotkeyInput.ConsumePressedForTesting(
+                "Alt+K",
+                AutoMiningDownKeys(AutoMiningVkAlt, AutoMiningVkK),
+                false,
+                string.Empty,
+                true,
+                now.AddMilliseconds(50));
+            if (held.PressedEdge || held.Accepted || !string.Equals(held.Reason, "held", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Auto mining hotkey input must debounce held keys.");
+            }
+
+            AutoMiningHotkeyInput.ConsumePressedForTesting("Alt+K", AutoMiningDownKeys(), false, string.Empty, true, now.AddMilliseconds(60));
+            var tooSoon = AutoMiningHotkeyInput.ConsumePressedForTesting(
+                "Alt+K",
+                AutoMiningDownKeys(AutoMiningVkAlt, AutoMiningVkK),
+                false,
+                string.Empty,
+                true,
+                now.AddMilliseconds(100));
+            if (!tooSoon.PressedEdge || tooSoon.Accepted || !string.Equals(tooSoon.Reason, "debounce", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Auto mining hotkey input must reject rapid re-presses inside the debounce window.");
+            }
+
+            AutoMiningHotkeyInput.ConsumePressedForTesting("Alt+K", AutoMiningDownKeys(), false, string.Empty, true, now.AddMilliseconds(260));
+            var afterWindow = AutoMiningHotkeyInput.ConsumePressedForTesting(
+                "Alt+K",
+                AutoMiningDownKeys(AutoMiningVkAlt, AutoMiningVkK),
+                false,
+                string.Empty,
+                true,
+                now.AddMilliseconds(300));
+            if (!afterWindow.PressedEdge || !afterWindow.Accepted)
+            {
+                throw new InvalidOperationException("Auto mining hotkey input should re-arm after release and debounce expiry.");
+            }
+        }
+
+        private static void AutoMiningHotkeyInputReportsBlockedReasons()
+        {
+            AutoMiningHotkeyInput.ResetForTesting();
+            var now = new DateTime(2026, 6, 20, 0, 1, 0, DateTimeKind.Utc);
+            var blocked = AutoMiningHotkeyInput.ConsumePressedForTesting(
+                "Alt+K",
+                AutoMiningDownKeys(AutoMiningVkAlt, AutoMiningVkK),
+                true,
+                "textInputFocused",
+                true,
+                now);
+            if (!blocked.PressedEdge ||
+                blocked.Accepted ||
+                !string.Equals(blocked.Reason, "textInputFocused", StringComparison.Ordinal) ||
+                blocked.DiagnosticResultCode != DiagnosticResultCode.BlockedByUi)
+            {
+                throw new InvalidOperationException("Auto mining hotkey input should report text-input gate blockers.");
+            }
+
+            var heldAfterGate = AutoMiningHotkeyInput.ConsumePressedForTesting(
+                "Alt+K",
+                AutoMiningDownKeys(AutoMiningVkAlt, AutoMiningVkK),
+                false,
+                string.Empty,
+                true,
+                now.AddMilliseconds(300));
+            if (heldAfterGate.PressedEdge || heldAfterGate.Accepted)
+            {
+                throw new InvalidOperationException("Auto mining hotkey input must require release after a blocked press.");
+            }
+
+            AutoMiningHotkeyInput.ResetForTesting();
+            var unfocused = AutoMiningHotkeyInput.ConsumePressedForTesting(
+                "Alt+K",
+                AutoMiningDownKeys(AutoMiningVkAlt, AutoMiningVkK),
+                false,
+                string.Empty,
+                false,
+                now);
+            if (!unfocused.PressedEdge ||
+                unfocused.Accepted ||
+                !string.Equals(unfocused.Reason, "notForeground", StringComparison.Ordinal) ||
+                unfocused.DiagnosticResultCode != DiagnosticResultCode.BlockedByEnvironment)
+            {
+                throw new InvalidOperationException("Auto mining hotkey input should report lost-focus blockers.");
+            }
+
+            AutoMiningHotkeyInput.ResetForTesting();
+            var gameInputUnavailable = AutoMiningHotkeyInput.ConsumePressedForTesting(
+                "Alt+K",
+                AutoMiningDownKeys(AutoMiningVkAlt, AutoMiningVkK),
+                true,
+                "gameInputUnavailable",
+                true,
+                now);
+            if (!gameInputUnavailable.PressedEdge ||
+                gameInputUnavailable.Accepted ||
+                !string.Equals(gameInputUnavailable.Reason, "gameInputUnavailable", StringComparison.Ordinal) ||
+                gameInputUnavailable.DiagnosticResultCode != DiagnosticResultCode.BlockedByEnvironment)
+            {
+                throw new InvalidOperationException("Auto mining hotkey input should report game-input blockers.");
             }
         }
 
@@ -457,6 +584,110 @@ namespace JueMingZ.Tests
             if (!AutoMiningService.ShouldIgnoreManualObservationForTesting(null, 100, 112, 40, 40))
             {
                 throw new InvalidOperationException("Auto mining should keep the short no-selection self-noise guard after its own mining tick.");
+            }
+        }
+
+        private static void AutoMiningAutoModeObservationSubmitsSustainedRequest()
+        {
+            var previousTile = Terraria.Main.tile;
+            var previousMaxTilesX = Terraria.Main.maxTilesX;
+            var previousMaxTilesY = Terraria.Main.maxTilesY;
+            var previousLocalPlayer = Terraria.Main.LocalPlayer;
+            var previousPlayer0 = Terraria.Main.player[0];
+            var previousMyPlayer = Terraria.Main.myPlayer;
+            var previousGameUpdateCount = Terraria.Main.GameUpdateCount;
+            var restoreMainType = PushFakeTerrariaMainType();
+
+            try
+            {
+                AutoMiningService.ResetForTesting();
+                Terraria.Main.tile = new object[64, 64];
+                Terraria.Main.maxTilesX = 64;
+                Terraria.Main.maxTilesY = 64;
+                Terraria.Main.GameUpdateCount = 1000;
+                SetTestTile(11, 10, true, 7);
+                SetTestTile(12, 10, true, 7);
+
+                var player = new Terraria.Player
+                {
+                    whoAmI = 0,
+                    selectedItem = 2,
+                    position = new Terraria.TestVector2 { X = 160f, Y = 160f },
+                    width = 20,
+                    height = 42
+                };
+                player.inventory[2] = new FakeItem
+                {
+                    type = 777,
+                    stack = 1,
+                    Name = "Test Pickaxe",
+                    pick = 35
+                };
+                Terraria.Main.LocalPlayer = player;
+                Terraria.Main.player[0] = player;
+                Terraria.Main.myPlayer = 0;
+
+                AutoMiningService.ObserveManualTileMined(10, 10, 7, 777, 2);
+                var settings = AppSettings.CreateDefault();
+                settings.WorldAutomationAutoMiningMode = AutoMiningModes.Auto;
+                var queue = new InputActionQueue();
+                var gameState = new GameStateSnapshot
+                {
+                    IsInWorld = true,
+                    Player = new PlayerStateSnapshot
+                    {
+                        Exists = true,
+                        Active = true,
+                        PositionX = 160f,
+                        PositionY = 160f
+                    }
+                };
+
+                AutoMiningService.Tick(
+                    queue,
+                    gameState,
+                    new RuntimeState { UpdateCount = 1001 },
+                    RuntimeSettingsSnapshot.FromSettings(settings));
+
+                var queueSnapshot = queue.GetSnapshot();
+                if (queueSnapshot.PendingCount != 1)
+                {
+                    var failureDiagnostics = AutoMiningService.GetDiagnostics();
+                    throw new InvalidOperationException(
+                        "Expected Auto mode PickTile observation to submit sustained mining, got " +
+                        queueSnapshot.PendingCount.ToString(CultureInfo.InvariantCulture) +
+                        ". LastDecision=" +
+                        (failureDiagnostics == null ? "<null>" : failureDiagnostics.LastDecision));
+                }
+
+                var diagnostics = AutoMiningService.GetDiagnostics();
+                if (diagnostics == null ||
+                    diagnostics.LastDecision == null ||
+                    diagnostics.LastDecision.IndexOf("sustained mining target refreshed", StringComparison.Ordinal) < 0)
+                {
+                    throw new InvalidOperationException("Auto mining Auto mode should refresh a sustained target after the manual PickTile observation.");
+                }
+
+                var overlay = AutoMiningService.GetOverlaySnapshot();
+                if (overlay == null ||
+                    !string.Equals(overlay.Mode, AutoMiningModes.Auto, StringComparison.Ordinal) ||
+                    overlay.Tiles == null ||
+                    overlay.Tiles.Count <= 0)
+                {
+                    throw new InvalidOperationException("Auto mining Auto mode should keep the observed vein selection for overlay and target refresh.");
+                }
+            }
+            finally
+            {
+                AutoMiningService.ResetForTesting();
+                Terraria.Main.tile = previousTile;
+                Terraria.Main.maxTilesX = previousMaxTilesX;
+                Terraria.Main.maxTilesY = previousMaxTilesY;
+                Terraria.Main.LocalPlayer = previousLocalPlayer;
+                Terraria.Main.player[0] = previousPlayer0;
+                Terraria.Main.myPlayer = previousMyPlayer;
+                Terraria.Main.GameUpdateCount = previousGameUpdateCount;
+                restoreMainType();
             }
         }
 
@@ -924,6 +1155,89 @@ namespace JueMingZ.Tests
             AssertMetadata(request, ActionMetadataKeys.TargetSlot, "6");
             AssertMetadata(request, "AutoCaptureCritterMode", AutoCaptureCritterModes.Manual);
             AssertMetadata(request, "BugNetCatchTool", "1");
+        }
+
+        private static void AutoCaptureCritterManualInventoryOpenRequiresSelectedHotbarBugNet()
+        {
+            var queue = new InputActionQueue();
+            var snapshot = new GameStateSnapshot
+            {
+                IsInWorld = true,
+                Player = new PlayerStateSnapshot
+                {
+                    Exists = true,
+                    Active = true,
+                    PositionX = 100f,
+                    PositionY = 100f
+                },
+                Ui = new UiStateSnapshot
+                {
+                    PlayerInventoryOpen = true
+                },
+                Inventory = new InventorySnapshot
+                {
+                    SelectedItemSlot = 0,
+                    SelectedItem = new InventoryItemSnapshot { SlotIndex = 0, Type = TerrariaBugNetCompat.BugNetItemType, Name = "Bug Net", Stack = 1 },
+                    Items = new List<InventoryItemSnapshot>
+                    {
+                        new InventoryItemSnapshot { SlotIndex = 0, Type = TerrariaBugNetCompat.BugNetItemType, Name = "Bug Net", Stack = 1 }
+                    }
+                },
+                Npcs = new NpcSummarySnapshot
+                {
+                    CatchableCritters = new List<NpcSnapshot>
+                    {
+                        new NpcSnapshot { Active = true, WhoAmI = 12, Type = 616, CatchItem = 4464, PositionX = 136f, PositionY = 108f, CenterX = 144f, CenterY = 116f, Width = 16, Height = 16 }
+                    }
+                }
+            };
+
+            var settings = AppSettings.CreateDefault();
+            settings.WorldAutomationAutoCaptureCritterMode = AutoCaptureCritterModes.Manual;
+            try
+            {
+                AutoCaptureCritterService.ResetForTesting();
+                AutoCaptureCritterService.Tick(
+                    queue,
+                    snapshot,
+                    new RuntimeState { UpdateCount = 100 },
+                    RuntimeSettingsSnapshot.FromSettings(settings));
+
+                var queueSnapshot = queue.GetSnapshot();
+                if (queueSnapshot.PendingCount != 1)
+                {
+                    throw new InvalidOperationException("Manual auto capture should run with inventory open when the selected hotbar item is a bug net.");
+                }
+
+                var diagnostics = AutoCaptureCritterService.GetDiagnostics();
+                AssertStringEquals(diagnostics.LastDecision, "submitted sustained capture request", "manual inventory-open capture decision");
+                if (diagnostics.BugNetSlot != 0 || diagnostics.TargetNpcIndex != 12)
+                {
+                    throw new InvalidOperationException("Manual inventory-open capture should keep the selected hotbar bug net and target NPC.");
+                }
+
+                AutoCaptureCritterService.ResetForTesting();
+                queue = new InputActionQueue();
+                settings.WorldAutomationAutoCaptureCritterMode = AutoCaptureCritterModes.Auto;
+                AutoCaptureCritterService.Tick(
+                    queue,
+                    snapshot,
+                    new RuntimeState { UpdateCount = 200 },
+                    RuntimeSettingsSnapshot.FromSettings(settings));
+
+                queueSnapshot = queue.GetSnapshot();
+                if (queueSnapshot.PendingCount != 0)
+                {
+                    throw new InvalidOperationException("Auto capture Auto mode must remain blocked while the player inventory is open.");
+                }
+
+                diagnostics = AutoCaptureCritterService.GetDiagnostics();
+                AssertStringEquals(diagnostics.LastDecision, "blocked: player inventory UI open", "auto inventory-open capture decision");
+            }
+            finally
+            {
+                AutoCaptureCritterService.ResetForTesting();
+            }
         }
 
         private static void AutoCaptureCritterCategoryDefaultsEnableAllOptions()
@@ -1561,6 +1875,17 @@ namespace JueMingZ.Tests
             {
                 throw new InvalidOperationException("Auto mining overlay must not draw per-tile borders; dense selections should not become a grid.");
             }
+        }
+
+        private static Dictionary<int, bool> AutoMiningDownKeys(params int[] keys)
+        {
+            var down = new Dictionary<int, bool>();
+            for (var index = 0; keys != null && index < keys.Length; index++)
+            {
+                down[keys[index]] = true;
+            }
+
+            return down;
         }
 
         private sealed class AutoMiningFallbackReachPlayer

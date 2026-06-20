@@ -11,46 +11,119 @@ namespace JueMingZ.Input
         private static void HandleBlueprintEntryHotkeyCommand(LegacyUiCommand command, string payload)
         {
             var before = BuildBlueprintUiStateJson();
-            if (!string.Equals(payload, "capture", StringComparison.OrdinalIgnoreCase))
-            {
-                Record(
-                    command,
-                    "Ui.Blueprint.EntryHotkey",
-                    "UI",
-                    "Rejected",
-                    "Unknown blueprint hotkey command.",
-                    before,
-                    BuildBlueprintUiStateJson(),
-                    "{\"submitted\":false,\"implemented\":false,\"uiOnly\":true,\"payload\":\"" + EscapeJson(payload) + "\",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
-                    "Button");
-                return;
-            }
-
-            if (!command.IsDoubleClick)
-            {
-                Record(
-                    command,
-                    "Ui.Blueprint.EntryHotkey",
-                    "UI",
-                    "NotApplicable",
-                    "Double-click the blueprint entry hotkey field to capture a key.",
-                    before,
-                    BuildBlueprintUiStateJson(),
-                    "{\"submitted\":false,\"implemented\":true,\"uiOnly\":true,\"doubleClick\":false,\"captureActive\":false,\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
-                    "Button");
-                return;
-            }
-
-            LegacyMainWindow.StartBlueprintEntryHotkeyCapture();
             Record(
                 command,
                 "Ui.Blueprint.EntryHotkey",
                 "UI",
-                "Succeeded",
-                "Blueprint entry hotkey capture is now active.",
+                "NotApplicable",
+                "Blueprint direct entry hotkey capture is disabled.",
                 before,
                 BuildBlueprintUiStateJson(),
-                "{\"submitted\":false,\"implemented\":true,\"uiOnly\":true,\"doubleClick\":true,\"captureActive\":true,\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                "{\"submitted\":false,\"implemented\":false,\"uiOnly\":true,\"payload\":\"" + EscapeJson(payload) + "\",\"resultCode\":\"directEntryHotkeyDisabled\",\"captureActive\":false,\"mouseCaptured\":" + BoolRaw(command != null && command.MouseCaptured) + "}",
+                "Button");
+        }
+
+        private static void HandleBlueprintActionHotkeyCommand(LegacyUiCommand command, string payload)
+        {
+            var before = BuildBlueprintUiStateJson();
+            var targetId = NormalizeBlueprintActionHotkeyTargetId(payload);
+            if (targetId.Length <= 0)
+            {
+                Record(
+                    command,
+                    "Ui.Blueprint.ActionHotkey",
+                    "UI",
+                    "Rejected",
+                    "Unknown blueprint action hotkey target.",
+                    before,
+                    BuildBlueprintUiStateJson(),
+                    "{\"submitted\":false,\"implemented\":false,\"uiOnly\":true,\"payload\":\"" + EscapeJson(payload) + "\",\"mouseCaptured\":" + BoolRaw(command != null && command.MouseCaptured) + "}",
+                    "Button");
+                return;
+            }
+
+            if (command == null || !command.IsDoubleClick)
+            {
+                Record(
+                    command,
+                    "Ui.Blueprint.ActionHotkey",
+                    "UI",
+                    "NotApplicable",
+                    "Double-click the blueprint action hotkey field to capture a key.",
+                    before,
+                    BuildBlueprintUiStateJson(),
+                    "{\"submitted\":false,\"implemented\":true,\"uiOnly\":true,\"doubleClick\":false,\"captureActive\":false,\"hotkeyFeatureId\":\"" + EscapeJson(targetId) + "\",\"actionLabel\":\"" + EscapeJson(BuildBlueprintActionHotkeyLabel(targetId)) + "\",\"mouseCaptured\":" + BoolRaw(command != null && command.MouseCaptured) + "}",
+                    "Button");
+                return;
+            }
+
+            LegacyMainWindow.StartBlueprintActionHotkeyCapture(targetId);
+            Record(
+                command,
+                "Ui.Blueprint.ActionHotkey",
+                "UI",
+                "Succeeded",
+                "Blueprint action hotkey capture is now active.",
+                before,
+                BuildBlueprintUiStateJson(),
+                "{\"submitted\":false,\"implemented\":true,\"uiOnly\":true,\"doubleClick\":true,\"captureActive\":true,\"hotkeyFeatureId\":\"" + EscapeJson(targetId) + "\",\"actionLabel\":\"" + EscapeJson(BuildBlueprintActionHotkeyLabel(targetId)) + "\",\"mouseCaptured\":" + BoolRaw(command != null && command.MouseCaptured) + "}",
+                "Button");
+        }
+
+        private static void HandleBlueprintActionEntryCommand(LegacyUiCommand command, string payload)
+        {
+            var before = BuildBlueprintUiStateJson();
+            var normalizedAction = NormalizeBlueprintActionEntryPayload(payload);
+            if (normalizedAction.Length <= 0)
+            {
+                Record(
+                    command,
+                    "Ui.Blueprint.CreateSaveEntry",
+                    "UI",
+                    "Rejected",
+                    "Unknown blueprint create/save entry command.",
+                    before,
+                    BuildBlueprintUiStateJson(),
+                    "{\"submitted\":false,\"implemented\":false,\"uiOnly\":true,\"payload\":\"" + EscapeJson(payload) + "\",\"resultCode\":\"invalidAction\",\"mouseCaptured\":" + BoolRaw(command != null && command.MouseCaptured) + "}",
+                    "Button");
+                return;
+            }
+
+            var targetId = string.Equals(normalizedAction, BlueprintEntryCommands.StartCreate, StringComparison.Ordinal)
+                ? FeatureIds.BlueprintCreateAction
+                : FeatureIds.BlueprintSaveAction;
+            var result = BlueprintEntryState.ApplyCommand(normalizedAction, ConfigService.AppSettings ?? AppSettings.CreateDefault());
+            BlueprintCaptureResult capture = null;
+            if (result.Succeeded &&
+                string.Equals(normalizedAction, BlueprintEntryCommands.FinishCreateSave, StringComparison.Ordinal))
+            {
+                capture = BlueprintCaptureService.CapturePendingMaskAndSave(false);
+                if (capture.Succeeded)
+                {
+                    BlueprintLibraryUiState.NotifyTemplateCreated(capture.SavedTemplate);
+                    result = BlueprintEntryState.MarkCaptureSaved(capture);
+                }
+                else
+                {
+                    result = BlueprintEntryState.RecordCaptureFailure(capture);
+                }
+            }
+
+            var outcome = capture != null
+                ? capture.Succeeded ? "Succeeded" : "Failed"
+                : result.Succeeded ? (result.Changed ? "Succeeded" : "NotApplicable") : "NotApplicable";
+            var resultCode = capture == null ? result.ResultCode : capture.ResultCode;
+            var templateId = capture == null || capture.SavedTemplate == null ? string.Empty : capture.SavedTemplate.TemplateId;
+            var templateName = capture == null || capture.SavedTemplate == null ? string.Empty : capture.SavedTemplate.Name;
+            Record(
+                command,
+                "Ui.Blueprint.CreateSaveEntry",
+                "UI",
+                outcome,
+                result.Message,
+                before,
+                BuildBlueprintUiStateJson(),
+                "{\"submitted\":false,\"implemented\":" + BoolRaw(!result.PlaceholderOnly) + ",\"uiOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"hotkeyFeatureId\":\"" + EscapeJson(targetId) + "\",\"action\":\"" + EscapeJson(normalizedAction) + "\",\"actionLabel\":\"" + EscapeJson(BuildBlueprintActionHotkeyLabel(targetId)) + "\",\"resultCode\":\"" + EscapeJson(resultCode) + "\",\"mode\":\"" + EscapeJson(result.Mode) + "\",\"changed\":" + BoolRaw(result.Changed || (capture != null && capture.Succeeded)) + ",\"placeholderOnly\":" + BoolRaw(result.PlaceholderOnly) + ",\"captureAttempted\":" + BoolRaw(capture != null) + ",\"capturedCells\":" + IntRaw(capture == null ? 0 : capture.CapturedCellCount) + ",\"capturedLayers\":" + IntRaw(capture == null ? 0 : capture.CapturedLayerCount) + ",\"skippedAirCells\":" + IntRaw(capture == null ? 0 : capture.SkippedAirCellCount) + ",\"unavailableCells\":" + IntRaw(capture == null ? 0 : capture.UnavailableCellCount) + ",\"templateId\":\"" + EscapeJson(templateId) + "\",\"templateName\":\"" + EscapeJson(templateName) + "\",\"mouseCaptured\":" + BoolRaw(command != null && command.MouseCaptured) + "}",
                 "Button");
         }
 
@@ -138,6 +211,101 @@ namespace JueMingZ.Input
         private static void HandleBlueprintHandheldActionBarCommand(LegacyUiCommand command, string payload)
         {
             var before = BuildBlueprintUiStateJson();
+            payload = (payload ?? string.Empty).Trim();
+            if (string.Equals(payload, BlueprintHandheldActionBarState.ButtonIdCreate, StringComparison.OrdinalIgnoreCase))
+            {
+                var entry = BlueprintEntryState.ApplyCommand(
+                    BlueprintEntryCommands.StartCreate,
+                    ConfigService.AppSettings ?? AppSettings.CreateDefault());
+                var commandResult = BlueprintHandheldActionBarState.RecordCommandResultClick(
+                    payload,
+                    command == null ? 0 : command.IntValue,
+                    command != null && command.MouseCaptured,
+                    entry.ResultCode,
+                    entry.Message);
+                Record(
+                    command,
+                    "Ui.Blueprint.HandheldActionBar",
+                    "UI",
+                    entry.Succeeded ? (entry.Changed ? "Succeeded" : "NotApplicable") : "Failed",
+                    entry.Message,
+                    before,
+                    BuildBlueprintUiStateJson(),
+                    "{\"submitted\":false,\"implemented\":" + BoolRaw(!entry.PlaceholderOnly) + ",\"uiOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"action\":\"" + EscapeJson(commandResult.ButtonId) + "\",\"buttonLabel\":\"" + EscapeJson(commandResult.ButtonLabel) + "\",\"resultCode\":\"" + EscapeJson(entry.ResultCode) + "\",\"mode\":\"" + EscapeJson(entry.Mode) + "\",\"changed\":" + BoolRaw(entry.Changed) + ",\"placeholderOnly\":" + BoolRaw(entry.PlaceholderOnly) + ",\"heldItemType\":" + IntRaw(commandResult.HeldItemType) + ",\"visibleReason\":\"" + EscapeJson(BlueprintHandheldActionBarState.HiddenReasonNone) + "\",\"blockedReason\":\"\",\"mouseCaptured\":" + BoolRaw(commandResult.MouseCaptured) + "}",
+                    "Button");
+                return;
+            }
+
+            if (string.Equals(payload, BlueprintHandheldActionBarState.ButtonIdSave, StringComparison.OrdinalIgnoreCase))
+            {
+                var entry = BlueprintEntryState.ApplyCommand(
+                    BlueprintEntryCommands.FinishCreateSave,
+                    ConfigService.AppSettings ?? AppSettings.CreateDefault());
+                BlueprintCaptureResult capture = null;
+                if (entry.Succeeded)
+                {
+                    capture = BlueprintCaptureService.CapturePendingMaskAndSave(false);
+                    if (capture.Succeeded)
+                    {
+                        BlueprintLibraryUiState.NotifyTemplateCreated(capture.SavedTemplate);
+                        entry = BlueprintEntryState.MarkCaptureSaved(capture);
+                    }
+                    else
+                    {
+                        entry = BlueprintEntryState.RecordCaptureFailure(capture);
+                    }
+                }
+
+                var resultCode = capture == null ? entry.ResultCode : capture.ResultCode;
+                var templateId = capture == null || capture.SavedTemplate == null ? string.Empty : capture.SavedTemplate.TemplateId;
+                var templateName = capture == null || capture.SavedTemplate == null ? string.Empty : capture.SavedTemplate.Name;
+                var commandResult = BlueprintHandheldActionBarState.RecordCommandResultClick(
+                    payload,
+                    command == null ? 0 : command.IntValue,
+                    command != null && command.MouseCaptured,
+                    resultCode,
+                    entry.Message);
+                Record(
+                    command,
+                    "Ui.Blueprint.HandheldActionBar",
+                    "UI",
+                    capture != null ? (capture.Succeeded ? "Succeeded" : "Failed") : entry.Succeeded ? (entry.Changed ? "Succeeded" : "NotApplicable") : "Failed",
+                    entry.Message,
+                    before,
+                    BuildBlueprintUiStateJson(),
+                    "{\"submitted\":false,\"implemented\":true,\"uiOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"action\":\"" + EscapeJson(commandResult.ButtonId) + "\",\"entryAction\":\"" + EscapeJson(BlueprintEntryCommands.FinishCreateSave) + "\",\"buttonLabel\":\"" + EscapeJson(commandResult.ButtonLabel) + "\",\"resultCode\":\"" + EscapeJson(resultCode) + "\",\"mode\":\"" + EscapeJson(entry.Mode) + "\",\"changed\":" + BoolRaw(entry.Changed || (capture != null && capture.Succeeded)) + ",\"placeholderOnly\":" + BoolRaw(entry.PlaceholderOnly) + ",\"captureAttempted\":" + BoolRaw(capture != null) + ",\"capturedCells\":" + IntRaw(capture == null ? 0 : capture.CapturedCellCount) + ",\"capturedLayers\":" + IntRaw(capture == null ? 0 : capture.CapturedLayerCount) + ",\"skippedAirCells\":" + IntRaw(capture == null ? 0 : capture.SkippedAirCellCount) + ",\"unavailableCells\":" + IntRaw(capture == null ? 0 : capture.UnavailableCellCount) + ",\"templateId\":\"" + EscapeJson(templateId) + "\",\"templateName\":\"" + EscapeJson(templateName) + "\",\"heldItemType\":" + IntRaw(commandResult.HeldItemType) + ",\"visibleReason\":\"" + EscapeJson(BlueprintHandheldActionBarState.HiddenReasonNone) + "\",\"blockedReason\":\"\",\"mouseCaptured\":" + BoolRaw(commandResult.MouseCaptured) + "}",
+                    "Button");
+                return;
+            }
+
+            if (string.Equals(payload, BlueprintHandheldActionBarState.ButtonIdOpenLibrary, StringComparison.OrdinalIgnoreCase))
+            {
+                var library = BlueprintLibraryUiState.OpenLibrary();
+                var entry = BlueprintEntryState.ApplyCommand(
+                    BlueprintEntryCommands.OpenLibrary,
+                    ConfigService.AppSettings ?? AppSettings.CreateDefault());
+                var resultCode = library == null || string.IsNullOrWhiteSpace(library.ResultCode)
+                    ? entry.ResultCode
+                    : library.ResultCode;
+                var commandResult = BlueprintHandheldActionBarState.RecordCommandResultClick(
+                    payload,
+                    command == null ? 0 : command.IntValue,
+                    command != null && command.MouseCaptured,
+                    entry.ResultCode,
+                    library != null && !string.IsNullOrWhiteSpace(library.Message) ? library.Message : entry.Message);
+                Record(
+                    command,
+                    "Ui.Blueprint.HandheldActionBar",
+                    "UI",
+                    library != null && !library.Succeeded ? "Failed" : entry.Succeeded ? (entry.Changed || (library != null && library.Changed) ? "Succeeded" : "NotApplicable") : "Failed",
+                    library != null && !library.Succeeded ? library.Message : entry.Message,
+                    before,
+                    BuildBlueprintUiStateJson(),
+                    "{\"submitted\":false,\"implemented\":true,\"uiOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"action\":\"" + EscapeJson(commandResult.ButtonId) + "\",\"entryAction\":\"" + EscapeJson(BlueprintEntryCommands.OpenLibrary) + "\",\"buttonLabel\":\"" + EscapeJson(commandResult.ButtonLabel) + "\",\"resultCode\":\"" + EscapeJson(resultCode) + "\",\"entryResultCode\":\"" + EscapeJson(entry.ResultCode) + "\",\"mode\":\"" + EscapeJson(entry.Mode) + "\",\"changed\":" + BoolRaw(entry.Changed || (library != null && library.Changed)) + ",\"placeholderOnly\":" + BoolRaw(entry.PlaceholderOnly) + ",\"heldItemType\":" + IntRaw(commandResult.HeldItemType) + ",\"visibleReason\":\"" + EscapeJson(BlueprintHandheldActionBarState.HiddenReasonNone) + "\",\"blockedReason\":\"\",\"mouseCaptured\":" + BoolRaw(commandResult.MouseCaptured) + "}",
+                    "Button");
+                return;
+            }
+
             var result = BlueprintHandheldActionBarState.RecordPlaceholderClick(
                 payload,
                 command == null ? 0 : command.IntValue,
@@ -623,6 +791,51 @@ namespace JueMingZ.Input
             return string.IsNullOrWhiteSpace(action) ? "Invalid" : action.Trim();
         }
 
+        private static string NormalizeBlueprintActionHotkeyTargetId(string payload)
+        {
+            if (string.Equals(payload, FeatureIds.BlueprintCreateAction, StringComparison.OrdinalIgnoreCase))
+            {
+                return FeatureIds.BlueprintCreateAction;
+            }
+
+            if (string.Equals(payload, FeatureIds.BlueprintSaveAction, StringComparison.OrdinalIgnoreCase))
+            {
+                return FeatureIds.BlueprintSaveAction;
+            }
+
+            return string.Empty;
+        }
+
+        private static string NormalizeBlueprintActionEntryPayload(string payload)
+        {
+            if (string.Equals(payload, BlueprintEntryCommands.StartCreate, StringComparison.OrdinalIgnoreCase))
+            {
+                return BlueprintEntryCommands.StartCreate;
+            }
+
+            if (string.Equals(payload, BlueprintEntryCommands.FinishCreateSave, StringComparison.OrdinalIgnoreCase))
+            {
+                return BlueprintEntryCommands.FinishCreateSave;
+            }
+
+            return string.Empty;
+        }
+
+        private static string BuildBlueprintActionHotkeyLabel(string targetId)
+        {
+            if (string.Equals(targetId, FeatureIds.BlueprintCreateAction, StringComparison.Ordinal))
+            {
+                return "创建蓝图";
+            }
+
+            if (string.Equals(targetId, FeatureIds.BlueprintSaveAction, StringComparison.Ordinal))
+            {
+                return "保存蓝图";
+            }
+
+            return "蓝图动作";
+        }
+
         internal static void HandleBlueprintLibraryCommandForTesting(LegacyUiCommand command)
         {
             if (command == null)
@@ -653,6 +866,22 @@ namespace JueMingZ.Input
             }
 
             HandleBlueprintEntryCommand(command, command.ElementId.Substring("blueprint-entry:".Length));
+        }
+
+        internal static void HandleBlueprintActionEntryCommandForTesting(LegacyUiCommand command)
+        {
+            if (command == null)
+            {
+                return;
+            }
+
+            if (!command.ElementId.StartsWith("blueprint-action-entry:", StringComparison.Ordinal))
+            {
+                HandleBlueprintActionEntryCommand(command, string.Empty);
+                return;
+            }
+
+            HandleBlueprintActionEntryCommand(command, command.ElementId.Substring("blueprint-action-entry:".Length));
         }
 
         internal static void HandleBlueprintHandheldActionBarCommandForTesting(LegacyUiCommand command)

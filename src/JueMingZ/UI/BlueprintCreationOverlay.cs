@@ -9,7 +9,11 @@ namespace JueMingZ.UI
 {
     public static class BlueprintCreationOverlay
     {
+        private const string VisualContract = "content-hover+air-skip+low-alpha-no-border+continuous-row-runs+world-left-consume";
         private const int TileSize = 16;
+        private const int SelectedMaskAlpha = 48;
+        private const int HoverMaskAlpha = 38;
+        private const int DragMaskAlpha = 30;
         private static bool _wasLeftDown;
         private static bool _wasActive;
 
@@ -85,7 +89,10 @@ namespace JueMingZ.UI
             bool leftReleased,
             bool worldTileHit,
             int tileX,
-            int tileY)
+            int tileY,
+            bool contentKnown = false,
+            bool hasSelectableContent = false,
+            Func<int, int, bool> isSelectableTile = null)
         {
             return new BlueprintCreationPointerInput
             {
@@ -95,7 +102,10 @@ namespace JueMingZ.UI
                 LeftReleased = active && leftReleased,
                 WorldTileHit = worldTileHit,
                 TileX = tileX,
-                TileY = tileY
+                TileY = tileY,
+                ContentKnown = contentKnown,
+                HasSelectableContent = hasSelectableContent,
+                IsSelectableTile = isSelectableTile
             };
         }
 
@@ -107,6 +117,26 @@ namespace JueMingZ.UI
         internal static bool ShouldConsumeAfterPlayerInputForTesting(bool active, bool legacyUiOwned, bool leftDown)
         {
             return active && leftDown && !legacyUiOwned;
+        }
+
+        internal static string GetVisualContractForTesting()
+        {
+            return VisualContract;
+        }
+
+        internal static int GetSelectedMaskAlphaForTesting()
+        {
+            return SelectedMaskAlpha;
+        }
+
+        internal static int GetHoverMaskAlphaForTesting()
+        {
+            return HoverMaskAlpha;
+        }
+
+        internal static int GetDragMaskAlphaForTesting()
+        {
+            return DragMaskAlpha;
         }
 
         internal static void ResetInputForTesting()
@@ -146,6 +176,19 @@ namespace JueMingZ.UI
             int tileX;
             int tileY;
             ResolveWorldTile(raw, out worldTileHit, out tileX, out tileY);
+            var contentKnown = false;
+            var hasSelectableContent = false;
+            Func<int, int, bool> isSelectableTile = null;
+            if (!legacyUiOwned && !vanillaUiOwned && worldTileHit)
+            {
+                var tileReader = BlueprintCaptureService.CreateWorldTileReader();
+                contentKnown = BlueprintCaptureService.TryHasSelectableContent(tileReader, tileX, tileY, out hasSelectableContent);
+                isSelectableTile = (x, y) =>
+                {
+                    bool selectable;
+                    return BlueprintCaptureService.TryHasSelectableContent(tileReader, x, y, out selectable) && selectable;
+                };
+            }
 
             var input = BuildPointerInputForTesting(
                 snapshot.Active,
@@ -156,7 +199,10 @@ namespace JueMingZ.UI
                 !leftDown && _wasLeftDown,
                 worldTileHit,
                 tileX,
-                tileY);
+                tileY,
+                contentKnown,
+                hasSelectableContent,
+                isSelectableTile);
             var result = BlueprintCreationMaskState.HandlePointer(input);
             if (result != null && result.ShouldConsumeLeftInput && !legacyUiOwned)
             {
@@ -244,10 +290,12 @@ namespace JueMingZ.UI
             var screenPosition = TerrariaMainCompat.ScreenPosition;
             if (snapshot.SelectedCells != null)
             {
-                for (var index = 0; index < snapshot.SelectedCells.Count; index++)
-                {
-                    DrawTileCell(spriteBatch, snapshot.SelectedCells[index], screenPosition, clipWidth, clipHeight);
-                }
+                DrawSelectedRuns(spriteBatch, snapshot, screenPosition, clipWidth, clipHeight);
+            }
+
+            if (snapshot.Active && snapshot.HoverTileHit)
+            {
+                DrawTileFill(spriteBatch, snapshot.HoverTileX, snapshot.HoverTileY, 1, screenPosition, clipWidth, clipHeight, HoverMaskAlpha);
             }
 
             if (snapshot.Dragging)
@@ -256,22 +304,59 @@ namespace JueMingZ.UI
             }
         }
 
-        private static void DrawTileCell(object spriteBatch, BlueprintCreationMaskCell cell, Vector2 screenPosition, int clipWidth, int clipHeight)
+        private static void DrawSelectedRuns(object spriteBatch, BlueprintCreationMaskSnapshot snapshot, Vector2 screenPosition, int clipWidth, int clipHeight)
         {
-            if (cell == null)
+            var cells = snapshot.SelectedCells;
+            if (cells == null || cells.Count <= 0)
             {
                 return;
             }
 
-            var x = (int)Math.Round(cell.X * TileSize - screenPosition.X);
-            var y = (int)Math.Round(cell.Y * TileSize - screenPosition.Y);
-            if (x >= clipWidth || y >= clipHeight || x + TileSize <= 0 || y + TileSize <= 0)
+            var runY = cells[0].Y;
+            var runStartX = cells[0].X;
+            var runEndX = cells[0].X;
+            for (var index = 1; index < cells.Count; index++)
+            {
+                var cell = cells[index];
+                if (cell != null && cell.Y == runY && cell.X == runEndX + 1)
+                {
+                    runEndX = cell.X;
+                    continue;
+                }
+
+                DrawTileFill(spriteBatch, runStartX, runY, runEndX - runStartX + 1, screenPosition, clipWidth, clipHeight, SelectedMaskAlpha);
+                if (cell == null)
+                {
+                    continue;
+                }
+
+                runY = cell.Y;
+                runStartX = cell.X;
+                runEndX = cell.X;
+            }
+
+            DrawTileFill(spriteBatch, runStartX, runY, runEndX - runStartX + 1, screenPosition, clipWidth, clipHeight, SelectedMaskAlpha);
+        }
+
+        private static void DrawTileFill(
+            object spriteBatch,
+            int tileX,
+            int tileY,
+            int tileWidth,
+            Vector2 screenPosition,
+            int clipWidth,
+            int clipHeight,
+            int alpha)
+        {
+            var width = Math.Max(1, tileWidth) * TileSize;
+            var x = (int)Math.Round(tileX * TileSize - screenPosition.X);
+            var y = (int)Math.Round(tileY * TileSize - screenPosition.Y);
+            if (x >= clipWidth || y >= clipHeight || x + width <= 0 || y + TileSize <= 0)
             {
                 return;
             }
 
-            UiPrimitiveRenderer.DrawFilledRectClipped(spriteBatch, x, y, TileSize, TileSize, 0, 0, clipWidth, clipHeight, 70, 150, 255, 72);
-            UiPrimitiveRenderer.DrawRectBorderClipped(spriteBatch, x, y, TileSize, TileSize, 1, 0, 0, clipWidth, clipHeight, 92, 210, 255, 165);
+            UiPrimitiveRenderer.DrawFilledRectClipped(spriteBatch, x, y, width, TileSize, 0, 0, clipWidth, clipHeight, 70, 150, 255, alpha);
         }
 
         private static void DrawDragRect(object spriteBatch, BlueprintCreationMaskSnapshot snapshot, Vector2 screenPosition, int clipWidth, int clipHeight)
@@ -284,8 +369,7 @@ namespace JueMingZ.UI
             var y = (int)Math.Round(minY * TileSize - screenPosition.Y);
             var width = Math.Max(TileSize, (maxX - minX + 1) * TileSize);
             var height = Math.Max(TileSize, (maxY - minY + 1) * TileSize);
-            UiPrimitiveRenderer.DrawFilledRectClipped(spriteBatch, x, y, width, height, 0, 0, clipWidth, clipHeight, 92, 180, 255, 42);
-            UiPrimitiveRenderer.DrawRectBorderClipped(spriteBatch, x, y, width, height, 2, 0, 0, clipWidth, clipHeight, 132, 230, 255, 210);
+            UiPrimitiveRenderer.DrawFilledRectClipped(spriteBatch, x, y, width, height, 0, 0, clipWidth, clipHeight, 92, 180, 255, DragMaskAlpha);
         }
     }
 }

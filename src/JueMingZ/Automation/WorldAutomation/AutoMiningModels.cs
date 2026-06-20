@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using JueMingZ.Actions;
 
 namespace JueMingZ.Automation.WorldAutomation
 {
@@ -166,6 +168,43 @@ namespace JueMingZ.Automation.WorldAutomation
         {
             Mode = string.Empty;
             Tiles = new List<AutoMiningOverlayTile>();
+        }
+    }
+
+    public sealed class AutoMiningDiagnostics
+    {
+        public string LastDecision { get; set; }
+        public DateTime? LastDecisionUtc { get; set; }
+        public string LastHotkey { get; set; }
+        public string LastHotkeyResultCode { get; set; }
+        public string LastHotkeyBlockedReason { get; set; }
+        public DateTime? LastHotkeyDecisionUtc { get; set; }
+
+        public AutoMiningDiagnostics()
+        {
+            LastDecision = string.Empty;
+            LastHotkey = string.Empty;
+            LastHotkeyResultCode = string.Empty;
+            LastHotkeyBlockedReason = string.Empty;
+        }
+    }
+
+    internal sealed class AutoMiningHotkeyInputResult
+    {
+        public bool PressedEdge { get; set; }
+        public bool Accepted { get; set; }
+        public bool Down { get; set; }
+        public string Display { get; set; }
+        public string Normalized { get; set; }
+        public string Reason { get; set; }
+        public DiagnosticResultCode DiagnosticResultCode { get; set; }
+
+        public AutoMiningHotkeyInputResult()
+        {
+            Display = string.Empty;
+            Normalized = string.Empty;
+            Reason = string.Empty;
+            DiagnosticResultCode = DiagnosticResultCode.NotApplicable;
         }
     }
 }

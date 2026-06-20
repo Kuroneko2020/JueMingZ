@@ -697,6 +697,11 @@ namespace JueMingZ.UI.Legacy
             return _blueprintEntryHotkeyCaptureActive;
         }
 
+        internal static string GetBlueprintHotkeyCaptureTargetIdForTesting()
+        {
+            return _blueprintHotkeyCaptureTargetId;
+        }
+
         internal static string BuildFeatureToggleHotkeyConflictMessageForTesting(FeatureToggleHotkeyConflict conflict)
         {
             return BuildFeatureToggleHotkeyConflictMessage(conflict);

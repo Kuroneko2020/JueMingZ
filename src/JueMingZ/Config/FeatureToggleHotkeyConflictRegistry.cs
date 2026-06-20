@@ -63,7 +63,7 @@ namespace JueMingZ.Config
                 return true;
             }
 
-            if (TryFindBlueprintEntryConflict(hotkeySettings, currentTargetId, chord, out conflict))
+            if (TryFindBlueprintActionConflict(hotkeySettings, currentTargetId, chord, out conflict))
             {
                 return true;
             }
@@ -185,38 +185,64 @@ namespace JueMingZ.Config
             return false;
         }
 
-        private static bool TryFindBlueprintEntryConflict(
+        private static bool TryFindBlueprintActionConflict(
             HotkeySettings hotkeySettings,
             string currentTargetId,
             FeatureToggleHotkeyChord chord,
             out FeatureToggleHotkeyConflict conflict)
         {
             conflict = null;
-            if (string.Equals(currentTargetId, FeatureIds.BlueprintMain, StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
             var hotkeys = hotkeySettings == null ? null : hotkeySettings.HotkeysByFeatureId;
             if (hotkeys == null || hotkeys.Count <= 0)
             {
                 return false;
             }
 
-            string blueprintHotkey;
-            if (!hotkeys.TryGetValue(FeatureIds.BlueprintMain, out blueprintHotkey))
+            if (TryFindBlueprintActionConflict(
+                    hotkeys,
+                    currentTargetId,
+                    FeatureIds.BlueprintCreateAction,
+                    "蓝图创建快捷键",
+                    chord,
+                    out conflict))
+            {
+                return true;
+            }
+
+            return TryFindBlueprintActionConflict(
+                hotkeys,
+                currentTargetId,
+                FeatureIds.BlueprintSaveAction,
+                "蓝图保存快捷键",
+                chord,
+                out conflict);
+        }
+
+        private static bool TryFindBlueprintActionConflict(
+            IDictionary<string, string> hotkeys,
+            string currentTargetId,
+            string ownerTargetId,
+            string ownerDisplayName,
+            FeatureToggleHotkeyChord chord,
+            out FeatureToggleHotkeyConflict conflict)
+        {
+            conflict = null;
+            if (hotkeys == null ||
+                string.Equals(currentTargetId, ownerTargetId, StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }
 
+            string actionHotkey;
             string normalized;
-            if (FeatureToggleHotkeyChord.TryNormalize(blueprintHotkey, out normalized) &&
+            if (hotkeys.TryGetValue(ownerTargetId, out actionHotkey) &&
+                FeatureToggleHotkeyChord.TryNormalize(actionHotkey, out normalized) &&
                 string.Equals(normalized, chord.Normalized, StringComparison.Ordinal))
             {
                 conflict = new FeatureToggleHotkeyConflict(
-                    FeatureToggleHotkeyConflictType.BlueprintEntry,
-                    FeatureIds.BlueprintMain,
-                    "蓝图入口快捷键",
+                    FeatureToggleHotkeyConflictType.BlueprintAction,
+                    ownerTargetId,
+                    ownerDisplayName,
                     chord.Normalized);
                 return true;
             }
@@ -343,7 +369,7 @@ namespace JueMingZ.Config
         FeatureToggle,
         QuickItem,
         AutoMiningTrigger,
-        BlueprintEntry,
+        BlueprintAction,
         QuickAnnouncement,
         LegacyMainWindow,
         DiagnosticReserved

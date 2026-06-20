@@ -51,6 +51,8 @@ namespace JueMingZ.Common
         public const string SearchMain = "search.main";
         public const string SearchChestItemLocator = "search.chest_item_locator";
         public const string BlueprintMain = "blueprint.main";
+        public const string BlueprintCreateAction = "blueprint.create";
+        public const string BlueprintSaveAction = "blueprint.save";
         public const string MovementSimulatedMultiJump = "movement.simulated_multi_jump";
         public const string MovementContinuousDash = "movement.continuous_dash";
         public const string MovementTeleportCorrection = "movement.teleport_correction";

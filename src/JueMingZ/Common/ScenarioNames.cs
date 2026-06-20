@@ -30,12 +30,14 @@ namespace JueMingZ.Common
         public const string NpcQuickReforge = "Npc.QuickReforge";
         public const string NpcAutoTaxCollect = "Npc.AutoTaxCollect";
         public const string WorldAutomationAutoMining = "WorldAutomation.AutoMining";
+        public const string WorldAutomationAutoMiningHotkey = "WorldAutomation.AutoMining.Hotkey";
         public const string WorldAutomationAutoCaptureCritter = "WorldAutomation.AutoCaptureCritter";
         public const string WorldAutomationAutoCaptureCritterRecast = "WorldAutomation.AutoCaptureCritter.Recast";
         public const string WorldAutomationAutoHarvest = "WorldAutomation.AutoHarvest";
         public const string WorldAutomationAutoHarvestReplant = "WorldAutomation.AutoHarvest.Replant";
         public const string MapQuickAnnouncement = "Map.QuickAnnouncement";
         public const string BlueprintAutoPlace = "Blueprint.AutoPlace";
+        public const string BlueprintActionHotkey = "Hotkey.BlueprintAction";
         public const string MovementSimulatedMultiJump = "Movement.SimulatedMultiJump";
         public const string MovementContinuousDash = "Movement.ContinuousDash";
         public const string MovementSafeLanding = "Movement.SafeLanding";

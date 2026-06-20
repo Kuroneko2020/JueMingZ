@@ -212,6 +212,47 @@ namespace JueMingZ.Tests
             AssertContains(json, "\"ActionQueueLastDirectEnqueueRequiredChannels\": \"InventorySlot|ChestInteraction\"");
         }
 
+        private static void BlueprintFeedbackDiagnosticsAuditFieldsStayWired()
+        {
+            AssertStringEquals(
+                ScenarioNames.WorldAutomationAutoMiningHotkey,
+                "WorldAutomation.AutoMining.Hotkey",
+                "auto mining hotkey diagnostic scenario");
+            AssertStringEquals(
+                ScenarioNames.BlueprintActionHotkey,
+                "Hotkey.BlueprintAction",
+                "blueprint action hotkey diagnostic scenario");
+
+            var snapshot = new DiagnosticSnapshot
+            {
+                AutoMiningLastDecision = "sustained mining target refreshed",
+                AutoMiningLastHotkey = "Alt+M",
+                AutoMiningLastHotkeyResultCode = "accepted",
+                AutoMiningLastHotkeyBlockedReason = "gameInputUnavailable",
+                AutoMiningLastHotkeyDecisionUtc = new DateTime(2026, 6, 20, 16, 30, 0, DateTimeKind.Utc),
+                BlueprintHandheldActionBarVisible = true,
+                BlueprintHandheldActionBarBlockedReason = string.Empty,
+                BlueprintHandheldActionBarToolItemId = 23,
+                BlueprintHandheldActionBarSelectedItemType = 23,
+                BlueprintHandheldActionBarLastAction = "red-map",
+                BlueprintHandheldActionBarLastResultCode = "uiOnlyNotImplemented"
+            };
+
+            var json = InvokeDiagnosticSnapshotJson(snapshot);
+
+            AssertContains(json, "\"AutoMiningLastDecision\": \"sustained mining target refreshed\"");
+            AssertContains(json, "\"AutoMiningLastHotkey\": \"Alt+M\"");
+            AssertContains(json, "\"AutoMiningLastHotkeyResultCode\": \"accepted\"");
+            AssertContains(json, "\"AutoMiningLastHotkeyBlockedReason\": \"gameInputUnavailable\"");
+            AssertContains(json, "\"AutoMiningLastHotkeyDecisionUtc\": \"2026-06-20T16:30:00.0000000Z\"");
+            AssertContains(json, "\"BlueprintHandheldActionBarVisible\": true");
+            AssertContains(json, "\"BlueprintHandheldActionBarBlockedReason\": \"\"");
+            AssertContains(json, "\"BlueprintHandheldActionBarToolItemId\": 23");
+            AssertContains(json, "\"BlueprintHandheldActionBarSelectedItemType\": 23");
+            AssertContains(json, "\"BlueprintHandheldActionBarLastAction\": \"red-map\"");
+            AssertContains(json, "\"BlueprintHandheldActionBarLastResultCode\": \"uiOnlyNotImplemented\"");
+        }
+
         private static void DiagnosticSnapshotWritesItemCheckWriterState()
         {
             var snapshot = new DiagnosticSnapshot
@@ -1251,8 +1292,8 @@ namespace JueMingZ.Tests
                     "targeting.startup-diagnostic-noop|targeting.startup-diagnostic-noop|1",
                     "targeting.diagnostic-button-actions|targeting.diagnostic-button-actions|1",
                     "targeting.legacy-ui-actions|targeting.legacy-ui-actions|1",
+                    "targeting.blueprint-action-hotkeys|targeting.blueprint-action-hotkeys|1",
                     "targeting.feature-toggle-hotkeys|targeting.feature-toggle-hotkeys|1",
-                    "targeting.blueprint-entry-hotkey|targeting.blueprint-entry-hotkey|1",
                     "targeting.map-custom-markers|targeting.map-custom-markers|1",
                     "targeting.diagnostic-hotkeys|targeting.diagnostic-hotkeys|1"
                 });

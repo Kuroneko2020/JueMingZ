@@ -22,6 +22,9 @@ namespace JueMingZ.Automation.Blueprint
         private static int _dragStartY;
         private static int _dragCurrentX;
         private static int _dragCurrentY;
+        private static bool _hoverTileHit;
+        private static int _hoverTileX;
+        private static int _hoverTileY;
         private static string _lastNotice = "创建 mask 待命。";
         private static string _lastInputOwner = string.Empty;
         private static string _lastResultCode = "idle";
@@ -50,6 +53,7 @@ namespace JueMingZ.Automation.Blueprint
                 _active = true;
                 _completedPendingCapture = false;
                 _dragging = false;
+                ClearHoverLocked();
                 _lastInputOwner = "ui";
                 _lastResultCode = "creationStarted";
                 _lastNotice = "创建中：左键单选/拖选世界格；只记录蓝图 mask。";
@@ -64,6 +68,7 @@ namespace JueMingZ.Automation.Blueprint
                 var changed = SelectedCells.Count > 0 || _dragging;
                 SelectedCells.Clear();
                 _dragging = false;
+                ClearHoverLocked();
                 _completedPendingCapture = false;
                 _active = true;
                 _lastInputOwner = "ui";
@@ -82,6 +87,7 @@ namespace JueMingZ.Automation.Blueprint
                 _active = false;
                 _completedPendingCapture = false;
                 _dragging = false;
+                ClearHoverLocked();
                 _lastInputOwner = "ui";
                 _lastResultCode = "creationCancelled";
                 _lastNotice = "已取消蓝图创建选区。";
@@ -105,6 +111,7 @@ namespace JueMingZ.Automation.Blueprint
                 _active = false;
                 _completedPendingCapture = true;
                 _dragging = false;
+                ClearHoverLocked();
                 _lastInputOwner = "ui";
                 _lastResultCode = useAfterSave ? "creationMaskPendingUse" : "creationMaskPendingSave";
                 _lastNotice = "已完成 " + SelectedCells.Count.ToString(CultureInfo.InvariantCulture) +
@@ -132,21 +139,34 @@ namespace JueMingZ.Automation.Blueprint
                 {
                     var changed = _dragging;
                     _dragging = false;
+                    ClearHoverLocked();
                     _lastInputOwner = "ui";
                     _lastResultCode = "uiOwned";
                     _lastNotice = "鼠标命中 UI；创建 mask 未变化。";
                     return BuildResultLocked(true, changed, true, true, _lastResultCode, _lastNotice);
                 }
 
+                UpdateHoverLocked(input);
                 if (input.LeftPressed)
                 {
                     if (!input.WorldTileHit)
                     {
                         var changed = _dragging;
                         _dragging = false;
+                        ClearHoverLocked();
                         _lastInputOwner = "world-outside";
                         _lastResultCode = "worldMiss";
                         _lastNotice = "鼠标未命中有效世界格；创建 mask 未变化。";
+                        return BuildResultLocked(true, changed, true, true, _lastResultCode, _lastNotice);
+                    }
+
+                    if (!IsSelectableForInputLocked(input, input.TileX, input.TileY))
+                    {
+                        var changed = _dragging;
+                        _dragging = false;
+                        _lastInputOwner = "world";
+                        _lastResultCode = "airSkipped";
+                        _lastNotice = "鼠标命中空气格；创建 mask 未变化。";
                         return BuildResultLocked(true, changed, true, true, _lastResultCode, _lastNotice);
                     }
 
@@ -190,7 +210,7 @@ namespace JueMingZ.Automation.Blueprint
 
                     _dragCurrentX = input.TileX;
                     _dragCurrentY = input.TileY;
-                    var toggle = ToggleDragRectangleLocked();
+                    var toggle = ToggleDragRectangleLocked(input);
                     _dragging = false;
                     _lastInputOwner = "world";
                     _lastResultCode = toggle.ResultCode;
@@ -219,6 +239,9 @@ namespace JueMingZ.Automation.Blueprint
             builder.Append("\"completedPendingCapture\":").Append(snapshot.CompletedPendingCapture ? "true" : "false").Append(',');
             builder.Append("\"selectedCount\":").Append(snapshot.SelectedCount.ToString(CultureInfo.InvariantCulture)).Append(',');
             builder.Append("\"dragging\":").Append(snapshot.Dragging ? "true" : "false").Append(',');
+            builder.Append("\"hoverTileHit\":").Append(snapshot.HoverTileHit ? "true" : "false").Append(',');
+            builder.Append("\"hoverTileX\":").Append(snapshot.HoverTileX.ToString(CultureInfo.InvariantCulture)).Append(',');
+            builder.Append("\"hoverTileY\":").Append(snapshot.HoverTileY.ToString(CultureInfo.InvariantCulture)).Append(',');
             builder.Append("\"lastInputOwner\":\"").Append(EscapeJson(snapshot.LastInputOwner)).Append("\",");
             builder.Append("\"lastResultCode\":\"").Append(EscapeJson(snapshot.LastResultCode)).Append("\",");
             builder.Append("\"lastNotice\":\"").Append(EscapeJson(snapshot.LastNotice)).Append("\"");
@@ -234,6 +257,7 @@ namespace JueMingZ.Automation.Blueprint
                 _active = false;
                 _completedPendingCapture = false;
                 _dragging = false;
+                ClearHoverLocked();
                 _lastInputOwner = "capture";
                 _lastResultCode = "templateSaved";
                 _lastNotice = "蓝图模板已保存：" + (string.IsNullOrWhiteSpace(templateName) ? BlueprintStorageConstants.DefaultTemplateName : templateName.Trim()) + "。";
@@ -256,13 +280,14 @@ namespace JueMingZ.Automation.Blueprint
                 _dragStartY = 0;
                 _dragCurrentX = 0;
                 _dragCurrentY = 0;
+                ClearHoverLocked();
                 _lastNotice = "创建 mask 待命。";
                 _lastInputOwner = string.Empty;
                 _lastResultCode = "idle";
             }
         }
 
-        private static ToggleResult ToggleDragRectangleLocked()
+        private static ToggleResult ToggleDragRectangleLocked(BlueprintCreationPointerInput input)
         {
             var minX = Math.Min(_dragStartX, _dragCurrentX);
             var maxX = Math.Max(_dragStartX, _dragCurrentX);
@@ -284,6 +309,7 @@ namespace JueMingZ.Automation.Blueprint
 
             var added = 0;
             var removed = 0;
+            var skippedAir = 0;
             for (var y = minY; y <= maxY; y++)
             {
                 for (var x = minX; x <= maxX; x++)
@@ -293,6 +319,10 @@ namespace JueMingZ.Automation.Blueprint
                     {
                         SelectedCells.Remove(key);
                         removed++;
+                    }
+                    else if (!IsSelectableForInputLocked(input, x, y))
+                    {
+                        skippedAir++;
                     }
                     else if (SelectedCells.Count < MaxSelectedCells)
                     {
@@ -305,6 +335,7 @@ namespace JueMingZ.Automation.Blueprint
             var changed = added > 0 || removed > 0;
             var message = "创建 mask 更新：+" + added.ToString(CultureInfo.InvariantCulture) +
                           " / -" + removed.ToString(CultureInfo.InvariantCulture) +
+                          (skippedAir > 0 ? " / 空气跳过 " + skippedAir.ToString(CultureInfo.InvariantCulture) : string.Empty) +
                           "，当前 " + SelectedCells.Count.ToString(CultureInfo.InvariantCulture) + " 格。";
             return new ToggleResult
             {
@@ -326,6 +357,9 @@ namespace JueMingZ.Automation.Blueprint
                 DragStartY = _dragStartY,
                 DragCurrentX = _dragCurrentX,
                 DragCurrentY = _dragCurrentY,
+                HoverTileHit = _hoverTileHit,
+                HoverTileX = _hoverTileX,
+                HoverTileY = _hoverTileY,
                 LastNotice = _lastNotice,
                 LastInputOwner = _lastInputOwner,
                 LastResultCode = _lastResultCode,
@@ -334,6 +368,59 @@ namespace JueMingZ.Automation.Blueprint
             snapshot.SelectedCount = snapshot.SelectedCells.Count;
             FillBounds(snapshot);
             return snapshot;
+        }
+
+        private static void UpdateHoverLocked(BlueprintCreationPointerInput input)
+        {
+            if (input == null ||
+                !input.WorldTileHit ||
+                !IsSelectableForInputLocked(input, input.TileX, input.TileY))
+            {
+                ClearHoverLocked();
+                return;
+            }
+
+            _hoverTileHit = true;
+            _hoverTileX = input.TileX;
+            _hoverTileY = input.TileY;
+        }
+
+        private static void ClearHoverLocked()
+        {
+            _hoverTileHit = false;
+            _hoverTileX = 0;
+            _hoverTileY = 0;
+        }
+
+        private static bool IsSelectableForInputLocked(BlueprintCreationPointerInput input, int tileX, int tileY)
+        {
+            if (SelectedCells.ContainsKey(BuildKey(tileX, tileY)))
+            {
+                return true;
+            }
+
+            if (input != null && input.IsSelectableTile != null)
+            {
+                try
+                {
+                    return input.IsSelectableTile(tileX, tileY);
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+
+            if (input != null &&
+                input.ContentKnown &&
+                input.WorldTileHit &&
+                input.TileX == tileX &&
+                input.TileY == tileY)
+            {
+                return input.HasSelectableContent;
+            }
+
+            return true;
         }
 
         private static BlueprintCreationInteractionResult BuildResultLocked(
@@ -454,6 +541,9 @@ namespace JueMingZ.Automation.Blueprint
         public int DragStartY { get; set; }
         public int DragCurrentX { get; set; }
         public int DragCurrentY { get; set; }
+        public bool HoverTileHit { get; set; }
+        public int HoverTileX { get; set; }
+        public int HoverTileY { get; set; }
         public int SelectedCount { get; set; }
         public bool HasBounds { get; set; }
         public int MinX { get; set; }
@@ -472,6 +562,9 @@ namespace JueMingZ.Automation.Blueprint
         public bool WorldTileHit { get; set; }
         public int TileX { get; set; }
         public int TileY { get; set; }
+        public bool ContentKnown { get; set; }
+        public bool HasSelectableContent { get; set; }
+        public Func<int, int, bool> IsSelectableTile { get; set; }
         public bool LeftDown { get; set; }
         public bool LeftPressed { get; set; }
         public bool LeftReleased { get; set; }

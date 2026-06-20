@@ -5047,6 +5047,10 @@ function Test-BlueprintHandheldActionBarGovernance {
     $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
     $functionDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
     $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $plan07Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图功能实机反馈修补", "07-手持操作栏动态按钮与真实命令接线.md")
+    if (-not (Test-Path -LiteralPath $plan07Path)) {
+        $plan07Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图功能实机反馈修补", "07-手持操作栏动态按钮与真实命令接线.md")
+    }
     $plan04Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图手持凝胶操作栏", "04-诊断测试文档审计.md")
     if (-not (Test-Path -LiteralPath $plan04Path)) {
         $plan04Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图手持凝胶操作栏", "04-诊断测试文档审计.md")
@@ -5062,33 +5066,62 @@ function Test-BlueprintHandheldActionBarGovernance {
     $programText = Read-TextIfExists -Path $programPath
     $functionDocText = Read-TextIfExists -Path $functionDocPath
     $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $plan07Text = Read-TextIfExists -Path $plan07Path
     $plan04Text = Read-TextIfExists -Path $plan04Path
 
     if ($stateText -and
         $stateText.Contains("CommandElementPrefix") -and
         $stateText.Contains("blueprint-handheld-action-bar:") -and
         $stateText.Contains("ResultCodeUiOnlyNotImplemented") -and
+        $stateText.Contains("ButtonIdSave") -and
+        $stateText.Contains("BlueprintCreationHasPendingSelection") -and
+        $stateText.Contains("BlueprintHasPlacedInstances") -and
+        $stateText.Contains("Tooltip") -and
         $stateText.Contains("BuildDiagnostics") -and
         $stateText.Contains("BlueprintHandheldActionBarDiagnostics")) {
-        Write-Pass "Blueprint handheld action bar state owns UI-only command ids and lightweight diagnostics."
+        Write-Pass "Blueprint handheld action bar state owns dedicated command ids, dynamic matrix inputs, tooltips, and lightweight diagnostics."
     }
     else {
-        Write-FailHealth "Blueprint handheld action bar state must keep dedicated UI-only command ids and lightweight diagnostics ownership."
+        Write-FailHealth "Blueprint handheld action bar state must keep dedicated command ids, dynamic matrix inputs, tooltips, and lightweight diagnostics ownership."
+    }
+
+    if ($stateText -and
+        -not $stateText.Contains("return Hidden(HiddenReasonGameInputUnavailable") -and
+        -not $stateText.Contains("return Hidden(HiddenReasonPlayerInventoryOpen") -and
+        -not $stateText.Contains("return Hidden(HiddenReasonChestOpen")) {
+        Write-Pass "Blueprint handheld action bar keeps inventory, chest, and game-input-unavailable as visible display-gate contexts."
+    }
+    else {
+        Write-FailHealth "Blueprint handheld action bar must not treat player inventory, chest, or game-input-unavailable as hard hidden reasons."
     }
 
     if ($overlayText -and
-        $overlayText.Contains("ui-only-placeholder-click") -and
+        $overlayText.Contains("dynamic-buttons") -and
+        $overlayText.Contains("create-enters-mask") -and
+        $overlayText.Contains("save-captures-mask") -and
+        $overlayText.Contains("open-library-real") -and
+        $overlayText.Contains("unimplemented-buttons-ui-only") -and
         $overlayText.Contains("mouse-consume") -and
+        $overlayText.Contains("legacy-ui-theme") -and
+        $overlayText.Contains("vanilla-ui-skin") -and
+        $overlayText.Contains("button-text-scale-0.78") -and
+        $overlayText.Contains("internal const float ButtonTextScale = 0.78f;") -and
+        $overlayText.Contains("LegacyUiTheme.DrawPanel") -and
+        $overlayText.Contains("LegacyUiTheme.DrawButtonClipped") -and
+        $overlayText.Contains("ResolveButtonTextScale") -and
+        $overlayText.Contains("PopulateDynamicBlueprintState") -and
+        $overlayText.Contains("GetCachedSummary") -and
+        $overlayText.Contains("GetDiagnostics") -and
         $overlayText.Contains("no-blueprint-refresh") -and
         $overlayText.Contains("no-input-action-queue") -and
         -not $overlayText.Contains("BlueprintEntryState.ApplyCommand") -and
         -not $overlayText.Contains("InputActionQueue") -and
         -not $overlayText.Contains("ForceRefreshForMaterialWindow") -and
         -not $overlayText.Contains("ForceRefreshForAutoPlacement")) {
-        Write-Pass "Blueprint handheld overlay remains draw/input-only and does not refresh blueprint caches or submit actions."
+        Write-Pass "Blueprint handheld overlay remains draw/input-only, uses cached dynamic state, uses the legacy UI theme skin path, and does not refresh blueprint caches or submit InputActionQueue actions."
     }
     else {
-        Write-FailHealth "Blueprint handheld overlay must remain UI-only: no BlueprintEntryState.ApplyCommand, InputActionQueue, or blueprint refresh calls."
+        Write-FailHealth "Blueprint handheld overlay must expose dynamic create/save/open-library/UI-only contract, use cached state and LegacyUiTheme skin rendering with 0.78 base text scale, and avoid blueprint refresh or InputActionQueue calls."
     }
 
     $handlerMatch = [System.Text.RegularExpressions.Regex]::Match(
@@ -5096,19 +5129,29 @@ function Test-BlueprintHandheldActionBarGovernance {
         "private\s+static\s+void\s+HandleBlueprintHandheldActionBarCommand[\s\S]*?private\s+static\s+void\s+HandleBlueprintReplacementMode")
     $handlerText = if ($handlerMatch.Success) { $handlerMatch.Value } else { "" }
     if ($handlerText.Contains("Ui.Blueprint.HandheldActionBar") -and
+        $handlerText.Contains("RecordCommandResultClick") -and
         $handlerText.Contains("RecordPlaceholderClick") -and
+        $handlerText.Contains("BlueprintEntryCommands.StartCreate") -and
+        $handlerText.Contains("BlueprintEntryCommands.FinishCreateSave") -and
+        $handlerText.Contains("BlueprintCaptureService.CapturePendingMaskAndSave(false)") -and
+        $handlerText.Contains("BlueprintLibraryUiState.NotifyTemplateCreated") -and
+        $handlerText.Contains("BlueprintEntryState.MarkCaptureSaved") -and
+        $handlerText.Contains("BlueprintEntryState.RecordCaptureFailure") -and
+        $handlerText.Contains("BlueprintLibraryUiState.OpenLibrary") -and
+        $handlerText.Contains("BlueprintEntryCommands.OpenLibrary") -and
+        $handlerText.Contains("BlueprintEntryState.ApplyCommand") -and
         $handlerText.Contains('\"submitted\":false') -and
+        $handlerText.Contains('BoolRaw(!entry.PlaceholderOnly)') -and
+        $handlerText.Contains('\"implemented\":true') -and
         $handlerText.Contains('\"implemented\":false') -and
         $handlerText.Contains('\"uiOnly\":true') -and
         $handlerText.Contains("result.ResultCode") -and
-        -not $handlerText.Contains("BlueprintEntryState.ApplyCommand") -and
         -not $handlerText.Contains("InputActionQueue") -and
-        -not $handlerText.Contains("OpenLibrary") -and
         -not $handlerText.Contains("ForceRefresh")) {
-        Write-Pass "Blueprint handheld action bar command handler records UI-only placeholder events only."
+        Write-Pass "Blueprint handheld action bar command handler wires create/save/open-library to real UI state commands while delete/move/red remain placeholders."
     }
     else {
-        Write-FailHealth "Blueprint handheld action bar handler must record Ui.Blueprint.HandheldActionBar as UI-only and must not call real blueprint commands, refreshes, or InputActionQueue."
+        Write-FailHealth "Blueprint handheld action bar handler must wire create/save/open-library to real UI state commands, keep delete/move/red placeholder-only, and avoid refresh/InputActionQueue paths."
     }
 
     $requiredSnapshotFields = @(
@@ -5134,26 +5177,584 @@ function Test-BlueprintHandheldActionBarGovernance {
     }
 
     if ($testText -and $programText -and
+        $testText.Contains("BlueprintHandheldActionBarDynamicButtonMatrix") -and
+        $testText.Contains("BlueprintHandheldActionBarDisplayGatesStayVisibleAndUiOnly") -and
+        $testText.Contains("BlueprintHandheldActionBarVisualStyleUsesLegacyThemeAndStableTextScale") -and
         $testText.Contains("BlueprintHandheldActionBarOverlayStaysUiOnlyAndNoScan") -and
-        $testText.Contains("BlueprintHandheldActionBarCommandsStayUiOnly") -and
+        $testText.Contains("BlueprintHandheldActionBarRealCommandsAndUnimplementedButtons") -and
         $testText.Contains("BlueprintHandheldActionBarDiagnosticsSnapshotJson") -and
+        $programText.Contains("blueprint handheld action bar dynamic button matrix") -and
+        $programText.Contains("blueprint handheld action bar display gates stay visible and UI-only") -and
+        $programText.Contains("blueprint handheld action bar real commands and unimplemented buttons") -and
+        $programText.Contains("blueprint handheld action bar visual style uses legacy theme and stable text scale") -and
         $programText.Contains("blueprint handheld action bar diagnostics snapshot json")) {
-        Write-Pass "Blueprint handheld action bar console tests cover no-scan, UI-only commands, and snapshot JSON."
+        Write-Pass "Blueprint handheld action bar console tests cover dynamic buttons, display-gate visibility, themed visual scale, no-scan, real create/save/open-library commands, UI-only delete/move/red commands, and snapshot JSON."
     }
     else {
-        Write-FailHealth "Blueprint handheld action bar tests must cover no-scan, UI-only commands, and snapshot JSON diagnostics."
+        Write-FailHealth "Blueprint handheld action bar tests must cover dynamic buttons, display-gate visibility, themed visual scale, no-scan, real create/save/open-library commands, UI-only delete/move/red commands, and snapshot JSON diagnostics."
     }
 
-    if ($functionDocText -and $diagnosticsDocText -and $plan04Text -and
+    if ($functionDocText -and $diagnosticsDocText -and $plan04Text -and $plan07Text -and
         $functionDocText.Contains("BlueprintHandheldActionBarVisible") -and
         $functionDocText.Contains("Ui.Blueprint.HandheldActionBar") -and
+        $functionDocText.Contains("保存蓝图") -and
+        $functionDocText.Contains("打开蓝图库") -and
+        $functionDocText.Contains("删除已经放置的蓝图或已经选区待创建的区域") -and
         $diagnosticsDocText.Contains("BlueprintHandheldActionBarVisible") -and
         $diagnosticsDocText.Contains("DiagnosticLifecycle=Stabilization") -and
-        $plan04Text.Contains("0.871-blueprint-handheld-diagnostics-audit")) {
-        Write-Pass "Blueprint handheld action bar function, diagnostics, and stage-04 plan docs are synchronized."
+        $diagnosticsDocText.Contains("save-captures-mask") -and
+        $plan04Text.Contains("0.871-blueprint-handheld-diagnostics-audit") -and
+        $plan07Text.Contains("0.878-blueprint-handheld-dynamic-actions")) {
+        Write-Pass "Blueprint handheld action bar function, diagnostics, stage-04, and stage-07 plan docs are synchronized."
     }
     else {
-        Write-FailHealth "Blueprint handheld action bar docs must describe UI-only action events, snapshot summary fields, Stabilization lifecycle, and 0.871 stage-04 completion."
+        Write-FailHealth "Blueprint handheld action bar docs must describe dynamic buttons, real save/library commands, UI-only delete/move/red events, snapshot summary fields, Stabilization lifecycle, and 0.878 stage-07 completion."
+    }
+}
+
+function Test-BlueprintActionShortcutGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $uiPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.Blueprint.cs"
+    $hotkeyPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.Blueprint.Hotkey.cs"
+    $uiActionPath = Join-Path $RepoRoot "src\JueMingZ\Input\LegacyUiActionService.Blueprint.cs"
+    $routerPath = Join-Path $RepoRoot "src\JueMingZ\Input\LegacyUiActionService.CommandRouter.cs"
+    $creationStatePath = Join-Path $RepoRoot "src\JueMingZ\Automation\Blueprint\BlueprintCreationMaskState.cs"
+    $creationOverlayPath = Join-Path $RepoRoot "src\JueMingZ\UI\BlueprintCreationOverlay.cs"
+    $capturePath = Join-Path $RepoRoot "src\JueMingZ\Automation\Blueprint\BlueprintCaptureService.cs"
+    $featureIdsPath = Join-Path $RepoRoot "src\JueMingZ\Common\FeatureIds.cs"
+    $conflictPath = Join-Path $RepoRoot "src\JueMingZ\Config\FeatureToggleHotkeyConflictRegistry.cs"
+    $testPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintEntryTests.cs"
+    $creationTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintCreationTests.cs"
+    $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
+    $functionDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $plan03Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图功能实机反馈修补", "03-F5蓝图创建保存入口.md")
+    if (-not (Test-Path -LiteralPath $plan03Path)) {
+        $plan03Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图功能实机反馈修补", "03-F5蓝图创建保存入口.md")
+    }
+
+    $uiText = Read-TextIfExists -Path $uiPath
+    $hotkeyText = Read-TextIfExists -Path $hotkeyPath
+    $uiActionText = Read-TextIfExists -Path $uiActionPath
+    $routerText = Read-TextIfExists -Path $routerPath
+    $creationStateText = Read-TextIfExists -Path $creationStatePath
+    $creationOverlayText = Read-TextIfExists -Path $creationOverlayPath
+    $captureText = Read-TextIfExists -Path $capturePath
+    $featureIdsText = Read-TextIfExists -Path $featureIdsPath
+    $conflictText = Read-TextIfExists -Path $conflictPath
+    $testText = Read-TextIfExists -Path $testPath
+    $creationTestText = Read-TextIfExists -Path $creationTestPath
+    $programText = Read-TextIfExists -Path $programPath
+    $functionDocText = Read-TextIfExists -Path $functionDocPath
+    $plan03Text = Read-TextIfExists -Path $plan03Path
+
+    if ($uiText -and
+        $uiText.Contains("BlueprintActionShortcutVisualContract") -and
+        $uiText.Contains("real-create-save-mask-entry") -and
+        $uiText.Contains("auto-mining-hotkey-shape") -and
+        $uiText.Contains("blueprint-action-hotkey:") -and
+        $uiText.Contains("blueprint-action-entry:") -and
+        $uiText.Contains("BlueprintCreateAction") -and
+        $uiText.Contains("BlueprintSaveAction") -and
+        $uiText.Contains("左键按住滑动选区，可多选") -and
+        $uiText.Contains("保存当前选区为蓝图") -and
+        $uiText.Contains("双击录入采集按键。")) {
+        Write-Pass "Blueprint F5 create/save shortcut rows keep the visual ids, tooltips, action hotkeys, and stage-06 real mask entry contract."
+    }
+    else {
+        Write-FailHealth "Blueprint F5 create/save shortcut rows must keep independent action hotkey fields, real create/save action buttons, and the required tooltips."
+    }
+
+    if ($featureIdsText -and
+        $featureIdsText.Contains('BlueprintCreateAction = "blueprint.create"') -and
+        $featureIdsText.Contains('BlueprintSaveAction = "blueprint.save"') -and
+        $hotkeyText -and
+        $hotkeyText.Contains("TrySaveBlueprintActionHotkey") -and
+        $hotkeyText.Contains("NormalizeBlueprintHotkeyTargetId") -and
+        $conflictText -and
+        $conflictText.Contains("FeatureToggleHotkeyConflictType.BlueprintAction") -and
+        $conflictText.Contains("蓝图创建快捷键") -and
+        $conflictText.Contains("蓝图保存快捷键")) {
+        Write-Pass "Blueprint create/save hotkeys use separate action keys and participate in hotkey conflict detection."
+    }
+    else {
+        Write-FailHealth "Blueprint create/save hotkeys must not reuse blueprint.main and must be covered by conflict detection."
+    }
+
+    $handlerMatch = [System.Text.RegularExpressions.Regex]::Match(
+        $uiActionText,
+        "private\s+static\s+void\s+HandleBlueprintActionEntryCommand[\s\S]*?private\s+static\s+void\s+HandleBlueprintToolItemCommand")
+    $handlerText = if ($handlerMatch.Success) { $handlerMatch.Value } else { "" }
+    if ($routerText -and
+        $routerText.Contains("blueprint-action-hotkey:") -and
+        $routerText.Contains("blueprint-action-entry:") -and
+        $handlerText.Contains("Ui.Blueprint.CreateSaveEntry") -and
+        $handlerText.Contains('\"submitted\":false') -and
+        $handlerText.Contains('BoolRaw(!result.PlaceholderOnly)') -and
+        $handlerText.Contains('\"uiOnly\":true') -and
+        $handlerText.Contains("BlueprintEntryState.ApplyCommand") -and
+        $handlerText.Contains("BlueprintCaptureService.CapturePendingMaskAndSave") -and
+        $handlerText.Contains("BlueprintLibraryUiState.NotifyTemplateCreated") -and
+        $handlerText.Contains("BlueprintEntryState.MarkCaptureSaved") -and
+        -not $handlerText.Contains("stage03UiOnlyNotImplemented") -and
+        -not $handlerText.Contains("ForceRefresh")) {
+        Write-Pass "Blueprint F5 create/save action buttons enter the creation mask/save path without refreshing projection or material caches."
+    }
+    else {
+        Write-FailHealth "Blueprint F5 create/save action buttons must call the real create/save state path and avoid projection/material refreshes."
+    }
+
+    if ($testText -and
+        $creationTestText -and
+        $testText.Contains("BlueprintActionHotkeysUseSeparateKeysAndConflictSources") -and
+        $testText.Contains("BlueprintCreateSaveActionCommandsEnterMaskAndSaveWithoutProjectionScan") -and
+        $creationTestText.Contains("BlueprintCreationMaskSkipsAirAndTracksHover") -and
+        $programText.Contains("blueprint action hotkeys use separate keys and conflict sources") -and
+        $programText.Contains("blueprint create save action commands enter mask and save without projection scan") -and
+        $programText.Contains("blueprint creation mask skips air and tracks hover")) {
+        Write-Pass "Blueprint stage-06 create/save shortcut console tests are present and registered."
+    }
+    else {
+        Write-FailHealth "Blueprint stage-06 create/save shortcut tests must cover hotkey separation/conflicts and real create/save no-projection-scan commands."
+    }
+
+    if ($creationStateText -and
+        $creationStateText.Contains("HoverTileHit") -and
+        $creationStateText.Contains("ContentKnown") -and
+        $creationStateText.Contains("HasSelectableContent") -and
+        $creationStateText.Contains("IsSelectableTile") -and
+        $creationStateText.Contains("airSkipped") -and
+        $captureText.Contains("TryHasSelectableContent") -and
+        $captureText.Contains("HasSelectableContent(BlueprintWorldTileSnapshot") -and
+        $creationOverlayText.Contains("low-alpha-no-border") -and
+        $creationOverlayText.Contains("continuous-row-runs") -and
+        $creationOverlayText.Contains("DrawSelectedRuns") -and
+        $creationOverlayText.Contains("DrawTileFill") -and
+        $creationOverlayText.Contains("TryHasSelectableContent") -and
+        -not $creationOverlayText.Contains("DrawRectBorderClipped")) {
+        Write-Pass "Blueprint creation mask skips air, tracks hover, and draws low-alpha continuous no-border overlay."
+    }
+    else {
+        Write-FailHealth "Blueprint creation mask must skip air via capture content probe, track hover, and draw low-alpha continuous no-border overlay."
+    }
+
+    if ($functionDocText -and
+        $functionDocText.Contains("blueprint.create") -and
+        $functionDocText.Contains("blueprint.save") -and
+        $functionDocText.Contains("左键按住滑动选区，可多选") -and
+        $functionDocText.Contains("保存当前选区为蓝图") -and
+        $plan03Text -and
+        $plan03Text.Contains("0.874-blueprint-f5-create-save-entry")) {
+        Write-Pass "Blueprint function docs and stage-03 plan describe the F5 create/save shortcut rows and action hotkey ids."
+    }
+    else {
+        Write-FailHealth "Blueprint docs and stage-03 plan must describe blueprint.create/blueprint.save, tooltips, and the 0.874 completion record."
+    }
+}
+
+function Test-BlueprintFeedbackStage04Governance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $dispatcherPath = Join-Path $RepoRoot "src\JueMingZ\Runtime\RuntimeAutomationDispatcher.cs"
+    $entryHotkeyPath = Join-Path $RepoRoot "src\JueMingZ\Input\BlueprintEntryHotkeyService.cs"
+    $configServicePath = Join-Path $RepoRoot "src\JueMingZ\Config\ConfigService.cs"
+    $conflictPath = Join-Path $RepoRoot "src\JueMingZ\Config\FeatureToggleHotkeyConflictRegistry.cs"
+    $entryStatePath = Join-Path $RepoRoot "src\JueMingZ\Automation\Blueprint\BlueprintEntryState.cs"
+    $stateApiPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.StateApi.cs"
+    $hotkeyPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.Blueprint.Hotkey.cs"
+    $autoMiningInputPath = Join-Path $RepoRoot "src\JueMingZ\Automation\WorldAutomation\AutoMiningHotkeyInput.cs"
+    $autoMiningModelsPath = Join-Path $RepoRoot "src\JueMingZ\Automation\WorldAutomation\AutoMiningModels.cs"
+    $autoMiningServicePath = Join-Path $RepoRoot "src\JueMingZ\Automation\WorldAutomation\AutoMiningService.cs"
+    $autoCaptureServicePath = Join-Path $RepoRoot "src\JueMingZ\Automation\WorldAutomation\AutoCaptureCritterService.cs"
+    $scenarioNamesPath = Join-Path $RepoRoot "src\JueMingZ\Common\ScenarioNames.cs"
+    $snapshotPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\DiagnosticSnapshot.cs"
+    $snapshotWriterPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\DiagnosticSnapshotWriter.Json.cs"
+    $snapshotBuilderPath = Join-Path $RepoRoot "src\JueMingZ\Runtime\Diagnostics\RuntimeDiagnosticSnapshotBuilder.InventoryInformationFishing.cs"
+    $blueprintTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintEntryTests.cs"
+    $worldTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.WorldAutomationActionTests.cs"
+    $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
+    $blueprintDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $autoMiningDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "杂项页", "自动挖矿.md")
+    $autoCaptureDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "物品页", "自动捕捉.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $plan04Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图功能实机反馈修补", "04-入口热键清理与自动挖矿采集键修复.md")
+    if (-not (Test-Path -LiteralPath $plan04Path)) {
+        $plan04Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图功能实机反馈修补", "04-入口热键清理与自动挖矿采集键修复.md")
+    }
+    $plan05Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图功能实机反馈修补", "05-自动挖矿自动模式与自动捕捉背包门禁.md")
+    if (-not (Test-Path -LiteralPath $plan05Path)) {
+        $plan05Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图功能实机反馈修补", "05-自动挖矿自动模式与自动捕捉背包门禁.md")
+    }
+
+    $dispatcherText = Read-TextIfExists -Path $dispatcherPath
+    $entryHotkeyText = Read-TextIfExists -Path $entryHotkeyPath
+    $configServiceText = Read-TextIfExists -Path $configServicePath
+    $conflictText = Read-TextIfExists -Path $conflictPath
+    $entryStateText = Read-TextIfExists -Path $entryStatePath
+    $stateApiText = Read-TextIfExists -Path $stateApiPath
+    $hotkeyText = Read-TextIfExists -Path $hotkeyPath
+    $autoMiningInputText = Read-TextIfExists -Path $autoMiningInputPath
+    $autoMiningModelsText = Read-TextIfExists -Path $autoMiningModelsPath
+    $autoMiningServiceText = Read-TextIfExists -Path $autoMiningServicePath
+    $autoCaptureServiceText = Read-TextIfExists -Path $autoCaptureServicePath
+    $scenarioNamesText = Read-TextIfExists -Path $scenarioNamesPath
+    $snapshotText = Read-TextIfExists -Path $snapshotPath
+    $snapshotWriterText = Read-TextIfExists -Path $snapshotWriterPath
+    $snapshotBuilderText = Read-TextIfExists -Path $snapshotBuilderPath
+    $blueprintTestText = Read-TextIfExists -Path $blueprintTestPath
+    $worldTestText = Read-TextIfExists -Path $worldTestPath
+    $programText = Read-TextIfExists -Path $programPath
+    $blueprintDocText = Read-TextIfExists -Path $blueprintDocPath
+    $autoMiningDocText = Read-TextIfExists -Path $autoMiningDocPath
+    $autoCaptureDocText = Read-TextIfExists -Path $autoCaptureDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $plan04Text = Read-TextIfExists -Path $plan04Path
+    $plan05Text = Read-TextIfExists -Path $plan05Path
+
+    if ($dispatcherText -and
+        -not $dispatcherText.Contains("targeting.blueprint-entry-hotkey") -and
+        $dispatcherText.Contains("targeting.blueprint-action-hotkeys") -and
+        $dispatcherText.Contains("BlueprintEntryHotkeyService.Tick(") -and
+        $entryHotkeyText -and
+        $entryHotkeyText.Contains("HasActiveBinding") -and
+        $entryHotkeyText.Contains("FeatureIds.BlueprintCreateAction") -and
+        $entryHotkeyText.Contains("FeatureIds.BlueprintSaveAction") -and
+        $entryHotkeyText.Contains("directEntryHotkeyDisabled") -and
+        -not $entryHotkeyText.Contains("FeatureIds.BlueprintMain") -and
+        -not $entryHotkeyText.Contains("OpenEntryHotkey") -and
+        $configServiceText -and
+        $configServiceText.Contains("RemoveBlueprintEntryHotkey") -and
+        $configServiceText.Contains("hotkeys.Remove(FeatureIds.BlueprintMain)") -and
+        $entryStateText -and
+        $entryStateText.Contains("directEntryHotkeyDisabled")) {
+        Write-Pass "Blueprint direct-entry hotkey runtime path stays disabled while stage-06 action hotkeys use blueprint.create/blueprint.save only."
+    }
+    else {
+        Write-FailHealth "Blueprint stage-04 must keep old targeting.blueprint-entry-hotkey/blueprint.main direct-open disabled while allowing only blueprint action hotkeys."
+    }
+
+    if ($conflictText -and
+        -not $conflictText.Contains("TryFindBlueprintEntryConflict") -and
+        -not $conflictText.Contains("BlueprintEntry,") -and
+        $stateApiText.Contains("直接打开蓝图页快捷键已停用") -and
+        $hotkeyText.Contains("蓝图页直接打开快捷键已停用") -and
+        $blueprintTestText.Contains("BlueprintDirectEntryHotkeyIsDisabled") -and
+        $blueprintTestText.Contains("BlueprintDirectEntryHotkeyIsNotAConflictSource") -and
+        $programText -and
+        $programText.Contains("blueprint direct entry hotkey is disabled")) {
+        Write-Pass "Blueprint direct-entry capture/save/conflict surfaces stay disabled and covered by console tests."
+    }
+    else {
+        Write-FailHealth "Blueprint stage-04 must reject direct-entry capture/save attempts and remove the old conflict source, with regression tests registered."
+    }
+
+    if ($autoMiningModelsText -and
+        $autoMiningModelsText.Contains("AutoMiningHotkeyInputResult") -and
+        $autoMiningModelsText.Contains("AutoMiningDiagnostics") -and
+        $autoMiningInputText -and
+        $autoMiningInputText.Contains("ConsumePressedForTesting") -and
+        $autoMiningInputText.Contains("gameInputUnavailable") -and
+        $autoMiningInputText.Contains("notForeground") -and
+        $autoMiningInputText.Contains("textInputFocused") -and
+        $autoMiningServiceText -and
+        $autoMiningServiceText.Contains("RecordHotkeyDecision") -and
+        $autoMiningServiceText.Contains("RecordRuntimeHotkeyGateSkipped") -and
+        $scenarioNamesText.Contains("WorldAutomationAutoMiningHotkey")) {
+        Write-Pass "Auto mining Hotkey trigger uses structured input results and records blocked reasons without touching Auto mode."
+    }
+    else {
+        Write-FailHealth "Auto mining stage-04 Hotkey trigger must expose structured results, blocked reasons, and hotkey diagnostics."
+    }
+
+    $requiredAutoMiningFields = @(
+        "AutoMiningLastDecision",
+        "AutoMiningLastDecisionUtc",
+        "AutoMiningLastHotkey",
+        "AutoMiningLastHotkeyResultCode",
+        "AutoMiningLastHotkeyBlockedReason",
+        "AutoMiningLastHotkeyDecisionUtc"
+    )
+    $missingAutoMiningFields = @()
+    foreach ($field in $requiredAutoMiningFields) {
+        if (-not ($snapshotText.Contains($field) -and $snapshotWriterText.Contains($field) -and $snapshotBuilderText.Contains($field))) {
+            $missingAutoMiningFields += $field
+        }
+    }
+
+    if ($missingAutoMiningFields.Count -eq 0 -and
+        $worldTestText.Contains("AutoMiningHotkeyInputTriggersAndDebounces") -and
+        $worldTestText.Contains("AutoMiningHotkeyInputReportsBlockedReasons") -and
+        $programText -and
+        $programText.Contains("auto mining hotkey input reports blocked reasons")) {
+        Write-Pass "Auto mining Hotkey blocked-reason snapshot fields and console tests are wired."
+    }
+    else {
+        Write-FailHealth "Auto mining stage-04 diagnostics/tests missing fields or registrations: $($missingAutoMiningFields -join ', ')"
+    }
+
+    if ($blueprintDocText -and
+        $blueprintDocText.Contains("directEntryHotkeyDisabled") -and
+        $blueprintDocText.Contains("blueprint.main") -and
+        $autoMiningDocText -and
+        $autoMiningDocText.Contains("AutoMiningLastHotkeyBlockedReason") -and
+        $diagnosticsDocText -and
+        $diagnosticsDocText.Contains("AutoMiningLastHotkeyBlockedReason") -and
+        $plan04Text -and
+        $plan04Text.Contains("0.875-blueprint-hotkey-automining-hotkey")) {
+        Write-Pass "Blueprint/auto-mining function docs, diagnostics rules, and stage-04 plan describe the hotkey cleanup."
+    }
+    else {
+        Write-FailHealth "Stage-04 docs must describe directEntryHotkeyDisabled, auto-mining Hotkey blocked-reason diagnostics, and the 0.875 completion record."
+    }
+
+    if ($autoMiningServiceText -and
+        $autoMiningServiceText.Contains("ObserveManualTileMined") -and
+        $autoMiningServiceText.Contains("TryHandleManualMiningSelection") -and
+        $autoMiningServiceText.Contains("ResetForTesting") -and
+        $worldTestText.Contains("AutoMiningAutoModeObservationSubmitsSustainedRequest") -and
+        $programText.Contains("auto mining auto mode observation submits sustained request")) {
+        Write-Pass "Auto mining Auto mode PickTile observation is covered by a sustained-request regression test."
+    }
+    else {
+        Write-FailHealth "Stage-05 must keep Auto mining Auto-mode PickTile observation wired to selection and covered by a sustained-request console test."
+    }
+
+    if ($autoCaptureServiceText -and
+        $autoCaptureServiceText.Contains("CanRunManualCaptureWithInventoryOpen") -and
+        $autoCaptureServiceText.Contains("AutoCaptureCritterModes.Manual") -and
+        $autoCaptureServiceText.Contains("bugNet.Slot >= 0 && bugNet.Slot < 10") -and
+        $worldTestText.Contains("AutoCaptureCritterManualInventoryOpenRequiresSelectedHotbarBugNet") -and
+        $programText.Contains("auto capture critter manual inventory open requires selected hotbar bug net")) {
+        Write-Pass "Auto capture inventory-open gate is limited to Manual mode with a selected hotbar bug net and covered by tests."
+    }
+    else {
+        Write-FailHealth "Stage-05 must keep auto capture inventory-open execution limited to Manual mode with a selected hotbar bug net, with Auto mode still blocked."
+    }
+
+    if ($autoMiningDocText -and
+        $autoMiningDocText.Contains("AutoMiningAutoModeObservationSubmitsSustainedRequest") -and
+        $autoCaptureDocText -and
+        $autoCaptureDocText.Contains("Manual + 当前选中快捷栏虫网") -and
+        $diagnosticsDocText -and
+        $diagnosticsDocText.Contains("AutoMiningAutoModeObservationSubmitsSustainedRequest") -and
+        $plan05Text -and
+        $plan05Text.Contains("0.876-automining-auto-autocapture-inventory-gate")) {
+        Write-Pass "Stage-05 auto mining/auto capture docs and plan record the 0.876 completion contract."
+    }
+    else {
+        Write-FailHealth "Stage-05 docs must describe Auto mining Auto-mode regression coverage, Manual selected-hotbar bug-net inventory gate, diagnostics, and the 0.876 completion record."
+    }
+}
+
+function Test-BlueprintFeedbackStage08Governance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $runtimeDiagnosticsTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.RuntimeDiagnosticsAndDispatchTests.cs"
+    $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
+    $blueprintDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $autoMiningDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "杂项页", "自动挖矿.md")
+    $autoCaptureDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "物品页", "自动捕捉.md")
+    $featureToggleDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "F5通用", "功能主开关快捷键.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $plan00Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图功能实机反馈修补", "00-基准.md")
+    if (-not (Test-Path -LiteralPath $plan00Path)) {
+        $plan00Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图功能实机反馈修补", "00-基准.md")
+    }
+    $plan08Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图功能实机反馈修补", "08-诊断测试文档审计.md")
+    if (-not (Test-Path -LiteralPath $plan08Path)) {
+        $plan08Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图功能实机反馈修补", "08-诊断测试文档审计.md")
+    }
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $updateRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "0.879-蓝图反馈诊断测试文档审计-2606202359.md")
+    $experienceIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("AI经验笔记", "索引.md")
+    $experienceNotePath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("AI经验笔记", "自动化与热键", "热键调度Hook静默失效防复发-2606202359.md")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+    $docHistoryRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "蓝图反馈诊断测试文档审计-2606202359.md")
+
+    $runtimeDiagnosticsTestText = Read-TextIfExists -Path $runtimeDiagnosticsTestPath
+    $programText = Read-TextIfExists -Path $programPath
+    $blueprintDocText = Read-TextIfExists -Path $blueprintDocPath
+    $autoMiningDocText = Read-TextIfExists -Path $autoMiningDocPath
+    $autoCaptureDocText = Read-TextIfExists -Path $autoCaptureDocPath
+    $featureToggleDocText = Read-TextIfExists -Path $featureToggleDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $plan00Text = Read-TextIfExists -Path $plan00Path
+    $plan08Text = Read-TextIfExists -Path $plan08Path
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $updateRecordText = Read-TextIfExists -Path $updateRecordPath
+    $experienceIndexText = Read-TextIfExists -Path $experienceIndexPath
+    $experienceNoteText = Read-TextIfExists -Path $experienceNotePath
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+    $docHistoryRecordText = Read-TextIfExists -Path $docHistoryRecordPath
+
+    if ($runtimeDiagnosticsTestText -and
+        $runtimeDiagnosticsTestText.Contains("BlueprintFeedbackDiagnosticsAuditFieldsStayWired") -and
+        $runtimeDiagnosticsTestText.Contains("ScenarioNames.WorldAutomationAutoMiningHotkey") -and
+        $runtimeDiagnosticsTestText.Contains("ScenarioNames.BlueprintActionHotkey") -and
+        $runtimeDiagnosticsTestText.Contains("AutoMiningLastHotkeyBlockedReason") -and
+        $runtimeDiagnosticsTestText.Contains("BlueprintHandheldActionBarLastResultCode") -and
+        $programText.Contains("blueprint feedback diagnostics audit fields stay wired")) {
+        Write-Pass "Blueprint feedback stage-08 diagnostic aggregate console test is present and registered."
+    }
+    else {
+        Write-FailHealth "Stage-08 must keep a registered aggregate test for blueprint feedback diagnostic fields and hotkey scenarios."
+    }
+
+    if ($blueprintDocText -and
+        $blueprintDocText.Contains("0.879-blueprint-feedback-diagnostics-audit") -and
+        $blueprintDocText.Contains("BlueprintFeedbackDiagnosticsAuditFieldsStayWired") -and
+        $blueprintDocText.Contains("删除 / 移动 / 红图仍 UI-only") -and
+        $autoMiningDocText -and
+        $autoMiningDocText.Contains("热键 / 调度 / hook 静默整类失效") -and
+        $autoMiningDocText.Contains("AutoMiningAutoModeObservationSubmitsSustainedRequest") -and
+        $autoCaptureDocText -and
+        $autoCaptureDocText.Contains("AutoCaptureCritterManualInventoryOpenRequiresSelectedHotbarBugNet") -and
+        $featureToggleDocText -and
+        $featureToggleDocText.Contains("WorldAutomation.AutoMining.Hotkey") -and
+        $diagnosticsDocText -and
+        $diagnosticsDocText.Contains("BlueprintFeedbackDiagnosticsAuditFieldsStayWired") -and
+        $diagnosticsDocText.Contains("Test-BlueprintFeedbackStage08Governance")) {
+        Write-Pass "Blueprint feedback stage-08 function and diagnostics documents describe the aggregate diagnostic/testing contract."
+    }
+    else {
+        Write-FailHealth "Stage-08 docs must describe 0.879 aggregate diagnostics, auto-mining silent-failure prevention, auto-capture inventory gate, feature-toggle separation, and health audit anchors."
+    }
+
+    if ($plan00Text -and
+        ($plan00Text.Contains('下一阶段为 `09-验证与收口`') -or $plan00Text.Contains('09-验证与收口` 已完成')) -and
+        $plan08Text -and
+        $plan08Text.Contains("状态：已完成") -and
+        $plan08Text.Contains("0.879-blueprint-feedback-diagnostics-audit") -and
+        ($plan08Text.Contains("未生成测试包") -or $plan08Text.Contains("不生成测试包")) -and
+        $updateRecordText -and
+        $updateRecordText.Contains('RuntimeVersion：`0.879-blueprint-feedback-diagnostics-audit`') -and
+        ($updateRecordText.Contains("不生成测试包") -or $updateRecordText.Contains("未生成测试包"))) {
+        Write-Pass "Blueprint feedback stage-08 plan and update record remain synchronized after final closeout."
+    }
+    else {
+        Write-FailHealth "Stage-08 plan/update record must mark 08 complete, record RuntimeVersion 0.879, and keep no-package scope."
+    }
+
+    if ($experienceNoteText -and
+        $experienceNoteText.Contains("WorldAutomation.AutoMining.Hotkey") -and
+        $experienceNoteText.Contains("AutoMiningAutoModeObservationSubmitsSustainedRequest") -and
+        $experienceNoteText.Contains("AutoCaptureCritterManualInventoryOpenRequiresSelectedHotbarBugNet") -and
+        $experienceNoteText.Contains("Test-BlueprintFeedbackStage08Governance") -and
+        $experienceIndexText.Contains("热键调度Hook静默失效防复发-2606202359.md")) {
+        Write-Pass "Stage-08 auto-mining silent-failure prevention experience note is indexed and points to automated guardrails."
+    }
+    else {
+        Write-FailHealth "Stage-08 must index an experience note summarizing hotkey/dispatcher/hook silent-failure prevention and its automated guardrails."
+    }
+
+    if ($updateIndexText -and
+        $updateIndexText.Contains("0.879-蓝图反馈诊断测试文档审计-2606202359.md") -and
+        $docHistoryRecordText -and
+        $docHistoryRecordText.Contains("蓝图功能实机反馈修补/08") -and
+        $docHistoryIndexText.Contains("蓝图反馈诊断测试文档审计-2606202359.md")) {
+        Write-Pass "Stage-08 update index and document-change history are synchronized."
+    }
+    else {
+        Write-FailHealth "Stage-08 update index and document-change history must reference the 0.879 diagnostic/test/doc audit."
+    }
+}
+
+function Test-BlueprintFeedbackStage09CloseoutGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $plan00Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图功能实机反馈修补", "00-基准.md")
+    $plan09Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图功能实机反馈修补", "09-验证与收口.md")
+    $currentPlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "索引.md")
+    $archivePlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "索引.md")
+    $blueprintDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $functionIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "功能索引.md")
+    $autoMiningDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "杂项页", "自动挖矿.md")
+    $autoCaptureDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "物品页", "自动捕捉.md")
+    $featureToggleDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "F5通用", "功能主开关快捷键.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $updateRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "0.880-蓝图反馈验证收口-2606210025.md")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+    $docHistoryRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "蓝图反馈验证收口-2606210025.md")
+
+    $plan00Text = Read-TextIfExists -Path $plan00Path
+    $plan09Text = Read-TextIfExists -Path $plan09Path
+    $currentPlanIndexText = Read-TextIfExists -Path $currentPlanIndexPath
+    $archivePlanIndexText = Read-TextIfExists -Path $archivePlanIndexPath
+    $blueprintDocText = Read-TextIfExists -Path $blueprintDocPath
+    $functionIndexText = Read-TextIfExists -Path $functionIndexPath
+    $autoMiningDocText = Read-TextIfExists -Path $autoMiningDocPath
+    $autoCaptureDocText = Read-TextIfExists -Path $autoCaptureDocPath
+    $featureToggleDocText = Read-TextIfExists -Path $featureToggleDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $updateRecordText = Read-TextIfExists -Path $updateRecordPath
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+    $docHistoryRecordText = Read-TextIfExists -Path $docHistoryRecordPath
+
+    if ($plan00Text -and
+        $plan00Text.Contains('状态：`09-验证与收口` 已完成') -and
+        $plan00Text.Contains("自动接力已终止") -and
+        $plan09Text -and
+        $plan09Text.Contains("状态：已完成") -and
+        $plan09Text.Contains("0.880-blueprint-feedback-closeout") -and
+        $plan09Text.Contains("默认测试包") -and
+        $plan09Text.Contains("不创建后续")) {
+        Write-Pass "Blueprint feedback stage-09 archived plan records final closeout, package delivery, and no further handoff."
+    }
+    else {
+        Write-FailHealth "Stage-09 archived plan must mark final closeout complete, record RuntimeVersion 0.880, default test package delivery, and no further handoff."
+    }
+
+    if ($currentPlanIndexText -and
+        $currentPlanIndexText.Contains("当前没有正在推进的计划") -and
+        -not $currentPlanIndexText.Contains("蓝图功能实机反馈修补/") -and
+        $archivePlanIndexText -and
+        $archivePlanIndexText.Contains("文档/归档历史计划/蓝图功能实机反馈修补/") -and
+        $archivePlanIndexText.Contains("0.880-blueprint-feedback-closeout") -and
+        $archivePlanIndexText.Contains("自动接力已终止")) {
+        Write-Pass "Blueprint feedback final closeout moved the plan from current index to archived index."
+    }
+    else {
+        Write-FailHealth "Stage-09 must remove the blueprint feedback plan from current index and add the archived closeout summary."
+    }
+
+    if ($blueprintDocText -and
+        $blueprintDocText.Contains("文档/归档历史计划/蓝图功能实机反馈修补/00-基准.md") -and
+        $blueprintDocText.Contains("0.880-blueprint-feedback-closeout") -and
+        $blueprintDocText.Contains("删除 / 移动 / 红图仍 UI-only") -and
+        $functionIndexText -and
+        $functionIndexText.Contains("0.880-blueprint-feedback-closeout") -and
+        $functionIndexText.Contains("用户实机验收仍待确认") -and
+        $autoMiningDocText -and
+        $autoMiningDocText.Contains("0.880-蓝图反馈验证收口-2606210025.md") -and
+        $autoCaptureDocText -and
+        $autoCaptureDocText.Contains("0.880-蓝图反馈验证收口-2606210025.md") -and
+        $featureToggleDocText -and
+        $featureToggleDocText.Contains("0.880-蓝图反馈验证收口-2606210025.md") -and
+        $diagnosticsDocText -and
+        $diagnosticsDocText.Contains("0.880-blueprint-feedback-closeout") -and
+        $diagnosticsDocText.Contains("不新增诊断字段")) {
+        Write-Pass "Stage-09 function and diagnostics docs describe final closeout without widening feature scope."
+    }
+    else {
+        Write-FailHealth "Stage-09 must synchronize blueprint/auto-mining/auto-capture/feature-toggle docs, feature index, and diagnostics closeout scope."
+    }
+
+    if ($updateIndexText -and
+        $updateIndexText.Contains("0.880-blueprint-feedback-closeout") -and
+        $updateIndexText.Contains("0.880-蓝图反馈验证收口-2606210025.md") -and
+        $updateRecordText -and
+        $updateRecordText.Contains('RuntimeVersion：`0.880-blueprint-feedback-closeout`') -and
+        $updateRecordText.Contains("JueMingZ-TestPackage") -and
+        $updateRecordText.Contains("-RequireFreshTestPackage") -and
+        $docHistoryRecordText -and
+        $docHistoryRecordText.Contains("蓝图功能实机反馈修补/09") -and
+        $docHistoryIndexText.Contains("蓝图反馈验证收口-2606210025.md")) {
+        Write-Pass "Stage-09 update record and document-change history are synchronized."
+    }
+    else {
+        Write-FailHealth "Stage-09 update record, update index, and document-change history must reference the 0.880 final closeout and package audit."
     }
 }
 
@@ -5193,7 +5794,11 @@ Test-MapDirectionHintGovernance -RepoRoot $repoRoot
 Test-MapFootprintGovernance -RepoRoot $repoRoot
 Test-PlayerWorldExplorationGovernance -RepoRoot $repoRoot
 Test-BlueprintDiagnosticsGovernance -RepoRoot $repoRoot
+Test-BlueprintActionShortcutGovernance -RepoRoot $repoRoot
+Test-BlueprintFeedbackStage04Governance -RepoRoot $repoRoot
 Test-BlueprintHandheldActionBarGovernance -RepoRoot $repoRoot
+Test-BlueprintFeedbackStage08Governance -RepoRoot $repoRoot
+Test-BlueprintFeedbackStage09CloseoutGovernance -RepoRoot $repoRoot
 Test-ActionQueueDirectEnqueueGovernance -RepoRoot $repoRoot
 Test-NewFeatureBoundaryGovernance -RepoRoot $repoRoot
 Test-DeepStructureBoundaryGovernance -RepoRoot $repoRoot

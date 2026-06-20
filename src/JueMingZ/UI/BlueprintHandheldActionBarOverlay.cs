@@ -10,7 +10,9 @@ namespace JueMingZ.UI
 {
     public static class BlueprintHandheldActionBarOverlay
     {
-        private const string VisualContract = "ui-scale-bottom-action-bar+five-buttons+ui-only-placeholder-click+mouse-consume+no-blueprint-refresh+no-input-action-queue";
+        private const string VisualContract = "ui-scale-bottom-action-bar+dynamic-buttons+legacy-ui-theme+vanilla-ui-skin+button-text-scale-0.78+create-enters-mask+save-captures-mask+open-library-real+unimplemented-buttons-ui-only+mouse-consume+no-blueprint-refresh+no-input-action-queue";
+        internal const float ButtonTextScale = 0.78f;
+        private const float MinimumButtonTextScale = 0.52f;
 
         public static bool DrawInterfaceLayer()
         {
@@ -68,6 +70,11 @@ namespace JueMingZ.UI
             return VisualContract;
         }
 
+        internal static float ResolveButtonTextScaleForTesting(string label, int availableWidth)
+        {
+            return ResolveButtonTextScale(label, availableWidth);
+        }
+
         internal static BlueprintHandheldActionBarFrame BuildFrameForTesting(
             RuntimeSettingsSnapshot settings,
             GameStateSnapshot gameState,
@@ -118,7 +125,31 @@ namespace JueMingZ.UI
                 environment.VanillaMenuReason = "unavailable";
             }
 
+            PopulateDynamicBlueprintState(environment);
             return environment;
+        }
+
+        private static void PopulateDynamicBlueprintState(BlueprintHandheldActionBarEnvironment environment)
+        {
+            if (environment == null)
+            {
+                return;
+            }
+
+            var creation = BlueprintCreationMaskState.GetSnapshot();
+            environment.BlueprintCreationActive = creation != null && creation.Active;
+            environment.BlueprintCreationSelectedCount = creation == null ? 0 : creation.SelectedCount;
+            environment.BlueprintCreationHasPendingSelection =
+                creation != null &&
+                (creation.CompletedPendingCapture || creation.SelectedCount > 0);
+
+            var placed = BlueprintPlacedInstanceUiState.GetCachedSummary();
+            var projection = BlueprintProjectionService.GetDiagnostics();
+            var placedCount = Math.Max(
+                placed == null ? 0 : placed.InstanceCount,
+                projection == null ? 0 : projection.InstanceCount);
+            environment.BlueprintPlacedInstanceCount = placedCount;
+            environment.BlueprintHasPlacedInstances = placedCount > 0;
         }
 
         private static void UpdateInputGuard(string source, bool allowCommand)
@@ -193,7 +224,8 @@ namespace JueMingZ.UI
                 Kind = "button",
                 Rect = ResolveButtonRect(frame, interaction.HoveredButtonId),
                 Enabled = true,
-                IntValue = interaction.HeldItemType
+                IntValue = interaction.HeldItemType,
+                TooltipLines = ResolveButtonTooltip(frame, interaction.HoveredButtonId)
             };
             LegacyUiInput.EnqueueClick(element, mouse, captured);
         }
@@ -217,12 +249,41 @@ namespace JueMingZ.UI
             return frame.Bounds;
         }
 
+        private static string[] ResolveButtonTooltip(BlueprintHandheldActionBarFrame frame, string buttonId)
+        {
+            var button = ResolveButtonFrame(frame, buttonId);
+            if (button == null || string.IsNullOrWhiteSpace(button.Tooltip))
+            {
+                return null;
+            }
+
+            return new[] { button.Tooltip };
+        }
+
+        private static BlueprintHandheldActionBarButtonFrame ResolveButtonFrame(BlueprintHandheldActionBarFrame frame, string buttonId)
+        {
+            if (frame == null || frame.Buttons == null)
+            {
+                return null;
+            }
+
+            for (var index = 0; index < frame.Buttons.Count; index++)
+            {
+                var button = frame.Buttons[index];
+                if (button != null && string.Equals(button.Id, buttonId, StringComparison.Ordinal))
+                {
+                    return button;
+                }
+            }
+
+            return null;
+        }
+
         private static void DrawFrame(object spriteBatch, BlueprintHandheldActionBarFrame frame)
         {
             var bounds = frame.Bounds;
             DrawNotice(spriteBatch, frame, bounds);
-            UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, bounds.X, bounds.Y, bounds.Width, bounds.Height, 6, 58, 72, 94, 218);
-            UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, bounds.X + 2, bounds.Y + 2, bounds.Width - 4, bounds.Height - 4, 5, 24, 29, 42, 226);
+            LegacyUiTheme.DrawPanel(spriteBatch, bounds);
 
             var buttons = frame.Buttons;
             for (var index = 0; index < buttons.Count; index++)
@@ -233,7 +294,8 @@ namespace JueMingZ.UI
 
         private static void DrawNotice(object spriteBatch, BlueprintHandheldActionBarFrame frame, LegacyUiRect bounds)
         {
-            if (frame == null || string.IsNullOrWhiteSpace(frame.LastNotice))
+            var notice = ResolveNotice(frame);
+            if (frame == null || string.IsNullOrWhiteSpace(notice))
             {
                 return;
             }
@@ -241,7 +303,7 @@ namespace JueMingZ.UI
             var y = Math.Max(0, bounds.Y - 20);
             UiTextRenderer.DrawCenteredTextClipped(
                 spriteBatch,
-                frame.LastNotice,
+                notice,
                 bounds.X,
                 y,
                 bounds.Width,
@@ -257,6 +319,17 @@ namespace JueMingZ.UI
                 0.58f);
         }
 
+        private static string ResolveNotice(BlueprintHandheldActionBarFrame frame)
+        {
+            var hovered = ResolveButtonFrame(frame, frame == null ? string.Empty : frame.HoveredButtonId);
+            if (hovered != null && !string.IsNullOrWhiteSpace(hovered.Tooltip))
+            {
+                return hovered.Tooltip;
+            }
+
+            return frame == null ? string.Empty : frame.LastNotice;
+        }
+
         private static void DrawButton(object spriteBatch, BlueprintHandheldActionBarButtonFrame button, LegacyUiRect clip, BlueprintHandheldActionBarFrame frame)
         {
             if (button == null)
@@ -267,29 +340,37 @@ namespace JueMingZ.UI
             var rect = button.Rect;
             var pressed = frame != null && string.Equals(frame.PressedButtonId, button.Id, StringComparison.Ordinal);
             var hovered = frame != null && string.Equals(frame.HoveredButtonId, button.Id, StringComparison.Ordinal);
-            var borderAlpha = pressed ? 242 : hovered ? 232 : 214;
-            var bodyAlpha = pressed ? 238 : hovered ? 232 : 222;
-            var bodyR = pressed ? 48 : hovered ? 42 : 34;
-            var bodyG = pressed ? 58 : hovered ? 52 : 42;
-            var bodyB = pressed ? 78 : hovered ? 72 : 62;
-            UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, rect.X, rect.Y, rect.Width, rect.Height, 4, 92, 110, 146, borderAlpha);
-            UiPrimitiveRenderer.DrawRoundedRect(spriteBatch, rect.X + 1, rect.Y + 1, rect.Width - 2, rect.Height - 2, 3, bodyR, bodyG, bodyB, bodyAlpha);
+            LegacyUiTheme.DrawButtonClipped(spriteBatch, rect, hovered, pressed, false, true, clip);
+            var contentRect = LegacyUiTheme.GetSelectedButtonContentRect(rect, false, true);
+            var textScale = ResolveButtonTextScale(button.Label, Math.Max(1, rect.Width - 8));
             UiTextRenderer.DrawCenteredTextClipped(
                 spriteBatch,
                 button.Label,
-                rect.X + 2,
-                rect.Y,
-                Math.Max(1, rect.Width - 4),
-                rect.Height,
+                rect.X + 4,
+                contentRect.Y,
+                Math.Max(1, rect.Width - 8),
+                contentRect.Height,
                 clip.X,
                 clip.Y,
                 clip.Width,
                 clip.Height,
-                242,
-                238,
-                220,
-                248,
-                0.58f);
+                pressed ? LegacyUiTheme.SelectedTextR : 230,
+                pressed ? LegacyUiTheme.SelectedTextG : 232,
+                pressed ? LegacyUiTheme.SelectedTextB : 224,
+                255,
+                textScale);
+        }
+
+        private static float ResolveButtonTextScale(string label, int availableWidth)
+        {
+            var scale = ButtonTextScale;
+            var safeWidth = Math.Max(1, availableWidth);
+            while (scale > MinimumButtonTextScale && UiTextRenderer.EstimateTextWidth(label ?? string.Empty, scale) > safeWidth)
+            {
+                scale -= 0.02f;
+            }
+
+            return scale < MinimumButtonTextScale ? MinimumButtonTextScale : scale;
         }
     }
 }

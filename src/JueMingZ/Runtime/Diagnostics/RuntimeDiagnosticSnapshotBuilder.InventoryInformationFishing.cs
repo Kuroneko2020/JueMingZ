@@ -33,6 +33,7 @@ namespace JueMingZ.Runtime
             var autoSell = AutoSellService.GetDiagnostics();
             var autoDiscard = AutoDiscardService.GetDiagnostics();
             var quickReforge = QuickReforgeService.GetDiagnostics();
+            var autoMining = AutoMiningService.GetDiagnostics();
             var autoCaptureCritter = AutoCaptureCritterService.GetDiagnostics();
             var autoHarvest = AutoHarvestService.GetDiagnostics();
             var quickBagOpen = QuickBagOpenService.GetDiagnostics();
@@ -88,6 +89,12 @@ namespace JueMingZ.Runtime
             snapshot.AutoCaptureCritterTargetNpcIndex = autoCaptureCritter == null ? -1 : autoCaptureCritter.TargetNpcIndex;
             snapshot.AutoCaptureCritterTargetNpcType = autoCaptureCritter == null ? 0 : autoCaptureCritter.TargetNpcType;
             snapshot.AutoCaptureCritterFishingProtectionState = autoCaptureCritter == null ? string.Empty : autoCaptureCritter.FishingProtectionState;
+            snapshot.AutoMiningLastDecision = autoMining == null ? string.Empty : autoMining.LastDecision;
+            snapshot.AutoMiningLastDecisionUtc = autoMining == null ? null : autoMining.LastDecisionUtc;
+            snapshot.AutoMiningLastHotkey = autoMining == null ? string.Empty : autoMining.LastHotkey;
+            snapshot.AutoMiningLastHotkeyResultCode = autoMining == null ? string.Empty : autoMining.LastHotkeyResultCode;
+            snapshot.AutoMiningLastHotkeyBlockedReason = autoMining == null ? string.Empty : autoMining.LastHotkeyBlockedReason;
+            snapshot.AutoMiningLastHotkeyDecisionUtc = autoMining == null ? null : autoMining.LastHotkeyDecisionUtc;
             snapshot.AutoHarvestLastDecision = autoHarvest == null ? string.Empty : autoHarvest.LastDecision;
             snapshot.AutoHarvestLastDecisionUtc = autoHarvest == null ? null : autoHarvest.LastDecisionUtc;
             snapshot.AutoHarvestLastAction = autoHarvest == null ? string.Empty : autoHarvest.LastAction;

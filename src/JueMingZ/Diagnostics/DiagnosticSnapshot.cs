@@ -739,6 +739,12 @@ namespace JueMingZ.Diagnostics
         public int AutoCaptureCritterTargetNpcIndex { get; set; }
         public int AutoCaptureCritterTargetNpcType { get; set; }
         public string AutoCaptureCritterFishingProtectionState { get; set; }
+        public string AutoMiningLastDecision { get; set; }
+        public DateTime? AutoMiningLastDecisionUtc { get; set; }
+        public string AutoMiningLastHotkey { get; set; }
+        public string AutoMiningLastHotkeyResultCode { get; set; }
+        public string AutoMiningLastHotkeyBlockedReason { get; set; }
+        public DateTime? AutoMiningLastHotkeyDecisionUtc { get; set; }
         public string AutoHarvestLastDecision { get; set; }
         public DateTime? AutoHarvestLastDecisionUtc { get; set; }
         public string AutoHarvestLastAction { get; set; }
@@ -1690,6 +1696,10 @@ namespace JueMingZ.Diagnostics
             AutoCaptureCritterBugNetSlot = -1;
             AutoCaptureCritterTargetNpcIndex = -1;
             AutoCaptureCritterFishingProtectionState = string.Empty;
+            AutoMiningLastDecision = string.Empty;
+            AutoMiningLastHotkey = string.Empty;
+            AutoMiningLastHotkeyResultCode = string.Empty;
+            AutoMiningLastHotkeyBlockedReason = string.Empty;
             AutoHarvestLastDecision = string.Empty;
             AutoHarvestLastAction = string.Empty;
             AutoHarvestToolSlot = -1;

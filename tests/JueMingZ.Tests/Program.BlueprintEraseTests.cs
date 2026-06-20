@@ -106,7 +106,12 @@ namespace JueMingZ.Tests
                     !HasProjectedLayer(selectedProjection.ProjectedLayers, selectedUpper.InstanceId, BlueprintLayerKinds.Tile) ||
                     HasProjectedLayer(selectedProjection.ProjectedLayers, selectedLower.InstanceId, BlueprintLayerKinds.Tile))
                 {
-                    throw new InvalidOperationException("Expected explicit selected instance erase to clip the selected lower layer, not the topmost layer.");
+                    throw new InvalidOperationException(
+                        "Expected explicit selected instance erase to clip the selected lower layer, not the topmost layer. " +
+                        "erased=" + selectedProjection.ErasedLayerCount +
+                        ", hasUpper=" + HasProjectedLayer(selectedProjection.ProjectedLayers, selectedUpper.InstanceId, BlueprintLayerKinds.Tile) +
+                        ", hasLower=" + HasProjectedLayer(selectedProjection.ProjectedLayers, selectedLower.InstanceId, BlueprintLayerKinds.Tile) +
+                        ", layers=" + selectedProjection.ProjectedLayers.Count);
                 }
 
                 BlueprintEraseRegionState.ResetForTesting();

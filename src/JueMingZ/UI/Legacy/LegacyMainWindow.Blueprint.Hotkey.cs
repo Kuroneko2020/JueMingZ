@@ -15,6 +15,7 @@ namespace JueMingZ.UI.Legacy
                 return;
             }
 
+            var targetId = NormalizeBlueprintHotkeyTargetId(_blueprintHotkeyCaptureTargetId);
             if (PressedCaptureKey(BlueprintEntryCaptureWasDown, 0x1B))
             {
                 _blueprintEntryHotkeyMessage = "已取消录入";
@@ -62,7 +63,7 @@ namespace JueMingZ.UI.Legacy
 
             string message;
             bool changed;
-            if (!TrySaveBlueprintEntryHotkey(ConfigService.HotkeySettings ?? HotkeySettings.CreateDefault(), ConfigService.AppSettings ?? AppSettings.CreateDefault(), chord.Normalized, out message, out changed))
+            if (!TrySaveBlueprintHotkey(ConfigService.HotkeySettings ?? HotkeySettings.CreateDefault(), ConfigService.AppSettings ?? AppSettings.CreateDefault(), targetId, chord.Normalized, out message, out changed))
             {
                 _blueprintEntryHotkeyMessage = message;
                 StopBlueprintEntryHotkeyCapture();
@@ -142,7 +143,44 @@ namespace JueMingZ.UI.Legacy
             out bool changed)
         {
             changed = false;
+            message = "蓝图页直接打开快捷键已停用";
+            return false;
+        }
+
+        private static bool TrySaveBlueprintActionHotkey(
+            HotkeySettings hotkeySettings,
+            AppSettings appSettings,
+            string targetId,
+            string chordText,
+            out string message,
+            out bool changed)
+        {
+            return TrySaveBlueprintHotkey(
+                hotkeySettings,
+                appSettings,
+                NormalizeBlueprintHotkeyTargetId(targetId),
+                chordText,
+                out message,
+                out changed);
+        }
+
+        private static bool TrySaveBlueprintHotkey(
+            HotkeySettings hotkeySettings,
+            AppSettings appSettings,
+            string targetId,
+            string chordText,
+            out string message,
+            out bool changed)
+        {
+            changed = false;
             message = string.Empty;
+            targetId = NormalizeBlueprintHotkeyTargetId(targetId);
+            if (targetId.Length <= 0)
+            {
+                message = "不支持这个蓝图快捷键目标";
+                return false;
+            }
+
             FeatureToggleHotkeyChord chord;
             if (!FeatureToggleHotkeyChord.TryParse(chordText, out chord))
             {
@@ -157,17 +195,55 @@ namespace JueMingZ.UI.Legacy
             }
 
             FeatureToggleHotkeyConflict conflict;
-            if (FeatureToggleHotkeyConflictRegistry.TryFindConflict(hotkeySettings, appSettings ?? AppSettings.CreateDefault(), FeatureIds.BlueprintMain, chord, out conflict))
+            if (FeatureToggleHotkeyConflictRegistry.TryFindConflict(hotkeySettings, appSettings ?? AppSettings.CreateDefault(), targetId, chord, out conflict))
             {
                 message = BuildFeatureToggleHotkeyConflictMessage(conflict);
                 return false;
             }
 
-            var old = GetBlueprintEntryHotkeyDisplay(hotkeySettings);
+            var old = GetBlueprintHotkeyDisplay(hotkeySettings, targetId);
             changed = !string.Equals(old, chord.Normalized, StringComparison.Ordinal);
-            hotkeySettings.HotkeysByFeatureId[FeatureIds.BlueprintMain] = chord.Normalized;
+            hotkeySettings.HotkeysByFeatureId[targetId] = chord.Normalized;
             message = changed ? "已保存 " + chord.Display : "未变化";
             return true;
+        }
+
+        private static string NormalizeBlueprintHotkeyTargetId(string targetId)
+        {
+            if (string.Equals(targetId, FeatureIds.BlueprintCreateAction, StringComparison.OrdinalIgnoreCase))
+            {
+                return FeatureIds.BlueprintCreateAction;
+            }
+
+            if (string.Equals(targetId, FeatureIds.BlueprintSaveAction, StringComparison.OrdinalIgnoreCase))
+            {
+                return FeatureIds.BlueprintSaveAction;
+            }
+
+            return string.Empty;
+        }
+
+        private static bool IsBlueprintActionHotkeyTargetId(string targetId)
+        {
+            var normalized = NormalizeBlueprintHotkeyTargetId(targetId);
+            return string.Equals(normalized, FeatureIds.BlueprintCreateAction, StringComparison.Ordinal) ||
+                   string.Equals(normalized, FeatureIds.BlueprintSaveAction, StringComparison.Ordinal);
+        }
+
+        private static string GetBlueprintHotkeyDisplay(HotkeySettings settings, string targetId)
+        {
+            var hotkeys = settings == null ? null : settings.HotkeysByFeatureId;
+            if (hotkeys == null)
+            {
+                return string.Empty;
+            }
+
+            string value;
+            string normalized;
+            return hotkeys.TryGetValue(NormalizeBlueprintHotkeyTargetId(targetId), out value) &&
+                   FeatureToggleHotkeyChord.TryNormalize(value, out normalized)
+                ? normalized
+                : string.Empty;
         }
 
         internal static bool TryApplyBlueprintEntryHotkeyForTesting(
@@ -178,6 +254,17 @@ namespace JueMingZ.UI.Legacy
             out bool changed)
         {
             return TrySaveBlueprintEntryHotkey(hotkeySettings, appSettings, chordText, out message, out changed);
+        }
+
+        internal static bool TryApplyBlueprintActionHotkeyForTesting(
+            HotkeySettings hotkeySettings,
+            AppSettings appSettings,
+            string targetId,
+            string chordText,
+            out string message,
+            out bool changed)
+        {
+            return TrySaveBlueprintActionHotkey(hotkeySettings, appSettings, targetId, chordText, out message, out changed);
         }
     }
 }
