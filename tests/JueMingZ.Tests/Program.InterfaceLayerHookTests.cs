@@ -132,7 +132,11 @@ namespace JueMingZ.Tests
                     "FirstWorldLoadPromptOverlay.DrawInterfaceLayer",
                     "CombatEquipmentWarningPromptOverlay.DrawInterfaceLayer",
                     "CombatAimMarkerOverlay.DrawInterfaceLayer",
-                    "MapDirectionHintOverlay.DrawInterfaceLayer"
+                    "MapDirectionHintOverlay.DrawInterfaceLayer",
+                    "BlueprintProjectionOverlay.DrawInterfaceLayer",
+                    "BlueprintCreationOverlay.DrawInterfaceLayer",
+                    "BlueprintPlacementPreviewOverlay.DrawInterfaceLayer",
+                    "BlueprintEraseRegionOverlay.DrawInterfaceLayer"
                 },
                 "game overlay dispatcher routes when low information layer is active");
 
@@ -147,7 +151,11 @@ namespace JueMingZ.Tests
                     "FirstWorldLoadPromptOverlay.DrawInterfaceLayer",
                     "CombatEquipmentWarningPromptOverlay.DrawInterfaceLayer",
                     "CombatAimMarkerOverlay.DrawInterfaceLayer",
-                    "MapDirectionHintOverlay.DrawInterfaceLayer"
+                    "MapDirectionHintOverlay.DrawInterfaceLayer",
+                    "BlueprintProjectionOverlay.DrawInterfaceLayer",
+                    "BlueprintCreationOverlay.DrawInterfaceLayer",
+                    "BlueprintPlacementPreviewOverlay.DrawInterfaceLayer",
+                    "BlueprintEraseRegionOverlay.DrawInterfaceLayer"
                 },
                 "game overlay fallback dispatcher routes when low information layer is missing");
         }
@@ -167,6 +175,8 @@ namespace JueMingZ.Tests
                 new[]
                 {
                     "LegacyMainWindow.DrawInterfaceLayer",
+                    "BlueprintMaterialWindowOverlay.DrawInterfaceLayer",
+                    "BlueprintHandheldActionBarOverlay.DrawInterfaceLayer",
                     "MapCustomMarkerStylePickerOverlay.DrawInterfaceLayer"
                 },
                 "UI overlay dispatcher routes when low status panel layer is active");
@@ -177,6 +187,8 @@ namespace JueMingZ.Tests
                 {
                     "InformationStatusPanelOverlay.DrawInterfaceLayer",
                     "LegacyMainWindow.DrawInterfaceLayer",
+                    "BlueprintMaterialWindowOverlay.DrawInterfaceLayer",
+                    "BlueprintHandheldActionBarOverlay.DrawInterfaceLayer",
                     "MapCustomMarkerStylePickerOverlay.DrawInterfaceLayer"
                 },
                 "UI overlay fallback dispatcher routes when low status panel layer is missing");

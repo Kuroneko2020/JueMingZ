@@ -863,6 +863,139 @@ namespace JueMingZ.Diagnostics
         public bool MapQuickAnnouncementLastInvisibleAir { get; set; }
         public string MapQuickAnnouncementLastVisibilityUnavailableReason { get; set; }
         public DateTime? MapQuickAnnouncementLastDecisionUtc { get; set; }
+        public bool BlueprintHandheldActionBarVisible { get; set; }
+        public string BlueprintHandheldActionBarBlockedReason { get; set; }
+        public int BlueprintHandheldActionBarToolItemId { get; set; }
+        public int BlueprintHandheldActionBarSelectedItemType { get; set; }
+        public string BlueprintHandheldActionBarLastAction { get; set; }
+        public string BlueprintHandheldActionBarLastResultCode { get; set; }
+        public string BlueprintMirrorLastStatus { get; set; }
+        public string BlueprintMirrorLastMessage { get; set; }
+        public string BlueprintMirrorMode { get; set; }
+        public string BlueprintMirrorTemplateId { get; set; }
+        public string BlueprintMirrorTemplateName { get; set; }
+        public string BlueprintMirrorBlockedReason { get; set; }
+        public int BlueprintMirrorMirroredCellCount { get; set; }
+        public int BlueprintMirrorMirroredLayerCount { get; set; }
+        public int BlueprintMirrorRejectedLayerCount { get; set; }
+        public DateTime? BlueprintMirrorLastAttemptedUtc { get; set; }
+        public string BlueprintDiagnosticsTemplateReadStatus { get; set; }
+        public string BlueprintDiagnosticsTemplateReadMessage { get; set; }
+        public int BlueprintDiagnosticsTemplateCount { get; set; }
+        public int BlueprintDiagnosticsInstanceCount { get; set; }
+        public int BlueprintDiagnosticsVisibleInstanceCount { get; set; }
+        public int BlueprintDiagnosticsHiddenInstanceCount { get; set; }
+        public int BlueprintDiagnosticsEffectiveProjectionLayerCount { get; set; }
+        public int BlueprintDiagnosticsErasedProjectionLayerCount { get; set; }
+        public int BlueprintDiagnosticsMaterialMissingItemCount { get; set; }
+        public int BlueprintDiagnosticsMaterialMissingStackTotal { get; set; }
+        public bool BlueprintDiagnosticsAutoPlacementEnabled { get; set; }
+        public int BlueprintDiagnosticsAutoPlacementCandidateCount { get; set; }
+        public long BlueprintPerformanceSlowEventCount { get; set; }
+        public string BlueprintPerformanceLastScenario { get; set; }
+        public double BlueprintPerformanceLastElapsedMs { get; set; }
+        public string BlueprintProjectionLastStatus { get; set; }
+        public string BlueprintProjectionLastMessage { get; set; }
+        public string BlueprintProjectionWorldPairKey { get; set; }
+        public string BlueprintProjectionWorldKey { get; set; }
+        public int BlueprintProjectionInstanceCount { get; set; }
+        public int BlueprintProjectionVisibleInstanceCount { get; set; }
+        public int BlueprintProjectionHiddenInstanceCount { get; set; }
+        public int BlueprintProjectionEffectiveLayerCount { get; set; }
+        public int BlueprintProjectionFulfilledLayerCount { get; set; }
+        public int BlueprintProjectionMissingLayerCount { get; set; }
+        public int BlueprintProjectionConflictLayerCount { get; set; }
+        public int BlueprintProjectionCoveredLayerCount { get; set; }
+        public int BlueprintProjectionErasedLayerCount { get; set; }
+        public int BlueprintProjectionUnavailableLayerCount { get; set; }
+        public int BlueprintProjectionCacheHitCount { get; set; }
+        public int BlueprintProjectionCacheMissCount { get; set; }
+        public double BlueprintProjectionLastResolveElapsedMs { get; set; }
+        public long BlueprintProjectionResolveCount { get; set; }
+        public double BlueprintProjectionAverageResolveElapsedMs { get; set; }
+        public DateTime? BlueprintProjectionLastResolvedUtc { get; set; }
+        public string BlueprintMaterialsLastStatus { get; set; }
+        public string BlueprintMaterialsLastMessage { get; set; }
+        public string BlueprintMaterialsWorldPairKey { get; set; }
+        public string BlueprintMaterialsWorldKey { get; set; }
+        public string BlueprintMaterialsProjectionStatus { get; set; }
+        public int BlueprintMaterialsRequiredItemCount { get; set; }
+        public int BlueprintMaterialsMissingItemCount { get; set; }
+        public int BlueprintMaterialsRequiredStackTotal { get; set; }
+        public int BlueprintMaterialsAvailableStackTotal { get; set; }
+        public int BlueprintMaterialsMissingStackTotal { get; set; }
+        public int BlueprintMaterialsProjectionMissingLayerCount { get; set; }
+        public int BlueprintMaterialsMaterializedMissingLayerCount { get; set; }
+        public int BlueprintMaterialsSkippedFulfilledLayerCount { get; set; }
+        public int BlueprintMaterialsSkippedConflictLayerCount { get; set; }
+        public int BlueprintMaterialsSkippedUnavailableLayerCount { get; set; }
+        public int BlueprintMaterialsSkippedMissingLayerWithoutMaterialCount { get; set; }
+        public bool BlueprintMaterialsInventoryReadSucceeded { get; set; }
+        public string BlueprintMaterialsInventoryReadStatus { get; set; }
+        public string BlueprintMaterialsInventoryReadMessage { get; set; }
+        public int BlueprintMaterialsInventoryMainStackTotal { get; set; }
+        public int BlueprintMaterialsInventoryVoidBagStackTotal { get; set; }
+        public bool BlueprintMaterialsWindowVisible { get; set; }
+        public int BlueprintMaterialsWindowOpacityPercent { get; set; }
+        public int BlueprintMaterialsCacheHitCount { get; set; }
+        public int BlueprintMaterialsCacheMissCount { get; set; }
+        public double BlueprintMaterialsLastResolveElapsedMs { get; set; }
+        public long BlueprintMaterialsResolveCount { get; set; }
+        public double BlueprintMaterialsAverageResolveElapsedMs { get; set; }
+        public DateTime? BlueprintMaterialsLastResolvedUtc { get; set; }
+        public bool BlueprintEraseRegionActive { get; set; }
+        public bool BlueprintEraseRegionDragging { get; set; }
+        public bool BlueprintEraseRegionHasFixedTarget { get; set; }
+        public string BlueprintEraseRegionTargetInstanceId { get; set; }
+        public string BlueprintEraseRegionTargetInstanceName { get; set; }
+        public int BlueprintEraseRegionTargetLayerOrder { get; set; }
+        public string BlueprintEraseRegionWorldPairKey { get; set; }
+        public string BlueprintEraseRegionWorldKey { get; set; }
+        public int BlueprintEraseRegionLastErasedCellCount { get; set; }
+        public int BlueprintEraseRegionTotalEraseCellCount { get; set; }
+        public string BlueprintEraseRegionLastStatus { get; set; }
+        public string BlueprintEraseRegionLastMessage { get; set; }
+        public string BlueprintEraseRegionLastInputOwner { get; set; }
+        public bool BlueprintAutoPlacementEnabled { get; set; }
+        public string BlueprintAutoPlacementLastStatus { get; set; }
+        public string BlueprintAutoPlacementLastMessage { get; set; }
+        public string BlueprintAutoPlacementWorldPairKey { get; set; }
+        public string BlueprintAutoPlacementWorldKey { get; set; }
+        public string BlueprintAutoPlacementProjectionStatus { get; set; }
+        public int BlueprintAutoPlacementCandidateCount { get; set; }
+        public int BlueprintAutoPlacementSkippedFulfilledLayerCount { get; set; }
+        public int BlueprintAutoPlacementSkippedConflictLayerCount { get; set; }
+        public int BlueprintAutoPlacementSkippedUnavailableLayerCount { get; set; }
+        public int BlueprintAutoPlacementSkippedUnsupportedLayerCount { get; set; }
+        public int BlueprintAutoPlacementSkippedNoMaterialLayerCount { get; set; }
+        public int BlueprintAutoPlacementSkippedInsufficientMaterialLayerCount { get; set; }
+        public string BlueprintAutoPlacementSelectedInstanceId { get; set; }
+        public string BlueprintAutoPlacementSelectedInstanceName { get; set; }
+        public int BlueprintAutoPlacementSelectedLayerOrder { get; set; }
+        public string BlueprintAutoPlacementSelectedLayerKind { get; set; }
+        public int BlueprintAutoPlacementSelectedWorldTileX { get; set; }
+        public int BlueprintAutoPlacementSelectedWorldTileY { get; set; }
+        public int BlueprintAutoPlacementSelectedMaterialItemId { get; set; }
+        public int BlueprintAutoPlacementSelectedOriginalMaterialItemId { get; set; }
+        public int BlueprintAutoPlacementSelectedMaterialStack { get; set; }
+        public int BlueprintAutoPlacementSelectedMaterialAvailableStack { get; set; }
+        public bool BlueprintAutoPlacementSelectedReplacementApplied { get; set; }
+        public string BlueprintAutoPlacementSelectedReplacementCategory { get; set; }
+        public string BlueprintAutoPlacementLastAdmissionStatus { get; set; }
+        public string BlueprintAutoPlacementLastAdmissionReason { get; set; }
+        public string BlueprintAutoPlacementLastAdmissionKey { get; set; }
+        public string BlueprintAutoPlacementLastRequestId { get; set; }
+        public int BlueprintAutoPlacementSubmittedCount { get; set; }
+        public int BlueprintAutoPlacementDeniedCount { get; set; }
+        public int BlueprintAutoPlacementFailClosedCount { get; set; }
+        public int BlueprintAutoPlacementSucceededCount { get; set; }
+        public int BlueprintAutoPlacementAttemptedButUnverifiedCount { get; set; }
+        public string BlueprintAutoPlacementLastResultCode { get; set; }
+        public string BlueprintAutoPlacementLastFailureReason { get; set; }
+        public double BlueprintAutoPlacementLastResolveElapsedMs { get; set; }
+        public long BlueprintAutoPlacementCandidateScanCount { get; set; }
+        public double BlueprintAutoPlacementAverageCandidateScanElapsedMs { get; set; }
+        public DateTime? BlueprintAutoPlacementLastResolvedUtc { get; set; }
         public bool FishingAutomationNeedsTick { get; set; }
         public bool FishingDisplayNeedsCatchResolver { get; set; }
         public bool FishingHasResidualState { get; set; }
@@ -1084,16 +1217,6 @@ namespace JueMingZ.Diagnostics
         public int MovementSafeLandingTeleportTargetTileY { get; set; }
         public double MovementSafeLandingTeleportTargetWorldX { get; set; }
         public double MovementSafeLandingTeleportTargetWorldY { get; set; }
-        public bool MovementSafeLandingHasCushionBlock { get; set; }
-        public int MovementSafeLandingCushionBlockInventorySlot { get; set; }
-        public int MovementSafeLandingCushionBlockHotbarSlot { get; set; }
-        public int MovementSafeLandingCushionBlockItemType { get; set; }
-        public int MovementSafeLandingCushionBlockCreateTile { get; set; }
-        public bool MovementSafeLandingBlockPlacementTargetKnown { get; set; }
-        public int MovementSafeLandingBlockPlacementTileX { get; set; }
-        public int MovementSafeLandingBlockPlacementTileY { get; set; }
-        public double MovementSafeLandingBlockPlacementWorldX { get; set; }
-        public double MovementSafeLandingBlockPlacementWorldY { get; set; }
         public bool MovementSafeLandingGravityRestorePending { get; set; }
         public double MovementSafeLandingGravityRestoreOriginalDirection { get; set; }
         public long MovementSafeLandingGravityRestorePendingTicks { get; set; }
@@ -1618,6 +1741,51 @@ namespace JueMingZ.Diagnostics
             MapQuickAnnouncementLastBlockedLayers = string.Empty;
             MapQuickAnnouncementLastEchoGate = string.Empty;
             MapQuickAnnouncementLastVisibilityUnavailableReason = string.Empty;
+            BlueprintHandheldActionBarBlockedReason = string.Empty;
+            BlueprintHandheldActionBarLastAction = string.Empty;
+            BlueprintHandheldActionBarLastResultCode = string.Empty;
+            BlueprintMirrorLastStatus = string.Empty;
+            BlueprintMirrorLastMessage = string.Empty;
+            BlueprintMirrorMode = string.Empty;
+            BlueprintMirrorTemplateId = string.Empty;
+            BlueprintMirrorTemplateName = string.Empty;
+            BlueprintMirrorBlockedReason = string.Empty;
+            BlueprintDiagnosticsTemplateReadStatus = string.Empty;
+            BlueprintDiagnosticsTemplateReadMessage = string.Empty;
+            BlueprintPerformanceLastScenario = string.Empty;
+            BlueprintProjectionLastStatus = string.Empty;
+            BlueprintProjectionLastMessage = string.Empty;
+            BlueprintProjectionWorldPairKey = string.Empty;
+            BlueprintProjectionWorldKey = string.Empty;
+            BlueprintMaterialsLastStatus = string.Empty;
+            BlueprintMaterialsLastMessage = string.Empty;
+            BlueprintMaterialsWorldPairKey = string.Empty;
+            BlueprintMaterialsWorldKey = string.Empty;
+            BlueprintMaterialsProjectionStatus = string.Empty;
+            BlueprintMaterialsInventoryReadStatus = string.Empty;
+            BlueprintMaterialsInventoryReadMessage = string.Empty;
+            BlueprintEraseRegionTargetInstanceId = string.Empty;
+            BlueprintEraseRegionTargetInstanceName = string.Empty;
+            BlueprintEraseRegionWorldPairKey = string.Empty;
+            BlueprintEraseRegionWorldKey = string.Empty;
+            BlueprintEraseRegionLastStatus = string.Empty;
+            BlueprintEraseRegionLastMessage = string.Empty;
+            BlueprintEraseRegionLastInputOwner = string.Empty;
+            BlueprintAutoPlacementLastStatus = string.Empty;
+            BlueprintAutoPlacementLastMessage = string.Empty;
+            BlueprintAutoPlacementWorldPairKey = string.Empty;
+            BlueprintAutoPlacementWorldKey = string.Empty;
+            BlueprintAutoPlacementProjectionStatus = string.Empty;
+            BlueprintAutoPlacementSelectedInstanceId = string.Empty;
+            BlueprintAutoPlacementSelectedInstanceName = string.Empty;
+            BlueprintAutoPlacementSelectedLayerKind = string.Empty;
+            BlueprintAutoPlacementSelectedReplacementCategory = string.Empty;
+            BlueprintAutoPlacementLastAdmissionStatus = string.Empty;
+            BlueprintAutoPlacementLastAdmissionReason = string.Empty;
+            BlueprintAutoPlacementLastAdmissionKey = string.Empty;
+            BlueprintAutoPlacementLastRequestId = string.Empty;
+            BlueprintAutoPlacementLastResultCode = string.Empty;
+            BlueprintAutoPlacementLastFailureReason = string.Empty;
             FishingLastDecision = string.Empty;
             FishingLastSkipReason = string.Empty;
             FishingAutoEquipmentLastDecision = string.Empty;

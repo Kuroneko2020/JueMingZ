@@ -70,6 +70,11 @@ namespace JueMingZ.Runtime
                 inventoryProfile |= InventoryReadProfile.ToolsAndSeeds;
             }
 
+            if (settings.BlueprintHandheldEntryEnabled)
+            {
+                inventoryProfile |= InventoryReadProfile.SelectedOnly;
+            }
+
             var fishingFilterNeedsActiveBuffs =
                 settings.FishingAutoFishEnabled &&
                 FishingAutomationService.IsFishingFilterEnabled(sourceSettings);

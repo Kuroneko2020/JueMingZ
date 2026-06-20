@@ -29,6 +29,7 @@ namespace JueMingZ.Actions
         Dash,
         TeleportCorrection,
         RawInput,
-        PlayerRename
+        PlayerRename,
+        BlueprintAutoPlace
     }
 }

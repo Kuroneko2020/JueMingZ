@@ -521,6 +521,7 @@ namespace JueMingZ.Actions
             Register(executors, new DashActionExecutor());
             Register(executors, new RawInputActionExecutor());
             Register(executors, new PlayerRenameActionExecutor());
+            Register(executors, new BlueprintAutoPlaceActionExecutor());
             return executors;
         }
 

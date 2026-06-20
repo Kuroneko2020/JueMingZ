@@ -135,6 +135,18 @@ namespace JueMingZ.Runtime
             private string _mapQuickAnnouncementColorHex;
             private int _mapQuickAnnouncementCooldownMilliseconds;
             private int _mapQuickAnnouncementAirCooldownMilliseconds;
+            private int _blueprintToolItemId;
+            private bool _blueprintHandheldEntryEnabled;
+            private bool _blueprintAutoPlacementEnabled;
+            private bool _blueprintReplacementEnabled;
+            private bool _blueprintReplacementTorchesEnabled;
+            private bool _blueprintReplacementPlatformsEnabled;
+            private bool _blueprintReplacementWorkBenchesEnabled;
+            private bool _blueprintReplacementChairsEnabled;
+            private bool _blueprintReplacementDoorsEnabled;
+            private bool _blueprintReplacementTablesEnabled;
+            private bool _blueprintReplacementChestsEnabled;
+            private bool _blueprintReplacementSignsEnabled;
             private bool _fishingAutoFishEnabled;
             private bool _fishingAutoLoadoutEnabled;
             private bool _fishingAutoEquipmentEnabled;
@@ -268,6 +280,18 @@ namespace JueMingZ.Runtime
                     _mapQuickAnnouncementColorHex = settings.MapQuickAnnouncementColorHex,
                     _mapQuickAnnouncementCooldownMilliseconds = settings.MapQuickAnnouncementCooldownMilliseconds,
                     _mapQuickAnnouncementAirCooldownMilliseconds = settings.MapQuickAnnouncementAirCooldownMilliseconds,
+                    _blueprintToolItemId = settings.BlueprintToolItemId,
+                    _blueprintHandheldEntryEnabled = settings.BlueprintHandheldEntryEnabled,
+                    _blueprintAutoPlacementEnabled = settings.BlueprintAutoPlacementEnabled,
+                    _blueprintReplacementEnabled = settings.BlueprintReplacementEnabled,
+                    _blueprintReplacementTorchesEnabled = settings.BlueprintReplacementTorchesEnabled,
+                    _blueprintReplacementPlatformsEnabled = settings.BlueprintReplacementPlatformsEnabled,
+                    _blueprintReplacementWorkBenchesEnabled = settings.BlueprintReplacementWorkBenchesEnabled,
+                    _blueprintReplacementChairsEnabled = settings.BlueprintReplacementChairsEnabled,
+                    _blueprintReplacementDoorsEnabled = settings.BlueprintReplacementDoorsEnabled,
+                    _blueprintReplacementTablesEnabled = settings.BlueprintReplacementTablesEnabled,
+                    _blueprintReplacementChestsEnabled = settings.BlueprintReplacementChestsEnabled,
+                    _blueprintReplacementSignsEnabled = settings.BlueprintReplacementSignsEnabled,
                     _fishingAutoFishEnabled = settings.FishingAutoFishEnabled,
                     _fishingAutoLoadoutEnabled = settings.FishingAutoLoadoutEnabled,
                     _fishingAutoEquipmentEnabled = settings.FishingAutoEquipmentEnabled,
@@ -396,6 +420,18 @@ namespace JueMingZ.Runtime
                        Same(_mapQuickAnnouncementColorHex, other._mapQuickAnnouncementColorHex) &&
                        _mapQuickAnnouncementCooldownMilliseconds == other._mapQuickAnnouncementCooldownMilliseconds &&
                        _mapQuickAnnouncementAirCooldownMilliseconds == other._mapQuickAnnouncementAirCooldownMilliseconds &&
+                       _blueprintToolItemId == other._blueprintToolItemId &&
+                       _blueprintHandheldEntryEnabled == other._blueprintHandheldEntryEnabled &&
+                       _blueprintAutoPlacementEnabled == other._blueprintAutoPlacementEnabled &&
+                       _blueprintReplacementEnabled == other._blueprintReplacementEnabled &&
+                       _blueprintReplacementTorchesEnabled == other._blueprintReplacementTorchesEnabled &&
+                       _blueprintReplacementPlatformsEnabled == other._blueprintReplacementPlatformsEnabled &&
+                       _blueprintReplacementWorkBenchesEnabled == other._blueprintReplacementWorkBenchesEnabled &&
+                       _blueprintReplacementChairsEnabled == other._blueprintReplacementChairsEnabled &&
+                       _blueprintReplacementDoorsEnabled == other._blueprintReplacementDoorsEnabled &&
+                       _blueprintReplacementTablesEnabled == other._blueprintReplacementTablesEnabled &&
+                       _blueprintReplacementChestsEnabled == other._blueprintReplacementChestsEnabled &&
+                       _blueprintReplacementSignsEnabled == other._blueprintReplacementSignsEnabled &&
                        _fishingAutoFishEnabled == other._fishingAutoFishEnabled &&
                        _fishingAutoLoadoutEnabled == other._fishingAutoLoadoutEnabled &&
                        _fishingAutoEquipmentEnabled == other._fishingAutoEquipmentEnabled &&

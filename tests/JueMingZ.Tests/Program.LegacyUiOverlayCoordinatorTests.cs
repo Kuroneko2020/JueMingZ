@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using JueMingZ.Automation.Blueprint;
 using JueMingZ.Automation.Fishing.Filtering;
 using JueMingZ.Automation.Information;
 using JueMingZ.Automation.Movement;
@@ -591,6 +592,69 @@ namespace JueMingZ.Tests
 
             coordinator.ResetForTesting();
             LegacyMainWindow.ResetMovementSafeLandingConfigPopupForTesting();
+        }
+
+        private static void LegacyBlueprintReplacementOverlayBlocksLowerHoverAndKeepsOptionClickable()
+        {
+            var coordinator = LegacyUiOverlayCoordinator.Current;
+            coordinator.ResetForTesting();
+            LegacyMainWindow.ResetBlueprintReplacementConfigPopupForTesting();
+            var viewport = new LegacyUiRect(20, 20, 500, 320);
+            var area = LegacyScrollArea.Create(viewport, 620, 0);
+            var anchor = new LegacyUiRect(410, 90, 64, 24);
+            var elements = new List<LegacyUiElement>
+            {
+                CreateLegacyUiElementForTesting("blueprint-entry:start-create", "Lower", "button", viewport)
+            };
+            var mouse = new LegacyMouseSnapshot
+            {
+                ReadAvailable = true,
+                LeftPressed = true
+            };
+
+            coordinator.BeginFrame("blueprint");
+            if (!LegacyMainWindow.RegisterBlueprintReplacementConfigPopupOverlayForTesting(area, anchor))
+            {
+                throw new InvalidOperationException("Expected blueprint same-kind replacement config popup to register as a modal overlay.");
+            }
+
+            coordinator.DrawOverlays(null, mouse, new LegacyUiRect(0, 0, 600, 400), "blueprint", AppSettings.CreateDefault(), elements);
+            var popup = FindLegacyUiElementForTesting(elements, LegacyMainWindow.GetBlueprintReplacementConfigPopupElementIdForTesting());
+            mouse.X = popup.Rect.X + 12;
+            mouse.Y = popup.Rect.Y + 38;
+
+            var hovered = LegacyUiElementFrame.ResolveHoveredElement(null, elements, mouse, coordinator);
+            bool blocked;
+            var clickId = LegacyMainWindow.ResolveClickableElementIdForTesting(elements, mouse, out blocked);
+            if (hovered == null || string.Equals(hovered.Id, "blueprint-entry:start-create", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected blueprint replacement modal overlay to own hover above lower blueprint rows.");
+            }
+
+            if (!blocked || clickId.Length != 0)
+            {
+                throw new InvalidOperationException("Expected blueprint replacement modal overlay to block lower blueprint row clicks.");
+            }
+
+            var option = FindLegacyUiElementForTesting(elements, LegacyMainWindow.GetBlueprintReplacementOptionElementIdForTesting(BlueprintReplacementCategories.Torch));
+            mouse.X = option.Rect.X + Math.Max(1, option.Rect.Width / 2);
+            mouse.Y = option.Rect.Y + Math.Max(1, option.Rect.Height / 2);
+            hovered = LegacyUiElementFrame.ResolveHoveredElement(null, elements, mouse, coordinator);
+            clickId = LegacyMainWindow.ResolveClickableElementIdForTesting(elements, mouse, out blocked);
+            coordinator.EndFrame();
+
+            if (hovered == null || hovered.Id != option.Id)
+            {
+                throw new InvalidOperationException("Expected blueprint replacement option to win hover over the modal blocker.");
+            }
+
+            if (blocked || clickId != option.Id)
+            {
+                throw new InvalidOperationException("Expected blueprint replacement option to remain clickable inside the overlay.");
+            }
+
+            coordinator.ResetForTesting();
+            LegacyMainWindow.ResetBlueprintReplacementConfigPopupForTesting();
         }
 
         private static void LegacyFishingPickerOverlayBlocksLowerHoverAndKeepsNestedScroll()

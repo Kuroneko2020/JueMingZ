@@ -63,6 +63,11 @@ namespace JueMingZ.Config
                 return true;
             }
 
+            if (TryFindBlueprintEntryConflict(hotkeySettings, currentTargetId, chord, out conflict))
+            {
+                return true;
+            }
+
             if (TryFindQuickAnnouncementConflict(appSettings, chord, out conflict))
             {
                 return true;
@@ -173,6 +178,45 @@ namespace JueMingZ.Config
                     FeatureToggleHotkeyConflictType.AutoMiningTrigger,
                     FeatureIds.WorldAutomationAutoMining,
                     "自动挖矿 的采集按键",
+                    chord.Normalized);
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryFindBlueprintEntryConflict(
+            HotkeySettings hotkeySettings,
+            string currentTargetId,
+            FeatureToggleHotkeyChord chord,
+            out FeatureToggleHotkeyConflict conflict)
+        {
+            conflict = null;
+            if (string.Equals(currentTargetId, FeatureIds.BlueprintMain, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            var hotkeys = hotkeySettings == null ? null : hotkeySettings.HotkeysByFeatureId;
+            if (hotkeys == null || hotkeys.Count <= 0)
+            {
+                return false;
+            }
+
+            string blueprintHotkey;
+            if (!hotkeys.TryGetValue(FeatureIds.BlueprintMain, out blueprintHotkey))
+            {
+                return false;
+            }
+
+            string normalized;
+            if (FeatureToggleHotkeyChord.TryNormalize(blueprintHotkey, out normalized) &&
+                string.Equals(normalized, chord.Normalized, StringComparison.Ordinal))
+            {
+                conflict = new FeatureToggleHotkeyConflict(
+                    FeatureToggleHotkeyConflictType.BlueprintEntry,
+                    FeatureIds.BlueprintMain,
+                    "蓝图入口快捷键",
                     chord.Normalized);
                 return true;
             }
@@ -299,6 +343,7 @@ namespace JueMingZ.Config
         FeatureToggle,
         QuickItem,
         AutoMiningTrigger,
+        BlueprintEntry,
         QuickAnnouncement,
         LegacyMainWindow,
         DiagnosticReserved

@@ -141,6 +141,7 @@ namespace JueMingZ.Hooks
             private static bool Prefix()
             {
                 var suppress = UserNotesPinnedOverlay.ShouldSuppressHotbarScrollFromHook() ||
+                               BlueprintMaterialWindowOverlay.ShouldSuppressHotbarScrollFromHook() ||
                                LegacyUiInput.ShouldSuppressHotbarScrollFromHook();
                 if (suppress)
                 {

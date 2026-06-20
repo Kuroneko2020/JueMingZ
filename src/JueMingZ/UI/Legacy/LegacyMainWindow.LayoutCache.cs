@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using JueMingZ.Automation.BuffAndRecovery;
+using JueMingZ.Automation.Blueprint;
 using JueMingZ.Automation.Information;
 using JueMingZ.Automation.Movement;
 using JueMingZ.Automation.WorldAutomation;
@@ -269,6 +270,11 @@ namespace JueMingZ.UI.Legacy
                 return CalculateNotesContentHeight(contentRect);
             }
 
+            if (string.Equals(selectedPage, "blueprint", StringComparison.Ordinal))
+            {
+                return CalculateBlueprintContentHeight();
+            }
+
             return contentRect.Height - LegacyUiMetrics.ContentPadding * 2;
         }
 
@@ -318,6 +324,10 @@ namespace JueMingZ.UI.Legacy
                 else if (string.Equals(selectedPage, "hotkeys", StringComparison.Ordinal))
                 {
                     AddHash(ref hash, UserNotesUiState.BuildStateSignature());
+                }
+                else if (string.Equals(selectedPage, "blueprint", StringComparison.Ordinal))
+                {
+                    AddBlueprintMenuStateHash(ref hash, settings, false);
                 }
                 else if (string.Equals(selectedPage, "map_enhancement", StringComparison.Ordinal))
                 {
@@ -557,6 +567,10 @@ namespace JueMingZ.UI.Legacy
                 {
                     AddHash(ref hash, UserNotesUiState.BuildStateSignature());
                 }
+                else if (string.Equals(selectedPage, "blueprint", StringComparison.Ordinal))
+                {
+                    AddBlueprintMenuStateHash(ref hash, settings, true);
+                }
 
                 return hash;
             }
@@ -565,6 +579,34 @@ namespace JueMingZ.UI.Legacy
         private static int ScaleSignature(double scale)
         {
             return (int)Math.Round(scale * 1000d);
+        }
+
+        private static void AddBlueprintMenuStateHash(ref int hash, AppSettings settings, bool includeTransientMessage)
+        {
+            settings = settings ?? AppSettings.CreateDefault();
+            AddHash(ref hash, _blueprintEntryHotkeyCaptureActive);
+            if (includeTransientMessage)
+            {
+                AddHash(ref hash, _blueprintEntryHotkeyMessage);
+            }
+
+            AddHash(ref hash, _blueprintReplacementConfigOpen);
+            AddHash(ref hash, settings.BlueprintHandheldEntryEnabled);
+            AddHash(ref hash, settings.BlueprintAutoPlacementEnabled);
+            AddHash(ref hash, settings.BlueprintReplacementEnabled);
+            if (!_blueprintReplacementConfigOpen)
+            {
+                return;
+            }
+
+            AddHash(ref hash, settings.BlueprintReplacementTorchesEnabled);
+            AddHash(ref hash, settings.BlueprintReplacementPlatformsEnabled);
+            AddHash(ref hash, settings.BlueprintReplacementWorkBenchesEnabled);
+            AddHash(ref hash, settings.BlueprintReplacementChairsEnabled);
+            AddHash(ref hash, settings.BlueprintReplacementDoorsEnabled);
+            AddHash(ref hash, settings.BlueprintReplacementTablesEnabled);
+            AddHash(ref hash, settings.BlueprintReplacementChestsEnabled);
+            AddHash(ref hash, settings.BlueprintReplacementSignsEnabled);
         }
 
         private static LegacyUiRect OffsetRect(LegacyUiRect rect, int offsetX, int offsetY)

@@ -89,6 +89,7 @@ namespace JueMingZ.UI.Legacy
             return _featureToggleHotkeyCaptureActive ||
                    _quickItemHotkeyCaptureActive ||
                    _autoMiningHotkeyCaptureActive ||
+                   _blueprintEntryHotkeyCaptureActive ||
                    !string.IsNullOrWhiteSpace(_mapQuickAnnouncementHotkeyCaptureSlot);
         }
 
@@ -121,6 +122,7 @@ namespace JueMingZ.UI.Legacy
         {
             StopQuickItemHotkeyCapture();
             StopAutoMiningHotkeyCapture();
+            StopBlueprintEntryHotkeyCapture();
             StopMapQuickAnnouncementHotkeyCapture();
         }
 
@@ -688,6 +690,11 @@ namespace JueMingZ.UI.Legacy
         internal static bool IsAutoMiningHotkeyCaptureActiveForTesting()
         {
             return _autoMiningHotkeyCaptureActive;
+        }
+
+        internal static bool IsBlueprintEntryHotkeyCaptureActiveForTesting()
+        {
+            return _blueprintEntryHotkeyCaptureActive;
         }
 
         internal static string BuildFeatureToggleHotkeyConflictMessageForTesting(FeatureToggleHotkeyConflict conflict)

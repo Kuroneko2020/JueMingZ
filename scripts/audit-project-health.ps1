@@ -1199,6 +1199,7 @@ function Test-LegacyUiOverlayGovernance {
     }
 
     $expectedPopupPanelUses = @{
+        "LegacyMainWindow.Blueprint.cs" = 1
         "LegacyMainWindow.MapEnhancement.cs" = 1
         "LegacyMainWindow.MapEnhancement.RevealedArea.cs" = 1
         "LegacyMainWindow.Misc.cs" = 1
@@ -1206,6 +1207,7 @@ function Test-LegacyUiOverlayGovernance {
         "LegacyMainWindow.Rows.Recovery.cs" = 1
     }
     $expectedAddUiBlockerUses = @{
+        "LegacyMainWindow.Blueprint.cs" = 1
         "LegacyMainWindow.Fishing.FilterExact.cs" = 1
         "LegacyMainWindow.Fishing.FilterPresets.cs" = 1
         "LegacyMainWindow.Shared.cs" = 1
@@ -2062,6 +2064,7 @@ function Test-UserNotesGovernance {
     $registrarPath = Join-Path $RepoRoot "src\JueMingZ\Features\Catalog\InformationFeatureRegistrar.cs"
     $categoryPath = Join-Path $RepoRoot "src\JueMingZ\Features\FeatureUserCategory.cs"
     $storePath = Join-Path $RepoRoot "src\JueMingZ\Automation\Information\Notes\UserNotesStore.cs"
+    $modelsPath = Join-Path $RepoRoot "src\JueMingZ\Automation\Information\Notes\UserNotesModels.cs"
     $cachePath = Join-Path $RepoRoot "src\JueMingZ\Automation\Information\Notes\UserNotesCache.cs"
     $diagnosticsPath = Join-Path $RepoRoot "src\JueMingZ\Automation\Information\Notes\UserNotesDiagnostics.cs"
     $metricsPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyUiMetrics.cs"
@@ -2100,6 +2103,7 @@ function Test-UserNotesGovernance {
     $registrarText = Read-TextIfExists -Path $registrarPath
     $categoryText = Read-TextIfExists -Path $categoryPath
     $storeText = Read-TextIfExists -Path $storePath
+    $modelsText = Read-TextIfExists -Path $modelsPath
     $cacheText = Read-TextIfExists -Path $cachePath
     $diagnosticsText = Read-TextIfExists -Path $diagnosticsPath
     $metricsText = Read-TextIfExists -Path $metricsPath
@@ -2133,7 +2137,7 @@ function Test-UserNotesGovernance {
     $systemPlan05Text = Read-TextIfExists -Path $systemPlan05Path
 
     if ($null -eq $tabBarText -or $null -eq $vectorIconText -or $null -eq $featureIdsText -or
-        $null -eq $registrarText -or $null -eq $categoryText -or $null -eq $storeText -or
+        $null -eq $registrarText -or $null -eq $categoryText -or $null -eq $storeText -or $null -eq $modelsText -or
         $null -eq $cacheText -or $null -eq $diagnosticsText -or $null -eq $metricsText -or $null -eq $notesWindowText -or
         $null -eq $notesSharedText -or $null -eq $notesStateText -or $null -eq $multilineInputText -or
         $null -eq $legacyTextInputText -or $null -eq $textInputCompatText -or $null -eq $scrollText -or
@@ -2315,6 +2319,8 @@ function Test-UserNotesGovernance {
         $pinnedOverlayText.Contains("ConsumeMouseButtonsForUi(bool includeLeftButton") -and
         $pinnedOverlayText.Contains("!hit.MouseInside ||") -and
         $pinnedOverlayText.Contains("interaction.ScrollConsumed ? 0 : rawScrollDelta") -and
+        $modelsText.Contains("OpacityPercent = 0;") -and
+        $pinnedOverlayStateText.Contains("OpacityPercent = 0") -and
         $pinnedOverlayStateText.Contains("nextOpacity == hit.OpacityPercent") -and
         $pinnedOverlayStateText.Contains("return ShouldCaptureMouse(frame, mouseX, mouseY);") -and
         $pinnedOverlayStateText.Contains('var interaction = new UserNotesPinnedOverlayInteraction()') -and
@@ -2331,6 +2337,8 @@ function Test-UserNotesGovernance {
         $overlayTestsText.Contains("UserNotesPinnedOverlayPostPlayerInputWheelScrollsBody") -and
         $overlayTestsText.Contains("UserNotesPinnedOverlayVisualSurfaceWheelBlocksHotbarWithoutFakeWheel") -and
         $overlayTestsText.Contains("UserNotesPinnedOverlayRepeatedToolbarClicksKeepEdgesAndWheel") -and
+        $overlayTestsText.Contains("default to 0 percent stored opacity") -and
+        $overlayTestsText.Contains("ScaleAlphaForTesting(168, 0)") -and
         $overlayTestsText.Contains("UserNotesPinnedOverlayRightEdgeUsesScreenMouseAndClamps") -and
         $overlayTestsText.Contains("UserNotesPinnedOverlayScreenCoordinatesMatchFrozenRightSideSample") -and
         $overlayTestsText.Contains("UserNotesPinnedOverlayInitialPlacementUsesScreenExtentUnderUiScale") -and
@@ -2348,10 +2356,10 @@ function Test-UserNotesGovernance {
         $programTestsText.Contains("user notes pinned overlay initial placement uses screen extent under UI scale") -and
         $interfaceLayerTestsText.Contains("UserNotesPinnedOverlay.DrawInterfaceLayer") -and
         $interfaceLayerTestsText.Contains("GetUserNotesPinnedOverlayScaleTypeNameForTesting")) {
-        Write-Pass "User notes pinned overlay stays UI-only and uses controlled prefix/post-PlayerInput mouse/scroll consumption guards, one-shot toolbar press transfer including stale Terraria coordinate misses, right-edge screen mouse coverage, drag held-left preservation with non-left mouse blocking, premultiplied non-wrapping background opacity, repeated toolbar edge coverage, visual-surface wheel isolation, and post-PlayerInput body wheel coverage."
+        Write-Pass "User notes pinned overlay stays UI-only and uses controlled prefix/post-PlayerInput mouse/scroll consumption guards, one-shot toolbar press transfer including stale Terraria coordinate misses, right-edge screen mouse coverage, drag held-left preservation with non-left mouse blocking, default transparent premultiplied non-wrapping background opacity, repeated toolbar edge coverage, visual-surface wheel isolation, and post-PlayerInput body wheel coverage."
     }
     else {
-        Write-FailHealth "User notes pinned overlay must not submit actions or mutate game state, must avoid mutable static interaction state, and must use prefix/post-PlayerInput/hotbar scroll guards with postfix-click, toolbar press-transfer including stale Terraria coordinate misses, right-edge screen mouse coverage, drag held-left preservation plus non-left mouse blocking, premultiplied foreground-separated opacity clamp, visual-surface wheel isolation, repeated toolbar edge, and post-PlayerInput wheel tests; leaks=$($mutationLeaks -join ', ')"
+        Write-FailHealth "User notes pinned overlay must not submit actions or mutate game state, must avoid mutable static interaction state, and must use prefix/post-PlayerInput/hotbar scroll guards with postfix-click, toolbar press-transfer including stale Terraria coordinate misses, right-edge screen mouse coverage, drag held-left preservation plus non-left mouse blocking, default transparent premultiplied foreground-separated opacity clamp, visual-surface wheel isolation, repeated toolbar edge, and post-PlayerInput wheel tests; leaks=$($mutationLeaks -join ', ')"
     }
 
     if ($pinnedOverlayStateText.Contains("ToolbarRect") -and
@@ -2359,6 +2367,9 @@ function Test-UserNotesGovernance {
         $pinnedOverlayStateText.Contains("ResolveBodyRect") -and
         $pinnedOverlayStateText.Contains("rect.Y + BodyPadding") -and
         $pinnedOverlayStateText.Contains("internal const int LineHeight = 36;") -and
+        $pinnedOverlayStateText.Contains("internal const int DefaultVisibleBodyLines = 8;") -and
+        $pinnedOverlayStateText.Contains("internal const int DefaultHeight = BodyPadding * 2 + LineHeight * DefaultVisibleBodyLines;") -and
+        $pinnedOverlayStateText.Contains("internal const int MaxHeight = 360;") -and
         $pinnedOverlayStateText.Contains("internal const float BodyTextScale = 1.20f;") -and
         $pinnedOverlayStateText.Contains("DragHandleMinWidth = 84") -and
         $pinnedOverlayStateText.Contains("BuildBodyLines(note.Body, bodyRect.Width)") -and
@@ -2368,11 +2379,12 @@ function Test-UserNotesGovernance {
         $overlayTestsText.Contains("UserNotesPinnedOverlayBodyStartsAtContentTopWhenToolbarHidden") -and
         $overlayTestsText.Contains("UserNotesPinnedOverlayBodyWrapMatchesDrawScaleWithoutEllipsis") -and
         $overlayTestsText.Contains("UserNotesPinnedOverlayToolbarHandleIsCenteredAndSeparatedFromButtons") -and
+        $overlayTestsText.Contains("Expected default pinned note height to fit at least eight body text lines.") -and
         $programTestsText.Contains("user notes pinned overlay toolbar handle is centered and separated from buttons")) {
-        Write-Pass "User notes pinned overlay keeps readable enlarged body text, toolbar/content separation, centered long drag handle, and wrap/draw scale consistency."
+        Write-Pass "User notes pinned overlay keeps readable enlarged body text, eight-line default height, toolbar/content separation, centered long drag handle, and wrap/draw scale consistency."
     }
     else {
-        Write-FailHealth "User notes pinned overlay must keep BodyRect/ToolbarRect separation, no invisible header reservation, 1.20 wrap/draw scale, 36 line height, centered long drag handle, and no-ellipsis tests."
+        Write-FailHealth "User notes pinned overlay must keep BodyRect/ToolbarRect separation, no invisible header reservation, 1.20 wrap/draw scale, 36 line height, eight-line default height, centered long drag handle, and no-ellipsis tests."
     }
 
     if ($mouseInputText.Contains("ReadMouseForInterfaceOverlay") -and
@@ -2770,11 +2782,7 @@ function Test-MapCustomMarkerGovernance {
         "MapMarkerPickerLastClick",
         "MapMarkerPickerLastCloseReason",
         "PlayerWorldMapMarkersLastReadUtc",
-        "PlayerWorldMapMarkersLastWriteUtc",
-        "MapMarkerTraceEventsPath",
-        "MapMarkerLastTraceEventWrittenAtUtc",
-        "MapMarkerLastTraceEventType",
-        "MapMarkerLastTraceMarkerId"
+        "PlayerWorldMapMarkersLastWriteUtc"
     )
     $missingDiagnosticFields = @()
     foreach ($field in $requiredDiagnosticFields) {
@@ -2792,10 +2800,10 @@ function Test-MapCustomMarkerGovernance {
         $testText.Contains("PlayerWorldMapMarkerDiagnosticsRecordsUiActionAndJumpState") -and
         $testText.Contains("PlayerWorldMapMarkerDiagnosticsRecordsCoordinateTransformState") -and
         $missingDiagnosticFields.Count -eq 0) {
-        Write-Pass "Map marker runtime snapshot covers read/write status, picker state, transform coordinates, jump state, and UI action summaries."
+        Write-Pass "Map marker runtime snapshot covers core read/write status, picker state, transform coordinates, jump state, and UI action summaries."
     }
     else {
-        Write-FailHealth "Map marker diagnostics must include read/write status, transform coordinates, picker draw/click/close state, last UI action, last jump state, and UI-only action count in runtime snapshot JSON."
+        Write-FailHealth "Map marker core diagnostics must include read/write status, transform coordinates, picker draw/click/close state, last UI action, last jump state, and UI-only action count in runtime snapshot JSON."
     }
 
     $screenToTileBody = [System.Text.RegularExpressions.Regex]::Match(
@@ -3828,6 +3836,168 @@ function Test-MapFootprintGovernance {
     }
 }
 
+function Test-DiagnosticLifecycleGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $diagnosticRulesPath = Join-Path $RepoRoot "文档\项目规则\AI诊断日志说明.md"
+    $engineeringRulesPath = Join-Path $RepoRoot "文档\项目规则\工程规则.md"
+    $testRulesPath = Join-Path $RepoRoot "文档\项目规则\AI测试规则.md"
+    $plan05Path = Join-Path $RepoRoot "文档\归档历史计划\诊断日志轻量化治理\05-审计与文档同步.md"
+    $mapMarkerFeatureDocPath = Join-Path $RepoRoot "文档\功能介绍\地图加强页\地图标记.md"
+    $safeLandingFeatureDocPath = Join-Path $RepoRoot "文档\功能介绍\移动页\智能防摔.md"
+    $mapTraceRecorderPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\PlayerWorldMapMarkerTraceRecorder.cs"
+    $appSettingsPath = Join-Path $RepoRoot "src\JueMingZ\Config\AppSettings.cs"
+    $snapshotPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\DiagnosticSnapshot.cs"
+    $snapshotWriterPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\DiagnosticSnapshotWriter.Json.cs"
+    $mapSnapshotBuilderPath = Join-Path $RepoRoot "src\JueMingZ\Runtime\Diagnostics\RuntimeDiagnosticSnapshotBuilder.Bootstrap.cs"
+    $movementSnapshotBuilderPath = Join-Path $RepoRoot "src\JueMingZ\Runtime\Diagnostics\RuntimeDiagnosticSnapshotBuilder.Movement.cs"
+    $mapMarkerTestsPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.PlayerWorldMapMarkerTests.cs"
+    $runtimeTestsPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.RuntimeDiagnosticsAndDispatchTests.cs"
+
+    $diagnosticRulesText = Read-TextIfExists -Path $diagnosticRulesPath
+    $engineeringRulesText = Read-TextIfExists -Path $engineeringRulesPath
+    $testRulesText = Read-TextIfExists -Path $testRulesPath
+    $plan05Text = Read-TextIfExists -Path $plan05Path
+    $mapMarkerFeatureDocText = Read-TextIfExists -Path $mapMarkerFeatureDocPath
+    $safeLandingFeatureDocText = Read-TextIfExists -Path $safeLandingFeatureDocPath
+    $mapTraceRecorderText = Read-TextIfExists -Path $mapTraceRecorderPath
+    $appSettingsText = Read-TextIfExists -Path $appSettingsPath
+    $snapshotText = Read-TextIfExists -Path $snapshotPath
+    $snapshotWriterText = Read-TextIfExists -Path $snapshotWriterPath
+    $mapSnapshotBuilderText = Read-TextIfExists -Path $mapSnapshotBuilderPath
+    $movementSnapshotBuilderText = Read-TextIfExists -Path $movementSnapshotBuilderPath
+    $mapMarkerTestsText = Read-TextIfExists -Path $mapMarkerTestsPath
+    $runtimeTestsText = Read-TextIfExists -Path $runtimeTestsPath
+
+    if ($null -eq $diagnosticRulesText -or $null -eq $engineeringRulesText -or $null -eq $testRulesText -or
+        $null -eq $plan05Text -or $null -eq $mapMarkerFeatureDocText -or $null -eq $safeLandingFeatureDocText -or
+        $null -eq $mapTraceRecorderText -or $null -eq $appSettingsText -or $null -eq $snapshotText -or
+        $null -eq $snapshotWriterText -or $null -eq $mapSnapshotBuilderText -or $null -eq $movementSnapshotBuilderText -or
+        $null -eq $mapMarkerTestsText -or $null -eq $runtimeTestsText) {
+        Write-FailHealth "Diagnostic lifecycle governance needs rules, involved feature docs, map trace recorder, snapshot writer/builders, and regression tests."
+        return
+    }
+
+    $requiredLifecycleTokens = @(
+        "DiagnosticLifecycle",
+        "DiagnosticOutputLayer",
+        "DiagnosticExitCondition",
+        "DiagnosticEnableScope",
+        "DiagnosticReplacement",
+        "DiagnosticRecoveryCondition",
+        "SnapshotCore",
+        "SnapshotModuleSummary",
+        "ActionEvent",
+        "PerformanceEvent",
+        "ExplicitDetail",
+        "TraceJsonl",
+        "ArchivedDoc"
+    )
+    $missingLifecycleTokens = @()
+    foreach ($token in $requiredLifecycleTokens) {
+        if (-not $diagnosticRulesText.Contains($token)) {
+            $missingLifecycleTokens += $token
+        }
+    }
+
+    if ($missingLifecycleTokens.Count -eq 0 -and
+        $testRulesText.Contains("临时字段永久存在") -and
+        $testRulesText.Contains("归档字段") -and
+        $plan05Text.Contains("正常水平契约") -and
+        $plan05Text.Contains("Archived")) {
+        Write-Pass "Diagnostic lifecycle and output-layer rules stay documented for health audit and tests."
+    }
+    else {
+        Write-FailHealth "Diagnostic lifecycle rules must keep lifecycle/output-layer anchors and test guidance; missing=$($missingLifecycleTokens -join ', ')"
+    }
+
+    if ($engineeringRulesText.Contains("Draw / hit-test / layout / tooltip") -and
+        $engineeringRulesText.Contains("不得为了填诊断字段主动刷新世界") -and
+        $engineeringRulesText.Contains("模块 trace JSONL") -and
+        $engineeringRulesText.Contains('字段存在类审计只适用于仍属 `Core` 或明确处于 `Stabilization` 的字段')) {
+        Write-Pass "Diagnostic high-frequency guardrails stay anchored in engineering rules."
+    }
+    else {
+        Write-FailHealth "Engineering rules must keep diagnostic high-frequency guardrails for draw/hit-test/layout/tooltip, trace JSONL, and scoped field-existence audits."
+    }
+
+    $traceFields = @(
+        "MapMarkerTraceEventsPath",
+        "MapMarkerLastTraceEventWrittenAtUtc",
+        "MapMarkerLastTraceEventType",
+        "MapMarkerLastTraceMarkerId"
+    )
+    $missingTraceFields = @()
+    foreach ($field in $traceFields) {
+        if (-not $snapshotText.Contains($field) -or
+            -not $snapshotWriterText.Contains($field) -or
+            -not $mapSnapshotBuilderText.Contains($field)) {
+            $missingTraceFields += $field
+        }
+    }
+
+    if ($missingTraceFields.Count -eq 0 -and
+        $appSettingsText.Contains("EnableTraceLog = false") -and
+        $mapTraceRecorderText.Contains("TraceEventsPathForSnapshot") -and
+        $mapTraceRecorderText.Contains("TraceRecordingEnabled ? TraceEventsPath : string.Empty") -and
+        $mapTraceRecorderText.Contains("settings.EnableTraceLog") -and
+        $mapTraceRecorderText.Contains("if (!TraceRecordingEnabled)") -and
+        $mapMarkerTestsText.Contains("PlayerWorldMapMarkerTraceRecorderRequiresTraceLog") -and
+        $mapMarkerFeatureDocText.Contains("DiagnosticLifecycle=ActiveInvestigation") -and
+        $mapMarkerFeatureDocText.Contains("DiagnosticEnableScope=AppSettings.EnableTraceLog=true") -and
+        $diagnosticRulesText.Contains("DiagnosticLifecycle=ActiveInvestigation") -and
+        $diagnosticRulesText.Contains("DiagnosticOutputLayer=TraceJsonl") -and
+        $diagnosticRulesText.Contains("DiagnosticRecoveryCondition") -and
+        $diagnosticRulesText.Contains('常规回传先看 `PlayerWorldMapMarkers*`')) {
+        Write-Pass "Map marker coordinate trace is audited as an explicit ActiveInvestigation trace, not as permanent core snapshot output."
+    }
+    else {
+        Write-FailHealth "Map marker coordinate trace must keep EnableTraceLog gating, trace fields/writer wiring, tests, and ActiveInvestigation docs. Missing fields=$($missingTraceFields -join ', ')"
+    }
+
+    $archivedSafeLandingFields = @(
+        "MovementSafeLandingHasCushionBlock",
+        "MovementSafeLandingCushionBlock",
+        "MovementSafeLandingBlockPlacement"
+    )
+    $archivedRuntimeLeaks = @()
+    foreach ($field in $archivedSafeLandingFields) {
+        if ($snapshotText.Contains($field) -or
+            $snapshotWriterText.Contains($field) -or
+            $movementSnapshotBuilderText.Contains($field)) {
+            $archivedRuntimeLeaks += $field
+        }
+    }
+
+    if ($archivedRuntimeLeaks.Count -eq 0 -and
+        $runtimeTestsText.Contains('AssertDoesNotContain(json, "MovementSafeLandingHasCushionBlock")') -and
+        $runtimeTestsText.Contains('AssertDoesNotContain(json, "MovementSafeLandingCushionBlock")') -and
+        $runtimeTestsText.Contains('AssertDoesNotContain(json, "MovementSafeLandingBlockPlacement")') -and
+        $diagnosticRulesText.Contains("DiagnosticLifecycle=Archived") -and
+        $diagnosticRulesText.Contains("DiagnosticOutputLayer=ArchivedDoc") -and
+        $diagnosticRulesText.Contains("MovementSafeLandingSelectedStrategyId") -and
+        $diagnosticRulesText.Contains("Movement.SafeLanding") -and
+        $safeLandingFeatureDocText.Contains("当前已归档") -and
+        $safeLandingFeatureDocText.Contains("传送杖目标字段")) {
+        Write-Pass "SafeLanding cushion-block legacy snapshot fields stay archived with replacement docs and JSON absence tests."
+    }
+    else {
+        Write-FailHealth "SafeLanding cushion-block fields must stay out of current snapshot JSON while docs explain replacement and recovery. Leaks=$($archivedRuntimeLeaks -join ', ')"
+    }
+
+    if ($diagnosticRulesText.Contains('`Ui.Notes.InputTrace`') -and
+        $diagnosticRulesText.Contains('蓝图 `BlueprintDiagnostics*`') -and
+        $diagnosticRulesText.Contains('`MapFootprintsPlayback*`') -and
+        $diagnosticRulesText.Contains("DiagnosticLifecycle=Stabilization") -and
+        $diagnosticRulesText.Contains("不得在用户仍未实机确认时提前归档") -and
+        $diagnosticRulesText.Contains("不作为 05 的下线目标")) {
+        Write-Pass "Notes, blueprint, and footprint diagnostics keep Stabilization scope instead of being prematurely archived."
+    }
+    else {
+        Write-FailHealth "Diagnostic rules must state Ui.Notes.InputTrace, blueprint diagnostics, and MapFootprintsPlayback* remain Stabilization and are not archived by this audit-sync stage."
+    }
+}
+
 function Test-ActionQueueDirectEnqueueGovernance {
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
 
@@ -4706,6 +4876,287 @@ function Test-PlayerWorldExplorationGovernance {
     }
 }
 
+function Test-BlueprintDiagnosticsGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $diagnosticsPath = Join-Path $RepoRoot "src\JueMingZ\Automation\Blueprint\BlueprintDiagnostics.cs"
+    $projectionPath = Join-Path $RepoRoot "src\JueMingZ\Automation\Blueprint\BlueprintProjectionService.cs"
+    $materialsPath = Join-Path $RepoRoot "src\JueMingZ\Automation\Blueprint\BlueprintMaterialService.cs"
+    $autoPlacementPath = Join-Path $RepoRoot "src\JueMingZ\Automation\Blueprint\BlueprintAutoPlacementService.cs"
+    $snapshotPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\DiagnosticSnapshot.cs"
+    $writerPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\DiagnosticSnapshotWriter.Json.cs"
+    $builderPath = Join-Path $RepoRoot "src\JueMingZ\Runtime\Diagnostics\RuntimeDiagnosticSnapshotBuilder.Blueprint.cs"
+    $uiActionPath = Join-Path $RepoRoot "src\JueMingZ\Input\LegacyUiActionService.Blueprint.cs"
+    $entryStatePath = Join-Path $RepoRoot "src\JueMingZ\Automation\Blueprint\BlueprintEntryState.cs"
+    $executorPath = Join-Path $RepoRoot "src\JueMingZ\Actions\Executors\BlueprintAutoPlaceActionExecutor.cs"
+    $testPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintDiagnosticsTests.cs"
+    $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
+    $functionDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $plan17Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图功能实现", "17-诊断性能测试审计护栏.md")
+
+    $diagnosticsText = Read-TextIfExists -Path $diagnosticsPath
+    $projectionText = Read-TextIfExists -Path $projectionPath
+    $materialsText = Read-TextIfExists -Path $materialsPath
+    $autoPlacementText = Read-TextIfExists -Path $autoPlacementPath
+    $snapshotText = Read-TextIfExists -Path $snapshotPath
+    $writerText = Read-TextIfExists -Path $writerPath
+    $builderText = Read-TextIfExists -Path $builderPath
+    $uiActionText = Read-TextIfExists -Path $uiActionPath
+    $entryStateText = Read-TextIfExists -Path $entryStatePath
+    $executorText = Read-TextIfExists -Path $executorPath
+    $testText = Read-TextIfExists -Path $testPath
+    $programText = Read-TextIfExists -Path $programPath
+    $functionDocText = Read-TextIfExists -Path $functionDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $plan17Text = Read-TextIfExists -Path $plan17Path
+
+    if ($diagnosticsText -and
+        $diagnosticsText.Contains("TemplateCountCacheMs") -and
+        $diagnosticsText.Contains("Blueprint.Projection.Resolve") -and
+        $diagnosticsText.Contains("Blueprint.Materials.Resolve") -and
+        $diagnosticsText.Contains("Blueprint.AutoPlacement.CandidateScan") -and
+        $diagnosticsText.Contains("RecordOperationIfNeeded")) {
+        Write-Pass "Blueprint diagnostics helper records throttled projection/material/auto-placement performance counters."
+    }
+    else {
+        Write-FailHealth "Blueprint diagnostics helper must own stage-17 performance counters and thresholded performance-events wiring."
+    }
+
+    if ($projectionText -and $materialsText -and $autoPlacementText -and
+        $projectionText.Contains("BlueprintDiagnostics.RecordProjectionResolve") -and
+        $materialsText.Contains("BlueprintDiagnostics.RecordMaterialResolve") -and
+        $autoPlacementText.Contains("BlueprintDiagnostics.RecordAutoPlacementCandidateScan")) {
+        Write-Pass "Blueprint projection, material, and auto-placement scans feed the stage-17 diagnostics counters."
+    }
+    else {
+        Write-FailHealth "Blueprint diagnostics counters must be fed by projection resolve, material resolve, and auto-placement candidate scan paths."
+    }
+
+    $requiredSnapshotFields = @(
+        "BlueprintDiagnosticsTemplateCount",
+        "BlueprintDiagnosticsInstanceCount",
+        "BlueprintDiagnosticsHiddenInstanceCount",
+        "BlueprintDiagnosticsMaterialMissingStackTotal",
+        "BlueprintProjectionAverageResolveElapsedMs",
+        "BlueprintMaterialsAverageResolveElapsedMs",
+        "BlueprintAutoPlacementLastFailureReason",
+        "BlueprintAutoPlacementAverageCandidateScanElapsedMs",
+        "BlueprintPerformanceLastScenario"
+    )
+    $missingSnapshotFields = @()
+    foreach ($field in $requiredSnapshotFields) {
+        if (-not ($snapshotText -and $snapshotText.Contains($field) -and $writerText -and $writerText.Contains($field) -and $builderText -and $builderText.Contains($field))) {
+            $missingSnapshotFields += $field
+        }
+    }
+
+    if ($missingSnapshotFields.Count -eq 0) {
+        Write-Pass "Blueprint runtime snapshot, JSON writer, and builder expose stage-17 diagnostics fields."
+    }
+    else {
+        Write-FailHealth "Blueprint runtime snapshot fields missing from DTO/writer/builder: $($missingSnapshotFields -join ', ')"
+    }
+
+    if ($uiActionText -and $executorText -and
+        $uiActionText.Contains("Ui.Blueprint.Entry") -and
+        $uiActionText.Contains("FinishCreateSave") -and
+        $uiActionText.Contains("FinishCreateUse") -and
+        $uiActionText.Contains("StartErase") -and
+        $entryStateText -and $entryStateText.Contains("MirrorPreviewHorizontal") -and
+        $uiActionText.Contains("Ui.Blueprint.Placed.") -and
+        $uiActionText.Contains("Ui.Blueprint.ReplacementCategory") -and
+        $executorText.Contains("ScenarioNames.BlueprintAutoPlace") -and
+        $executorText.Contains("directWorldMutationAttempted") -and
+        $executorText.Contains("inventoryMutationAttempted")) {
+        Write-Pass "Blueprint action events cover create/save, preview/place, erase, mirror, replacement, and auto-place request/result contracts."
+    }
+    else {
+        Write-FailHealth "Blueprint action events must keep create/save, preview/place, erase, mirror, replacement, and auto-place diagnostics anchors."
+    }
+
+    if ($testText -and $programText -and
+        $testText.Contains("BlueprintDiagnosticsAggregateRuntimeSnapshotJson") -and
+        $testText.Contains("BlueprintDiagnosticsPerformanceCountersAverageCosts") -and
+        $programText.Contains("blueprint diagnostics aggregate runtime snapshot json") -and
+        $programText.Contains("blueprint diagnostics performance counters average costs")) {
+        Write-Pass "Blueprint stage-17 console tests are registered."
+    }
+    else {
+        Write-FailHealth "Blueprint stage-17 diagnostics/performance tests must be present and registered."
+    }
+
+    $blueprintSourceDir = Join-Path $RepoRoot "src\JueMingZ\Automation\Blueprint"
+    $blueprintSourceText = ""
+    if (Test-Path -LiteralPath $blueprintSourceDir) {
+        $sourceFiles = Get-ChildItem -LiteralPath $blueprintSourceDir -Filter "*.cs" -File -ErrorAction SilentlyContinue
+        foreach ($file in $sourceFiles) {
+            $blueprintSourceText += "`n" + (Read-TextIfExists -Path $file.FullName)
+        }
+    }
+
+    $forbiddenPatterns = @(
+        "Main\.tile\s*\[",
+        "\.stack\s*=",
+        "NetMessage\.Send",
+        "controlUseItem\s*=",
+        "selectedItem\s*=",
+        "\.AddBuff\s*\(",
+        "buffType\s*\[",
+        "buffTime\s*\[",
+        "statLife\s*=",
+        "statMana\s*="
+    )
+    $violations = @()
+    foreach ($pattern in $forbiddenPatterns) {
+        if ($blueprintSourceText -match $pattern) {
+            $violations += $pattern
+        }
+    }
+
+    if ($violations.Count -eq 0) {
+        Write-Pass "Blueprint automation source has no naked world/inventory/player/input mutation patterns outside controlled executors."
+    }
+    else {
+        Write-FailHealth "Blueprint automation source contains forbidden naked mutation patterns: $($violations -join ', ')"
+    }
+
+    if ($functionDocText -and $diagnosticsDocText -and $plan17Text -and
+        $functionDocText.Contains("BlueprintDiagnosticsTemplateCount") -and
+        $functionDocText.Contains("BlueprintAutoPlacementAverageCandidateScanElapsedMs") -and
+        $diagnosticsDocText.Contains("BlueprintDiagnosticsTemplateCount") -and
+        $diagnosticsDocText.Contains("BlueprintAutoPlacementLastFailureReason") -and
+        $plan17Text.Contains("0.854-blueprint-diagnostics-performance-audit")) {
+        Write-Pass "Blueprint stage-17 function, diagnostics, and plan documents are synchronized."
+    }
+    else {
+        Write-FailHealth "Blueprint stage-17 documents must describe new diagnostics fields, average-cost counters, and the 0.854 completion record."
+    }
+}
+
+function Test-BlueprintHandheldActionBarGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $statePath = Join-Path $RepoRoot "src\JueMingZ\Automation\Blueprint\BlueprintHandheldActionBarState.cs"
+    $overlayPath = Join-Path $RepoRoot "src\JueMingZ\UI\BlueprintHandheldActionBarOverlay.cs"
+    $uiActionPath = Join-Path $RepoRoot "src\JueMingZ\Input\LegacyUiActionService.Blueprint.cs"
+    $snapshotPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\DiagnosticSnapshot.cs"
+    $writerPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\DiagnosticSnapshotWriter.Json.cs"
+    $builderPath = Join-Path $RepoRoot "src\JueMingZ\Runtime\Diagnostics\RuntimeDiagnosticSnapshotBuilder.Blueprint.cs"
+    $testPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintHandheldActionBarTests.cs"
+    $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
+    $functionDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $plan04Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图手持凝胶操作栏", "04-诊断测试文档审计.md")
+    if (-not (Test-Path -LiteralPath $plan04Path)) {
+        $plan04Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图手持凝胶操作栏", "04-诊断测试文档审计.md")
+    }
+
+    $stateText = Read-TextIfExists -Path $statePath
+    $overlayText = Read-TextIfExists -Path $overlayPath
+    $uiActionText = Read-TextIfExists -Path $uiActionPath
+    $snapshotText = Read-TextIfExists -Path $snapshotPath
+    $writerText = Read-TextIfExists -Path $writerPath
+    $builderText = Read-TextIfExists -Path $builderPath
+    $testText = Read-TextIfExists -Path $testPath
+    $programText = Read-TextIfExists -Path $programPath
+    $functionDocText = Read-TextIfExists -Path $functionDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $plan04Text = Read-TextIfExists -Path $plan04Path
+
+    if ($stateText -and
+        $stateText.Contains("CommandElementPrefix") -and
+        $stateText.Contains("blueprint-handheld-action-bar:") -and
+        $stateText.Contains("ResultCodeUiOnlyNotImplemented") -and
+        $stateText.Contains("BuildDiagnostics") -and
+        $stateText.Contains("BlueprintHandheldActionBarDiagnostics")) {
+        Write-Pass "Blueprint handheld action bar state owns UI-only command ids and lightweight diagnostics."
+    }
+    else {
+        Write-FailHealth "Blueprint handheld action bar state must keep dedicated UI-only command ids and lightweight diagnostics ownership."
+    }
+
+    if ($overlayText -and
+        $overlayText.Contains("ui-only-placeholder-click") -and
+        $overlayText.Contains("mouse-consume") -and
+        $overlayText.Contains("no-blueprint-refresh") -and
+        $overlayText.Contains("no-input-action-queue") -and
+        -not $overlayText.Contains("BlueprintEntryState.ApplyCommand") -and
+        -not $overlayText.Contains("InputActionQueue") -and
+        -not $overlayText.Contains("ForceRefreshForMaterialWindow") -and
+        -not $overlayText.Contains("ForceRefreshForAutoPlacement")) {
+        Write-Pass "Blueprint handheld overlay remains draw/input-only and does not refresh blueprint caches or submit actions."
+    }
+    else {
+        Write-FailHealth "Blueprint handheld overlay must remain UI-only: no BlueprintEntryState.ApplyCommand, InputActionQueue, or blueprint refresh calls."
+    }
+
+    $handlerMatch = [System.Text.RegularExpressions.Regex]::Match(
+        $uiActionText,
+        "private\s+static\s+void\s+HandleBlueprintHandheldActionBarCommand[\s\S]*?private\s+static\s+void\s+HandleBlueprintReplacementMode")
+    $handlerText = if ($handlerMatch.Success) { $handlerMatch.Value } else { "" }
+    if ($handlerText.Contains("Ui.Blueprint.HandheldActionBar") -and
+        $handlerText.Contains("RecordPlaceholderClick") -and
+        $handlerText.Contains('\"submitted\":false') -and
+        $handlerText.Contains('\"implemented\":false') -and
+        $handlerText.Contains('\"uiOnly\":true') -and
+        $handlerText.Contains("result.ResultCode") -and
+        -not $handlerText.Contains("BlueprintEntryState.ApplyCommand") -and
+        -not $handlerText.Contains("InputActionQueue") -and
+        -not $handlerText.Contains("OpenLibrary") -and
+        -not $handlerText.Contains("ForceRefresh")) {
+        Write-Pass "Blueprint handheld action bar command handler records UI-only placeholder events only."
+    }
+    else {
+        Write-FailHealth "Blueprint handheld action bar handler must record Ui.Blueprint.HandheldActionBar as UI-only and must not call real blueprint commands, refreshes, or InputActionQueue."
+    }
+
+    $requiredSnapshotFields = @(
+        "BlueprintHandheldActionBarVisible",
+        "BlueprintHandheldActionBarBlockedReason",
+        "BlueprintHandheldActionBarToolItemId",
+        "BlueprintHandheldActionBarSelectedItemType",
+        "BlueprintHandheldActionBarLastAction",
+        "BlueprintHandheldActionBarLastResultCode"
+    )
+    $missingSnapshotFields = @()
+    foreach ($field in $requiredSnapshotFields) {
+        if (-not ($snapshotText -and $snapshotText.Contains($field) -and $writerText -and $writerText.Contains($field) -and $builderText -and $builderText.Contains($field))) {
+            $missingSnapshotFields += $field
+        }
+    }
+
+    if ($missingSnapshotFields.Count -eq 0) {
+        Write-Pass "Blueprint handheld action bar snapshot summary fields are wired through DTO, JSON writer, and runtime builder."
+    }
+    else {
+        Write-FailHealth "Blueprint handheld action bar snapshot fields missing from DTO/writer/builder: $($missingSnapshotFields -join ', ')"
+    }
+
+    if ($testText -and $programText -and
+        $testText.Contains("BlueprintHandheldActionBarOverlayStaysUiOnlyAndNoScan") -and
+        $testText.Contains("BlueprintHandheldActionBarCommandsStayUiOnly") -and
+        $testText.Contains("BlueprintHandheldActionBarDiagnosticsSnapshotJson") -and
+        $programText.Contains("blueprint handheld action bar diagnostics snapshot json")) {
+        Write-Pass "Blueprint handheld action bar console tests cover no-scan, UI-only commands, and snapshot JSON."
+    }
+    else {
+        Write-FailHealth "Blueprint handheld action bar tests must cover no-scan, UI-only commands, and snapshot JSON diagnostics."
+    }
+
+    if ($functionDocText -and $diagnosticsDocText -and $plan04Text -and
+        $functionDocText.Contains("BlueprintHandheldActionBarVisible") -and
+        $functionDocText.Contains("Ui.Blueprint.HandheldActionBar") -and
+        $diagnosticsDocText.Contains("BlueprintHandheldActionBarVisible") -and
+        $diagnosticsDocText.Contains("DiagnosticLifecycle=Stabilization") -and
+        $plan04Text.Contains("0.871-blueprint-handheld-diagnostics-audit")) {
+        Write-Pass "Blueprint handheld action bar function, diagnostics, and stage-04 plan docs are synchronized."
+    }
+    else {
+        Write-FailHealth "Blueprint handheld action bar docs must describe UI-only action events, snapshot summary fields, Stabilization lifecycle, and 0.871 stage-04 completion."
+    }
+}
+
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
 
@@ -4732,6 +5183,7 @@ Test-InformationFishingFallbackCleanup -RepoRoot $repoRoot
 Test-LegacyUiOverlayGovernance -RepoRoot $repoRoot
 Test-CombatAimDiagnosticsGovernance -RepoRoot $repoRoot
 Test-PhasebladeQuickSwitchDiagnosticsGovernance -RepoRoot $repoRoot
+Test-DiagnosticLifecycleGovernance -RepoRoot $repoRoot
 Test-MapQuickAnnouncementGovernance -RepoRoot $repoRoot
 Test-FeatureToggleHotkeyGovernance -RepoRoot $repoRoot
 Test-F5MultiPageUiLayoutGovernance -RepoRoot $repoRoot
@@ -4740,6 +5192,8 @@ Test-MapCustomMarkerGovernance -RepoRoot $repoRoot
 Test-MapDirectionHintGovernance -RepoRoot $repoRoot
 Test-MapFootprintGovernance -RepoRoot $repoRoot
 Test-PlayerWorldExplorationGovernance -RepoRoot $repoRoot
+Test-BlueprintDiagnosticsGovernance -RepoRoot $repoRoot
+Test-BlueprintHandheldActionBarGovernance -RepoRoot $repoRoot
 Test-ActionQueueDirectEnqueueGovernance -RepoRoot $repoRoot
 Test-NewFeatureBoundaryGovernance -RepoRoot $repoRoot
 Test-DeepStructureBoundaryGovernance -RepoRoot $repoRoot

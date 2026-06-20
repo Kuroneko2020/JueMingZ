@@ -693,6 +693,50 @@ namespace JueMingZ.Tests
             AssertContains(json, "\"deltaFromRightClickX\":0");
         }
 
+        private static void PlayerWorldMapMarkerTraceRecorderRequiresTraceLog()
+        {
+            ConfigService.ResetSettingsForTesting();
+            PlayerWorldMapMarkerTraceRecorder.ResetForTesting();
+
+            if (!string.IsNullOrEmpty(PlayerWorldMapMarkerTraceRecorder.TraceEventsPathForSnapshot))
+            {
+                throw new InvalidOperationException("Map marker trace path must stay out of normal runtime snapshot output while EnableTraceLog=false.");
+            }
+
+            PlayerWorldMapMarkerTraceRecorder.Record(new PlayerWorldMapMarkerTraceEvent
+            {
+                UtcNow = new DateTime(2026, 6, 16, 3, 4, 5, DateTimeKind.Utc),
+                RuntimeVersion = "0.test",
+                EventType = "markerCreate",
+                PairId = "pair-trace",
+                MarkerId = "marker-trace-disabled",
+                IconItemId = 48,
+                WriteAttempted = true,
+                WriteSucceeded = true,
+                WriteStatus = "saved",
+                TileX = 5,
+                TileY = 7,
+                ScreenX = 110,
+                ScreenY = 214,
+                ScreenWidth = 1280,
+                ScreenHeight = 720,
+                WorldSizeX = 8400,
+                WorldSizeY = 2400
+            });
+
+            if (PlayerWorldMapMarkerTraceRecorder.LastTraceEventWrittenAtUtc.HasValue ||
+                !string.IsNullOrEmpty(PlayerWorldMapMarkerTraceRecorder.LastTraceEventType) ||
+                !string.IsNullOrEmpty(PlayerWorldMapMarkerTraceRecorder.LastTraceMarkerId))
+            {
+                throw new InvalidOperationException("Map marker trace recorder must not record coordinate trace state while EnableTraceLog=false.");
+            }
+
+            ConfigService.AppSettings.EnableTraceLog = true;
+            AssertContains(PlayerWorldMapMarkerTraceRecorder.TraceEventsPathForSnapshot, "map-marker-events-");
+            ConfigService.ResetSettingsForTesting();
+            PlayerWorldMapMarkerTraceRecorder.ResetForTesting();
+        }
+
         private static void PlayerWorldMapMarkerTraceDrawEventIncludesScreenDelta()
         {
             var createSample = new PlayerWorldMapMarkerTraceEvent

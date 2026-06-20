@@ -1,0 +1,386 @@
+using System;
+using System.Collections.Generic;
+using JueMingZ.Automation.Blueprint;
+using JueMingZ.Config;
+using JueMingZ.Diagnostics;
+using JueMingZ.Runtime;
+using JueMingZ.UI.Legacy;
+
+namespace JueMingZ.Tests
+{
+    internal static partial class Program
+    {
+        private static void BlueprintMirrorHorizontalMirrorsPreviewCoordinatesAnchorAndSlope()
+        {
+            BlueprintEntryState.ResetForTesting();
+            try
+            {
+                var template = CreateMirrorableBlueprintTemplate("镜像预览");
+                RequireBlueprintEntrySuccess(BlueprintEntryState.SelectTemplateForPlacement(template), "start mirror preview");
+                BlueprintPlacementPreviewState.HandlePointer(new BlueprintPlacementPointerInput
+                {
+                    WorldTileHit = true,
+                    TileX = 100,
+                    TileY = 200
+                });
+
+                var result = BlueprintEntryState.ApplyCommand(BlueprintEntryCommands.MirrorPreviewHorizontal, AppSettings.CreateDefault());
+                RequireBlueprintEntrySuccess(result, "mirror preview horizontally");
+                var snapshot = BlueprintPlacementPreviewState.GetSnapshot();
+                if (!snapshot.Active ||
+                    snapshot.AnchorX != 2 ||
+                    snapshot.OriginTileX != 98 ||
+                    snapshot.OriginTileY != 200)
+                {
+                    throw new InvalidOperationException("Expected horizontal mirror to flip the preview anchor and recalculate the hover origin.");
+                }
+
+                var mirroredTile = FindLayerAt(snapshot.TemplateSnapshot, 3, 0, BlueprintLayerKinds.Tile);
+                var mirroredWall = FindLayerAt(snapshot.TemplateSnapshot, 0, 1, BlueprintLayerKinds.Wall);
+                if (mirroredTile == null ||
+                    mirroredTile.Slope != 2 ||
+                    mirroredWall == null ||
+                    mirroredWall.ContentId != 2)
+                {
+                    throw new InvalidOperationException("Expected horizontal mirror to flip cell X coordinates and map slope 1 to 2.");
+                }
+
+                AssertContains(BlueprintPlacementPreviewState.BuildUiStateJson(), "\"mirrorLastStatus\":\"mirrorHorizontalApplied\"");
+                AssertContains(LegacyMainWindow.BuildBlueprintPlacementSummaryForTesting(), "锚点 2,0");
+                AssertContains(LegacyMainWindow.GetBlueprintMirrorVisualContractForTesting(), "fail-closed-frame-matrix");
+            }
+            finally
+            {
+                BlueprintEntryState.ResetForTesting();
+            }
+        }
+
+        private static void BlueprintMirrorRejectsDirectionalFurnitureFramesFailClosed()
+        {
+            BlueprintEntryState.ResetForTesting();
+            try
+            {
+                var template = CreateDirectionalFurnitureBlueprintTemplate();
+                RequireBlueprintEntrySuccess(BlueprintEntryState.SelectTemplateForPlacement(template), "start directional mirror preview");
+                var result = BlueprintEntryState.ApplyCommand(BlueprintEntryCommands.MirrorPreviewHorizontal, AppSettings.CreateDefault());
+                if (result.Succeeded || result.Changed)
+                {
+                    throw new InvalidOperationException("Expected directional furniture frames to block horizontal mirror.");
+                }
+
+                var snapshot = BlueprintPlacementPreviewState.GetSnapshot();
+                if (!snapshot.Active ||
+                    FindLayerAt(snapshot.TemplateSnapshot, 0, 0, BlueprintLayerKinds.Object) == null ||
+                    FindLayerAt(snapshot.TemplateSnapshot, 1, 0, BlueprintLayerKinds.Object) != null)
+                {
+                    throw new InvalidOperationException("Expected blocked mirror to leave the preview template snapshot unchanged.");
+                }
+
+                var diagnostics = BlueprintMirrorService.GetDiagnostics();
+                AssertStringEquals(diagnostics.LastStatus, "mirrorBlocked", "blueprint mirror blocked status");
+                AssertContains(diagnostics.LastBlockedReason, "objectDirectionFrameUnsupported");
+                AssertContains(LegacyMainWindow.BuildBlueprintPlacementSummaryForTesting(), "镜像阻止");
+            }
+            finally
+            {
+                BlueprintEntryState.ResetForTesting();
+            }
+        }
+
+        private static void BlueprintMirrorSupportMatrixMapsSlopesAndRejectsUnknownDirection()
+        {
+            if (BlueprintMirrorService.MirrorSlopeForTesting(1) != 2 ||
+                BlueprintMirrorService.MirrorSlopeForTesting(2) != 1 ||
+                BlueprintMirrorService.MirrorSlopeForTesting(3) != 4 ||
+                BlueprintMirrorService.MirrorSlopeForTesting(4) != 3 ||
+                BlueprintMirrorService.MirrorSlopeForTesting(9) != -1)
+            {
+                throw new InvalidOperationException("Expected horizontal mirror slope map to pair 1/2 and 3/4 only.");
+            }
+
+            string reason;
+            var chair = new BlueprintCellLayerRecord
+            {
+                LayerKind = BlueprintLayerKinds.Object,
+                ContentId = 15
+            };
+            if (BlueprintMirrorService.CanMirrorLayerForTesting(chair, out reason) ||
+                !string.Equals(reason, "objectDirectionUnsupported", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected direction-bearing chair object to stay outside the mirror matrix.");
+            }
+
+            var framedDoor = new BlueprintCellLayerRecord
+            {
+                LayerKind = BlueprintLayerKinds.Object,
+                ContentId = 10,
+                FrameX = 18
+            };
+            if (BlueprintMirrorService.CanMirrorLayerForTesting(framedDoor, out reason) ||
+                !string.Equals(reason, "objectDirectionFrameUnsupported", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected framed door object to fail closed before guessing direction frame mapping.");
+            }
+        }
+
+        private static void BlueprintMirrorProjectionMaterialsAndAutoPlacementUseMirroredSnapshot()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-mirror-snapshot-chain");
+            try
+            {
+                BlueprintEntryState.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintAutoPlacementService.ResetForTesting();
+
+                var instanceStore = new BlueprintWorldInstanceStore();
+                BlueprintPlacementPreviewState.SetPlacementDependenciesForTesting(
+                    new BlueprintTemplateLibraryStore(),
+                    instanceStore,
+                    BlueprintPlacementWorldContext.Success("pair-mirror", "world-mirror"));
+                var template = CreateMirrorSingleMaterialTemplate("镜像链路", 31, 901, 2);
+                RequireBlueprintEntrySuccess(BlueprintEntryState.SelectTemplateForPlacement(template), "start mirror chain preview");
+                RequireBlueprintEntrySuccess(BlueprintEntryState.ApplyCommand(BlueprintEntryCommands.MirrorPreviewHorizontal, AppSettings.CreateDefault()), "mirror chain preview");
+
+                var placed = BlueprintPlacementPreviewState.HandlePointer(new BlueprintPlacementPointerInput
+                {
+                    WorldTileHit = true,
+                    TileX = 100,
+                    TileY = 50,
+                    LeftDown = true,
+                    LeftPressed = true
+                });
+                BlueprintEntryState.MarkPlacementConfirmed(placed);
+                if (!placed.Succeeded || !placed.PlacedInstance)
+                {
+                    throw new InvalidOperationException("Expected mirrored preview to create a world instance.");
+                }
+
+                BlueprintWorldInstanceSnapshot saved;
+                RequireBlueprintSuccess(instanceStore.TryLoadWorld("pair-mirror", out saved), "load mirrored instance");
+                var instance = saved.Instances[0];
+                var mirroredLayer = FindLayerAt(instance.TemplateSnapshot, 2, 0, BlueprintLayerKinds.Tile);
+                if (instance.OriginTileX != 99 ||
+                    instance.OriginTileY != 50 ||
+                    mirroredLayer == null)
+                {
+                    throw new InvalidOperationException("Expected placed instance to store the mirrored template snapshot before projection.");
+                }
+
+                var reader = new FakeBlueprintWorldTileReader();
+                BlueprintProjectionService.SetDependenciesForTesting(
+                    instanceStore,
+                    BlueprintPlacementWorldContext.Success("pair-mirror", "world-mirror"),
+                    reader,
+                    true);
+                BlueprintMaterialService.SetInventoryReaderForTesting(new FakeBlueprintMaterialInventoryReader(
+                    new Dictionary<int, int> { { 901, 2 } },
+                    new Dictionary<int, int>()), true);
+
+                var projection = BlueprintProjectionService.GetSnapshot();
+                if (projection.ProjectedLayers.Count != 1 ||
+                    projection.ProjectedLayers[0].WorldTileX != 101 ||
+                    projection.ProjectedLayers[0].WorldTileY != 50 ||
+                    projection.MissingLayerCount != 1)
+                {
+                    throw new InvalidOperationException("Expected projection to derive world coordinates from the mirrored template snapshot.");
+                }
+
+                var materials = BlueprintMaterialService.GetSnapshot();
+                if (materials.RequiredItemCount != 1 ||
+                    materials.AvailableStackTotal != 2)
+                {
+                    throw new InvalidOperationException("Expected material stats to aggregate missing layers from the mirrored projection.");
+                }
+
+                var settings = AppSettings.CreateDefault();
+                settings.BlueprintAutoPlacementEnabled = true;
+                var candidates = BlueprintAutoPlacementService.ResolveCandidatesForTesting(RuntimeSettingsSnapshot.FromSettings(settings));
+                if (candidates.Candidate == null ||
+                    candidates.Candidate.WorldTileX != 101 ||
+                    candidates.Candidate.WorldTileY != 50 ||
+                    candidates.Candidate.MaterialItemId != 901)
+                {
+                    throw new InvalidOperationException("Expected auto placement candidates to target the mirrored projection coordinate.");
+                }
+            }
+            finally
+            {
+                BlueprintAutoPlacementService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintEntryState.ResetForTesting();
+                restore();
+            }
+        }
+
+        private static void BlueprintMirrorDiagnosticsWriteRuntimeSnapshotJson()
+        {
+            BlueprintMirrorService.ResetForTesting();
+            try
+            {
+                var result = BlueprintMirrorService.TryMirrorHorizontal(CreateMirrorableBlueprintTemplate("镜像诊断"));
+                if (!result.Succeeded)
+                {
+                    throw new InvalidOperationException("Expected mirror diagnostic setup to succeed.");
+                }
+
+                var runtimeSnapshot = RuntimeDiagnosticSnapshotBuilder.Build(new RuntimeDiagnosticSnapshotContext
+                {
+                    Initialized = true,
+                    Version = "test-blueprint-mirror"
+                });
+                var json = InvokeDiagnosticSnapshotJson(runtimeSnapshot);
+                AssertContains(json, "\"BlueprintMirrorLastStatus\": \"mirrorHorizontalApplied\"");
+                AssertContains(json, "\"BlueprintMirrorMode\": \"horizontal\"");
+                AssertContains(json, "\"BlueprintMirrorMirroredCellCount\": 2");
+                AssertContains(json, "\"BlueprintMirrorRejectedLayerCount\": 0");
+                AssertContains(BlueprintMirrorService.BuildUiStateJson(), "\"lastMirroredLayerCount\":2");
+            }
+            finally
+            {
+                BlueprintMirrorService.ResetForTesting();
+            }
+        }
+
+        private static BlueprintTemplateRecord CreateMirrorableBlueprintTemplate(string name)
+        {
+            var template = new BlueprintTemplateRecord
+            {
+                TemplateId = "template-" + Guid.NewGuid().ToString("N"),
+                Name = name,
+                Width = 4,
+                Height = 2,
+                AnchorX = 1,
+                AnchorY = 0
+            };
+            template.Cells.Add(new BlueprintCellRecord
+            {
+                X = 0,
+                Y = 0,
+                Layers =
+                {
+                    new BlueprintCellLayerRecord
+                    {
+                        LayerKind = BlueprintLayerKinds.Tile,
+                        ContentId = 1,
+                        MaterialItemId = 1,
+                        MaterialStack = 1,
+                        Slope = 1
+                    }
+                }
+            });
+            template.Cells.Add(new BlueprintCellRecord
+            {
+                X = 3,
+                Y = 1,
+                Layers =
+                {
+                    new BlueprintCellLayerRecord
+                    {
+                        LayerKind = BlueprintLayerKinds.Wall,
+                        ContentId = 2,
+                        MaterialItemId = 2,
+                        MaterialStack = 1
+                    }
+                }
+            });
+            AddMaterialEntries(template);
+            return template;
+        }
+
+        private static void RequireBlueprintEntrySuccess(BlueprintEntryCommandResult result, string label)
+        {
+            if (result == null || !result.Succeeded)
+            {
+                throw new InvalidOperationException(
+                    "Expected blueprint entry command to succeed: " + label +
+                    " / " + (result == null ? "null" : result.ResultCode + " / " + result.Message));
+            }
+        }
+
+        private static BlueprintTemplateRecord CreateDirectionalFurnitureBlueprintTemplate()
+        {
+            var template = new BlueprintTemplateRecord
+            {
+                TemplateId = "template-" + Guid.NewGuid().ToString("N"),
+                Name = "方向家具",
+                Width = 2,
+                Height = 1,
+                AnchorX = 0,
+                AnchorY = 0
+            };
+            template.Cells.Add(new BlueprintCellRecord
+            {
+                X = 0,
+                Y = 0,
+                Layers =
+                {
+                    new BlueprintCellLayerRecord
+                    {
+                        LayerKind = BlueprintLayerKinds.Object,
+                        ContentId = 15,
+                        FrameX = 18,
+                        MaterialItemId = 1007,
+                        MaterialStack = 1
+                    }
+                }
+            });
+            AddMaterialEntries(template);
+            return template;
+        }
+
+        private static BlueprintTemplateRecord CreateMirrorSingleMaterialTemplate(string name, int tileType, int materialItemId, int materialStack)
+        {
+            var template = new BlueprintTemplateRecord
+            {
+                TemplateId = "template-" + Guid.NewGuid().ToString("N"),
+                Name = name,
+                Width = 3,
+                Height = 1,
+                AnchorX = 1,
+                AnchorY = 0
+            };
+            template.Cells.Add(new BlueprintCellRecord
+            {
+                X = 0,
+                Y = 0,
+                Layers =
+                {
+                    new BlueprintCellLayerRecord
+                    {
+                        LayerKind = BlueprintLayerKinds.Tile,
+                        ContentId = tileType,
+                        MaterialItemId = materialItemId,
+                        MaterialStack = materialStack
+                    }
+                }
+            });
+            AddMaterialEntries(template);
+            return template;
+        }
+
+        private static BlueprintCellLayerRecord FindLayerAt(BlueprintTemplateRecord template, int x, int y, string layerKind)
+        {
+            for (var cellIndex = 0; template != null && template.Cells != null && cellIndex < template.Cells.Count; cellIndex++)
+            {
+                var cell = template.Cells[cellIndex];
+                if (cell == null || cell.X != x || cell.Y != y)
+                {
+                    continue;
+                }
+
+                for (var layerIndex = 0; cell.Layers != null && layerIndex < cell.Layers.Count; layerIndex++)
+                {
+                    var layer = cell.Layers[layerIndex];
+                    if (layer != null && string.Equals(layer.LayerKind, layerKind, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return layer;
+                    }
+                }
+            }
+
+            return null;
+        }
+    }
+}

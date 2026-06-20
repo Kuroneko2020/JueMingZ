@@ -38,6 +38,7 @@ namespace JueMingZ.Runtime
             WriteBootstrapAndGameState(snapshot, source);
             WriteActionQueue(snapshot, source);
             WriteDiagnosticUi(snapshot, source);
+            WriteBlueprintProjection(snapshot, source);
             WritePerformanceAndConfig(snapshot, source);
             WriteInventoryInformationFishing(snapshot, source);
             WriteMovement(snapshot, source);

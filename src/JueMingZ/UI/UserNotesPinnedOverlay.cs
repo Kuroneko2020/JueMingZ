@@ -215,6 +215,17 @@ namespace JueMingZ.UI
                 var coordinateContext = ResolveCoordinateContext(rawState);
                 var mouse = handleState ? ReadOverlayMouseForInput(rawState) : ReadOverlayMouse(rawState);
                 var frame = BuildFrame(mouse, coordinateContext);
+                if (!ShouldProcessInputFrame(frame))
+                {
+                    if (handleState)
+                    {
+                        ResetTrackedMouseButtons();
+                    }
+
+                    ClearPendingToolbarPress();
+                    return;
+                }
+
                 var hitDiagnostics = UserNotesPinnedOverlayState.BuildHitDiagnostics(frame, mouse.X, mouse.Y);
                 var legacyWindowOwnsMouse = ShouldLegacyWindowOwnMouse(mouse, frame);
                 var scroll = TerrariaUiMouseCompat.ReadScrollSnapshot(mouse.ScrollDelta);
@@ -227,18 +238,6 @@ namespace JueMingZ.UI
                 if (legacyWindowOwnsMouse)
                 {
                     ClearPendingToolbarPressIfReleased(mouse);
-                    UserNotesPinnedOverlayInputDiagnostics.Record(
-                        source,
-                        handleState,
-                        handleScroll,
-                        rawState,
-                        mouse,
-                        hitDiagnostics,
-                        null,
-                        null,
-                        rawScrollDelta,
-                        true,
-                        "legacyWindowOwnsMouse");
                     return;
                 }
 
@@ -561,6 +560,16 @@ namespace JueMingZ.UI
                 mouse == null ? -1 : mouse.X,
                 mouse == null ? -1 : mouse.Y,
                 coordinateContext.CoordinateMode);
+        }
+
+        internal static bool ShouldProcessInputFrameForTesting(UserNotesPinnedOverlayFrame frame)
+        {
+            return ShouldProcessInputFrame(frame);
+        }
+
+        private static bool ShouldProcessInputFrame(UserNotesPinnedOverlayFrame frame)
+        {
+            return frame != null && frame.Items != null && frame.Items.Count > 0;
         }
 
         private static UserNotesPinnedOverlayCoordinateContext ResolveCoordinateContext(DiagnosticMouseState raw)

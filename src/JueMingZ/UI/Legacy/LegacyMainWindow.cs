@@ -48,6 +48,17 @@ namespace JueMingZ.UI.Legacy
         private const int MovementSafeLandingPopupRowGap = 6;
         private const int MovementSafeLandingOptionMinWidth = 96;
         private const int MovementSafeLandingOptionHeight = 32;
+        private const int BlueprintReplacementPopupMaxWidth = MovementSafeLandingPopupMaxWidth;
+        private const int BlueprintReplacementPopupMinWidth = MovementSafeLandingPopupMinWidth;
+        private const int BlueprintReplacementPopupMaxHeight = MovementSafeLandingPopupMaxHeight;
+        private const int BlueprintReplacementPopupMinHeight = MovementSafeLandingPopupMinHeight;
+        private const int BlueprintReplacementPopupHorizontalPadding = MovementSafeLandingPopupHorizontalPadding;
+        private const int BlueprintReplacementPopupContentStartY = MovementSafeLandingPopupContentStartY;
+        private const int BlueprintReplacementPopupBottomPadding = MovementSafeLandingPopupBottomPadding;
+        private const int BlueprintReplacementPopupColumnGap = MovementSafeLandingPopupColumnGap;
+        private const int BlueprintReplacementPopupRowGap = MovementSafeLandingPopupRowGap;
+        private const int BlueprintReplacementOptionMinWidth = MovementSafeLandingOptionMinWidth;
+        private const int BlueprintReplacementOptionHeight = MovementSafeLandingOptionHeight;
         private const int AutoCaptureCritterPopupMaxWidth = 460;
         private const int AutoCaptureCritterPopupMinWidth = 332;
         private const int AutoCaptureCritterPopupMaxHeight = 260;
@@ -139,6 +150,9 @@ namespace JueMingZ.UI.Legacy
         private static bool _movementSafeLandingConfigOpen;
         private static LegacyUiRect _movementSafeLandingConfigAnchor;
         private static bool _movementSafeLandingConfigAnchorVisible;
+        private static bool _blueprintReplacementConfigOpen;
+        private static LegacyUiRect _blueprintReplacementConfigAnchor;
+        private static bool _blueprintReplacementConfigAnchorVisible;
         private static bool _autoCaptureCritterConfigOpen;
         private static LegacyUiRect _autoCaptureCritterConfigAnchor;
         private static bool _autoCaptureCritterConfigAnchorVisible;
@@ -156,6 +170,8 @@ namespace JueMingZ.UI.Legacy
         private static bool _quickItemHotkeyCaptureActive;
         private static int _quickItemHotkeyCaptureBindingIndex = -1;
         private static bool _autoMiningHotkeyCaptureActive;
+        private static bool _blueprintEntryHotkeyCaptureActive;
+        private static string _blueprintEntryHotkeyMessage = string.Empty;
         private static string _mapQuickAnnouncementHotkeyCaptureSlot = string.Empty;
         private static bool _mapDeathHistoryPopupOpen;
         private static LegacyUiRect _mapDeathHistoryAnchor;
@@ -167,6 +183,7 @@ namespace JueMingZ.UI.Legacy
         private static bool _mapRevealedAreaDetailsAnchorVisible;
         private static readonly Dictionary<int, bool> QuickItemCaptureWasDown = new Dictionary<int, bool>();
         private static readonly Dictionary<int, bool> AutoMiningCaptureWasDown = new Dictionary<int, bool>();
+        private static readonly Dictionary<int, bool> BlueprintEntryCaptureWasDown = new Dictionary<int, bool>();
         private static readonly Dictionary<int, bool> MapQuickAnnouncementCaptureWasDown = new Dictionary<int, bool>();
         private static readonly TimeSpan PickerCandidateCacheWindow = TimeSpan.FromMilliseconds(120);
         private static DateTime _quickItemPickerCandidateCacheUtc = DateTime.MinValue;

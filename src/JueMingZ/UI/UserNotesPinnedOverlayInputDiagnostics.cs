@@ -87,6 +87,19 @@ namespace JueMingZ.UI
             return BuildVerificationJson(source, handleState, handleScroll, mouse, hit, interaction, suppression, rawScrollDelta, legacyWindowOwnsMouse);
         }
 
+        internal static bool ShouldRecordForTesting(
+            string source,
+            LegacyMouseSnapshot mouse,
+            UserNotesPinnedOverlayHitDiagnostics hit,
+            UserNotesPinnedOverlayInteraction interaction,
+            UserNotesPinnedOverlaySuppressionDiagnostics suppression,
+            int rawScrollDelta,
+            bool legacyWindowOwnsMouse,
+            string resultCode)
+        {
+            return ShouldRecord(source, mouse, hit, interaction, suppression, rawScrollDelta, legacyWindowOwnsMouse, resultCode);
+        }
+
         private static bool ShouldRecord(
             string source,
             LegacyMouseSnapshot mouse,
@@ -99,14 +112,12 @@ namespace JueMingZ.UI
         {
             var active =
                 hit.MouseInside ||
-                legacyWindowOwnsMouse ||
-                mouse.LeftDown ||
-                mouse.LeftPressed ||
-                mouse.LeftReleased ||
-                rawScrollDelta != 0 ||
+                interaction.MouseInside ||
                 interaction.CapturedMouse ||
+                interaction.ScrollConsumed ||
                 interaction.DragStarted ||
                 interaction.Dragging ||
+                interaction.DragSaved ||
                 interaction.OpacityChanged ||
                 interaction.Unpinned ||
                 suppression.MouseCaptureRequested ||

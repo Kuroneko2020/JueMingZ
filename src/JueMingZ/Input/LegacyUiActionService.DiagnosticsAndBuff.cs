@@ -223,7 +223,18 @@ namespace JueMingZ.Input
                    "\"miscQuickReforgePrefixCount\":" + IntRaw(CountValidQuickReforgePrefixes(settings.NpcAutoReforgePrefixes)) + "," +
                    "\"miscQuickReforgeInputActive\":" + BoolRaw(LegacyTextInput.IsFocused("misc-quick-reforge:prefix")) + "," +
                    "\"miscAutoTaxCollectEnabled\":" + BoolRaw(settings.NpcAutoTaxCollectEnabled) + "," +
-                   "\"miscDeveloperEasterEggPending\":" + BoolRaw(LegacyMainWindow.IsDeveloperEasterEggConfirmPending()) +
+                   "\"miscDeveloperEasterEggPending\":" + BoolRaw(LegacyMainWindow.IsDeveloperEasterEggConfirmPending()) + "," +
+                   "\"blueprintToolItemId\":" + IntRaw(settings.BlueprintToolItemId) + "," +
+                   "\"blueprintAutoPlacementEnabled\":" + BoolRaw(settings.BlueprintAutoPlacementEnabled) + "," +
+                   "\"blueprintReplacementEnabled\":" + BoolRaw(settings.BlueprintReplacementEnabled) + "," +
+                   "\"blueprintReplacementTorchesEnabled\":" + BoolRaw(settings.BlueprintReplacementTorchesEnabled) + "," +
+                   "\"blueprintReplacementPlatformsEnabled\":" + BoolRaw(settings.BlueprintReplacementPlatformsEnabled) + "," +
+                   "\"blueprintReplacementWorkBenchesEnabled\":" + BoolRaw(settings.BlueprintReplacementWorkBenchesEnabled) + "," +
+                   "\"blueprintReplacementChairsEnabled\":" + BoolRaw(settings.BlueprintReplacementChairsEnabled) + "," +
+                   "\"blueprintReplacementDoorsEnabled\":" + BoolRaw(settings.BlueprintReplacementDoorsEnabled) + "," +
+                   "\"blueprintReplacementTablesEnabled\":" + BoolRaw(settings.BlueprintReplacementTablesEnabled) + "," +
+                   "\"blueprintReplacementChestsEnabled\":" + BoolRaw(settings.BlueprintReplacementChestsEnabled) + "," +
+                   "\"blueprintReplacementSignsEnabled\":" + BoolRaw(settings.BlueprintReplacementSignsEnabled) +
                    "}";
         }
 

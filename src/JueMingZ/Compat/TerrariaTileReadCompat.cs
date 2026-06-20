@@ -73,6 +73,36 @@ namespace JueMingZ.Compat
             return tile != null && tile.inActive();
         }
 
+        public static int TilePaint(Tile tile)
+        {
+            return tile == null ? 0 : tile.color();
+        }
+
+        public static int WallPaint(Tile tile)
+        {
+            return tile == null ? 0 : tile.wallColor();
+        }
+
+        public static bool IsTileFullbright(Tile tile)
+        {
+            return tile != null && tile.fullbrightBlock();
+        }
+
+        public static bool IsWallFullbright(Tile tile)
+        {
+            return tile != null && tile.fullbrightWall();
+        }
+
+        public static bool IsTileInvisible(Tile tile)
+        {
+            return tile != null && tile.invisibleBlock();
+        }
+
+        public static bool IsWallInvisible(Tile tile)
+        {
+            return tile != null && tile.invisibleWall();
+        }
+
         public static bool HasRedWire(Tile tile)
         {
             return tile != null && tile.wire();

@@ -737,6 +737,32 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void GameStateReadOptionsBlueprintHandheldEntryUsesSelectedOnly()
+        {
+            var disabled = AppSettings.CreateDefault();
+            disabled.BlueprintHandheldEntryEnabled = false;
+            var disabledOptions = JueMingZRuntime.BuildGameStateReadOptionsForTesting(disabled, false);
+            if ((disabledOptions.InventoryProfile & InventoryReadProfile.SelectedOnly) != InventoryReadProfile.None)
+            {
+                throw new InvalidOperationException("Disabled blueprint handheld entry must not request selected item reads.");
+            }
+
+            var enabled = AppSettings.CreateDefault();
+            enabled.BlueprintHandheldEntryEnabled = true;
+            var enabledOptions = JueMingZRuntime.BuildGameStateReadOptionsForTesting(enabled, false);
+            if ((enabledOptions.InventoryProfile & InventoryReadProfile.SelectedOnly) != InventoryReadProfile.SelectedOnly)
+            {
+                throw new InvalidOperationException("Enabled blueprint handheld entry must request only the selected item profile.");
+            }
+
+            if ((enabledOptions.InventoryProfile & InventoryReadProfile.InventorySlots) == InventoryReadProfile.InventorySlots ||
+                (enabledOptions.InventoryProfile & InventoryReadProfile.TrashItem) == InventoryReadProfile.TrashItem ||
+                (enabledOptions.InventoryProfile & InventoryReadProfile.Stackability) == InventoryReadProfile.Stackability)
+            {
+                throw new InvalidOperationException("Blueprint handheld selected item read must not expand to full inventory fields.");
+            }
+        }
+
         private static void GameStateReadOptionsKeepDiagnosticsFullProfile()
         {
             var settings = AppSettings.CreateDefault();
@@ -1226,6 +1252,7 @@ namespace JueMingZ.Tests
                     "targeting.diagnostic-button-actions|targeting.diagnostic-button-actions|1",
                     "targeting.legacy-ui-actions|targeting.legacy-ui-actions|1",
                     "targeting.feature-toggle-hotkeys|targeting.feature-toggle-hotkeys|1",
+                    "targeting.blueprint-entry-hotkey|targeting.blueprint-entry-hotkey|1",
                     "targeting.map-custom-markers|targeting.map-custom-markers|1",
                     "targeting.diagnostic-hotkeys|targeting.diagnostic-hotkeys|1"
                 });
@@ -1242,6 +1269,7 @@ namespace JueMingZ.Tests
                     "auto-capture-critter|dispatch.auto-capture-critter|4",
                     "auto-harvest|dispatch.auto-harvest|1",
                     "auto-mining|dispatch.auto-mining|1",
+                    "blueprint-auto-placement|dispatch.blueprint-auto-placement|10",
                     "auto-stack|dispatch.auto-stack|5",
                     "auto-sell|dispatch.auto-sell|15",
                     "auto-discard|dispatch.auto-discard|15",
@@ -1278,6 +1306,7 @@ namespace JueMingZ.Tests
                     "auto-capture-critter|ActionSubmitting",
                     "auto-harvest|ActionSubmitting",
                     "auto-mining|ActionSubmitting",
+                    "blueprint-auto-placement|ActionSubmitting",
                     "auto-stack|ActionSubmitting",
                     "auto-sell|ActionSubmitting",
                     "auto-discard|ActionSubmitting",
@@ -1829,6 +1858,9 @@ namespace JueMingZ.Tests
             AssertContains(json, "\"MovementSafeLandingCheapSkipLastReason\": \"notFallingFastEnough:cheap\"");
             AssertContains(json, "\"MovementSafeLandingCheapSkipDiagnosticCadenceTicks\": 30");
             AssertContains(json, "\"MovementSafeLandingRecoverySummarySkippedCount\": 119");
+            AssertDoesNotContain(json, "MovementSafeLandingHasCushionBlock");
+            AssertDoesNotContain(json, "MovementSafeLandingCushionBlock");
+            AssertDoesNotContain(json, "MovementSafeLandingBlockPlacement");
             AssertContains(json, "\"LastSlowestStageName\": \"game-state-read\"");
             AssertContains(json, "\"PerformanceEventsPath\": \"diagnostics/performance-events-20260525.jsonl\"");
             AssertContains(json, "\"PerformanceHitchCount\": 3");

@@ -35,7 +35,7 @@ namespace JueMingZ.Tests
                     out updated),
                     "pin first note");
 
-                var state = UserNotesPinnedOverlay.BuildInitialPinnedStateForTesting(cache.Snapshot, second.NoteId, new LegacyUiRect(320, 80, 88, 40), 960, 540);
+                var state = UserNotesPinnedOverlay.BuildInitialPinnedStateForTesting(cache.Snapshot, second.NoteId, new LegacyUiRect(320, 80, 88, 40), 1280, 720);
                 var secondRect = new LegacyUiRect((int)state.X, (int)state.Y, (int)state.Width, (int)state.Height);
                 var firstRect = new LegacyUiRect(420, 80, 280, 180);
                 if (RectsIntersect(firstRect, secondRect))
@@ -43,9 +43,21 @@ namespace JueMingZ.Tests
                     throw new InvalidOperationException("Expected initial pinned note placement to avoid existing notes.");
                 }
 
-                if (secondRect.X < 12 || secondRect.Y < 12 || secondRect.Right > 948 || secondRect.Bottom > 528)
+                if (secondRect.X < 12 || secondRect.Y < 12 || secondRect.Right > 1268 || secondRect.Bottom > 708)
                 {
                     throw new InvalidOperationException("Expected initial pinned note placement to stay inside the screen safe area.");
+                }
+
+                if (state.OpacityPercent != 0)
+                {
+                    throw new InvalidOperationException("Expected initial pinned note opacity to default to 0 percent opacity so UI transparency starts at 100 percent.");
+                }
+
+                var visibleBodyRows = (state.Height - UserNotesPinnedOverlayState.BodyPadding * 2) / UserNotesPinnedOverlayState.LineHeight;
+                if (visibleBodyRows < UserNotesPinnedOverlayState.DefaultVisibleBodyLines ||
+                    UserNotesPinnedOverlayState.DefaultVisibleBodyLines < 8)
+                {
+                    throw new InvalidOperationException("Expected default pinned note height to fit at least eight body text lines.");
                 }
             }
             finally
@@ -161,6 +173,89 @@ namespace JueMingZ.Tests
             AssertContains(json, "\"mouseCaptureRequested\":true");
             AssertContains(json, "\"buttonConsumeSucceeded\":true");
             AssertContains(json, "\"persistResultCode\":\"saved\"");
+        }
+
+        private static void UserNotesPinnedOverlayInputTraceRequiresPinnedScope()
+        {
+            UserNotesPinnedOverlay.ResetForTesting();
+            UserNotesPinnedOverlayInputDiagnostics.ResetForTesting();
+
+            var emptyFrame = UserNotesPinnedOverlay.BuildFrameForTesting(BuildPinnedNotesSnapshot(), 1280, 800, 320, 120);
+            if (UserNotesPinnedOverlay.ShouldProcessInputFrameForTesting(emptyFrame))
+            {
+                throw new InvalidOperationException("Expected an empty pinned overlay frame to skip input diagnostics.");
+            }
+
+            var f5Mouse = new LegacyMouseSnapshot
+            {
+                X = 320,
+                Y = 120,
+                LeftDown = true,
+                LeftPressed = true,
+                ReadAvailable = true,
+                ReadMode = "Test/LegacyWindow",
+                WindowHit = true
+            };
+            var noPinnedHit = new UserNotesPinnedOverlayHitDiagnostics
+            {
+                MouseX = 320,
+                MouseY = 120,
+                ControlId = "none"
+            };
+            if (UserNotesPinnedOverlayInputDiagnostics.ShouldRecordForTesting(
+                    "UserNotesPinnedOverlay.UpdateAfterPlayerInputGuard",
+                    f5Mouse,
+                    noPinnedHit,
+                    new UserNotesPinnedOverlayInteraction(),
+                    new UserNotesPinnedOverlaySuppressionDiagnostics(),
+                    -120,
+                    true,
+                    "legacyWindowOwnsMouse"))
+            {
+                throw new InvalidOperationException("F5 window ownership without a pinned-note hit must not record Ui.Notes.InputTrace.");
+            }
+
+            var pinnedSnapshot = BuildPinnedNotesSnapshot(
+                new UserNoteSnapshot
+                {
+                    NoteId = "note-a",
+                    Body = "trace",
+                    PinnedState = new UserNotePinnedState
+                    {
+                        Pinned = true,
+                        X = 100,
+                        Y = 80,
+                        Width = 280,
+                        Height = 150,
+                        OpacityPercent = 100
+                    }
+                });
+            var pinnedFrame = UserNotesPinnedOverlay.BuildFrameForTesting(pinnedSnapshot, 1280, 800, 104, 84);
+            if (!UserNotesPinnedOverlay.ShouldProcessInputFrameForTesting(pinnedFrame))
+            {
+                throw new InvalidOperationException("Expected a pinned overlay frame to keep input diagnostics enabled.");
+            }
+
+            var pinnedHit = UserNotesPinnedOverlayState.BuildHitDiagnostics(pinnedFrame, 104, 84);
+            if (!pinnedHit.MouseInside ||
+                !UserNotesPinnedOverlayInputDiagnostics.ShouldRecordForTesting(
+                    "UserNotesPinnedOverlay.UpdateAfterPlayerInputGuard",
+                    new LegacyMouseSnapshot
+                    {
+                        X = 104,
+                        Y = 84,
+                        ReadAvailable = true,
+                        ReadMode = "Test/PinnedOverlay"
+                    },
+                    pinnedHit,
+                    new UserNotesPinnedOverlayInteraction { MouseInside = true, HitNoteId = "note-a" },
+                    new UserNotesPinnedOverlaySuppressionDiagnostics(),
+                    0,
+                    false,
+                    "hover"))
+            {
+                throw new InvalidOperationException("Expected real pinned-note hover to remain eligible for Ui.Notes.InputTrace.");
+            }
         }
 
         private static void UserNotesPinnedOverlayBodyStartsAtContentTopWhenToolbarHidden()
@@ -281,9 +376,11 @@ namespace JueMingZ.Tests
             var item = frame.Items[0];
             if (UserNotesPinnedOverlayState.BodyTextScale < 1.20f ||
                 UserNotesPinnedOverlayState.LineHeight < 36 ||
+                UserNotesPinnedOverlayState.DefaultVisibleBodyLines < 8 ||
+                UserNotesPinnedOverlayState.DefaultHeight < UserNotesPinnedOverlayState.BodyPadding * 2 + UserNotesPinnedOverlayState.LineHeight * 8 ||
                 UserNotesPinnedOverlayState.ToolbarHeight < 28)
             {
-                throw new InvalidOperationException("Expected pinned overlay body text and toolbar metrics to be enlarged together.");
+                throw new InvalidOperationException("Expected pinned overlay body text, default height, and toolbar metrics to be enlarged together.");
             }
 
             if (item.DragHandleRect.Width < 84)
@@ -1156,12 +1253,13 @@ namespace JueMingZ.Tests
         private static void UserNotesPinnedOverlayOpacityDefaultsAndClampsWithoutWrap()
         {
             UserNotesPinnedOverlay.ResetForTesting();
-            if (new UserNotePinnedState().OpacityPercent != 100)
+            if (new UserNotePinnedState().OpacityPercent != 0)
             {
-                throw new InvalidOperationException("Expected new pinned note state to default to 100 percent opacity.");
+                throw new InvalidOperationException("Expected new pinned note state to default to 0 percent stored opacity.");
             }
 
             if (UserNotesPinnedOverlay.ScaleAlphaForTesting(200, 50) != 100 ||
+                UserNotesPinnedOverlay.ScaleAlphaForTesting(168, 0) != 0 ||
                 UserNotesPinnedOverlay.ScaleAlphaForTesting(168, 100) != 168 ||
                 UserNotesPinnedOverlay.PremultiplyForAlphaBlendForTesting(18, 0) != 0 ||
                 UserNotesPinnedOverlay.PremultiplyForAlphaBlendForTesting(18, 109) != 8 ||

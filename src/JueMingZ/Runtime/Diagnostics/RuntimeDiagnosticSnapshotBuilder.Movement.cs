@@ -190,16 +190,6 @@ namespace JueMingZ.Runtime
             snapshot.MovementSafeLandingTeleportTargetTileY = safeLanding == null ? -1 : safeLanding.TeleportTargetTileY;
             snapshot.MovementSafeLandingTeleportTargetWorldX = safeLanding == null ? 0d : safeLanding.TeleportTargetWorldX;
             snapshot.MovementSafeLandingTeleportTargetWorldY = safeLanding == null ? 0d : safeLanding.TeleportTargetWorldY;
-            snapshot.MovementSafeLandingHasCushionBlock = safeLanding != null && safeLanding.HasCushionBlock;
-            snapshot.MovementSafeLandingCushionBlockInventorySlot = safeLanding == null ? -1 : safeLanding.CushionBlockInventorySlot;
-            snapshot.MovementSafeLandingCushionBlockHotbarSlot = safeLanding == null ? -1 : safeLanding.CushionBlockHotbarSlot;
-            snapshot.MovementSafeLandingCushionBlockItemType = safeLanding == null ? 0 : safeLanding.CushionBlockItemType;
-            snapshot.MovementSafeLandingCushionBlockCreateTile = safeLanding == null ? -1 : safeLanding.CushionBlockCreateTile;
-            snapshot.MovementSafeLandingBlockPlacementTargetKnown = safeLanding != null && safeLanding.BlockPlacementTargetKnown;
-            snapshot.MovementSafeLandingBlockPlacementTileX = safeLanding == null ? -1 : safeLanding.BlockPlacementTileX;
-            snapshot.MovementSafeLandingBlockPlacementTileY = safeLanding == null ? -1 : safeLanding.BlockPlacementTileY;
-            snapshot.MovementSafeLandingBlockPlacementWorldX = safeLanding == null ? 0d : safeLanding.BlockPlacementWorldX;
-            snapshot.MovementSafeLandingBlockPlacementWorldY = safeLanding == null ? 0d : safeLanding.BlockPlacementWorldY;
             snapshot.MovementSafeLandingGravityRestorePending = safeLanding != null && safeLanding.GravityRestorePending;
             snapshot.MovementSafeLandingGravityRestoreOriginalDirection = safeLanding == null ? 0d : safeLanding.GravityRestoreOriginalDirection;
             snapshot.MovementSafeLandingGravityRestorePendingTicks = safeLanding == null ? 0 : safeLanding.GravityRestorePendingTicks;

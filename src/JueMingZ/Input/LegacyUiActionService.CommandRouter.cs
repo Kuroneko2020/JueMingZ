@@ -1,5 +1,6 @@
 using System;
 using JueMingZ.Actions;
+using JueMingZ.Automation.Blueprint;
 using JueMingZ.GameState;
 using JueMingZ.UI.Legacy;
 
@@ -286,6 +287,66 @@ namespace JueMingZ.Input
             if (command.ElementId.StartsWith("notes:", StringComparison.Ordinal))
             {
                 HandleUserNotesCommand(command);
+                return;
+            }
+
+            if (command.ElementId.StartsWith("blueprint-entry-hotkey:", StringComparison.Ordinal))
+            {
+                HandleBlueprintEntryHotkeyCommand(command, command.ElementId.Substring("blueprint-entry-hotkey:".Length));
+                return;
+            }
+
+            if (command.ElementId.StartsWith("blueprint-tool-item:", StringComparison.Ordinal))
+            {
+                HandleBlueprintToolItemCommand(command, command.ElementId.Substring("blueprint-tool-item:".Length));
+                return;
+            }
+
+            if (command.ElementId.StartsWith("blueprint-handheld-entry-mode:", StringComparison.Ordinal))
+            {
+                HandleBlueprintHandheldEntryMode(command, command.ElementId.Substring("blueprint-handheld-entry-mode:".Length));
+                return;
+            }
+
+            if (command.ElementId.StartsWith(BlueprintHandheldActionBarState.CommandElementPrefix, StringComparison.Ordinal))
+            {
+                HandleBlueprintHandheldActionBarCommand(command, command.ElementId.Substring(BlueprintHandheldActionBarState.CommandElementPrefix.Length));
+                return;
+            }
+
+            if (command.ElementId.StartsWith("blueprint-auto-placement-mode:", StringComparison.Ordinal))
+            {
+                HandleBlueprintAutoPlacementMode(command, command.ElementId.Substring("blueprint-auto-placement-mode:".Length));
+                return;
+            }
+
+            if (command.ElementId.StartsWith("blueprint-replacement-mode:", StringComparison.Ordinal))
+            {
+                HandleBlueprintReplacementMode(command, command.ElementId.Substring("blueprint-replacement-mode:".Length));
+                return;
+            }
+
+            if (command.ElementId.StartsWith("blueprint-replacement-category:", StringComparison.Ordinal))
+            {
+                HandleBlueprintReplacementCategoryMode(command, command.ElementId.Substring("blueprint-replacement-category:".Length));
+                return;
+            }
+
+            if (command.ElementId.StartsWith("blueprint-library:", StringComparison.Ordinal))
+            {
+                HandleBlueprintLibraryCommand(command, command.ElementId.Substring("blueprint-library:".Length));
+                return;
+            }
+
+            if (command.ElementId.StartsWith("blueprint-placed:", StringComparison.Ordinal))
+            {
+                HandleBlueprintPlacedInstanceCommand(command, command.ElementId.Substring("blueprint-placed:".Length));
+                return;
+            }
+
+            if (command.ElementId.StartsWith("blueprint-entry:", StringComparison.Ordinal))
+            {
+                HandleBlueprintEntryCommand(command, command.ElementId.Substring("blueprint-entry:".Length));
                 return;
             }
 

@@ -100,6 +100,9 @@ namespace JueMingZ.Diagnostics
         public const double ActionQueueAdmissionThresholdMs = ActionQueueUpdateThresholdMs;
         public const double ItemCheckWriterResolveThresholdMs = InputActionUpdateThresholdMs;
         public const double InventoryTransactionVerifyThresholdMs = ActionQueueUpdateThresholdMs;
+        public const double BlueprintProjectionResolveThresholdMs = ActionQueueUpdateThresholdMs;
+        public const double BlueprintMaterialsResolveThresholdMs = ActionQueueUpdateThresholdMs;
+        public const double BlueprintAutoPlacementCandidateScanThresholdMs = ActionQueueUpdateThresholdMs;
         public const double SevereUpdateStartGapThresholdMs = 125d;
         public const double SevereRuntimeUpdateThresholdMs = 50d;
 

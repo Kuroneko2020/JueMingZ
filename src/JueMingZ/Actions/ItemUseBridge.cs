@@ -611,7 +611,8 @@ namespace JueMingZ.Actions
 
             _pending = null;
             Logger.Info("ItemUseBridge", "ItemUseBridge finished: " + status + " / " + pending.LastMessage);
-            if (pending.ActionKind != InputActionKind.UseHotbarItem)
+            if (pending.ActionKind != InputActionKind.UseHotbarItem &&
+                pending.ActionKind != InputActionKind.BlueprintAutoPlace)
             {
                 RecordActionEvent(pending);
             }

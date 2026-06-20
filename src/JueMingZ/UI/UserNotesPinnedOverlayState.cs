@@ -8,17 +8,18 @@ namespace JueMingZ.UI
 {
     internal static class UserNotesPinnedOverlayState
     {
+        internal const int BodyPadding = 8;
+        internal const int LineHeight = 36;
+        internal const int DefaultVisibleBodyLines = 8;
         internal const int DefaultWidth = 280;
-        internal const int DefaultHeight = 180;
+        internal const int DefaultHeight = BodyPadding * 2 + LineHeight * DefaultVisibleBodyLines;
         internal const int MinWidth = 220;
         internal const int MinHeight = 120;
         internal const int MaxWidth = 360;
-        internal const int MaxHeight = 300;
+        internal const int MaxHeight = 360;
         internal const int HeaderHeight = 28;
         internal const int ToolbarHeight = HeaderHeight;
         internal const int ToolbarGap = 4;
-        internal const int BodyPadding = 8;
-        internal const int LineHeight = 36;
         internal const int ScreenPadding = 12;
         internal const int AvoidanceStep = 28;
         internal const int OpacityStep = 5;
@@ -163,7 +164,7 @@ namespace JueMingZ.UI
                 Y = rect.Y,
                 Width = rect.Width,
                 Height = rect.Height,
-                OpacityPercent = 100
+                OpacityPercent = 0
             };
         }
 
@@ -211,7 +212,7 @@ namespace JueMingZ.UI
                         Y = rect.Y,
                         Width = rect.Width,
                         Height = rect.Height,
-                        OpacityPercent = dragged == null ? 100 : dragged.OpacityPercent
+                        OpacityPercent = dragged == null ? 0 : dragged.OpacityPercent
                     };
                 }
                 else

@@ -182,6 +182,25 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void ChannelResolverBlueprintAutoPlaceUsesPlacementChannels()
+        {
+            var request = new InputActionRequest { Kind = InputActionKind.BlueprintAutoPlace };
+            request.Metadata[ActionMetadataKeys.Scenario] = ScenarioNames.BlueprintAutoPlace;
+
+            var profile = InputActionChannelResolver.Resolve(request);
+            AssertHas(profile.RequiredChannels, InputActionChannel.MouseTarget, "blueprint auto place required");
+            AssertHas(profile.RequiredChannels, InputActionChannel.UseItem, "blueprint auto place required");
+            AssertHas(profile.RequiredChannels, InputActionChannel.InventorySlot, "blueprint auto place required");
+            AssertHas(profile.RequiredChannels, InputActionChannel.HotbarSelection, "blueprint auto place required");
+            AssertHas(profile.RequiredChannels, InputActionChannel.BridgeItemUse, "blueprint auto place required");
+            AssertHas(profile.ConflictChannels, InputActionChannel.UseTile, "blueprint auto place conflicts");
+            AssertHas(profile.ConflictChannels, InputActionChannel.NpcInteraction, "blueprint auto place conflicts");
+            if (profile.GlobalExclusive)
+            {
+                throw new InvalidOperationException("Blueprint auto place must reserve explicit placement channels instead of falling back to GlobalExclusive.");
+            }
+        }
+
         private static void ChannelResolverShopUsesNpcAndInventory()
         {
             var request = new InputActionRequest

@@ -605,7 +605,8 @@ namespace JueMingZ.Tests
                 FishingFilterUiState.GlobalSearchInputId,
                 FishingFilterUiState.PresetNameInputId,
                 "fishing-quick-rename:name",
-                "misc-quick-reforge:prefix"
+                "misc-quick-reforge:prefix",
+                LegacyMainWindow.BuildBlueprintLibraryNameInputIdForTesting("template-ime")
             };
         }
 

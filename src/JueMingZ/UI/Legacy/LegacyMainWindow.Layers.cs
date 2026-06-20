@@ -187,6 +187,10 @@ namespace JueMingZ.UI.Legacy
                     {
                         hoveredElement = DrawNotesPage(spriteBatch, scrollArea, mouse, elements);
                     }
+                    else if (string.Equals(selectedPage, "blueprint", StringComparison.Ordinal))
+                    {
+                        hoveredElement = DrawBlueprintPage(spriteBatch, scrollArea, mouse, elements);
+                    }
                     else
                     {
                         hoveredElement = DrawEmptyPage(spriteBatch, scrollArea, selectedPage, mouse);

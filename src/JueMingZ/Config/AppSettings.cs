@@ -1,5 +1,6 @@
 using System.Runtime.Serialization;
 using System.Collections.Generic;
+using JueMingZ.Automation.Blueprint;
 using JueMingZ.Automation.WorldAutomation;
 
 namespace JueMingZ.Config
@@ -172,6 +173,42 @@ namespace JueMingZ.Config
 
         [DataMember(Order = 200)]
         public bool MapTravellingMerchantDirectionEnabled { get; set; }
+
+        [DataMember(Order = 201)]
+        public int BlueprintToolItemId { get; set; } = BlueprintSettings.DefaultToolItemId;
+
+        [DataMember(Order = 212)]
+        public bool BlueprintHandheldEntryEnabled { get; set; }
+
+        [DataMember(Order = 202)]
+        public bool BlueprintAutoPlacementEnabled { get; set; }
+
+        [DataMember(Order = 203)]
+        public bool BlueprintReplacementEnabled { get; set; }
+
+        [DataMember(Order = 204)]
+        public bool BlueprintReplacementTorchesEnabled { get; set; }
+
+        [DataMember(Order = 205)]
+        public bool BlueprintReplacementPlatformsEnabled { get; set; }
+
+        [DataMember(Order = 206)]
+        public bool BlueprintReplacementWorkBenchesEnabled { get; set; }
+
+        [DataMember(Order = 207)]
+        public bool BlueprintReplacementChairsEnabled { get; set; }
+
+        [DataMember(Order = 208)]
+        public bool BlueprintReplacementDoorsEnabled { get; set; }
+
+        [DataMember(Order = 209)]
+        public bool BlueprintReplacementTablesEnabled { get; set; }
+
+        [DataMember(Order = 210)]
+        public bool BlueprintReplacementChestsEnabled { get; set; }
+
+        [DataMember(Order = 211)]
+        public bool BlueprintReplacementSignsEnabled { get; set; }
 
         [DataMember(Order = 37)]
         public bool CombatPerfectRevolverEnabled { get; set; }
@@ -819,6 +856,18 @@ namespace JueMingZ.Config
                 MapFootprintsDisplayEnabled = false,
                 MapRareCreatureDirectionEnabled = false,
                 MapTravellingMerchantDirectionEnabled = false,
+                BlueprintToolItemId = BlueprintSettings.DefaultToolItemId,
+                BlueprintHandheldEntryEnabled = false,
+                BlueprintAutoPlacementEnabled = false,
+                BlueprintReplacementEnabled = false,
+                BlueprintReplacementTorchesEnabled = false,
+                BlueprintReplacementPlatformsEnabled = false,
+                BlueprintReplacementWorkBenchesEnabled = false,
+                BlueprintReplacementChairsEnabled = false,
+                BlueprintReplacementDoorsEnabled = false,
+                BlueprintReplacementTablesEnabled = false,
+                BlueprintReplacementChestsEnabled = false,
+                BlueprintReplacementSignsEnabled = false,
                 CombatGoblinExecutionEnabled = false,
                 AimRangeOrigin = CombatAimModes.RangeOriginPlayer,
                 AimTargetPriority = CombatAimModes.TargetPriorityNearest,

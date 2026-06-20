@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using JueMingZ.Actions;
 using JueMingZ.Automation.AutoRecovery;
+using JueMingZ.Automation.Blueprint;
 using JueMingZ.Automation.Combat;
 using JueMingZ.Automation.Fishing;
 using JueMingZ.Automation.Information;
@@ -35,6 +36,8 @@ namespace JueMingZ.Runtime
             new RuntimeDispatchStep("targeting.legacy-ui-actions", "targeting.legacy-ui-actions", 1);
         private static readonly RuntimeDispatchStep TargetingFeatureToggleHotkeys =
             new RuntimeDispatchStep("targeting.feature-toggle-hotkeys", "targeting.feature-toggle-hotkeys", 1);
+        private static readonly RuntimeDispatchStep TargetingBlueprintEntryHotkey =
+            new RuntimeDispatchStep("targeting.blueprint-entry-hotkey", "targeting.blueprint-entry-hotkey", 1);
         private static readonly RuntimeDispatchStep TargetingMapCustomMarkers =
             new RuntimeDispatchStep("targeting.map-custom-markers", "targeting.map-custom-markers", 1);
         private static readonly RuntimeDispatchStep TargetingDiagnosticHotkeys =
@@ -64,6 +67,8 @@ namespace JueMingZ.Runtime
             new RuntimeDispatchStep("auto-harvest", "dispatch.auto-harvest", 1);
         private static readonly RuntimeDispatchStep DispatchAutoMining =
             new RuntimeDispatchStep("auto-mining", "dispatch.auto-mining", 1);
+        private static readonly RuntimeDispatchStep DispatchBlueprintAutoPlacement =
+            new RuntimeDispatchStep("blueprint-auto-placement", "dispatch.blueprint-auto-placement", 10);
         private static readonly RuntimeDispatchStep DispatchAutoStack =
             new RuntimeDispatchStep("auto-stack", "dispatch.auto-stack", 5);
         private static readonly RuntimeDispatchStep DispatchAutoSell =
@@ -124,6 +129,7 @@ namespace JueMingZ.Runtime
             TargetingDiagnosticButtonActions,
             TargetingLegacyUiActions,
             TargetingFeatureToggleHotkeys,
+            TargetingBlueprintEntryHotkey,
             TargetingMapCustomMarkers,
             TargetingDiagnosticHotkeys
         };
@@ -138,6 +144,7 @@ namespace JueMingZ.Runtime
             DispatchAutoCaptureCritter,
             DispatchAutoHarvest,
             DispatchAutoMining,
+            DispatchBlueprintAutoPlacement,
             DispatchAutoStack,
             DispatchAutoSell,
             DispatchAutoDiscard,
@@ -218,6 +225,13 @@ namespace JueMingZ.Runtime
             {
                 FeatureToggleHotkeyService.Tick(gameState);
                 RecordOperationTiming(context, TargetingFeatureToggleHotkeys, operationStart);
+            }
+
+            operationStart = Stopwatch.GetTimestamp();
+            if (ShouldRun(TargetingBlueprintEntryHotkey, BlueprintEntryHotkeyService.HasActiveBinding, context.UpdateTick))
+            {
+                BlueprintEntryHotkeyService.Tick(gameState);
+                RecordOperationTiming(context, TargetingBlueprintEntryHotkey, operationStart);
             }
 
             operationStart = Stopwatch.GetTimestamp();
@@ -311,6 +325,18 @@ namespace JueMingZ.Runtime
             {
                 AutoMiningService.Tick(actionQueue, gameState, state, settings);
                 RecordOperationTiming(context, DispatchAutoMining, operationStart);
+                operationStart = Stopwatch.GetTimestamp();
+            }
+
+            if (ShouldRun(
+                DispatchBlueprintAutoPlacement,
+                settings.BlueprintAutoPlacementEnabled ||
+                    (actionQueue != null && actionQueue.IsSourcePendingOrRunning(FeatureIds.BlueprintMain)),
+                gameState,
+                tick))
+            {
+                BlueprintAutoPlacementService.Tick(actionQueue, gameState, settings);
+                RecordOperationTiming(context, DispatchBlueprintAutoPlacement, operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 

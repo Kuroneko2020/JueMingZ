@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Runtime.Serialization.Json;
 using System.Threading;
+using JueMingZ.Automation.Blueprint;
 using JueMingZ.Automation.Movement;
 using JueMingZ.Automation.WorldAutomation;
 using JueMingZ.Common;
@@ -881,6 +882,7 @@ namespace JueMingZ.Config
             settings.NpcAutoReforgePrefixes = NormalizeQuickReforgePrefixes(settings.NpcAutoReforgePrefixes);
             settings.WorldAutomationAutoMiningMode = AutoMiningModes.Normalize(settings.WorldAutomationAutoMiningMode);
             settings.WorldAutomationAutoCaptureCritterMode = AutoCaptureCritterModes.Normalize(settings.WorldAutomationAutoCaptureCritterMode, settings.MiscAutoCaptureCritterEnabled);
+            settings.BlueprintToolItemId = BlueprintSettings.NormalizeToolItemId(settings.BlueprintToolItemId);
             if (!settings.MiscAutoCaptureCritterCategoryDefaultsMigrated)
             {
                 AutoCaptureCritterCategoryCatalog.ApplyDefaultOptions(settings);
@@ -1141,6 +1143,10 @@ namespace JueMingZ.Config
             {
                 settings.HotkeysByFeatureId = new System.Collections.Generic.Dictionary<string, string>();
             }
+            else
+            {
+                NormalizeBlueprintEntryHotkey(settings.HotkeysByFeatureId);
+            }
 
             if (settings.ConfigVersion < 3 &&
                 IsLegacyDefaultQuickItemHotkeyBindings(settings.QuickItemHotkeyBindings))
@@ -1155,6 +1161,29 @@ namespace JueMingZ.Config
             {
                 settings.ConfigVersion = 4;
             }
+        }
+
+        private static void NormalizeBlueprintEntryHotkey(Dictionary<string, string> hotkeys)
+        {
+            if (hotkeys == null)
+            {
+                return;
+            }
+
+            string value;
+            if (!hotkeys.TryGetValue(FeatureIds.BlueprintMain, out value))
+            {
+                return;
+            }
+
+            string normalized;
+            if (FeatureToggleHotkeyChord.TryNormalize(value, out normalized))
+            {
+                hotkeys[FeatureIds.BlueprintMain] = normalized;
+                return;
+            }
+
+            hotkeys.Remove(FeatureIds.BlueprintMain);
         }
 
         private static Dictionary<string, string> NormalizeFeatureToggleHotkeys(Dictionary<string, string> bindings)

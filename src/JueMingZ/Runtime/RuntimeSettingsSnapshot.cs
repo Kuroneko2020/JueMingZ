@@ -1,5 +1,6 @@
 using System;
 using JueMingZ.Automation.AutoRecovery;
+using JueMingZ.Automation.Blueprint;
 using JueMingZ.Automation.Information;
 using JueMingZ.Automation.WorldAutomation;
 using JueMingZ.Config;
@@ -136,6 +137,18 @@ namespace JueMingZ.Runtime
                     MapQuickAnnouncementSettings.NormalizeCooldownMilliseconds(
                         settings.MapQuickAnnouncementAirCooldownMilliseconds,
                         MapQuickAnnouncementSettings.DefaultAirCooldownMilliseconds),
+                BlueprintToolItemId = BlueprintSettings.NormalizeToolItemId(settings.BlueprintToolItemId),
+                BlueprintHandheldEntryEnabled = settings.BlueprintHandheldEntryEnabled,
+                BlueprintAutoPlacementEnabled = settings.BlueprintAutoPlacementEnabled,
+                BlueprintReplacementEnabled = settings.BlueprintReplacementEnabled,
+                BlueprintReplacementTorchesEnabled = settings.BlueprintReplacementTorchesEnabled,
+                BlueprintReplacementPlatformsEnabled = settings.BlueprintReplacementPlatformsEnabled,
+                BlueprintReplacementWorkBenchesEnabled = settings.BlueprintReplacementWorkBenchesEnabled,
+                BlueprintReplacementChairsEnabled = settings.BlueprintReplacementChairsEnabled,
+                BlueprintReplacementDoorsEnabled = settings.BlueprintReplacementDoorsEnabled,
+                BlueprintReplacementTablesEnabled = settings.BlueprintReplacementTablesEnabled,
+                BlueprintReplacementChestsEnabled = settings.BlueprintReplacementChestsEnabled,
+                BlueprintReplacementSignsEnabled = settings.BlueprintReplacementSignsEnabled,
                 FishingAutoFishEnabled = settings.FishingAutoFishEnabled,
                 FishingAutoLoadoutEnabled = settings.FishingAutoLoadoutEnabled,
                 FishingAutoEquipmentEnabled = settings.FishingAutoEquipmentEnabled,
@@ -254,6 +267,18 @@ namespace JueMingZ.Runtime
         public string MapQuickAnnouncementColorHex { get; private set; }
         public int MapQuickAnnouncementCooldownMilliseconds { get; private set; }
         public int MapQuickAnnouncementAirCooldownMilliseconds { get; private set; }
+        public int BlueprintToolItemId { get; private set; }
+        public bool BlueprintHandheldEntryEnabled { get; private set; }
+        public bool BlueprintAutoPlacementEnabled { get; private set; }
+        public bool BlueprintReplacementEnabled { get; private set; }
+        public bool BlueprintReplacementTorchesEnabled { get; private set; }
+        public bool BlueprintReplacementPlatformsEnabled { get; private set; }
+        public bool BlueprintReplacementWorkBenchesEnabled { get; private set; }
+        public bool BlueprintReplacementChairsEnabled { get; private set; }
+        public bool BlueprintReplacementDoorsEnabled { get; private set; }
+        public bool BlueprintReplacementTablesEnabled { get; private set; }
+        public bool BlueprintReplacementChestsEnabled { get; private set; }
+        public bool BlueprintReplacementSignsEnabled { get; private set; }
         public bool FishingAutoFishEnabled { get; private set; }
         public bool FishingAutoLoadoutEnabled { get; private set; }
         public bool FishingAutoEquipmentEnabled { get; private set; }

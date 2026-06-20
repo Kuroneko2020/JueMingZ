@@ -43,7 +43,11 @@ namespace JueMingZ.Hooks
             FirstWorldLoadPromptOverlay.DrawInterfaceLayer,
             CombatEquipmentWarningPromptOverlay.DrawInterfaceLayer,
             CombatAimMarkerOverlay.DrawInterfaceLayer,
-            MapDirectionHintOverlay.DrawInterfaceLayer
+            MapDirectionHintOverlay.DrawInterfaceLayer,
+            BlueprintProjectionOverlay.DrawInterfaceLayer,
+            BlueprintCreationOverlay.DrawInterfaceLayer,
+            BlueprintPlacementPreviewOverlay.DrawInterfaceLayer,
+            BlueprintEraseRegionOverlay.DrawInterfaceLayer
         };
 
         private static readonly Func<bool>[] GameOverlayFallbackDispatcherDrawers =
@@ -55,12 +59,18 @@ namespace JueMingZ.Hooks
             FirstWorldLoadPromptOverlay.DrawInterfaceLayer,
             CombatEquipmentWarningPromptOverlay.DrawInterfaceLayer,
             CombatAimMarkerOverlay.DrawInterfaceLayer,
-            MapDirectionHintOverlay.DrawInterfaceLayer
+            MapDirectionHintOverlay.DrawInterfaceLayer,
+            BlueprintProjectionOverlay.DrawInterfaceLayer,
+            BlueprintCreationOverlay.DrawInterfaceLayer,
+            BlueprintPlacementPreviewOverlay.DrawInterfaceLayer,
+            BlueprintEraseRegionOverlay.DrawInterfaceLayer
         };
 
         private static readonly Func<bool>[] UiOverlayDispatcherDrawers =
         {
             LegacyMainWindow.DrawInterfaceLayer,
+            BlueprintMaterialWindowOverlay.DrawInterfaceLayer,
+            BlueprintHandheldActionBarOverlay.DrawInterfaceLayer,
             // The map marker style picker uses screen/UI coordinates; keeping it
             // in the UI-scale dispatcher prevents fullscreen map clicks from
             // being transformed by the Game/world matrix.
@@ -71,6 +81,8 @@ namespace JueMingZ.Hooks
         {
             InformationStatusPanelOverlay.DrawInterfaceLayer,
             LegacyMainWindow.DrawInterfaceLayer,
+            BlueprintMaterialWindowOverlay.DrawInterfaceLayer,
+            BlueprintHandheldActionBarOverlay.DrawInterfaceLayer,
             MapCustomMarkerStylePickerOverlay.DrawInterfaceLayer
         };
 

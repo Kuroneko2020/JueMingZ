@@ -35,6 +35,7 @@ namespace JueMingZ.Common
         public const string WorldAutomationAutoHarvest = "WorldAutomation.AutoHarvest";
         public const string WorldAutomationAutoHarvestReplant = "WorldAutomation.AutoHarvest.Replant";
         public const string MapQuickAnnouncement = "Map.QuickAnnouncement";
+        public const string BlueprintAutoPlace = "Blueprint.AutoPlace";
         public const string MovementSimulatedMultiJump = "Movement.SimulatedMultiJump";
         public const string MovementContinuousDash = "Movement.ContinuousDash";
         public const string MovementSafeLanding = "Movement.SafeLanding";

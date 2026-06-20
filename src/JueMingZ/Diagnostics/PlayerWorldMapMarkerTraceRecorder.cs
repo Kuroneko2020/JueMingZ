@@ -4,6 +4,7 @@ using System.IO;
 using System.Text;
 using System.Threading;
 using System.Collections.Generic;
+using JueMingZ.Config;
 
 namespace JueMingZ.Diagnostics
 {
@@ -95,6 +96,20 @@ namespace JueMingZ.Diagnostics
             }
         }
 
+        public static string TraceEventsPathForSnapshot
+        {
+            get { return TraceRecordingEnabled ? TraceEventsPath : string.Empty; }
+        }
+
+        public static bool TraceRecordingEnabled
+        {
+            get
+            {
+                var settings = ConfigService.AppSettings;
+                return settings != null && settings.EnableTraceLog;
+            }
+        }
+
         public static DateTime? LastTraceEventWrittenAtUtc
         {
             get
@@ -135,6 +150,11 @@ namespace JueMingZ.Diagnostics
                 return;
             }
 
+            if (!TraceRecordingEnabled)
+            {
+                return;
+            }
+
             try
             {
                 if (sample.UtcNow == default(DateTime))
@@ -169,6 +189,11 @@ namespace JueMingZ.Diagnostics
             bool visible,
             string skippedReason)
         {
+            if (!TraceRecordingEnabled)
+            {
+                return;
+            }
+
             PlayerWorldMapMarkerTraceEvent drawSample;
             lock (SyncRoot)
             {

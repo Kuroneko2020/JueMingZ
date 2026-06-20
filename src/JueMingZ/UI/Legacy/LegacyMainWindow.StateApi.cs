@@ -60,6 +60,11 @@ namespace JueMingZ.UI.Legacy
             _movementSafeLandingConfigOpen = !_movementSafeLandingConfigOpen;
         }
 
+        public static void ToggleBlueprintReplacementConfigPopup()
+        {
+            _blueprintReplacementConfigOpen = !_blueprintReplacementConfigOpen;
+        }
+
         public static void ToggleAutoCaptureCritterConfigPopup()
         {
             _autoCaptureCritterConfigOpen = !_autoCaptureCritterConfigOpen;
@@ -115,6 +120,7 @@ namespace JueMingZ.UI.Legacy
             CloseAutoSellPicker();
             CloseAutoDiscardPicker();
             StopAutoMiningHotkeyCapture();
+            StopBlueprintEntryHotkeyCapture();
             StopMapQuickAnnouncementHotkeyCapture();
             _quickItemPickerBindingIndex = bindingIndex;
             _quickItemPickerOpen = true;
@@ -142,6 +148,7 @@ namespace JueMingZ.UI.Legacy
             CloseAutoDiscardPicker();
             StopQuickItemHotkeyCapture();
             StopAutoMiningHotkeyCapture();
+            StopBlueprintEntryHotkeyCapture();
             StopMapQuickAnnouncementHotkeyCapture();
             _autoSellPickerIndex = itemIndex;
             _autoSellPickerOpen = true;
@@ -156,6 +163,7 @@ namespace JueMingZ.UI.Legacy
             CloseAutoDiscardPicker();
             StopQuickItemHotkeyCapture();
             StopAutoMiningHotkeyCapture();
+            StopBlueprintEntryHotkeyCapture();
             StopMapQuickAnnouncementHotkeyCapture();
             _autoSellPickerIndex = -1;
             _autoSellPickerOpen = true;
@@ -195,6 +203,7 @@ namespace JueMingZ.UI.Legacy
             CloseAutoSellPicker();
             StopQuickItemHotkeyCapture();
             StopAutoMiningHotkeyCapture();
+            StopBlueprintEntryHotkeyCapture();
             StopMapQuickAnnouncementHotkeyCapture();
             _autoDiscardPickerIndex = itemIndex;
             _autoDiscardPickerOpen = true;
@@ -209,6 +218,7 @@ namespace JueMingZ.UI.Legacy
             CloseAutoSellPicker();
             StopQuickItemHotkeyCapture();
             StopAutoMiningHotkeyCapture();
+            StopBlueprintEntryHotkeyCapture();
             StopMapQuickAnnouncementHotkeyCapture();
             _autoDiscardPickerIndex = -1;
             _autoDiscardPickerOpen = true;
@@ -257,9 +267,11 @@ namespace JueMingZ.UI.Legacy
             _quickItemHotkeyCaptureActive = true;
             _quickItemHotkeyCaptureBindingIndex = bindingIndex;
             _autoMiningHotkeyCaptureActive = false;
+            _blueprintEntryHotkeyCaptureActive = false;
             _mapQuickAnnouncementHotkeyCaptureSlot = string.Empty;
             CloseFeatureToggleHotkeyModal();
             AutoMiningCaptureWasDown.Clear();
+            BlueprintEntryCaptureWasDown.Clear();
             QuickItemCaptureWasDown.Clear();
             MapQuickAnnouncementCaptureWasDown.Clear();
         }
@@ -277,6 +289,7 @@ namespace JueMingZ.UI.Legacy
             CloseAutoSellPicker();
             CloseAutoDiscardPicker();
             StopQuickItemHotkeyCapture();
+            StopBlueprintEntryHotkeyCapture();
             StopMapQuickAnnouncementHotkeyCapture();
             CloseFeatureToggleHotkeyModal();
             _autoMiningHotkeyCaptureActive = true;
@@ -287,6 +300,27 @@ namespace JueMingZ.UI.Legacy
         {
             _autoMiningHotkeyCaptureActive = false;
             AutoMiningCaptureWasDown.Clear();
+        }
+
+        public static void StartBlueprintEntryHotkeyCapture()
+        {
+            CloseQuickItemPicker();
+            CloseAutoSellPicker();
+            CloseAutoDiscardPicker();
+            StopQuickItemHotkeyCapture();
+            StopAutoMiningHotkeyCapture();
+            StopMapQuickAnnouncementHotkeyCapture();
+            CloseFeatureToggleHotkeyModal();
+            _blueprintEntryHotkeyCaptureActive = true;
+            _blueprintEntryHotkeyMessage = string.Empty;
+            BlueprintEntryCaptureWasDown.Clear();
+            SeedBlueprintEntryHotkeyCaptureState();
+        }
+
+        public static void StopBlueprintEntryHotkeyCapture()
+        {
+            _blueprintEntryHotkeyCaptureActive = false;
+            BlueprintEntryCaptureWasDown.Clear();
         }
 
         public static void StartMapQuickAnnouncementHotkeyCapture(string slot)
@@ -303,6 +337,7 @@ namespace JueMingZ.UI.Legacy
             CloseAutoDiscardPicker();
             StopQuickItemHotkeyCapture();
             StopAutoMiningHotkeyCapture();
+            StopBlueprintEntryHotkeyCapture();
             CloseFeatureToggleHotkeyModal();
             _mapQuickAnnouncementHotkeyCaptureSlot = slotId;
             // Seed held keys so the double-click that starts capture cannot become the captured trigger.

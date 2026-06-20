@@ -115,6 +115,15 @@ namespace JueMingZ.Actions.Channels
                 case InputActionKind.PlayerRename:
                     return InputActionChannel.GlobalExclusive;
 
+                case InputActionKind.BlueprintAutoPlace:
+                    // Blueprint placement reserves the future item-use path even in the
+                    // contract-only stage, so later executors cannot bypass queue ownership.
+                    return InputActionChannel.MouseTarget |
+                           InputActionChannel.UseItem |
+                           InputActionChannel.InventorySlot |
+                           InputActionChannel.HotbarSelection |
+                           InputActionChannel.BridgeItemUse;
+
                 case InputActionKind.None:
                 case InputActionKind.Movement:
                 default:

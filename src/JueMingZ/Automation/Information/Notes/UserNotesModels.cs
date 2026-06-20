@@ -58,7 +58,7 @@ namespace JueMingZ.Automation.Information.Notes
     {
         public UserNotePinnedState()
         {
-            OpacityPercent = 100;
+            OpacityPercent = 0;
         }
 
         public bool Pinned { get; set; }

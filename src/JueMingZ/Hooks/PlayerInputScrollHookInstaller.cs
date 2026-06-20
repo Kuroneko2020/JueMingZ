@@ -189,6 +189,11 @@ namespace JueMingZ.Hooks
                 TerrariaUiMouseCompat.UpdateActiveTriggerSuppressionAfterPlayerInputGuard();
                 MapFootprintPlaybackOverlay.UpdateAfterPlayerInputGuard();
                 UserNotesPinnedOverlay.UpdateAfterPlayerInputGuard();
+                BlueprintMaterialWindowOverlay.UpdateAfterPlayerInputGuard();
+                BlueprintHandheldActionBarOverlay.UpdateAfterPlayerInputGuard();
+                BlueprintCreationOverlay.UpdateAfterPlayerInputGuard();
+                BlueprintPlacementPreviewOverlay.UpdateAfterPlayerInputGuard();
+                BlueprintEraseRegionOverlay.UpdateAfterPlayerInputGuard();
                 SearchItemPickRuntimeService.UpdateAfterPlayerInputGuard();
                 LegacyUiInput.UpdateAfterPlayerInputGuard(phase);
             }
