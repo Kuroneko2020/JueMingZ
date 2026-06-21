@@ -127,6 +127,8 @@ namespace JueMingZ.UI.Legacy
         private const int VkShift = 0x10;
         private const int VkControl = 0x11;
         private const int VkAlt = 0x12;
+        private const int VkBackspace = 0x08;
+        private const int VkEscape = 0x1B;
         private const string FishingQuickRenameTextInputId = "fishing-quick-rename:name";
         private const string MiscQuickReforgeTextInputId = "misc-quick-reforge:prefix";
         private const int RowLabelTextHeight = 22;

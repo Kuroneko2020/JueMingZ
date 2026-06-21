@@ -85,7 +85,7 @@ namespace JueMingZ.UI.Legacy
                     scale);
             }
 
-            var element = AddFrameElement(elements, "misc-auto-mining:hotkey", "自动挖矿:采集按键", "button", elementRect, selected: _autoMiningHotkeyCaptureActive, tooltipLines: new[] { "双击录入采集按键。", "Esc 取消录入。" });
+            var element = AddFrameElement(elements, "misc-auto-mining:hotkey", "自动挖矿:采集按键", "button", elementRect, selected: _autoMiningHotkeyCaptureActive, tooltipLines: new[] { "双击录入采集按键。", "Esc 取消录入。", "Backspace 删除绑定。" });
             RecordFrameElementHover(element, hovered);
             return hovered ? element : null;
         }

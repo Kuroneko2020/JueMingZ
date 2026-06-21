@@ -5308,14 +5308,14 @@ function Test-BlueprintActionShortcutGovernance {
         $creationTestText -and
         $testText.Contains("BlueprintActionHotkeysUseSeparateKeysAndConflictSources") -and
         $testText.Contains("BlueprintCreateSaveActionCommandsEnterMaskAndSaveWithoutProjectionScan") -and
-        $creationTestText.Contains("BlueprintCreationMaskSkipsAirAndTracksHover") -and
+        $creationTestText.Contains("BlueprintCreationMaskSelectsAirAndTracksBounds") -and
         $programText.Contains("blueprint action hotkeys use separate keys and conflict sources") -and
         $programText.Contains("blueprint create save action commands enter mask and save without projection scan") -and
-        $programText.Contains("blueprint creation mask skips air and tracks hover")) {
+        $programText.Contains("blueprint creation mask selects air and tracks bounds")) {
         Write-Pass "Blueprint stage-06 create/save shortcut console tests are present and registered."
     }
     else {
-        Write-FailHealth "Blueprint stage-06 create/save shortcut tests must cover hotkey separation/conflicts and real create/save no-projection-scan commands."
+        Write-FailHealth "Blueprint create/save shortcut tests must cover hotkey separation/conflicts, real create/save no-projection-scan commands, and air-select mask bounds."
     }
 
     if ($creationStateText -and
@@ -5323,19 +5323,23 @@ function Test-BlueprintActionShortcutGovernance {
         $creationStateText.Contains("ContentKnown") -and
         $creationStateText.Contains("HasSelectableContent") -and
         $creationStateText.Contains("IsSelectableTile") -and
-        $creationStateText.Contains("airSkipped") -and
+        $creationStateText.Contains("tileUnavailable") -and
+        -not $creationStateText.Contains('"airSkipped"') -and
         $captureText.Contains("TryHasSelectableContent") -and
         $captureText.Contains("HasSelectableContent(BlueprintWorldTileSnapshot") -and
-        $creationOverlayText.Contains("low-alpha-no-border") -and
+        $captureText.Contains("TryResolveSelectedBounds") -and
+        $captureText.Contains("Air cells are stored as template bounds") -and
+        $captureText.Contains("Projection/material/auto-place only consume Cells") -and
+        $creationOverlayText.Contains("world-hover+air-select+lower-saturation-lower-alpha-no-border") -and
         $creationOverlayText.Contains("continuous-row-runs") -and
         $creationOverlayText.Contains("DrawSelectedRuns") -and
         $creationOverlayText.Contains("DrawTileFill") -and
         $creationOverlayText.Contains("TryHasSelectableContent") -and
         -not $creationOverlayText.Contains("DrawRectBorderClipped")) {
-        Write-Pass "Blueprint creation mask skips air, tracks hover, and draws low-alpha continuous no-border overlay."
+        Write-Pass "Blueprint creation mask selects readable air, tracks hover/bounds, keeps content-only capture cells, and draws lower-saturation lower-alpha continuous no-border overlay."
     }
     else {
-        Write-FailHealth "Blueprint creation mask must skip air via capture content probe, track hover, and draw low-alpha continuous no-border overlay."
+        Write-FailHealth "Blueprint creation mask must select readable air, fail closed on unavailable tiles, preserve air-inclusive bounds with content-only Cells, and draw lower-saturation lower-alpha continuous no-border overlay."
     }
 
     if ($functionDocText -and
@@ -5758,6 +5762,401 @@ function Test-BlueprintFeedbackStage09CloseoutGovernance {
     }
 }
 
+function Test-HotkeyBackspaceClearGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $featureToggleUiPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.FeatureToggleHotkeys.cs"
+    $featureToggleChordPath = Join-Path $RepoRoot "src\JueMingZ\Config\FeatureToggleHotkeyChord.cs"
+    $blueprintUiPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.Blueprint.cs"
+    $blueprintHotkeyPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.Blueprint.Hotkey.cs"
+    $quickItemCapturePath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.Misc.QuickItems.Capture.cs"
+    $quickItemUiPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.Misc.QuickItems.cs"
+    $quickItemCardPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.Misc.QuickItems.Cards.cs"
+    $quickItemRuntimePath = Join-Path $RepoRoot "src\JueMingZ\Automation\InventoryAndItems\QuickItemHotkeyService.cs"
+    $autoMiningUiPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.Misc.AutoMining.cs"
+    $mapInputPath = Join-Path $RepoRoot "src\JueMingZ\Automation\Information\MapQuickAnnouncementHotkeyInput.cs"
+    $mapSettingsPath = Join-Path $RepoRoot "src\JueMingZ\Config\MapQuickAnnouncementSettings.cs"
+    $mapCapturePath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.MapEnhancement.Capture.cs"
+    $mapUiPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.MapEnhancement.cs"
+    $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
+    $featureToggleTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.FeatureToggleHotkeyTests.cs"
+    $blueprintTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintEntryTests.cs"
+    $inventoryTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.InventoryAutomationActionTests.cs"
+    $worldTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.WorldAutomationActionTests.cs"
+    $mapTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.MapQuickAnnouncementTests.cs"
+    $plan06Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图创建交互二次反馈修补", "06-快捷键退格解绑治理.md")
+    $archivedPlan06Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图创建交互二次反馈修补", "06-快捷键退格解绑治理.md")
+    $blueprintDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $featureToggleDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "F5通用", "功能主开关快捷键.md")
+    $quickItemDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "物品页", "快捷物品.md")
+    $autoMiningDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "杂项页", "自动挖矿.md")
+    $quickAnnouncementDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "地图加强页", "快捷宣告.md")
+
+    if (-not (Test-Path -LiteralPath $plan06Path) -and (Test-Path -LiteralPath $archivedPlan06Path)) {
+        $plan06Path = $archivedPlan06Path
+    }
+
+    $featureToggleUiText = Read-TextIfExists -Path $featureToggleUiPath
+    $featureToggleChordText = Read-TextIfExists -Path $featureToggleChordPath
+    $blueprintUiText = Read-TextIfExists -Path $blueprintUiPath
+    $blueprintHotkeyText = Read-TextIfExists -Path $blueprintHotkeyPath
+    $quickItemCaptureText = Read-TextIfExists -Path $quickItemCapturePath
+    $quickItemUiText = Read-TextIfExists -Path $quickItemUiPath
+    $quickItemCardText = Read-TextIfExists -Path $quickItemCardPath
+    $quickItemRuntimeText = Read-TextIfExists -Path $quickItemRuntimePath
+    $autoMiningUiText = Read-TextIfExists -Path $autoMiningUiPath
+    $mapInputText = Read-TextIfExists -Path $mapInputPath
+    $mapSettingsText = Read-TextIfExists -Path $mapSettingsPath
+    $mapCaptureText = Read-TextIfExists -Path $mapCapturePath
+    $mapUiText = Read-TextIfExists -Path $mapUiPath
+    $programText = Read-TextIfExists -Path $programPath
+    $featureToggleTestText = Read-TextIfExists -Path $featureToggleTestPath
+    $blueprintTestText = Read-TextIfExists -Path $blueprintTestPath
+    $inventoryTestText = Read-TextIfExists -Path $inventoryTestPath
+    $worldTestText = Read-TextIfExists -Path $worldTestPath
+    $mapTestText = Read-TextIfExists -Path $mapTestPath
+    $plan06Text = Read-TextIfExists -Path $plan06Path
+    $blueprintDocText = Read-TextIfExists -Path $blueprintDocPath
+    $featureToggleDocText = Read-TextIfExists -Path $featureToggleDocPath
+    $quickItemDocText = Read-TextIfExists -Path $quickItemDocPath
+    $autoMiningDocText = Read-TextIfExists -Path $autoMiningDocPath
+    $quickAnnouncementDocText = Read-TextIfExists -Path $quickAnnouncementDocPath
+
+    if ($featureToggleUiText -and
+        $featureToggleUiText.Contains("VkBackspace") -and
+        $featureToggleUiText.Contains("ClearFeatureToggleHotkeyBinding") -and
+        $featureToggleUiText.Contains("TryClearFeatureToggleHotkeyBindingForTesting") -and
+        $featureToggleChordText -and
+        $featureToggleChordText.Contains("Backspace")) {
+        Write-Pass "Feature toggle hotkey capture treats Backspace as clear-only and rejects it as a saved chord."
+    }
+    else {
+        Write-FailHealth "Feature toggle hotkey capture must clear on Backspace and FeatureToggleHotkeyChord must reject Backspace."
+    }
+
+    if ($blueprintUiText -and
+        $blueprintUiText.Contains("BlueprintActionHotkeyTooltipClear") -and
+        $blueprintHotkeyText -and
+        $blueprintHotkeyText.Contains("VkBackspace") -and
+        $blueprintHotkeyText.Contains("ClearBlueprintHotkeyBinding") -and
+        $blueprintHotkeyText.Contains("TryClearBlueprintActionHotkeyForTesting")) {
+        Write-Pass "Blueprint create/save action hotkey capture clears bindings on Backspace without saving Backspace."
+    }
+    else {
+        Write-FailHealth "Blueprint create/save action hotkey capture must expose Backspace clear behavior and clear test hooks."
+    }
+
+    if ($quickItemCaptureText -and
+        $quickItemCaptureText.Contains("ClearQuickItemHotkeyBinding") -and
+        $quickItemCaptureText.Contains("ClearAutoMiningHotkeyBinding") -and
+        $quickItemCaptureText.Contains("VkBackspace") -and
+        $quickItemUiText -and
+        $quickItemUiText.Contains("Backspace 删除") -and
+        $quickItemCardText -and
+        $quickItemCardText.Contains("Backspace 删除") -and
+        $quickItemRuntimeText -and
+        $quickItemRuntimeText.Contains("TryNormalizeHotkeyForTesting") -and
+        $autoMiningUiText -and
+        $autoMiningUiText.Contains("Backspace 删除绑定")) {
+        Write-Pass "Quick item and auto-mining capture paths expose Backspace clear behavior while runtime parsing stays explicit."
+    }
+    else {
+        Write-FailHealth "Quick item and auto-mining capture paths must clear on Backspace, update visible hints, and keep runtime parsing testable."
+    }
+
+    if ($mapInputText -and
+        $mapInputText.Contains("0x08") -and
+        $mapInputText.Contains('"Backspace"') -and
+        $mapSettingsText -and
+        $mapSettingsText.Contains("TryClearHotkeySlot") -and
+        $mapCaptureText -and
+        $mapCaptureText.Contains("TryClearMapQuickAnnouncementHotkeySlotForTesting") -and
+        $mapUiText -and
+        $mapUiText.Contains("Backspace 删除")) {
+        Write-Pass "Map quick announcement capture recognizes Backspace only for selected-slot clearing."
+    }
+    else {
+        Write-FailHealth "Map quick announcement capture must recognize Backspace for clearing without making it a saved token."
+    }
+
+    if ($programText -and
+        $programText.Contains("Backspace clears binding") -and
+        $featureToggleTestText -and
+        $featureToggleTestText.Contains("FeatureToggleHotkeyBackspaceClearContract") -and
+        $blueprintTestText -and
+        $blueprintTestText.Contains("BlueprintActionHotkeyBackspaceClearContract") -and
+        $inventoryTestText -and
+        $inventoryTestText.Contains("QuickItemHotkeyBackspaceClearContract") -and
+        $worldTestText -and
+        $worldTestText.Contains("AutoMiningHotkeyBackspaceClearContract") -and
+        $mapTestText -and
+        $mapTestText.Contains("MapQuickAnnouncementBackspaceClearContract")) {
+        Write-Pass "Console tests cover Backspace clear contracts for blueprint, feature toggle, quick item, auto-mining, and quick announcement hotkeys."
+    }
+    else {
+        Write-FailHealth "Console tests must cover all Backspace clear hotkey capture paths introduced in stage 06."
+    }
+
+    if ($plan06Text -and
+        $plan06Text.Contains("Backspace") -and
+        $plan06Text.Contains("0.885-blueprint-hotkey-backspace-clear") -and
+        $blueprintDocText -and
+        $blueprintDocText.Contains("Backspace") -and
+        $featureToggleDocText -and
+        $featureToggleDocText.Contains("Backspace") -and
+        $quickItemDocText -and
+        $quickItemDocText.Contains("Backspace") -and
+        $autoMiningDocText -and
+        $autoMiningDocText.Contains("Backspace") -and
+        $quickAnnouncementDocText -and
+        $quickAnnouncementDocText.Contains("Backspace")) {
+        Write-Pass "Stage 06 plan and feature docs describe Backspace clear-only hotkey behavior."
+    }
+    else {
+        Write-FailHealth "Stage 06 plan and feature docs must document Backspace clear-only hotkey behavior for all touched capture paths."
+    }
+}
+
+function Test-BlueprintSecondFeedbackStage07Governance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $testPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintSecondFeedbackTests.cs"
+    $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
+    $auditPath = Join-Path $RepoRoot "scripts\audit-project-health.ps1"
+    $plan00Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图创建交互二次反馈修补", "00-基准.md")
+    $plan07Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图创建交互二次反馈修补", "07-诊断测试文档审计.md")
+    $archivedPlan00Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图创建交互二次反馈修补", "00-基准.md")
+    $archivedPlan07Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图创建交互二次反馈修补", "07-诊断测试文档审计.md")
+    $currentPlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "索引.md")
+    $archivePlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "索引.md")
+    $blueprintDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $featureToggleDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "F5通用", "功能主开关快捷键.md")
+    $quickItemDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "物品页", "快捷物品.md")
+    $autoMiningDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "杂项页", "自动挖矿.md")
+    $quickAnnouncementDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "地图加强页", "快捷宣告.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $updateRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "0.886-蓝图二次反馈诊断审计-2606210411.md")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+    $docHistoryRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "蓝图二次反馈诊断审计-2606210411.md")
+
+    if (-not (Test-Path -LiteralPath $plan00Path) -and (Test-Path -LiteralPath $archivedPlan00Path)) {
+        $plan00Path = $archivedPlan00Path
+    }
+    if (-not (Test-Path -LiteralPath $plan07Path) -and (Test-Path -LiteralPath $archivedPlan07Path)) {
+        $plan07Path = $archivedPlan07Path
+    }
+
+    $testText = Read-TextIfExists -Path $testPath
+    $programText = Read-TextIfExists -Path $programPath
+    $auditText = Read-TextIfExists -Path $auditPath
+    $plan00Text = Read-TextIfExists -Path $plan00Path
+    $plan07Text = Read-TextIfExists -Path $plan07Path
+    $currentPlanIndexText = Read-TextIfExists -Path $currentPlanIndexPath
+    $blueprintDocText = Read-TextIfExists -Path $blueprintDocPath
+    $featureToggleDocText = Read-TextIfExists -Path $featureToggleDocPath
+    $quickItemDocText = Read-TextIfExists -Path $quickItemDocPath
+    $autoMiningDocText = Read-TextIfExists -Path $autoMiningDocPath
+    $quickAnnouncementDocText = Read-TextIfExists -Path $quickAnnouncementDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $updateRecordText = Read-TextIfExists -Path $updateRecordPath
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+    $docHistoryRecordText = Read-TextIfExists -Path $docHistoryRecordPath
+    $archivePlanIndexText = Read-TextIfExists -Path $archivePlanIndexPath
+
+    if ($testText -and
+        $testText.Contains("BlueprintSecondFeedbackStage07AuditContractsStayWired") -and
+        $testText.Contains("LegacyMainUiState.Visible") -and
+        $testText.Contains("BlueprintEntryCommands.StartCreate") -and
+        $testText.Contains("SaveDisabledTooltip") -and
+        $testText.Contains("lower-saturation-lower-alpha-no-border") -and
+        $testText.Contains("GetLocalPromptContractForTesting") -and
+        $testText.Contains("NormalizeKeyboardKey(" + [char]34 + "Backspace" + [char]34 + ")") -and
+        $programText -and
+        $programText.Contains("blueprint second feedback stage 07 audit contracts stay wired")) {
+        Write-Pass "Blueprint second-feedback stage-07 aggregate console test is registered and covers create toggle, handheld matrix, air/visual prompt, and Backspace contracts."
+    }
+    else {
+        Write-FailHealth "Stage-07 must register an aggregate blueprint second-feedback console test covering create toggle, handheld matrix, air/visual prompt, and Backspace contracts."
+    }
+
+    if ($auditText -and
+        $auditText.Contains("Test-BlueprintSecondFeedbackStage07Governance") -and
+        $auditText.Contains("BlueprintSecondFeedbackStage07AuditContractsStayWired") -and
+        $auditText.Contains("0.886-blueprint-second-feedback-diagnostics-audit")) {
+        Write-Pass "Blueprint second-feedback stage-07 health audit function is present and wired to the 0.886 stage contract."
+    }
+    else {
+        Write-FailHealth "Stage-07 health audit must include Test-BlueprintSecondFeedbackStage07Governance and lock the 0.886 stage contract."
+    }
+
+    if ($blueprintDocText -and
+        $blueprintDocText.Contains('F5 `开始` 成功进入创建态后会立即关闭 F5 主菜单') -and
+        $blueprintDocText.Contains('只显示 `保存蓝图` / `退出创建`') -and
+        $blueprintDocText.Contains("空气格也会进入 mask / 选区 bounds") -and
+        $blueprintDocText.Contains("本地玩家头顶显示蓝字") -and
+        $blueprintDocText.Contains("低饱和、低透明蓝色") -and
+        $blueprintDocText.Contains("Backspace") -and
+        $blueprintDocText.Contains("0.886-blueprint-second-feedback-diagnostics-audit") -and
+        $featureToggleDocText -and
+        $featureToggleDocText.Contains("Backspace") -and
+        $quickItemDocText -and
+        $quickItemDocText.Contains("Backspace") -and
+        $autoMiningDocText -and
+        $autoMiningDocText.Contains("Backspace") -and
+        $quickAnnouncementDocText -and
+        $quickAnnouncementDocText.Contains("Backspace")) {
+        Write-Pass "Blueprint and related hotkey feature docs describe the second-feedback create/visual/Backspace contracts."
+    }
+    else {
+        Write-FailHealth "Stage-07 docs must describe blueprint create toggle, handheld matrix, air mask, local prompt, visual convergence, and Backspace clear-only behavior."
+    }
+
+    if ($diagnosticsDocText -and
+        $diagnosticsDocText.Contains("Ui.Blueprint.CreateSaveEntry") -and
+        $diagnosticsDocText.Contains("Hotkey.BlueprintAction") -and
+        $diagnosticsDocText.Contains("BlueprintHandheldActionBarVisible") -and
+        $diagnosticsDocText.Contains("Test-BlueprintSecondFeedbackStage07Governance") -and
+        $diagnosticsDocText.Contains("0.886-blueprint-second-feedback-diagnostics-audit")) {
+        Write-Pass "Diagnostics docs keep the second-feedback stage-07 blueprint action and handheld audit routing."
+    }
+    else {
+        Write-FailHealth "Stage-07 diagnostics docs must keep Ui.Blueprint.CreateSaveEntry, Hotkey.BlueprintAction, handheld snapshot fields, and the new health audit route."
+    }
+
+    $stage07IndexOk =
+        ($currentPlanIndexText -and
+            $currentPlanIndexText.Contains('`07-诊断测试文档审计.md` 已完成') -and
+            $currentPlanIndexText.Contains('后续入口为 `08-验证与收口.md`')) -or
+        ($archivePlanIndexText -and
+            $archivePlanIndexText.Contains("蓝图创建交互二次反馈修补") -and
+            $archivePlanIndexText.Contains("0.887-blueprint-second-feedback-closeout"))
+
+    if ($plan00Text -and
+        $plan00Text.Contains('`07` 已完成诊断测试文档审计') -and
+        $plan00Text.Contains("0.886-blueprint-second-feedback-diagnostics-audit") -and
+        $plan07Text -and
+        $plan07Text.Contains("状态：已完成") -and
+        $plan07Text.Contains("0.886-blueprint-second-feedback-diagnostics-audit") -and
+        $plan07Text.Contains("未生成测试包") -and
+        $stage07IndexOk) {
+        Write-Pass "Stage-07 plan files and plan indices preserve the 0.886 diagnostic/test/doc audit contract before or after closeout archive."
+    }
+    else {
+        Write-FailHealth "Stage-07 plan files and plan indices must preserve the 0.886 diagnostic/test/doc audit contract before or after closeout archive."
+    }
+
+    if ($updateIndexText -and
+        $updateIndexText.Contains("0.886-蓝图二次反馈诊断审计-2606210411.md") -and
+        $updateRecordText -and
+        $updateRecordText.Contains('RuntimeVersion：`0.886-blueprint-second-feedback-diagnostics-audit`') -and
+        $updateRecordText.Contains("未生成测试包") -and
+        $docHistoryIndexText -and
+        $docHistoryIndexText.Contains("蓝图二次反馈诊断审计-2606210411.md") -and
+        $docHistoryRecordText -and
+        $docHistoryRecordText.Contains("蓝图创建交互二次反馈修补/07")) {
+        Write-Pass "Stage-07 update record and document-change history are synchronized."
+    }
+    else {
+        Write-FailHealth "Stage-07 update record, update index, and document-change history must reference the 0.886 diagnostic/test/doc audit."
+    }
+}
+
+function Test-BlueprintSecondFeedbackStage08CloseoutGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $auditPath = Join-Path $RepoRoot "scripts\audit-project-health.ps1"
+    $currentPlanDirPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图创建交互二次反馈修补")
+    $archivedPlan00Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图创建交互二次反馈修补", "00-基准.md")
+    $archivedPlan08Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图创建交互二次反馈修补", "08-验证与收口.md")
+    $currentPlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "索引.md")
+    $archivePlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "索引.md")
+    $blueprintDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $updateRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "0.887-蓝图二次反馈验证收口-2606210430.md")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+    $docHistoryRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "蓝图二次反馈验证收口-2606210430.md")
+
+    $auditText = Read-TextIfExists -Path $auditPath
+    $plan00Text = Read-TextIfExists -Path $archivedPlan00Path
+    $plan08Text = Read-TextIfExists -Path $archivedPlan08Path
+    $currentPlanIndexText = Read-TextIfExists -Path $currentPlanIndexPath
+    $archivePlanIndexText = Read-TextIfExists -Path $archivePlanIndexPath
+    $blueprintDocText = Read-TextIfExists -Path $blueprintDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $updateRecordText = Read-TextIfExists -Path $updateRecordPath
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+    $docHistoryRecordText = Read-TextIfExists -Path $docHistoryRecordPath
+
+    if ($auditText -and
+        $auditText.Contains("Test-BlueprintSecondFeedbackStage08CloseoutGovernance") -and
+        $auditText.Contains("0.887-blueprint-second-feedback-closeout") -and
+        $auditText.Contains("0.887-蓝图二次反馈验证收口-2606210430.md")) {
+        Write-Pass "Blueprint second-feedback stage-08 closeout health audit function is present and wired to the 0.887 closeout contract."
+    }
+    else {
+        Write-FailHealth "Stage-08 closeout health audit must lock the 0.887 closeout contract and update record."
+    }
+
+    if (-not (Test-Path -LiteralPath $currentPlanDirPath) -and
+        $plan00Text -and
+        $plan00Text.Contains("0.887-blueprint-second-feedback-closeout") -and
+        $plan00Text.Contains("自动串行接力终止") -and
+        $plan08Text -and
+        $plan08Text.Contains("状态：已完成") -and
+        $plan08Text.Contains("JueMingZ-TestPackage") -and
+        $plan08Text.Contains("严格新鲜包健康审计")) {
+        Write-Pass "Blueprint second-feedback plan is archived with the 0.887 closeout and package/fresh-audit scope."
+    }
+    else {
+        Write-FailHealth "Stage-08 closeout must move the plan to archive and mark 08 complete with package/fresh-audit scope."
+    }
+
+    if ($currentPlanIndexText -and
+        $currentPlanIndexText.Contains("当前暂无正在推进或待执行的分阶段计划") -and
+        $currentPlanIndexText.Contains("蓝图创建交互二次反馈修补") -and
+        $archivePlanIndexText -and
+        $archivePlanIndexText.Contains("文档/归档历史计划/蓝图创建交互二次反馈修补/") -and
+        $archivePlanIndexText.Contains("0.887-blueprint-second-feedback-closeout")) {
+        Write-Pass "Current and archived plan indices record the stage-08 closeout and relay termination."
+    }
+    else {
+        Write-FailHealth "Stage-08 closeout must update current and archived plan indices."
+    }
+
+    if ($blueprintDocText -and
+        $blueprintDocText.Contains("0.887-blueprint-second-feedback-closeout") -and
+        $blueprintDocText.Contains("不新增用户可见蓝图运行时行为") -and
+        $blueprintDocText.Contains("文档/归档历史计划/蓝图创建交互二次反馈修补/00-基准.md") -and
+        $diagnosticsDocText -and
+        $diagnosticsDocText.Contains("0.887-blueprint-second-feedback-closeout") -and
+        $diagnosticsDocText.Contains("不新增诊断字段")) {
+        Write-Pass "Blueprint feature and diagnostics docs record the 0.887 closeout without expanding runtime or diagnostics scope."
+    }
+    else {
+        Write-FailHealth "Stage-08 closeout must update blueprint feature and diagnostics docs with the no-new-runtime/no-new-diagnostics scope."
+    }
+
+    if ($updateIndexText -and
+        $updateIndexText.Contains("0.887-蓝图二次反馈验证收口-2606210430.md") -and
+        $updateRecordText -and
+        $updateRecordText.Contains('RuntimeVersion：`0.887-blueprint-second-feedback-closeout`') -and
+        $updateRecordText.Contains("JueMingZ-TestPackage") -and
+        $updateRecordText.Contains("严格新鲜包健康审计") -and
+        $docHistoryIndexText -and
+        $docHistoryIndexText.Contains("蓝图二次反馈验证收口-2606210430.md") -and
+        $docHistoryRecordText -and
+        $docHistoryRecordText.Contains("0.887-blueprint-second-feedback-closeout")) {
+        Write-Pass "Stage-08 update record and document-change history are synchronized."
+    }
+    else {
+        Write-FailHealth "Stage-08 update record, update index, and document-change history must reference the 0.887 closeout."
+    }
+}
+
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
 
@@ -5787,6 +6186,9 @@ Test-PhasebladeQuickSwitchDiagnosticsGovernance -RepoRoot $repoRoot
 Test-DiagnosticLifecycleGovernance -RepoRoot $repoRoot
 Test-MapQuickAnnouncementGovernance -RepoRoot $repoRoot
 Test-FeatureToggleHotkeyGovernance -RepoRoot $repoRoot
+Test-HotkeyBackspaceClearGovernance -RepoRoot $repoRoot
+Test-BlueprintSecondFeedbackStage07Governance -RepoRoot $repoRoot
+Test-BlueprintSecondFeedbackStage08CloseoutGovernance -RepoRoot $repoRoot
 Test-F5MultiPageUiLayoutGovernance -RepoRoot $repoRoot
 Test-UserNotesGovernance -RepoRoot $repoRoot
 Test-MapCustomMarkerGovernance -RepoRoot $repoRoot

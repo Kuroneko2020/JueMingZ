@@ -101,6 +101,18 @@ namespace JueMingZ.Tests
                 throw new InvalidOperationException("Map quick announcement trigger slot must reject mouse wheel capture.");
             }
 
+            if (LegacyMainWindow.TryApplyMapQuickAnnouncementCapturedTokenForTesting(settings, "1", "Backspace", out resultCode) ||
+                !string.Equals(resultCode, "invalidKeyboardKey", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Map quick announcement prefix slots must reject Backspace as a saved key.");
+            }
+
+            if (LegacyMainWindow.TryApplyMapQuickAnnouncementCapturedTokenForTesting(settings, "trigger", "Backspace", out resultCode) ||
+                !string.Equals(resultCode, "invalidTriggerKey", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Map quick announcement trigger slot must reject Backspace as a saved key.");
+            }
+
             if (LegacyMainWindow.TryApplyMapQuickAnnouncementCapturedTokenForTesting(settings, "2", "Alt", out resultCode) ||
                 !string.Equals(resultCode, "duplicateKey", StringComparison.Ordinal))
             {
@@ -125,6 +137,37 @@ namespace JueMingZ.Tests
             }
 
             AssertStringEquals(settings.MapQuickAnnouncementTriggerKey, "Mouse4", "map quick announcement side mouse token normalized");
+        }
+
+        private static void MapQuickAnnouncementBackspaceClearContract()
+        {
+            var settings = AppSettings.CreateDefault();
+            settings.MapQuickAnnouncementHotkeySlot1 = "H";
+            settings.MapQuickAnnouncementHotkeySlot2 = "J";
+            settings.MapQuickAnnouncementTriggerKey = "MouseLeft";
+
+            string resultCode;
+            if (!LegacyMainWindow.TryClearMapQuickAnnouncementHotkeySlotForTesting(settings, "2", out resultCode) ||
+                !string.Equals(resultCode, "cleared", StringComparison.Ordinal) ||
+                !string.Equals(settings.MapQuickAnnouncementHotkeySlot1, "H", StringComparison.Ordinal) ||
+                !string.IsNullOrWhiteSpace(settings.MapQuickAnnouncementHotkeySlot2) ||
+                !string.Equals(settings.MapQuickAnnouncementTriggerKey, "MouseLeft", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected Backspace clear to remove only the selected map quick announcement prefix slot.");
+            }
+
+            if (!LegacyMainWindow.TryClearMapQuickAnnouncementHotkeySlotForTesting(settings, "2", out resultCode) ||
+                !string.Equals(resultCode, "alreadyEmpty", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected clearing an already-empty map quick announcement slot to be a no-op.");
+            }
+
+            if (!LegacyMainWindow.TryClearMapQuickAnnouncementHotkeySlotForTesting(settings, "trigger", out resultCode) ||
+                !string.Equals(resultCode, "cleared", StringComparison.Ordinal) ||
+                !string.IsNullOrWhiteSpace(settings.MapQuickAnnouncementTriggerKey))
+            {
+                throw new InvalidOperationException("Expected Backspace clear to remove the selected map quick announcement trigger slot.");
+            }
         }
 
         private static void MapQuickAnnouncementHotkeyStateMachineFiresOnTriggerEdgeOnceUntilRelease()
@@ -362,9 +405,9 @@ namespace JueMingZ.Tests
                 throw new InvalidOperationException("Map quick announcement tooltip test contract must expose five button slots.");
             }
 
-            AssertStringEquals(tooltips[0], "双击进行改键，不支持鼠标按键", "map quick announcement slot1 tooltip");
-            AssertStringEquals(tooltips[1], "双击进行改键，不支持鼠标按键", "map quick announcement slot2 tooltip");
-            AssertStringEquals(tooltips[2], "双击进行改键，支持鼠标按键", "map quick announcement trigger tooltip");
+            AssertStringEquals(tooltips[0], "双击进行改键，Backspace 删除，不支持鼠标按键", "map quick announcement slot1 tooltip");
+            AssertStringEquals(tooltips[1], "双击进行改键，Backspace 删除，不支持鼠标按键", "map quick announcement slot2 tooltip");
+            AssertStringEquals(tooltips[2], "双击进行改键，Backspace 删除，支持鼠标按键", "map quick announcement trigger tooltip");
             AssertStringEquals(tooltips[3], "按下三个快捷键对光标位置内容进行广播", "map quick announcement on tooltip");
             AssertStringEquals(tooltips[4], string.Empty, "map quick announcement off tooltip");
         }

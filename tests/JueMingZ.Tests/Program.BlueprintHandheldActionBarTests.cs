@@ -103,6 +103,32 @@ namespace JueMingZ.Tests
                     BlueprintSettings.DefaultToolItemId,
                     BlueprintHandheldEnvironment(1280, 720, blueprintCreationActive: true)),
                 BlueprintHandheldActionBarState.ButtonIdSave,
+                BlueprintHandheldActionBarState.ButtonIdExitCreate);
+            AssertBlueprintHandheldButtonState(
+                BuildBlueprintHandheldFrame(
+                    true,
+                    BlueprintSettings.DefaultToolItemId,
+                    BlueprintHandheldEnvironment(1280, 720, blueprintCreationActive: true)),
+                BlueprintHandheldActionBarState.ButtonIdSave,
+                "保存蓝图",
+                BlueprintHandheldActionBarState.SaveDisabledTooltip,
+                false);
+
+            AssertBlueprintHandheldButtons(
+                BuildBlueprintHandheldFrame(
+                    true,
+                    BlueprintSettings.DefaultToolItemId,
+                    BlueprintHandheldEnvironment(1280, 720, blueprintCreationActive: true, blueprintCreationHasPendingSelection: true, blueprintCreationSelectedCount: 3)),
+                BlueprintHandheldActionBarState.ButtonIdSave,
+                BlueprintHandheldActionBarState.ButtonIdExitCreate);
+
+            var exitedWithPreservedMask = BuildBlueprintHandheldFrame(
+                true,
+                BlueprintSettings.DefaultToolItemId,
+                BlueprintHandheldEnvironment(1280, 720, blueprintCreationHasPendingSelection: true, blueprintCreationSelectedCount: 3));
+            AssertBlueprintHandheldButtons(
+                exitedWithPreservedMask,
+                BlueprintHandheldActionBarState.ButtonIdCreate,
                 BlueprintHandheldActionBarState.ButtonIdOpenLibrary);
 
             AssertBlueprintHandheldButtons(
@@ -111,9 +137,17 @@ namespace JueMingZ.Tests
                     BlueprintSettings.DefaultToolItemId,
                     BlueprintHandheldEnvironment(1280, 720, blueprintCreationActive: true, blueprintCreationHasPendingSelection: true, blueprintCreationSelectedCount: 3, blueprintHasPlacedInstances: true, blueprintPlacedInstanceCount: 2)),
                 BlueprintHandheldActionBarState.ButtonIdSave,
-                BlueprintHandheldActionBarState.ButtonIdOpenLibrary,
+                BlueprintHandheldActionBarState.ButtonIdExitCreate,
                 BlueprintHandheldActionBarState.ButtonIdDelete,
                 BlueprintHandheldActionBarState.ButtonIdMove);
+
+            AssertBlueprintHandheldButtons(
+                BuildBlueprintHandheldFrame(
+                    true,
+                    BlueprintSettings.DefaultToolItemId,
+                    BlueprintHandheldEnvironment(1280, 720, blueprintCreationCompletedPendingCapture: true, blueprintCreationHasPendingSelection: true, blueprintCreationSelectedCount: 3)),
+                BlueprintHandheldActionBarState.ButtonIdSave,
+                BlueprintHandheldActionBarState.ButtonIdExitCreate);
         }
 
         private static void BlueprintHandheldActionBarLayoutKeepsButtonsStable()
@@ -289,6 +323,31 @@ namespace JueMingZ.Tests
             {
                 throw new InvalidOperationException("Expected handheld action bar outside click to pass through.");
             }
+
+            BlueprintHandheldActionBarState.ResetInteractionForTesting();
+            var disabledFrame = BuildBlueprintHandheldFrame(
+                true,
+                BlueprintSettings.DefaultToolItemId,
+                BlueprintHandheldEnvironment(1280, 720, blueprintCreationActive: true));
+            var disabledSave = disabledFrame.Buttons[0];
+            if (disabledSave.Enabled)
+            {
+                throw new InvalidOperationException("Expected empty creation save button to be disabled.");
+            }
+
+            var disabledPress = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
+                disabledFrame,
+                BlueprintHandheldPointer(disabledSave.Rect.CenterX, disabledSave.Rect.CenterY, true, 0, true));
+            if (!disabledPress.ShouldCaptureMouse ||
+                !disabledPress.ShouldConsumeLeftInput ||
+                disabledPress.Clicked ||
+                !string.Equals(disabledPress.HoveredButtonId, BlueprintHandheldActionBarState.ButtonIdSave, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected disabled handheld save to capture input and hover without submitting a click.");
+            }
+
+            var disabledInteraction = BlueprintHandheldActionBarState.GetInteractionSnapshotForTesting();
+            AssertStringEquals(disabledInteraction.PressedButtonId, string.Empty, "disabled save must not enter pressed state");
         }
 
         private static void BlueprintHandheldActionBarDisplayGatesStayVisibleAndUiOnly()
@@ -364,6 +423,29 @@ namespace JueMingZ.Tests
                 }
 
                 ClickTileForBlueprintCreation(5, 6);
+                LegacyUiActionService.HandleBlueprintHandheldActionBarCommandForTesting(BuildBlueprintHandheldCommand(BlueprintHandheldActionBarState.ButtonIdExitCreate, "退出创建"));
+                var exited = BlueprintHandheldActionBarState.GetInteractionSnapshotForTesting();
+                AssertStringEquals(exited.LastClickedButtonId, BlueprintHandheldActionBarState.ButtonIdExitCreate, "handheld exit-create clicked id");
+                AssertStringEquals(exited.LastResultCode, "entryStateChanged", "handheld exit-create command result");
+                AssertStringEquals(BlueprintEntryState.GetSnapshot(settings).Mode, BlueprintEntryModes.Tool, "handheld exit-create returns tool mode");
+                var exitedMask = BlueprintCreationMaskState.GetSnapshot();
+                if (exitedMask.Active ||
+                    exitedMask.CompletedPendingCapture ||
+                    exitedMask.SelectedCount != 1 ||
+                    !HasBlueprintCell(exitedMask, 5, 6))
+                {
+                    throw new InvalidOperationException("Expected handheld exit-create to preserve the selected mask without saving or clearing it.");
+                }
+
+                LegacyUiActionService.HandleBlueprintHandheldActionBarCommandForTesting(BuildBlueprintHandheldCommand(BlueprintHandheldActionBarState.ButtonIdCreate, "创建蓝图"));
+                var resumedMask = BlueprintCreationMaskState.GetSnapshot();
+                if (!resumedMask.Active ||
+                    resumedMask.SelectedCount != 1 ||
+                    !HasBlueprintCell(resumedMask, 5, 6))
+                {
+                    throw new InvalidOperationException("Expected handheld create to resume the mask preserved by exit-create.");
+                }
+
                 LegacyUiActionService.HandleBlueprintHandheldActionBarCommandForTesting(BuildBlueprintHandheldCommand(BlueprintHandheldActionBarState.ButtonIdSave, "保存蓝图"));
                 var saved = BlueprintHandheldActionBarState.GetInteractionSnapshotForTesting();
                 AssertStringEquals(saved.LastClickedButtonId, BlueprintHandheldActionBarState.ButtonIdSave, "handheld save clicked id");
@@ -591,6 +673,7 @@ namespace JueMingZ.Tests
             string vanillaReason = "",
             bool blueprintCreationActive = false,
             bool blueprintCreationHasPendingSelection = false,
+            bool blueprintCreationCompletedPendingCapture = false,
             int blueprintCreationSelectedCount = 0,
             bool blueprintHasPlacedInstances = false,
             int blueprintPlacedInstanceCount = 0)
@@ -606,6 +689,7 @@ namespace JueMingZ.Tests
                 VanillaMenuReason = vanillaReason ?? string.Empty,
                 BlueprintCreationActive = blueprintCreationActive,
                 BlueprintCreationHasPendingSelection = blueprintCreationHasPendingSelection,
+                BlueprintCreationCompletedPendingCapture = blueprintCreationCompletedPendingCapture,
                 BlueprintCreationSelectedCount = blueprintCreationSelectedCount,
                 BlueprintHasPlacedInstances = blueprintHasPlacedInstances,
                 BlueprintPlacedInstanceCount = blueprintPlacedInstanceCount,
@@ -676,6 +760,11 @@ namespace JueMingZ.Tests
 
         private static void AssertBlueprintHandheldButton(BlueprintHandheldActionBarFrame frame, string buttonId, string label, string tooltip)
         {
+            AssertBlueprintHandheldButtonState(frame, buttonId, label, tooltip, true);
+        }
+
+        private static void AssertBlueprintHandheldButtonState(BlueprintHandheldActionBarFrame frame, string buttonId, string label, string tooltip, bool enabled)
+        {
             if (frame == null || frame.Buttons == null)
             {
                 throw new InvalidOperationException("Expected blueprint handheld frame before checking button.");
@@ -688,6 +777,11 @@ namespace JueMingZ.Tests
                 {
                     AssertStringEquals(button.Label, label, "handheld button label " + buttonId);
                     AssertStringEquals(button.Tooltip, tooltip, "handheld button tooltip " + buttonId);
+                    if (button.Enabled != enabled)
+                    {
+                        throw new InvalidOperationException("Expected handheld button " + buttonId + " enabled=" + enabled + ", got " + button.Enabled + ".");
+                    }
+
                     return;
                 }
             }

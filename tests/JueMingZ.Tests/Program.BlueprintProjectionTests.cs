@@ -50,6 +50,45 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void BlueprintProjectionIgnoresAirOnlyTemplateBounds()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-projection-air-bounds");
+            try
+            {
+                var store = new BlueprintWorldInstanceStore();
+                var reader = new FakeBlueprintWorldTileReader();
+                var template = CreateProjectionAirBoundsTemplate();
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(store.CreateInstanceFromTemplate("pair-proj-air", "world-proj-air", template, 30, 40, 0, out instance), "create projection air-bound instance");
+                reader.Set(30, 40, new BlueprintWorldTileSnapshot { Active = true, TileType = 999 });
+                reader.Set(31, 41, new BlueprintWorldTileSnapshot { Active = true, TileType = 77 });
+                reader.Set(32, 42, new BlueprintWorldTileSnapshot { Active = true, TileType = 998 });
+                BlueprintProjectionService.SetDependenciesForTesting(
+                    store,
+                    BlueprintPlacementWorldContext.Success("pair-proj-air", "world-proj-air"),
+                    reader,
+                    true);
+
+                var snapshot = BlueprintProjectionService.GetSnapshot();
+                if (!snapshot.LoadSucceeded ||
+                    snapshot.EffectiveLayerCount != 1 ||
+                    snapshot.FulfilledLayerCount != 1 ||
+                    snapshot.MissingLayerCount != 0 ||
+                    snapshot.ConflictLayerCount != 0 ||
+                    snapshot.ProjectedLayers.Count != 1 ||
+                    snapshot.ProjectedLayers[0].WorldTileX != 31 ||
+                    snapshot.ProjectedLayers[0].WorldTileY != 41)
+                {
+                    throw new InvalidOperationException("Expected projection to ignore air-only template bounds and resolve only content cells.");
+                }
+            }
+            finally
+            {
+                BlueprintProjectionService.ResetForTesting();
+                restore();
+            }
+        }
+
         private static void BlueprintProjectionComposesLayerOrderAndSkipsHidden()
         {
             var restore = PushTemporaryConfigDirectory("blueprint-projection-layer-order-hidden");
@@ -253,6 +292,20 @@ namespace JueMingZ.Tests
             template.Cells.Add(CreateTileCell(0, 0, 11));
             template.Cells.Add(CreateWallCell(1, 0, 22));
             template.Cells.Add(CreateTileCell(2, 0, 33));
+            return template;
+        }
+
+        private static BlueprintTemplateRecord CreateProjectionAirBoundsTemplate()
+        {
+            var template = new BlueprintTemplateRecord
+            {
+                Name = "空气边界投影",
+                Width = 3,
+                Height = 3,
+                AnchorX = 1,
+                AnchorY = 1
+            };
+            template.Cells.Add(CreateTileCell(1, 1, 77));
             return template;
         }
 

@@ -96,6 +96,43 @@ namespace JueMingZ.Config
             return true;
         }
 
+        public static bool TryClearHotkeySlot(
+            string slot1,
+            string slot2,
+            string triggerKey,
+            string targetSlot,
+            out MapQuickAnnouncementHotkey hotkey,
+            out string resultCode)
+        {
+            hotkey = NormalizeHotkey(slot1, slot2, triggerKey);
+            resultCode = string.Empty;
+            var slotId = NormalizeHotkeySlotId(targetSlot);
+            if (slotId.Length <= 0)
+            {
+                resultCode = "invalidSlot";
+                return false;
+            }
+
+            var oldValue = string.Equals(slotId, HotkeySlot1Id, StringComparison.Ordinal)
+                ? hotkey.Slot1
+                : (string.Equals(slotId, HotkeySlot2Id, StringComparison.Ordinal) ? hotkey.Slot2 : hotkey.TriggerKey);
+            if (string.Equals(slotId, HotkeySlot1Id, StringComparison.Ordinal))
+            {
+                hotkey = new MapQuickAnnouncementHotkey(string.Empty, hotkey.Slot2, hotkey.TriggerKey);
+            }
+            else if (string.Equals(slotId, HotkeySlot2Id, StringComparison.Ordinal))
+            {
+                hotkey = new MapQuickAnnouncementHotkey(hotkey.Slot1, string.Empty, hotkey.TriggerKey);
+            }
+            else
+            {
+                hotkey = new MapQuickAnnouncementHotkey(hotkey.Slot1, hotkey.Slot2, string.Empty);
+            }
+
+            resultCode = string.IsNullOrWhiteSpace(oldValue) ? "alreadyEmpty" : "cleared";
+            return true;
+        }
+
         public static string NormalizeHotkeySlotId(string value)
         {
             var slot = string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();

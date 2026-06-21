@@ -27,6 +27,29 @@ namespace JueMingZ.UI.Legacy
 
             MapQuickAnnouncementHotkey hotkey;
             string resultCode;
+            if (string.Equals(token, "Backspace", System.StringComparison.Ordinal))
+            {
+                if (MapQuickAnnouncementSettings.TryClearHotkeySlot(
+                        settings.MapQuickAnnouncementHotkeySlot1,
+                        settings.MapQuickAnnouncementHotkeySlot2,
+                        settings.MapQuickAnnouncementTriggerKey,
+                        _mapQuickAnnouncementHotkeyCaptureSlot,
+                        out hotkey,
+                        out resultCode))
+                {
+                    settings.MapQuickAnnouncementHotkeySlot1 = hotkey.Slot1;
+                    settings.MapQuickAnnouncementHotkeySlot2 = hotkey.Slot2;
+                    settings.MapQuickAnnouncementTriggerKey = hotkey.TriggerKey;
+                    if (string.Equals(resultCode, "cleared", System.StringComparison.Ordinal))
+                    {
+                        ConfigService.SaveAll();
+                    }
+                }
+
+                StopMapQuickAnnouncementHotkeyCapture();
+                return;
+            }
+
             if (MapQuickAnnouncementSettings.TryApplyCapturedHotkeyToken(
                     settings.MapQuickAnnouncementHotkeySlot1,
                     settings.MapQuickAnnouncementHotkeySlot2,
@@ -59,6 +82,30 @@ namespace JueMingZ.UI.Legacy
                     settings.MapQuickAnnouncementTriggerKey,
                     slot,
                     token,
+                    out hotkey,
+                    out resultCode))
+            {
+                return false;
+            }
+
+            settings.MapQuickAnnouncementHotkeySlot1 = hotkey.Slot1;
+            settings.MapQuickAnnouncementHotkeySlot2 = hotkey.Slot2;
+            settings.MapQuickAnnouncementTriggerKey = hotkey.TriggerKey;
+            return true;
+        }
+
+        internal static bool TryClearMapQuickAnnouncementHotkeySlotForTesting(
+            AppSettings settings,
+            string slot,
+            out string resultCode)
+        {
+            settings = settings ?? AppSettings.CreateDefault();
+            MapQuickAnnouncementHotkey hotkey;
+            if (!MapQuickAnnouncementSettings.TryClearHotkeySlot(
+                    settings.MapQuickAnnouncementHotkeySlot1,
+                    settings.MapQuickAnnouncementHotkeySlot2,
+                    settings.MapQuickAnnouncementTriggerKey,
+                    slot,
                     out hotkey,
                     out resultCode))
             {

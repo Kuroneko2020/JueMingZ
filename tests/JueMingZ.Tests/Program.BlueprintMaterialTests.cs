@@ -70,6 +70,46 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void BlueprintMaterialsIgnoreAirOnlyTemplateBounds()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-material-air-bounds");
+            try
+            {
+                var store = new BlueprintWorldInstanceStore();
+                var reader = new FakeBlueprintWorldTileReader();
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(store.CreateInstanceFromTemplate("pair-material-air", "world-material-air", CreateProjectionAirBoundsTemplate(), 50, 60, 0, out instance), "create material air-bound instance");
+                reader.Set(50, 60, new BlueprintWorldTileSnapshot { Active = true, TileType = 999 });
+                reader.Set(51, 61, new BlueprintWorldTileSnapshot { Active = true, TileType = 77 });
+                reader.Set(52, 62, new BlueprintWorldTileSnapshot { Active = true, TileType = 998 });
+                BlueprintProjectionService.SetDependenciesForTesting(
+                    store,
+                    BlueprintPlacementWorldContext.Success("pair-material-air", "world-material-air"),
+                    reader,
+                    true);
+                BlueprintMaterialService.SetInventoryReaderForTesting(new FakeBlueprintMaterialInventoryReader(), true);
+
+                var projection = BlueprintProjectionService.GetSnapshot();
+                var materials = BlueprintMaterialService.GetSnapshot();
+                if (projection.EffectiveLayerCount != 1 ||
+                    projection.FulfilledLayerCount != 1 ||
+                    materials.ProjectionMissingLayerCount != 0 ||
+                    materials.RequiredItemCount != 0 ||
+                    materials.MissingStackTotal != 0 ||
+                    materials.SkippedConflictLayerCount != 0)
+                {
+                    throw new InvalidOperationException("Expected material statistics to ignore air-only template bounds and count only content layers.");
+                }
+            }
+            finally
+            {
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialWindowOverlay.ResetForTesting();
+                restore();
+            }
+        }
+
         private static void BlueprintMaterialsReadMainInventoryAndVoidBagAvailability()
         {
             var restore = PushTemporaryConfigDirectory("blueprint-material-inventory");

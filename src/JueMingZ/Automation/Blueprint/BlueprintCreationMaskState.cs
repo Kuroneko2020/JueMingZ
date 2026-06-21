@@ -48,15 +48,17 @@ namespace JueMingZ.Automation.Blueprint
         {
             lock (SyncRoot)
             {
-                var changed = !_active || _completedPendingCapture || SelectedCells.Count > 0 || _dragging;
-                SelectedCells.Clear();
+                var preservedCount = SelectedCells.Count;
+                var changed = !_active || _completedPendingCapture || _dragging;
                 _active = true;
                 _completedPendingCapture = false;
                 _dragging = false;
                 ClearHoverLocked();
                 _lastInputOwner = "ui";
-                _lastResultCode = "creationStarted";
-                _lastNotice = "创建中：左键单选/拖选世界格；只记录蓝图 mask。";
+                _lastResultCode = preservedCount > 0 ? "creationResumed" : "creationStarted";
+                _lastNotice = preservedCount > 0
+                    ? "创建中：已保留 " + preservedCount.ToString(CultureInfo.InvariantCulture) + " 格选区，可继续编辑蓝图 mask。"
+                    : "创建中：左键单选/拖选世界格；只记录蓝图 mask。";
                 return BuildResultLocked(true, changed, false, true, _lastResultCode, _lastNotice);
             }
         }
@@ -75,6 +77,27 @@ namespace JueMingZ.Automation.Blueprint
                 _lastResultCode = "selectionCleared";
                 _lastNotice = changed ? "已清空蓝图创建选区。" : "蓝图创建选区已经为空。";
                 return BuildResultLocked(true, changed, false, true, _lastResultCode, _lastNotice);
+            }
+        }
+
+        public static BlueprintCreationInteractionResult ExitCreatePreservingSelection()
+        {
+            lock (SyncRoot)
+            {
+                var preservedCount = SelectedCells.Count;
+                var changed = _active || _completedPendingCapture || _dragging;
+                // This is intentionally distinct from Cancel(): repeated create
+                // toggles leave the in-memory mask intact for a later re-entry.
+                _active = false;
+                _completedPendingCapture = false;
+                _dragging = false;
+                ClearHoverLocked();
+                _lastInputOwner = "ui";
+                _lastResultCode = "creationExited";
+                _lastNotice = preservedCount > 0
+                    ? "已退出蓝图创建状态；已保留 " + preservedCount.ToString(CultureInfo.InvariantCulture) + " 格选区。"
+                    : "已退出蓝图创建状态；当前没有选区。";
+                return BuildResultLocked(true, changed, false, false, _lastResultCode, _lastNotice);
             }
         }
 
@@ -165,8 +188,8 @@ namespace JueMingZ.Automation.Blueprint
                         var changed = _dragging;
                         _dragging = false;
                         _lastInputOwner = "world";
-                        _lastResultCode = "airSkipped";
-                        _lastNotice = "鼠标命中空气格；创建 mask 未变化。";
+                        _lastResultCode = "tileUnavailable";
+                        _lastNotice = "鼠标命中的世界格暂不可读取；创建 mask 未变化。";
                         return BuildResultLocked(true, changed, true, true, _lastResultCode, _lastNotice);
                     }
 
@@ -309,7 +332,7 @@ namespace JueMingZ.Automation.Blueprint
 
             var added = 0;
             var removed = 0;
-            var skippedAir = 0;
+            var skippedUnavailable = 0;
             for (var y = minY; y <= maxY; y++)
             {
                 for (var x = minX; x <= maxX; x++)
@@ -322,7 +345,7 @@ namespace JueMingZ.Automation.Blueprint
                     }
                     else if (!IsSelectableForInputLocked(input, x, y))
                     {
-                        skippedAir++;
+                        skippedUnavailable++;
                     }
                     else if (SelectedCells.Count < MaxSelectedCells)
                     {
@@ -335,7 +358,7 @@ namespace JueMingZ.Automation.Blueprint
             var changed = added > 0 || removed > 0;
             var message = "创建 mask 更新：+" + added.ToString(CultureInfo.InvariantCulture) +
                           " / -" + removed.ToString(CultureInfo.InvariantCulture) +
-                          (skippedAir > 0 ? " / 空气跳过 " + skippedAir.ToString(CultureInfo.InvariantCulture) : string.Empty) +
+                          (skippedUnavailable > 0 ? " / 不可读取 " + skippedUnavailable.ToString(CultureInfo.InvariantCulture) : string.Empty) +
                           "，当前 " + SelectedCells.Count.ToString(CultureInfo.InvariantCulture) + " 格。";
             return new ToggleResult
             {
@@ -417,7 +440,7 @@ namespace JueMingZ.Automation.Blueprint
                 input.TileX == tileX &&
                 input.TileY == tileY)
             {
-                return input.HasSelectableContent;
+                return true;
             }
 
             return true;

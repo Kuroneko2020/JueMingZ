@@ -631,6 +631,42 @@ namespace JueMingZ.Tests
             AssertMetadata(request, "TargetItemTypeOverride", "4263");
         }
 
+        private static void QuickItemHotkeyBackspaceClearContract()
+        {
+            var bindings = new List<QuickItemHotkeyBinding>
+            {
+                new QuickItemHotkeyBinding
+                {
+                    Hotkey = "Ctrl+G",
+                    DisplayName = "回家",
+                    ItemTypes = new List<int> { 4263 },
+                    Enabled = true
+                }
+            };
+
+            bool changed;
+            if (!LegacyMainWindow.TryClearQuickItemHotkeyBindingForTesting(bindings, 0, out changed) ||
+                !changed ||
+                !string.IsNullOrWhiteSpace(bindings[0].Hotkey) ||
+                !bindings[0].Enabled)
+            {
+                throw new InvalidOperationException("Expected Backspace clear to remove the quick item hotkey without disabling the binding row.");
+            }
+
+            if (!LegacyMainWindow.TryClearQuickItemHotkeyBindingForTesting(bindings, 0, out changed) ||
+                changed)
+            {
+                throw new InvalidOperationException("Expected clearing an already-empty quick item hotkey to be a no-op.");
+            }
+
+            string normalized;
+            if (QuickItemHotkeyService.TryNormalizeHotkeyForTesting("Backspace", out normalized) ||
+                QuickItemHotkeyService.TryNormalizeHotkeyForTesting("Ctrl+Backspace", out normalized))
+            {
+                throw new InvalidOperationException("Backspace must not be parsed as a normal quick item hotkey.");
+            }
+        }
+
         private static void QuickBagOpenYieldsAfterBatchWhenCleanupEnabled()
         {
             QuickBagOpenService.ClearState("test reset");

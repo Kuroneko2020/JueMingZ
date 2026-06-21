@@ -18,8 +18,8 @@ namespace JueMingZ.UI.Legacy
         private const string MapFootprintsDisplayTooltip = "在大地图展示足迹";
         private const string MapRareCreatureDirectionTooltip = "装备生命体分析仪时显示稀有生物方向";
         private const string MapTravellingMerchantDirectionTooltip = "显示旅商方位";
-        private const string MapQuickAnnouncementKeyboardSlotTooltip = "双击进行改键，不支持鼠标按键";
-        private const string MapQuickAnnouncementTriggerSlotTooltip = "双击进行改键，支持鼠标按键";
+        private const string MapQuickAnnouncementKeyboardSlotTooltip = "双击进行改键，Backspace 删除，不支持鼠标按键";
+        private const string MapQuickAnnouncementTriggerSlotTooltip = "双击进行改键，Backspace 删除，支持鼠标按键";
         private const string MapQuickAnnouncementOnTooltip = "按下三个快捷键对光标位置内容进行广播";
         private const string MapQuickAnnouncementOffTooltip = "";
         private const int MapQuickAnnouncementSlotWidth = 64;

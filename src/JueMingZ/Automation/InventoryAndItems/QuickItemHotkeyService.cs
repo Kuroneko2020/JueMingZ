@@ -31,6 +31,19 @@ namespace JueMingZ.Automation.InventoryAndItems
             return BuildUseRequest(slot, itemType, itemName, requestedItemType, displayName, sourceHotkey);
         }
 
+        internal static bool TryNormalizeHotkeyForTesting(string text, out string normalized)
+        {
+            HotkeyChord chord;
+            if (TryParseHotkey(text, out chord))
+            {
+                normalized = chord.Normalized;
+                return true;
+            }
+
+            normalized = string.Empty;
+            return false;
+        }
+
         public static void Tick(InputActionQueue queue, GameStateSnapshot gameState, RuntimeState runtimeState)
         {
             Tick(queue, gameState, runtimeState, RuntimeSettingsSnapshotProvider.GetCurrent());

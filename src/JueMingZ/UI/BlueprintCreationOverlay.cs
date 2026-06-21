@@ -9,11 +9,11 @@ namespace JueMingZ.UI
 {
     public static class BlueprintCreationOverlay
     {
-        private const string VisualContract = "content-hover+air-skip+low-alpha-no-border+continuous-row-runs+world-left-consume";
+        private const string VisualContract = "world-hover+air-select+lower-saturation-lower-alpha-no-border+continuous-row-runs+world-left-consume";
         private const int TileSize = 16;
-        private const int SelectedMaskAlpha = 48;
-        private const int HoverMaskAlpha = 38;
-        private const int DragMaskAlpha = 30;
+        private const int SelectedMaskAlpha = 30;
+        private const int HoverMaskAlpha = 24;
+        private const int DragMaskAlpha = 20;
         private static bool _wasLeftDown;
         private static bool _wasActive;
 
@@ -186,7 +186,7 @@ namespace JueMingZ.UI
                 isSelectableTile = (x, y) =>
                 {
                     bool selectable;
-                    return BlueprintCaptureService.TryHasSelectableContent(tileReader, x, y, out selectable) && selectable;
+                    return BlueprintCaptureService.TryHasSelectableContent(tileReader, x, y, out selectable);
                 };
             }
 
@@ -356,7 +356,7 @@ namespace JueMingZ.UI
                 return;
             }
 
-            UiPrimitiveRenderer.DrawFilledRectClipped(spriteBatch, x, y, width, TileSize, 0, 0, clipWidth, clipHeight, 70, 150, 255, alpha);
+            UiPrimitiveRenderer.DrawFilledRectClipped(spriteBatch, x, y, width, TileSize, 0, 0, clipWidth, clipHeight, 88, 142, 220, alpha);
         }
 
         private static void DrawDragRect(object spriteBatch, BlueprintCreationMaskSnapshot snapshot, Vector2 screenPosition, int clipWidth, int clipHeight)
@@ -369,7 +369,7 @@ namespace JueMingZ.UI
             var y = (int)Math.Round(minY * TileSize - screenPosition.Y);
             var width = Math.Max(TileSize, (maxX - minX + 1) * TileSize);
             var height = Math.Max(TileSize, (maxY - minY + 1) * TileSize);
-            UiPrimitiveRenderer.DrawFilledRectClipped(spriteBatch, x, y, width, height, 0, 0, clipWidth, clipHeight, 92, 180, 255, DragMaskAlpha);
+            UiPrimitiveRenderer.DrawFilledRectClipped(spriteBatch, x, y, width, height, 0, 0, clipWidth, clipHeight, 96, 150, 220, DragMaskAlpha);
         }
     }
 }

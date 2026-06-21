@@ -155,6 +155,8 @@ namespace JueMingZ.Tests
             AssertInvalidFeatureToggleChord("Shift");
             AssertInvalidFeatureToggleChord("Esc");
             AssertInvalidFeatureToggleChord("Escape");
+            AssertInvalidFeatureToggleChord("Backspace");
+            AssertInvalidFeatureToggleChord("Ctrl+Backspace");
             AssertInvalidFeatureToggleChord("Ctrl+Alt+K");
             AssertInvalidFeatureToggleChord("Alt+Shift+R");
             AssertInvalidFeatureToggleChord("A+B");
@@ -313,11 +315,11 @@ namespace JueMingZ.Tests
             var copy = LegacyMainWindow.GetFeatureToggleHotkeyModalCopyForTesting();
             AssertStringEquals(copy[0], "只切换功能开启/关闭，不执行功能动作。", "feature toggle modal intro");
             AssertStringEquals(copy[1], "单击开始录入按钮", "feature toggle modal idle text");
-            AssertStringEquals(copy[2], "请按下按键，按esc退出", "feature toggle modal capture text");
+            AssertStringEquals(copy[2], "请按下按键，Backspace 删除，Esc 取消", "feature toggle modal capture text");
 
             var tooltipCopy = LegacyMainWindow.GetFeatureToggleHotkeyModalTooltipCopyForTesting();
             AssertStringEquals(tooltipCopy[0], null, "feature toggle close button tooltip");
-            AssertStringEquals(tooltipCopy[1], "支持Ctrl，Alt，Shift + ", "feature toggle capture button tooltip");
+            AssertStringEquals(tooltipCopy[1], "支持 Ctrl / Alt / Shift + 键；Backspace 删除绑定", "feature toggle capture button tooltip");
             AssertStringEquals(tooltipCopy[2], null, "feature toggle clear button tooltip");
 
             LegacyMainWindow.StartQuickItemHotkeyCapture(0);
@@ -353,6 +355,35 @@ namespace JueMingZ.Tests
             LegacyMainWindow.StopAutoMiningHotkeyCapture();
             LegacyMainWindow.StopMapQuickAnnouncementHotkeyCapture();
             LegacyMainWindow.CloseFeatureToggleHotkeyModal();
+        }
+
+        private static void FeatureToggleHotkeyBackspaceClearContract()
+        {
+            var settings = BuildHotkeySettingsWithToggle("buff.auto_heal", "Alt+K");
+            bool changed;
+            if (!LegacyMainWindow.TryClearFeatureToggleHotkeyBindingForTesting(settings, "buff.auto_heal", out changed) ||
+                !changed ||
+                settings.ToggleHotkeysByTargetId.ContainsKey("buff.auto_heal"))
+            {
+                throw new InvalidOperationException("Expected Backspace clear path to remove an existing feature-toggle hotkey binding.");
+            }
+
+            if (!LegacyMainWindow.TryClearFeatureToggleHotkeyBindingForTesting(settings, "buff.auto_heal", out changed) ||
+                changed)
+            {
+                throw new InvalidOperationException("Expected clearing an already-empty feature-toggle hotkey binding to be a no-op.");
+            }
+
+            FeatureToggleHotkeyConflict conflict;
+            if (FeatureToggleHotkeyConflictRegistry.TryFindConflict(
+                    settings,
+                    AppSettings.CreateDefault(),
+                    "buff.auto_heal",
+                    "Backspace",
+                    out conflict))
+            {
+                throw new InvalidOperationException("Backspace must not be treated as a normal feature-toggle hotkey chord.");
+            }
         }
 
         private static void FeatureToggleHotkeyModalSaveHonorsConflictsAndSelf()

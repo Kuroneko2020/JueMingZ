@@ -128,8 +128,8 @@ namespace JueMingZ.UI.Legacy
                 {
                     LegacyUiTheme.DrawRowClipped(spriteBatch, captureRect, clip);
                     var status = _quickItemHotkeyCaptureBindingIndex < 0
-                        ? "请按下快捷键组合（支持 Ctrl / Alt / Shift + 键）"
-                        : "正在录入第 " + (_quickItemHotkeyCaptureBindingIndex + 1).ToString(CultureInfo.InvariantCulture) + " 条快捷键（Esc 取消）";
+                        ? "请按下快捷键组合（支持 Ctrl / Alt / Shift + 键，Backspace 删除）"
+                        : "正在录入第 " + (_quickItemHotkeyCaptureBindingIndex + 1).ToString(CultureInfo.InvariantCulture) + " 条快捷键（Backspace 删除，Esc 取消）";
                     UiTextRenderer.DrawTextClipped(spriteBatch, status, captureRect.X + 10, captureRect.Y + 5, captureRect.Width - 90, captureRect.Height - 4, clip.X, clip.Y, clip.Width, clip.Height, 236, 230, 206, 246, 0.66f);
 
                     var cancelRect = new LegacyUiRect(captureRect.Right - 72, captureRect.Y + 3, 64, 22);

@@ -10,7 +10,7 @@ namespace JueMingZ.UI
 {
     public static class BlueprintHandheldActionBarOverlay
     {
-        private const string VisualContract = "ui-scale-bottom-action-bar+dynamic-buttons+legacy-ui-theme+vanilla-ui-skin+button-text-scale-0.78+create-enters-mask+save-captures-mask+open-library-real+unimplemented-buttons-ui-only+mouse-consume+no-blueprint-refresh+no-input-action-queue";
+        private const string VisualContract = "ui-scale-bottom-action-bar+dynamic-buttons+legacy-ui-theme+vanilla-ui-skin+button-text-scale-0.78+create-enters-mask+exit-create-preserves-mask+save-captures-mask+disabled-save-tooltip+open-library-real+unimplemented-buttons-ui-only+mouse-consume+no-blueprint-refresh+no-input-action-queue";
         internal const float ButtonTextScale = 0.78f;
         private const float MinimumButtonTextScale = 0.52f;
 
@@ -139,6 +139,7 @@ namespace JueMingZ.UI
             var creation = BlueprintCreationMaskState.GetSnapshot();
             environment.BlueprintCreationActive = creation != null && creation.Active;
             environment.BlueprintCreationSelectedCount = creation == null ? 0 : creation.SelectedCount;
+            environment.BlueprintCreationCompletedPendingCapture = creation != null && creation.CompletedPendingCapture;
             environment.BlueprintCreationHasPendingSelection =
                 creation != null &&
                 (creation.CompletedPendingCapture || creation.SelectedCount > 0);
@@ -223,7 +224,7 @@ namespace JueMingZ.UI
                 Label = interaction.ButtonLabel,
                 Kind = "button",
                 Rect = ResolveButtonRect(frame, interaction.HoveredButtonId),
-                Enabled = true,
+                Enabled = IsButtonEnabled(frame, interaction.HoveredButtonId),
                 IntValue = interaction.HeldItemType,
                 TooltipLines = ResolveButtonTooltip(frame, interaction.HoveredButtonId)
             };
@@ -258,6 +259,12 @@ namespace JueMingZ.UI
             }
 
             return new[] { button.Tooltip };
+        }
+
+        private static bool IsButtonEnabled(BlueprintHandheldActionBarFrame frame, string buttonId)
+        {
+            var button = ResolveButtonFrame(frame, buttonId);
+            return button == null || button.Enabled;
         }
 
         private static BlueprintHandheldActionBarButtonFrame ResolveButtonFrame(BlueprintHandheldActionBarFrame frame, string buttonId)
@@ -338,10 +345,11 @@ namespace JueMingZ.UI
             }
 
             var rect = button.Rect;
-            var pressed = frame != null && string.Equals(frame.PressedButtonId, button.Id, StringComparison.Ordinal);
+            var enabled = button.Enabled;
+            var pressed = enabled && frame != null && string.Equals(frame.PressedButtonId, button.Id, StringComparison.Ordinal);
             var hovered = frame != null && string.Equals(frame.HoveredButtonId, button.Id, StringComparison.Ordinal);
-            LegacyUiTheme.DrawButtonClipped(spriteBatch, rect, hovered, pressed, false, true, clip);
-            var contentRect = LegacyUiTheme.GetSelectedButtonContentRect(rect, false, true);
+            LegacyUiTheme.DrawButtonClipped(spriteBatch, rect, hovered, pressed, false, enabled, clip);
+            var contentRect = LegacyUiTheme.GetSelectedButtonContentRect(rect, false, enabled);
             var textScale = ResolveButtonTextScale(button.Label, Math.Max(1, rect.Width - 8));
             UiTextRenderer.DrawCenteredTextClipped(
                 spriteBatch,
@@ -354,10 +362,10 @@ namespace JueMingZ.UI
                 clip.Y,
                 clip.Width,
                 clip.Height,
-                pressed ? LegacyUiTheme.SelectedTextR : 230,
-                pressed ? LegacyUiTheme.SelectedTextG : 232,
-                pressed ? LegacyUiTheme.SelectedTextB : 224,
-                255,
+                enabled ? pressed ? LegacyUiTheme.SelectedTextR : 230 : 150,
+                enabled ? pressed ? LegacyUiTheme.SelectedTextG : 232 : 156,
+                enabled ? pressed ? LegacyUiTheme.SelectedTextB : 224 : 170,
+                enabled ? 255 : 210,
                 textScale);
         }
 

@@ -9,6 +9,7 @@ namespace JueMingZ.Automation.Information
     {
         private static readonly int[] CaptureVirtualKeys =
         {
+            0x08,
             0x10,
             0x11,
             0x12,
@@ -266,6 +267,9 @@ namespace JueMingZ.Automation.Information
 
             switch (virtualKey)
             {
+                case 0x08:
+                    token = "Backspace";
+                    return true;
                 case 0x01:
                     token = "MouseLeft";
                     return true;

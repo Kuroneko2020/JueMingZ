@@ -224,6 +224,7 @@ namespace JueMingZ.Tests
             AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "main-menu-open-row");
             AssertContains(LegacyMainWindow.GetBlueprintPlacedInstanceVisualContractForTesting(), "main-menu-open-row");
             AssertContains(LegacyMainWindow.GetBlueprintCreationVisualContractForTesting(), "drag-toggle");
+            AssertContains(LegacyMainWindow.GetBlueprintCreationVisualContractForTesting(), "air-select");
             if (LegacyMainWindow.GetBlueprintLibraryPageSizeForTesting() != 6)
             {
                 throw new InvalidOperationException("Expected blueprint library to keep a stable six-template page size.");
@@ -260,9 +261,10 @@ namespace JueMingZ.Tests
 
             var hotkeyTooltips = LegacyMainWindow.GetBlueprintActionHotkeyTooltipLinesForTesting();
             if (hotkeyTooltips == null ||
-                hotkeyTooltips.Length != 2 ||
+                hotkeyTooltips.Length != 3 ||
                 !string.Equals(hotkeyTooltips[0], "双击录入采集按键。", StringComparison.Ordinal) ||
-                !string.Equals(hotkeyTooltips[1], "Esc 取消录入。", StringComparison.Ordinal))
+                !string.Equals(hotkeyTooltips[1], "Esc 取消录入。", StringComparison.Ordinal) ||
+                !string.Equals(hotkeyTooltips[2], "Backspace 删除绑定。", StringComparison.Ordinal))
             {
                 throw new InvalidOperationException("Expected blueprint action hotkey fields to keep the auto-mining trigger capture tooltip shape.");
             }
@@ -379,6 +381,56 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void BlueprintActionHotkeyBackspaceClearContract()
+        {
+            var hotkeys = HotkeySettings.CreateDefault();
+            string message;
+            bool changed;
+            if (!LegacyMainWindow.TryApplyBlueprintActionHotkeyForTesting(
+                    hotkeys,
+                    AppSettings.CreateDefault(),
+                    FeatureIds.BlueprintCreateAction,
+                    "Alt+C",
+                    out message,
+                    out changed) ||
+                !LegacyMainWindow.TryApplyBlueprintActionHotkeyForTesting(
+                    hotkeys,
+                    AppSettings.CreateDefault(),
+                    FeatureIds.BlueprintSaveAction,
+                    "Alt+S",
+                    out message,
+                    out changed))
+            {
+                throw new InvalidOperationException("Expected blueprint action hotkeys to be seedable before Backspace clear.");
+            }
+
+            if (!LegacyMainWindow.TryClearBlueprintActionHotkeyForTesting(hotkeys, FeatureIds.BlueprintCreateAction, out changed) ||
+                !changed ||
+                hotkeys.HotkeysByFeatureId.ContainsKey(FeatureIds.BlueprintCreateAction) ||
+                !hotkeys.HotkeysByFeatureId.ContainsKey(FeatureIds.BlueprintSaveAction))
+            {
+                throw new InvalidOperationException("Expected Backspace clear to remove only the targeted blueprint action hotkey.");
+            }
+
+            if (!LegacyMainWindow.TryClearBlueprintActionHotkeyForTesting(hotkeys, FeatureIds.BlueprintCreateAction, out changed) ||
+                changed)
+            {
+                throw new InvalidOperationException("Expected clearing an already-empty blueprint action hotkey to be a no-op.");
+            }
+
+            if (LegacyMainWindow.TryApplyBlueprintActionHotkeyForTesting(
+                    hotkeys,
+                    AppSettings.CreateDefault(),
+                    FeatureIds.BlueprintCreateAction,
+                    "Backspace",
+                    out message,
+                    out changed) ||
+                changed)
+            {
+                throw new InvalidOperationException("Backspace must not be saved as a blueprint action hotkey.");
+            }
+        }
+
         private static void BlueprintCreateSaveActionCommandsEnterMaskAndSaveWithoutProjectionScan()
         {
             var restore = PushTemporaryConfigDirectory("blueprint-action-shortcuts-real");
@@ -409,6 +461,7 @@ namespace JueMingZ.Tests
                 BlueprintMaterialService.SetInventoryReaderForTesting(inventoryReader, true);
                 BlueprintCaptureService.SetCaptureDependenciesForTesting(captureReader, new BlueprintTemplateLibraryStore());
 
+                LegacyMainUiState.SetVisible(true);
                 LegacyUiActionService.HandleBlueprintActionEntryCommandForTesting(new LegacyUiCommand
                 {
                     ElementId = LegacyMainWindow.GetBlueprintCreateActionElementIdForTesting(),
@@ -423,6 +476,11 @@ namespace JueMingZ.Tests
                     creation.SelectedCount != 0)
                 {
                     throw new InvalidOperationException("Expected stage-06 F5 create action to enter real mask creation mode.");
+                }
+
+                if (LegacyMainUiState.Visible)
+                {
+                    throw new InvalidOperationException("Expected stage-02 F5 create action to close the F5 menu after entering creation mode.");
                 }
 
                 ClickTileForBlueprintCreation(10, 20);
@@ -491,6 +549,63 @@ namespace JueMingZ.Tests
 
                 ClickTileForBlueprintCreation(10, 20);
                 downKeys['C'] = false;
+                BlueprintEntryHotkeyService.TickForTesting(
+                    AppSettings.CreateDefault(),
+                    hotkeys,
+                    downKeys,
+                    true,
+                    string.Empty,
+                    false);
+                downKeys['C'] = true;
+                var exitHotkey = BlueprintEntryHotkeyService.TickForTesting(
+                    AppSettings.CreateDefault(),
+                    hotkeys,
+                    downKeys,
+                    true,
+                    string.Empty,
+                    false);
+                var exitedMask = BlueprintCreationMaskState.GetSnapshot();
+                if (!exitHotkey.Triggered ||
+                    !exitHotkey.Applied ||
+                    !string.Equals(exitHotkey.Action, BlueprintEntryCommands.StartCreate, StringComparison.Ordinal) ||
+                    !string.Equals(BlueprintEntryState.GetSnapshot(AppSettings.CreateDefault()).Mode, BlueprintEntryModes.Tool, StringComparison.Ordinal) ||
+                    exitedMask.Active ||
+                    exitedMask.CompletedPendingCapture ||
+                    exitedMask.SelectedCount != 1 ||
+                    !HasBlueprintCell(exitedMask, 10, 20))
+                {
+                    throw new InvalidOperationException("Expected repeated blueprint create hotkey to exit creation while preserving the selected mask.");
+                }
+
+                downKeys['C'] = false;
+                BlueprintEntryHotkeyService.TickForTesting(
+                    AppSettings.CreateDefault(),
+                    hotkeys,
+                    downKeys,
+                    true,
+                    string.Empty,
+                    false);
+                downKeys['C'] = true;
+                var resumeHotkey = BlueprintEntryHotkeyService.TickForTesting(
+                    AppSettings.CreateDefault(),
+                    hotkeys,
+                    downKeys,
+                    true,
+                    string.Empty,
+                    false);
+                var resumedMask = BlueprintCreationMaskState.GetSnapshot();
+                if (!resumeHotkey.Triggered ||
+                    !resumeHotkey.Applied ||
+                    !string.Equals(BlueprintEntryState.GetSnapshot(AppSettings.CreateDefault()).Mode, BlueprintEntryModes.Creating, StringComparison.Ordinal) ||
+                    !resumedMask.Active ||
+                    resumedMask.CompletedPendingCapture ||
+                    resumedMask.SelectedCount != 1 ||
+                    !HasBlueprintCell(resumedMask, 10, 20))
+                {
+                    throw new InvalidOperationException("Expected blueprint create hotkey to re-enter creation with the preserved mask still visible.");
+                }
+
+                downKeys['C'] = false;
                 downKeys['S'] = true;
                 var saveHotkey = BlueprintEntryHotkeyService.TickForTesting(
                     AppSettings.CreateDefault(),
@@ -527,6 +642,7 @@ namespace JueMingZ.Tests
                 BlueprintProjectionService.ResetForTesting();
                 BlueprintMaterialService.ResetForTesting();
                 BlueprintCaptureService.ResetForTesting();
+                LegacyMainUiState.SetVisible(false);
                 BlueprintEntryState.ResetForTesting();
                 BlueprintCreationMaskState.ResetForTesting();
                 BlueprintEntryHotkeyService.ResetForTesting();

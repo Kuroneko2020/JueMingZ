@@ -72,6 +72,7 @@ namespace JueMingZ.Automation.Blueprint
         public const string OpenMaterials = "open-materials";
         public const string StartErase = "start-erase";
         public const string ClearSelection = "clear-selection";
+        public const string ExitCreate = "exit-create";
         public const string FinishCreateSave = "finish-create-save";
         public const string FinishCreateUse = "finish-create-use";
         public const string MirrorPreviewHorizontal = "mirror-preview-horizontal";
@@ -178,15 +179,22 @@ namespace JueMingZ.Automation.Blueprint
                         false,
                         false);
                 case BlueprintEntryCommands.StartCreate:
+                    if (IsCurrentMode(BlueprintEntryModes.Creating))
+                    {
+                        return ExitCreatePreservingSelection();
+                    }
+
                     BlueprintPlacementPreviewState.Cancel();
                     BlueprintEraseRegionState.Cancel();
                     BlueprintCreationMaskState.BeginCreate();
-                    return SetMode(
+                    var started = SetMode(
                         BlueprintEntryModes.Creating,
                         "ui",
                         "entryStateChanged",
                         "创建入口已进入 mask 选择状态。",
                         false);
+                    BlueprintCreationPromptService.NotifyCreateStarted(started);
+                    return started;
                 case BlueprintEntryCommands.OpenLibrary:
                     return RecordNotice(
                         "ui",
@@ -221,6 +229,8 @@ namespace JueMingZ.Automation.Blueprint
                     return MarkEraseStarted(BlueprintEraseRegionState.BeginErase(string.Empty));
                 case BlueprintEntryCommands.ClearSelection:
                     return ApplyCreationSelectionResult(BlueprintCreationMaskState.ClearSelection(), BlueprintEntryModes.Creating, false);
+                case BlueprintEntryCommands.ExitCreate:
+                    return ExitCreatePreservingSelection();
                 case BlueprintEntryCommands.FinishCreateSave:
                     return ApplyCreationSelectionResult(BlueprintCreationMaskState.FinishCreate(false), BlueprintEntryModes.CreatedPendingSave, true);
                 case BlueprintEntryCommands.FinishCreateUse:
@@ -467,6 +477,29 @@ namespace JueMingZ.Automation.Blueprint
             return count;
         }
 
+        private static bool IsCurrentMode(string mode)
+        {
+            var normalized = BlueprintEntryModes.Normalize(mode);
+            lock (SyncRoot)
+            {
+                return string.Equals(_mode, normalized, StringComparison.Ordinal);
+            }
+        }
+
+        private static BlueprintEntryCommandResult ExitCreatePreservingSelection()
+        {
+            var wasCreating = IsCurrentMode(BlueprintEntryModes.Creating);
+            var exit = BlueprintCreationMaskState.ExitCreatePreservingSelection();
+            var result = SetMode(
+                BlueprintEntryModes.Tool,
+                "ui",
+                "entryStateChanged",
+                exit == null ? "已退出蓝图创建状态。" : exit.Message,
+                false);
+            BlueprintCreationPromptService.NotifyCreateExited(result, wasCreating);
+            return result;
+        }
+
         internal static void ResetForTesting()
         {
             lock (SyncRoot)
@@ -481,6 +514,7 @@ namespace JueMingZ.Automation.Blueprint
             BlueprintCreationMaskState.ResetForTesting();
             BlueprintPlacementPreviewState.ResetForTesting();
             BlueprintEraseRegionState.ResetForTesting();
+            BlueprintCreationPromptService.ResetForTesting();
         }
 
         private static BlueprintEntryCommandResult ApplyPlacementMirrorResult(BlueprintPlacementCommandResult result)

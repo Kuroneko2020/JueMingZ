@@ -35,6 +35,7 @@ namespace JueMingZ.Tests
     {
         private const int AutoMiningVkAlt = 0x12;
         private const int AutoMiningVkK = 0x4B;
+        private const int AutoMiningVkBackspace = 0x08;
 
         private static void AutoMiningScannerLinksThreeTileGaps()
         {
@@ -353,6 +354,40 @@ namespace JueMingZ.Tests
                 gameInputUnavailable.DiagnosticResultCode != DiagnosticResultCode.BlockedByEnvironment)
             {
                 throw new InvalidOperationException("Auto mining hotkey input should report game-input blockers.");
+            }
+        }
+
+        private static void AutoMiningHotkeyBackspaceClearContract()
+        {
+            var settings = HotkeySettings.CreateDefault();
+            settings.HotkeysByFeatureId[FeatureIds.WorldAutomationAutoMining] = "Alt+K";
+            bool changed;
+            if (!LegacyMainWindow.TryClearAutoMiningHotkeyBindingForTesting(settings, out changed) ||
+                !changed ||
+                settings.HotkeysByFeatureId.ContainsKey(FeatureIds.WorldAutomationAutoMining))
+            {
+                throw new InvalidOperationException("Expected Backspace clear to remove the auto-mining trigger hotkey binding.");
+            }
+
+            if (!LegacyMainWindow.TryClearAutoMiningHotkeyBindingForTesting(settings, out changed) ||
+                changed)
+            {
+                throw new InvalidOperationException("Expected clearing an already-empty auto-mining trigger hotkey to be a no-op.");
+            }
+
+            AutoMiningHotkeyInput.ResetForTesting();
+            var invalid = AutoMiningHotkeyInput.ConsumePressedForTesting(
+                "Backspace",
+                AutoMiningDownKeys(AutoMiningVkBackspace),
+                false,
+                string.Empty,
+                true,
+                new DateTime(2026, 6, 21, 0, 0, 0, DateTimeKind.Utc));
+            if (invalid.PressedEdge ||
+                invalid.Accepted ||
+                !string.Equals(invalid.Reason, "invalidHotkey", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Backspace must not be parsed as a normal auto-mining trigger hotkey.");
             }
         }
 

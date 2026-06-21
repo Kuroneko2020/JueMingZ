@@ -16,9 +16,24 @@ namespace JueMingZ.UI.Legacy
             }
 
             var targetId = NormalizeBlueprintHotkeyTargetId(_blueprintHotkeyCaptureTargetId);
-            if (PressedCaptureKey(BlueprintEntryCaptureWasDown, 0x1B))
+            if (PressedCaptureKey(BlueprintEntryCaptureWasDown, VkEscape))
             {
                 _blueprintEntryHotkeyMessage = "已取消录入";
+                StopBlueprintEntryHotkeyCapture();
+                return;
+            }
+
+            if (PressedCaptureKey(BlueprintEntryCaptureWasDown, VkBackspace))
+            {
+                var hotkeySettings = ConfigService.HotkeySettings ?? HotkeySettings.CreateDefault();
+                bool clearChanged;
+                ClearBlueprintHotkeyBinding(hotkeySettings, targetId, out clearChanged);
+                if (clearChanged)
+                {
+                    ConfigService.SaveAll();
+                }
+
+                _blueprintEntryHotkeyMessage = clearChanged ? "已清除绑定" : "当前未绑定";
                 StopBlueprintEntryHotkeyCapture();
                 return;
             }
@@ -85,7 +100,8 @@ namespace JueMingZ.UI.Legacy
             BlueprintEntryCaptureWasDown[VkAlt] = IsKeyDown(VkAlt);
             BlueprintEntryCaptureWasDown[VkControl] = IsKeyDown(VkControl);
             BlueprintEntryCaptureWasDown[VkShift] = IsKeyDown(VkShift);
-            BlueprintEntryCaptureWasDown[0x1B] = IsKeyDown(0x1B);
+            BlueprintEntryCaptureWasDown[VkBackspace] = IsKeyDown(VkBackspace);
+            BlueprintEntryCaptureWasDown[VkEscape] = IsKeyDown(VkEscape);
             for (var key = 0x41; key <= 0x5A; key++)
             {
                 BlueprintEntryCaptureWasDown[key] = IsKeyDown(key);
@@ -208,6 +224,25 @@ namespace JueMingZ.UI.Legacy
             return true;
         }
 
+        private static bool ClearBlueprintHotkeyBinding(HotkeySettings hotkeySettings, string targetId, out bool changed)
+        {
+            changed = false;
+            targetId = NormalizeBlueprintHotkeyTargetId(targetId);
+            if (targetId.Length <= 0)
+            {
+                return false;
+            }
+
+            hotkeySettings = hotkeySettings ?? HotkeySettings.CreateDefault();
+            if (hotkeySettings.HotkeysByFeatureId == null)
+            {
+                hotkeySettings.HotkeysByFeatureId = new Dictionary<string, string>();
+            }
+
+            changed = hotkeySettings.HotkeysByFeatureId.Remove(targetId);
+            return true;
+        }
+
         private static string NormalizeBlueprintHotkeyTargetId(string targetId)
         {
             if (string.Equals(targetId, FeatureIds.BlueprintCreateAction, StringComparison.OrdinalIgnoreCase))
@@ -265,6 +300,11 @@ namespace JueMingZ.UI.Legacy
             out bool changed)
         {
             return TrySaveBlueprintActionHotkey(hotkeySettings, appSettings, targetId, chordText, out message, out changed);
+        }
+
+        internal static bool TryClearBlueprintActionHotkeyForTesting(HotkeySettings hotkeySettings, string targetId, out bool changed)
+        {
+            return ClearBlueprintHotkeyBinding(hotkeySettings, targetId, out changed);
         }
     }
 }

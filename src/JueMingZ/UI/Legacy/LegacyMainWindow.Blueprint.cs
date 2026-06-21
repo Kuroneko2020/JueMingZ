@@ -25,7 +25,7 @@ namespace JueMingZ.UI.Legacy
         private const string BlueprintStatusBarElementId = "blueprint-status-bar";
         private const string BlueprintLibraryVisualContract = "main-menu-open-row+deferred-secondary-menu+state-paged-6+inline-rename+two-step-delete+template-only-export";
         private const string BlueprintPlacedInstanceVisualContract = "main-menu-open-row+deferred-secondary-menu+current-world-list+paged-5+select+hide-show+two-step-remove+layer-up-down+template-snapshot-isolated";
-        private const string BlueprintCreationVisualContract = "world-mask+single-toggle+drag-toggle+multi-region+ui-owned-consume+content-hover+air-skip+low-alpha-no-border+continuous-mask+clear-selection+finish-cancel+placement-preview+center-anchor+left-click-instance";
+        private const string BlueprintCreationVisualContract = "world-mask+single-toggle+drag-toggle+multi-region+ui-owned-consume+world-hover+air-select+low-alpha-no-border+continuous-mask+clear-selection+finish-cancel+placement-preview+center-anchor+left-click-instance";
         private const string BlueprintProjectionVisualContract = "world-projection+fulfilled-missing-conflict+hidden-skip+layer-cover";
         private const string BlueprintMaterialVisualContract = "aggregate-materials+main-inventory+void-bag+floating-window";
         private const string BlueprintEraseVisualContract = "instance-erase-region+selected-priority+top-layer-fallback+store-mask-only";
@@ -38,6 +38,7 @@ namespace JueMingZ.UI.Legacy
         private const string BlueprintActionShortcutVisualContract = "stage06-f5-create-save-rows+auto-mining-hotkey-shape+action-hotkeys-not-blueprint-main+real-create-save-mask-entry";
         private const string BlueprintActionHotkeyTooltipPrimary = "双击录入采集按键。";
         private const string BlueprintActionHotkeyTooltipCancel = "Esc 取消录入。";
+        private const string BlueprintActionHotkeyTooltipClear = "Backspace 删除绑定。";
         private const string BlueprintCreateActionButtonTooltip = "左键按住滑动选区，可多选";
         private const string BlueprintSaveActionButtonTooltip = "保存当前选区为蓝图";
         private const string BlueprintReplacementConfigPopupElementId = "blueprint-replacement-config-popup";
@@ -261,7 +262,7 @@ namespace JueMingZ.UI.Legacy
 
         private static string[] GetBlueprintActionHotkeyTooltipLines()
         {
-            return new[] { BlueprintActionHotkeyTooltipPrimary, BlueprintActionHotkeyTooltipCancel };
+            return new[] { BlueprintActionHotkeyTooltipPrimary, BlueprintActionHotkeyTooltipCancel, BlueprintActionHotkeyTooltipClear };
         }
 
         private static LegacyUiElement DrawBlueprintOpenRow(

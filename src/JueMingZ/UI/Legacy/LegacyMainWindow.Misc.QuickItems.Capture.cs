@@ -28,8 +28,20 @@ namespace JueMingZ.UI.Legacy
             var ctrl = IsKeyDown(VkControl);
             var alt = IsKeyDown(VkAlt);
             var shift = IsKeyDown(VkShift);
-            if (!ctrl && !alt && !shift && PressedQuickItemCaptureKey(0x1B))
+            if (!ctrl && !alt && !shift && PressedQuickItemCaptureKey(VkEscape))
             {
+                StopQuickItemHotkeyCapture();
+                return;
+            }
+
+            if (PressedQuickItemCaptureKey(VkBackspace))
+            {
+                bool clearChanged;
+                if (ClearQuickItemHotkeyBinding(bindings, _quickItemHotkeyCaptureBindingIndex, out clearChanged) && clearChanged)
+                {
+                    ConfigService.SaveAll();
+                }
+
                 StopQuickItemHotkeyCapture();
                 return;
             }
@@ -65,8 +77,20 @@ namespace JueMingZ.UI.Legacy
             var ctrl = IsKeyDown(VkControl);
             var alt = IsKeyDown(VkAlt);
             var shift = IsKeyDown(VkShift);
-            if (!ctrl && !alt && !shift && PressedCaptureKey(AutoMiningCaptureWasDown, 0x1B))
+            if (!ctrl && !alt && !shift && PressedCaptureKey(AutoMiningCaptureWasDown, VkEscape))
             {
+                StopAutoMiningHotkeyCapture();
+                return;
+            }
+
+            if (PressedCaptureKey(AutoMiningCaptureWasDown, VkBackspace))
+            {
+                bool clearChanged;
+                if (ClearAutoMiningHotkeyBinding(ConfigService.HotkeySettings ?? HotkeySettings.CreateDefault(), out clearChanged) && clearChanged)
+                {
+                    ConfigService.SaveAll();
+                }
+
                 StopAutoMiningHotkeyCapture();
                 return;
             }
@@ -214,6 +238,48 @@ namespace JueMingZ.UI.Legacy
                 default:
                     return false;
             }
+        }
+
+        private static bool ClearQuickItemHotkeyBinding(List<QuickItemHotkeyBinding> bindings, int index, out bool changed)
+        {
+            changed = false;
+            if (bindings == null || index < 0 || index >= bindings.Count)
+            {
+                return false;
+            }
+
+            var binding = bindings[index];
+            if (binding == null)
+            {
+                return false;
+            }
+
+            changed = !string.IsNullOrWhiteSpace(binding.Hotkey);
+            binding.Hotkey = string.Empty;
+            return true;
+        }
+
+        private static bool ClearAutoMiningHotkeyBinding(HotkeySettings hotkeySettings, out bool changed)
+        {
+            changed = false;
+            hotkeySettings = hotkeySettings ?? HotkeySettings.CreateDefault();
+            if (hotkeySettings.HotkeysByFeatureId == null)
+            {
+                hotkeySettings.HotkeysByFeatureId = new Dictionary<string, string>();
+            }
+
+            changed = hotkeySettings.HotkeysByFeatureId.Remove(FeatureIds.WorldAutomationAutoMining);
+            return true;
+        }
+
+        internal static bool TryClearQuickItemHotkeyBindingForTesting(List<QuickItemHotkeyBinding> bindings, int index, out bool changed)
+        {
+            return ClearQuickItemHotkeyBinding(bindings, index, out changed);
+        }
+
+        internal static bool TryClearAutoMiningHotkeyBindingForTesting(HotkeySettings hotkeySettings, out bool changed)
+        {
+            return ClearAutoMiningHotkeyBinding(hotkeySettings, out changed);
         }
 
         private static bool IsCurrentProcessForeground()

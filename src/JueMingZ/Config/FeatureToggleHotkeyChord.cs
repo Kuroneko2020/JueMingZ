@@ -133,7 +133,8 @@ namespace JueMingZ.Config
 
             var text = token.Trim();
             if (string.Equals(text, "Esc", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(text, "Escape", StringComparison.OrdinalIgnoreCase))
+                string.Equals(text, "Escape", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(text, "Backspace", StringComparison.OrdinalIgnoreCase))
             {
                 return string.Empty;
             }

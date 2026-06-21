@@ -115,6 +115,13 @@ namespace JueMingZ.Input
             var resultCode = capture == null ? result.ResultCode : capture.ResultCode;
             var templateId = capture == null || capture.SavedTemplate == null ? string.Empty : capture.SavedTemplate.TemplateId;
             var templateName = capture == null || capture.SavedTemplate == null ? string.Empty : capture.SavedTemplate.Name;
+            if (string.Equals(normalizedAction, BlueprintEntryCommands.StartCreate, StringComparison.Ordinal) &&
+                result.Succeeded &&
+                string.Equals(result.Mode, BlueprintEntryModes.Creating, StringComparison.Ordinal))
+            {
+                LegacyMainUiState.SetVisible(false);
+            }
+
             Record(
                 command,
                 "Ui.Blueprint.CreateSaveEntry",
@@ -274,6 +281,30 @@ namespace JueMingZ.Input
                     before,
                     BuildBlueprintUiStateJson(),
                     "{\"submitted\":false,\"implemented\":true,\"uiOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"action\":\"" + EscapeJson(commandResult.ButtonId) + "\",\"entryAction\":\"" + EscapeJson(BlueprintEntryCommands.FinishCreateSave) + "\",\"buttonLabel\":\"" + EscapeJson(commandResult.ButtonLabel) + "\",\"resultCode\":\"" + EscapeJson(resultCode) + "\",\"mode\":\"" + EscapeJson(entry.Mode) + "\",\"changed\":" + BoolRaw(entry.Changed || (capture != null && capture.Succeeded)) + ",\"placeholderOnly\":" + BoolRaw(entry.PlaceholderOnly) + ",\"captureAttempted\":" + BoolRaw(capture != null) + ",\"capturedCells\":" + IntRaw(capture == null ? 0 : capture.CapturedCellCount) + ",\"capturedLayers\":" + IntRaw(capture == null ? 0 : capture.CapturedLayerCount) + ",\"skippedAirCells\":" + IntRaw(capture == null ? 0 : capture.SkippedAirCellCount) + ",\"unavailableCells\":" + IntRaw(capture == null ? 0 : capture.UnavailableCellCount) + ",\"templateId\":\"" + EscapeJson(templateId) + "\",\"templateName\":\"" + EscapeJson(templateName) + "\",\"heldItemType\":" + IntRaw(commandResult.HeldItemType) + ",\"visibleReason\":\"" + EscapeJson(BlueprintHandheldActionBarState.HiddenReasonNone) + "\",\"blockedReason\":\"\",\"mouseCaptured\":" + BoolRaw(commandResult.MouseCaptured) + "}",
+                    "Button");
+                return;
+            }
+
+            if (string.Equals(payload, BlueprintHandheldActionBarState.ButtonIdExitCreate, StringComparison.OrdinalIgnoreCase))
+            {
+                var entry = BlueprintEntryState.ApplyCommand(
+                    BlueprintEntryCommands.ExitCreate,
+                    ConfigService.AppSettings ?? AppSettings.CreateDefault());
+                var commandResult = BlueprintHandheldActionBarState.RecordCommandResultClick(
+                    payload,
+                    command == null ? 0 : command.IntValue,
+                    command != null && command.MouseCaptured,
+                    entry.ResultCode,
+                    entry.Message);
+                Record(
+                    command,
+                    "Ui.Blueprint.HandheldActionBar",
+                    "UI",
+                    entry.Succeeded ? (entry.Changed ? "Succeeded" : "NotApplicable") : "Failed",
+                    entry.Message,
+                    before,
+                    BuildBlueprintUiStateJson(),
+                    "{\"submitted\":false,\"implemented\":true,\"uiOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"action\":\"" + EscapeJson(commandResult.ButtonId) + "\",\"entryAction\":\"" + EscapeJson(BlueprintEntryCommands.ExitCreate) + "\",\"buttonLabel\":\"" + EscapeJson(commandResult.ButtonLabel) + "\",\"resultCode\":\"" + EscapeJson(entry.ResultCode) + "\",\"mode\":\"" + EscapeJson(entry.Mode) + "\",\"changed\":" + BoolRaw(entry.Changed) + ",\"placeholderOnly\":" + BoolRaw(entry.PlaceholderOnly) + ",\"heldItemType\":" + IntRaw(commandResult.HeldItemType) + ",\"visibleReason\":\"" + EscapeJson(BlueprintHandheldActionBarState.HiddenReasonNone) + "\",\"blockedReason\":\"\",\"mouseCaptured\":" + BoolRaw(commandResult.MouseCaptured) + "}",
                     "Button");
                 return;
             }

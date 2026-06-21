@@ -32,10 +32,12 @@ namespace JueMingZ.Automation.Blueprint
         public const string ResultCodeUiOnlyNotImplemented = "uiOnlyNotImplemented";
         public const string ButtonIdCreate = "create";
         public const string ButtonIdSave = "save";
+        public const string ButtonIdExitCreate = "exit-create";
         public const string ButtonIdOpenLibrary = "open-library";
         public const string ButtonIdDelete = "delete";
         public const string ButtonIdMove = "move";
         public const string ButtonIdRedMap = "red-map";
+        public const string SaveDisabledTooltip = "还没有创建蓝图呢";
 
         private const int PanelHeight = 48;
         private const int PanelPadding = 8;
@@ -52,6 +54,7 @@ namespace JueMingZ.Automation.Blueprint
         {
             new BlueprintHandheldActionBarButtonDefinition(ButtonIdCreate, "创建蓝图", 0, "创建新的蓝图选区"),
             new BlueprintHandheldActionBarButtonDefinition(ButtonIdSave, "保存蓝图", 0, "保存当前蓝图选区"),
+            new BlueprintHandheldActionBarButtonDefinition(ButtonIdExitCreate, "退出创建", 1, "退出创建并保留当前选区"),
             new BlueprintHandheldActionBarButtonDefinition(ButtonIdOpenLibrary, "打开蓝图库", 1, "打开蓝图库"),
             new BlueprintHandheldActionBarButtonDefinition(ButtonIdDelete, "删除蓝图", 2, "删除已经放置的蓝图或已经选区待创建的区域"),
             new BlueprintHandheldActionBarButtonDefinition(ButtonIdMove, "移动蓝图", 3, "移动已经放置的蓝图或已经选区待创建的区域"),
@@ -190,7 +193,10 @@ namespace JueMingZ.Automation.Blueprint
                 _lastLeftDown = input.LeftDown;
                 _hoveredButtonId = hoveredButtonId;
 
-                if (leftPressed && !string.IsNullOrWhiteSpace(hoveredButtonId))
+                var hoveredButton = FindButtonFrame(frame, hoveredButtonId);
+                var hoveredButtonEnabled = hoveredButton == null || hoveredButton.Enabled;
+
+                if (leftPressed && !string.IsNullOrWhiteSpace(hoveredButtonId) && hoveredButtonEnabled)
                 {
                     _pressedButtonId = hoveredButtonId;
                 }
@@ -198,6 +204,7 @@ namespace JueMingZ.Automation.Blueprint
                 clicked =
                     input.AllowCommand &&
                     leftPressed &&
+                    hoveredButtonEnabled &&
                     !string.IsNullOrWhiteSpace(hoveredButtonId);
 
                 if (!input.LeftDown)
@@ -332,7 +339,7 @@ namespace JueMingZ.Automation.Blueprint
             int selectedItemType,
             BlueprintHandheldActionBarEnvironment environment)
         {
-            var visibleButtons = SelectVisibleButtonDefinitions(environment);
+            var visibleButtons = SelectVisibleButtonSpecs(environment);
             var count = Math.Max(1, visibleButtons.Count);
             var compact = screenWidth < 480;
             var gap = compact ? CompactButtonGap : ButtonGap;
@@ -368,10 +375,11 @@ namespace JueMingZ.Automation.Blueprint
                 var definition = visibleButtons[index];
                 var x = bounds.X + padding + index * (buttonWidth + gap);
                 buttons.Add(new BlueprintHandheldActionBarButtonFrame(
-                    definition.Id,
-                    definition.Label,
-                    definition.Order,
+                    definition.Definition.Id,
+                    definition.Definition.Label,
+                    definition.Definition.Order,
                     definition.Tooltip,
+                    definition.Enabled,
                     new LegacyUiRect(x, buttonY, buttonWidth, Math.Min(ButtonHeight, bounds.Height))));
             }
 
@@ -392,37 +400,61 @@ namespace JueMingZ.Automation.Blueprint
                 CurrentLastClickedButtonId());
         }
 
-        private static IReadOnlyList<BlueprintHandheldActionBarButtonDefinition> SelectVisibleButtonDefinitions(BlueprintHandheldActionBarEnvironment environment)
+        private static IReadOnlyList<BlueprintHandheldActionBarButtonSpec> SelectVisibleButtonSpecs(BlueprintHandheldActionBarEnvironment environment)
         {
             environment = environment ?? new BlueprintHandheldActionBarEnvironment();
-            var definitions = new List<BlueprintHandheldActionBarButtonDefinition>();
-            var hasPendingSelection = environment.BlueprintCreationHasPendingSelection;
-            var creating = environment.BlueprintCreationActive || hasPendingSelection;
+            var definitions = new List<BlueprintHandheldActionBarButtonSpec>();
+            var creating = environment.BlueprintCreationActive;
+            var pendingCapture = environment.BlueprintCreationCompletedPendingCapture;
+            var creatingOrPendingCapture = creating || pendingCapture;
+            var hasSelectedCells = environment.BlueprintCreationSelectedCount > 0;
 
-            definitions.Add(FindButtonDefinition(creating ? ButtonIdSave : ButtonIdCreate));
-            definitions.Add(FindButtonDefinition(ButtonIdOpenLibrary));
-
-            if (hasPendingSelection)
+            if (creatingOrPendingCapture)
             {
-                definitions.Add(FindButtonDefinition(ButtonIdDelete));
-                definitions.Add(FindButtonDefinition(ButtonIdMove));
+                definitions.Add(BuildButtonSpec(
+                    ButtonIdSave,
+                    hasSelectedCells,
+                    hasSelectedCells ? string.Empty : SaveDisabledTooltip));
+                definitions.Add(BuildButtonSpec(ButtonIdExitCreate, true, string.Empty));
+                if (environment.BlueprintHasPlacedInstances)
+                {
+                    definitions.Add(BuildButtonSpec(ButtonIdDelete, true, string.Empty));
+                    definitions.Add(BuildButtonSpec(ButtonIdMove, true, string.Empty));
+                }
             }
-            else if (environment.BlueprintHasPlacedInstances)
+            else
             {
-                definitions.Add(FindButtonDefinition(ButtonIdDelete));
-                definitions.Add(FindButtonDefinition(ButtonIdMove));
-                definitions.Add(FindButtonDefinition(ButtonIdRedMap));
+                definitions.Add(BuildButtonSpec(ButtonIdCreate, true, string.Empty));
+                definitions.Add(BuildButtonSpec(ButtonIdOpenLibrary, true, string.Empty));
+
+                if (environment.BlueprintHasPlacedInstances)
+                {
+                    definitions.Add(BuildButtonSpec(ButtonIdDelete, true, string.Empty));
+                    definitions.Add(BuildButtonSpec(ButtonIdMove, true, string.Empty));
+                    definitions.Add(BuildButtonSpec(ButtonIdRedMap, true, string.Empty));
+                }
             }
 
             for (var index = definitions.Count - 1; index >= 0; index--)
             {
-                if (definitions[index] == null)
+                if (definitions[index] == null || definitions[index].Definition == null)
                 {
                     definitions.RemoveAt(index);
                 }
             }
 
             return definitions;
+        }
+
+        private static BlueprintHandheldActionBarButtonSpec BuildButtonSpec(string buttonId, bool enabled, string tooltipOverride)
+        {
+            var definition = FindButtonDefinition(buttonId);
+            if (definition == null)
+            {
+                return null;
+            }
+
+            return new BlueprintHandheldActionBarButtonSpec(definition, enabled, string.IsNullOrWhiteSpace(tooltipOverride) ? definition.Tooltip : tooltipOverride);
         }
 
         private static BlueprintHandheldActionBarFrame Hidden(string reason, int toolItemId, int selectedItemType)
@@ -522,6 +554,25 @@ namespace JueMingZ.Automation.Blueprint
             return null;
         }
 
+        private static BlueprintHandheldActionBarButtonFrame FindButtonFrame(BlueprintHandheldActionBarFrame frame, string buttonId)
+        {
+            if (frame == null || frame.Buttons == null || string.IsNullOrWhiteSpace(buttonId))
+            {
+                return null;
+            }
+
+            for (var index = 0; index < frame.Buttons.Count; index++)
+            {
+                var button = frame.Buttons[index];
+                if (button != null && string.Equals(button.Id, buttonId, StringComparison.Ordinal))
+                {
+                    return button;
+                }
+            }
+
+            return null;
+        }
+
         private static void ClearTransientInteraction(string reason)
         {
             lock (InteractionSyncRoot)
@@ -589,6 +640,7 @@ namespace JueMingZ.Automation.Blueprint
         public bool LegacyMainUiVisible { get; set; }
         public bool BlueprintCreationActive { get; set; }
         public bool BlueprintCreationHasPendingSelection { get; set; }
+        public bool BlueprintCreationCompletedPendingCapture { get; set; }
         public int BlueprintCreationSelectedCount { get; set; }
         public bool BlueprintHasPlacedInstances { get; set; }
         public int BlueprintPlacedInstanceCount { get; set; }
@@ -615,6 +667,20 @@ namespace JueMingZ.Automation.Blueprint
         }
     }
 
+    internal sealed class BlueprintHandheldActionBarButtonSpec
+    {
+        public BlueprintHandheldActionBarButtonSpec(BlueprintHandheldActionBarButtonDefinition definition, bool enabled, string tooltip)
+        {
+            Definition = definition;
+            Enabled = enabled;
+            Tooltip = tooltip ?? string.Empty;
+        }
+
+        public BlueprintHandheldActionBarButtonDefinition Definition { get; private set; }
+        public bool Enabled { get; private set; }
+        public string Tooltip { get; private set; }
+    }
+
     public sealed class BlueprintHandheldActionBarButtonDefinition
     {
         public BlueprintHandheldActionBarButtonDefinition(string id, string label, int order, string tooltip)
@@ -633,12 +699,13 @@ namespace JueMingZ.Automation.Blueprint
 
     public sealed class BlueprintHandheldActionBarButtonFrame
     {
-        public BlueprintHandheldActionBarButtonFrame(string id, string label, int order, string tooltip, LegacyUiRect rect)
+        public BlueprintHandheldActionBarButtonFrame(string id, string label, int order, string tooltip, bool enabled, LegacyUiRect rect)
         {
             Id = id ?? string.Empty;
             Label = label ?? string.Empty;
             Order = order;
             Tooltip = tooltip ?? string.Empty;
+            Enabled = enabled;
             Rect = rect;
         }
 
@@ -646,6 +713,7 @@ namespace JueMingZ.Automation.Blueprint
         public string Label { get; private set; }
         public int Order { get; private set; }
         public string Tooltip { get; private set; }
+        public bool Enabled { get; private set; }
         public LegacyUiRect Rect { get; private set; }
     }
 

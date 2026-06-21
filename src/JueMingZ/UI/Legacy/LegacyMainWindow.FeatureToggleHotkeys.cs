@@ -22,8 +22,8 @@ namespace JueMingZ.UI.Legacy
         private const string FeatureToggleHotkeyCloseElementId = "feature-toggle-hotkey-close";
         private const string FeatureToggleHotkeyIntroText = "只切换功能开启/关闭，不执行功能动作。";
         private const string FeatureToggleHotkeyIdleText = "单击开始录入按钮";
-        private const string FeatureToggleHotkeyCapturingText = "请按下按键，按esc退出";
-        private const string FeatureToggleHotkeyCaptureTooltip = "支持Ctrl，Alt，Shift + ";
+        private const string FeatureToggleHotkeyCapturingText = "请按下按键，Backspace 删除，Esc 取消";
+        private const string FeatureToggleHotkeyCaptureTooltip = "支持 Ctrl / Alt / Shift + 键；Backspace 删除绑定";
 
         private static string _featureToggleHotkeyModalTargetId = string.Empty;
         private static LegacyUiRect _featureToggleHotkeyModalAnchor;
@@ -102,12 +102,8 @@ namespace JueMingZ.UI.Legacy
             }
 
             var settings = EnsureHotkeySettings();
-            if (settings.ToggleHotkeysByTargetId == null)
-            {
-                settings.ToggleHotkeysByTargetId = new Dictionary<string, string>();
-            }
-
-            var changed = settings.ToggleHotkeysByTargetId.Remove(targetId);
+            bool changed;
+            ClearFeatureToggleHotkeyBinding(settings, targetId, out changed);
             StopFeatureToggleHotkeyCapture();
             _featureToggleHotkeyMessage = changed ? "已清除绑定" : "当前未绑定";
             if (changed)
@@ -378,10 +374,16 @@ namespace JueMingZ.UI.Legacy
                 return;
             }
 
-            if (PressedCaptureKey(FeatureToggleHotkeyCaptureWasDown, 0x1B))
+            if (PressedCaptureKey(FeatureToggleHotkeyCaptureWasDown, VkEscape))
             {
                 StopFeatureToggleHotkeyCapture();
                 _featureToggleHotkeyMessage = "已取消录入";
+                return;
+            }
+
+            if (PressedCaptureKey(FeatureToggleHotkeyCaptureWasDown, VkBackspace))
+            {
+                ClearFeatureToggleHotkeyBinding();
                 return;
             }
 
@@ -477,7 +479,11 @@ namespace JueMingZ.UI.Legacy
 
         private static bool IsAnyFeatureToggleCaptureKeyDown()
         {
-            if (IsKeyDown(VkAlt) || IsKeyDown(VkControl) || IsKeyDown(VkShift) || IsKeyDown(0x1B))
+            if (IsKeyDown(VkAlt) ||
+                IsKeyDown(VkControl) ||
+                IsKeyDown(VkShift) ||
+                IsKeyDown(VkBackspace) ||
+                IsKeyDown(VkEscape))
             {
                 return true;
             }
@@ -515,7 +521,8 @@ namespace JueMingZ.UI.Legacy
             FeatureToggleHotkeyCaptureWasDown[VkAlt] = IsKeyDown(VkAlt);
             FeatureToggleHotkeyCaptureWasDown[VkControl] = IsKeyDown(VkControl);
             FeatureToggleHotkeyCaptureWasDown[VkShift] = IsKeyDown(VkShift);
-            FeatureToggleHotkeyCaptureWasDown[0x1B] = IsKeyDown(0x1B);
+            FeatureToggleHotkeyCaptureWasDown[VkBackspace] = IsKeyDown(VkBackspace);
+            FeatureToggleHotkeyCaptureWasDown[VkEscape] = IsKeyDown(VkEscape);
             for (var key = 0x41; key <= 0x5A; key++)
             {
                 FeatureToggleHotkeyCaptureWasDown[key] = IsKeyDown(key);
@@ -567,6 +574,25 @@ namespace JueMingZ.UI.Legacy
             changed = !string.Equals(old, chord.Normalized, StringComparison.Ordinal);
             hotkeySettings.ToggleHotkeysByTargetId[normalizedTargetId] = chord.Normalized;
             message = changed ? "已保存 " + chord.Display : "未变化";
+            return true;
+        }
+
+        private static bool ClearFeatureToggleHotkeyBinding(HotkeySettings hotkeySettings, string targetId, out bool changed)
+        {
+            changed = false;
+            string normalizedTargetId;
+            if (!FeatureToggleHotkeyTargetCatalog.TryNormalizeTargetId(targetId, out normalizedTargetId))
+            {
+                return false;
+            }
+
+            hotkeySettings = hotkeySettings ?? HotkeySettings.CreateDefault();
+            if (hotkeySettings.ToggleHotkeysByTargetId == null)
+            {
+                hotkeySettings.ToggleHotkeysByTargetId = new Dictionary<string, string>();
+            }
+
+            changed = hotkeySettings.ToggleHotkeysByTargetId.Remove(normalizedTargetId);
             return true;
         }
 
@@ -660,6 +686,11 @@ namespace JueMingZ.UI.Legacy
         internal static bool TryApplyFeatureToggleHotkeyCapturedChordForTesting(HotkeySettings hotkeySettings, AppSettings appSettings, string targetId, string chordText, out string message, out bool changed)
         {
             return TrySaveFeatureToggleHotkey(hotkeySettings, appSettings, targetId, chordText, out message, out changed);
+        }
+
+        internal static bool TryClearFeatureToggleHotkeyBindingForTesting(HotkeySettings hotkeySettings, string targetId, out bool changed)
+        {
+            return ClearFeatureToggleHotkeyBinding(hotkeySettings, targetId, out changed);
         }
 
         internal static void OpenFeatureToggleHotkeyModalForTesting(string targetId, LegacyUiRect anchor)

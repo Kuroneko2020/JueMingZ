@@ -39,6 +39,47 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void BlueprintAutoPlacementIgnoresAirOnlyTemplateBounds()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-auto-placement-air-bounds");
+            try
+            {
+                BlueprintAutoPlacementService.ResetForTesting();
+                var store = new BlueprintWorldInstanceStore();
+                var reader = new FakeBlueprintWorldTileReader();
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(store.CreateInstanceFromTemplate("pair-auto-air", "world-auto-air", CreateAirOnlyTemplate("空气边界"), 70, 80, 0, out instance), "create air-only auto placement instance");
+                reader.Set(70, 80, new BlueprintWorldTileSnapshot { Active = true, TileType = 999 });
+                reader.Set(73, 81, new BlueprintWorldTileSnapshot { Active = true, TileType = 998 });
+                BlueprintProjectionService.SetDependenciesForTesting(store, BlueprintPlacementWorldContext.Success("pair-auto-air", "world-auto-air"), reader, true);
+                BlueprintMaterialService.SetInventoryReaderForTesting(new FakeBlueprintMaterialInventoryReader(), true);
+
+                var settings = AppSettings.CreateDefault();
+                settings.BlueprintAutoPlacementEnabled = true;
+                var queue = new InputActionQueue();
+                var result = BlueprintAutoPlacementService.TickForTesting(queue, CreateBlueprintInWorldSnapshot(), RuntimeSettingsSnapshot.FromSettings(settings));
+                var snapshot = result.Snapshot;
+                if (result.Submitted ||
+                    result.Candidate != null ||
+                    queue.GetSnapshot().PendingCount != 0 ||
+                    snapshot.CandidateCount != 0 ||
+                    snapshot.SkippedUnsupportedLayerCount != 0 ||
+                    snapshot.SkippedNoMaterialLayerCount != 0 ||
+                    !string.Equals(snapshot.ResultCode, "noCandidate", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected auto placement to ignore air-only template bounds and submit no action.");
+                }
+            }
+            finally
+            {
+                BlueprintAutoPlacementService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialWindowOverlay.ResetForTesting();
+                restore();
+            }
+        }
+
         private static void BlueprintAutoPlacementCandidatesSortAndSkipUnsafeLayers()
         {
             var restore = PushTemporaryConfigDirectory("blueprint-auto-placement-candidates");
@@ -524,6 +565,18 @@ namespace JueMingZ.Tests
             });
             AddMaterialEntries(template);
             return template;
+        }
+
+        private static BlueprintTemplateRecord CreateAirOnlyTemplate(string name)
+        {
+            return new BlueprintTemplateRecord
+            {
+                Name = name ?? string.Empty,
+                Width = 4,
+                Height = 2,
+                AnchorX = 1,
+                AnchorY = 0
+            };
         }
 
         private static GameStateSnapshot CreateBlueprintInWorldSnapshot()

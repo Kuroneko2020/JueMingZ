@@ -128,11 +128,14 @@ namespace JueMingZ.Automation.Blueprint
 
             var state = new BlueprintCaptureBuildState();
             var selected = CloneAndSortSelectedCells(mask.SelectedCells);
-            var minContentX = 0;
-            var minContentY = 0;
-            var maxContentX = 0;
-            var maxContentY = 0;
-            var hasContentBounds = false;
+            int minMaskX;
+            int minMaskY;
+            int maxMaskX;
+            int maxMaskY;
+            if (!TryResolveSelectedBounds(selected, out minMaskX, out minMaskY, out maxMaskX, out maxMaskY))
+            {
+                return BlueprintCaptureResult.Failure("emptySelection", "没有可采集的蓝图选区。", null, null, mask.SelectedCount, 0, 0, 0, 0, useAfterSave);
+            }
 
             for (var index = 0; index < selected.Count; index++)
             {
@@ -155,28 +158,13 @@ namespace JueMingZ.Automation.Blueprint
                 }
 
                 state.Cells.Add(cell);
-                if (!hasContentBounds)
-                {
-                    minContentX = sample.TileX;
-                    maxContentX = sample.TileX;
-                    minContentY = sample.TileY;
-                    maxContentY = sample.TileY;
-                    hasContentBounds = true;
-                }
-                else
-                {
-                    if (sample.TileX < minContentX) minContentX = sample.TileX;
-                    if (sample.TileX > maxContentX) maxContentX = sample.TileX;
-                    if (sample.TileY < minContentY) minContentY = sample.TileY;
-                    if (sample.TileY > maxContentY) maxContentY = sample.TileY;
-                }
             }
 
-            if (!hasContentBounds || state.Cells.Count <= 0)
+            if (state.Cells.Count <= 0)
             {
                 return BlueprintCaptureResult.Failure(
                     "emptyContent",
-                    "选区内没有可保存的 Tile、Wall、wire 或 actuator 内容。",
+                    "选区内没有可保存的 Tile、Wall、wire 或 actuator 内容；纯空气选区不会生成空蓝图模板。",
                     null,
                     null,
                     mask.SelectedCount,
@@ -187,9 +175,12 @@ namespace JueMingZ.Automation.Blueprint
                     useAfterSave);
             }
 
-            NormalizeCellCoordinates(state.Cells, minContentX, minContentY);
-            var width = maxContentX - minContentX + 1;
-            var height = maxContentY - minContentY + 1;
+            // Air cells are stored as template bounds, not as content layers.
+            // Projection/material/auto-place only consume Cells, so blank mask
+            // edges never mean "remove world content".
+            NormalizeCellCoordinates(state.Cells, minMaskX, minMaskY);
+            var width = maxMaskX - minMaskX + 1;
+            var height = maxMaskY - minMaskY + 1;
             var template = new BlueprintTemplateRecord
             {
                 Width = Math.Max(1, width),
@@ -522,6 +513,43 @@ namespace JueMingZ.Automation.Blueprint
                 return y != 0 ? y : left.X.CompareTo(right.X);
             });
             return cells;
+        }
+
+        private static bool TryResolveSelectedBounds(
+            IList<BlueprintCreationMaskCell> selected,
+            out int minX,
+            out int minY,
+            out int maxX,
+            out int maxY)
+        {
+            minX = 0;
+            minY = 0;
+            maxX = 0;
+            maxY = 0;
+            if (selected == null || selected.Count <= 0)
+            {
+                return false;
+            }
+
+            minX = selected[0].X;
+            maxX = selected[0].X;
+            minY = selected[0].Y;
+            maxY = selected[0].Y;
+            for (var index = 1; index < selected.Count; index++)
+            {
+                var cell = selected[index];
+                if (cell == null)
+                {
+                    continue;
+                }
+
+                if (cell.X < minX) minX = cell.X;
+                if (cell.X > maxX) maxX = cell.X;
+                if (cell.Y < minY) minY = cell.Y;
+                if (cell.Y > maxY) maxY = cell.Y;
+            }
+
+            return true;
         }
 
         private static void NormalizeCellCoordinates(IList<BlueprintCellRecord> cells, int originX, int originY)

@@ -10,7 +10,7 @@ namespace JueMingZ.Tests
 {
     internal static partial class Program
     {
-        private static void BlueprintCaptureRecordsLayersAndFiltersAir()
+        private static void BlueprintCaptureRecordsLayersAndKeepsAirBounds()
         {
             BlueprintEntryState.ResetForTesting();
             BlueprintCreationMaskState.BeginCreate();
@@ -20,7 +20,8 @@ namespace JueMingZ.Tests
             BlueprintCreationMaskState.FinishCreate(false);
 
             var reader = new FakeBlueprintWorldTileReader();
-            reader.Set(10, 20, new BlueprintWorldTileSnapshot
+            reader.Set(10, 20, new BlueprintWorldTileSnapshot());
+            reader.Set(11, 20, new BlueprintWorldTileSnapshot
             {
                 Active = true,
                 TileType = 1,
@@ -44,7 +45,6 @@ namespace JueMingZ.Tests
                 TileDisplayName = "Stone Block",
                 WallDisplayName = "Stone Wall"
             });
-            reader.Set(11, 20, new BlueprintWorldTileSnapshot());
             reader.Set(12, 20, new BlueprintWorldTileSnapshot
             {
                 LiquidAmount = 128,
@@ -58,12 +58,17 @@ namespace JueMingZ.Tests
             }
 
             var template = result.Template;
-            if (template.Width != 1 || template.Height != 1 || template.Cells.Count != 1)
+            if (template.Width != 3 || template.Height != 1 || template.AnchorX != 1 || template.Cells.Count != 1)
             {
-                throw new InvalidOperationException("Expected blueprint capture bounds to shrink around real content.");
+                throw new InvalidOperationException("Expected blueprint capture bounds to preserve selected air edges while keeping content-only cells.");
             }
 
             var cell = template.Cells[0];
+            if (cell.X != 1 || cell.Y != 0)
+            {
+                throw new InvalidOperationException("Expected captured content to stay relative to the air-inclusive mask bounds.");
+            }
+
             var tile = RequireLayer(cell, BlueprintLayerKinds.Tile);
             if (tile.ContentId != 1 ||
                 tile.FrameX != 18 ||
@@ -103,7 +108,7 @@ namespace JueMingZ.Tests
             }
         }
 
-        private static void BlueprintCaptureRejectsEmptyContentAfterAirFilter()
+        private static void BlueprintCaptureRejectsPureAirSelectionExplicitly()
         {
             BlueprintCreationMaskState.ResetForTesting();
             BlueprintCreationMaskState.BeginCreate();
@@ -113,9 +118,12 @@ namespace JueMingZ.Tests
             var reader = new FakeBlueprintWorldTileReader();
             reader.Set(1, 1, new BlueprintWorldTileSnapshot());
             var result = BlueprintCaptureService.CaptureSnapshotToTemplate(BlueprintCreationMaskState.GetSnapshot(), reader, false);
-            if (result.Succeeded || !string.Equals(result.ResultCode, "emptyContent", StringComparison.Ordinal))
+            if (result.Succeeded ||
+                !string.Equals(result.ResultCode, "emptyContent", StringComparison.Ordinal) ||
+                result.MaskSelectedCount != 1 ||
+                result.SkippedAirCellCount != 1)
             {
-                throw new InvalidOperationException("Expected all-air selection to be rejected after capture filtering.");
+                throw new InvalidOperationException("Expected pure-air selection to fail explicitly instead of saving an empty template.");
             }
         }
 

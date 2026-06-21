@@ -1074,6 +1074,7 @@ namespace JueMingZ.Tests
             Run("blueprint direct entry hotkey is not a conflict source", ref failed, BlueprintDirectEntryHotkeyIsNotAConflictSource);
             Run("blueprint entry UI contracts expose blocker and capture", ref failed, BlueprintEntryUiContractsExposeBlockerAndCapture);
             Run("blueprint action hotkeys use separate keys and conflict sources", ref failed, BlueprintActionHotkeysUseSeparateKeysAndConflictSources);
+            Run("blueprint action hotkey Backspace clears binding", ref failed, BlueprintActionHotkeyBackspaceClearContract);
             Run("blueprint create save action commands enter mask and save without projection scan", ref failed, BlueprintCreateSaveActionCommandsEnterMaskAndSaveWithoutProjectionScan);
             Run("blueprint menu UI state does not refresh projection or materials", ref failed, BlueprintMenuUiStateDoesNotRefreshProjectionOrMaterials);
             Run("blueprint replacement config menu contracts", ref failed, BlueprintReplacementConfigMenuContracts);
@@ -1087,15 +1088,17 @@ namespace JueMingZ.Tests
             Run("blueprint handheld action bar real commands and unimplemented buttons", ref failed, BlueprintHandheldActionBarRealCommandsAndUnimplementedButtons);
             Run("blueprint handheld action bar diagnostics snapshot json", ref failed, BlueprintHandheldActionBarDiagnosticsSnapshotJson);
             Run("blueprint feedback diagnostics audit fields stay wired", ref failed, BlueprintFeedbackDiagnosticsAuditFieldsStayWired);
+            Run("blueprint second feedback stage 07 audit contracts stay wired", ref failed, BlueprintSecondFeedbackStage07AuditContractsStayWired);
             Run("blueprint handheld action bar hidden clears input state", ref failed, BlueprintHandheldActionBarHiddenClearsInputState);
             Run("blueprint creation mask toggles single tile and multi region", ref failed, BlueprintCreationMaskTogglesSingleTileAndMultiRegion);
             Run("blueprint creation mask drag toggles rectangle", ref failed, BlueprintCreationMaskDragTogglesRectangle);
-            Run("blueprint creation mask skips air and tracks hover", ref failed, BlueprintCreationMaskSkipsAirAndTracksHover);
+            Run("blueprint creation mask selects air and tracks bounds", ref failed, BlueprintCreationMaskSelectsAirAndTracksBounds);
             Run("blueprint creation UI hit consumes without changing mask", ref failed, BlueprintCreationUiHitConsumesWithoutChangingMask);
             Run("blueprint creation clear finish and cancel contracts", ref failed, BlueprintCreationClearFinishAndCancelContracts);
             Run("blueprint creation overlay routes and pointer contract", ref failed, BlueprintCreationOverlayRoutesAndPointerContract);
-            Run("blueprint capture records layers and filters air", ref failed, BlueprintCaptureRecordsLayersAndFiltersAir);
-            Run("blueprint capture rejects empty content after air filter", ref failed, BlueprintCaptureRejectsEmptyContentAfterAirFilter);
+            Run("blueprint creation local prompt edges and visual contract", ref failed, BlueprintCreationLocalPromptEdgesAndVisualContract);
+            Run("blueprint capture records layers and keeps air bounds", ref failed, BlueprintCaptureRecordsLayersAndKeepsAirBounds);
+            Run("blueprint capture rejects pure air selection explicitly", ref failed, BlueprintCaptureRejectsPureAirSelectionExplicitly);
             Run("blueprint capture counts multitile material once and flags external content", ref failed, BlueprintCaptureCountsMultitileMaterialOnceAndFlagsExternalContent);
             Run("blueprint capture save writes template and refreshes library", ref failed, BlueprintCaptureSaveWritesTemplateAndRefreshesLibrary);
             Run("blueprint capture finish-use saves and enters placement preview", ref failed, BlueprintCaptureFinishUseSavesAndEntersPlacementPreview);
@@ -1112,11 +1115,13 @@ namespace JueMingZ.Tests
             Run("blueprint placed instances UI state loads current world and keeps snapshots", ref failed, BlueprintPlacedInstancesUiStateLoadsCurrentWorldAndKeepsSnapshots);
             Run("blueprint placed instance commands toggle remove select and layer", ref failed, BlueprintPlacedInstanceCommandsToggleRemoveSelectAndLayer);
             Run("blueprint projection classifies fulfilled missing and conflict", ref failed, BlueprintProjectionClassifiesFulfilledMissingAndConflict);
+            Run("blueprint projection ignores air-only template bounds", ref failed, BlueprintProjectionIgnoresAirOnlyTemplateBounds);
             Run("blueprint projection composes layer order and skips hidden", ref failed, BlueprintProjectionComposesLayerOrderAndSkipsHidden);
             Run("blueprint projection cache avoids immediate recompute", ref failed, BlueprintProjectionCacheAvoidsImmediateRecompute);
             Run("blueprint projection replacement rules fulfill configured same category", ref failed, BlueprintProjectionReplacementRulesFulfillConfiguredSameCategory);
             Run("blueprint projection UI overlay and diagnostics contracts", ref failed, BlueprintProjectionUiOverlayAndDiagnosticsContracts);
             Run("blueprint materials count only missing effective projection layers", ref failed, BlueprintMaterialsCountOnlyMissingEffectiveProjectionLayers);
+            Run("blueprint materials ignore air-only template bounds", ref failed, BlueprintMaterialsIgnoreAirOnlyTemplateBounds);
             Run("blueprint materials read main inventory and void bag availability", ref failed, BlueprintMaterialsReadMainInventoryAndVoidBagAvailability);
             Run("blueprint materials use replacement item when configured", ref failed, BlueprintMaterialsUseReplacementItemWhenConfigured);
             Run("blueprint material window routes and consumes input", ref failed, BlueprintMaterialWindowRoutesAndConsumesInput);
@@ -1125,6 +1130,7 @@ namespace JueMingZ.Tests
             Run("blueprint erase selection prefers selected and top layer fallback", ref failed, BlueprintEraseSelectionPrefersSelectedAndTopLayerFallback);
             Run("blueprint erase UI overlay and diagnostics contracts", ref failed, BlueprintEraseUiOverlayAndDiagnosticsContracts);
             Run("blueprint auto placement disabled does not enqueue", ref failed, BlueprintAutoPlacementDisabledDoesNotEnqueue);
+            Run("blueprint auto placement ignores air-only template bounds", ref failed, BlueprintAutoPlacementIgnoresAirOnlyTemplateBounds);
             Run("blueprint auto placement candidates sort and skip unsafe layers", ref failed, BlueprintAutoPlacementCandidatesSortAndSkipUnsafeLayers);
             Run("blueprint auto placement stage 14 supports furniture track actuator and skips wire", ref failed, BlueprintAutoPlacementStage14SupportsFurnitureTrackActuatorAndSkipsWire);
             Run("blueprint auto placement submits ActionQueue and verifies placement", ref failed, BlueprintAutoPlacementSubmitsActionQueueAndVerifiesPlacement);
@@ -1178,6 +1184,7 @@ namespace JueMingZ.Tests
             Run("feature toggle hotkey conflict registry skips self target", ref failed, FeatureToggleHotkeyConflictRegistrySkipsSelfTarget);
             Run("feature toggle hotkey UI reserve and icon contract", ref failed, FeatureToggleHotkeyUiReserveAndIconContract);
             Run("feature toggle hotkey modal copy and capture mutual exclusion", ref failed, FeatureToggleHotkeyModalCopyAndCaptureMutualExclusion);
+            Run("feature toggle hotkey Backspace clears binding", ref failed, FeatureToggleHotkeyBackspaceClearContract);
             Run("feature toggle hotkey modal save honors conflicts and self", ref failed, FeatureToggleHotkeyModalSaveHonorsConflictsAndSelf);
             Run("feature toggle hotkey eligible and excluded targets", ref failed, FeatureToggleHotkeyEligibleAndExcludedTargets);
             Run("feature toggle hotkey runtime debounces single and modifier chords", ref failed, FeatureToggleHotkeyRuntimeDebouncesSingleAndModifierChords);
@@ -1332,6 +1339,7 @@ namespace JueMingZ.Tests
             Run("auto discard candidates use inventory snapshot", ref failed, AutoDiscardCandidatesUseInventorySnapshot);
             Run("quick bag open request uses inventory slot metadata", ref failed, QuickBagOpenRequestUsesInventorySlotMetadata);
             Run("quick item hotkey request uses fresh click metadata", ref failed, QuickItemHotkeyRequestUsesFreshClickMetadata);
+            Run("quick item hotkey Backspace clears binding", ref failed, QuickItemHotkeyBackspaceClearContract);
             Run("quick bag open yields after batch when cleanup enabled", ref failed, QuickBagOpenYieldsAfterBatchWhenCleanupEnabled);
             Run("auto deposit coins request uses chest metadata", ref failed, AutoDepositCoinsRequestUsesChestMetadata);
             Run("auto deposit coins candidates use inventory snapshot", ref failed, AutoDepositCoinsCandidatesUseInventorySnapshot);
@@ -1364,6 +1372,7 @@ namespace JueMingZ.Tests
             Run("feature catalog exposes search query UI", ref failed, FeatureCatalogExposesSearchQueryUi);
             Run("feature catalog exposes chest item locator F5 entry", ref failed, FeatureCatalogExposesChestItemLocatorF5Entry);
             Run("map quick announcement capture rejects invalid mouse wheel and duplicates", ref failed, MapQuickAnnouncementCaptureRulesRejectInvalidMouseWheelAndDuplicates);
+            Run("map quick announcement Backspace clears selected slot", ref failed, MapQuickAnnouncementBackspaceClearContract);
             Run("map quick announcement hotkey state fires once per chord hold", ref failed, MapQuickAnnouncementHotkeyStateMachineFiresOnTriggerEdgeOnceUntilRelease);
             Run("map quick announcement hotkey state supports mouse trigger", ref failed, MapQuickAnnouncementHotkeyStateMachineSupportsMouseTrigger);
             Run("map quick announcement runtime skips disabled and blocked contexts", ref failed, MapQuickAnnouncementRuntimeSkipsDisabledAndBlockedContexts);
@@ -1383,6 +1392,7 @@ namespace JueMingZ.Tests
             Run("auto mining fallback recognizes extra ore and gravity tiles", ref failed, AutoMiningFallbackRecognizesExtraOreAndGravityTiles);
             Run("auto mining hotkey input triggers and debounces", ref failed, AutoMiningHotkeyInputTriggersAndDebounces);
             Run("auto mining hotkey input reports blocked reasons", ref failed, AutoMiningHotkeyInputReportsBlockedReasons);
+            Run("auto mining hotkey Backspace clears binding", ref failed, AutoMiningHotkeyBackspaceClearContract);
             Run("auto mining refresh tracks nearby gravity tile after vanilla fall", ref failed, AutoMiningRefreshTracksNearbyGravityTileAfterVanillaFall);
             Run("auto mining refresh relocates gravity tile beyond old three tile radius", ref failed, AutoMiningRefreshRelocatesGravityTileBeyondOldThreeTileRadius);
             Run("auto mining refresh keeps shifted gravity column marked", ref failed, AutoMiningRefreshKeepsShiftedGravityColumnMarked);

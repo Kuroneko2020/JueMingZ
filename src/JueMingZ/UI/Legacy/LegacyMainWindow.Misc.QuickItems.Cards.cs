@@ -119,7 +119,7 @@ namespace JueMingZ.UI.Legacy
                 UiTextRenderer.DrawTextClipped(spriteBatch, "编辑", hotkeyRect.X + 4, hotkeyRect.Y + 2, hotkeyRect.Width - 8, 14, clip.X, clip.Y, clip.Width, clip.Height, 238, 196, 156, 248, 0.52f);
             }
 
-            var hotkeyElement = AddFrameElement(elements, hotkeyId, "编辑快捷键", "button", hotkeyElementRect, selected: captureSelected, tooltipLines: new[] { "点击后按下快捷键组合（支持 Ctrl / Alt / Shift + 键）。" });
+            var hotkeyElement = AddFrameElement(elements, hotkeyId, "编辑快捷键", "button", hotkeyElementRect, selected: captureSelected, tooltipLines: new[] { "点击后按下快捷键组合（支持 Ctrl / Alt / Shift + 键，Backspace 删除）。" });
             RecordFrameElementHover(hotkeyElement, hotkeyHovered);
             if (hotkeyHovered)
             {
