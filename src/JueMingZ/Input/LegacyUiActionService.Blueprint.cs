@@ -244,7 +244,7 @@ namespace JueMingZ.Input
                     entry.Message,
                     before,
                     BuildBlueprintUiStateJson(),
-                    "{\"submitted\":false,\"implemented\":" + BoolRaw(!entry.PlaceholderOnly) + ",\"uiOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"action\":\"" + EscapeJson(commandResult.ButtonId) + "\",\"buttonLabel\":\"" + EscapeJson(commandResult.ButtonLabel) + "\",\"resultCode\":\"" + EscapeJson(entry.ResultCode) + "\",\"mode\":\"" + EscapeJson(entry.Mode) + "\",\"changed\":" + BoolRaw(entry.Changed) + ",\"placeholderOnly\":" + BoolRaw(entry.PlaceholderOnly) + ",\"heldItemType\":" + IntRaw(commandResult.HeldItemType) + ",\"visibleReason\":\"" + EscapeJson(BlueprintHandheldActionBarState.HiddenReasonNone) + "\",\"blockedReason\":\"\",\"mouseCaptured\":" + BoolRaw(commandResult.MouseCaptured) + "}",
+                    "{\"submitted\":false,\"implemented\":" + BoolRaw(!entry.PlaceholderOnly) + ",\"uiOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"action\":\"" + EscapeJson(commandResult.ButtonId) + "\",\"buttonLabel\":\"" + EscapeJson(commandResult.ButtonLabel) + "\",\"resultCode\":\"" + EscapeJson(entry.ResultCode) + "\",\"mode\":\"" + EscapeJson(entry.Mode) + "\",\"changed\":" + BoolRaw(entry.Changed) + ",\"placeholderOnly\":" + BoolRaw(entry.PlaceholderOnly) + ",\"heldItemType\":" + IntRaw(commandResult.HeldItemType) + ",\"visibleReason\":\"" + EscapeJson(BlueprintHandheldActionBarState.HiddenReasonNone) + "\",\"blockedReason\":\"\"" + BuildBlueprintHandheldActionMetadata(command, commandResult.ButtonId, commandResult.MouseCaptured) + "}",
                     "Button");
                 return;
             }
@@ -286,7 +286,7 @@ namespace JueMingZ.Input
                     entry.Message,
                     before,
                     BuildBlueprintUiStateJson(),
-                    "{\"submitted\":false,\"implemented\":true,\"uiOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"action\":\"" + EscapeJson(commandResult.ButtonId) + "\",\"entryAction\":\"" + EscapeJson(BlueprintEntryCommands.FinishCreateSave) + "\",\"buttonLabel\":\"" + EscapeJson(commandResult.ButtonLabel) + "\",\"resultCode\":\"" + EscapeJson(resultCode) + "\",\"mode\":\"" + EscapeJson(entry.Mode) + "\",\"changed\":" + BoolRaw(entry.Changed || (capture != null && capture.Succeeded)) + ",\"placeholderOnly\":" + BoolRaw(entry.PlaceholderOnly) + ",\"captureAttempted\":" + BoolRaw(capture != null) + ",\"capturedCells\":" + IntRaw(capture == null ? 0 : capture.CapturedCellCount) + ",\"capturedLayers\":" + IntRaw(capture == null ? 0 : capture.CapturedLayerCount) + ",\"skippedAirCells\":" + IntRaw(capture == null ? 0 : capture.SkippedAirCellCount) + ",\"unavailableCells\":" + IntRaw(capture == null ? 0 : capture.UnavailableCellCount) + ",\"templateId\":\"" + EscapeJson(templateId) + "\",\"templateName\":\"" + EscapeJson(templateName) + "\",\"heldItemType\":" + IntRaw(commandResult.HeldItemType) + ",\"visibleReason\":\"" + EscapeJson(BlueprintHandheldActionBarState.HiddenReasonNone) + "\",\"blockedReason\":\"\",\"mouseCaptured\":" + BoolRaw(commandResult.MouseCaptured) + "}",
+                    "{\"submitted\":false,\"implemented\":true,\"uiOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"action\":\"" + EscapeJson(commandResult.ButtonId) + "\",\"entryAction\":\"" + EscapeJson(BlueprintEntryCommands.FinishCreateSave) + "\",\"buttonLabel\":\"" + EscapeJson(commandResult.ButtonLabel) + "\",\"resultCode\":\"" + EscapeJson(resultCode) + "\",\"mode\":\"" + EscapeJson(entry.Mode) + "\",\"changed\":" + BoolRaw(entry.Changed || (capture != null && capture.Succeeded)) + ",\"placeholderOnly\":" + BoolRaw(entry.PlaceholderOnly) + ",\"captureAttempted\":" + BoolRaw(capture != null) + ",\"capturedCells\":" + IntRaw(capture == null ? 0 : capture.CapturedCellCount) + ",\"capturedLayers\":" + IntRaw(capture == null ? 0 : capture.CapturedLayerCount) + ",\"skippedAirCells\":" + IntRaw(capture == null ? 0 : capture.SkippedAirCellCount) + ",\"unavailableCells\":" + IntRaw(capture == null ? 0 : capture.UnavailableCellCount) + ",\"templateId\":\"" + EscapeJson(templateId) + "\",\"templateName\":\"" + EscapeJson(templateName) + "\",\"heldItemType\":" + IntRaw(commandResult.HeldItemType) + ",\"visibleReason\":\"" + EscapeJson(BlueprintHandheldActionBarState.HiddenReasonNone) + "\",\"blockedReason\":\"\"" + BuildBlueprintHandheldActionMetadata(command, commandResult.ButtonId, commandResult.MouseCaptured) + "}",
                     "Button");
                 return;
             }
@@ -310,7 +310,7 @@ namespace JueMingZ.Input
                     entry.Message,
                     before,
                     BuildBlueprintUiStateJson(),
-                    "{\"submitted\":false,\"implemented\":true,\"uiOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"action\":\"" + EscapeJson(commandResult.ButtonId) + "\",\"entryAction\":\"" + EscapeJson(BlueprintEntryCommands.ExitCreate) + "\",\"buttonLabel\":\"" + EscapeJson(commandResult.ButtonLabel) + "\",\"resultCode\":\"" + EscapeJson(entry.ResultCode) + "\",\"mode\":\"" + EscapeJson(entry.Mode) + "\",\"changed\":" + BoolRaw(entry.Changed) + ",\"placeholderOnly\":" + BoolRaw(entry.PlaceholderOnly) + ",\"heldItemType\":" + IntRaw(commandResult.HeldItemType) + ",\"visibleReason\":\"" + EscapeJson(BlueprintHandheldActionBarState.HiddenReasonNone) + "\",\"blockedReason\":\"\",\"mouseCaptured\":" + BoolRaw(commandResult.MouseCaptured) + "}",
+                    "{\"submitted\":false,\"implemented\":true,\"uiOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"action\":\"" + EscapeJson(commandResult.ButtonId) + "\",\"entryAction\":\"" + EscapeJson(BlueprintEntryCommands.ExitCreate) + "\",\"buttonLabel\":\"" + EscapeJson(commandResult.ButtonLabel) + "\",\"resultCode\":\"" + EscapeJson(entry.ResultCode) + "\",\"mode\":\"" + EscapeJson(entry.Mode) + "\",\"changed\":" + BoolRaw(entry.Changed) + ",\"placeholderOnly\":" + BoolRaw(entry.PlaceholderOnly) + ",\"heldItemType\":" + IntRaw(commandResult.HeldItemType) + ",\"visibleReason\":\"" + EscapeJson(BlueprintHandheldActionBarState.HiddenReasonNone) + "\",\"blockedReason\":\"\"" + BuildBlueprintHandheldActionMetadata(command, commandResult.ButtonId, commandResult.MouseCaptured) + "}",
                     "Button");
                 return;
             }
@@ -334,7 +334,7 @@ namespace JueMingZ.Input
                     entry.Message,
                     before,
                     BuildBlueprintUiStateJson(),
-                    "{\"submitted\":false,\"implemented\":true,\"uiOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"action\":\"" + EscapeJson(commandResult.ButtonId) + "\",\"entryAction\":\"" + EscapeJson(BlueprintEntryCommands.ClearSelection) + "\",\"buttonLabel\":\"" + EscapeJson(commandResult.ButtonLabel) + "\",\"resultCode\":\"" + EscapeJson(entry.ResultCode) + "\",\"mode\":\"" + EscapeJson(entry.Mode) + "\",\"changed\":" + BoolRaw(entry.Changed) + ",\"placeholderOnly\":" + BoolRaw(entry.PlaceholderOnly) + ",\"heldItemType\":" + IntRaw(commandResult.HeldItemType) + ",\"visibleReason\":\"" + EscapeJson(BlueprintHandheldActionBarState.HiddenReasonNone) + "\",\"blockedReason\":\"\",\"mouseCaptured\":" + BoolRaw(commandResult.MouseCaptured) + "}",
+                    "{\"submitted\":false,\"implemented\":true,\"uiOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"action\":\"" + EscapeJson(commandResult.ButtonId) + "\",\"entryAction\":\"" + EscapeJson(BlueprintEntryCommands.ClearSelection) + "\",\"buttonLabel\":\"" + EscapeJson(commandResult.ButtonLabel) + "\",\"resultCode\":\"" + EscapeJson(entry.ResultCode) + "\",\"mode\":\"" + EscapeJson(entry.Mode) + "\",\"changed\":" + BoolRaw(entry.Changed) + ",\"placeholderOnly\":" + BoolRaw(entry.PlaceholderOnly) + ",\"heldItemType\":" + IntRaw(commandResult.HeldItemType) + ",\"visibleReason\":\"" + EscapeJson(BlueprintHandheldActionBarState.HiddenReasonNone) + "\",\"blockedReason\":\"\"" + BuildBlueprintHandheldActionMetadata(command, commandResult.ButtonId, commandResult.MouseCaptured) + "}",
                     "Button");
                 return;
             }
@@ -363,7 +363,7 @@ namespace JueMingZ.Input
                     library != null && !library.Succeeded ? library.Message : entry.Message,
                     before,
                     BuildBlueprintUiStateJson(),
-                    "{\"submitted\":false,\"implemented\":true,\"uiOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"action\":\"" + EscapeJson(commandResult.ButtonId) + "\",\"entryAction\":\"" + EscapeJson(BlueprintEntryCommands.OpenLibrary) + "\",\"buttonLabel\":\"" + EscapeJson(commandResult.ButtonLabel) + "\",\"resultCode\":\"" + EscapeJson(resultCode) + "\",\"entryResultCode\":\"" + EscapeJson(entry.ResultCode) + "\",\"mode\":\"" + EscapeJson(entry.Mode) + "\",\"changed\":" + BoolRaw(entry.Changed || (library != null && library.Changed)) + ",\"placeholderOnly\":" + BoolRaw(entry.PlaceholderOnly) + ",\"heldItemType\":" + IntRaw(commandResult.HeldItemType) + ",\"visibleReason\":\"" + EscapeJson(BlueprintHandheldActionBarState.HiddenReasonNone) + "\",\"blockedReason\":\"\",\"mouseCaptured\":" + BoolRaw(commandResult.MouseCaptured) + "}",
+                    "{\"submitted\":false,\"implemented\":true,\"uiOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"action\":\"" + EscapeJson(commandResult.ButtonId) + "\",\"entryAction\":\"" + EscapeJson(BlueprintEntryCommands.OpenLibrary) + "\",\"buttonLabel\":\"" + EscapeJson(commandResult.ButtonLabel) + "\",\"resultCode\":\"" + EscapeJson(resultCode) + "\",\"entryResultCode\":\"" + EscapeJson(entry.ResultCode) + "\",\"mode\":\"" + EscapeJson(entry.Mode) + "\",\"changed\":" + BoolRaw(entry.Changed || (library != null && library.Changed)) + ",\"placeholderOnly\":" + BoolRaw(entry.PlaceholderOnly) + ",\"heldItemType\":" + IntRaw(commandResult.HeldItemType) + ",\"visibleReason\":\"" + EscapeJson(BlueprintHandheldActionBarState.HiddenReasonNone) + "\",\"blockedReason\":\"\"" + BuildBlueprintHandheldActionMetadata(command, commandResult.ButtonId, commandResult.MouseCaptured) + "}",
                     "Button");
                 return;
             }
@@ -380,8 +380,22 @@ namespace JueMingZ.Input
                 result.Message,
                 before,
                 BuildBlueprintUiStateJson(),
-                "{\"submitted\":false,\"implemented\":false,\"uiOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"action\":\"" + EscapeJson(result.ButtonId) + "\",\"buttonLabel\":\"" + EscapeJson(result.ButtonLabel) + "\",\"resultCode\":\"" + EscapeJson(result.ResultCode) + "\",\"heldItemType\":" + IntRaw(result.HeldItemType) + ",\"visibleReason\":\"" + EscapeJson(BlueprintHandheldActionBarState.HiddenReasonNone) + "\",\"blockedReason\":\"\",\"mouseCaptured\":" + BoolRaw(result.MouseCaptured) + "}",
+                "{\"submitted\":false,\"implemented\":false,\"uiOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"action\":\"" + EscapeJson(result.ButtonId) + "\",\"buttonLabel\":\"" + EscapeJson(result.ButtonLabel) + "\",\"resultCode\":\"" + EscapeJson(result.ResultCode) + "\",\"heldItemType\":" + IntRaw(result.HeldItemType) + ",\"visibleReason\":\"" + EscapeJson(BlueprintHandheldActionBarState.HiddenReasonNone) + "\",\"blockedReason\":\"\"" + BuildBlueprintHandheldActionMetadata(command, result.ButtonId, result.MouseCaptured) + "}",
                 "Button");
+        }
+
+        private static string BuildBlueprintHandheldActionMetadata(LegacyUiCommand command, string buttonId, bool mouseCaptured)
+        {
+            var commandElementId = command == null || command.ElementId == null ? string.Empty : command.ElementId;
+            var ownerId = commandElementId.StartsWith(BlueprintHandheldActionBarState.CommandElementPrefix, StringComparison.Ordinal)
+                ? commandElementId
+                : BlueprintHandheldActionBarState.BuildPointerOwnerId(buttonId);
+            var trace = BlueprintUiClickDiagnostics.GetSnapshot();
+            return ",\"mouseCaptured\":" + BoolRaw(mouseCaptured) +
+                   ",\"mouseReadMode\":\"" + EscapeJson(command == null ? string.Empty : command.MouseReadMode) + "\"" +
+                   ",\"ownerId\":\"" + EscapeJson(ownerId) + "\"" +
+                   ",\"inputTrace\":\"" + EscapeJson(trace.HandheldInputTrace) + "\"" +
+                   ",\"ownershipTrace\":\"" + EscapeJson(trace.HandheldOwnershipTrace) + "\"";
         }
 
         private static void HandleBlueprintReplacementMode(LegacyUiCommand command, string payload)

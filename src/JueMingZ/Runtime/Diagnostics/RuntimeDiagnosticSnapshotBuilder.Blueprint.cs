@@ -19,6 +19,14 @@ namespace JueMingZ.Runtime
             snapshot.BlueprintHandheldActionBarSelectedItemType = handheld.SelectedItemType;
             snapshot.BlueprintHandheldActionBarLastAction = handheld.LastAction;
             snapshot.BlueprintHandheldActionBarLastResultCode = handheld.LastResultCode;
+            snapshot.BlueprintHandheldActionBarHoveredButtonId = handheld.HoveredButtonId;
+            snapshot.BlueprintHandheldActionBarPressedButtonId = handheld.PressedButtonId;
+            snapshot.BlueprintHandheldActionBarLastMouseReadMode = handheld.LastMouseReadMode;
+            snapshot.BlueprintHandheldActionBarLastOwnershipReason = handheld.LastOwnershipReason;
+            var uiClick = BlueprintUiClickDiagnostics.GetSnapshot();
+            snapshot.BlueprintHandheldActionBarLastInputTrace = uiClick.HandheldInputTrace;
+            snapshot.BlueprintHandheldActionBarLastOwnershipTrace = uiClick.HandheldOwnershipTrace;
+            snapshot.BlueprintWorldOverlayLastInputTrace = uiClick.WorldOverlayInputTrace;
 
             var mirror = BlueprintMirrorService.GetDiagnostics();
             snapshot.BlueprintMirrorLastStatus = mirror.LastStatus;

@@ -890,6 +890,13 @@ namespace JueMingZ.Diagnostics
             Append(builder, "BlueprintHandheldActionBarSelectedItemType", snapshot.BlueprintHandheldActionBarSelectedItemType, true);
             Append(builder, "BlueprintHandheldActionBarLastAction", snapshot.BlueprintHandheldActionBarLastAction, true);
             Append(builder, "BlueprintHandheldActionBarLastResultCode", snapshot.BlueprintHandheldActionBarLastResultCode, true);
+            Append(builder, "BlueprintHandheldActionBarHoveredButtonId", snapshot.BlueprintHandheldActionBarHoveredButtonId, true);
+            Append(builder, "BlueprintHandheldActionBarPressedButtonId", snapshot.BlueprintHandheldActionBarPressedButtonId, true);
+            Append(builder, "BlueprintHandheldActionBarLastMouseReadMode", snapshot.BlueprintHandheldActionBarLastMouseReadMode, true);
+            Append(builder, "BlueprintHandheldActionBarLastOwnershipReason", snapshot.BlueprintHandheldActionBarLastOwnershipReason, true);
+            Append(builder, "BlueprintHandheldActionBarLastInputTrace", snapshot.BlueprintHandheldActionBarLastInputTrace, true);
+            Append(builder, "BlueprintHandheldActionBarLastOwnershipTrace", snapshot.BlueprintHandheldActionBarLastOwnershipTrace, true);
+            Append(builder, "BlueprintWorldOverlayLastInputTrace", snapshot.BlueprintWorldOverlayLastInputTrace, true);
             Append(builder, "BlueprintMirrorLastStatus", snapshot.BlueprintMirrorLastStatus, true);
             Append(builder, "BlueprintMirrorLastMessage", snapshot.BlueprintMirrorLastMessage, true);
             Append(builder, "BlueprintMirrorMode", snapshot.BlueprintMirrorMode, true);

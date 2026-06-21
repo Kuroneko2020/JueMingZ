@@ -215,6 +215,233 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void BlueprintUiPointerOwnershipBlocksWorldOverlayClicks()
+        {
+            ResetUiInputFrameTestState();
+            BlueprintCreationMaskState.ResetForTesting();
+            BlueprintPlacementPreviewState.ResetForTesting();
+            BlueprintEraseRegionState.ResetForTesting();
+            BlueprintHandheldActionBarState.ResetInteractionForTesting();
+            try
+            {
+                BlueprintCreationMaskState.BeginCreate();
+                ClickTileForBlueprintCreation(30, 40);
+                var before = BlueprintCreationMaskState.GetSnapshot();
+
+                RegisterHandheldOwnershipForWorldOverlayTest(
+                    BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId),
+                    BlueprintHandheldActionBarState.ButtonIdCreate,
+                    true);
+                var osRevivedLeft = new DiagnosticMouseState
+                {
+                    GameInputAvailable = true,
+                    TerrariaReadAvailable = true,
+                    TerrariaLeftDown = false,
+                    OsReadAvailable = true,
+                    OsLeftDown = true
+                };
+                var consumedLeftDown = UiPointerOwnershipService.ResolveWorldLeftDown(osRevivedLeft);
+                var creationUiInput = BlueprintCreationOverlay.BuildPointerInputForTesting(
+                    true,
+                    false,
+                    false,
+                    UiPointerOwnershipService.IsPointerOwnedThisFrame(),
+                    consumedLeftDown,
+                    consumedLeftDown,
+                    false,
+                    true,
+                    99,
+                    99,
+                    true,
+                    true,
+                    (x, y) => true);
+                if (creationUiInput.LeftDown || creationUiInput.LeftPressed)
+                {
+                    throw new InvalidOperationException("Expected UI-consumed OS left to be gated before creation pointer input is built.");
+                }
+
+                var creationUiResult = BlueprintCreationMaskState.HandlePointer(creationUiInput);
+                var after = BlueprintCreationMaskState.GetSnapshot();
+                if (!creationUiResult.ShouldConsumeLeftInput ||
+                    after.SelectedCount != before.SelectedCount ||
+                    !HasBlueprintCell(after, 30, 40) ||
+                    HasBlueprintCell(after, 99, 99))
+                {
+                    throw new InvalidOperationException("Expected handheld button ownership to block creation mask changes from revived OS left.");
+                }
+
+                BlueprintHandheldActionBarState.ResetInteractionForTesting();
+                var disabledFrame = BuildBlueprintHandheldFrame(
+                    true,
+                    BlueprintSettings.DefaultToolItemId,
+                    BlueprintHandheldEnvironment(1280, 720, blueprintCreationActive: true));
+                var disabledSave = disabledFrame.Buttons[0];
+                var disabledPress = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
+                    disabledFrame,
+                    BlueprintHandheldPointer(disabledSave.Rect.CenterX, disabledSave.Rect.CenterY, true, 0, true));
+                if (!disabledPress.ShouldConsumeLeftInput || disabledPress.Clicked)
+                {
+                    throw new InvalidOperationException("Expected disabled handheld save to consume ownership without submitting a command.");
+                }
+
+                RegisterHandheldOwnershipForWorldOverlayTest(disabledFrame, disabledPress, true);
+                var disabledUiInput = BlueprintCreationOverlay.BuildPointerInputForTesting(
+                    true,
+                    false,
+                    false,
+                    UiPointerOwnershipService.IsPointerOwnedThisFrame(),
+                    UiPointerOwnershipService.ResolveWorldLeftDown(osRevivedLeft),
+                    false,
+                    false,
+                    true,
+                    98,
+                    98,
+                    true,
+                    true,
+                    (x, y) => true);
+                BlueprintCreationMaskState.HandlePointer(disabledUiInput);
+                if (HasBlueprintCell(BlueprintCreationMaskState.GetSnapshot(), 98, 98))
+                {
+                    throw new InvalidOperationException("Expected disabled save ownership to block creation mask changes.");
+                }
+
+                BlueprintHandheldActionBarState.ResetInteractionForTesting();
+                var blankFrame = BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId);
+                var blankPress = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
+                    blankFrame,
+                    BlueprintHandheldPointer(blankFrame.Bounds.X + 1, blankFrame.Bounds.CenterY, true, 0, true));
+                if (!blankPress.ShouldConsumeLeftInput || blankPress.Clicked)
+                {
+                    throw new InvalidOperationException("Expected handheld blank-bar click to consume ownership without submitting a command.");
+                }
+
+                RegisterHandheldOwnershipForWorldOverlayTest(blankFrame, blankPress, true);
+                var blankUiInput = BlueprintCreationOverlay.BuildPointerInputForTesting(
+                    true,
+                    false,
+                    false,
+                    UiPointerOwnershipService.IsPointerOwnedThisFrame(),
+                    UiPointerOwnershipService.ResolveWorldLeftDown(osRevivedLeft),
+                    false,
+                    false,
+                    true,
+                    97,
+                    97,
+                    true,
+                    true,
+                    (x, y) => true);
+                BlueprintCreationMaskState.HandlePointer(blankUiInput);
+                if (HasBlueprintCell(BlueprintCreationMaskState.GetSnapshot(), 97, 97))
+                {
+                    throw new InvalidOperationException("Expected handheld blank-bar ownership to block creation mask changes.");
+                }
+
+                UiPointerOwnershipService.ResetForTesting();
+                UiInputFrameClock.BeginUpdateFrame("test.blueprint-ui-ownership.outside-world");
+                var outsideLeftDown = UiPointerOwnershipService.ResolveWorldLeftDown(osRevivedLeft);
+                var outsideWorldInput = BlueprintCreationOverlay.BuildPointerInputForTesting(
+                    true,
+                    false,
+                    false,
+                    false,
+                    outsideLeftDown,
+                    outsideLeftDown,
+                    false,
+                    true,
+                    96,
+                    96,
+                    true,
+                    true,
+                    (x, y) => true);
+                BlueprintCreationMaskState.HandlePointer(outsideWorldInput);
+                BlueprintCreationMaskState.HandlePointer(
+                    BlueprintCreationOverlay.BuildPointerInputForTesting(
+                        true,
+                        false,
+                        false,
+                        false,
+                        false,
+                        false,
+                        true,
+                        true,
+                        96,
+                        96,
+                        true,
+                        true,
+                        (x, y) => true));
+                if (!HasBlueprintCell(BlueprintCreationMaskState.GetSnapshot(), 96, 96))
+                {
+                    throw new InvalidOperationException("Expected world clicks outside UI ownership to keep modifying the creation mask.");
+                }
+
+                var preview = BlueprintPlacementPreviewState.BeginPreview(CreateEvenBlueprintTemplate("UI ownership preview"), "test");
+                if (!preview.Succeeded)
+                {
+                    throw new InvalidOperationException("Expected placement preview to begin for UI ownership test.");
+                }
+
+                var placementUi = BlueprintPlacementPreviewState.HandlePointer(
+                    BlueprintPlacementPreviewOverlay.BuildPointerInputForTesting(
+                        true,
+                        false,
+                        false,
+                        true,
+                        true,
+                        true,
+                        false,
+                        true,
+                        44,
+                        55));
+                if (!placementUi.ShouldConsumeLeftInput ||
+                    placementUi.PlacedInstance ||
+                    !BlueprintPlacementPreviewState.GetSnapshot().Active)
+                {
+                    throw new InvalidOperationException("Expected UI-owned placement click to consume without confirming an instance.");
+                }
+
+                BlueprintEraseRegionState.SetDependenciesForTesting(
+                    new BlueprintWorldInstanceStore(),
+                    BlueprintPlacementWorldContext.Success("pair-ui-owned", "world-ui-owned"));
+                var beginErase = BlueprintEraseRegionState.BeginErase(string.Empty);
+                if (!beginErase.Succeeded)
+                {
+                    throw new InvalidOperationException("Expected erase mode to begin for UI ownership test.");
+                }
+
+                var eraseUi = BlueprintEraseRegionState.HandlePointer(
+                    BlueprintEraseRegionOverlay.BuildPointerInputForTesting(
+                        true,
+                        false,
+                        false,
+                        true,
+                        true,
+                        true,
+                        false,
+                        true,
+                        12,
+                        13));
+                if (!eraseUi.ShouldConsumeLeftInput || eraseUi.ErasedRegion)
+                {
+                    throw new InvalidOperationException("Expected UI-owned erase click to consume without erasing an instance region.");
+                }
+
+                if (BlueprintCreationOverlay.ShouldConsumeAfterPlayerInputForTesting(true, false, false, true, true) ||
+                    BlueprintPlacementPreviewOverlay.ShouldConsumeAfterPlayerInputForTesting(true, false, false, true, true) ||
+                    BlueprintEraseRegionOverlay.ShouldConsumeAfterPlayerInputForTesting(true, false, false, true, true))
+                {
+                    throw new InvalidOperationException("Expected pointer ownership to suppress after-PlayerInput world consume guards.");
+                }
+            }
+            finally
+            {
+                ResetUiInputFrameTestState();
+                BlueprintCreationMaskState.ResetForTesting();
+                BlueprintPlacementPreviewState.ResetForTesting();
+                BlueprintEraseRegionState.ResetForTesting();
+                BlueprintHandheldActionBarState.ResetInteractionForTesting();
+            }
+        }
+
         private static void BlueprintCreationClearFinishAndCancelContracts()
         {
             BlueprintEntryState.ResetForTesting();
@@ -417,6 +644,53 @@ namespace JueMingZ.Tests
                 TileY = tileY,
                 LeftReleased = true
             });
+        }
+
+        private static void RegisterHandheldOwnershipForWorldOverlayTest(
+            BlueprintHandheldActionBarFrame frame,
+            string buttonId,
+            bool leftConsumed)
+        {
+            BlueprintHandheldActionBarState.ResetInteractionForTesting();
+            var button = frame.Buttons[0];
+            for (var index = 0; index < frame.Buttons.Count; index++)
+            {
+                if (string.Equals(frame.Buttons[index].Id, buttonId, StringComparison.Ordinal))
+                {
+                    button = frame.Buttons[index];
+                    break;
+                }
+            }
+
+            var interaction = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
+                frame,
+                BlueprintHandheldPointer(button.Rect.CenterX, button.Rect.CenterY, true, 0, true));
+            if (!interaction.ShouldConsumeLeftInput)
+            {
+                throw new InvalidOperationException("Expected handheld button to consume left ownership for test setup.");
+            }
+
+            RegisterHandheldOwnershipForWorldOverlayTest(frame, interaction, leftConsumed);
+        }
+
+        private static void RegisterHandheldOwnershipForWorldOverlayTest(
+            BlueprintHandheldActionBarFrame frame,
+            BlueprintHandheldActionBarInteraction interaction,
+            bool leftConsumed)
+        {
+            UiInputFrameClock.BeginUpdateFrame("test.blueprint-ui-ownership");
+            var hoveredId = interaction == null ? string.Empty : interaction.HoveredButtonId ?? string.Empty;
+            var ownerId = string.IsNullOrWhiteSpace(hoveredId)
+                ? "blueprint-handheld-action-bar:frame"
+                : BlueprintHandheldActionBarState.BuildCommandElementId(hoveredId);
+            UiPointerOwnershipService.RegisterPointerOwnerForCurrentFrame(
+                ownerId,
+                "BlueprintHandheldActionBar",
+                frame.Bounds,
+                true,
+                leftConsumed,
+                interaction != null && interaction.ShouldConsumeScroll,
+                "test");
         }
 
         private static bool HasBlueprintCell(BlueprintCreationMaskSnapshot snapshot, int tileX, int tileY)

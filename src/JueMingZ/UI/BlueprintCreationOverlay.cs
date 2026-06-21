@@ -94,9 +94,40 @@ namespace JueMingZ.UI
             bool hasSelectableContent = false,
             Func<int, int, bool> isSelectableTile = null)
         {
+            return BuildPointerInputForTesting(
+                active,
+                legacyUiOwned,
+                vanillaUiOwned,
+                false,
+                leftDown,
+                leftPressed,
+                leftReleased,
+                worldTileHit,
+                tileX,
+                tileY,
+                contentKnown,
+                hasSelectableContent,
+                isSelectableTile);
+        }
+
+        internal static BlueprintCreationPointerInput BuildPointerInputForTesting(
+            bool active,
+            bool legacyUiOwned,
+            bool vanillaUiOwned,
+            bool pointerUiOwned,
+            bool leftDown,
+            bool leftPressed,
+            bool leftReleased,
+            bool worldTileHit,
+            int tileX,
+            int tileY,
+            bool contentKnown = false,
+            bool hasSelectableContent = false,
+            Func<int, int, bool> isSelectableTile = null)
+        {
             return new BlueprintCreationPointerInput
             {
-                UiOwned = legacyUiOwned || vanillaUiOwned,
+                UiOwned = legacyUiOwned || vanillaUiOwned || pointerUiOwned,
                 LeftDown = active && leftDown,
                 LeftPressed = active && leftPressed,
                 LeftReleased = active && leftReleased,
@@ -116,7 +147,17 @@ namespace JueMingZ.UI
 
         internal static bool ShouldConsumeAfterPlayerInputForTesting(bool active, bool legacyUiOwned, bool leftDown)
         {
-            return active && leftDown && !legacyUiOwned;
+            return ShouldConsumeAfterPlayerInputForTesting(active, legacyUiOwned, false, false, leftDown);
+        }
+
+        internal static bool ShouldConsumeAfterPlayerInputForTesting(
+            bool active,
+            bool legacyUiOwned,
+            bool vanillaUiOwned,
+            bool pointerUiOwned,
+            bool leftDown)
+        {
+            return active && leftDown && !legacyUiOwned && !vanillaUiOwned && !pointerUiOwned;
         }
 
         internal static string GetVisualContractForTesting()
@@ -156,13 +197,30 @@ namespace JueMingZ.UI
             }
 
             var raw = DiagnosticMouseStateReader.Read();
-            var leftDown = raw != null && raw.GameInputAvailable && (raw.TerrariaLeftDown || raw.OsLeftDown);
+            var leftDown = UiPointerOwnershipService.ResolveWorldLeftDown(raw);
             var justActivated = !_wasActive;
             _wasActive = true;
+            var legacyUiOwned = IsLegacyWindowHit(raw);
+            var vanillaUiOwned = IsVanillaUiBlockingWorldSelection();
+            var pointerUiOwned = UiPointerOwnershipService.IsPointerOwnedThisFrame();
 
             if (afterPlayerInput)
             {
-                if (ShouldConsumeAfterPlayerInputForTesting(snapshot.Active, IsLegacyWindowHit(raw), leftDown))
+                var shouldConsumeAfter = ShouldConsumeAfterPlayerInputForTesting(snapshot.Active, legacyUiOwned, vanillaUiOwned, pointerUiOwned, leftDown);
+                BlueprintUiClickDiagnostics.RecordWorldOverlayInput(
+                    "creation",
+                    "after-player-input",
+                    snapshot.Active,
+                    raw,
+                    legacyUiOwned,
+                    vanillaUiOwned,
+                    pointerUiOwned,
+                    leftDown,
+                    shouldConsumeAfter,
+                    false,
+                    0,
+                    0);
+                if (shouldConsumeAfter)
                 {
                     UiMouseCaptureService.ConsumeMouseTriggerForOperationWindow("MouseLeft", out _);
                 }
@@ -170,16 +228,28 @@ namespace JueMingZ.UI
                 return;
             }
 
-            var legacyUiOwned = IsLegacyWindowHit(raw);
-            var vanillaUiOwned = IsVanillaUiBlockingWorldSelection();
+            var uiOwned = legacyUiOwned || vanillaUiOwned || pointerUiOwned;
             bool worldTileHit;
             int tileX;
             int tileY;
             ResolveWorldTile(raw, out worldTileHit, out tileX, out tileY);
+            BlueprintUiClickDiagnostics.RecordWorldOverlayInput(
+                "creation",
+                "prefix",
+                snapshot.Active,
+                raw,
+                legacyUiOwned,
+                vanillaUiOwned,
+                pointerUiOwned,
+                leftDown,
+                false,
+                worldTileHit,
+                tileX,
+                tileY);
             var contentKnown = false;
             var hasSelectableContent = false;
             Func<int, int, bool> isSelectableTile = null;
-            if (!legacyUiOwned && !vanillaUiOwned && worldTileHit)
+            if (!uiOwned && worldTileHit)
             {
                 var tileReader = BlueprintCaptureService.CreateWorldTileReader();
                 contentKnown = BlueprintCaptureService.TryHasSelectableContent(tileReader, tileX, tileY, out hasSelectableContent);
@@ -194,6 +264,7 @@ namespace JueMingZ.UI
                 snapshot.Active,
                 legacyUiOwned,
                 vanillaUiOwned,
+                pointerUiOwned,
                 leftDown,
                 !justActivated && leftDown && !_wasLeftDown,
                 !leftDown && _wasLeftDown,

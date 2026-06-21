@@ -875,6 +875,13 @@ namespace JueMingZ.Diagnostics
         public int BlueprintHandheldActionBarSelectedItemType { get; set; }
         public string BlueprintHandheldActionBarLastAction { get; set; }
         public string BlueprintHandheldActionBarLastResultCode { get; set; }
+        public string BlueprintHandheldActionBarHoveredButtonId { get; set; }
+        public string BlueprintHandheldActionBarPressedButtonId { get; set; }
+        public string BlueprintHandheldActionBarLastMouseReadMode { get; set; }
+        public string BlueprintHandheldActionBarLastOwnershipReason { get; set; }
+        public string BlueprintHandheldActionBarLastInputTrace { get; set; }
+        public string BlueprintHandheldActionBarLastOwnershipTrace { get; set; }
+        public string BlueprintWorldOverlayLastInputTrace { get; set; }
         public string BlueprintMirrorLastStatus { get; set; }
         public string BlueprintMirrorLastMessage { get; set; }
         public string BlueprintMirrorMode { get; set; }
@@ -1754,6 +1761,13 @@ namespace JueMingZ.Diagnostics
             BlueprintHandheldActionBarBlockedReason = string.Empty;
             BlueprintHandheldActionBarLastAction = string.Empty;
             BlueprintHandheldActionBarLastResultCode = string.Empty;
+            BlueprintHandheldActionBarHoveredButtonId = string.Empty;
+            BlueprintHandheldActionBarPressedButtonId = string.Empty;
+            BlueprintHandheldActionBarLastMouseReadMode = string.Empty;
+            BlueprintHandheldActionBarLastOwnershipReason = string.Empty;
+            BlueprintHandheldActionBarLastInputTrace = string.Empty;
+            BlueprintHandheldActionBarLastOwnershipTrace = string.Empty;
+            BlueprintWorldOverlayLastInputTrace = string.Empty;
             BlueprintMirrorLastStatus = string.Empty;
             BlueprintMirrorLastMessage = string.Empty;
             BlueprintMirrorMode = string.Empty;

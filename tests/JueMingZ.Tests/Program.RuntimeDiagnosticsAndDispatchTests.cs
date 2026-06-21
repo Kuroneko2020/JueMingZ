@@ -237,7 +237,11 @@ namespace JueMingZ.Tests
                 BlueprintHandheldActionBarToolItemId = 23,
                 BlueprintHandheldActionBarSelectedItemType = 23,
                 BlueprintHandheldActionBarLastAction = "red-map",
-                BlueprintHandheldActionBarLastResultCode = "uiOnlyNotImplemented"
+                BlueprintHandheldActionBarLastResultCode = "uiOnlyNotImplemented",
+                BlueprintHandheldActionBarHoveredButtonId = "red-map",
+                BlueprintHandheldActionBarPressedButtonId = "red-map",
+                BlueprintHandheldActionBarLastMouseReadMode = "Terraria+OsClient/BlueprintHandheldOverlayGateBypass/InterfaceOverlay",
+                BlueprintHandheldActionBarLastOwnershipReason = "left"
             };
 
             var json = InvokeDiagnosticSnapshotJson(snapshot);
@@ -253,6 +257,10 @@ namespace JueMingZ.Tests
             AssertContains(json, "\"BlueprintHandheldActionBarSelectedItemType\": 23");
             AssertContains(json, "\"BlueprintHandheldActionBarLastAction\": \"red-map\"");
             AssertContains(json, "\"BlueprintHandheldActionBarLastResultCode\": \"uiOnlyNotImplemented\"");
+            AssertContains(json, "\"BlueprintHandheldActionBarHoveredButtonId\": \"red-map\"");
+            AssertContains(json, "\"BlueprintHandheldActionBarPressedButtonId\": \"red-map\"");
+            AssertContains(json, "\"BlueprintHandheldActionBarLastMouseReadMode\": \"Terraria+OsClient/BlueprintHandheldOverlayGateBypass/InterfaceOverlay\"");
+            AssertContains(json, "\"BlueprintHandheldActionBarLastOwnershipReason\": \"left\"");
         }
 
         private static void DiagnosticSnapshotWritesItemCheckWriterState()

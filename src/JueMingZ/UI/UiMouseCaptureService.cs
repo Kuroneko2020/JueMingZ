@@ -44,6 +44,7 @@ namespace JueMingZ.UI
                     _lastCaptureFrameKeyValid &&
                     _lastCaptureFrameKey.Equals(frameKey))
                 {
+                    UiPointerOwnershipService.EnsureOperationWindowPointerOwned("capture-cache-hit");
                     return true;
                 }
             }
@@ -52,6 +53,12 @@ namespace JueMingZ.UI
                 ? TerrariaUiMouseCompat.TryMarkUiMouseCapturePreserveButtonsForUi()
                 : TerrariaUiMouseCompat.TryMarkUiMouseCapture();
             var suppressed = TerrariaUiMouseCompat.TrySuppressMouseText();
+            if (captured)
+            {
+                UiPointerOwnershipService.EnsureOperationWindowPointerOwned(
+                    preserveMouseButtons ? "capture-preserve-buttons" : "capture");
+            }
+
             lock (SyncRoot)
             {
                 _lastCaptureFrameKey = frameKey;
@@ -128,6 +135,11 @@ namespace JueMingZ.UI
             }
 
             var consumed = TerrariaUiMouseCompat.TryConsumeMouseTriggerInput(triggerToken, out message);
+            if (consumed && string.Equals(triggerToken, "MouseLeft", System.StringComparison.OrdinalIgnoreCase))
+            {
+                UiPointerOwnershipService.MarkOperationWindowLeftConsumed("mouse-left-consumed");
+            }
+
             lock (SyncRoot)
             {
                 _captureActive = false;

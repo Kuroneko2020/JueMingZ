@@ -318,6 +318,8 @@ namespace JueMingZ.Tests
             var pressedFrame = BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId);
             AssertStringEquals(pressedFrame.HoveredButtonId, button.Id, "handheld hovered button after press");
             AssertStringEquals(pressedFrame.PressedButtonId, button.Id, "handheld pressed button after press");
+            AssertStringEquals(pressedFrame.LastMouseReadMode, "Test/BlueprintHandheldPointer", "handheld press read mode");
+            AssertStringEquals(pressedFrame.LastOwnershipReason, BlueprintHandheldActionBarState.PointerOwnershipReasonLeft, "handheld press ownership reason");
 
             var release = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
                 frame,
@@ -335,6 +337,9 @@ namespace JueMingZ.Tests
                 throw new InvalidOperationException("Expected handheld action bar panel hover to capture scroll without clicking a button.");
             }
 
+            var gapFrame = BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId);
+            AssertStringEquals(gapFrame.LastOwnershipReason, BlueprintHandheldActionBarState.PointerOwnershipReasonScroll, "blank handheld panel scroll ownership reason");
+
             BlueprintHandheldActionBarState.ResetInteractionForTesting();
             var outside = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
                 frame,
@@ -343,6 +348,10 @@ namespace JueMingZ.Tests
             {
                 throw new InvalidOperationException("Expected handheld action bar outside click to pass through.");
             }
+
+            var outsideInteraction = BlueprintHandheldActionBarState.GetInteractionSnapshotForTesting();
+            AssertStringEquals(outsideInteraction.LastMouseReadMode, string.Empty, "outside handheld click must not claim read mode");
+            AssertStringEquals(outsideInteraction.LastOwnershipReason, string.Empty, "outside handheld click must not claim ownership reason");
 
             BlueprintHandheldActionBarState.ResetInteractionForTesting();
             var disabledFrame = BuildBlueprintHandheldFrame(
@@ -368,6 +377,8 @@ namespace JueMingZ.Tests
 
             var disabledInteraction = BlueprintHandheldActionBarState.GetInteractionSnapshotForTesting();
             AssertStringEquals(disabledInteraction.PressedButtonId, string.Empty, "disabled save must not enter pressed state");
+            AssertStringEquals(disabledInteraction.LastMouseReadMode, "Test/BlueprintHandheldPointer", "disabled save read mode");
+            AssertStringEquals(disabledInteraction.LastOwnershipReason, BlueprintHandheldActionBarState.PointerOwnershipReasonLeft, "disabled save ownership reason");
         }
 
         private static void BlueprintHandheldActionBarAfterPlayerInputGuardSubmitsFreshClickEdge()
@@ -505,6 +516,145 @@ namespace JueMingZ.Tests
                 mouse.ReadMode.IndexOf("InterfaceOverlay", StringComparison.Ordinal) < 0)
             {
                 throw new InvalidOperationException("Expected handheld overlay to prefer fresh OS client coordinates while the game input gate is open.");
+            }
+        }
+
+        private static void BlueprintHandheldActionBarUiScaleFrameAndMouseHitSameBottomBar()
+        {
+            BlueprintHandheldActionBarState.ResetInteractionForTesting();
+            var physicalWidth = 1920;
+            var physicalHeight = 1080;
+            var uiScale = 1.25d;
+            var translateX = 12d;
+            var translateY = 8d;
+            var raw = new DiagnosticMouseState
+            {
+                GameInputAvailable = true,
+                TerrariaReadAvailable = true,
+                TerrariaMouseX = 0,
+                TerrariaMouseY = 0,
+                TerrariaLeftDown = true,
+                OsReadAvailable = true,
+                OsLeftDown = true,
+                UiScaleAvailable = true,
+                UiScaleMatrixAvailable = true,
+                UiScale = uiScale,
+                UiScaleX = uiScale,
+                UiScaleY = uiScale,
+                UiTranslateX = translateX,
+                UiTranslateY = translateY,
+                UiScaleSource = "UIScaleMatrix",
+                ReadMode = "Terraria+OsClient"
+            };
+
+            var frame = BlueprintHandheldActionBarOverlay.BuildFrameForTesting(
+                BlueprintHandheldSettings(true),
+                BlueprintHandheldSnapshot(BlueprintSettings.DefaultToolItemId),
+                BlueprintHandheldEnvironment(physicalWidth, physicalHeight),
+                raw);
+            var expectedLogicalWidth = (int)Math.Round((physicalWidth - translateX) / uiScale);
+            var expectedLogicalHeight = (int)Math.Round((physicalHeight - translateY) / uiScale);
+            AssertIntEquals(frame.ScreenWidth, expectedLogicalWidth, "scaled handheld frame width");
+            AssertIntEquals(frame.ScreenHeight, expectedLogicalHeight, "scaled handheld frame height");
+            if (frame.Bounds.Bottom > expectedLogicalHeight)
+            {
+                throw new InvalidOperationException("Expected scaled handheld frame to stay inside the UI logical bottom edge.");
+            }
+
+            var button = frame.Buttons[0];
+            raw.OsClientMouseX = BlueprintHandheldUiToScreenCoordinate(button.Rect.CenterX, uiScale, translateX);
+            raw.OsClientMouseY = BlueprintHandheldUiToScreenCoordinate(button.Rect.CenterY, uiScale, translateY);
+            var mouse = LegacyUiInput.ReadMouseForBlueprintHandheldOverlay(
+                raw,
+                LegacyMainUiScale.ResolveForScreen(raw, physicalWidth, physicalHeight));
+            AssertIntEquals(mouse.X, button.Rect.CenterX, "scaled OS handheld mouse X");
+            AssertIntEquals(mouse.Y, button.Rect.CenterY, "scaled OS handheld mouse Y");
+            AssertContains(mouse.ReadMode, "OsClientScreenToUi");
+            AssertContains(mouse.ReadMode, "UIScaleMatrix");
+            AssertContains(mouse.ReadMode, "InterfaceOverlay");
+            AssertStringEquals(BlueprintHandheldActionBarState.HitTest(frame, mouse.X, mouse.Y), button.Id, "scaled OS handheld hit-test");
+
+            var stalePrefix = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
+                frame,
+                BlueprintHandheldPointer(0, 0, true, 0, true, false, mouse.ReadMode));
+            if (stalePrefix.Clicked || stalePrefix.ShouldCaptureMouse || stalePrefix.ShouldConsumeLeftInput)
+            {
+                throw new InvalidOperationException("Expected scaled stale prefix coordinates outside the visual handheld frame to defer the edge.");
+            }
+
+            var afterPlayerInput = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
+                frame,
+                BlueprintHandheldPointer(mouse.X, mouse.Y, true, 0, true, true, mouse.ReadMode));
+            if (!afterPlayerInput.ShouldCaptureMouse ||
+                !afterPlayerInput.ShouldConsumeLeftInput ||
+                !afterPlayerInput.Clicked ||
+                !string.Equals(afterPlayerInput.HoveredButtonId, button.Id, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected scaled after-PlayerInput OS coordinate to replay and click the visual handheld button.");
+            }
+
+            var repeatedAfterPlayerInput = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
+                frame,
+                BlueprintHandheldPointer(mouse.X, mouse.Y, true, 0, true, true, mouse.ReadMode));
+            if (repeatedAfterPlayerInput.Clicked)
+            {
+                throw new InvalidOperationException("Expected scaled prefix replay to remain single-use.");
+            }
+
+            BlueprintHandheldActionBarState.ResetInteractionForTesting();
+            var blank = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
+                frame,
+                BlueprintHandheldPointer(frame.Bounds.X + 1, frame.Bounds.CenterY, true, 0, true, true, mouse.ReadMode));
+            if (!blank.ShouldCaptureMouse || !blank.ShouldConsumeLeftInput || blank.Clicked)
+            {
+                throw new InvalidOperationException("Expected scaled handheld blank panel area to consume without submitting a command.");
+            }
+
+            BlueprintHandheldActionBarState.ResetInteractionForTesting();
+            var disabledFrame = BlueprintHandheldActionBarOverlay.BuildFrameForTesting(
+                BlueprintHandheldSettings(true),
+                BlueprintHandheldSnapshot(BlueprintSettings.DefaultToolItemId),
+                BlueprintHandheldEnvironment(physicalWidth, physicalHeight, blueprintCreationActive: true),
+                raw);
+            var disabledSave = disabledFrame.Buttons[0];
+            raw.OsClientMouseX = BlueprintHandheldUiToScreenCoordinate(disabledSave.Rect.CenterX, uiScale, translateX);
+            raw.OsClientMouseY = BlueprintHandheldUiToScreenCoordinate(disabledSave.Rect.CenterY, uiScale, translateY);
+            var disabledMouse = LegacyUiInput.ReadMouseForBlueprintHandheldOverlay(
+                raw,
+                LegacyMainUiScale.ResolveForScreen(raw, physicalWidth, physicalHeight));
+            var disabledPress = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
+                disabledFrame,
+                BlueprintHandheldPointer(disabledMouse.X, disabledMouse.Y, true, 0, true, true, disabledMouse.ReadMode));
+            if (!disabledPress.ShouldCaptureMouse ||
+                !disabledPress.ShouldConsumeLeftInput ||
+                disabledPress.Clicked ||
+                !string.Equals(disabledPress.HoveredButtonId, BlueprintHandheldActionBarState.ButtonIdSave, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected scaled disabled save button to hover and consume without a command.");
+            }
+
+            BlueprintHandheldActionBarState.ResetInteractionForTesting();
+            raw.OsReadAvailable = false;
+            raw.OsClientMouseX = -1;
+            raw.OsClientMouseY = -1;
+            raw.TerrariaMouseX = button.Rect.CenterX;
+            raw.TerrariaMouseY = button.Rect.CenterY;
+            raw.ReadMode = "TerrariaOnly";
+            var terrariaMouse = LegacyUiInput.ReadMouseForBlueprintHandheldOverlay(
+                raw,
+                LegacyMainUiScale.ResolveForScreen(raw, physicalWidth, physicalHeight));
+            AssertIntEquals(terrariaMouse.X, button.Rect.CenterX, "scaled Terraria fallback handheld mouse X");
+            AssertIntEquals(terrariaMouse.Y, button.Rect.CenterY, "scaled Terraria fallback handheld mouse Y");
+            AssertContains(terrariaMouse.ReadMode, "TerrariaRaw");
+            var terrariaPress = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
+                frame,
+                BlueprintHandheldPointer(terrariaMouse.X, terrariaMouse.Y, true, 0, true, true, terrariaMouse.ReadMode));
+            if (!terrariaPress.ShouldCaptureMouse ||
+                !terrariaPress.ShouldConsumeLeftInput ||
+                !terrariaPress.Clicked ||
+                !string.Equals(terrariaPress.HoveredButtonId, button.Id, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected scaled Terraria in-process coordinate to hit the same visual handheld button when OS fallback is absent.");
             }
         }
 
@@ -675,6 +825,31 @@ namespace JueMingZ.Tests
         private static void BlueprintHandheldActionBarDiagnosticsSnapshotJson()
         {
             BlueprintHandheldActionBarState.ResetInteractionForTesting();
+            BlueprintUiClickDiagnostics.ResetForTesting();
+            var frame = BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId);
+            var button = frame.Buttons[0];
+            var pointer = BlueprintHandheldPointer(button.Rect.CenterX, button.Rect.CenterY, true, 0, true, false, "Test/BlueprintHandheldOverlay");
+            var interaction = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(frame, pointer);
+            BlueprintUiClickDiagnostics.RecordHandheldInput("TestPrefix", frame, pointer, interaction);
+            BlueprintUiClickDiagnostics.RecordWorldOverlayInput(
+                "creation",
+                "after-player-input",
+                true,
+                new DiagnosticMouseState
+                {
+                    ReadMode = "TestWorld",
+                    GameInputAvailable = true,
+                    TerrariaLeftDown = true,
+                    OsLeftDown = true
+                },
+                false,
+                false,
+                true,
+                false,
+                false,
+                true,
+                12,
+                34);
             LegacyUiActionService.HandleBlueprintHandheldActionBarCommandForTesting(new LegacyUiCommand
             {
                 ElementId = BlueprintHandheldActionBarState.BuildCommandElementId("create"),
@@ -682,6 +857,7 @@ namespace JueMingZ.Tests
                 Kind = "button",
                 IntValue = BlueprintSettings.DefaultToolItemId,
                 MouseCaptured = true,
+                MouseReadMode = "Test/BlueprintHandheldOverlay",
                 Rect = new LegacyUiRect(10, 20, 80, 24)
             });
 
@@ -699,6 +875,20 @@ namespace JueMingZ.Tests
             AssertIntEquals(visible.SelectedItemType, BlueprintSettings.DefaultToolItemId, "handheld diagnostics selected item");
             AssertStringEquals(visible.LastAction, "create", "handheld diagnostics last action");
             AssertStringEquals(visible.LastResultCode, "entryStateChanged", "handheld diagnostics result");
+            AssertStringEquals(visible.HoveredButtonId, "create", "handheld diagnostics hovered button");
+            AssertStringEquals(visible.PressedButtonId, "create", "handheld diagnostics pressed button");
+            AssertStringEquals(visible.LastMouseReadMode, "Test/BlueprintHandheldOverlay", "handheld diagnostics mouse read mode");
+            AssertStringEquals(visible.LastOwnershipReason, BlueprintHandheldActionBarState.PointerOwnershipReasonLeft, "handheld diagnostics ownership reason");
+            var uiClick = BlueprintUiClickDiagnostics.GetSnapshot();
+            AssertContains(uiClick.HandheldInputTrace, "source=TestPrefix");
+            AssertContains(uiClick.HandheldInputTrace, "frameVisible=true");
+            AssertContains(uiClick.HandheldInputTrace, "hovered=create");
+            AssertContains(uiClick.HandheldInputTrace, "clicked=true");
+            AssertContains(uiClick.HandheldOwnershipTrace, "ownerId=blueprint-handheld-action-bar:create");
+            AssertContains(uiClick.HandheldOwnershipTrace, "leftConsumed=true");
+            AssertContains(uiClick.WorldOverlayInputTrace, "overlay=creation");
+            AssertContains(uiClick.WorldOverlayInputTrace, "pointerUiOwned=true");
+            AssertContains(uiClick.WorldOverlayInputTrace, "resolvedLeft=false");
 
             var hidden = BlueprintHandheldActionBarState.BuildDiagnostics(
                 BlueprintHandheldSettings(false),
@@ -718,7 +908,14 @@ namespace JueMingZ.Tests
                 BlueprintHandheldActionBarToolItemId = visible.ToolItemId,
                 BlueprintHandheldActionBarSelectedItemType = visible.SelectedItemType,
                 BlueprintHandheldActionBarLastAction = visible.LastAction,
-                BlueprintHandheldActionBarLastResultCode = visible.LastResultCode
+                BlueprintHandheldActionBarLastResultCode = visible.LastResultCode,
+                BlueprintHandheldActionBarHoveredButtonId = visible.HoveredButtonId,
+                BlueprintHandheldActionBarPressedButtonId = visible.PressedButtonId,
+                BlueprintHandheldActionBarLastMouseReadMode = visible.LastMouseReadMode,
+                BlueprintHandheldActionBarLastOwnershipReason = visible.LastOwnershipReason,
+                BlueprintHandheldActionBarLastInputTrace = uiClick.HandheldInputTrace,
+                BlueprintHandheldActionBarLastOwnershipTrace = uiClick.HandheldOwnershipTrace,
+                BlueprintWorldOverlayLastInputTrace = uiClick.WorldOverlayInputTrace
             };
             var json = InvokeDiagnosticSnapshotJson(snapshot);
             AssertContains(json, "\"BlueprintHandheldActionBarVisible\": true");
@@ -727,8 +924,16 @@ namespace JueMingZ.Tests
             AssertContains(json, "\"BlueprintHandheldActionBarSelectedItemType\": 23");
             AssertContains(json, "\"BlueprintHandheldActionBarLastAction\": \"create\"");
             AssertContains(json, "\"BlueprintHandheldActionBarLastResultCode\": \"entryStateChanged\"");
+            AssertContains(json, "\"BlueprintHandheldActionBarHoveredButtonId\": \"create\"");
+            AssertContains(json, "\"BlueprintHandheldActionBarPressedButtonId\": \"create\"");
+            AssertContains(json, "\"BlueprintHandheldActionBarLastMouseReadMode\": \"Test/BlueprintHandheldOverlay\"");
+            AssertContains(json, "\"BlueprintHandheldActionBarLastOwnershipReason\": \"left\"");
+            AssertContains(json, "\"BlueprintHandheldActionBarLastInputTrace\": \"source=TestPrefix;");
+            AssertContains(json, "\"BlueprintHandheldActionBarLastOwnershipTrace\": \"registered=true;");
+            AssertContains(json, "\"BlueprintWorldOverlayLastInputTrace\": \"overlay=creation;");
             BlueprintEntryState.ResetForTesting();
             BlueprintCreationMaskState.ResetForTesting();
+            BlueprintUiClickDiagnostics.ResetForTesting();
         }
 
         private static void BlueprintHandheldActionBarHiddenClearsInputState()
@@ -755,6 +960,8 @@ namespace JueMingZ.Tests
             AssertStringEquals(interaction.PressedButtonId, string.Empty, "hidden handheld press clear");
             AssertStringEquals(interaction.LastClickedButtonId, string.Empty, "hidden handheld click clear");
             AssertStringEquals(interaction.LastNotice, string.Empty, "hidden handheld notice clear");
+            AssertStringEquals(interaction.LastMouseReadMode, string.Empty, "hidden handheld read mode clear");
+            AssertStringEquals(interaction.LastOwnershipReason, string.Empty, "hidden handheld ownership reason clear");
         }
 
         private static LegacyUiCommand BuildBlueprintHandheldCommand(string buttonId, string label)
@@ -766,6 +973,7 @@ namespace JueMingZ.Tests
                 Kind = "button",
                 IntValue = BlueprintSettings.DefaultToolItemId,
                 MouseCaptured = true,
+                MouseReadMode = "Test/BlueprintHandheldCommand",
                 Rect = new LegacyUiRect(10, 20, 80, 24)
             };
         }
@@ -887,7 +1095,8 @@ namespace JueMingZ.Tests
             bool leftDown,
             int scrollDelta,
             bool allowCommand,
-            bool afterPlayerInput = false)
+            bool afterPlayerInput = false,
+            string mouseReadMode = "Test/BlueprintHandheldPointer")
         {
             return new BlueprintHandheldActionBarPointerInput
             {
@@ -895,10 +1104,16 @@ namespace JueMingZ.Tests
                 MouseY = mouseY,
                 LeftDown = leftDown,
                 ScrollDelta = scrollDelta,
+                MouseReadMode = mouseReadMode,
                 ReadAvailable = true,
                 AllowCommand = allowCommand,
                 AfterPlayerInput = afterPlayerInput
             };
+        }
+
+        private static int BlueprintHandheldUiToScreenCoordinate(int uiValue, double scale, double translate)
+        {
+            return (int)Math.Round(uiValue * scale + translate);
         }
 
         private static void AssertBlueprintHandheldHidden(BlueprintHandheldActionBarFrame frame, string expectedReason)

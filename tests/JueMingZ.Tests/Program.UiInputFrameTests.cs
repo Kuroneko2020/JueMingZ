@@ -197,6 +197,81 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void UiPointerOwnershipConsumedLeftSurvivesCaptureReset()
+        {
+            var restoreRuntimeTypes = PushFakeTerrariaMainType();
+            try
+            {
+                TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(true);
+                ResetUiInputFrameTestState();
+                Terraria.Main.mouseLeft = true;
+                Terraria.Main.mouseLeftRelease = true;
+                Terraria.GameInput.PlayerInput.Triggers.Current.MouseLeft = true;
+                Terraria.GameInput.PlayerInput.Triggers.JustPressed.MouseLeft = true;
+
+                UiInputFrameClock.BeginUpdateFrame("test.pointer-ownership.consume");
+                UiPointerOwnershipService.RegisterPointerOwnerForCurrentFrame(
+                    "blueprint-handheld-action-bar:create",
+                    "BlueprintHandheldActionBar",
+                    new LegacyUiRect(200, 700, 320, 42),
+                    true,
+                    false,
+                    false,
+                    "button-left");
+                if (!UiMouseCaptureService.CaptureForOperationWindowPreserveMouseButtons())
+                {
+                    throw new InvalidOperationException("Expected UI capture before consume to succeed.");
+                }
+
+                string message;
+                if (!UiMouseCaptureService.ConsumeMouseTriggerForOperationWindow("MouseLeft", out message))
+                {
+                    throw new InvalidOperationException("Expected UI mouse trigger consume to succeed: " + message);
+                }
+
+                var snapshot = UiPointerOwnershipService.GetSnapshotForTesting();
+                if (!snapshot.PointerOwned ||
+                    !snapshot.LeftOwned ||
+                    !snapshot.LeftConsumed ||
+                    !string.Equals(snapshot.OwnerKind, "BlueprintHandheldActionBar", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected left-consumed ownership to survive capture cache reset for the same input frame.");
+                }
+
+                var raw = new DiagnosticMouseState
+                {
+                    GameInputAvailable = true,
+                    TerrariaReadAvailable = true,
+                    TerrariaLeftDown = false,
+                    OsReadAvailable = true,
+                    OsLeftDown = true
+                };
+                if (UiPointerOwnershipService.ResolveWorldLeftDown(raw))
+                {
+                    throw new InvalidOperationException("Expected UI-consumed OS left to stay unavailable to world overlays.");
+                }
+
+                Terraria.Main.GameUpdateCount++;
+                UiInputFrameClock.BeginUpdateFrame("test.pointer-ownership.next-frame");
+                if (UiPointerOwnershipService.IsPointerOwnedThisFrame() ||
+                    UiPointerOwnershipService.IsLeftConsumedThisFrame())
+                {
+                    throw new InvalidOperationException("Expected UI pointer ownership to expire on the next input frame.");
+                }
+
+                if (!UiPointerOwnershipService.ResolveWorldLeftDown(raw))
+                {
+                    throw new InvalidOperationException("Expected OS left to remain available to world overlays after ownership expires.");
+                }
+            }
+            finally
+            {
+                ResetUiInputFrameTestState();
+                TerrariaMainCompat.SetAllowsInputProcessingOverrideForTesting(null);
+                restoreRuntimeTypes();
+            }
+        }
+
         private static void UiMouseCaptureServiceClearsPendingMouseTextAndNpcHover()
         {
             var restoreRuntimeTypes = PushUiMouseCompatMainType(typeof(FakePendingMouseTextMain));
@@ -578,6 +653,7 @@ namespace JueMingZ.Tests
             UiInputFrameClock.ResetForTesting();
             DiagnosticMouseStateReader.ResetForTesting();
             UiMouseCaptureService.InvalidateCache();
+            UiPointerOwnershipService.ResetForTesting();
             TerrariaUiMouseCompat.ResetUiMouseCaptureAccessorsForTesting();
             Terraria.Main.mouseX = 0;
             Terraria.Main.mouseY = 0;

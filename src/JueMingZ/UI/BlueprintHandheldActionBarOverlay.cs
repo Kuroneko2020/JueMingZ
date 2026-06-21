@@ -18,7 +18,8 @@ namespace JueMingZ.UI
         {
             try
             {
-                var frame = BuildFrame(RuntimeSettingsSnapshotProvider.GetCurrent(), GameStateReader.LastSnapshot, ReadEnvironment(GameStateReader.LastSnapshot));
+                var raw = DiagnosticMouseStateReader.ReadForBlueprintHandheldActionBarOverlay();
+                var frame = BuildFrame(RuntimeSettingsSnapshotProvider.GetCurrent(), GameStateReader.LastSnapshot, ReadEnvironment(GameStateReader.LastSnapshot, raw));
                 if (frame == null || !frame.Visible)
                 {
                     return true;
@@ -83,11 +84,32 @@ namespace JueMingZ.UI
             return BuildFrame(settings, gameState, environment);
         }
 
+        internal static BlueprintHandheldActionBarFrame BuildFrameForTesting(
+            RuntimeSettingsSnapshot settings,
+            GameStateSnapshot gameState,
+            BlueprintHandheldActionBarEnvironment environment,
+            DiagnosticMouseState raw)
+        {
+            return BuildFrame(settings, gameState, ResolveFrameEnvironment(environment, raw));
+        }
+
         internal static BlueprintHandheldActionBarInteraction HandlePointerForTesting(
             BlueprintHandheldActionBarFrame frame,
             BlueprintHandheldActionBarPointerInput input)
         {
             return BlueprintHandheldActionBarState.HandlePointer(frame, input);
+        }
+
+        internal static UiPointerOwnershipSnapshot RegisterPointerOwnershipForTesting(
+            BlueprintHandheldActionBarFrame frame,
+            BlueprintHandheldActionBarInteraction interaction,
+            bool mouseLeftDown)
+        {
+            RegisterPointerOwnership(
+                frame,
+                new LegacyMouseSnapshot { LeftDown = mouseLeftDown },
+                interaction);
+            return UiPointerOwnershipService.GetSnapshotForTesting();
         }
 
         private static BlueprintHandheldActionBarFrame BuildFrame(
@@ -98,7 +120,7 @@ namespace JueMingZ.UI
             return BlueprintHandheldActionBarState.BuildFrame(settings, gameState, environment);
         }
 
-        private static BlueprintHandheldActionBarEnvironment ReadEnvironment(GameStateSnapshot gameState)
+        private static BlueprintHandheldActionBarEnvironment ReadEnvironment(GameStateSnapshot gameState, DiagnosticMouseState raw)
         {
             var environment = new BlueprintHandheldActionBarEnvironment
             {
@@ -126,7 +148,71 @@ namespace JueMingZ.UI
             }
 
             PopulateDynamicBlueprintState(environment);
-            return environment;
+            return ResolveFrameEnvironment(environment, raw);
+        }
+
+        private static BlueprintHandheldActionBarEnvironment ResolveFrameEnvironment(
+            BlueprintHandheldActionBarEnvironment environment,
+            DiagnosticMouseState raw)
+        {
+            if (environment == null)
+            {
+                return null;
+            }
+
+            var resolved = new BlueprintHandheldActionBarEnvironment
+            {
+                WorldReady = environment.WorldReady,
+                GameInputAvailable = environment.GameInputAvailable,
+                VanillaMenuReadAvailable = environment.VanillaMenuReadAvailable,
+                VanillaMenuBlocked = environment.VanillaMenuBlocked,
+                VanillaMenuReason = environment.VanillaMenuReason,
+                MapFullscreenOpen = environment.MapFullscreenOpen,
+                LegacyMainUiVisible = environment.LegacyMainUiVisible,
+                BlueprintCreationActive = environment.BlueprintCreationActive,
+                BlueprintCreationHasPendingSelection = environment.BlueprintCreationHasPendingSelection,
+                BlueprintCreationCompletedPendingCapture = environment.BlueprintCreationCompletedPendingCapture,
+                BlueprintCreationSelectedCount = environment.BlueprintCreationSelectedCount,
+                BlueprintHasPlacedInstances = environment.BlueprintHasPlacedInstances,
+                BlueprintPlacedInstanceCount = environment.BlueprintPlacedInstanceCount,
+                ScreenWidth = environment.ScreenWidth,
+                ScreenHeight = environment.ScreenHeight
+            };
+
+            if (raw == null || !raw.UiScaleAvailable)
+            {
+                return resolved;
+            }
+
+            var scaleX = ResolveUiScale(raw.UiScaleX, raw.UiScale);
+            var scaleY = ResolveUiScale(raw.UiScaleY, raw.UiScale);
+            // The bar draws inside Terraria's active interface SpriteBatch, so
+            // the visual frame and hit-test must both use UI-scale logical extents.
+            resolved.ScreenWidth = ResolveUiExtent(resolved.ScreenWidth, scaleX, raw.UiTranslateX);
+            resolved.ScreenHeight = ResolveUiExtent(resolved.ScreenHeight, scaleY, raw.UiTranslateY);
+            return resolved;
+        }
+
+        private static double ResolveUiScale(double axisScale, double fallbackScale)
+        {
+            if (axisScale > 0.01d)
+            {
+                return axisScale;
+            }
+
+            return fallbackScale > 0.01d ? fallbackScale : 1d;
+        }
+
+        private static int ResolveUiExtent(int screenSize, double scale, double translate)
+        {
+            var safeSize = Math.Max(1, screenSize);
+            if (scale <= 0.01d || Math.Abs(scale - 1d) <= 0.01d)
+            {
+                return safeSize;
+            }
+
+            var scaled = (int)Math.Round((safeSize - translate) / scale);
+            return scaled > 0 ? scaled : safeSize;
         }
 
         private static void PopulateDynamicBlueprintState(BlueprintHandheldActionBarEnvironment environment)
@@ -158,21 +244,24 @@ namespace JueMingZ.UI
             try
             {
                 var gameState = GameStateReader.LastSnapshot;
-                var frame = BuildFrame(RuntimeSettingsSnapshotProvider.GetCurrent(), gameState, ReadEnvironment(gameState));
                 var raw = DiagnosticMouseStateReader.ReadForBlueprintHandheldActionBarOverlay();
+                var frame = BuildFrame(RuntimeSettingsSnapshotProvider.GetCurrent(), gameState, ReadEnvironment(gameState, raw));
                 var mouse = LegacyUiInput.ReadMouseForBlueprintHandheldOverlay(raw, LegacyMainUiScale.Resolve(raw));
-                var interaction = BlueprintHandheldActionBarState.HandlePointer(
-                    frame,
-                    new BlueprintHandheldActionBarPointerInput
-                    {
-                        MouseX = mouse.X,
-                        MouseY = mouse.Y,
-                        LeftDown = mouse.LeftDown,
-                        ScrollDelta = mouse.ScrollDelta,
-                        ReadAvailable = mouse.ReadAvailable,
-                        AllowCommand = allowCommand,
-                        AfterPlayerInput = afterPlayerInput
-                    });
+                var pointerInput = new BlueprintHandheldActionBarPointerInput
+                {
+                    MouseX = mouse.X,
+                    MouseY = mouse.Y,
+                    LeftDown = mouse.LeftDown,
+                    ScrollDelta = mouse.ScrollDelta,
+                    MouseReadMode = mouse.ReadMode,
+                    ReadAvailable = mouse.ReadAvailable,
+                    AllowCommand = allowCommand,
+                    AfterPlayerInput = afterPlayerInput
+                };
+                var interaction = BlueprintHandheldActionBarState.HandlePointer(frame, pointerInput);
+                BlueprintUiClickDiagnostics.RecordHandheldInput(source, frame, pointerInput, interaction);
+
+                RegisterPointerOwnership(frame, mouse, interaction);
 
                 var captured = false;
                 if (interaction.ShouldCaptureMouse)
@@ -206,6 +295,35 @@ namespace JueMingZ.UI
                     "BlueprintHandheldActionBarOverlay",
                     "Blueprint handheld action bar input guard failed; exception swallowed.", error);
             }
+        }
+
+        private static void RegisterPointerOwnership(
+            BlueprintHandheldActionBarFrame frame,
+            LegacyMouseSnapshot mouse,
+            BlueprintHandheldActionBarInteraction interaction)
+        {
+            if (frame == null ||
+                interaction == null ||
+                (!interaction.ShouldCaptureMouse && !interaction.ShouldConsumeLeftInput && !interaction.ShouldConsumeScroll))
+            {
+                return;
+            }
+
+            var hoveredId = interaction.HoveredButtonId ?? string.Empty;
+            var ownerId = BlueprintHandheldActionBarState.BuildPointerOwnerId(hoveredId);
+            var reason = interaction.ShouldConsumeLeftInput
+                ? BlueprintHandheldActionBarState.PointerOwnershipReasonLeft
+                : interaction.ShouldConsumeScroll
+                    ? BlueprintHandheldActionBarState.PointerOwnershipReasonScroll
+                    : BlueprintHandheldActionBarState.PointerOwnershipReasonHover;
+            UiPointerOwnershipService.RegisterPointerOwnerForCurrentFrame(
+                ownerId,
+                "BlueprintHandheldActionBar",
+                frame.Bounds,
+                interaction.ShouldConsumeLeftInput || (mouse != null && mouse.LeftDown),
+                interaction.ShouldConsumeLeftInput,
+                interaction.ShouldConsumeScroll,
+                reason);
         }
 
         private static void EnqueuePlaceholderCommand(

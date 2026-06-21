@@ -39,6 +39,9 @@ namespace JueMingZ.Automation.Blueprint
         public const string ButtonIdMove = "move";
         public const string ButtonIdRedMap = "red-map";
         public const string SaveDisabledTooltip = "还没有创建蓝图呢";
+        public const string PointerOwnershipReasonLeft = "left";
+        public const string PointerOwnershipReasonScroll = "scroll";
+        public const string PointerOwnershipReasonHover = "hover";
 
         private const int PanelHeight = 48;
         private const int PanelPadding = 8;
@@ -69,6 +72,8 @@ namespace JueMingZ.Automation.Blueprint
         private static string _lastNotice = string.Empty;
         private static string _lastResultCode = string.Empty;
         private static int _lastHeldItemType;
+        private static string _lastMouseReadMode = string.Empty;
+        private static string _lastOwnershipReason = string.Empty;
         private static bool _lastCommandLeftDown;
         private static bool _lastCaptureLeftDown;
         private static bool _pendingAfterPlayerInputCommandEdge;
@@ -81,6 +86,13 @@ namespace JueMingZ.Automation.Blueprint
         public static string BuildCommandElementId(string buttonId)
         {
             return CommandElementPrefix + (buttonId ?? string.Empty);
+        }
+
+        public static string BuildPointerOwnerId(string buttonId)
+        {
+            return string.IsNullOrWhiteSpace(buttonId)
+                ? CommandElementPrefix + "frame"
+                : BuildCommandElementId(buttonId);
         }
 
         internal static BlueprintHandheldActionBarFrame BuildFrame(
@@ -258,6 +270,16 @@ namespace JueMingZ.Automation.Blueprint
             var shouldCaptureMouse = overBar || !string.IsNullOrWhiteSpace(pressedButtonId);
             var shouldConsumeLeft = shouldCaptureMouse && (input.LeftDown || leftPressed || leftReleased || clicked);
             var shouldConsumeScroll = overBar && input.ScrollDelta != 0;
+            var ownershipReason = ResolvePointerOwnershipReason(shouldConsumeLeft, shouldConsumeScroll, shouldCaptureMouse);
+            if (!string.IsNullOrWhiteSpace(ownershipReason))
+            {
+                lock (InteractionSyncRoot)
+                {
+                    _lastMouseReadMode = input.MouseReadMode ?? string.Empty;
+                    _lastOwnershipReason = ownershipReason;
+                }
+            }
+
             return new BlueprintHandheldActionBarInteraction(
                 shouldCaptureMouse,
                 shouldConsumeLeft,
@@ -342,7 +364,9 @@ namespace JueMingZ.Automation.Blueprint
                     _lastClickedButtonLabel,
                     _lastNotice,
                     _lastResultCode,
-                    _lastHeldItemType);
+                    _lastHeldItemType,
+                    _lastMouseReadMode,
+                    _lastOwnershipReason);
             }
         }
 
@@ -363,7 +387,11 @@ namespace JueMingZ.Automation.Blueprint
                 frame.ToolItemId,
                 frame.SelectedItemType,
                 frame.LastClickedButtonId,
-                frame.LastResultCode);
+                frame.LastResultCode,
+                frame.HoveredButtonId,
+                frame.PressedButtonId,
+                frame.LastMouseReadMode,
+                frame.LastOwnershipReason);
         }
 
         internal static void ResetInteractionForTesting()
@@ -436,7 +464,9 @@ namespace JueMingZ.Automation.Blueprint
                 CurrentPressedButtonId(),
                 CurrentLastNotice(),
                 CurrentLastResultCode(),
-                CurrentLastClickedButtonId());
+                CurrentLastClickedButtonId(),
+                CurrentLastMouseReadMode(),
+                CurrentLastOwnershipReason());
         }
 
         private static IReadOnlyList<BlueprintHandheldActionBarButtonSpec> SelectVisibleButtonSpecs(BlueprintHandheldActionBarEnvironment environment)
@@ -507,6 +537,8 @@ namespace JueMingZ.Automation.Blueprint
                 0,
                 new LegacyUiRect(0, 0, 0, 0),
                 new BlueprintHandheldActionBarButtonFrame[0],
+                string.Empty,
+                string.Empty,
                 string.Empty,
                 string.Empty,
                 string.Empty,
@@ -622,6 +654,8 @@ namespace JueMingZ.Automation.Blueprint
                 _lastNotice = string.Empty;
                 _lastResultCode = string.IsNullOrWhiteSpace(reason) ? string.Empty : reason;
                 _lastHeldItemType = 0;
+                _lastMouseReadMode = string.Empty;
+                _lastOwnershipReason = string.Empty;
                 _lastCommandLeftDown = false;
                 _lastCaptureLeftDown = false;
                 _pendingAfterPlayerInputCommandEdge = false;
@@ -666,6 +700,37 @@ namespace JueMingZ.Automation.Blueprint
             {
                 return _lastClickedButtonId;
             }
+        }
+
+        private static string CurrentLastMouseReadMode()
+        {
+            lock (InteractionSyncRoot)
+            {
+                return _lastMouseReadMode;
+            }
+        }
+
+        private static string CurrentLastOwnershipReason()
+        {
+            lock (InteractionSyncRoot)
+            {
+                return _lastOwnershipReason;
+            }
+        }
+
+        private static string ResolvePointerOwnershipReason(bool shouldConsumeLeft, bool shouldConsumeScroll, bool shouldCaptureMouse)
+        {
+            if (shouldConsumeLeft)
+            {
+                return PointerOwnershipReasonLeft;
+            }
+
+            if (shouldConsumeScroll)
+            {
+                return PointerOwnershipReasonScroll;
+            }
+
+            return shouldCaptureMouse ? PointerOwnershipReasonHover : string.Empty;
         }
     }
 
@@ -773,7 +838,9 @@ namespace JueMingZ.Automation.Blueprint
             string pressedButtonId,
             string lastNotice,
             string lastResultCode,
-            string lastClickedButtonId)
+            string lastClickedButtonId,
+            string lastMouseReadMode,
+            string lastOwnershipReason)
         {
             Visible = visible;
             HiddenReason = hiddenReason ?? string.Empty;
@@ -789,6 +856,8 @@ namespace JueMingZ.Automation.Blueprint
             LastNotice = lastNotice ?? string.Empty;
             LastResultCode = lastResultCode ?? string.Empty;
             LastClickedButtonId = lastClickedButtonId ?? string.Empty;
+            LastMouseReadMode = lastMouseReadMode ?? string.Empty;
+            LastOwnershipReason = lastOwnershipReason ?? string.Empty;
         }
 
         public bool Visible { get; private set; }
@@ -805,6 +874,8 @@ namespace JueMingZ.Automation.Blueprint
         public string LastNotice { get; private set; }
         public string LastResultCode { get; private set; }
         public string LastClickedButtonId { get; private set; }
+        public string LastMouseReadMode { get; private set; }
+        public string LastOwnershipReason { get; private set; }
     }
 
     public sealed class BlueprintHandheldActionBarPointerInput
@@ -813,6 +884,7 @@ namespace JueMingZ.Automation.Blueprint
         public int MouseY { get; set; }
         public bool LeftDown { get; set; }
         public int ScrollDelta { get; set; }
+        public string MouseReadMode { get; set; }
         public bool ReadAvailable { get; set; }
         public bool AllowCommand { get; set; }
         public bool AfterPlayerInput { get; set; }
@@ -821,6 +893,7 @@ namespace JueMingZ.Automation.Blueprint
         {
             MouseX = -1;
             MouseY = -1;
+            MouseReadMode = string.Empty;
             AllowCommand = true;
             AfterPlayerInput = false;
         }
@@ -913,7 +986,9 @@ namespace JueMingZ.Automation.Blueprint
             string lastClickedButtonLabel,
             string lastNotice,
             string lastResultCode,
-            int lastHeldItemType)
+            int lastHeldItemType,
+            string lastMouseReadMode,
+            string lastOwnershipReason)
         {
             HoveredButtonId = hoveredButtonId ?? string.Empty;
             PressedButtonId = pressedButtonId ?? string.Empty;
@@ -922,6 +997,8 @@ namespace JueMingZ.Automation.Blueprint
             LastNotice = lastNotice ?? string.Empty;
             LastResultCode = lastResultCode ?? string.Empty;
             LastHeldItemType = lastHeldItemType;
+            LastMouseReadMode = lastMouseReadMode ?? string.Empty;
+            LastOwnershipReason = lastOwnershipReason ?? string.Empty;
         }
 
         public string HoveredButtonId { get; private set; }
@@ -931,6 +1008,8 @@ namespace JueMingZ.Automation.Blueprint
         public string LastNotice { get; private set; }
         public string LastResultCode { get; private set; }
         public int LastHeldItemType { get; private set; }
+        public string LastMouseReadMode { get; private set; }
+        public string LastOwnershipReason { get; private set; }
     }
 
     internal sealed class BlueprintHandheldActionBarDiagnostics
@@ -941,7 +1020,11 @@ namespace JueMingZ.Automation.Blueprint
             int toolItemId,
             int selectedItemType,
             string lastAction,
-            string lastResultCode)
+            string lastResultCode,
+            string hoveredButtonId,
+            string pressedButtonId,
+            string lastMouseReadMode,
+            string lastOwnershipReason)
         {
             Visible = visible;
             BlockedReason = blockedReason ?? string.Empty;
@@ -949,6 +1032,10 @@ namespace JueMingZ.Automation.Blueprint
             SelectedItemType = selectedItemType;
             LastAction = lastAction ?? string.Empty;
             LastResultCode = lastResultCode ?? string.Empty;
+            HoveredButtonId = hoveredButtonId ?? string.Empty;
+            PressedButtonId = pressedButtonId ?? string.Empty;
+            LastMouseReadMode = lastMouseReadMode ?? string.Empty;
+            LastOwnershipReason = lastOwnershipReason ?? string.Empty;
         }
 
         public bool Visible { get; private set; }
@@ -957,10 +1044,14 @@ namespace JueMingZ.Automation.Blueprint
         public int SelectedItemType { get; private set; }
         public string LastAction { get; private set; }
         public string LastResultCode { get; private set; }
+        public string HoveredButtonId { get; private set; }
+        public string PressedButtonId { get; private set; }
+        public string LastMouseReadMode { get; private set; }
+        public string LastOwnershipReason { get; private set; }
 
         public static BlueprintHandheldActionBarDiagnostics Hidden(string blockedReason, int toolItemId, int selectedItemType)
         {
-            return new BlueprintHandheldActionBarDiagnostics(false, blockedReason, toolItemId, selectedItemType, string.Empty, string.Empty);
+            return new BlueprintHandheldActionBarDiagnostics(false, blockedReason, toolItemId, selectedItemType, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty);
         }
     }
 }

@@ -1096,6 +1096,7 @@ namespace JueMingZ.Tests
             Run("blueprint handheld action bar postfix replays stale prefix press", ref failed, BlueprintHandheldActionBarPostfixReplaysStalePrefixPress);
             Run("blueprint handheld action bar gate-closed mouse keeps Terraria click", ref failed, BlueprintHandheldActionBarGateClosedMouseKeepsTerrariaClick);
             Run("blueprint handheld action bar gate-open mouse prefers OS client coordinate", ref failed, BlueprintHandheldActionBarGateOpenMousePrefersOsClientCoordinate);
+            Run("blueprint handheld action bar UI scale frame and mouse hit same bottom bar", ref failed, BlueprintHandheldActionBarUiScaleFrameAndMouseHitSameBottomBar);
             Run("blueprint handheld action bar display gates stay visible and UI-only", ref failed, BlueprintHandheldActionBarDisplayGatesStayVisibleAndUiOnly);
             Run("blueprint handheld action bar real commands and unimplemented buttons", ref failed, BlueprintHandheldActionBarRealCommandsAndUnimplementedButtons);
             Run("blueprint handheld action bar diagnostics snapshot json", ref failed, BlueprintHandheldActionBarDiagnosticsSnapshotJson);
@@ -1106,6 +1107,10 @@ namespace JueMingZ.Tests
             Run("blueprint creation mask drag toggles rectangle", ref failed, BlueprintCreationMaskDragTogglesRectangle);
             Run("blueprint creation mask selects air and tracks bounds", ref failed, BlueprintCreationMaskSelectsAirAndTracksBounds);
             Run("blueprint creation UI hit consumes without changing mask", ref failed, BlueprintCreationUiHitConsumesWithoutChangingMask);
+            Run("blueprint UI pointer ownership blocks world overlay clicks", ref failed, BlueprintUiPointerOwnershipBlocksWorldOverlayClicks);
+            Run("blueprint handheld action bar ownership registration consumes left for bar hits", ref failed, BlueprintHandheldActionBarOwnershipRegistrationConsumesLeftForBarHits);
+            Run("blueprint handheld UI click ownership contracts stay wired", ref failed, BlueprintHandheldUiClickOwnershipContractsStayWired);
+            Run("blueprint hotbar dead click regression contracts stay wired", ref failed, BlueprintHotbarDeadClickRegressionContractsStayWired);
             Run("blueprint creation clear finish and cancel contracts", ref failed, BlueprintCreationClearFinishAndCancelContracts);
             Run("blueprint creation overlay routes and pointer contract", ref failed, BlueprintCreationOverlayRoutesAndPointerContract);
             Run("blueprint creation local prompt edges and visual contract", ref failed, BlueprintCreationLocalPromptEdgesAndVisualContract);
@@ -1985,6 +1990,7 @@ namespace JueMingZ.Tests
             Run("diagnostic mouse state reader reuses snapshot within draw frame", ref failed, DiagnosticMouseStateReaderReusesSnapshotWithinDrawFrame);
             Run("diagnostic mouse state reader refreshes on new fast draw frame", ref failed, DiagnosticMouseStateReaderRefreshesOnNewFastDrawFrame);
             Run("diagnostic mouse state reader refreshes when draw frame changes under same update", ref failed, DiagnosticMouseStateReaderRefreshesWhenDrawFrameChangesUnderSameUpdate);
+            Run("UI pointer ownership consumed left survives capture reset", ref failed, UiPointerOwnershipConsumedLeftSurvivesCaptureReset);
             Run("UI mouse capture service short-circuits within draw frame", ref failed, UiMouseCaptureServiceShortCircuitsWithinDrawFrame);
             Run("UI mouse capture service rewrites capture and suppress on next draw frame", ref failed, UiMouseCaptureServiceRewritesCaptureAndSuppressOnNextDrawFrame);
             Run("UI mouse capture service clears pending MouseText and NPC hover", ref failed, UiMouseCaptureServiceClearsPendingMouseTextAndNpcHover);

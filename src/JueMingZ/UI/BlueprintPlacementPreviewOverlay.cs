@@ -87,9 +87,34 @@ namespace JueMingZ.UI
             int tileX,
             int tileY)
         {
+            return BuildPointerInputForTesting(
+                active,
+                legacyUiOwned,
+                vanillaUiOwned,
+                false,
+                leftDown,
+                leftPressed,
+                leftReleased,
+                worldTileHit,
+                tileX,
+                tileY);
+        }
+
+        internal static BlueprintPlacementPointerInput BuildPointerInputForTesting(
+            bool active,
+            bool legacyUiOwned,
+            bool vanillaUiOwned,
+            bool pointerUiOwned,
+            bool leftDown,
+            bool leftPressed,
+            bool leftReleased,
+            bool worldTileHit,
+            int tileX,
+            int tileY)
+        {
             return new BlueprintPlacementPointerInput
             {
-                UiOwned = legacyUiOwned || vanillaUiOwned,
+                UiOwned = legacyUiOwned || vanillaUiOwned || pointerUiOwned,
                 LeftDown = active && leftDown,
                 LeftPressed = active && leftPressed,
                 LeftReleased = active && leftReleased,
@@ -106,7 +131,17 @@ namespace JueMingZ.UI
 
         internal static bool ShouldConsumeAfterPlayerInputForTesting(bool active, bool legacyUiOwned, bool leftDown)
         {
-            return active && leftDown && !legacyUiOwned;
+            return ShouldConsumeAfterPlayerInputForTesting(active, legacyUiOwned, false, false, leftDown);
+        }
+
+        internal static bool ShouldConsumeAfterPlayerInputForTesting(
+            bool active,
+            bool legacyUiOwned,
+            bool vanillaUiOwned,
+            bool pointerUiOwned,
+            bool leftDown)
+        {
+            return active && leftDown && !legacyUiOwned && !vanillaUiOwned && !pointerUiOwned;
         }
 
         internal static void ResetInputForTesting()
@@ -126,13 +161,30 @@ namespace JueMingZ.UI
             }
 
             var raw = DiagnosticMouseStateReader.Read();
-            var leftDown = raw != null && raw.GameInputAvailable && (raw.TerrariaLeftDown || raw.OsLeftDown);
+            var leftDown = UiPointerOwnershipService.ResolveWorldLeftDown(raw);
             var justActivated = !_wasActive;
             _wasActive = true;
+            var legacyUiOwned = IsLegacyWindowHit(raw);
+            var vanillaUiOwned = IsVanillaUiBlockingWorldSelection();
+            var pointerUiOwned = UiPointerOwnershipService.IsPointerOwnedThisFrame();
 
             if (afterPlayerInput)
             {
-                if (ShouldConsumeAfterPlayerInputForTesting(snapshot.Active, IsLegacyWindowHit(raw), leftDown))
+                var shouldConsumeAfter = ShouldConsumeAfterPlayerInputForTesting(snapshot.Active, legacyUiOwned, vanillaUiOwned, pointerUiOwned, leftDown);
+                BlueprintUiClickDiagnostics.RecordWorldOverlayInput(
+                    "placement",
+                    "after-player-input",
+                    snapshot.Active,
+                    raw,
+                    legacyUiOwned,
+                    vanillaUiOwned,
+                    pointerUiOwned,
+                    leftDown,
+                    shouldConsumeAfter,
+                    false,
+                    0,
+                    0);
+                if (shouldConsumeAfter)
                 {
                     UiMouseCaptureService.ConsumeMouseTriggerForOperationWindow("MouseLeft", out _);
                 }
@@ -140,17 +192,29 @@ namespace JueMingZ.UI
                 return;
             }
 
-            var legacyUiOwned = IsLegacyWindowHit(raw);
-            var vanillaUiOwned = IsVanillaUiBlockingWorldSelection();
             bool worldTileHit;
             int tileX;
             int tileY;
             ResolveWorldTile(raw, out worldTileHit, out tileX, out tileY);
+            BlueprintUiClickDiagnostics.RecordWorldOverlayInput(
+                "placement",
+                "prefix",
+                snapshot.Active,
+                raw,
+                legacyUiOwned,
+                vanillaUiOwned,
+                pointerUiOwned,
+                leftDown,
+                false,
+                worldTileHit,
+                tileX,
+                tileY);
 
             var input = BuildPointerInputForTesting(
                 snapshot.Active,
                 legacyUiOwned,
                 vanillaUiOwned,
+                pointerUiOwned,
                 leftDown,
                 !justActivated && leftDown && !_wasLeftDown,
                 !leftDown && _wasLeftDown,
