@@ -87,15 +87,16 @@ namespace JueMingZ.Tests
                     throw new InvalidOperationException("Expected blueprint library next-page command to show the remaining template.");
                 }
 
-                AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "main-menu-open-row");
+                AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "main-menu-hotkey-open-row");
+                AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "same-content-submenu");
                 AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "state-paged-6");
                 AssertStringEquals(
                     LegacyMainWindow.GetBlueprintLibraryOpenElementIdForTesting(),
-                    "blueprint-entry:open-library",
+                    "blueprint-action-entry:open-library",
                     "blueprint library open row command id");
-                if (LegacyMainWindow.GetBlueprintMenuOpenRowCountForTesting() != 2)
+                if (LegacyMainWindow.GetBlueprintMenuOpenRowCountForTesting() != 1)
                 {
-                    throw new InvalidOperationException("Expected blueprint page to expose exactly two deferred submenu open rows.");
+                    throw new InvalidOperationException("Expected blueprint page to keep only the placed-blueprint deferred open row after the library row becomes a shortcut row.");
                 }
             }
             finally
@@ -104,6 +105,504 @@ namespace JueMingZ.Tests
                 BlueprintTemplateLibraryStore.ResetTestingHooks();
                 restore();
             }
+        }
+
+        private static void BlueprintLibraryTwoColumnCardsPreviewAndLayoutButtons()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-library-two-column-cards");
+            try
+            {
+                var store = new BlueprintTemplateLibraryStore();
+                BlueprintTemplateRecord wide;
+                BlueprintTemplateRecord tall;
+                RequireBlueprintSuccess(store.CreateTemplate(CreatePreviewTemplate("宽蓝图", 80, 4), out wide), "create wide blueprint");
+                RequireBlueprintSuccess(store.CreateTemplate(CreatePreviewTemplate("高蓝图", 4, 80), out tall), "create tall blueprint");
+                for (var index = 0; index < 4; index++)
+                {
+                    BlueprintTemplateRecord ignored;
+                    RequireBlueprintSuccess(store.CreateTemplate(CreatePreviewTemplate("补位 " + index.ToString(System.Globalization.CultureInfo.InvariantCulture), 6, 6), out ignored), "create filler blueprint");
+                }
+
+                BlueprintLibraryUiState.SetStoreForTesting(store, true);
+                var opened = BlueprintLibraryUiState.OpenLibrary();
+                if (!opened.Succeeded || !BlueprintLibraryUiState.IsOpen)
+                {
+                    throw new InvalidOperationException("Expected blueprint library to open before validating the stage 06 layout.");
+                }
+
+                var snapshot = BlueprintLibraryUiState.GetSnapshot();
+                if (snapshot.VisibleCount != BlueprintLibraryUiState.PageSize)
+                {
+                    throw new InvalidOperationException("Expected stage 06 card layout to keep the existing six-template page.");
+                }
+
+                if (LegacyMainWindow.GetBlueprintLibraryCardColumnsForTesting() != 2)
+                {
+                    throw new InvalidOperationException("Expected blueprint library cards to use exactly two columns.");
+                }
+
+                var viewport = new LegacyUiRect(12, 34, 456, 278);
+                var first = LegacyMainWindow.CalculateBlueprintLibraryCardRectForTesting(viewport, 120, 0);
+                var second = LegacyMainWindow.CalculateBlueprintLibraryCardRectForTesting(viewport, 120, 1);
+                var third = LegacyMainWindow.CalculateBlueprintLibraryCardRectForTesting(viewport, 120, 2);
+                if (first.Y != second.Y ||
+                    second.X <= first.X ||
+                    first.Width != second.Width ||
+                    third.X != first.X ||
+                    third.Y != first.Y + LegacyMainWindow.GetBlueprintLibraryCardHeightForTesting() + LegacyMainWindow.GetBlueprintLibraryCardGapForTesting())
+                {
+                    throw new InvalidOperationException("Expected blueprint library cards to flow left-to-right in fixed two-column rows.");
+                }
+
+                var expectedHeight = LegacyMainWindow.GetBlueprintLibraryCardHeightForTesting() * 3 +
+                                     LegacyMainWindow.GetBlueprintLibraryCardGapForTesting() * 2;
+                var actualHeight = LegacyMainWindow.CalculateBlueprintLibraryListHeightForTesting(true, 6, 6);
+                if (actualHeight != expectedHeight)
+                {
+                    throw new InvalidOperationException("Expected blueprint library list height to be fixed by card rows, not by dynamic content.");
+                }
+
+                AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "stage06-two-column-fixed-cards");
+                AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "preview-scales-to-fit");
+                AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "stage07-name-edit-delete-confirm");
+                AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "stage08-import-long-button-export-real");
+                AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "stage09-layout-use-real-template-snapshot");
+                AssertContains(
+                    LegacyMainWindow.BuildBlueprintLibraryLayoutCommandIdForTesting("use", wide.TemplateId),
+                    "blueprint-library:layout-use:");
+
+                var toolbar = new LegacyUiRect(12, 34, 456, 34);
+                var importRect = LegacyMainWindow.CalculateBlueprintLibraryImportButtonRectForTesting(toolbar);
+                if (importRect.Width <= toolbar.Width / 2 ||
+                    importRect.Height != 34 ||
+                    !string.Equals(LegacyMainWindow.GetBlueprintLibraryImportElementIdForTesting(), "blueprint-library:import", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected stage 08 to expose a long top import button like the notes add button.");
+                }
+
+                int originX;
+                int originY;
+                int drawWidth;
+                int drawHeight;
+                double scale;
+                var preview = new LegacyUiRect(0, 0, 120, 60);
+                if (!LegacyMainWindow.TryResolveBlueprintTemplatePreviewLayoutForTesting(wide, preview, out originX, out originY, out drawWidth, out drawHeight, out scale) ||
+                    drawWidth > preview.Width - 10 ||
+                    drawHeight > preview.Height - 10 ||
+                    scale <= 0d)
+                {
+                    throw new InvalidOperationException("Expected wide blueprint preview to scale fully inside the fixed preview bounds.");
+                }
+
+                if (!LegacyMainWindow.TryResolveBlueprintTemplatePreviewLayoutForTesting(tall, preview, out originX, out originY, out drawWidth, out drawHeight, out scale) ||
+                    drawWidth > preview.Width - 10 ||
+                    drawHeight > preview.Height - 10 ||
+                    scale <= 0d)
+                {
+                    throw new InvalidOperationException("Expected tall blueprint preview to scale fully inside the fixed preview bounds.");
+                }
+
+                if (LegacyMainWindow.TryResolveBlueprintTemplatePreviewLayoutForTesting(new BlueprintTemplateRecord(), preview, out originX, out originY, out drawWidth, out drawHeight, out scale))
+                {
+                    throw new InvalidOperationException("Empty blueprint previews must fail closed instead of inventing shape data.");
+                }
+
+                var beforeProjectionSignature = BlueprintProjectionService.BuildStateSignature();
+                var beforeMaterialSignature = BlueprintMaterialService.BuildStateSignature();
+                var useShell = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("layout-use", wide.TemplateId);
+                var exportShell = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("layout-export", wide.TemplateId);
+                var nameShell = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("layout-name", wide.TemplateId);
+                var deleteShell = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("layout-delete", wide.TemplateId);
+                if (useShell == null || exportShell == null || deleteShell == null || nameShell == null ||
+                    useShell.PlaceholderOnly ||
+                    !useShell.Succeeded ||
+                    !string.Equals(useShell.ResultCode, "previewStarted", StringComparison.Ordinal) ||
+                    exportShell.PlaceholderOnly ||
+                    !exportShell.Succeeded ||
+                    deleteShell.PlaceholderOnly ||
+                    nameShell.PlaceholderOnly ||
+                    !string.Equals(nameShell.ResultCode, "needsDoubleClick", StringComparison.Ordinal) ||
+                    !string.Equals(deleteShell.ResultCode, "deleteConfirmArmed", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected stage 09 to make layout-use real while layout-export, name, and delete stay real UI commands.");
+                }
+
+                var previewAfterUse = BlueprintPlacementPreviewState.GetSnapshot();
+                if (!previewAfterUse.Active ||
+                    !string.Equals(previewAfterUse.TemplateId, wide.TemplateId, StringComparison.Ordinal) ||
+                    previewAfterUse.TemplateSnapshot == null ||
+                    previewAfterUse.TemplateSnapshot.Cells.Count <= 0)
+                {
+                    throw new InvalidOperationException("Expected layout-use to enter placement preview with a template snapshot.");
+                }
+
+                if (BlueprintProjectionService.BuildStateSignature() != beforeProjectionSignature ||
+                    BlueprintMaterialService.BuildStateSignature() != beforeMaterialSignature)
+                {
+                    throw new InvalidOperationException("layout-use must not refresh projection or material caches while entering placement preview.");
+                }
+
+                var afterEntry = BlueprintEntryState.GetSnapshot(AppSettings.CreateDefault());
+                BlueprintTemplateLibrarySnapshot afterTemplates;
+                RequireBlueprintSuccess(store.TryLoad(out afterTemplates), "load templates after layout actions");
+                if (!string.Equals(afterEntry.Mode, BlueprintEntryModes.PlacementPreview, StringComparison.Ordinal) ||
+                    afterTemplates.Templates.Count != 6 ||
+                    !string.Equals(BlueprintLibraryUiState.GetSnapshot().DeleteConfirmTemplateId, wide.TemplateId, StringComparison.Ordinal) ||
+                    string.IsNullOrWhiteSpace(BlueprintLibraryUiState.GetSnapshot().LastExportPath) ||
+                    !File.Exists(BlueprintLibraryUiState.GetSnapshot().LastExportPath))
+                {
+                    throw new InvalidOperationException("Stage 09 layout-use must start preview while layout export writes a template export and delete only arms confirmation.");
+                }
+            }
+            finally
+            {
+                BlueprintEntryState.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintLibraryUiState.ResetForTesting();
+                BlueprintTemplateLibraryStore.ResetTestingHooks();
+                restore();
+            }
+        }
+
+        private static void BlueprintLibraryStage07NamingRenameDeleteConfirmKeepsInstances()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-library-stage07-naming-delete");
+            try
+            {
+                var store = new BlueprintTemplateLibraryStore();
+                var instanceStore = new BlueprintWorldInstanceStore();
+                BlueprintTemplateRecord firstDefault;
+                BlueprintTemplateRecord secondDefault;
+                BlueprintTemplateRecord thirdDefault;
+                RequireBlueprintSuccess(store.CreateDefaultTemplate(3, 2, out firstDefault), "create first default blueprint");
+                RequireBlueprintSuccess(store.CreateDefaultTemplate(3, 2, out secondDefault), "create second default blueprint");
+                RequireBlueprintSuccess(store.CreateDefaultTemplate(3, 2, out thirdDefault), "create third default blueprint");
+                AssertStringEquals(firstDefault.Name, BlueprintStorageConstants.DefaultTemplateName, "stage07 first default name");
+                AssertStringEquals(secondDefault.Name, BlueprintStorageConstants.DefaultTemplateName + " 2", "stage07 second default name");
+                AssertStringEquals(thirdDefault.Name, BlueprintStorageConstants.DefaultTemplateName + " 3", "stage07 third default name");
+
+                BlueprintTemplateRecord castle;
+                BlueprintTemplateRecord tower;
+                RequireBlueprintSuccess(store.CreateTemplate(CreateSampleBlueprintTemplate("城堡"), out castle), "create existing castle blueprint");
+                RequireBlueprintSuccess(store.CreateTemplate(CreateSampleBlueprintTemplate("塔楼"), out tower), "create tower blueprint for rename/delete");
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(
+                    instanceStore.CreateInstanceFromTemplate("stage07-player-world", "stage07-world", tower, 30, 40, 2, out instance),
+                    "create instance before stage07 rename/delete");
+
+                BlueprintLibraryUiState.SetStoreForTesting(store, true);
+                RequireBlueprintCommandSuccess(BlueprintLibraryUiState.OpenLibrary(), "open stage07 blueprint library");
+
+                var inputId = LegacyMainWindow.BuildBlueprintLibraryNameInputIdForTesting(tower.TemplateId);
+                var singleName = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("layout-name", tower.TemplateId);
+                if (singleName == null ||
+                    singleName.PlaceholderOnly ||
+                    !string.Equals(singleName.ResultCode, "needsDoubleClick", StringComparison.Ordinal) ||
+                    LegacyTextInput.IsFocused(inputId))
+                {
+                    throw new InvalidOperationException("Expected blueprint template names to require a double-click before editing.");
+                }
+
+                LegacyUiActionService.HandleBlueprintLibraryCommandForTesting(new LegacyUiCommand
+                {
+                    ElementId = LegacyMainWindow.BuildBlueprintLibraryCommandIdForTesting("name", tower.TemplateId),
+                    Label = "蓝图库:名称",
+                    Kind = "button",
+                    MouseCaptured = true,
+                    IsDoubleClick = true,
+                    Rect = new LegacyUiRect(0, 0, 120, 22)
+                });
+                if (!LegacyTextInput.IsFocused(inputId))
+                {
+                    throw new InvalidOperationException("Expected double-clicking the blueprint template name to enter edit mode.");
+                }
+
+                LegacyTextInput.Focus(inputId, "临时名称");
+                LegacyTextInput.ClearFocus();
+                BlueprintTemplateLibrarySnapshot templates;
+                RequireBlueprintSuccess(store.TryLoad(out templates), "load templates after cancelled rename");
+                AssertStringEquals(FindTemplateName(templates, tower.TemplateId), "塔楼", "cancelled blueprint rename leaves template name unchanged");
+
+                LegacyUiActionService.HandleBlueprintLibraryCommandForTesting(new LegacyUiCommand
+                {
+                    ElementId = LegacyMainWindow.BuildBlueprintLibraryCommandIdForTesting("name", tower.TemplateId),
+                    Label = "蓝图库:名称",
+                    Kind = "button",
+                    MouseCaptured = true,
+                    IsDoubleClick = true,
+                    Rect = new LegacyUiRect(0, 0, 120, 22)
+                });
+                LegacyTextInput.Focus(inputId, "城堡");
+                LegacyUiActionService.HandleBlueprintLibraryCommandForTesting(new LegacyUiCommand
+                {
+                    ElementId = LegacyMainWindow.BuildBlueprintLibraryCommandIdForTesting(BlueprintLibraryUiState.ConfirmNameAction, tower.TemplateId),
+                    Label = "蓝图库:保存名称",
+                    Kind = "button",
+                    MouseCaptured = true
+                });
+                RequireBlueprintSuccess(store.TryLoad(out templates), "load templates after stage07 rename");
+                AssertStringEquals(FindTemplateName(templates, tower.TemplateId), "城堡 2", "stage07 rename uses store suffix rule");
+                if (LegacyTextInput.IsFocused(inputId))
+                {
+                    throw new InvalidOperationException("Expected successful blueprint rename to clear the inline name editor.");
+                }
+
+                var beforeDeleteCount = templates.Templates.Count;
+                var deleteArm = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("layout-delete", tower.TemplateId);
+                if (deleteArm == null ||
+                    deleteArm.PlaceholderOnly ||
+                    !string.Equals(deleteArm.ResultCode, "deleteConfirmArmed", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected first blueprint card delete click to arm confirmation only.");
+                }
+
+                RequireBlueprintSuccess(store.TryLoad(out templates), "load templates after first delete click");
+                if (templates.Templates.Count != beforeDeleteCount ||
+                    !string.Equals(BlueprintLibraryUiState.GetSnapshot().DeleteConfirmTemplateId, tower.TemplateId, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected first blueprint card delete click to keep the template and remember the confirmation target.");
+                }
+
+                var deleteConfirm = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("layout-delete", tower.TemplateId);
+                if (deleteConfirm == null || !deleteConfirm.Succeeded || deleteConfirm.PlaceholderOnly)
+                {
+                    throw new InvalidOperationException("Expected second blueprint card delete click to delete the template.");
+                }
+
+                RequireBlueprintSuccess(store.TryLoad(out templates), "load templates after confirmed delete");
+                if (!string.IsNullOrWhiteSpace(FindTemplateName(templates, tower.TemplateId)) ||
+                    !string.IsNullOrWhiteSpace(BlueprintLibraryUiState.GetSnapshot().DeleteConfirmTemplateId))
+                {
+                    throw new InvalidOperationException("Expected confirmed blueprint delete to remove only the template and clear confirmation.");
+                }
+
+                BlueprintWorldInstanceSnapshot instances;
+                RequireBlueprintSuccess(instanceStore.TryLoadWorld("stage07-player-world", out instances), "load instances after stage07 rename/delete");
+                if (instances.Instances.Count != 1)
+                {
+                    throw new InvalidOperationException("Expected template delete to leave placed blueprint instances intact.");
+                }
+
+                AssertStringEquals(instances.Instances[0].Name, "塔楼", "stage07 instance name snapshot");
+                AssertStringEquals(instances.Instances[0].TemplateSnapshot.Name, "塔楼", "stage07 instance template snapshot name");
+            }
+            finally
+            {
+                LegacyTextInput.ClearFocus();
+                BlueprintEntryState.ResetForTesting();
+                BlueprintLibraryUiState.ResetForTesting();
+                BlueprintTemplateLibraryStore.ResetTestingHooks();
+                restore();
+            }
+        }
+
+        private static void BlueprintLibraryStage08ImportExportDiagnostics()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-library-stage08-import-export");
+            try
+            {
+                var store = new BlueprintTemplateLibraryStore();
+                BlueprintTemplateRecord source;
+                RequireBlueprintSuccess(store.CreateTemplate(CreateSampleBlueprintTemplate("Stage08 Import"), out source), "create stage08 source blueprint");
+
+                string exportPath;
+                RequireBlueprintSuccess(store.ExportTemplate(source.TemplateId, string.Empty, out exportPath), "export stage08 source blueprint");
+                var importDirectory = BlueprintStoragePaths.BuildDefaultImportDirectory(store.RootDirectory);
+                Directory.CreateDirectory(importDirectory);
+                var importPath = Path.Combine(importDirectory, "stage08-import.json");
+                File.Copy(exportPath, importPath, true);
+
+                BlueprintLibraryUiState.SetStoreForTesting(store, true);
+                RequireBlueprintCommandSuccess(BlueprintLibraryUiState.OpenLibrary(), "open stage08 blueprint library");
+
+                var imported = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("import", string.Empty);
+                if (imported == null ||
+                    !imported.Succeeded ||
+                    imported.PlaceholderOnly ||
+                    !string.Equals(imported.ResultCode, "imported", StringComparison.Ordinal) ||
+                    !string.Equals(imported.ImportPath, importPath, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(imported.TemplateId, source.TemplateId, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException("Expected blueprint library import to read the single imports JSON, create a fresh template, and return diagnostic metadata.");
+                }
+
+                BlueprintTemplateLibrarySnapshot templates;
+                RequireBlueprintSuccess(store.TryLoad(out templates), "load templates after stage08 import");
+                if (templates.Templates.Count != 2 ||
+                    !string.Equals(FindTemplateName(templates, imported.TemplateId), "Stage08 Import 2", StringComparison.Ordinal) ||
+                    !string.Equals(BlueprintLibraryUiState.GetSnapshot().LastImportPath, importPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException("Expected stage08 import to suffix duplicate names without overwriting the original template.");
+                }
+
+                var expectedFailedExportPath = BlueprintStoragePaths.BuildDefaultExportPath(store.RootDirectory, source);
+                BlueprintTemplateLibraryStore.SetCommitFailurePredicateForTesting(
+                    path => string.Equals(path, expectedFailedExportPath, StringComparison.OrdinalIgnoreCase));
+                var failedExport = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("layout-export", source.TemplateId);
+                if (failedExport == null ||
+                    failedExport.Succeeded ||
+                    failedExport.PlaceholderOnly ||
+                    !string.Equals(failedExport.ResultCode, "writeFailed", StringComparison.Ordinal) ||
+                    !string.IsNullOrWhiteSpace(BlueprintLibraryUiState.GetSnapshot().LastExportPath))
+                {
+                    throw new InvalidOperationException("Expected stage08 export failure to stay real, fail closed, and clear stale export path diagnostics.");
+                }
+
+                RequireBlueprintSuccess(store.TryLoad(out templates), "load templates after failed stage08 export");
+                if (templates.Templates.Count != 2)
+                {
+                    throw new InvalidOperationException("Failed stage08 export must not alter the template library.");
+                }
+            }
+            finally
+            {
+                BlueprintTemplateLibraryStore.ResetTestingHooks();
+                BlueprintLibraryUiState.ResetForTesting();
+                restore();
+            }
+        }
+
+        private static void BlueprintLibraryStage09UseSnapshotAndInstanceBoundary()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-library-stage09-use-instance-boundary");
+            try
+            {
+                var store = new BlueprintTemplateLibraryStore();
+                var instanceStore = new BlueprintWorldInstanceStore();
+                BlueprintTemplateRecord source;
+                RequireBlueprintSuccess(store.CreateTemplate(CreateSampleBlueprintTemplate("Stage09 Source"), out source), "create stage09 source blueprint");
+
+                BlueprintEntryState.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintLibraryUiState.SetStoreForTesting(store, true);
+                BlueprintPlacementPreviewState.SetPlacementDependenciesForTesting(
+                    store,
+                    instanceStore,
+                    BlueprintPlacementWorldContext.Success("stage09-pair", "stage09-world"));
+                RequireBlueprintCommandSuccess(BlueprintLibraryUiState.OpenLibrary(), "open stage09 blueprint library");
+
+                var projectionSignature = BlueprintProjectionService.BuildStateSignature();
+                var materialSignature = BlueprintMaterialService.BuildStateSignature();
+                var use = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("layout-use", source.TemplateId);
+                if (use == null ||
+                    !use.Succeeded ||
+                    use.PlaceholderOnly ||
+                    !string.Equals(use.ResultCode, "previewStarted", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected stage09 layout-use to enter placement preview through the real template-use path.");
+                }
+
+                var preview = BlueprintPlacementPreviewState.GetSnapshot();
+                AssertStringEquals(preview.TemplateName, "Stage09 Source", "stage09 preview template name");
+                AssertStringEquals(BlueprintEntryState.GetSnapshot(AppSettings.CreateDefault()).Mode, BlueprintEntryModes.PlacementPreview, "stage09 entry preview mode");
+                if (!preview.Active ||
+                    preview.TemplateSnapshot == null ||
+                    GetFirstTemplateContentId(preview.TemplateSnapshot) != 17)
+                {
+                    throw new InvalidOperationException("Expected stage09 preview to hold a cloned template snapshot.");
+                }
+
+                preview.TemplateSnapshot.Name = "Mutated Preview Clone";
+                preview.TemplateSnapshot.Cells[0].Layers[0].ContentId = 999;
+                var previewAgain = BlueprintPlacementPreviewState.GetSnapshot();
+                AssertStringEquals(previewAgain.TemplateSnapshot.Name, "Stage09 Source", "stage09 preview snapshot accessor clone");
+                if (GetFirstTemplateContentId(previewAgain.TemplateSnapshot) != 17)
+                {
+                    throw new InvalidOperationException("Mutating a returned preview snapshot must not change the active preview template.");
+                }
+
+                if (BlueprintProjectionService.BuildStateSignature() != projectionSignature ||
+                    BlueprintMaterialService.BuildStateSignature() != materialSignature)
+                {
+                    throw new InvalidOperationException("Using a library template must not refresh projection or material caches.");
+                }
+
+                var placement = BlueprintPlacementPreviewState.HandlePointer(new BlueprintPlacementPointerInput
+                {
+                    WorldTileHit = true,
+                    TileX = 50,
+                    TileY = 60,
+                    LeftDown = true,
+                    LeftPressed = true
+                });
+                BlueprintEntryState.MarkPlacementConfirmed(placement);
+                if (!placement.Succeeded || !placement.PlacedInstance || placement.Instance == null)
+                {
+                    throw new InvalidOperationException("Expected stage09 placement confirmation to create an instance from the preview snapshot.");
+                }
+
+                BlueprintWorldInstanceSnapshot instances;
+                RequireBlueprintSuccess(instanceStore.TryLoadWorld("stage09-pair", out instances), "load stage09 instances after placement");
+                if (instances.Instances.Count != 1)
+                {
+                    throw new InvalidOperationException("Expected exactly one stage09 placed instance.");
+                }
+
+                var placed = instances.Instances[0];
+                AssertStringEquals(placed.Name, "Stage09 Source", "stage09 placed instance name snapshot");
+                AssertStringEquals(placed.TemplateSnapshot.Name, "Stage09 Source", "stage09 placed instance template snapshot");
+                if (GetFirstTemplateContentId(placed.TemplateSnapshot) != 17)
+                {
+                    throw new InvalidOperationException("Expected placed instance to save the template content snapshot from placement time.");
+                }
+
+                var edited = placed.Clone();
+                edited.Name = "Edited Instance";
+                edited.TemplateSnapshot.Name = "Edited Instance Snapshot";
+                edited.TemplateSnapshot.Cells[0].Layers[0].ContentId = 1234;
+                BlueprintWorldInstanceSnapshot editedSnapshot;
+                RequireBlueprintSuccess(
+                    instanceStore.SaveWorldInstances("stage09-pair", "stage09-world", new[] { edited }, out editedSnapshot),
+                    "save edited stage09 instance snapshot");
+
+                BlueprintTemplateLibrarySnapshot templates;
+                RequireBlueprintSuccess(store.TryLoad(out templates), "load templates after editing instance snapshot");
+                AssertStringEquals(FindTemplateName(templates, source.TemplateId), "Stage09 Source", "stage09 template name after instance edit");
+                if (GetFirstTemplateContentId(templates.Templates[0]) != 17)
+                {
+                    throw new InvalidOperationException("Editing an instance snapshot must not write back to the template library.");
+                }
+
+                BlueprintTemplateRecord renamed;
+                RequireBlueprintSuccess(store.RenameTemplate(source.TemplateId, "Renamed Template", out renamed), "rename stage09 template");
+                RequireBlueprintSuccess(store.DeleteTemplate(source.TemplateId), "delete stage09 source template");
+                RequireBlueprintSuccess(instanceStore.TryLoadWorld("stage09-pair", out instances), "load stage09 instances after template rename and delete");
+                if (instances.Instances.Count != 1)
+                {
+                    throw new InvalidOperationException("Template rename/delete must not remove placed stage09 instances.");
+                }
+
+                AssertStringEquals(instances.Instances[0].Name, "Edited Instance", "stage09 edited instance name after template delete");
+                AssertStringEquals(instances.Instances[0].TemplateSnapshot.Name, "Edited Instance Snapshot", "stage09 edited instance snapshot name after template delete");
+                if (GetFirstTemplateContentId(instances.Instances[0].TemplateSnapshot) != 1234)
+                {
+                    throw new InvalidOperationException("Template rename/delete must not overwrite edited instance snapshot content.");
+                }
+            }
+            finally
+            {
+                BlueprintEntryState.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintLibraryUiState.ResetForTesting();
+                BlueprintTemplateLibraryStore.ResetTestingHooks();
+                restore();
+            }
+        }
+
+        private static void BlueprintLibraryStage10DiagnosticsAuditContractsStayWired()
+        {
+            BlueprintHandheldActionBarOverlayStaysUiOnlyAndNoScan();
+            BlueprintHandheldActionBarInputCapturesOnlyInsideBar();
+            BlueprintHandheldActionBarDynamicButtonMatrix();
+            BlueprintCreateActionButtonSyncsExitStateWithSharedToggle();
+            BlueprintLibrarySubmenuAndShortcutRowsOpenSameUiState();
+            BlueprintLibraryTwoColumnCardsPreviewAndLayoutButtons();
+            BlueprintLibraryStage07NamingRenameDeleteConfirmKeepsInstances();
+            BlueprintLibraryStage08ImportExportDiagnostics();
+            BlueprintLibraryStage09UseSnapshotAndInstanceBoundary();
         }
 
         private static void BlueprintLibraryCommandsRenameDeleteUseAndExport()
@@ -195,6 +694,95 @@ namespace JueMingZ.Tests
                 BlueprintTemplateLibraryStore.ResetTestingHooks();
                 restore();
             }
+        }
+
+        private static void RequireBlueprintCommandSuccess(BlueprintLibraryCommandResult result, string label)
+        {
+            if (result == null || !result.Succeeded)
+            {
+                throw new InvalidOperationException("Expected blueprint library command success: " + label);
+            }
+        }
+
+        private static string FindTemplateName(BlueprintTemplateLibrarySnapshot snapshot, string templateId)
+        {
+            if (snapshot == null || snapshot.Templates == null)
+            {
+                return string.Empty;
+            }
+
+            for (var index = 0; index < snapshot.Templates.Count; index++)
+            {
+                var template = snapshot.Templates[index];
+                if (template != null &&
+                    string.Equals(template.TemplateId, templateId, StringComparison.OrdinalIgnoreCase))
+                {
+                    return template.Name ?? string.Empty;
+                }
+            }
+
+            return string.Empty;
+        }
+
+        private static int GetFirstTemplateContentId(BlueprintTemplateRecord template)
+        {
+            if (template == null ||
+                template.Cells == null ||
+                template.Cells.Count <= 0 ||
+                template.Cells[0] == null ||
+                template.Cells[0].Layers == null ||
+                template.Cells[0].Layers.Count <= 0 ||
+                template.Cells[0].Layers[0] == null)
+            {
+                return -1;
+            }
+
+            return template.Cells[0].Layers[0].ContentId;
+        }
+
+        private static BlueprintTemplateRecord CreatePreviewTemplate(string name, int width, int height)
+        {
+            var template = new BlueprintTemplateRecord
+            {
+                Name = name,
+                Width = width,
+                Height = height,
+                AnchorX = width / 2,
+                AnchorY = height / 2
+            };
+
+            for (var x = 0; x < width; x++)
+            {
+                template.Cells.Add(CreatePreviewCell(x, 0));
+                template.Cells.Add(CreatePreviewCell(x, height - 1));
+            }
+
+            for (var y = 1; y < height - 1; y++)
+            {
+                template.Cells.Add(CreatePreviewCell(0, y));
+                template.Cells.Add(CreatePreviewCell(width - 1, y));
+            }
+
+            return template;
+        }
+
+        private static BlueprintCellRecord CreatePreviewCell(int x, int y)
+        {
+            return new BlueprintCellRecord
+            {
+                X = x,
+                Y = y,
+                Layers =
+                {
+                    new BlueprintCellLayerRecord
+                    {
+                        LayerKind = BlueprintLayerKinds.Tile,
+                        ContentId = 1,
+                        MaterialItemId = 2,
+                        MaterialStack = 1
+                    }
+                }
+            };
         }
 
     }

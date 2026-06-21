@@ -16,6 +16,8 @@ namespace JueMingZ.UI.Legacy
         public string LastNotice { get; set; }
         public string LastResultCode { get; set; }
         public string LastExportPath { get; set; }
+        public string LastImportPath { get; set; }
+        public bool IsOpen { get; set; }
         public int PageIndex { get; set; }
         public int PageCount { get; set; }
         public int PageSize { get; set; }
@@ -33,6 +35,7 @@ namespace JueMingZ.UI.Legacy
             LastNotice = string.Empty;
             LastResultCode = string.Empty;
             LastExportPath = string.Empty;
+            LastImportPath = string.Empty;
             PageSize = BlueprintLibraryUiState.PageSize;
         }
     }
@@ -47,6 +50,7 @@ namespace JueMingZ.UI.Legacy
             TemplateId = string.Empty;
             TemplateName = string.Empty;
             ExportPath = string.Empty;
+            ImportPath = string.Empty;
         }
 
         public bool Succeeded { get; private set; }
@@ -58,6 +62,7 @@ namespace JueMingZ.UI.Legacy
         public string TemplateId { get; private set; }
         public string TemplateName { get; private set; }
         public string ExportPath { get; private set; }
+        public string ImportPath { get; private set; }
 
         public static BlueprintLibraryCommandResult Create(
             bool succeeded,
@@ -70,6 +75,21 @@ namespace JueMingZ.UI.Legacy
             string templateName,
             string exportPath)
         {
+            return Create(succeeded, changed, placeholderOnly, outcome, resultCode, message, templateId, templateName, exportPath, string.Empty);
+        }
+
+        public static BlueprintLibraryCommandResult Create(
+            bool succeeded,
+            bool changed,
+            bool placeholderOnly,
+            string outcome,
+            string resultCode,
+            string message,
+            string templateId,
+            string templateName,
+            string exportPath,
+            string importPath)
+        {
             return new BlueprintLibraryCommandResult
             {
                 Succeeded = succeeded,
@@ -80,7 +100,8 @@ namespace JueMingZ.UI.Legacy
                 Message = message ?? string.Empty,
                 TemplateId = templateId ?? string.Empty,
                 TemplateName = templateName ?? string.Empty,
-                ExportPath = exportPath ?? string.Empty
+                ExportPath = exportPath ?? string.Empty,
+                ImportPath = importPath ?? string.Empty
             };
         }
     }
@@ -103,8 +124,21 @@ namespace JueMingZ.UI.Legacy
         private static string _lastNotice = "蓝图库待命。";
         private static string _lastResultCode = string.Empty;
         private static string _lastExportPath = string.Empty;
+        private static string _lastImportPath = string.Empty;
+        private static bool _isOpen;
         private static int _pageIndex;
         private static int _revision;
+
+        public static bool IsOpen
+        {
+            get
+            {
+                lock (SyncRoot)
+                {
+                    return _isOpen;
+                }
+            }
+        }
 
         public static BlueprintLibraryUiSnapshot GetSnapshot()
         {
@@ -127,8 +161,21 @@ namespace JueMingZ.UI.Legacy
                 }
 
                 var count = _snapshot == null || _snapshot.Templates == null ? 0 : _snapshot.Templates.Count;
+                var changed = !_isOpen;
+                _isOpen = true;
                 RecordNoticeLocked("opened", "蓝图库已打开，模板 " + count.ToString(CultureInfo.InvariantCulture) + " 个。", string.Empty, false);
-                return CreateResultLocked(true, false, false, "Succeeded", "opened", _lastNotice, string.Empty, string.Empty, string.Empty);
+                return CreateResultLocked(true, changed, false, changed ? "Succeeded" : "NotApplicable", "opened", _lastNotice, string.Empty, string.Empty, string.Empty);
+            }
+        }
+
+        public static BlueprintLibraryCommandResult CloseLibrary()
+        {
+            lock (SyncRoot)
+            {
+                var changed = _isOpen;
+                _isOpen = false;
+                RecordNoticeLocked(changed ? "closed" : "closeNoop", changed ? "已返回蓝图主菜单。" : "蓝图库未打开。", string.Empty, changed);
+                return CreateResultLocked(true, changed, false, changed ? "Succeeded" : "NotApplicable", _lastResultCode, _lastNotice, string.Empty, string.Empty, string.Empty);
             }
         }
 
@@ -275,6 +322,10 @@ namespace JueMingZ.UI.Legacy
                     _selectedTemplateId = BlueprintTemplateLibraryStore.NormalizeId(templateId);
                     _lastExportPath = savedPath ?? string.Empty;
                 }
+                else
+                {
+                    _lastExportPath = string.Empty;
+                }
 
                 RecordNoticeLocked(
                     write.ResultCode,
@@ -282,6 +333,42 @@ namespace JueMingZ.UI.Legacy
                     templateId,
                     write.Succeeded);
                 return CreateResultLocked(write.Succeeded, write.Succeeded, false, write.Succeeded ? "Succeeded" : "Failed", write.ResultCode, _lastNotice, templateId, string.Empty, savedPath);
+            }
+        }
+
+        public static BlueprintLibraryCommandResult ImportTemplate()
+        {
+            BlueprintTemplateLibraryStore store;
+            lock (SyncRoot)
+            {
+                store = ResolveStoreLocked();
+            }
+
+            BlueprintTemplateRecord imported;
+            var write = store.ImportTemplate(string.Empty, out imported);
+            lock (SyncRoot)
+            {
+                _lastImportPath = write == null ? string.Empty : write.Path ?? string.Empty;
+                if (write.Succeeded)
+                {
+                    _loaded = false;
+                    RefreshLocked();
+                    if (imported != null)
+                    {
+                        _selectedTemplateId = imported.TemplateId;
+                    }
+
+                    _deleteConfirmTemplateId = string.Empty;
+                }
+
+                var importedId = imported == null ? string.Empty : imported.TemplateId;
+                var importedName = imported == null ? string.Empty : imported.Name;
+                RecordNoticeLocked(
+                    write.ResultCode,
+                    write.Succeeded ? "模板已导入：" + importedName + "。" : "模板导入失败：" + write.Message,
+                    importedId,
+                    write.Succeeded);
+                return CreateResultLocked(write.Succeeded, write.Succeeded, false, write.Succeeded ? "Succeeded" : "Failed", write.ResultCode, _lastNotice, importedId, importedName, string.Empty, _lastImportPath);
             }
         }
 
@@ -373,7 +460,9 @@ namespace JueMingZ.UI.Legacy
                        "\"selectedTemplateId\":\"" + EscapeJson(_selectedTemplateId) + "\"," +
                        "\"deleteConfirmTemplateId\":\"" + EscapeJson(_deleteConfirmTemplateId) + "\"," +
                        "\"lastResultCode\":\"" + EscapeJson(_lastResultCode) + "\"," +
-                       "\"lastExportPath\":\"" + EscapeJson(_lastExportPath) + "\"" +
+                       "\"isOpen\":" + BoolRaw(_isOpen) + "," +
+                       "\"lastExportPath\":\"" + EscapeJson(_lastExportPath) + "\"," +
+                       "\"lastImportPath\":\"" + EscapeJson(_lastImportPath) + "\"" +
                        "}";
             }
         }
@@ -386,6 +475,7 @@ namespace JueMingZ.UI.Legacy
                 unchecked
                 {
                     var hash = 17;
+                    hash = hash * 31 + (_isOpen ? 1 : 0);
                     hash = hash * 31 + _revision;
                     hash = hash * 31 + GetTemplateCountLocked();
                     hash = hash * 31 + _pageIndex;
@@ -394,6 +484,7 @@ namespace JueMingZ.UI.Legacy
                     hash = hash * 31 + StringComparer.Ordinal.GetHashCode(_lastNotice ?? string.Empty);
                     hash = hash * 31 + StringComparer.Ordinal.GetHashCode(_lastResultCode ?? string.Empty);
                     hash = hash * 31 + StringComparer.Ordinal.GetHashCode(_lastExportPath ?? string.Empty);
+                    hash = hash * 31 + StringComparer.Ordinal.GetHashCode(_lastImportPath ?? string.Empty);
                     hash = hash * 31 + (LegacyTextInput.IsAnyFocused ? 1 : 0);
                     return hash;
                 }
@@ -431,6 +522,8 @@ namespace JueMingZ.UI.Legacy
                 _lastNotice = "蓝图库待命。";
                 _lastResultCode = string.Empty;
                 _lastExportPath = string.Empty;
+                _lastImportPath = string.Empty;
+                _isOpen = false;
                 if (reload)
                 {
                     EnsureLoadedLocked();
@@ -453,6 +546,8 @@ namespace JueMingZ.UI.Legacy
                 _lastNotice = "蓝图库待命。";
                 _lastResultCode = string.Empty;
                 _lastExportPath = string.Empty;
+                _lastImportPath = string.Empty;
+                _isOpen = false;
                 _pageIndex = 0;
                 _revision = 0;
             }
@@ -481,6 +576,8 @@ namespace JueMingZ.UI.Legacy
                 LastNotice = _lastNotice,
                 LastResultCode = _lastResultCode,
                 LastExportPath = _lastExportPath,
+                LastImportPath = _lastImportPath,
+                IsOpen = _isOpen,
                 PageIndex = _pageIndex,
                 PageCount = pageCount,
                 PageSize = PageSize,
@@ -502,6 +599,21 @@ namespace JueMingZ.UI.Legacy
             string exportPath)
         {
             return BlueprintLibraryCommandResult.Create(succeeded, changed, placeholderOnly, outcome, resultCode, message, templateId, templateName, exportPath);
+        }
+
+        private static BlueprintLibraryCommandResult CreateResultLocked(
+            bool succeeded,
+            bool changed,
+            bool placeholderOnly,
+            string outcome,
+            string resultCode,
+            string message,
+            string templateId,
+            string templateName,
+            string exportPath,
+            string importPath)
+        {
+            return BlueprintLibraryCommandResult.Create(succeeded, changed, placeholderOnly, outcome, resultCode, message, templateId, templateName, exportPath, importPath);
         }
 
         private static void EnsureLoadedLocked()

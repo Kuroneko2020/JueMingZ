@@ -37,7 +37,7 @@ namespace JueMingZ.Runtime
         private static long _lastRuntimeUpdateStartTimestamp;
         private static readonly RuntimeTickPipeline TickPipeline = CreateTickPipeline();
 
-        public const string Version = "0.887-blueprint-second-feedback-closeout";
+        public const string Version = "0.899-blueprint-library-closeout";
 
         public static RuntimeState State { get; private set; } = new RuntimeState();
         public static FeatureRegistry FeatureRegistry { get; private set; }

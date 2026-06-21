@@ -89,11 +89,10 @@ namespace JueMingZ.Input
                 return;
             }
 
-            var targetId = string.Equals(normalizedAction, BlueprintEntryCommands.StartCreate, StringComparison.Ordinal)
-                ? FeatureIds.BlueprintCreateAction
-                : FeatureIds.BlueprintSaveAction;
+            var targetId = GetBlueprintActionHotkeyTargetId(normalizedAction);
             var result = BlueprintEntryState.ApplyCommand(normalizedAction, ConfigService.AppSettings ?? AppSettings.CreateDefault());
             BlueprintCaptureResult capture = null;
+            BlueprintLibraryCommandResult library = null;
             if (result.Succeeded &&
                 string.Equals(normalizedAction, BlueprintEntryCommands.FinishCreateSave, StringComparison.Ordinal))
             {
@@ -108,11 +107,18 @@ namespace JueMingZ.Input
                     result = BlueprintEntryState.RecordCaptureFailure(capture);
                 }
             }
+            else if (result.Succeeded &&
+                     string.Equals(normalizedAction, BlueprintEntryCommands.OpenLibrary, StringComparison.Ordinal))
+            {
+                library = BlueprintLibraryUiState.OpenLibrary();
+                RevealBlueprintLibraryMenuIfOpened(library);
+            }
 
             var outcome = capture != null
                 ? capture.Succeeded ? "Succeeded" : "Failed"
+                : library != null && !library.Succeeded ? "Failed"
                 : result.Succeeded ? (result.Changed ? "Succeeded" : "NotApplicable") : "NotApplicable";
-            var resultCode = capture == null ? result.ResultCode : capture.ResultCode;
+            var resultCode = capture == null ? (library == null ? result.ResultCode : library.ResultCode) : capture.ResultCode;
             var templateId = capture == null || capture.SavedTemplate == null ? string.Empty : capture.SavedTemplate.TemplateId;
             var templateName = capture == null || capture.SavedTemplate == null ? string.Empty : capture.SavedTemplate.Name;
             if (string.Equals(normalizedAction, BlueprintEntryCommands.StartCreate, StringComparison.Ordinal) &&
@@ -127,10 +133,10 @@ namespace JueMingZ.Input
                 "Ui.Blueprint.CreateSaveEntry",
                 "UI",
                 outcome,
-                result.Message,
+                library != null && !library.Succeeded ? library.Message : result.Message,
                 before,
                 BuildBlueprintUiStateJson(),
-                "{\"submitted\":false,\"implemented\":" + BoolRaw(!result.PlaceholderOnly) + ",\"uiOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"hotkeyFeatureId\":\"" + EscapeJson(targetId) + "\",\"action\":\"" + EscapeJson(normalizedAction) + "\",\"actionLabel\":\"" + EscapeJson(BuildBlueprintActionHotkeyLabel(targetId)) + "\",\"resultCode\":\"" + EscapeJson(resultCode) + "\",\"mode\":\"" + EscapeJson(result.Mode) + "\",\"changed\":" + BoolRaw(result.Changed || (capture != null && capture.Succeeded)) + ",\"placeholderOnly\":" + BoolRaw(result.PlaceholderOnly) + ",\"captureAttempted\":" + BoolRaw(capture != null) + ",\"capturedCells\":" + IntRaw(capture == null ? 0 : capture.CapturedCellCount) + ",\"capturedLayers\":" + IntRaw(capture == null ? 0 : capture.CapturedLayerCount) + ",\"skippedAirCells\":" + IntRaw(capture == null ? 0 : capture.SkippedAirCellCount) + ",\"unavailableCells\":" + IntRaw(capture == null ? 0 : capture.UnavailableCellCount) + ",\"templateId\":\"" + EscapeJson(templateId) + "\",\"templateName\":\"" + EscapeJson(templateName) + "\",\"mouseCaptured\":" + BoolRaw(command != null && command.MouseCaptured) + "}",
+                "{\"submitted\":false,\"implemented\":" + BoolRaw(!result.PlaceholderOnly) + ",\"uiOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"hotkeyFeatureId\":\"" + EscapeJson(targetId) + "\",\"action\":\"" + EscapeJson(normalizedAction) + "\",\"actionLabel\":\"" + EscapeJson(BuildBlueprintActionHotkeyLabel(targetId)) + "\",\"resultCode\":\"" + EscapeJson(resultCode) + "\",\"mode\":\"" + EscapeJson(result.Mode) + "\",\"changed\":" + BoolRaw(result.Changed || (library != null && library.Changed) || (capture != null && capture.Succeeded)) + ",\"placeholderOnly\":" + BoolRaw(result.PlaceholderOnly) + ",\"libraryOpen\":" + BoolRaw(BlueprintLibraryUiState.IsOpen) + ",\"captureAttempted\":" + BoolRaw(capture != null) + ",\"capturedCells\":" + IntRaw(capture == null ? 0 : capture.CapturedCellCount) + ",\"capturedLayers\":" + IntRaw(capture == null ? 0 : capture.CapturedLayerCount) + ",\"skippedAirCells\":" + IntRaw(capture == null ? 0 : capture.SkippedAirCellCount) + ",\"unavailableCells\":" + IntRaw(capture == null ? 0 : capture.UnavailableCellCount) + ",\"templateId\":\"" + EscapeJson(templateId) + "\",\"templateName\":\"" + EscapeJson(templateName) + "\",\"mouseCaptured\":" + BoolRaw(command != null && command.MouseCaptured) + "}",
                 "Button");
         }
 
@@ -309,9 +315,34 @@ namespace JueMingZ.Input
                 return;
             }
 
+            if (string.Equals(payload, BlueprintHandheldActionBarState.ButtonIdClearSelection, StringComparison.OrdinalIgnoreCase))
+            {
+                var entry = BlueprintEntryState.ApplyCommand(
+                    BlueprintEntryCommands.ClearSelection,
+                    ConfigService.AppSettings ?? AppSettings.CreateDefault());
+                var commandResult = BlueprintHandheldActionBarState.RecordCommandResultClick(
+                    payload,
+                    command == null ? 0 : command.IntValue,
+                    command != null && command.MouseCaptured,
+                    entry.ResultCode,
+                    entry.Message);
+                Record(
+                    command,
+                    "Ui.Blueprint.HandheldActionBar",
+                    "UI",
+                    entry.Succeeded ? (entry.Changed ? "Succeeded" : "NotApplicable") : "Failed",
+                    entry.Message,
+                    before,
+                    BuildBlueprintUiStateJson(),
+                    "{\"submitted\":false,\"implemented\":true,\"uiOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"action\":\"" + EscapeJson(commandResult.ButtonId) + "\",\"entryAction\":\"" + EscapeJson(BlueprintEntryCommands.ClearSelection) + "\",\"buttonLabel\":\"" + EscapeJson(commandResult.ButtonLabel) + "\",\"resultCode\":\"" + EscapeJson(entry.ResultCode) + "\",\"mode\":\"" + EscapeJson(entry.Mode) + "\",\"changed\":" + BoolRaw(entry.Changed) + ",\"placeholderOnly\":" + BoolRaw(entry.PlaceholderOnly) + ",\"heldItemType\":" + IntRaw(commandResult.HeldItemType) + ",\"visibleReason\":\"" + EscapeJson(BlueprintHandheldActionBarState.HiddenReasonNone) + "\",\"blockedReason\":\"\",\"mouseCaptured\":" + BoolRaw(commandResult.MouseCaptured) + "}",
+                    "Button");
+                return;
+            }
+
             if (string.Equals(payload, BlueprintHandheldActionBarState.ButtonIdOpenLibrary, StringComparison.OrdinalIgnoreCase))
             {
                 var library = BlueprintLibraryUiState.OpenLibrary();
+                RevealBlueprintLibraryMenuIfOpened(library);
                 var entry = BlueprintEntryState.ApplyCommand(
                     BlueprintEntryCommands.OpenLibrary,
                     ConfigService.AppSettings ?? AppSettings.CreateDefault());
@@ -486,6 +517,7 @@ namespace JueMingZ.Input
             if (string.Equals(payload, BlueprintEntryCommands.OpenLibrary, StringComparison.OrdinalIgnoreCase))
             {
                 library = BlueprintLibraryUiState.OpenLibrary();
+                RevealBlueprintLibraryMenuIfOpened(library);
             }
             else if (string.Equals(payload, BlueprintEntryCommands.OpenPlacedInstances, StringComparison.OrdinalIgnoreCase))
             {
@@ -569,7 +601,7 @@ namespace JueMingZ.Input
                 result == null ? "Blueprint library command failed." : result.Message,
                 before,
                 BuildBlueprintUiStateJson(),
-                "{\"submitted\":false,\"implemented\":" + BoolRaw(result != null && !result.PlaceholderOnly) + ",\"uiOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"action\":\"" + EscapeJson(action) + "\",\"templateId\":\"" + EscapeJson(templateId) + "\",\"templateName\":\"" + EscapeJson(result == null ? string.Empty : result.TemplateName) + "\",\"resultCode\":\"" + EscapeJson(result == null ? string.Empty : result.ResultCode) + "\",\"changed\":" + BoolRaw(result != null && result.Changed) + ",\"placeholderOnly\":" + BoolRaw(result != null && result.PlaceholderOnly) + ",\"exportPath\":\"" + EscapeJson(result == null ? string.Empty : result.ExportPath) + "\",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                "{\"submitted\":false,\"implemented\":" + BoolRaw(result != null && !result.PlaceholderOnly) + ",\"uiOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"action\":\"" + EscapeJson(action) + "\",\"templateId\":\"" + EscapeJson(templateId) + "\",\"templateName\":\"" + EscapeJson(result == null ? string.Empty : result.TemplateName) + "\",\"resultCode\":\"" + EscapeJson(result == null ? string.Empty : result.ResultCode) + "\",\"changed\":" + BoolRaw(result != null && result.Changed) + ",\"placeholderOnly\":" + BoolRaw(result != null && result.PlaceholderOnly) + ",\"libraryOpen\":" + BoolRaw(BlueprintLibraryUiState.IsOpen) + ",\"exportPath\":\"" + EscapeJson(result == null ? string.Empty : result.ExportPath) + "\",\"importPath\":\"" + EscapeJson(result == null ? string.Empty : result.ImportPath) + "\",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
                 "Button");
         }
 
@@ -577,6 +609,12 @@ namespace JueMingZ.Input
         {
             action = (action ?? string.Empty).Trim();
             templateId = (templateId ?? string.Empty).Trim();
+            if (string.Equals(action, "back", StringComparison.OrdinalIgnoreCase))
+            {
+                LegacyTextInput.ClearFocus();
+                return BlueprintLibraryUiState.CloseLibrary();
+            }
+
             if (string.Equals(action, "page-prev", StringComparison.OrdinalIgnoreCase))
             {
                 LegacyTextInput.ClearFocus();
@@ -587,6 +625,32 @@ namespace JueMingZ.Input
             {
                 LegacyTextInput.ClearFocus();
                 return BlueprintLibraryUiState.MovePage(1);
+            }
+
+            if (string.Equals(action, "layout-name", StringComparison.OrdinalIgnoreCase))
+            {
+                return HandleBlueprintLibraryAction(command, "name", templateId);
+            }
+
+            if (string.Equals(action, "layout-delete", StringComparison.OrdinalIgnoreCase))
+            {
+                return HandleBlueprintLibraryAction(command, "delete", templateId);
+            }
+
+            if (string.Equals(action, "layout-export", StringComparison.OrdinalIgnoreCase))
+            {
+                return HandleBlueprintLibraryAction(command, "export", templateId);
+            }
+
+            if (string.Equals(action, "layout-use", StringComparison.OrdinalIgnoreCase))
+            {
+                return HandleBlueprintLibraryAction(command, "use", templateId);
+            }
+
+            if (string.Equals(action, "import", StringComparison.OrdinalIgnoreCase))
+            {
+                LegacyTextInput.ClearFocus();
+                return BlueprintLibraryUiState.ImportTemplate();
             }
 
             if (string.Equals(action, "name", StringComparison.OrdinalIgnoreCase))
@@ -775,6 +839,7 @@ namespace JueMingZ.Input
                    "\"replacementChestsEnabled\":" + BoolRaw(settings.BlueprintReplacementChestsEnabled) + "," +
                    "\"replacementSignsEnabled\":" + BoolRaw(settings.BlueprintReplacementSignsEnabled) + "," +
                    "\"entryMode\":\"" + EscapeJson(entry.Mode) + "\"," +
+                   "\"libraryOpen\":" + BoolRaw(BlueprintLibraryUiState.IsOpen) + "," +
                    "\"selectedTemplateId\":\"" + EscapeJson(entry.SelectedTemplateId) + "\"," +
                    "\"creationMask\":" + BlueprintCreationMaskState.BuildUiStateJson() + "," +
                    "\"placementPreview\":" + BlueprintPlacementPreviewState.BuildUiStateJson() + "," +
@@ -834,6 +899,11 @@ namespace JueMingZ.Input
                 return FeatureIds.BlueprintSaveAction;
             }
 
+            if (string.Equals(payload, FeatureIds.BlueprintLibraryAction, StringComparison.OrdinalIgnoreCase))
+            {
+                return FeatureIds.BlueprintLibraryAction;
+            }
+
             return string.Empty;
         }
 
@@ -849,7 +919,29 @@ namespace JueMingZ.Input
                 return BlueprintEntryCommands.FinishCreateSave;
             }
 
+            if (string.Equals(payload, BlueprintEntryCommands.OpenLibrary, StringComparison.OrdinalIgnoreCase))
+            {
+                return BlueprintEntryCommands.OpenLibrary;
+            }
+
             return string.Empty;
+        }
+
+        private static string GetBlueprintActionHotkeyTargetId(string action)
+        {
+            if (string.Equals(action, BlueprintEntryCommands.StartCreate, StringComparison.Ordinal))
+            {
+                return FeatureIds.BlueprintCreateAction;
+            }
+
+            if (string.Equals(action, BlueprintEntryCommands.FinishCreateSave, StringComparison.Ordinal))
+            {
+                return FeatureIds.BlueprintSaveAction;
+            }
+
+            return string.Equals(action, BlueprintEntryCommands.OpenLibrary, StringComparison.Ordinal)
+                ? FeatureIds.BlueprintLibraryAction
+                : string.Empty;
         }
 
         private static string BuildBlueprintActionHotkeyLabel(string targetId)
@@ -864,7 +956,25 @@ namespace JueMingZ.Input
                 return "保存蓝图";
             }
 
+            if (string.Equals(targetId, FeatureIds.BlueprintLibraryAction, StringComparison.Ordinal))
+            {
+                return "蓝图库";
+            }
+
             return "蓝图动作";
+        }
+
+        private static void RevealBlueprintLibraryMenuIfOpened(BlueprintLibraryCommandResult library)
+        {
+            if (library != null && !library.Succeeded)
+            {
+                return;
+            }
+
+            LegacyTextInput.ClearFocus();
+            LegacyMainUiState.SelectPage("blueprint");
+            LegacyMainUiState.SetScrollOffset(0, 0);
+            LegacyMainUiState.SetVisible(true);
         }
 
         internal static void HandleBlueprintLibraryCommandForTesting(LegacyUiCommand command)
@@ -881,6 +991,11 @@ namespace JueMingZ.Input
             }
 
             HandleBlueprintLibraryCommand(command, command.ElementId.Substring("blueprint-library:".Length));
+        }
+
+        internal static BlueprintLibraryCommandResult HandleBlueprintLibraryActionForTesting(string action, string templateId)
+        {
+            return HandleBlueprintLibraryAction(null, action, templateId);
         }
 
         internal static void HandleBlueprintEntryCommandForTesting(LegacyUiCommand command)

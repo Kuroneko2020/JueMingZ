@@ -10,7 +10,7 @@ namespace JueMingZ.UI
 {
     public static class BlueprintHandheldActionBarOverlay
     {
-        private const string VisualContract = "ui-scale-bottom-action-bar+dynamic-buttons+legacy-ui-theme+vanilla-ui-skin+button-text-scale-0.78+create-enters-mask+exit-create-preserves-mask+save-captures-mask+disabled-save-tooltip+open-library-real+unimplemented-buttons-ui-only+mouse-consume+no-blueprint-refresh+no-input-action-queue";
+        private const string VisualContract = "ui-scale-bottom-action-bar+dynamic-buttons+legacy-ui-theme+vanilla-ui-skin+button-text-scale-0.78+create-enters-mask+exit-create-preserves-mask+save-captures-mask+clear-selection+disabled-save-tooltip+open-library-real+unimplemented-buttons-ui-only+mouse-consume+no-blueprint-refresh+no-library-refresh+no-input-action-queue";
         internal const float ButtonTextScale = 0.78f;
         private const float MinimumButtonTextScale = 0.52f;
 
@@ -47,12 +47,12 @@ namespace JueMingZ.UI
 
         public static void UpdatePrefixGuard()
         {
-            UpdateInputGuard("BlueprintHandheldActionBarOverlay.UpdatePrefixGuard", true);
+            UpdateInputGuard("BlueprintHandheldActionBarOverlay.UpdatePrefixGuard", true, false);
         }
 
         public static void UpdateAfterPlayerInputGuard()
         {
-            UpdateInputGuard("BlueprintHandheldActionBarOverlay.UpdateAfterPlayerInputGuard", false);
+            UpdateInputGuard("BlueprintHandheldActionBarOverlay.UpdateAfterPlayerInputGuard", true, true);
         }
 
         internal static bool ShouldRegisterUiOverlayForTesting()
@@ -153,14 +153,14 @@ namespace JueMingZ.UI
             environment.BlueprintHasPlacedInstances = placedCount > 0;
         }
 
-        private static void UpdateInputGuard(string source, bool allowCommand)
+        private static void UpdateInputGuard(string source, bool allowCommand, bool afterPlayerInput)
         {
             try
             {
                 var gameState = GameStateReader.LastSnapshot;
                 var frame = BuildFrame(RuntimeSettingsSnapshotProvider.GetCurrent(), gameState, ReadEnvironment(gameState));
-                var raw = DiagnosticMouseStateReader.Read();
-                var mouse = LegacyUiInput.ReadMouseForOverlay(raw, LegacyMainUiScale.Resolve(raw));
+                var raw = DiagnosticMouseStateReader.ReadForBlueprintHandheldActionBarOverlay();
+                var mouse = LegacyUiInput.ReadMouseForBlueprintHandheldOverlay(raw, LegacyMainUiScale.Resolve(raw));
                 var interaction = BlueprintHandheldActionBarState.HandlePointer(
                     frame,
                     new BlueprintHandheldActionBarPointerInput
@@ -170,7 +170,8 @@ namespace JueMingZ.UI
                         LeftDown = mouse.LeftDown,
                         ScrollDelta = mouse.ScrollDelta,
                         ReadAvailable = mouse.ReadAvailable,
-                        AllowCommand = allowCommand
+                        AllowCommand = allowCommand,
+                        AfterPlayerInput = afterPlayerInput
                     });
 
                 var captured = false;

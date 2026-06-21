@@ -589,9 +589,17 @@ namespace JueMingZ.UI.Legacy
             AddHash(ref hash, _blueprintHotkeyCaptureTargetId);
             AddHash(ref hash, GetBlueprintHotkeyDisplay(ConfigService.HotkeySettings, FeatureIds.BlueprintCreateAction));
             AddHash(ref hash, GetBlueprintHotkeyDisplay(ConfigService.HotkeySettings, FeatureIds.BlueprintSaveAction));
+            AddHash(ref hash, GetBlueprintHotkeyDisplay(ConfigService.HotkeySettings, FeatureIds.BlueprintLibraryAction));
             if (includeTransientMessage)
             {
                 AddHash(ref hash, _blueprintEntryHotkeyMessage);
+            }
+
+            AddHash(ref hash, BlueprintLibraryUiState.IsOpen);
+            if (BlueprintLibraryUiState.IsOpen)
+            {
+                AddHash(ref hash, BlueprintLibraryUiState.BuildStateSignature());
+                return;
             }
 
             AddHash(ref hash, _blueprintReplacementConfigOpen);

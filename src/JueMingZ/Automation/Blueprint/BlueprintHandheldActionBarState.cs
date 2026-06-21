@@ -33,6 +33,7 @@ namespace JueMingZ.Automation.Blueprint
         public const string ButtonIdCreate = "create";
         public const string ButtonIdSave = "save";
         public const string ButtonIdExitCreate = "exit-create";
+        public const string ButtonIdClearSelection = "clear-selection";
         public const string ButtonIdOpenLibrary = "open-library";
         public const string ButtonIdDelete = "delete";
         public const string ButtonIdMove = "move";
@@ -55,10 +56,11 @@ namespace JueMingZ.Automation.Blueprint
             new BlueprintHandheldActionBarButtonDefinition(ButtonIdCreate, "创建蓝图", 0, "创建新的蓝图选区"),
             new BlueprintHandheldActionBarButtonDefinition(ButtonIdSave, "保存蓝图", 0, "保存当前蓝图选区"),
             new BlueprintHandheldActionBarButtonDefinition(ButtonIdExitCreate, "退出创建", 1, "退出创建并保留当前选区"),
+            new BlueprintHandheldActionBarButtonDefinition(ButtonIdClearSelection, "清除已有选区", 2, "只清除当前蓝图创建选区"),
             new BlueprintHandheldActionBarButtonDefinition(ButtonIdOpenLibrary, "打开蓝图库", 1, "打开蓝图库"),
-            new BlueprintHandheldActionBarButtonDefinition(ButtonIdDelete, "删除蓝图", 2, "删除已经放置的蓝图或已经选区待创建的区域"),
-            new BlueprintHandheldActionBarButtonDefinition(ButtonIdMove, "移动蓝图", 3, "移动已经放置的蓝图或已经选区待创建的区域"),
-            new BlueprintHandheldActionBarButtonDefinition(ButtonIdRedMap, "红图", 4, "对已放置的蓝图区域进行修改")
+            new BlueprintHandheldActionBarButtonDefinition(ButtonIdDelete, "删除蓝图", 3, "删除已经放置的蓝图或已经选区待创建的区域"),
+            new BlueprintHandheldActionBarButtonDefinition(ButtonIdMove, "移动蓝图", 4, "移动已经放置的蓝图或已经选区待创建的区域"),
+            new BlueprintHandheldActionBarButtonDefinition(ButtonIdRedMap, "红图", 5, "对已放置的蓝图区域进行修改")
         };
         private static string _hoveredButtonId = string.Empty;
         private static string _pressedButtonId = string.Empty;
@@ -67,7 +69,9 @@ namespace JueMingZ.Automation.Blueprint
         private static string _lastNotice = string.Empty;
         private static string _lastResultCode = string.Empty;
         private static int _lastHeldItemType;
-        private static bool _lastLeftDown;
+        private static bool _lastCommandLeftDown;
+        private static bool _lastCaptureLeftDown;
+        private static bool _pendingAfterPlayerInputCommandEdge;
 
         public static IReadOnlyList<BlueprintHandheldActionBarButtonDefinition> GetButtonDefinitions()
         {
@@ -188,24 +192,59 @@ namespace JueMingZ.Automation.Blueprint
 
             lock (InteractionSyncRoot)
             {
-                leftPressed = input.LeftDown && !_lastLeftDown;
-                leftReleased = !input.LeftDown && _lastLeftDown;
-                _lastLeftDown = input.LeftDown;
+                var previousLeftDown = input.AllowCommand ? _lastCommandLeftDown : _lastCaptureLeftDown;
+                leftPressed = input.LeftDown && !previousLeftDown;
+                leftReleased = !input.LeftDown && previousLeftDown;
+                if (input.AllowCommand)
+                {
+                    _lastCommandLeftDown = input.LeftDown;
+                }
+                else
+                {
+                    // Capture-only readers are separate from command readers so
+                    // future overlays cannot consume the handheld command edge.
+                    _lastCaptureLeftDown = input.LeftDown;
+                }
+
                 _hoveredButtonId = hoveredButtonId;
 
                 var hoveredButton = FindButtonFrame(frame, hoveredButtonId);
                 var hoveredButtonEnabled = hoveredButton == null || hoveredButton.Enabled;
+                var replayPendingAfterPlayerInputEdge =
+                    input.AllowCommand &&
+                    input.AfterPlayerInput &&
+                    input.LeftDown &&
+                    !leftPressed &&
+                    _pendingAfterPlayerInputCommandEdge &&
+                    hoveredButtonEnabled &&
+                    !string.IsNullOrWhiteSpace(hoveredButtonId);
 
                 if (leftPressed && !string.IsNullOrWhiteSpace(hoveredButtonId) && hoveredButtonEnabled)
+                {
+                    _pressedButtonId = hoveredButtonId;
+                }
+                else if (replayPendingAfterPlayerInputEdge)
                 {
                     _pressedButtonId = hoveredButtonId;
                 }
 
                 clicked =
                     input.AllowCommand &&
-                    leftPressed &&
+                    (leftPressed || replayPendingAfterPlayerInputEdge) &&
                     hoveredButtonEnabled &&
                     !string.IsNullOrWhiteSpace(hoveredButtonId);
+
+                // Prefix can observe a fresh OS button edge while Terraria UI
+                // coordinates are still stale. Let the PlayerInput postfix replay
+                // exactly that edge once after Terraria refreshes the mouse coordinates.
+                if (input.AllowCommand && !input.AfterPlayerInput && leftPressed && !clicked)
+                {
+                    _pendingAfterPlayerInputCommandEdge = true;
+                }
+                else if (!input.LeftDown || input.AfterPlayerInput || clicked)
+                {
+                    _pendingAfterPlayerInputCommandEdge = false;
+                }
 
                 if (!input.LeftDown)
                 {
@@ -416,10 +455,9 @@ namespace JueMingZ.Automation.Blueprint
                     hasSelectedCells,
                     hasSelectedCells ? string.Empty : SaveDisabledTooltip));
                 definitions.Add(BuildButtonSpec(ButtonIdExitCreate, true, string.Empty));
-                if (environment.BlueprintHasPlacedInstances)
+                if (hasSelectedCells)
                 {
-                    definitions.Add(BuildButtonSpec(ButtonIdDelete, true, string.Empty));
-                    definitions.Add(BuildButtonSpec(ButtonIdMove, true, string.Empty));
+                    definitions.Add(BuildButtonSpec(ButtonIdClearSelection, true, string.Empty));
                 }
             }
             else
@@ -584,7 +622,9 @@ namespace JueMingZ.Automation.Blueprint
                 _lastNotice = string.Empty;
                 _lastResultCode = string.IsNullOrWhiteSpace(reason) ? string.Empty : reason;
                 _lastHeldItemType = 0;
-                _lastLeftDown = false;
+                _lastCommandLeftDown = false;
+                _lastCaptureLeftDown = false;
+                _pendingAfterPlayerInputCommandEdge = false;
             }
         }
 
@@ -775,12 +815,14 @@ namespace JueMingZ.Automation.Blueprint
         public int ScrollDelta { get; set; }
         public bool ReadAvailable { get; set; }
         public bool AllowCommand { get; set; }
+        public bool AfterPlayerInput { get; set; }
 
         public BlueprintHandheldActionBarPointerInput()
         {
             MouseX = -1;
             MouseY = -1;
             AllowCommand = true;
+            AfterPlayerInput = false;
         }
     }
 

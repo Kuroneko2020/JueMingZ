@@ -120,7 +120,16 @@ namespace JueMingZ.Tests
                     BlueprintSettings.DefaultToolItemId,
                     BlueprintHandheldEnvironment(1280, 720, blueprintCreationActive: true, blueprintCreationHasPendingSelection: true, blueprintCreationSelectedCount: 3)),
                 BlueprintHandheldActionBarState.ButtonIdSave,
-                BlueprintHandheldActionBarState.ButtonIdExitCreate);
+                BlueprintHandheldActionBarState.ButtonIdExitCreate,
+                BlueprintHandheldActionBarState.ButtonIdClearSelection);
+            AssertBlueprintHandheldButton(
+                BuildBlueprintHandheldFrame(
+                    true,
+                    BlueprintSettings.DefaultToolItemId,
+                    BlueprintHandheldEnvironment(1280, 720, blueprintCreationActive: true, blueprintCreationHasPendingSelection: true, blueprintCreationSelectedCount: 3)),
+                BlueprintHandheldActionBarState.ButtonIdClearSelection,
+                "清除已有选区",
+                "只清除当前蓝图创建选区");
 
             var exitedWithPreservedMask = BuildBlueprintHandheldFrame(
                 true,
@@ -138,8 +147,7 @@ namespace JueMingZ.Tests
                     BlueprintHandheldEnvironment(1280, 720, blueprintCreationActive: true, blueprintCreationHasPendingSelection: true, blueprintCreationSelectedCount: 3, blueprintHasPlacedInstances: true, blueprintPlacedInstanceCount: 2)),
                 BlueprintHandheldActionBarState.ButtonIdSave,
                 BlueprintHandheldActionBarState.ButtonIdExitCreate,
-                BlueprintHandheldActionBarState.ButtonIdDelete,
-                BlueprintHandheldActionBarState.ButtonIdMove);
+                BlueprintHandheldActionBarState.ButtonIdClearSelection);
 
             AssertBlueprintHandheldButtons(
                 BuildBlueprintHandheldFrame(
@@ -147,7 +155,8 @@ namespace JueMingZ.Tests
                     BlueprintSettings.DefaultToolItemId,
                     BlueprintHandheldEnvironment(1280, 720, blueprintCreationCompletedPendingCapture: true, blueprintCreationHasPendingSelection: true, blueprintCreationSelectedCount: 3)),
                 BlueprintHandheldActionBarState.ButtonIdSave,
-                BlueprintHandheldActionBarState.ButtonIdExitCreate);
+                BlueprintHandheldActionBarState.ButtonIdExitCreate,
+                BlueprintHandheldActionBarState.ButtonIdClearSelection);
         }
 
         private static void BlueprintHandheldActionBarLayoutKeepsButtonsStable()
@@ -232,12 +241,16 @@ namespace JueMingZ.Tests
 
         private static void BlueprintHandheldActionBarOverlayStaysUiOnlyAndNoScan()
         {
+            var restore = PushTemporaryConfigDirectory("blueprint-handheld-no-scan");
             BlueprintProjectionService.ResetForTesting();
             BlueprintMaterialService.ResetForTesting();
+            BlueprintLibraryUiState.ResetForTesting();
             try
             {
+                BlueprintLibraryUiState.SetStoreForTesting(new BlueprintTemplateLibraryStore(), true);
                 var projectionBefore = BlueprintProjectionService.BuildStateSignature();
                 var materialBefore = BlueprintMaterialService.BuildStateSignature();
+                var libraryBefore = BlueprintLibraryUiState.BuildStateSignature();
 
                 var frame = BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId);
                 if (!frame.Visible)
@@ -247,8 +260,10 @@ namespace JueMingZ.Tests
 
                 var projectionAfter = BlueprintProjectionService.BuildStateSignature();
                 var materialAfter = BlueprintMaterialService.BuildStateSignature();
+                var libraryAfter = BlueprintLibraryUiState.BuildStateSignature();
                 AssertIntEquals(projectionAfter, projectionBefore, "blueprint handheld projection signature");
                 AssertIntEquals(materialAfter, materialBefore, "blueprint handheld material signature");
+                AssertIntEquals(libraryAfter, libraryBefore, "blueprint handheld library signature");
 
                 if (!BlueprintHandheldActionBarOverlay.ShouldRegisterUiOverlayForTesting())
                 {
@@ -264,9 +279,11 @@ namespace JueMingZ.Tests
                 AssertContains(contract, "dynamic-buttons");
                 AssertContains(contract, "create-enters-mask");
                 AssertContains(contract, "save-captures-mask");
+                AssertContains(contract, "clear-selection");
                 AssertContains(contract, "open-library-real");
                 AssertContains(contract, "unimplemented-buttons-ui-only");
                 AssertContains(contract, "no-blueprint-refresh");
+                AssertContains(contract, "no-library-refresh");
                 AssertContains(contract, "mouse-consume");
                 AssertContains(contract, "no-input-action-queue");
                 AssertContains(contract, "legacy-ui-theme");
@@ -276,6 +293,9 @@ namespace JueMingZ.Tests
             {
                 BlueprintProjectionService.ResetForTesting();
                 BlueprintMaterialService.ResetForTesting();
+                BlueprintLibraryUiState.ResetForTesting();
+                BlueprintTemplateLibraryStore.ResetTestingHooks();
+                restore();
             }
         }
 
@@ -350,6 +370,144 @@ namespace JueMingZ.Tests
             AssertStringEquals(disabledInteraction.PressedButtonId, string.Empty, "disabled save must not enter pressed state");
         }
 
+        private static void BlueprintHandheldActionBarAfterPlayerInputGuardSubmitsFreshClickEdge()
+        {
+            BlueprintHandheldActionBarState.ResetInteractionForTesting();
+            var frame = BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId);
+            var button = frame.Buttons[0];
+
+            var prefixWithoutClick = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
+                frame,
+                BlueprintHandheldPointer(button.Rect.CenterX, button.Rect.CenterY, false, 0, true, false));
+            if (!prefixWithoutClick.ShouldCaptureMouse ||
+                prefixWithoutClick.ShouldConsumeLeftInput ||
+                prefixWithoutClick.Clicked)
+            {
+                throw new InvalidOperationException("Expected prefix guard without a left edge to capture hover without submitting a handheld command.");
+            }
+
+            var afterPlayerInput = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
+                frame,
+                BlueprintHandheldPointer(button.Rect.CenterX, button.Rect.CenterY, true, 0, true, true));
+            if (!afterPlayerInput.ShouldCaptureMouse ||
+                !afterPlayerInput.ShouldConsumeLeftInput ||
+                !afterPlayerInput.Clicked ||
+                !string.Equals(afterPlayerInput.HoveredButtonId, button.Id, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected after-PlayerInput guard to submit the fresh handheld button click edge.");
+            }
+
+            var repeatedAfterPlayerInput = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
+                frame,
+                BlueprintHandheldPointer(button.Rect.CenterX, button.Rect.CenterY, true, 0, true, true));
+            if (repeatedAfterPlayerInput.Clicked)
+            {
+                throw new InvalidOperationException("Expected held after-PlayerInput handheld click to submit only once.");
+            }
+        }
+
+        private static void BlueprintHandheldActionBarPostfixReplaysStalePrefixPress()
+        {
+            BlueprintHandheldActionBarState.ResetInteractionForTesting();
+            var frame = BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId);
+            var button = frame.Buttons[0];
+
+            var stalePrefix = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
+                frame,
+                BlueprintHandheldPointer(0, 0, true, 0, true, false));
+            if (stalePrefix.Clicked || stalePrefix.ShouldCaptureMouse || stalePrefix.ShouldConsumeLeftInput)
+            {
+                throw new InvalidOperationException("Expected stale prefix coordinates outside the handheld bar to defer the left edge instead of clicking.");
+            }
+
+            var afterPlayerInput = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
+                frame,
+                BlueprintHandheldPointer(button.Rect.CenterX, button.Rect.CenterY, true, 0, true, true));
+            if (!afterPlayerInput.ShouldCaptureMouse ||
+                !afterPlayerInput.ShouldConsumeLeftInput ||
+                !afterPlayerInput.Clicked ||
+                !string.Equals(afterPlayerInput.HoveredButtonId, button.Id, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected PlayerInput postfix to replay the prefix left edge once after Terraria refreshed the handheld button coordinates.");
+            }
+
+            var repeatedAfterPlayerInput = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
+                frame,
+                BlueprintHandheldPointer(button.Rect.CenterX, button.Rect.CenterY, true, 0, true, true));
+            if (repeatedAfterPlayerInput.Clicked)
+            {
+                throw new InvalidOperationException("Expected replayed handheld postfix edge to be single-use while the button remains held.");
+            }
+        }
+
+        private static void BlueprintHandheldActionBarGateClosedMouseKeepsTerrariaClick()
+        {
+            var scale = LegacyMainUiScale.ResolveForTesting(1d, 1280, 720);
+            var raw = new DiagnosticMouseState
+            {
+                GameInputAvailable = false,
+                TerrariaReadAvailable = true,
+                TerrariaMouseX = 640,
+                TerrariaMouseY = 650,
+                TerrariaLeftDown = true,
+                TerrariaScrollWheelAvailable = true,
+                ScrollDelta = -120,
+                OsReadAvailable = true,
+                OsClientMouseX = 32,
+                OsClientMouseY = 48,
+                OsLeftDown = true,
+                ReadMode = "Terraria+OsClient/BlueprintHandheldOverlayGateBypass"
+            };
+
+            var mouse = LegacyUiInput.ReadMouseForBlueprintHandheldOverlay(raw, scale);
+            if (!mouse.ReadAvailable ||
+                !mouse.LeftDown ||
+                mouse.ScrollDelta != -120 ||
+                mouse.X != 640 ||
+                mouse.Y != 650 ||
+                mouse.ReadMode.IndexOf("InterfaceOverlay", StringComparison.Ordinal) < 0)
+            {
+                throw new InvalidOperationException("Expected handheld overlay mouse to keep Terraria in-process click and scroll when the global input gate is closed.");
+            }
+
+            raw.TerrariaLeftDown = false;
+            raw.OsLeftDown = true;
+            var osFallback = LegacyUiInput.ReadMouseForBlueprintHandheldOverlay(raw, scale);
+            if (osFallback.LeftDown)
+            {
+                throw new InvalidOperationException("Expected handheld overlay gate bypass not to restore OS physical mouse fallback when global input is unavailable.");
+            }
+        }
+
+        private static void BlueprintHandheldActionBarGateOpenMousePrefersOsClientCoordinate()
+        {
+            var scale = LegacyMainUiScale.ResolveForTesting(1d, 1280, 720);
+            var raw = new DiagnosticMouseState
+            {
+                GameInputAvailable = true,
+                TerrariaReadAvailable = true,
+                TerrariaMouseX = 12,
+                TerrariaMouseY = 24,
+                TerrariaLeftDown = false,
+                OsReadAvailable = true,
+                OsClientMouseX = 640,
+                OsClientMouseY = 650,
+                OsLeftDown = true,
+                ReadMode = "Terraria+OsClient"
+            };
+
+            var mouse = LegacyUiInput.ReadMouseForBlueprintHandheldOverlay(raw, scale);
+            if (!mouse.ReadAvailable ||
+                !mouse.LeftDown ||
+                mouse.X != 640 ||
+                mouse.Y != 650 ||
+                mouse.ReadMode.IndexOf("OsClientRaw", StringComparison.Ordinal) < 0 ||
+                mouse.ReadMode.IndexOf("InterfaceOverlay", StringComparison.Ordinal) < 0)
+            {
+                throw new InvalidOperationException("Expected handheld overlay to prefer fresh OS client coordinates while the game input gate is open.");
+            }
+        }
+
         private static void BlueprintHandheldActionBarDisplayGatesStayVisibleAndUiOnly()
         {
             BlueprintHandheldActionBarState.ResetInteractionForTesting();
@@ -363,15 +521,15 @@ namespace JueMingZ.Tests
             var button = inventory.Buttons[0];
             var limitedPress = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
                 inventory,
-                BlueprintHandheldPointer(button.Rect.CenterX, button.Rect.CenterY, true, 0, false));
-            if (!limitedPress.ShouldCaptureMouse || !limitedPress.ShouldConsumeLeftInput || limitedPress.Clicked)
+                BlueprintHandheldPointer(button.Rect.CenterX, button.Rect.CenterY, true, 0, true, true));
+            if (!limitedPress.ShouldCaptureMouse || !limitedPress.ShouldConsumeLeftInput || !limitedPress.Clicked)
             {
-                throw new InvalidOperationException("Expected visible-but-limited handheld bar press to capture and consume without submitting a command.");
+                throw new InvalidOperationException("Expected visible display-gate handheld bar press to submit its UI command while still staying outside InputActionQueue.");
             }
 
             var wheel = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
                 chest,
-                BlueprintHandheldPointer(chest.Bounds.CenterX, chest.Bounds.CenterY, false, -120, false));
+                BlueprintHandheldPointer(chest.Bounds.CenterX, chest.Bounds.CenterY, false, -120, true, true));
             if (!wheel.ShouldCaptureMouse || !wheel.ShouldConsumeScroll || wheel.Clicked)
             {
                 throw new InvalidOperationException("Expected chest-visible handheld bar hover to consume wheel without submitting a command.");
@@ -446,6 +604,31 @@ namespace JueMingZ.Tests
                     throw new InvalidOperationException("Expected handheld create to resume the mask preserved by exit-create.");
                 }
 
+                LegacyUiActionService.HandleBlueprintHandheldActionBarCommandForTesting(BuildBlueprintHandheldCommand(BlueprintHandheldActionBarState.ButtonIdClearSelection, "清除已有选区"));
+                var cleared = BlueprintHandheldActionBarState.GetInteractionSnapshotForTesting();
+                AssertStringEquals(cleared.LastClickedButtonId, BlueprintHandheldActionBarState.ButtonIdClearSelection, "handheld clear-selection clicked id");
+                AssertStringEquals(cleared.LastResultCode, "selectionCleared", "handheld clear-selection command result");
+                AssertStringEquals(BlueprintEntryState.GetSnapshot(settings).Mode, BlueprintEntryModes.Creating, "handheld clear-selection keeps create mode");
+                var clearedMask = BlueprintCreationMaskState.GetSnapshot();
+                if (!clearedMask.Active ||
+                    clearedMask.SelectedCount != 0 ||
+                    clearedMask.CompletedPendingCapture)
+                {
+                    throw new InvalidOperationException("Expected handheld clear-selection to empty only the pending creation mask.");
+                }
+
+                BlueprintTemplateLibrarySnapshot clearedStore;
+                RequireBlueprintSuccess(store.TryLoad(out clearedStore), "load blueprint handheld clear-selection result");
+                if (clearedStore.Templates.Count != 0)
+                {
+                    throw new InvalidOperationException("Expected handheld clear-selection not to create, delete, or modify blueprint templates.");
+                }
+
+                LegacyUiActionService.HandleBlueprintHandheldActionBarCommandForTesting(BuildBlueprintHandheldCommand(BlueprintHandheldActionBarState.ButtonIdSave, "保存蓝图"));
+                var saveAfterClear = BlueprintHandheldActionBarState.GetInteractionSnapshotForTesting();
+                AssertStringEquals(saveAfterClear.LastResultCode, "emptySelection", "handheld save after clear-selection result");
+
+                ClickTileForBlueprintCreation(5, 6);
                 LegacyUiActionService.HandleBlueprintHandheldActionBarCommandForTesting(BuildBlueprintHandheldCommand(BlueprintHandheldActionBarState.ButtonIdSave, "保存蓝图"));
                 var saved = BlueprintHandheldActionBarState.GetInteractionSnapshotForTesting();
                 AssertStringEquals(saved.LastClickedButtonId, BlueprintHandheldActionBarState.ButtonIdSave, "handheld save clicked id");
@@ -703,7 +886,8 @@ namespace JueMingZ.Tests
             int mouseY,
             bool leftDown,
             int scrollDelta,
-            bool allowCommand)
+            bool allowCommand,
+            bool afterPlayerInput = false)
         {
             return new BlueprintHandheldActionBarPointerInput
             {
@@ -712,7 +896,8 @@ namespace JueMingZ.Tests
                 LeftDown = leftDown,
                 ScrollDelta = scrollDelta,
                 ReadAvailable = true,
-                AllowCommand = allowCommand
+                AllowCommand = allowCommand,
+                AfterPlayerInput = afterPlayerInput
             };
         }
 

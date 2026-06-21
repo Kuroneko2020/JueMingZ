@@ -24,6 +24,71 @@ namespace JueMingZ.UI.Legacy
             }
         }
 
+        internal static int CountPendingCommandsByElementPrefix(string elementIdPrefix)
+        {
+            if (string.IsNullOrWhiteSpace(elementIdPrefix))
+            {
+                return 0;
+            }
+
+            lock (SyncRoot)
+            {
+                var count = 0;
+                foreach (var command in PendingCommands)
+                {
+                    if (command != null &&
+                        !string.IsNullOrWhiteSpace(command.ElementId) &&
+                        command.ElementId.StartsWith(elementIdPrefix, StringComparison.Ordinal))
+                    {
+                        count++;
+                    }
+                }
+
+                return count;
+            }
+        }
+
+        internal static bool TryDrainCommandByElementPrefix(string elementIdPrefix, out LegacyUiCommand command)
+        {
+            command = null;
+            if (string.IsNullOrWhiteSpace(elementIdPrefix))
+            {
+                return false;
+            }
+
+            lock (SyncRoot)
+            {
+                if (PendingCommands.Count <= 0)
+                {
+                    return false;
+                }
+
+                var kept = new Queue<LegacyUiCommand>(PendingCommands.Count);
+                while (PendingCommands.Count > 0)
+                {
+                    var next = PendingCommands.Dequeue();
+                    if (command == null &&
+                        next != null &&
+                        !string.IsNullOrWhiteSpace(next.ElementId) &&
+                        next.ElementId.StartsWith(elementIdPrefix, StringComparison.Ordinal))
+                    {
+                        command = next;
+                    }
+                    else
+                    {
+                        kept.Enqueue(next);
+                    }
+                }
+
+                while (kept.Count > 0)
+                {
+                    PendingCommands.Enqueue(kept.Dequeue());
+                }
+
+                return command != null;
+            }
+        }
+
         public static void EnqueueClick(LegacyUiElement element, LegacyMouseSnapshot mouse, bool captured)
         {
             // Captured UI clicks are buffered as commands; the bounded queue prevents

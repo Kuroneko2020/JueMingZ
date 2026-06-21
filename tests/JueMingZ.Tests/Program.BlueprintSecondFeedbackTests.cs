@@ -76,7 +76,8 @@ namespace JueMingZ.Tests
                 AssertBlueprintHandheldButtons(
                     selectedCreateFrame,
                     BlueprintHandheldActionBarState.ButtonIdSave,
-                    BlueprintHandheldActionBarState.ButtonIdExitCreate);
+                    BlueprintHandheldActionBarState.ButtonIdExitCreate,
+                    BlueprintHandheldActionBarState.ButtonIdClearSelection);
 
                 var overlayContract = BlueprintCreationOverlay.GetVisualContractForTesting();
                 AssertContains(overlayContract, "world-hover");

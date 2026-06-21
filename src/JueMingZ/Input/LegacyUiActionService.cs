@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using JueMingZ.Actions;
+using JueMingZ.Automation.Blueprint;
 using JueMingZ.Diagnostics;
 using JueMingZ.GameState;
 using JueMingZ.UI.Legacy;
@@ -94,6 +95,40 @@ namespace JueMingZ.Input
             }
         }
 
+        internal static void UpdateBlueprintHandheldCommandsWhenInputUnavailable(InputActionQueue queue, GameStateSnapshot snapshot)
+        {
+            try
+            {
+                var pending = LegacyUiInput.CountPendingCommandsByElementPrefix(BlueprintHandheldActionBarState.CommandElementPrefix);
+                RecordActionGateEntry(pending);
+                if (pending <= 0)
+                {
+                    RecordActionUpdateSkipped();
+                    return;
+                }
+
+                RecordActionUpdateRan();
+                var dispatchStart = Stopwatch.GetTimestamp();
+                var dispatched = 0;
+                LegacyUiCommand command;
+                while (LegacyUiInput.TryDrainCommandByElementPrefix(BlueprintHandheldActionBarState.CommandElementPrefix, out command))
+                {
+                    dispatched++;
+                    Dispatch(command, queue, snapshot);
+                }
+
+                RecordDispatchResult(dispatched, GetElapsedMilliseconds(dispatchStart, Stopwatch.GetTimestamp()));
+            }
+            catch (Exception error)
+            {
+                LogThrottle.ErrorThrottled(
+                    "legacy-ui-blueprint-handheld-action-error",
+                    TimeSpan.FromSeconds(10),
+                    "LegacyUiActionService",
+                    "Blueprint handheld UI action dispatch failed while global input gate was closed.", error);
+            }
+        }
+
         internal static void ResetActionUpdateDiagnosticsForTesting()
         {
             lock (ActionDiagnosticsSyncRoot)
@@ -104,6 +139,16 @@ namespace JueMingZ.Input
                 _dispatchedCommandCountLast = 0;
                 _dispatchElapsedMsLast = 0d;
                 _dragFrameActionSkipCount = 0;
+            }
+        }
+
+        private static void RecordActionGateEntry(int pendingCommandCount)
+        {
+            lock (ActionDiagnosticsSyncRoot)
+            {
+                _pendingCommandCountLast = pendingCommandCount < 0 ? 0 : pendingCommandCount;
+                _dispatchedCommandCountLast = 0;
+                _dispatchElapsedMsLast = 0d;
             }
         }
 

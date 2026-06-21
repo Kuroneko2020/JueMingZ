@@ -1063,8 +1063,14 @@ namespace JueMingZ.Tests
             Run("blueprint safe write failure keeps existing template library", ref failed, BlueprintSafeWriteFailureKeepsExistingTemplateLibrary);
             Run("blueprint corrupt json fails soft without overwrite", ref failed, BlueprintCorruptJsonFailsSoftWithoutOverwrite);
             Run("blueprint template export contains template only", ref failed, BlueprintTemplateExportContainsTemplateOnly);
+            Run("blueprint template import uses suffix and keeps existing library on failure", ref failed, BlueprintTemplateImportUsesSuffixAndKeepsExistingLibraryOnFailure);
             Run("blueprint template rename uses suffix and keeps instances", ref failed, BlueprintTemplateRenameUsesSuffixAndKeepsInstances);
             Run("blueprint library UI state keeps empty and paging contracts", ref failed, BlueprintLibraryUiStateEmptyAndPagingContracts);
+            Run("blueprint library two-column cards preview and layout buttons", ref failed, BlueprintLibraryTwoColumnCardsPreviewAndLayoutButtons);
+            Run("blueprint library stage 07 naming rename delete confirm keeps instances", ref failed, BlueprintLibraryStage07NamingRenameDeleteConfirmKeepsInstances);
+            Run("blueprint library stage 08 import export diagnostics", ref failed, BlueprintLibraryStage08ImportExportDiagnostics);
+            Run("blueprint library stage 09 use snapshot and instance boundary", ref failed, BlueprintLibraryStage09UseSnapshotAndInstanceBoundary);
+            Run("blueprint library stage 10 diagnostics audit contracts stay wired", ref failed, BlueprintLibraryStage10DiagnosticsAuditContractsStayWired);
             Run("blueprint library commands rename delete use and export", ref failed, BlueprintLibraryCommandsRenameDeleteUseAndExport);
             Run("blueprint feature catalog keeps entry planned placeholder", ref failed, FeatureCatalogExposesBlueprintEntryAsPlannedPlaceholder);
             Run("blueprint entry settings default and normalize", ref failed, BlueprintEntrySettingsDefaultAndNormalize);
@@ -1076,6 +1082,8 @@ namespace JueMingZ.Tests
             Run("blueprint action hotkeys use separate keys and conflict sources", ref failed, BlueprintActionHotkeysUseSeparateKeysAndConflictSources);
             Run("blueprint action hotkey Backspace clears binding", ref failed, BlueprintActionHotkeyBackspaceClearContract);
             Run("blueprint create save action commands enter mask and save without projection scan", ref failed, BlueprintCreateSaveActionCommandsEnterMaskAndSaveWithoutProjectionScan);
+            Run("blueprint create action button syncs exit state with shared toggle", ref failed, BlueprintCreateActionButtonSyncsExitStateWithSharedToggle);
+            Run("blueprint library submenu and shortcut rows open same UI state", ref failed, BlueprintLibrarySubmenuAndShortcutRowsOpenSameUiState);
             Run("blueprint menu UI state does not refresh projection or materials", ref failed, BlueprintMenuUiStateDoesNotRefreshProjectionOrMaterials);
             Run("blueprint replacement config menu contracts", ref failed, BlueprintReplacementConfigMenuContracts);
             Run("blueprint handheld action bar visibility matrix", ref failed, BlueprintHandheldActionBarVisibilityMatrix);
@@ -1084,6 +1092,10 @@ namespace JueMingZ.Tests
             Run("blueprint handheld action bar visual style uses legacy theme and stable text scale", ref failed, BlueprintHandheldActionBarVisualStyleUsesLegacyThemeAndStableTextScale);
             Run("blueprint handheld action bar overlay stays UI-only and no-scan", ref failed, BlueprintHandheldActionBarOverlayStaysUiOnlyAndNoScan);
             Run("blueprint handheld action bar input captures only inside bar", ref failed, BlueprintHandheldActionBarInputCapturesOnlyInsideBar);
+            Run("blueprint handheld action bar after PlayerInput guard submits fresh click edge", ref failed, BlueprintHandheldActionBarAfterPlayerInputGuardSubmitsFreshClickEdge);
+            Run("blueprint handheld action bar postfix replays stale prefix press", ref failed, BlueprintHandheldActionBarPostfixReplaysStalePrefixPress);
+            Run("blueprint handheld action bar gate-closed mouse keeps Terraria click", ref failed, BlueprintHandheldActionBarGateClosedMouseKeepsTerrariaClick);
+            Run("blueprint handheld action bar gate-open mouse prefers OS client coordinate", ref failed, BlueprintHandheldActionBarGateOpenMousePrefersOsClientCoordinate);
             Run("blueprint handheld action bar display gates stay visible and UI-only", ref failed, BlueprintHandheldActionBarDisplayGatesStayVisibleAndUiOnly);
             Run("blueprint handheld action bar real commands and unimplemented buttons", ref failed, BlueprintHandheldActionBarRealCommandsAndUnimplementedButtons);
             Run("blueprint handheld action bar diagnostics snapshot json", ref failed, BlueprintHandheldActionBarDiagnosticsSnapshotJson);

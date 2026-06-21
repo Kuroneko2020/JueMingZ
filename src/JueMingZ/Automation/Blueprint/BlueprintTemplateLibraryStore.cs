@@ -221,6 +221,44 @@ namespace JueMingZ.Automation.Blueprint
             return result;
         }
 
+        public BlueprintStorageOperationResult ImportTemplate(string importPath, out BlueprintTemplateRecord imported)
+        {
+            imported = null;
+            string path;
+            var resolve = ResolveImportPath(importPath, out path);
+            if (!resolve.Succeeded)
+            {
+                return resolve;
+            }
+
+            BlueprintTemplateExportFile file;
+            var read = BlueprintJsonSafeFileStore.TryRead(path, out file);
+            if (!read.Succeeded)
+            {
+                return string.Equals(read.ResultCode, "missing", StringComparison.Ordinal)
+                    ? BlueprintStorageOperationResult.Failure("missingImportFile", "import file not found", path)
+                    : read;
+            }
+
+            if (file == null ||
+                file.Template == null ||
+                file.SchemaVersion <= 0 ||
+                file.SchemaVersion > BlueprintStorageConstants.SchemaVersion ||
+                !string.Equals(file.SchemaKind, BlueprintStorageConstants.ExportSchemaKind, StringComparison.Ordinal))
+            {
+                return BlueprintStorageOperationResult.Failure("invalidImportSchema", "invalid blueprint template export schema", path);
+            }
+
+            var draft = file.Template.Clone();
+            draft.TemplateId = string.Empty;
+            draft.CreatedUtc = string.Empty;
+            draft.UpdatedUtc = string.Empty;
+            var create = CreateTemplate(draft, out imported);
+            return create.Succeeded
+                ? BlueprintStorageOperationResult.Success("imported", "imported", path)
+                : create;
+        }
+
         internal static void ResetTestingHooks()
         {
             BlueprintJsonSafeFileStore.ResetTestingHooks();
@@ -234,6 +272,51 @@ namespace JueMingZ.Automation.Blueprint
         internal static BlueprintStorageOperationResult ReadExportForTesting(string path, out BlueprintTemplateExportFile export)
         {
             return BlueprintJsonSafeFileStore.TryRead(path, out export);
+        }
+
+        private BlueprintStorageOperationResult ResolveImportPath(string importPath, out string path)
+        {
+            path = string.Empty;
+            if (!string.IsNullOrWhiteSpace(importPath))
+            {
+                try
+                {
+                    path = Path.GetFullPath(importPath);
+                    return BlueprintStorageOperationResult.Success("resolvedImportPath", "resolved", path);
+                }
+                catch (Exception error)
+                {
+                    return BlueprintStorageOperationResult.Failure("invalidImportPath", error.GetType().Name + ": " + error.Message, importPath);
+                }
+            }
+
+            var directory = BlueprintStoragePaths.BuildDefaultImportDirectory(_rootDirectory);
+            try
+            {
+                if (!Directory.Exists(directory))
+                {
+                    return BlueprintStorageOperationResult.Failure("missingImportFile", "put one blueprint export json in the imports directory", directory);
+                }
+
+                var files = Directory.GetFiles(directory, "*.json", SearchOption.TopDirectoryOnly);
+                if (files == null || files.Length <= 0)
+                {
+                    return BlueprintStorageOperationResult.Failure("missingImportFile", "put one blueprint export json in the imports directory", directory);
+                }
+
+                Array.Sort(files, StringComparer.OrdinalIgnoreCase);
+                if (files.Length > 1)
+                {
+                    return BlueprintStorageOperationResult.Failure("ambiguousImportFile", "imports directory must contain exactly one json file", directory);
+                }
+
+                path = files[0];
+                return BlueprintStorageOperationResult.Success("resolvedImportPath", "resolved", path);
+            }
+            catch (Exception error)
+            {
+                return BlueprintStorageOperationResult.Failure("importDirectoryReadFailed", error.GetType().Name + ": " + error.Message, directory);
+            }
         }
 
         private BlueprintStorageOperationResult SaveTemplates(IList<BlueprintTemplateRecord> templates)

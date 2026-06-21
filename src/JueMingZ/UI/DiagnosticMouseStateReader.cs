@@ -14,10 +14,13 @@ namespace JueMingZ.UI
         private static bool _mainResolved;
         private static DiagnosticMouseState _cachedReadState;
         private static DiagnosticMouseState _cachedFullscreenMapOverlayReadState;
+        private static DiagnosticMouseState _cachedBlueprintHandheldActionBarOverlayReadState;
         private static UiInputFrameKey _cachedFrameKey;
         private static UiInputFrameKey _cachedFullscreenMapOverlayFrameKey;
+        private static UiInputFrameKey _cachedBlueprintHandheldActionBarOverlayFrameKey;
         private static bool _cachedFrameKeyValid;
         private static bool _cachedFullscreenMapOverlayFrameKeyValid;
+        private static bool _cachedBlueprintHandheldActionBarOverlayFrameKeyValid;
         private static FieldInfo _mouseXField;
         private static FieldInfo _mouseYField;
         private static FieldInfo _mouseLeftField;
@@ -37,28 +40,41 @@ namespace JueMingZ.UI
 
         public static DiagnosticMouseState Read()
         {
-            return ReadCore(false);
+            return ReadCore(GateClosedMousePreserveMode.None);
         }
 
         internal static DiagnosticMouseState ReadForFullscreenMapOverlay()
         {
-            return ReadCore(true);
+            return ReadCore(GateClosedMousePreserveMode.FullscreenMapOverlay);
         }
 
-        private static DiagnosticMouseState ReadCore(bool preserveTerrariaInputWhenGateClosed)
+        internal static DiagnosticMouseState ReadForBlueprintHandheldActionBarOverlay()
         {
+            return ReadCore(GateClosedMousePreserveMode.BlueprintHandheldActionBarOverlay);
+        }
+
+        private static DiagnosticMouseState ReadCore(GateClosedMousePreserveMode preserveMode)
+        {
+            var preserveTerrariaInputWhenGateClosed = preserveMode != GateClosedMousePreserveMode.None;
             var frameKey = UiInputFrameClock.CurrentFrameKey;
             lock (ReadCacheSyncRoot)
             {
-                var cachedState = preserveTerrariaInputWhenGateClosed
-                    ? _cachedFullscreenMapOverlayReadState
-                    : _cachedReadState;
-                var cachedKey = preserveTerrariaInputWhenGateClosed
-                    ? _cachedFullscreenMapOverlayFrameKey
-                    : _cachedFrameKey;
-                var cachedKeyValid = preserveTerrariaInputWhenGateClosed
-                    ? _cachedFullscreenMapOverlayFrameKeyValid
-                    : _cachedFrameKeyValid;
+                var cachedState = _cachedReadState;
+                var cachedKey = _cachedFrameKey;
+                var cachedKeyValid = _cachedFrameKeyValid;
+                if (preserveMode == GateClosedMousePreserveMode.FullscreenMapOverlay)
+                {
+                    cachedState = _cachedFullscreenMapOverlayReadState;
+                    cachedKey = _cachedFullscreenMapOverlayFrameKey;
+                    cachedKeyValid = _cachedFullscreenMapOverlayFrameKeyValid;
+                }
+                else if (preserveMode == GateClosedMousePreserveMode.BlueprintHandheldActionBarOverlay)
+                {
+                    cachedState = _cachedBlueprintHandheldActionBarOverlayReadState;
+                    cachedKey = _cachedBlueprintHandheldActionBarOverlayFrameKey;
+                    cachedKeyValid = _cachedBlueprintHandheldActionBarOverlayFrameKeyValid;
+                }
+
                 if (frameKey.IsValid &&
                     cachedKeyValid &&
                     cachedState != null &&
@@ -110,7 +126,7 @@ namespace JueMingZ.UI
             state.ReadMode = BuildReadMode(state);
             if (preserveTerrariaInputWhenGateClosed && !state.GameInputAvailable)
             {
-                state.ReadMode += "/FullscreenOverlayGateBypass";
+                state.ReadMode += "/" + GateBypassReadModeSuffix(preserveMode);
             }
 
             if (!state.TerrariaReadAvailable &&
@@ -124,11 +140,17 @@ namespace JueMingZ.UI
             {
                 if (frameKey.IsValid)
                 {
-                    if (preserveTerrariaInputWhenGateClosed)
+                    if (preserveMode == GateClosedMousePreserveMode.FullscreenMapOverlay)
                     {
                         _cachedFullscreenMapOverlayReadState = state;
                         _cachedFullscreenMapOverlayFrameKey = frameKey;
                         _cachedFullscreenMapOverlayFrameKeyValid = true;
+                    }
+                    else if (preserveMode == GateClosedMousePreserveMode.BlueprintHandheldActionBarOverlay)
+                    {
+                        _cachedBlueprintHandheldActionBarOverlayReadState = state;
+                        _cachedBlueprintHandheldActionBarOverlayFrameKey = frameKey;
+                        _cachedBlueprintHandheldActionBarOverlayFrameKeyValid = true;
                     }
                     else
                     {
@@ -139,11 +161,17 @@ namespace JueMingZ.UI
                 }
                 else
                 {
-                    if (preserveTerrariaInputWhenGateClosed)
+                    if (preserveMode == GateClosedMousePreserveMode.FullscreenMapOverlay)
                     {
                         _cachedFullscreenMapOverlayReadState = null;
                         _cachedFullscreenMapOverlayFrameKey = UiInputFrameKey.None;
                         _cachedFullscreenMapOverlayFrameKeyValid = false;
+                    }
+                    else if (preserveMode == GateClosedMousePreserveMode.BlueprintHandheldActionBarOverlay)
+                    {
+                        _cachedBlueprintHandheldActionBarOverlayReadState = null;
+                        _cachedBlueprintHandheldActionBarOverlayFrameKey = UiInputFrameKey.None;
+                        _cachedBlueprintHandheldActionBarOverlayFrameKeyValid = false;
                     }
                     else
                     {
@@ -163,10 +191,13 @@ namespace JueMingZ.UI
             {
                 _cachedReadState = null;
                 _cachedFullscreenMapOverlayReadState = null;
+                _cachedBlueprintHandheldActionBarOverlayReadState = null;
                 _cachedFrameKey = UiInputFrameKey.None;
                 _cachedFullscreenMapOverlayFrameKey = UiInputFrameKey.None;
+                _cachedBlueprintHandheldActionBarOverlayFrameKey = UiInputFrameKey.None;
                 _cachedFrameKeyValid = false;
                 _cachedFullscreenMapOverlayFrameKeyValid = false;
+                _cachedBlueprintHandheldActionBarOverlayFrameKeyValid = false;
                 _mainResolved = false;
                 _mouseXField = null;
                 _mouseYField = null;
@@ -458,6 +489,21 @@ namespace JueMingZ.UI
             return "none";
         }
 
+        private static string GateBypassReadModeSuffix(GateClosedMousePreserveMode preserveMode)
+        {
+            if (preserveMode == GateClosedMousePreserveMode.FullscreenMapOverlay)
+            {
+                return "FullscreenOverlayGateBypass";
+            }
+
+            if (preserveMode == GateClosedMousePreserveMode.BlueprintHandheldActionBarOverlay)
+            {
+                return "BlueprintHandheldOverlayGateBypass";
+            }
+
+            return "OverlayGateBypass";
+        }
+
         private static string AppendError(string existing, string next)
         {
             if (string.IsNullOrWhiteSpace(next))
@@ -489,5 +535,12 @@ namespace JueMingZ.UI
 
         [DllImport("user32.dll")]
         private static extern short GetAsyncKeyState(int virtualKey);
+
+        private enum GateClosedMousePreserveMode
+        {
+            None,
+            FullscreenMapOverlay,
+            BlueprintHandheldActionBarOverlay
+        }
     }
 }

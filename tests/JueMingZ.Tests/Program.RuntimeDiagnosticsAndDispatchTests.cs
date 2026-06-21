@@ -7,6 +7,7 @@ using JueMingZ.Actions;
 using JueMingZ.Actions.Channels;
 using JueMingZ.Actions.Executors;
 using JueMingZ.Automation.AutoRecovery;
+using JueMingZ.Automation.Blueprint;
 using JueMingZ.Automation.Combat;
 using JueMingZ.Automation.Fishing;
 using JueMingZ.Automation.Information;
@@ -25,6 +26,7 @@ using JueMingZ.GameState.Inventory;
 using JueMingZ.GameState.Npcs;
 using JueMingZ.GameState.Player;
 using JueMingZ.GameState.Ui;
+using JueMingZ.Input;
 using JueMingZ.Runtime;
 using JueMingZ.UI;
 using JueMingZ.UI.Legacy;
@@ -1550,6 +1552,11 @@ namespace JueMingZ.Tests
         {
             RuntimeTargetingDiagnostics.ResetForTesting();
             DrainDiagnosticButtonCommandsForTesting();
+            LegacyUiInput.ResetActionUpdateGateStateForTesting();
+            LegacyUiActionService.ResetActionUpdateDiagnosticsForTesting();
+            BlueprintEntryState.ResetForTesting();
+            BlueprintCreationMaskState.ResetForTesting();
+            BlueprintHandheldActionBarState.ResetInteractionForTesting();
             JueMingZRuntime.ResetServiceSchedulerForTesting();
 
             try
@@ -1583,6 +1590,34 @@ namespace JueMingZ.Tests
                 if (queue.GetFastState().PendingCount != 0)
                 {
                     throw new InvalidOperationException("gameInputAvailable=false must not drain diagnostic commands or submit actions.");
+                }
+
+                if (LegacyUiActionService.DispatchedCommandCountLast != 0)
+                {
+                    throw new InvalidOperationException("gameInputAvailable=false must not drain non-handheld Legacy UI commands.");
+                }
+
+                QueueBlueprintHandheldActionBarCommandForTesting();
+                RuntimeAutomationDispatcher.RunTargetingAndUiActions(blockedContext, state, queue, false);
+
+                if (LegacyUiActionService.PendingCommandCountLast != 1 ||
+                    LegacyUiActionService.DispatchedCommandCountLast != 1)
+                {
+                    throw new InvalidOperationException("gameInputAvailable=false should drain already queued blueprint handheld UI commands only.");
+                }
+
+                var handheldInteraction = BlueprintHandheldActionBarState.GetInteractionSnapshotForTesting();
+                AssertStringEquals(
+                    handheldInteraction.LastClickedButtonId,
+                    BlueprintHandheldActionBarState.ButtonIdCreate,
+                    "gate-closed handheld command action");
+                AssertStringEquals(
+                    handheldInteraction.LastResultCode,
+                    "entryStateChanged",
+                    "gate-closed handheld command result");
+                if (queue.GetFastState().PendingCount != 0)
+                {
+                    throw new InvalidOperationException("Gate-closed handheld UI command must not submit gameplay actions.");
                 }
 
                 var skippedSnapshot = RuntimeDiagnosticSnapshotBuilder.Build(new RuntimeDiagnosticSnapshotContext
@@ -1632,9 +1667,38 @@ namespace JueMingZ.Tests
             finally
             {
                 DrainDiagnosticButtonCommandsForTesting();
+                LegacyUiInput.ResetActionUpdateGateStateForTesting();
+                BlueprintEntryState.ResetForTesting();
+                BlueprintCreationMaskState.ResetForTesting();
+                BlueprintHandheldActionBarState.ResetInteractionForTesting();
                 RuntimeTargetingDiagnostics.ResetForTesting();
                 JueMingZRuntime.ResetServiceSchedulerForTesting();
             }
+        }
+
+        private static void QueueBlueprintHandheldActionBarCommandForTesting()
+        {
+            LegacyUiInput.EnqueueClick(
+                new LegacyUiElement
+                {
+                    Id = BlueprintHandheldActionBarState.BuildCommandElementId(BlueprintHandheldActionBarState.ButtonIdCreate),
+                    Label = "创建蓝图",
+                    Kind = "button",
+                    Rect = new LegacyUiRect(8, 8, 120, 24),
+                    Enabled = true,
+                    IntValue = BlueprintSettings.DefaultToolItemId
+                },
+                new LegacyMouseSnapshot
+                {
+                    X = 16,
+                    Y = 16,
+                    LeftDown = true,
+                    LeftPressed = true,
+                    ReadAvailable = true,
+                    ReadMode = "Test/BlueprintHandheldOverlay",
+                    WindowHit = false
+                },
+                true);
         }
 
         private static void QueueDiagnosticNoopButtonCommandForTesting()

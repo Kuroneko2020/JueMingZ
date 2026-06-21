@@ -244,6 +244,57 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void BlueprintTemplateImportUsesSuffixAndKeepsExistingLibraryOnFailure()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-template-import");
+            try
+            {
+                var store = new BlueprintTemplateLibraryStore();
+                BlueprintTemplateRecord source;
+                RequireBlueprintSuccess(store.CreateTemplate(CreateSampleBlueprintTemplate("Shared Import"), out source), "create source blueprint template");
+
+                string exportPath;
+                RequireBlueprintSuccess(store.ExportTemplate(source.TemplateId, string.Empty, out exportPath), "export source blueprint template");
+
+                BlueprintTemplateRecord imported;
+                RequireBlueprintSuccess(store.ImportTemplate(exportPath, out imported), "import duplicate blueprint template");
+                if (string.Equals(imported.TemplateId, source.TemplateId, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException("Imported blueprint templates must receive a fresh template id.");
+                }
+
+                AssertStringEquals(imported.Name, "Shared Import 2", "import duplicate template suffix");
+
+                BlueprintTemplateRecord importedAgain;
+                RequireBlueprintSuccess(store.ImportTemplate(exportPath, out importedAgain), "import duplicate blueprint template again");
+                AssertStringEquals(importedAgain.Name, "Shared Import 3", "second import duplicate template suffix");
+
+                BlueprintTemplateLibrarySnapshot snapshot;
+                RequireBlueprintSuccess(store.TryLoad(out snapshot), "load templates after imports");
+                if (snapshot.Templates.Count != 3 || !TemplateExists(snapshot, source.TemplateId))
+                {
+                    throw new InvalidOperationException("Importing a duplicate blueprint must append templates without overwriting the existing one.");
+                }
+
+                var oldText = File.ReadAllText(store.LibraryPath, Encoding.UTF8);
+                var badImportPath = Path.Combine(store.RootDirectory, "bad-import.json");
+                File.WriteAllText(badImportPath, "{ broken blueprint import", Encoding.UTF8);
+                BlueprintTemplateRecord failed;
+                var failedImport = store.ImportTemplate(badImportPath, out failed);
+                if (failedImport.Succeeded || !string.Equals(failedImport.ResultCode, "readFailed", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected corrupt blueprint import JSON to fail with a diagnostic result.");
+                }
+
+                AssertFileTextEquals(store.LibraryPath, oldText, "blueprint library after failed import");
+            }
+            finally
+            {
+                BlueprintTemplateLibraryStore.ResetTestingHooks();
+                restore();
+            }
+        }
+
         private static BlueprintTemplateRecord CreateSampleBlueprintTemplate(string name)
         {
             var template = new BlueprintTemplateRecord
@@ -287,6 +338,26 @@ namespace JueMingZ.Tests
             });
             template.MissingCapabilityFlags.Add("liquid-not-supported");
             return template;
+        }
+
+        private static bool TemplateExists(BlueprintTemplateLibrarySnapshot snapshot, string templateId)
+        {
+            if (snapshot == null || snapshot.Templates == null)
+            {
+                return false;
+            }
+
+            for (var index = 0; index < snapshot.Templates.Count; index++)
+            {
+                var template = snapshot.Templates[index];
+                if (template != null &&
+                    string.Equals(template.TemplateId, templateId, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static void RequireBlueprintSuccess(BlueprintStorageOperationResult result, string label)

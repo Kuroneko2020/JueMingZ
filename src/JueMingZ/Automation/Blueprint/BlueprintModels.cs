@@ -10,6 +10,8 @@ namespace JueMingZ.Automation.Blueprint
         public const string DefaultTemplateName = "新蓝图";
         public const string TemplatesFileName = "templates.json";
         public const string ExportSchemaKind = "JueMingZ.Blueprint.Template";
+        public const string ImportDirectoryName = "imports";
+        public const string ExportDirectoryName = "exports";
         public const string WorldInstancesDirectoryName = "worlds";
 
         public static string FormatUtc(DateTime utc)

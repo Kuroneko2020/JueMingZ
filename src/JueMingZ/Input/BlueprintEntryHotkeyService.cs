@@ -30,7 +30,8 @@ namespace JueMingZ.Input
                 var settings = ConfigService.HotkeySettings;
                 FeatureToggleHotkeyChord chord;
                 return TryGetActionChord(settings, FeatureIds.BlueprintCreateAction, out chord) ||
-                       TryGetActionChord(settings, FeatureIds.BlueprintSaveAction, out chord);
+                       TryGetActionChord(settings, FeatureIds.BlueprintSaveAction, out chord) ||
+                       TryGetActionChord(settings, FeatureIds.BlueprintLibraryAction, out chord);
             }
         }
 
@@ -108,12 +109,28 @@ namespace JueMingZ.Input
                 return result;
             }
 
-            return TryTickTarget(
+            result = TryTickTarget(
                 appSettings,
                 hotkeySettings,
                 gameState,
                 FeatureIds.BlueprintSaveAction,
                 BlueprintEntryCommands.FinishCreateSave,
+                gameInputAvailable,
+                gateReason,
+                foreground,
+                textInputFocused,
+                isKeyDown);
+            if (result.Triggered)
+            {
+                return result;
+            }
+
+            return TryTickTarget(
+                appSettings,
+                hotkeySettings,
+                gameState,
+                FeatureIds.BlueprintLibraryAction,
+                BlueprintEntryCommands.OpenLibrary,
                 gameInputAvailable,
                 gateReason,
                 foreground,
@@ -184,6 +201,21 @@ namespace JueMingZ.Input
                 else
                 {
                     result = BlueprintEntryState.RecordCaptureFailure(capture);
+                }
+            }
+            else if (result.Succeeded &&
+                     string.Equals(action, BlueprintEntryCommands.OpenLibrary, StringComparison.Ordinal))
+            {
+                var library = BlueprintLibraryUiState.OpenLibrary();
+                if (library != null && !library.Succeeded)
+                {
+                    result = BlueprintEntryCommandResult.Create(false, false, false, library.ResultCode, library.Message, result.Mode);
+                }
+                else
+                {
+                    LegacyMainUiState.SelectPage("blueprint");
+                    LegacyMainUiState.SetScrollOffset(0, 0);
+                    LegacyMainUiState.SetVisible(true);
                 }
             }
 

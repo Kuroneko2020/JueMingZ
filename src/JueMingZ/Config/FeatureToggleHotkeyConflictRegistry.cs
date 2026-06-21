@@ -209,11 +209,22 @@ namespace JueMingZ.Config
                 return true;
             }
 
+            if (TryFindBlueprintActionConflict(
+                    hotkeys,
+                    currentTargetId,
+                    FeatureIds.BlueprintSaveAction,
+                    "蓝图保存快捷键",
+                    chord,
+                    out conflict))
+            {
+                return true;
+            }
+
             return TryFindBlueprintActionConflict(
                 hotkeys,
                 currentTargetId,
-                FeatureIds.BlueprintSaveAction,
-                "蓝图保存快捷键",
+                FeatureIds.BlueprintLibraryAction,
+                "蓝图库打开快捷键",
                 chord,
                 out conflict);
         }

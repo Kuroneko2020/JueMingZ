@@ -25,6 +25,11 @@ namespace JueMingZ.UI.Legacy
             return BuildMouseSnapshot(raw, false, scale);
         }
 
+        internal static LegacyMouseSnapshot ReadMouseForBlueprintHandheldOverlay(DiagnosticMouseState raw, LegacyMainUiScaleSnapshot scale)
+        {
+            return BuildMouseSnapshot(raw, false, scale, false, true, true);
+        }
+
         internal static LegacyMouseSnapshot ReadMouseForInterfaceOverlay(DiagnosticMouseState raw)
         {
             return BuildInterfaceOverlayMouseSnapshot(raw);
@@ -42,6 +47,27 @@ namespace JueMingZ.UI.Legacy
 
         private static LegacyMouseSnapshot BuildMouseSnapshot(DiagnosticMouseState raw, bool consumePendingScroll, LegacyMainUiScaleSnapshot scale, bool applyMainDrawScale)
         {
+            return BuildMouseSnapshot(raw, consumePendingScroll, scale, applyMainDrawScale, false);
+        }
+
+        private static LegacyMouseSnapshot BuildMouseSnapshot(
+            DiagnosticMouseState raw,
+            bool consumePendingScroll,
+            LegacyMainUiScaleSnapshot scale,
+            bool applyMainDrawScale,
+            bool preserveTerrariaInputWhenGateClosed)
+        {
+            return BuildMouseSnapshot(raw, consumePendingScroll, scale, applyMainDrawScale, preserveTerrariaInputWhenGateClosed, false);
+        }
+
+        private static LegacyMouseSnapshot BuildMouseSnapshot(
+            DiagnosticMouseState raw,
+            bool consumePendingScroll,
+            LegacyMainUiScaleSnapshot scale,
+            bool applyMainDrawScale,
+            bool preserveTerrariaInputWhenGateClosed,
+            bool preferOsClientWhenGateOpen)
+        {
             if (raw == null)
             {
                 raw = new DiagnosticMouseState();
@@ -52,19 +78,29 @@ namespace JueMingZ.UI.Legacy
                 scale = LegacyMainUiScale.Resolve(raw);
             }
 
-            var coordinate = ResolveLogicalMouse(raw);
+            var coordinate = preferOsClientWhenGateOpen && raw.GameInputAvailable
+                ? ResolveBlueprintHandheldOverlayMouse(raw)
+                : ResolveLogicalMouse(raw);
             var x = applyMainDrawScale ? scale.ToBaseLogicalX(coordinate.X) : coordinate.X;
             var y = applyMainDrawScale ? scale.ToBaseLogicalY(coordinate.Y) : coordinate.Y;
             var readMode = applyMainDrawScale ? AppendLegacyScaleMode(coordinate.Mode, scale) : AppendInterfaceOverlayMode(coordinate.Mode);
 
-            var inputAvailable = raw.GameInputAvailable;
-            var down = inputAvailable && (raw.TerrariaLeftDown || raw.OsLeftDown);
-            var scrollDelta = inputAvailable && !consumePendingScroll ? raw.ScrollDelta : 0;
+            var gateOpen = raw.GameInputAvailable;
+            var overlayTerrariaInputAvailable = preserveTerrariaInputWhenGateClosed && raw.TerrariaReadAvailable;
+            var inputAvailable = gateOpen || overlayTerrariaInputAvailable;
+            var down = gateOpen
+                ? raw.TerrariaLeftDown || raw.OsLeftDown
+                : overlayTerrariaInputAvailable && raw.TerrariaLeftDown;
+            var scrollDelta = gateOpen && !consumePendingScroll
+                ? raw.ScrollDelta
+                : !gateOpen && overlayTerrariaInputAvailable && raw.TerrariaScrollWheelAvailable && !consumePendingScroll
+                    ? raw.ScrollDelta
+                    : 0;
             if (consumePendingScroll)
             {
                 lock (SyncRoot)
                 {
-                    if (!inputAvailable)
+                    if (!gateOpen)
                     {
                         _pendingUiScrollDelta = 0;
                     }
@@ -242,6 +278,48 @@ namespace JueMingZ.UI.Legacy
                 return new MouseCoordinate(raw.OsClientMouseX, raw.OsClientMouseY, BuildMouseMode(raw, "OsClientScreen"));
             }
 
+            if (hasTerraria)
+            {
+                return new MouseCoordinate(raw.TerrariaMouseX, raw.TerrariaMouseY, BuildMouseMode(raw, "TerrariaRaw"));
+            }
+
+            return new MouseCoordinate(-1, -1, BuildMouseMode(raw, "none"));
+        }
+
+        private static MouseCoordinate ResolveBlueprintHandheldOverlayMouse(DiagnosticMouseState raw)
+        {
+            var hasOs = raw.OsReadAvailable && raw.OsClientMouseX >= 0 && raw.OsClientMouseY >= 0;
+            if (hasOs)
+            {
+                var scaleX = raw.UiScaleX > 0.01d ? raw.UiScaleX : raw.UiScale;
+                var scaleY = raw.UiScaleY > 0.01d ? raw.UiScaleY : raw.UiScale;
+                if (scaleX <= 0.01d)
+                {
+                    scaleX = 1d;
+                }
+
+                if (scaleY <= 0.01d)
+                {
+                    scaleY = 1d;
+                }
+
+                var scaleActive = raw.UiScaleAvailable &&
+                                  (Math.Abs(scaleX - 1d) > 0.01d ||
+                                   Math.Abs(scaleY - 1d) > 0.01d ||
+                                   Math.Abs(raw.UiTranslateX) > 0.01d ||
+                                   Math.Abs(raw.UiTranslateY) > 0.01d);
+                if (scaleActive)
+                {
+                    return new MouseCoordinate(
+                        ScreenToUiCoordinate(raw.OsClientMouseX, scaleX, raw.UiTranslateX),
+                        ScreenToUiCoordinate(raw.OsClientMouseY, scaleY, raw.UiTranslateY),
+                        BuildMouseMode(raw, "OsClientScreenToUi"));
+                }
+
+                return new MouseCoordinate(raw.OsClientMouseX, raw.OsClientMouseY, BuildMouseMode(raw, "OsClientRaw"));
+            }
+
+            var hasTerraria = raw.TerrariaReadAvailable && raw.TerrariaMouseX >= 0 && raw.TerrariaMouseY >= 0;
             if (hasTerraria)
             {
                 return new MouseCoordinate(raw.TerrariaMouseX, raw.TerrariaMouseY, BuildMouseMode(raw, "TerrariaRaw"));

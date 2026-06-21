@@ -255,6 +255,11 @@ namespace JueMingZ.UI.Legacy
                 return FeatureIds.BlueprintSaveAction;
             }
 
+            if (string.Equals(targetId, FeatureIds.BlueprintLibraryAction, StringComparison.OrdinalIgnoreCase))
+            {
+                return FeatureIds.BlueprintLibraryAction;
+            }
+
             return string.Empty;
         }
 
@@ -262,7 +267,8 @@ namespace JueMingZ.UI.Legacy
         {
             var normalized = NormalizeBlueprintHotkeyTargetId(targetId);
             return string.Equals(normalized, FeatureIds.BlueprintCreateAction, StringComparison.Ordinal) ||
-                   string.Equals(normalized, FeatureIds.BlueprintSaveAction, StringComparison.Ordinal);
+                   string.Equals(normalized, FeatureIds.BlueprintSaveAction, StringComparison.Ordinal) ||
+                   string.Equals(normalized, FeatureIds.BlueprintLibraryAction, StringComparison.Ordinal);
         }
 
         private static string GetBlueprintHotkeyDisplay(HotkeySettings settings, string targetId)

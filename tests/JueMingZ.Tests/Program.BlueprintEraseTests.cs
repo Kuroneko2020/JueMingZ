@@ -16,6 +16,11 @@ namespace JueMingZ.Tests
             var restore = PushTemporaryConfigDirectory("blueprint-erase-single-instance");
             try
             {
+                BlueprintEraseRegionState.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialWindowOverlay.ResetForTesting();
+
                 var store = new BlueprintWorldInstanceStore();
                 var reader = new FakeBlueprintWorldTileReader();
                 var template = CreateEraseMaterialTemplate();

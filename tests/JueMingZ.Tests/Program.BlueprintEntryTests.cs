@@ -211,8 +211,8 @@ namespace JueMingZ.Tests
 
             AssertStringEquals(
                 LegacyMainWindow.GetBlueprintLibraryOpenElementIdForTesting(),
-                "blueprint-entry:open-library",
-                "blueprint library open row command id");
+                "blueprint-action-entry:open-library",
+                "blueprint library action open row command id");
             AssertStringEquals(
                 LegacyMainWindow.GetBlueprintPlacedOpenElementIdForTesting(),
                 "blueprint-entry:open-placed",
@@ -221,7 +221,13 @@ namespace JueMingZ.Tests
                 LegacyMainWindow.BuildBlueprintLibraryNameInputIdForTesting("template-ime"),
                 "blueprint-library:name-input:template-ime",
                 "blueprint library rename input id");
-            AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "main-menu-open-row");
+            AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "main-menu-hotkey-open-row");
+            AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "same-content-submenu");
+            AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "stage06-two-column-fixed-cards");
+            AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "preview-scales-to-fit");
+            AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "stage07-name-edit-delete-confirm");
+            AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "stage08-import-long-button-export-real");
+            AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "stage09-layout-use-real-template-snapshot");
             AssertContains(LegacyMainWindow.GetBlueprintPlacedInstanceVisualContractForTesting(), "main-menu-open-row");
             AssertContains(LegacyMainWindow.GetBlueprintCreationVisualContractForTesting(), "drag-toggle");
             AssertContains(LegacyMainWindow.GetBlueprintCreationVisualContractForTesting(), "air-select");
@@ -230,14 +236,14 @@ namespace JueMingZ.Tests
                 throw new InvalidOperationException("Expected blueprint library to keep a stable six-template page size.");
             }
 
-            if (LegacyMainWindow.GetBlueprintMenuOpenRowCountForTesting() != 2)
+            if (LegacyMainWindow.GetBlueprintMenuOpenRowCountForTesting() != 1)
             {
-                throw new InvalidOperationException("Expected blueprint menu to keep library and placed-blueprint open rows.");
+                throw new InvalidOperationException("Expected blueprint menu to keep only the placed-blueprint deferred open row after the library row becomes an action hotkey row.");
             }
 
-            if (LegacyMainWindow.GetBlueprintActionShortcutRowCountForTesting() != 2)
+            if (LegacyMainWindow.GetBlueprintActionShortcutRowCountForTesting() != 3)
             {
-                throw new InvalidOperationException("Expected blueprint menu to expose create/save action shortcut rows.");
+                throw new InvalidOperationException("Expected blueprint menu to expose create/save/library action shortcut rows.");
             }
 
             AssertStringEquals(
@@ -249,6 +255,10 @@ namespace JueMingZ.Tests
                 "blueprint-action-hotkey:" + FeatureIds.BlueprintSaveAction,
                 "blueprint save action hotkey field id");
             AssertStringEquals(
+                LegacyMainWindow.GetBlueprintLibraryActionHotkeyElementIdForTesting(),
+                "blueprint-action-hotkey:" + FeatureIds.BlueprintLibraryAction,
+                "blueprint library action hotkey field id");
+            AssertStringEquals(
                 LegacyMainWindow.GetBlueprintCreateActionElementIdForTesting(),
                 "blueprint-action-entry:" + BlueprintEntryCommands.StartCreate,
                 "blueprint create action button id");
@@ -256,8 +266,20 @@ namespace JueMingZ.Tests
                 LegacyMainWindow.GetBlueprintSaveActionElementIdForTesting(),
                 "blueprint-action-entry:" + BlueprintEntryCommands.FinishCreateSave,
                 "blueprint save action button id");
+            AssertStringEquals(
+                LegacyMainWindow.GetBlueprintLibraryActionElementIdForTesting(),
+                "blueprint-action-entry:" + BlueprintEntryCommands.OpenLibrary,
+                "blueprint library action button id");
             AssertContains(LegacyMainWindow.GetBlueprintActionShortcutVisualContractForTesting(), "auto-mining-hotkey-shape");
-            AssertContains(LegacyMainWindow.GetBlueprintActionShortcutVisualContractForTesting(), "real-create-save-mask-entry");
+            AssertContains(LegacyMainWindow.GetBlueprintActionShortcutVisualContractForTesting(), "real-create-save-library-entry");
+            AssertContains(LegacyMainWindow.GetBlueprintActionShortcutVisualContractForTesting(), "short-hotkey-fields");
+
+            if (LegacyMainWindow.GetBlueprintActionHotkeyInputMaxWidthForTesting() >= 160 ||
+                LegacyMainWindow.ResolveBlueprintActionHotkeyInputWidthForTesting(400) != LegacyMainWindow.GetBlueprintActionHotkeyInputMaxWidthForTesting() ||
+                LegacyMainWindow.ResolveBlueprintActionHotkeyInputWidthForTesting(96) != 96)
+            {
+                throw new InvalidOperationException("Expected blueprint create/save/library action hotkey fields to share the shortened width cap without breaking narrow rows.");
+            }
 
             var hotkeyTooltips = LegacyMainWindow.GetBlueprintActionHotkeyTooltipLinesForTesting();
             if (hotkeyTooltips == null ||
@@ -298,6 +320,126 @@ namespace JueMingZ.Tests
 
             LegacyMainWindow.StopBlueprintEntryHotkeyCapture();
             LegacyMainWindow.StopAutoMiningHotkeyCapture();
+        }
+
+        private static void BlueprintLibrarySubmenuAndShortcutRowsOpenSameUiState()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-library-submenu-entry");
+            try
+            {
+                ConfigService.Initialize();
+                BlueprintEntryState.ResetForTesting();
+                BlueprintLibraryUiState.ResetForTesting();
+                BlueprintPlacedInstanceUiState.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintEntryHotkeyService.ResetForTesting();
+                BlueprintHandheldActionBarState.ResetInteractionForTesting();
+
+                var templateStore = new BlueprintTemplateLibraryStore();
+                BlueprintLibraryUiState.SetStoreForTesting(templateStore, true);
+                var projectionReader = new FakeBlueprintWorldTileReader();
+                var inventoryReader = new FakeBlueprintMaterialInventoryReader();
+                BlueprintProjectionService.SetDependenciesForTesting(
+                    new BlueprintWorldInstanceStore(),
+                    BlueprintPlacementWorldContext.Success("pair-library-submenu", "world-library-submenu"),
+                    projectionReader,
+                    true);
+                BlueprintMaterialService.SetInventoryReaderForTesting(inventoryReader, true);
+
+                if (BlueprintLibraryUiState.IsOpen)
+                {
+                    throw new InvalidOperationException("Expected blueprint library submenu to start closed.");
+                }
+
+                LegacyMainUiState.SetVisible(false);
+                LegacyUiActionService.HandleBlueprintActionEntryCommandForTesting(new LegacyUiCommand
+                {
+                    ElementId = LegacyMainWindow.GetBlueprintLibraryActionElementIdForTesting(),
+                    Label = "蓝图:蓝图库:打开",
+                    Kind = "button",
+                    MouseCaptured = true
+                });
+
+                var snapshot = BlueprintLibraryUiState.GetSnapshot();
+                if (!snapshot.IsOpen ||
+                    !LegacyMainUiState.Visible ||
+                    !string.Equals(LegacyMainUiState.SelectedPageId, "blueprint", StringComparison.Ordinal) ||
+                    !string.Equals(BlueprintEntryState.GetSnapshot(AppSettings.CreateDefault()).Mode, BlueprintEntryModes.Tool, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected F5 library row to open the blueprint library submenu without changing gameplay entry mode.");
+                }
+
+                var viewport = new LegacyUiRect(12, 34, 456, 278);
+                var submenuBounds = LegacyMainWindow.GetBlueprintLibrarySubmenuContentBoundsForTesting(viewport);
+                if (submenuBounds.X != viewport.X ||
+                    submenuBounds.Y != viewport.Y ||
+                    submenuBounds.Width != viewport.Width ||
+                    submenuBounds.Height != viewport.Height)
+                {
+                    throw new InvalidOperationException("Expected blueprint library submenu to use the same F5 content viewport instead of nesting a card-sized page.");
+                }
+
+                LegacyUiActionService.HandleBlueprintLibraryCommandForTesting(new LegacyUiCommand
+                {
+                    ElementId = LegacyMainWindow.GetBlueprintLibraryBackElementIdForTesting(),
+                    Label = "蓝图库:返回",
+                    Kind = "button",
+                    MouseCaptured = true
+                });
+                if (BlueprintLibraryUiState.IsOpen)
+                {
+                    throw new InvalidOperationException("Expected blueprint library back command to return to the blueprint main menu.");
+                }
+
+                LegacyUiActionService.HandleBlueprintHandheldActionBarCommandForTesting(
+                    BuildBlueprintHandheldCommand(BlueprintHandheldActionBarState.ButtonIdOpenLibrary, "打开蓝图库"));
+                if (!BlueprintLibraryUiState.IsOpen ||
+                    !LegacyMainUiState.Visible ||
+                    !string.Equals(LegacyMainUiState.SelectedPageId, "blueprint", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected handheld open-library to reveal the same blueprint library submenu as the F5 row.");
+                }
+
+                BlueprintLibraryUiState.CloseLibrary();
+                var hotkeys = HotkeySettings.CreateDefault();
+                hotkeys.HotkeysByFeatureId[FeatureIds.BlueprintLibraryAction] = "Alt+L";
+                var libraryHotkey = BlueprintEntryHotkeyService.TickForTesting(
+                    AppSettings.CreateDefault(),
+                    hotkeys,
+                    new Dictionary<int, bool> { [0x12] = true, ['L'] = true },
+                    true,
+                    string.Empty,
+                    false);
+                if (!libraryHotkey.Triggered ||
+                    !libraryHotkey.Applied ||
+                    !string.Equals(libraryHotkey.Action, BlueprintEntryCommands.OpenLibrary, StringComparison.Ordinal) ||
+                    !BlueprintLibraryUiState.IsOpen ||
+                    !LegacyMainUiState.Visible ||
+                    !string.Equals(LegacyMainUiState.SelectedPageId, "blueprint", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected blueprint.library action hotkey to open the same blueprint library submenu.");
+                }
+
+                if (projectionReader.ReadCount != 0 || inventoryReader.ReadCount != 0)
+                {
+                    throw new InvalidOperationException("Opening the blueprint library submenu must not refresh projection, material, world instance, or inventory scans.");
+                }
+            }
+            finally
+            {
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintEntryState.ResetForTesting();
+                BlueprintLibraryUiState.ResetForTesting();
+                BlueprintPlacedInstanceUiState.ResetForTesting();
+                BlueprintEntryHotkeyService.ResetForTesting();
+                BlueprintHandheldActionBarState.ResetInteractionForTesting();
+                LegacyMainUiState.SetVisible(false);
+                ConfigService.ResetSettingsForTesting();
+                BlueprintTemplateLibraryStore.ResetTestingHooks();
+                restore();
+            }
         }
 
         private static void BlueprintActionHotkeysUseSeparateKeysAndConflictSources()
@@ -353,6 +495,19 @@ namespace JueMingZ.Tests
                 throw new InvalidOperationException("Expected blueprint save action hotkey to save under its own action key.");
             }
 
+            if (!LegacyMainWindow.TryApplyBlueprintActionHotkeyForTesting(
+                    hotkeys,
+                    AppSettings.CreateDefault(),
+                    FeatureIds.BlueprintLibraryAction,
+                    "Alt+L",
+                    out message,
+                    out changed) ||
+                !changed ||
+                !string.Equals(hotkeys.HotkeysByFeatureId[FeatureIds.BlueprintLibraryAction], "Alt+L", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected blueprint library action hotkey to save under its own action key.");
+            }
+
             FeatureToggleHotkeyConflict conflict;
             if (!FeatureToggleHotkeyConflictRegistry.TryFindConflict(
                     hotkeys,
@@ -364,6 +519,18 @@ namespace JueMingZ.Tests
                 !string.Equals(conflict.OwnerTargetId, FeatureIds.BlueprintSaveAction, StringComparison.Ordinal))
             {
                 throw new InvalidOperationException("Expected feature toggle conflict registry to report blueprint action hotkeys.");
+            }
+
+            if (!FeatureToggleHotkeyConflictRegistry.TryFindConflict(
+                    hotkeys,
+                    AppSettings.CreateDefault(),
+                    "buff.auto_heal",
+                    "Alt+L",
+                    out conflict) ||
+                conflict.ConflictType != FeatureToggleHotkeyConflictType.BlueprintAction ||
+                !string.Equals(conflict.OwnerTargetId, FeatureIds.BlueprintLibraryAction, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected feature toggle conflict registry to report blueprint library action hotkeys.");
             }
 
             var autoMiningSettings = HotkeySettings.CreateDefault();
@@ -399,6 +566,13 @@ namespace JueMingZ.Tests
                     FeatureIds.BlueprintSaveAction,
                     "Alt+S",
                     out message,
+                    out changed) ||
+                !LegacyMainWindow.TryApplyBlueprintActionHotkeyForTesting(
+                    hotkeys,
+                    AppSettings.CreateDefault(),
+                    FeatureIds.BlueprintLibraryAction,
+                    "Alt+L",
+                    out message,
                     out changed))
             {
                 throw new InvalidOperationException("Expected blueprint action hotkeys to be seedable before Backspace clear.");
@@ -407,9 +581,18 @@ namespace JueMingZ.Tests
             if (!LegacyMainWindow.TryClearBlueprintActionHotkeyForTesting(hotkeys, FeatureIds.BlueprintCreateAction, out changed) ||
                 !changed ||
                 hotkeys.HotkeysByFeatureId.ContainsKey(FeatureIds.BlueprintCreateAction) ||
-                !hotkeys.HotkeysByFeatureId.ContainsKey(FeatureIds.BlueprintSaveAction))
+                !hotkeys.HotkeysByFeatureId.ContainsKey(FeatureIds.BlueprintSaveAction) ||
+                !hotkeys.HotkeysByFeatureId.ContainsKey(FeatureIds.BlueprintLibraryAction))
             {
                 throw new InvalidOperationException("Expected Backspace clear to remove only the targeted blueprint action hotkey.");
+            }
+
+            if (!LegacyMainWindow.TryClearBlueprintActionHotkeyForTesting(hotkeys, FeatureIds.BlueprintLibraryAction, out changed) ||
+                !changed ||
+                hotkeys.HotkeysByFeatureId.ContainsKey(FeatureIds.BlueprintLibraryAction) ||
+                !hotkeys.HotkeysByFeatureId.ContainsKey(FeatureIds.BlueprintSaveAction))
+            {
+                throw new InvalidOperationException("Expected Backspace clear to remove only the targeted blueprint library action hotkey.");
             }
 
             if (!LegacyMainWindow.TryClearBlueprintActionHotkeyForTesting(hotkeys, FeatureIds.BlueprintCreateAction, out changed) ||
@@ -439,8 +622,10 @@ namespace JueMingZ.Tests
                 ConfigService.Initialize();
                 BlueprintProjectionService.ResetForTesting();
                 BlueprintMaterialService.ResetForTesting();
+                BlueprintCaptureService.ResetForTesting();
                 BlueprintEntryState.ResetForTesting();
                 BlueprintCreationMaskState.ResetForTesting();
+                BlueprintLibraryUiState.ResetForTesting();
                 BlueprintEntryHotkeyService.ResetForTesting();
 
                 var projectionReader = new FakeBlueprintWorldTileReader();
@@ -510,6 +695,9 @@ namespace JueMingZ.Tests
 
                 BlueprintEntryState.ResetForTesting();
                 BlueprintCreationMaskState.ResetForTesting();
+                BlueprintCaptureService.ResetForTesting();
+                BlueprintCaptureService.SetCaptureDependenciesForTesting(captureReader, new BlueprintTemplateLibraryStore());
+                BlueprintLibraryUiState.ResetForTesting();
                 BlueprintEntryHotkeyService.ResetForTesting();
 
                 var hotkeys = HotkeySettings.CreateDefault();
@@ -642,10 +830,143 @@ namespace JueMingZ.Tests
                 BlueprintProjectionService.ResetForTesting();
                 BlueprintMaterialService.ResetForTesting();
                 BlueprintCaptureService.ResetForTesting();
+                BlueprintLibraryUiState.ResetForTesting();
                 LegacyMainUiState.SetVisible(false);
                 BlueprintEntryState.ResetForTesting();
                 BlueprintCreationMaskState.ResetForTesting();
                 BlueprintEntryHotkeyService.ResetForTesting();
+                ConfigService.ResetSettingsForTesting();
+                restore();
+            }
+        }
+
+        private static void BlueprintCreateActionButtonSyncsExitStateWithSharedToggle()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-create-exit-sync");
+            try
+            {
+                ConfigService.Initialize();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintEntryState.ResetForTesting();
+                BlueprintCreationMaskState.ResetForTesting();
+                BlueprintEntryHotkeyService.ResetForTesting();
+                BlueprintHandheldActionBarState.ResetInteractionForTesting();
+
+                var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
+                var projectionReader = new FakeBlueprintWorldTileReader();
+                var inventoryReader = new FakeBlueprintMaterialInventoryReader();
+                BlueprintProjectionService.SetDependenciesForTesting(
+                    new BlueprintWorldInstanceStore(),
+                    BlueprintPlacementWorldContext.Success("pair-create-exit-sync", "world-create-exit-sync"),
+                    projectionReader,
+                    true);
+                BlueprintMaterialService.SetInventoryReaderForTesting(inventoryReader, true);
+
+                AssertStringEquals(
+                    LegacyMainWindow.GetBlueprintCreateActionButtonTextForTesting(settings),
+                    "开始",
+                    "blueprint create action initial button text");
+                AssertStringEquals(
+                    LegacyMainWindow.GetBlueprintCreateActionButtonTooltipForTesting(settings),
+                    "左键按住滑动选区，可多选",
+                    "blueprint create action initial tooltip");
+
+                LegacyMainUiState.SetVisible(true);
+                LegacyUiActionService.HandleBlueprintActionEntryCommandForTesting(new LegacyUiCommand
+                {
+                    ElementId = LegacyMainWindow.GetBlueprintCreateActionElementIdForTesting(),
+                    Label = "蓝图:创建蓝图:开始",
+                    Kind = "button",
+                    MouseCaptured = true
+                });
+
+                AssertStringEquals(
+                    BlueprintEntryState.GetSnapshot(settings).Mode,
+                    BlueprintEntryModes.Creating,
+                    "F5 create action enters shared create state");
+                if (!BlueprintCreationMaskState.GetSnapshot().Active || LegacyMainUiState.Visible)
+                {
+                    throw new InvalidOperationException("Expected F5 create action to enter creation mode and close the F5 menu.");
+                }
+
+                AssertStringEquals(
+                    LegacyMainWindow.GetBlueprintCreateActionButtonTextForTesting(settings),
+                    "退出",
+                    "blueprint create action creating button text");
+                AssertStringEquals(
+                    LegacyMainWindow.GetBlueprintCreateActionButtonTooltipForTesting(settings),
+                    "退出创建蓝图",
+                    "blueprint create action creating tooltip");
+
+                ClickTileForBlueprintCreation(14, 15);
+                LegacyMainUiState.SetVisible(true);
+                LegacyUiActionService.HandleBlueprintActionEntryCommandForTesting(new LegacyUiCommand
+                {
+                    ElementId = LegacyMainWindow.GetBlueprintCreateActionElementIdForTesting(),
+                    Label = "蓝图:创建蓝图:退出",
+                    Kind = "button",
+                    MouseCaptured = true
+                });
+
+                var exitedMask = BlueprintCreationMaskState.GetSnapshot();
+                if (!string.Equals(BlueprintEntryState.GetSnapshot(settings).Mode, BlueprintEntryModes.Tool, StringComparison.Ordinal) ||
+                    exitedMask.Active ||
+                    exitedMask.CompletedPendingCapture ||
+                    exitedMask.SelectedCount != 1 ||
+                    !HasBlueprintCell(exitedMask, 14, 15))
+                {
+                    throw new InvalidOperationException("Expected F5 exit action to leave creation mode while preserving the selected mask.");
+                }
+
+                AssertStringEquals(
+                    LegacyMainWindow.GetBlueprintCreateActionButtonTextForTesting(settings),
+                    "开始",
+                    "blueprint create action restored button text");
+
+                BlueprintEntryHotkeyService.ResetForTesting();
+                var hotkeys = HotkeySettings.CreateDefault();
+                hotkeys.HotkeysByFeatureId[FeatureIds.BlueprintCreateAction] = "Alt+C";
+                var createHotkey = BlueprintEntryHotkeyService.TickForTesting(
+                    settings,
+                    hotkeys,
+                    new Dictionary<int, bool> { [0x12] = true, ['C'] = true },
+                    true,
+                    string.Empty,
+                    false);
+                if (!createHotkey.Triggered ||
+                    !createHotkey.Applied ||
+                    !string.Equals(createHotkey.Action, BlueprintEntryCommands.StartCreate, StringComparison.Ordinal) ||
+                    !string.Equals(BlueprintEntryState.GetSnapshot(settings).Mode, BlueprintEntryModes.Creating, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected blueprint.create action hotkey to enter the same create toggle state.");
+                }
+
+                BlueprintEntryState.ResetForTesting();
+                BlueprintCreationMaskState.ResetForTesting();
+                BlueprintHandheldActionBarState.ResetInteractionForTesting();
+                LegacyUiActionService.HandleBlueprintHandheldActionBarCommandForTesting(
+                    BuildBlueprintHandheldCommand(BlueprintHandheldActionBarState.ButtonIdCreate, "创建蓝图"));
+                if (!string.Equals(BlueprintEntryState.GetSnapshot(settings).Mode, BlueprintEntryModes.Creating, StringComparison.Ordinal) ||
+                    !BlueprintCreationMaskState.GetSnapshot().Active)
+                {
+                    throw new InvalidOperationException("Expected handheld create command to enter the same create toggle state.");
+                }
+
+                if (projectionReader.ReadCount != 0 || inventoryReader.ReadCount != 0)
+                {
+                    throw new InvalidOperationException("Create/exit button state sync must not refresh blueprint projection or material caches.");
+                }
+            }
+            finally
+            {
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintEntryState.ResetForTesting();
+                BlueprintCreationMaskState.ResetForTesting();
+                BlueprintEntryHotkeyService.ResetForTesting();
+                BlueprintHandheldActionBarState.ResetInteractionForTesting();
+                LegacyMainUiState.SetVisible(false);
                 ConfigService.ResetSettingsForTesting();
                 restore();
             }

@@ -181,8 +181,14 @@ namespace JueMingZ.Runtime
             if (!gameInputAvailable)
             {
                 // Keep the input gate fail-closed: diagnostics record why the
-                // user-facing input services were skipped, but no action drains.
+                // user-facing input services were skipped. The handheld blueprint
+                // bar is a visible UI overlay, so only its already-queued UI command
+                // prefix may drain here; hotkeys and gameplay action submitters stay closed.
                 RuntimeTargetingDiagnostics.RecordDiagnosticInputSkipped("gameInputAvailable=false");
+                var skippedGateGameState = context.GameState;
+                var skippedGateOperationStart = Stopwatch.GetTimestamp();
+                LegacyUiActionService.UpdateBlueprintHandheldCommandsWhenInputUnavailable(actionQueue, skippedGateGameState);
+                RecordOperationTiming(context, TargetingLegacyUiActions, skippedGateOperationStart);
                 return;
             }
 
