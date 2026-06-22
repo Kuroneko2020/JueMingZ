@@ -101,10 +101,14 @@ namespace JueMingZ.Automation.Blueprint
             bool shouldConsumeAfterPlayerInput,
             bool worldTileHit,
             int tileX,
-            int tileY)
+            int tileY,
+            bool? resolvedUiOwned = null)
         {
             raw = raw ?? new DiagnosticMouseState();
-            var uiOwned = legacyUiOwned || vanillaUiOwned || pointerUiOwned;
+            var uiOwned = resolvedUiOwned.HasValue
+                ? resolvedUiOwned.Value
+                : legacyUiOwned || vanillaUiOwned || pointerUiOwned;
+            var pointerOwnership = UiPointerOwnershipService.ResolveWorldPointerOwnership(raw);
             var trace =
                 "overlay=" + Sanitize(overlay) +
                 ";phase=" + Sanitize(phase) +
@@ -118,6 +122,17 @@ namespace JueMingZ.Automation.Blueprint
                 ";vanillaUiOwned=" + Bool(vanillaUiOwned) +
                 ";pointerUiOwned=" + Bool(pointerUiOwned) +
                 ";uiOwned=" + Bool(uiOwned) +
+                ";pointerOwnerId=" + Sanitize(pointerOwnership.OwnerId) +
+                ";pointerOwnerKind=" + Sanitize(pointerOwnership.OwnerKind) +
+                ";pointerOwnerReason=" + Sanitize(pointerOwnership.Reason) +
+                ";pointerOwnerHasBounds=" + Bool(pointerOwnership.HasBounds) +
+                ";pointerOwnerBounds=" + FormatRect(pointerOwnership.Bounds) +
+                ";pointerOwnerMouse=" + FormatMouse(pointerOwnership) +
+                ";pointerOwnerMouseSource=" + Sanitize(pointerOwnership.MouseSource) +
+                ";pointerOwnerBoundsHit=" + Bool(pointerOwnership.BoundsHit) +
+                ";pointerLeftOwned=" + Bool(pointerOwnership.LeftOwned) +
+                ";pointerLeftConsumed=" + Bool(pointerOwnership.LeftConsumed) +
+                ";pointerScrollOwned=" + Bool(pointerOwnership.ScrollOwned) +
                 ";consumeAfter=" + Bool(shouldConsumeAfterPlayerInput) +
                 ";worldTileHit=" + Bool(worldTileHit) +
                 ";tile=" + Int(tileX) + "," + Int(tileY);
@@ -169,6 +184,16 @@ namespace JueMingZ.Automation.Blueprint
         private static string FormatRect(LegacyUiRect rect)
         {
             return Int(rect.X) + "," + Int(rect.Y) + "," + Int(rect.Width) + "," + Int(rect.Height);
+        }
+
+        private static string FormatMouse(UiPointerOwnershipDetails details)
+        {
+            if (details == null || !details.MouseAvailable)
+            {
+                return "unavailable";
+            }
+
+            return Int(details.MouseX) + "," + Int(details.MouseY);
         }
 
         private static string Bool(bool value)

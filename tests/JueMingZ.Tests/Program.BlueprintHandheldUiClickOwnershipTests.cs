@@ -14,6 +14,8 @@ namespace JueMingZ.Tests
     {
         private static void BlueprintHandheldUiClickOwnershipContractsStayWired()
         {
+            BlueprintWorldOverlayOwnershipDiagnosticsIncludeSnapshotDetails();
+            BlueprintCreationPointerOwnershipNarrowingKeepsWorldHoverAndMask();
             BlueprintHandheldActionBarOwnershipRegistrationConsumesLeftForBarHits();
             UiPointerOwnershipConsumedLeftSurvivesCaptureReset();
             BlueprintUiPointerOwnershipBlocksWorldOverlayClicks();
@@ -24,9 +26,448 @@ namespace JueMingZ.Tests
             BlueprintHandheldActionBarDiagnosticsSnapshotJson();
         }
 
+        private static void BlueprintWorldOverlayOwnershipDiagnosticsIncludeSnapshotDetails()
+        {
+            ResetUiInputFrameTestState();
+            BlueprintUiClickDiagnostics.ResetForTesting();
+            try
+            {
+                UiInputFrameClock.BeginUpdateFrame("test.blueprint-world-overlay-owner-details");
+                UiPointerOwnershipService.RegisterPointerOwnerForCurrentFrame(
+                    "blueprint-hover-owner",
+                    "BlueprintHandheldActionBar",
+                    new LegacyUiRect(100, 200, 80, 48),
+                    false,
+                    false,
+                    false,
+                    "hover");
+
+                var rawInside = new DiagnosticMouseState
+                {
+                    GameInputAvailable = true,
+                    TerrariaReadAvailable = true,
+                    TerrariaMouseX = 120,
+                    TerrariaMouseY = 220,
+                    TerrariaLeftDown = false,
+                    OsReadAvailable = true,
+                    OsClientMouseX = 600,
+                    OsClientMouseY = 700,
+                    OsLeftDown = true,
+                    ReadMode = "TestWorld"
+                };
+                var inside = UiPointerOwnershipService.ResolveWorldPointerOwnership(rawInside);
+                if (!inside.PointerOwned ||
+                    inside.LeftOwned ||
+                    inside.LeftConsumed ||
+                    inside.ScrollOwned ||
+                    !inside.HasBounds ||
+                    !inside.BoundsHit ||
+                    !inside.MouseAvailable ||
+                    inside.MouseX != 120 ||
+                    inside.MouseY != 220 ||
+                    !string.Equals(inside.MouseSource, "Terraria", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected hover-only pointer ownership details to report same-domain owner bounds hit without left consumption.");
+                }
+
+                if (!UiPointerOwnershipService.IsPointerOwnerBoundsHitThisFrame(rawInside) ||
+                    !UiPointerOwnershipService.ResolveWorldLeftDown(rawInside))
+                {
+                    throw new InvalidOperationException("Expected hover-only pointer ownership to expose bounds hit while leaving OS left available to world overlays.");
+                }
+
+                BlueprintUiClickDiagnostics.RecordWorldOverlayInput(
+                    "creation",
+                    "prefix",
+                    true,
+                    rawInside,
+                    false,
+                    false,
+                    UiPointerOwnershipService.IsPointerOwnedThisFrame(),
+                    UiPointerOwnershipService.ResolveWorldLeftDown(rawInside),
+                    false,
+                    true,
+                    4211,
+                    572);
+                var trace = BlueprintUiClickDiagnostics.GetSnapshot().WorldOverlayInputTrace;
+                AssertContains(trace, "pointerOwnerId=blueprint-hover-owner");
+                AssertContains(trace, "pointerOwnerKind=BlueprintHandheldActionBar");
+                AssertContains(trace, "pointerOwnerReason=hover");
+                AssertContains(trace, "pointerOwnerHasBounds=true");
+                AssertContains(trace, "pointerOwnerBounds=100,200,80,48");
+                AssertContains(trace, "pointerOwnerMouse=120,220");
+                AssertContains(trace, "pointerOwnerMouseSource=Terraria");
+                AssertContains(trace, "pointerOwnerBoundsHit=true");
+                AssertContains(trace, "pointerLeftOwned=false");
+                AssertContains(trace, "pointerLeftConsumed=false");
+                AssertContains(trace, "pointerScrollOwned=false");
+
+                var rawOutside = new DiagnosticMouseState
+                {
+                    GameInputAvailable = true,
+                    TerrariaReadAvailable = true,
+                    TerrariaMouseX = 12,
+                    TerrariaMouseY = 34,
+                    OsReadAvailable = true,
+                    OsClientMouseX = 120,
+                    OsClientMouseY = 220,
+                    OsLeftDown = true
+                };
+                var outside = UiPointerOwnershipService.ResolveWorldPointerOwnership(rawOutside);
+                if (!outside.PointerOwned ||
+                    outside.BoundsHit ||
+                    UiPointerOwnershipService.IsPointerOwnerBoundsHitThisFrame(rawOutside))
+                {
+                    throw new InvalidOperationException("Expected ownership query to distinguish pointer-owned frames from current mouse bounds hits.");
+                }
+
+                UiInputFrameClock.BeginUpdateFrame("test.blueprint-world-overlay-owner-nobounds");
+                UiPointerOwnershipService.EnsureOperationWindowPointerOwned("capture-window");
+                var rawOsInside = new DiagnosticMouseState
+                {
+                    GameInputAvailable = true,
+                    TerrariaReadAvailable = false,
+                    OsReadAvailable = true,
+                    OsClientMouseX = 0,
+                    OsClientMouseY = 0,
+                    OsLeftDown = true
+                };
+                var noBounds = UiPointerOwnershipService.ResolveWorldPointerOwnership(rawOsInside);
+                if (!noBounds.PointerOwned ||
+                    !noBounds.LeftOwned ||
+                    noBounds.LeftConsumed ||
+                    noBounds.HasBounds ||
+                    noBounds.BoundsHit ||
+                    !noBounds.MouseAvailable ||
+                    !string.Equals(noBounds.MouseSource, "OsClient", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected operation-window ownership to report no bounds instead of fabricating a bounds hit.");
+                }
+
+                UiPointerOwnershipService.MarkOperationWindowLeftConsumed("left");
+                var consumed = UiPointerOwnershipService.ResolveWorldPointerOwnership(rawOsInside);
+                if (!consumed.LeftConsumed || UiPointerOwnershipService.ResolveWorldLeftDown(rawOsInside))
+                {
+                    throw new InvalidOperationException("Expected left-consumed ownership to keep blocking OS-left revival for world overlays.");
+                }
+            }
+            finally
+            {
+                ResetUiInputFrameTestState();
+                BlueprintUiClickDiagnostics.ResetForTesting();
+            }
+        }
+
+        private static void BlueprintPlacementErasePointerOwnershipNarrowingKeepsWorldInput()
+        {
+            ResetUiInputFrameTestState();
+            BlueprintUiClickDiagnostics.ResetForTesting();
+            BlueprintPlacementPreviewState.ResetForTesting();
+            BlueprintEraseRegionState.ResetForTesting();
+            var restore = PushTemporaryConfigDirectory("blueprint-adjacent-overlay-ownership-narrow");
+            try
+            {
+                UiInputFrameClock.BeginUpdateFrame("test.blueprint-adjacent-overlay-owner-outside");
+                UiPointerOwnershipService.RegisterPointerOwnerForCurrentFrame(
+                    "blueprint-hover-owner",
+                    "BlueprintHandheldActionBar",
+                    new LegacyUiRect(500, 500, 80, 48),
+                    false,
+                    false,
+                    false,
+                    "hover");
+
+                var rawOutside = new DiagnosticMouseState
+                {
+                    GameInputAvailable = true,
+                    TerrariaReadAvailable = true,
+                    TerrariaMouseX = 32,
+                    TerrariaMouseY = 32,
+                    OsReadAvailable = true,
+                    OsClientMouseX = 32,
+                    OsClientMouseY = 32,
+                    OsLeftDown = true,
+                    ReadMode = "TestWorld"
+                };
+                var outside = UiPointerOwnershipService.ResolveWorldPointerOwnership(rawOutside);
+                var creationBlocksOutside = BlueprintCreationOverlay.ShouldBlockCreationForPointerOwnershipForTesting(outside);
+                var placementBlocksOutside = BlueprintPlacementPreviewOverlay.ShouldBlockPlacementForPointerOwnershipForTesting(outside);
+                var eraseBlocksOutside = BlueprintEraseRegionOverlay.ShouldBlockEraseForPointerOwnershipForTesting(outside);
+                if (!outside.PointerOwned ||
+                    outside.LeftConsumed ||
+                    outside.BoundsHit ||
+                    creationBlocksOutside ||
+                    placementBlocksOutside ||
+                    eraseBlocksOutside)
+                {
+                    throw new InvalidOperationException("Expected out-of-bounds hover-only pointer ownership not to block adjacent blueprint world overlays.");
+                }
+
+                var outsideLeftDown = UiPointerOwnershipService.ResolveWorldLeftDown(rawOutside);
+                if (!outsideLeftDown)
+                {
+                    throw new InvalidOperationException("Expected hover-only pointer ownership to leave world left input available for adjacent overlays.");
+                }
+
+                BlueprintUiClickDiagnostics.RecordWorldOverlayInput(
+                    "placement",
+                    "prefix",
+                    true,
+                    rawOutside,
+                    false,
+                    false,
+                    outside.PointerOwned,
+                    outsideLeftDown,
+                    false,
+                    true,
+                    44,
+                    55,
+                    false);
+                var placementTrace = BlueprintUiClickDiagnostics.GetSnapshot().WorldOverlayInputTrace;
+                AssertContains(placementTrace, "overlay=placement");
+                AssertContains(placementTrace, "pointerUiOwned=true");
+                AssertContains(placementTrace, "uiOwned=false");
+                AssertContains(placementTrace, "pointerOwnerBoundsHit=false");
+
+                BlueprintUiClickDiagnostics.RecordWorldOverlayInput(
+                    "erase",
+                    "prefix",
+                    true,
+                    rawOutside,
+                    false,
+                    false,
+                    outside.PointerOwned,
+                    outsideLeftDown,
+                    false,
+                    true,
+                    10,
+                    20,
+                    false);
+                var eraseTrace = BlueprintUiClickDiagnostics.GetSnapshot().WorldOverlayInputTrace;
+                AssertContains(eraseTrace, "overlay=erase");
+                AssertContains(eraseTrace, "pointerUiOwned=true");
+                AssertContains(eraseTrace, "uiOwned=false");
+                AssertContains(eraseTrace, "pointerOwnerBoundsHit=false");
+
+                var template = CreateEvenBlueprintTemplate("相邻 overlay 放行");
+                var placementStore = new BlueprintWorldInstanceStore();
+                BlueprintPlacementPreviewState.SetPlacementDependenciesForTesting(
+                    new BlueprintTemplateLibraryStore(),
+                    placementStore,
+                    BlueprintPlacementWorldContext.Success("pair-placement-narrow", "world-placement-narrow"));
+                var preview = BlueprintPlacementPreviewState.BeginPreview(template, "test");
+                if (!preview.Succeeded)
+                {
+                    throw new InvalidOperationException("Expected placement preview to begin for adjacent ownership narrowing test.");
+                }
+
+                var placement = BlueprintPlacementPreviewState.HandlePointer(
+                    BlueprintPlacementPreviewOverlay.BuildPointerInputForTesting(
+                        true,
+                        false,
+                        false,
+                        placementBlocksOutside,
+                        outsideLeftDown,
+                        outsideLeftDown,
+                        false,
+                        true,
+                        44,
+                        55));
+                if (!placement.PlacedInstance || placement.Instance == null)
+                {
+                    throw new InvalidOperationException("Expected out-of-bounds hover-only ownership to allow placement confirmation.");
+                }
+
+                BlueprintPlacementPreviewState.ResetForTesting();
+
+                var eraseStore = new BlueprintWorldInstanceStore();
+                BlueprintWorldInstanceRecord eraseInstance;
+                RequireBlueprintSuccess(
+                    eraseStore.CreateInstanceFromTemplate(
+                        "pair-erase-narrow",
+                        "world-erase-narrow",
+                        CreateEraseMaterialTemplate(),
+                        10,
+                        20,
+                        0,
+                        out eraseInstance),
+                    "create erase narrowing instance");
+                BlueprintEraseRegionState.SetDependenciesForTesting(
+                    eraseStore,
+                    BlueprintPlacementWorldContext.Success("pair-erase-narrow", "world-erase-narrow"));
+                var beginErase = BlueprintEraseRegionState.BeginErase(eraseInstance.InstanceId);
+                if (!beginErase.Succeeded)
+                {
+                    throw new InvalidOperationException("Expected erase mode to begin for adjacent ownership narrowing test.");
+                }
+
+                var eraseStart = BlueprintEraseRegionState.HandlePointer(
+                    BlueprintEraseRegionOverlay.BuildPointerInputForTesting(
+                        true,
+                        false,
+                        false,
+                        eraseBlocksOutside,
+                        outsideLeftDown,
+                        outsideLeftDown,
+                        false,
+                        true,
+                        10,
+                        20));
+                if (!eraseStart.ShouldConsumeLeftInput ||
+                    eraseStart.ErasedRegion ||
+                    !BlueprintEraseRegionState.GetSnapshot().Dragging)
+                {
+                    throw new InvalidOperationException("Expected out-of-bounds hover-only ownership to allow erase drag start without applying an erase region yet.");
+                }
+
+                BlueprintEraseRegionState.ResetForTesting();
+
+                UiInputFrameClock.BeginUpdateFrame("test.blueprint-adjacent-overlay-owner-inside");
+                UiPointerOwnershipService.RegisterPointerOwnerForCurrentFrame(
+                    "blueprint-hover-owner",
+                    "BlueprintHandheldActionBar",
+                    new LegacyUiRect(20, 20, 80, 48),
+                    false,
+                    false,
+                    false,
+                    "hover");
+                var rawInside = new DiagnosticMouseState
+                {
+                    GameInputAvailable = true,
+                    TerrariaReadAvailable = true,
+                    TerrariaMouseX = 32,
+                    TerrariaMouseY = 32,
+                    OsReadAvailable = true,
+                    OsClientMouseX = 32,
+                    OsClientMouseY = 32,
+                    OsLeftDown = true,
+                    ReadMode = "TestWorld"
+                };
+                var inside = UiPointerOwnershipService.ResolveWorldPointerOwnership(rawInside);
+                var creationBlocksInside = BlueprintCreationOverlay.ShouldBlockCreationForPointerOwnershipForTesting(inside);
+                var placementBlocksInside = BlueprintPlacementPreviewOverlay.ShouldBlockPlacementForPointerOwnershipForTesting(inside);
+                var eraseBlocksInside = BlueprintEraseRegionOverlay.ShouldBlockEraseForPointerOwnershipForTesting(inside);
+                if (!inside.BoundsHit ||
+                    !creationBlocksInside ||
+                    !placementBlocksInside ||
+                    !eraseBlocksInside)
+                {
+                    throw new InvalidOperationException("Expected current owner-bounds hits to block all blueprint world overlays consistently.");
+                }
+
+                BlueprintPlacementPreviewState.SetPlacementDependenciesForTesting(
+                    new BlueprintTemplateLibraryStore(),
+                    new BlueprintWorldInstanceStore(),
+                    BlueprintPlacementWorldContext.Success("pair-placement-inside", "world-placement-inside"));
+                BlueprintPlacementPreviewState.BeginPreview(template, "test");
+                var placementBlocked = BlueprintPlacementPreviewState.HandlePointer(
+                    BlueprintPlacementPreviewOverlay.BuildPointerInputForTesting(
+                        true,
+                        false,
+                        false,
+                        placementBlocksInside,
+                        UiPointerOwnershipService.ResolveWorldLeftDown(rawInside),
+                        true,
+                        false,
+                        true,
+                        45,
+                        56));
+                if (!placementBlocked.ShouldConsumeLeftInput ||
+                    placementBlocked.PlacedInstance ||
+                    !BlueprintPlacementPreviewState.GetSnapshot().Active)
+                {
+                    throw new InvalidOperationException("Expected owner-bounds hits to block placement confirmation without exiting preview.");
+                }
+
+                var eraseInsideStore = new BlueprintWorldInstanceStore();
+                BlueprintWorldInstanceRecord eraseInsideInstance;
+                RequireBlueprintSuccess(
+                    eraseInsideStore.CreateInstanceFromTemplate(
+                        "pair-erase-inside",
+                        "world-erase-inside",
+                        CreateEraseMaterialTemplate(),
+                        10,
+                        20,
+                        0,
+                        out eraseInsideInstance),
+                    "create erase bounds-hit instance");
+                BlueprintEraseRegionState.SetDependenciesForTesting(
+                    eraseInsideStore,
+                    BlueprintPlacementWorldContext.Success("pair-erase-inside", "world-erase-inside"));
+                BlueprintEraseRegionState.BeginErase(eraseInsideInstance.InstanceId);
+                var eraseBlocked = BlueprintEraseRegionState.HandlePointer(
+                    BlueprintEraseRegionOverlay.BuildPointerInputForTesting(
+                        true,
+                        false,
+                        false,
+                        eraseBlocksInside,
+                        UiPointerOwnershipService.ResolveWorldLeftDown(rawInside),
+                        true,
+                        false,
+                        true,
+                        10,
+                        20));
+                if (!eraseBlocked.ShouldConsumeLeftInput ||
+                    eraseBlocked.ErasedRegion ||
+                    BlueprintEraseRegionState.GetSnapshot().Dragging)
+                {
+                    throw new InvalidOperationException("Expected owner-bounds hits to block erase drag start.");
+                }
+
+                UiInputFrameClock.BeginUpdateFrame("test.blueprint-adjacent-overlay-owner-consumed");
+                UiPointerOwnershipService.RegisterPointerOwnerForCurrentFrame(
+                    "blueprint-left-consumed",
+                    "BlueprintHandheldActionBar",
+                    new LegacyUiRect(500, 500, 80, 48),
+                    true,
+                    true,
+                    false,
+                    "left");
+                var rawConsumed = new DiagnosticMouseState
+                {
+                    GameInputAvailable = true,
+                    TerrariaReadAvailable = true,
+                    TerrariaMouseX = 32,
+                    TerrariaMouseY = 32,
+                    OsReadAvailable = true,
+                    OsClientMouseX = 32,
+                    OsClientMouseY = 32,
+                    OsLeftDown = true
+                };
+                var consumed = UiPointerOwnershipService.ResolveWorldPointerOwnership(rawConsumed);
+                if (!consumed.LeftConsumed ||
+                    !BlueprintPlacementPreviewOverlay.ShouldBlockPlacementForPointerOwnershipForTesting(consumed) ||
+                    !BlueprintEraseRegionOverlay.ShouldBlockEraseForPointerOwnershipForTesting(consumed) ||
+                    UiPointerOwnershipService.ResolveWorldLeftDown(rawConsumed))
+                {
+                    throw new InvalidOperationException("Expected left-consumed ownership to keep blocking OS-left revival for placement and erase.");
+                }
+            }
+            finally
+            {
+                ResetUiInputFrameTestState();
+                BlueprintUiClickDiagnostics.ResetForTesting();
+                BlueprintPlacementPreviewState.ResetForTesting();
+                BlueprintEraseRegionState.ResetForTesting();
+                restore();
+            }
+        }
+
+        private static void BlueprintWorldOverlayPointerOwnershipContractsStayWired()
+        {
+            BlueprintHandheldUiClickOwnershipContractsStayWired();
+            BlueprintPlacementErasePointerOwnershipNarrowingKeepsWorldInput();
+            BlueprintHotbarDeadClickHotkeyPathStaysIndependentOfHandheldOwnership();
+        }
+
         private static void BlueprintHotbarDeadClickRegressionContractsStayWired()
         {
-            BlueprintHandheldActionBarUiScaleFrameAndMouseHitSameBottomBar();
+            BlueprintHotbarPhysicalCoordinateRegressionContractsStayWired();
+        }
+
+        private static void BlueprintHotbarPhysicalCoordinateRegressionContractsStayWired()
+        {
+            BlueprintHandheldActionBarPhysicalBottomCenterRejectsUiScaleLogicalExtent();
             BlueprintHandheldUiClickOwnershipContractsStayWired();
             BlueprintHotbarDeadClickHotkeyPathStaysIndependentOfHandheldOwnership();
         }

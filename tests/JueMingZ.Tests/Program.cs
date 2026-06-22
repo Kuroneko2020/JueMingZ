@@ -1096,7 +1096,7 @@ namespace JueMingZ.Tests
             Run("blueprint handheld action bar postfix replays stale prefix press", ref failed, BlueprintHandheldActionBarPostfixReplaysStalePrefixPress);
             Run("blueprint handheld action bar gate-closed mouse keeps Terraria click", ref failed, BlueprintHandheldActionBarGateClosedMouseKeepsTerrariaClick);
             Run("blueprint handheld action bar gate-open mouse prefers OS client coordinate", ref failed, BlueprintHandheldActionBarGateOpenMousePrefersOsClientCoordinate);
-            Run("blueprint handheld action bar UI scale frame and mouse hit same bottom bar", ref failed, BlueprintHandheldActionBarUiScaleFrameAndMouseHitSameBottomBar);
+            Run("blueprint handheld action bar physical bottom-center rejects UI-scale logical extent", ref failed, BlueprintHandheldActionBarPhysicalBottomCenterRejectsUiScaleLogicalExtent);
             Run("blueprint handheld action bar display gates stay visible and UI-only", ref failed, BlueprintHandheldActionBarDisplayGatesStayVisibleAndUiOnly);
             Run("blueprint handheld action bar real commands and unimplemented buttons", ref failed, BlueprintHandheldActionBarRealCommandsAndUnimplementedButtons);
             Run("blueprint handheld action bar diagnostics snapshot json", ref failed, BlueprintHandheldActionBarDiagnosticsSnapshotJson);
@@ -1107,10 +1107,15 @@ namespace JueMingZ.Tests
             Run("blueprint creation mask drag toggles rectangle", ref failed, BlueprintCreationMaskDragTogglesRectangle);
             Run("blueprint creation mask selects air and tracks bounds", ref failed, BlueprintCreationMaskSelectsAirAndTracksBounds);
             Run("blueprint creation UI hit consumes without changing mask", ref failed, BlueprintCreationUiHitConsumesWithoutChangingMask);
+            Run("blueprint creation pointer ownership narrowing keeps world hover and mask", ref failed, BlueprintCreationPointerOwnershipNarrowingKeepsWorldHoverAndMask);
+            Run("blueprint placement erase pointer ownership narrowing keeps world input", ref failed, BlueprintPlacementErasePointerOwnershipNarrowingKeepsWorldInput);
             Run("blueprint UI pointer ownership blocks world overlay clicks", ref failed, BlueprintUiPointerOwnershipBlocksWorldOverlayClicks);
+            Run("blueprint world overlay ownership diagnostics include snapshot details", ref failed, BlueprintWorldOverlayOwnershipDiagnosticsIncludeSnapshotDetails);
             Run("blueprint handheld action bar ownership registration consumes left for bar hits", ref failed, BlueprintHandheldActionBarOwnershipRegistrationConsumesLeftForBarHits);
             Run("blueprint handheld UI click ownership contracts stay wired", ref failed, BlueprintHandheldUiClickOwnershipContractsStayWired);
+            Run("blueprint world overlay pointer ownership contracts stay wired", ref failed, BlueprintWorldOverlayPointerOwnershipContractsStayWired);
             Run("blueprint hotbar dead click regression contracts stay wired", ref failed, BlueprintHotbarDeadClickRegressionContractsStayWired);
+            Run("blueprint hotbar physical coordinate regression contracts stay wired", ref failed, BlueprintHotbarPhysicalCoordinateRegressionContractsStayWired);
             Run("blueprint creation clear finish and cancel contracts", ref failed, BlueprintCreationClearFinishAndCancelContracts);
             Run("blueprint creation overlay routes and pointer contract", ref failed, BlueprintCreationOverlayRoutesAndPointerContract);
             Run("blueprint creation local prompt edges and visual contract", ref failed, BlueprintCreationLocalPromptEdgesAndVisualContract);

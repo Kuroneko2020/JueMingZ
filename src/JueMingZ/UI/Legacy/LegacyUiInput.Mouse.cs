@@ -78,7 +78,7 @@ namespace JueMingZ.UI.Legacy
                 scale = LegacyMainUiScale.Resolve(raw);
             }
 
-            var coordinate = preferOsClientWhenGateOpen && raw.GameInputAvailable
+            var coordinate = preferOsClientWhenGateOpen
                 ? ResolveBlueprintHandheldOverlayMouse(raw)
                 : ResolveLogicalMouse(raw);
             var x = applyMainDrawScale ? scale.ToBaseLogicalX(coordinate.X) : coordinate.X;
@@ -289,34 +289,13 @@ namespace JueMingZ.UI.Legacy
         private static MouseCoordinate ResolveBlueprintHandheldOverlayMouse(DiagnosticMouseState raw)
         {
             var hasOs = raw.OsReadAvailable && raw.OsClientMouseX >= 0 && raw.OsClientMouseY >= 0;
-            if (hasOs)
+            if (raw.GameInputAvailable && hasOs)
             {
-                var scaleX = raw.UiScaleX > 0.01d ? raw.UiScaleX : raw.UiScale;
-                var scaleY = raw.UiScaleY > 0.01d ? raw.UiScaleY : raw.UiScale;
-                if (scaleX <= 0.01d)
-                {
-                    scaleX = 1d;
-                }
-
-                if (scaleY <= 0.01d)
-                {
-                    scaleY = 1d;
-                }
-
-                var scaleActive = raw.UiScaleAvailable &&
-                                  (Math.Abs(scaleX - 1d) > 0.01d ||
-                                   Math.Abs(scaleY - 1d) > 0.01d ||
-                                   Math.Abs(raw.UiTranslateX) > 0.01d ||
-                                   Math.Abs(raw.UiTranslateY) > 0.01d);
-                if (scaleActive)
-                {
-                    return new MouseCoordinate(
-                        ScreenToUiCoordinate(raw.OsClientMouseX, scaleX, raw.UiTranslateX),
-                        ScreenToUiCoordinate(raw.OsClientMouseY, scaleY, raw.UiTranslateY),
-                        BuildMouseMode(raw, "OsClientScreenToUi"));
-                }
-
-                return new MouseCoordinate(raw.OsClientMouseX, raw.OsClientMouseY, BuildMouseMode(raw, "OsClientRaw"));
+                // The handheld bar is laid out and drawn in draw/client-screen
+                // coordinates. Do not fold OS client coordinates through the F5
+                // UI-scale matrix; that would put the mouse back into the old
+                // logical domain while the visual frame is now physical.
+                return new MouseCoordinate(raw.OsClientMouseX, raw.OsClientMouseY, BuildMouseMode(raw, "OsClientScreen"));
             }
 
             var hasTerraria = raw.TerrariaReadAvailable && raw.TerrariaMouseX >= 0 && raw.TerrariaMouseY >= 0;

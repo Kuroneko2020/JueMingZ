@@ -5263,7 +5263,8 @@ function Test-BlueprintHandheldActionBarGovernance {
         $testText.Contains("BlueprintHandheldActionBarPostfixReplaysStalePrefixPress") -and
         $testText.Contains("BlueprintHandheldActionBarGateClosedMouseKeepsTerrariaClick") -and
         $testText.Contains("BlueprintHandheldActionBarGateOpenMousePrefersOsClientCoordinate") -and
-        $testText.Contains("BlueprintHandheldActionBarUiScaleFrameAndMouseHitSameBottomBar") -and
+        $testText.Contains("BlueprintHandheldActionBarPhysicalBottomCenterRejectsUiScaleLogicalExtent") -and
+        $testText.Contains("old UI-scale logical extent false positive") -and
         $runtimeTestText.Contains("QueueBlueprintHandheldActionBarCommandForTesting") -and
         $runtimeTestText.Contains("gameInputAvailable=false should drain already queued blueprint handheld UI commands only") -and
         $testText.Contains("BlueprintHandheldActionBarVisualStyleUsesLegacyThemeAndStableTextScale") -and
@@ -5286,14 +5287,14 @@ function Test-BlueprintHandheldActionBarGovernance {
         $programText.Contains("blueprint handheld action bar postfix replays stale prefix press") -and
         $programText.Contains("blueprint handheld action bar gate-closed mouse keeps Terraria click") -and
         $programText.Contains("blueprint handheld action bar gate-open mouse prefers OS client coordinate") -and
-        $programText.Contains("blueprint handheld action bar UI scale frame and mouse hit same bottom bar") -and
+        $programText.Contains("blueprint handheld action bar physical bottom-center rejects UI-scale logical extent") -and
         $programText.Contains("blueprint handheld action bar real commands and unimplemented buttons") -and
         $programText.Contains("blueprint handheld action bar visual style uses legacy theme and stable text scale") -and
         $programText.Contains("blueprint handheld action bar diagnostics snapshot json")) {
-        Write-Pass "Blueprint handheld action bar console tests cover dynamic buttons, clear-selection, display-gate visibility, post-PlayerInput command timing, stale prefix edge replay, gate-open OS coordinates, UI-scale bottom frame hit-test, gate-closed Terraria mouse input, themed visual scale, no-scan, real create/save/open-library commands, UI-only delete/move/red commands, and snapshot JSON."
+        Write-Pass "Blueprint handheld action bar console tests cover dynamic buttons, clear-selection, display-gate visibility, post-PlayerInput command timing, stale prefix edge replay, gate-open OS coordinates, physical bottom-center frame hit-test, gate-closed Terraria mouse input, themed visual scale, no-scan, real create/save/open-library commands, UI-only delete/move/red commands, and snapshot JSON."
     }
     else {
-        Write-FailHealth "Blueprint handheld action bar tests must cover dynamic buttons, clear-selection, display-gate visibility, post-PlayerInput command timing, stale prefix edge replay, gate-open OS coordinates, UI-scale bottom frame hit-test, gate-closed Terraria mouse input, themed visual scale, no-scan, real create/save/open-library commands, UI-only delete/move/red commands, and snapshot JSON diagnostics."
+        Write-FailHealth "Blueprint handheld action bar tests must cover dynamic buttons, clear-selection, display-gate visibility, post-PlayerInput command timing, stale prefix edge replay, gate-open OS coordinates, physical bottom-center frame hit-test, gate-closed Terraria mouse input, themed visual scale, no-scan, real create/save/open-library commands, UI-only delete/move/red commands, and snapshot JSON diagnostics."
     }
 
     if ($functionDocText -and $diagnosticsDocText -and $plan04Text -and $plan07Text -and
@@ -5403,20 +5404,37 @@ function Test-BlueprintUiClickStage02Governance {
         Write-FailHealth "Blueprint handheld action bar must register pointer ownership for button, disabled button, and blank bar hits."
     }
 
-    $worldOverlayOk =
-        $creationText -and $placementText -and $eraseText -and
+    $creationPointerGateOk =
+        $creationText -and
         $creationText.Contains("UiPointerOwnershipService.ResolveWorldLeftDown(raw)") -and
-        $placementText.Contains("UiPointerOwnershipService.ResolveWorldLeftDown(raw)") -and
-        $eraseText.Contains("UiPointerOwnershipService.ResolveWorldLeftDown(raw)") -and
+        $creationText.Contains("UiPointerOwnershipService.ResolveWorldPointerOwnership(raw)") -and
         $creationText.Contains("pointerUiOwned") -and
+        $creationText.Contains("pointerBlocksCreation") -and
+        $creationText.Contains("legacyUiOwned || vanillaUiOwned || pointerBlocksCreation") -and
+        $creationText.Contains("ShouldBlockCreationForPointerOwnership") -and
+        $creationText.Contains("ownership.LeftConsumed || ownership.BoundsHit")
+    $placementPointerGateOk =
+        $placementText -and
+        $placementText.Contains("UiPointerOwnershipService.ResolveWorldLeftDown(raw)") -and
+        $placementText.Contains("UiPointerOwnershipService.ResolveWorldPointerOwnership(raw)") -and
         $placementText.Contains("pointerUiOwned") -and
+        $placementText.Contains("pointerBlocksPlacement") -and
+        $placementText.Contains("legacyUiOwned || vanillaUiOwned || pointerBlocksPlacement") -and
+        $placementText.Contains("ShouldBlockPlacementForPointerOwnership") -and
+        $placementText.Contains("ownership.LeftConsumed || ownership.BoundsHit")
+    $erasePointerGateOk =
+        $eraseText -and
+        $eraseText.Contains("UiPointerOwnershipService.ResolveWorldLeftDown(raw)") -and
+        $eraseText.Contains("UiPointerOwnershipService.ResolveWorldPointerOwnership(raw)") -and
         $eraseText.Contains("pointerUiOwned") -and
-        $creationText.Contains("legacyUiOwned || vanillaUiOwned || pointerUiOwned") -and
-        $placementText.Contains("legacyUiOwned || vanillaUiOwned || pointerUiOwned") -and
-        $eraseText.Contains("legacyUiOwned || vanillaUiOwned || pointerUiOwned") -and
-        $creationText.Contains("ShouldConsumeAfterPlayerInputForTesting(snapshot.Active, legacyUiOwned, vanillaUiOwned, pointerUiOwned, leftDown)") -and
-        $placementText.Contains("ShouldConsumeAfterPlayerInputForTesting(snapshot.Active, legacyUiOwned, vanillaUiOwned, pointerUiOwned, leftDown)") -and
-        $eraseText.Contains("ShouldConsumeAfterPlayerInputForTesting(snapshot.Active, legacyUiOwned, vanillaUiOwned, pointerUiOwned, leftDown)")
+        $eraseText.Contains("pointerBlocksErase") -and
+        $eraseText.Contains("legacyUiOwned || vanillaUiOwned || pointerBlocksErase") -and
+        $eraseText.Contains("ShouldBlockEraseForPointerOwnership") -and
+        $eraseText.Contains("ownership.LeftConsumed || ownership.BoundsHit")
+    $worldOverlayOk =
+        $creationPointerGateOk -and
+        $placementPointerGateOk -and
+        $erasePointerGateOk
     if ($worldOverlayOk) {
         Write-Pass "Blueprint creation, placement, and erase world overlays query shared pointer ownership and consumed-left before world input."
     }
@@ -5650,15 +5668,16 @@ function Test-BlueprintHotbarDeadClickStage04Governance {
 
     if ($aggregateTestText -and $programText -and
         $aggregateTestText.Contains("BlueprintHotbarDeadClickRegressionContractsStayWired") -and
-        $aggregateTestText.Contains("BlueprintHandheldActionBarUiScaleFrameAndMouseHitSameBottomBar") -and
+        $aggregateTestText.Contains("BlueprintHotbarPhysicalCoordinateRegressionContractsStayWired") -and
+        $aggregateTestText.Contains("BlueprintHandheldActionBarPhysicalBottomCenterRejectsUiScaleLogicalExtent") -and
         $aggregateTestText.Contains("BlueprintHandheldUiClickOwnershipContractsStayWired") -and
         $aggregateTestText.Contains("BlueprintHotbarDeadClickHotkeyPathStaysIndependentOfHandheldOwnership") -and
         $aggregateTestText.Contains("ScenarioNames.BlueprintActionHotkey") -and
         $programText.Contains("blueprint hotbar dead click regression contracts stay wired")) {
-        Write-Pass "Blueprint hotbar dead-click stage 04 aggregate regression is registered and covers hit-test, ownership, world gates, diagnostics, and G hotkey adjacency."
+        Write-Pass "Blueprint hotbar dead-click stage 04 aggregate regression is registered and now reuses the corrected physical-coordinate hit-test, ownership, world gates, diagnostics, and G hotkey adjacency."
     }
     else {
-        Write-FailHealth "Blueprint hotbar dead-click stage 04 must register BlueprintHotbarDeadClickRegressionContractsStayWired and reuse the 02/03 plus hotkey-adjacent contracts."
+        Write-FailHealth "Blueprint hotbar dead-click stage 04 must register BlueprintHotbarDeadClickRegressionContractsStayWired and reuse the corrected physical-coordinate, ownership, and hotkey-adjacent contracts."
     }
 
     if ($functionDocText -and $diagnosticsDocText -and
@@ -5714,6 +5733,243 @@ function Test-BlueprintHotbarDeadClickStage04Governance {
     }
     else {
         Write-FailHealth "Blueprint hotbar dead-click stage 04 must synchronize update record/index and document history with the aggregate audit."
+    }
+}
+
+function Test-BlueprintHotbarPhysicalCoordinateStage04Governance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $auditPath = Join-Path $RepoRoot "scripts\audit-project-health.ps1"
+    $handheldTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintHandheldActionBarTests.cs"
+    $aggregateTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintHandheldUiClickOwnershipTests.cs"
+    $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
+    $functionDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $plan00Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图快捷栏物理坐标闭环修复", "00-基准.md")
+    if (-not (Test-Path -LiteralPath $plan00Path)) {
+        $plan00Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图快捷栏物理坐标闭环修复", "00-基准.md")
+    }
+
+    $plan04Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图快捷栏物理坐标闭环修复", "04-回归测试与审计防线.md")
+    if (-not (Test-Path -LiteralPath $plan04Path)) {
+        $plan04Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图快捷栏物理坐标闭环修复", "04-回归测试与审计防线.md")
+    }
+
+    $currentPlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "索引.md")
+    $archivePlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "索引.md")
+    $updateRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "0.921-蓝图快捷栏物理回归审计-2606220505.md")
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $docHistoryPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "蓝图快捷栏物理回归审计-2606220505.md")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+
+    $auditText = Read-TextIfExists -Path $auditPath
+    $handheldTestText = Read-TextIfExists -Path $handheldTestPath
+    $aggregateTestText = Read-TextIfExists -Path $aggregateTestPath
+    $programText = Read-TextIfExists -Path $programPath
+    $functionDocText = Read-TextIfExists -Path $functionDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $plan00Text = Read-TextIfExists -Path $plan00Path
+    $plan04Text = Read-TextIfExists -Path $plan04Path
+    $currentPlanIndexText = Read-TextIfExists -Path $currentPlanIndexPath
+    $archivePlanIndexText = Read-TextIfExists -Path $archivePlanIndexPath
+    $updateRecordText = Read-TextIfExists -Path $updateRecordPath
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $docHistoryText = Read-TextIfExists -Path $docHistoryPath
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+
+    if ($handheldTestText -and
+        $handheldTestText.Contains("BlueprintHandheldActionBarPhysicalBottomCenterRejectsUiScaleLogicalExtent") -and
+        $handheldTestText.Contains("old UI-scale logical extent false positive") -and
+        $handheldTestText.Contains("expectedLogicalHeight") -and
+        $handheldTestText.Contains("AssertBlueprintHandheldPhysicalLayout") -and
+        $handheldTestText.Contains("AssertDoesNotContain(mouse.ReadMode, " + [char]34 + "ScreenToUi" + [char]34 + ")")) {
+        Write-Pass "Blueprint physical coordinate stage 04 locks physical bottom-center layout and the old UI-scale logical false-positive counterexample."
+    }
+    else {
+        Write-FailHealth "Blueprint physical coordinate stage 04 must lock physical bottom-center layout and reject the old UI-scale logical false positive."
+    }
+
+    if ($aggregateTestText -and $programText -and
+        $aggregateTestText.Contains("BlueprintHotbarPhysicalCoordinateRegressionContractsStayWired") -and
+        $aggregateTestText.Contains("BlueprintHandheldActionBarPhysicalBottomCenterRejectsUiScaleLogicalExtent") -and
+        $aggregateTestText.Contains("BlueprintHandheldUiClickOwnershipContractsStayWired") -and
+        $aggregateTestText.Contains("BlueprintHotbarDeadClickHotkeyPathStaysIndependentOfHandheldOwnership") -and
+        $programText.Contains("blueprint hotbar physical coordinate regression contracts stay wired")) {
+        Write-Pass "Blueprint physical coordinate stage 04 aggregate regression covers physical position, click hit-test, ownership/world gates, and G hotkey adjacency."
+    }
+    else {
+        Write-FailHealth "Blueprint physical coordinate stage 04 must register the aggregate physical-coordinate regression with ownership, world-gate, and hotkey adjacency coverage."
+    }
+
+    if ($auditText -and
+        $auditText.Contains("Test-BlueprintHotbarPhysicalCoordinateStage04Governance") -and
+        $auditText.Contains("0.921-blueprint-hotbar-physical-regression-audit") -and
+        $auditText.Contains("0.921-蓝图快捷栏物理回归审计-2606220505.md")) {
+        Write-Pass "Blueprint physical coordinate stage 04 health audit function is present and wired to the 0.921 stage contract."
+    }
+    else {
+        Write-FailHealth "Blueprint physical coordinate stage 04 health audit must be wired to the 0.921 stage contract."
+    }
+
+    if ($functionDocText -and $diagnosticsDocText -and
+        $functionDocText.Contains("0.921-blueprint-hotbar-physical-regression-audit") -and
+        $functionDocText.Contains("0.916") -and
+        $functionDocText.Contains("旧测试假阳性") -and
+        $functionDocText.Contains("物理坐标闭环") -and
+        $functionDocText.Contains("BlueprintHotbarPhysicalCoordinateRegressionContractsStayWired") -and
+        $functionDocText.Contains("Test-BlueprintHotbarPhysicalCoordinateStage04Governance") -and
+        $diagnosticsDocText.Contains("0.921-blueprint-hotbar-physical-regression-audit") -and
+        $diagnosticsDocText.Contains("0.916") -and
+        $diagnosticsDocText.Contains("旧测试假阳性") -and
+        $diagnosticsDocText.Contains("物理坐标闭环") -and
+        $diagnosticsDocText.Contains("BlueprintHotbarPhysicalCoordinateRegressionContractsStayWired") -and
+        $diagnosticsDocText.Contains("Test-BlueprintHotbarPhysicalCoordinateStage04Governance")) {
+        Write-Pass "Blueprint feature and diagnostics docs describe the physical coordinate regression audit and old false-positive guard."
+    }
+    else {
+        Write-FailHealth "Blueprint feature and diagnostics docs must describe the 0.921 physical coordinate regression audit, 0.916 failure, and old false-positive guard."
+    }
+
+    $stage04BeforeCloseout =
+        $currentPlanIndexText -and
+        $currentPlanIndexText.Contains('下一阶段唯一入口为 `05-验证打包与归档收口.md`') -and
+        $currentPlanIndexText.Contains("0.921-blueprint-hotbar-physical-regression-audit")
+    $stage04AfterCloseout =
+        $plan00Text -and $archivePlanIndexText -and
+        $plan00Text.Contains('状态：`05-验证打包与归档收口` 已完成') -and
+        $plan00Text.Contains("0.922-blueprint-hotbar-physical-closeout") -and
+        $archivePlanIndexText.Contains("0.922-blueprint-hotbar-physical-closeout")
+
+    if ($plan00Text -and $plan04Text -and
+        $plan00Text.Contains('`04` 已完成') -and
+        $plan00Text.Contains("0.921-blueprint-hotbar-physical-regression-audit") -and
+        $plan04Text.Contains("状态：已完成") -and
+        $plan04Text.Contains('RuntimeVersion：`0.921-blueprint-hotbar-physical-regression-audit`') -and
+        $plan04Text.Contains("BlueprintHotbarPhysicalCoordinateRegressionContractsStayWired") -and
+        $plan04Text.Contains("Test-BlueprintHotbarPhysicalCoordinateStage04Governance") -and
+        $plan04Text.Contains("未生成测试包") -and
+        $plan04Text.Contains("接力自检") -and
+        ($stage04BeforeCloseout -or $stage04AfterCloseout)) {
+        Write-Pass "Blueprint physical coordinate stage 04 plan files record completion, no-package scope, and the 05 handoff/archive state."
+    }
+    else {
+        Write-FailHealth "Blueprint physical coordinate stage 04 plan files must record completion, no-package scope, and the 05 handoff/archive state."
+    }
+
+    if ($updateRecordText -and $updateIndexText -and $docHistoryText -and $docHistoryIndexText -and
+        $updateRecordText.Contains('RuntimeVersion：`0.921-blueprint-hotbar-physical-regression-audit`') -and
+        $updateRecordText.Contains("BlueprintHotbarPhysicalCoordinateRegressionContractsStayWired") -and
+        $updateRecordText.Contains("Test-BlueprintHotbarPhysicalCoordinateStage04Governance") -and
+        $updateRecordText.Contains("不生成测试包") -and
+        $updateRecordText.Contains("旧测试假阳性") -and
+        $updateIndexText.Contains("0.921-蓝图快捷栏物理回归审计-2606220505.md") -and
+        $docHistoryText.Contains("BlueprintHotbarPhysicalCoordinateRegressionContractsStayWired") -and
+        $docHistoryText.Contains("Test-BlueprintHotbarPhysicalCoordinateStage04Governance") -and
+        $docHistoryIndexText.Contains("蓝图快捷栏物理回归审计-2606220505.md")) {
+        Write-Pass "Blueprint physical coordinate stage 04 update record and document-change history are synchronized."
+    }
+    else {
+        Write-FailHealth "Blueprint physical coordinate stage 04 update record and document-change history must be synchronized."
+    }
+}
+
+function Test-BlueprintHotbarPhysicalCoordinateStage05CloseoutGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $auditPath = Join-Path $RepoRoot "scripts\audit-project-health.ps1"
+    $currentPlanDirPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图快捷栏物理坐标闭环修复")
+    $archivedPlan00Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图快捷栏物理坐标闭环修复", "00-基准.md")
+    $archivedPlan05Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图快捷栏物理坐标闭环修复", "05-验证打包与归档收口.md")
+    $currentPlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "索引.md")
+    $archivePlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "索引.md")
+    $blueprintDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $updateRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "0.922-蓝图快捷栏物理坐标验证收口-2606220520.md")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+    $docHistoryRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "蓝图快捷栏物理坐标验证收口-2606220520.md")
+
+    $auditText = Read-TextIfExists -Path $auditPath
+    $plan00Text = Read-TextIfExists -Path $archivedPlan00Path
+    $plan05Text = Read-TextIfExists -Path $archivedPlan05Path
+    $currentPlanIndexText = Read-TextIfExists -Path $currentPlanIndexPath
+    $archivePlanIndexText = Read-TextIfExists -Path $archivePlanIndexPath
+    $blueprintDocText = Read-TextIfExists -Path $blueprintDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $updateRecordText = Read-TextIfExists -Path $updateRecordPath
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+    $docHistoryRecordText = Read-TextIfExists -Path $docHistoryRecordPath
+
+    if ($auditText -and
+        $auditText.Contains("Test-BlueprintHotbarPhysicalCoordinateStage05CloseoutGovernance") -and
+        $auditText.Contains("0.922-blueprint-hotbar-physical-closeout") -and
+        $auditText.Contains("0.922-蓝图快捷栏物理坐标验证收口-2606220520.md")) {
+        Write-Pass "Blueprint physical-coordinate stage-05 closeout health audit is present and wired to the 0.922 closeout contract."
+    }
+    else {
+        Write-FailHealth "Blueprint physical-coordinate stage-05 closeout health audit must lock the 0.922 closeout contract and update record."
+    }
+
+    if (-not (Test-Path -LiteralPath $currentPlanDirPath) -and
+        $plan00Text -and
+        $plan00Text.Contains('状态：`05-验证打包与归档收口` 已完成') -and
+        $plan00Text.Contains("0.922-blueprint-hotbar-physical-closeout") -and
+        $plan00Text.Contains("自动串行接力终止") -and
+        $plan05Text -and
+        $plan05Text.Contains("状态：已完成") -and
+        $plan05Text.Contains("0.922-blueprint-hotbar-physical-closeout") -and
+        $plan05Text.Contains("JueMingZ-TestPackage") -and
+        $plan05Text.Contains("严格新鲜包健康审计") -and
+        $plan05Text.Contains("不再创建新对话")) {
+        Write-Pass "Blueprint physical-coordinate plan is archived with the 0.922 closeout, package delivery, and no further handoff."
+    }
+    else {
+        Write-FailHealth "Stage-05 closeout must move the blueprint physical-coordinate plan to archive and mark 05 complete with package/fresh-audit scope."
+    }
+
+    if ($currentPlanIndexText -and
+        $currentPlanIndexText.Contains("当前没有正在推进的计划") -and
+        $currentPlanIndexText.Contains("文档/归档历史计划/蓝图快捷栏物理坐标闭环修复/") -and
+        $archivePlanIndexText -and
+        $archivePlanIndexText.Contains("文档/归档历史计划/蓝图快捷栏物理坐标闭环修复/") -and
+        $archivePlanIndexText.Contains("0.922-blueprint-hotbar-physical-closeout") -and
+        $archivePlanIndexText.Contains("自动接力已终止")) {
+        Write-Pass "Current and archived plan indices record the blueprint physical-coordinate closeout and relay termination."
+    }
+    else {
+        Write-FailHealth "Stage-05 physical-coordinate closeout must update current and archived plan indices."
+    }
+
+    if ($blueprintDocText -and
+        $blueprintDocText.Contains("0.922-blueprint-hotbar-physical-closeout") -and
+        $blueprintDocText.Contains("文档/归档历史计划/蓝图快捷栏物理坐标闭环修复/00-基准.md") -and
+        $blueprintDocText.Contains("不新增蓝图用户可见行为") -and
+        $blueprintDocText.Contains("真实屏幕底部居中") -and
+        $diagnosticsDocText -and
+        $diagnosticsDocText.Contains("0.922-blueprint-hotbar-physical-closeout") -and
+        $diagnosticsDocText.Contains("不新增诊断字段") -and
+        $diagnosticsDocText.Contains("真实屏幕底部居中")) {
+        Write-Pass "Blueprint feature and diagnostics docs record the 0.922 physical-coordinate closeout without expanding runtime or diagnostics scope."
+    }
+    else {
+        Write-FailHealth "Stage-05 physical-coordinate closeout must update blueprint feature and diagnostics docs with no-new-runtime/no-new-diagnostics scope."
+    }
+
+    if ($updateIndexText -and
+        $updateIndexText.Contains("0.922-蓝图快捷栏物理坐标验证收口-2606220520.md") -and
+        $updateRecordText -and
+        $updateRecordText.Contains('RuntimeVersion：`0.922-blueprint-hotbar-physical-closeout`') -and
+        $updateRecordText.Contains("JueMingZ-TestPackage") -and
+        $updateRecordText.Contains("-RequireFreshTestPackage") -and
+        $docHistoryIndexText -and
+        $docHistoryIndexText.Contains("蓝图快捷栏物理坐标验证收口-2606220520.md") -and
+        $docHistoryRecordText -and
+        $docHistoryRecordText.Contains("0.922-blueprint-hotbar-physical-closeout")) {
+        Write-Pass "Stage-05 blueprint physical-coordinate update record and document-change history are synchronized."
+    }
+    else {
+        Write-FailHealth "Stage-05 physical-coordinate update record, update index, and document-change history must reference the 0.922 closeout."
     }
 }
 
@@ -5871,9 +6127,15 @@ function Test-BlueprintUiClickStage04Governance {
         $creationText.Contains("UiPointerOwnershipService.ResolveWorldLeftDown(raw)") -and
         $placementText.Contains("UiPointerOwnershipService.ResolveWorldLeftDown(raw)") -and
         $eraseText.Contains("UiPointerOwnershipService.ResolveWorldLeftDown(raw)") -and
-        $creationText.Contains("legacyUiOwned || vanillaUiOwned || pointerUiOwned") -and
-        $placementText.Contains("legacyUiOwned || vanillaUiOwned || pointerUiOwned") -and
-        $eraseText.Contains("legacyUiOwned || vanillaUiOwned || pointerUiOwned")
+        $creationText.Contains("UiPointerOwnershipService.ResolveWorldPointerOwnership(raw)") -and
+        $placementText.Contains("UiPointerOwnershipService.ResolveWorldPointerOwnership(raw)") -and
+        $eraseText.Contains("UiPointerOwnershipService.ResolveWorldPointerOwnership(raw)") -and
+        $creationText.Contains("legacyUiOwned || vanillaUiOwned || pointerBlocksCreation") -and
+        $placementText.Contains("legacyUiOwned || vanillaUiOwned || pointerBlocksPlacement") -and
+        $eraseText.Contains("legacyUiOwned || vanillaUiOwned || pointerBlocksErase") -and
+        $creationText.Contains("ownership.LeftConsumed || ownership.BoundsHit") -and
+        $placementText.Contains("ownership.LeftConsumed || ownership.BoundsHit") -and
+        $eraseText.Contains("ownership.LeftConsumed || ownership.BoundsHit")
     if ($worldOverlayOk) {
         Write-Pass "Blueprint UI click stage 04 keeps the shared ownership primitive and all world overlay ownership queries wired."
     }
@@ -5948,6 +6210,236 @@ function Test-BlueprintUiClickStage04Governance {
     }
     else {
         Write-FailHealth "Blueprint UI click stage 04 must synchronize update record/index and document history with the aggregate test and health audit."
+    }
+}
+
+function Test-BlueprintWorldOverlayPointerOwnershipStage05Governance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $creationPath = Join-Path $RepoRoot "src\JueMingZ\UI\BlueprintCreationOverlay.cs"
+    $placementPath = Join-Path $RepoRoot "src\JueMingZ\UI\BlueprintPlacementPreviewOverlay.cs"
+    $erasePath = Join-Path $RepoRoot "src\JueMingZ\UI\BlueprintEraseRegionOverlay.cs"
+    $aggregateTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintHandheldUiClickOwnershipTests.cs"
+    $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
+    $functionDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $plan00Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图创建选区UI所有权误拦修复", "00-基准.md")
+    if (-not (Test-Path -LiteralPath $plan00Path)) {
+        $plan00Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图创建选区UI所有权误拦修复", "00-基准.md")
+    }
+    $plan05Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图创建选区UI所有权误拦修复", "05-回归测试与审计防线.md")
+    if (-not (Test-Path -LiteralPath $plan05Path)) {
+        $plan05Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图创建选区UI所有权误拦修复", "05-回归测试与审计防线.md")
+    }
+    $currentPlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "索引.md")
+    $archivePlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "索引.md")
+    $updateRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "0.928-蓝图选区所有权回归审计-2606221548.md")
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $docHistoryPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "蓝图选区所有权回归审计-2606221548.md")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+
+    $creationText = Read-TextIfExists -Path $creationPath
+    $placementText = Read-TextIfExists -Path $placementPath
+    $eraseText = Read-TextIfExists -Path $erasePath
+    $aggregateTestText = Read-TextIfExists -Path $aggregateTestPath
+    $programText = Read-TextIfExists -Path $programPath
+    $functionDocText = Read-TextIfExists -Path $functionDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $plan00Text = Read-TextIfExists -Path $plan00Path
+    $plan05Text = Read-TextIfExists -Path $plan05Path
+    $currentPlanIndexText = Read-TextIfExists -Path $currentPlanIndexPath
+    $archivePlanIndexText = Read-TextIfExists -Path $archivePlanIndexPath
+    $updateRecordText = Read-TextIfExists -Path $updateRecordPath
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $docHistoryText = Read-TextIfExists -Path $docHistoryPath
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+
+    $worldOverlayNarrowGateOk =
+        $creationText -and $placementText -and $eraseText -and
+        $creationText.Contains("UiPointerOwnershipService.ResolveWorldPointerOwnership(raw)") -and
+        $placementText.Contains("UiPointerOwnershipService.ResolveWorldPointerOwnership(raw)") -and
+        $eraseText.Contains("UiPointerOwnershipService.ResolveWorldPointerOwnership(raw)") -and
+        $creationText.Contains("ShouldBlockCreationForPointerOwnership") -and
+        $placementText.Contains("ShouldBlockPlacementForPointerOwnership") -and
+        $eraseText.Contains("ShouldBlockEraseForPointerOwnership") -and
+        $creationText.Contains("ownership.LeftConsumed || ownership.BoundsHit") -and
+        $placementText.Contains("ownership.LeftConsumed || ownership.BoundsHit") -and
+        $eraseText.Contains("ownership.LeftConsumed || ownership.BoundsHit")
+    if ($worldOverlayNarrowGateOk) {
+        Write-Pass "Blueprint world overlays keep the narrow pointer ownership gate: LeftConsumed or owner-bounds hit, not coarse pointer ownership alone."
+    }
+    else {
+        Write-FailHealth "Blueprint creation, placement, and erase overlays must keep ResolveWorldPointerOwnership(raw) and block pointer ownership only on LeftConsumed or owner bounds hit."
+    }
+
+    if ($aggregateTestText -and $programText -and
+        $aggregateTestText.Contains("BlueprintWorldOverlayPointerOwnershipContractsStayWired") -and
+        $aggregateTestText.Contains("BlueprintHandheldUiClickOwnershipContractsStayWired") -and
+        $aggregateTestText.Contains("BlueprintCreationPointerOwnershipNarrowingKeepsWorldHoverAndMask") -and
+        $aggregateTestText.Contains("BlueprintPlacementErasePointerOwnershipNarrowingKeepsWorldInput") -and
+        $aggregateTestText.Contains("BlueprintHandheldActionBarOwnershipRegistrationConsumesLeftForBarHits") -and
+        $aggregateTestText.Contains("BlueprintHotbarDeadClickHotkeyPathStaysIndependentOfHandheldOwnership") -and
+        $programText.Contains("blueprint world overlay pointer ownership contracts stay wired")) {
+        Write-Pass "Blueprint stage-05 aggregate console regression is registered and reuses creation, placement/erase, handheld ownership, and hotkey-adjacent contracts."
+    }
+    else {
+        Write-FailHealth "Blueprint stage-05 must register BlueprintWorldOverlayPointerOwnershipContractsStayWired and reuse the creation hover, placement/erase, handheld ownership, and Hotkey.BlueprintAction contracts."
+    }
+
+    if ($functionDocText -and $diagnosticsDocText -and
+        $functionDocText.Contains("0.928-blueprint-world-overlay-ownership-audit") -and
+        $functionDocText.Contains("BlueprintWorldOverlayPointerOwnershipContractsStayWired") -and
+        $functionDocText.Contains("Test-BlueprintWorldOverlayPointerOwnershipStage05Governance") -and
+        $diagnosticsDocText.Contains("0.928-blueprint-world-overlay-ownership-audit") -and
+        $diagnosticsDocText.Contains("BlueprintWorldOverlayPointerOwnershipContractsStayWired") -and
+        $diagnosticsDocText.Contains("Test-BlueprintWorldOverlayPointerOwnershipStage05Governance") -and
+        $diagnosticsDocText.Contains("DiagnosticLifecycle=Stabilization")) {
+        Write-Pass "Blueprint function and diagnostics docs describe the stage-05 world overlay pointer ownership audit."
+    }
+    else {
+        Write-FailHealth "Blueprint function and diagnostics docs must describe 0.928, the aggregate regression, health audit, and stabilization diagnostics boundary."
+    }
+
+    $stage05BeforeCloseout =
+        $currentPlanIndexText -and
+        $plan00Text.Contains('`05-回归测试与审计防线` 已完成') -and
+        $plan00Text.Contains('下一入口为 `06-验证打包与归档收口.md`') -and
+        $currentPlanIndexText.Contains('下一阶段唯一入口是 `06-验证打包与归档收口.md`')
+    $stage05AfterCloseout =
+        $currentPlanIndexText -and $archivePlanIndexText -and
+        $plan00Text.Contains('状态：`06-验证打包与归档收口` 已完成') -and
+        $plan00Text.Contains('0.929') -and
+        $currentPlanIndexText.Contains("文档/归档历史计划/蓝图创建选区UI所有权误拦修复/") -and
+        $archivePlanIndexText.Contains("蓝图创建选区UI所有权误拦修复")
+    if ($plan00Text -and $plan05Text -and
+        $plan05Text.Contains("状态：已完成") -and
+        $plan05Text.Contains('RuntimeVersion：`0.928-blueprint-world-overlay-ownership-audit`') -and
+        $plan05Text.Contains("BlueprintWorldOverlayPointerOwnershipContractsStayWired") -and
+        $plan05Text.Contains("Test-BlueprintWorldOverlayPointerOwnershipStage05Governance") -and
+        $plan05Text.Contains("不生成测试包") -and
+        $plan05Text.Contains("未新增 AI 经验笔记") -and
+        ($stage05BeforeCloseout -or $stage05AfterCloseout)) {
+        Write-Pass "Blueprint stage-05 plan files record completion, aggregate regression, scoped audit, no-package boundary, and 06 handoff/archive state."
+    }
+    else {
+        Write-FailHealth "Blueprint stage-05 plan files must record completion, aggregate regression, health audit, no-package/no-experience-note review, and 06 handoff/archive state."
+    }
+
+    if ($updateRecordText -and $updateIndexText -and $docHistoryText -and $docHistoryIndexText -and
+        $updateRecordText.Contains("0.928-blueprint-world-overlay-ownership-audit") -and
+        $updateRecordText.Contains("BlueprintWorldOverlayPointerOwnershipContractsStayWired") -and
+        $updateRecordText.Contains("Test-BlueprintWorldOverlayPointerOwnershipStage05Governance") -and
+        $updateRecordText.Contains("不生成测试包") -and
+        $updateRecordText.Contains("本地验证不等于用户实机验收") -and
+        $updateRecordText.Contains("未新增 AI 经验笔记") -and
+        $updateIndexText.Contains("0.928-蓝图选区所有权回归审计-2606221548.md") -and
+        $docHistoryText.Contains("BlueprintWorldOverlayPointerOwnershipContractsStayWired") -and
+        $docHistoryText.Contains("Test-BlueprintWorldOverlayPointerOwnershipStage05Governance") -and
+        $docHistoryIndexText.Contains("蓝图选区所有权回归审计-2606221548.md")) {
+        Write-Pass "Blueprint stage-05 update record and document-change history are synchronized."
+    }
+    else {
+        Write-FailHealth "Blueprint stage-05 must synchronize update record/index and document-change history with the aggregate regression and health audit."
+    }
+}
+
+function Test-BlueprintWorldOverlayPointerOwnershipStage06CloseoutGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $auditPath = Join-Path $RepoRoot "scripts\audit-project-health.ps1"
+    $currentPlanDirPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图创建选区UI所有权误拦修复")
+    $archivedPlan00Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图创建选区UI所有权误拦修复", "00-基准.md")
+    $archivedPlan06Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图创建选区UI所有权误拦修复", "06-验证打包与归档收口.md")
+    $currentPlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "索引.md")
+    $archivePlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "索引.md")
+    $blueprintDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $updateRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "0.929-蓝图选区所有权验证收口-2606221601.md")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+    $docHistoryRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "蓝图选区所有权验证收口-2606221601.md")
+
+    $auditText = Read-TextIfExists -Path $auditPath
+    $plan00Text = Read-TextIfExists -Path $archivedPlan00Path
+    $plan06Text = Read-TextIfExists -Path $archivedPlan06Path
+    $currentPlanIndexText = Read-TextIfExists -Path $currentPlanIndexPath
+    $archivePlanIndexText = Read-TextIfExists -Path $archivePlanIndexPath
+    $blueprintDocText = Read-TextIfExists -Path $blueprintDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $updateRecordText = Read-TextIfExists -Path $updateRecordPath
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+    $docHistoryRecordText = Read-TextIfExists -Path $docHistoryRecordPath
+
+    if ($auditText -and
+        $auditText.Contains("Test-BlueprintWorldOverlayPointerOwnershipStage06CloseoutGovernance") -and
+        $auditText.Contains("0.929-blueprint-world-overlay-ownership-closeout") -and
+        $auditText.Contains("0.929-蓝图选区所有权验证收口-2606221601.md")) {
+        Write-Pass "Blueprint world-overlay ownership stage-06 closeout health audit is present and wired to the 0.929 closeout contract."
+    }
+    else {
+        Write-FailHealth "Blueprint world-overlay ownership stage-06 closeout health audit must lock the 0.929 closeout contract and update record."
+    }
+
+    if (-not (Test-Path -LiteralPath $currentPlanDirPath) -and
+        $plan00Text -and
+        $plan00Text.Contains('状态：`06-验证打包与归档收口` 已完成') -and
+        $plan00Text.Contains("0.929-blueprint-world-overlay-ownership-closeout") -and
+        $plan00Text.Contains("自动串行接力终止") -and
+        $plan06Text -and
+        $plan06Text.Contains("状态：已完成") -and
+        $plan06Text.Contains("0.929-blueprint-world-overlay-ownership-closeout") -and
+        $plan06Text.Contains("JueMingZ-TestPackage") -and
+        $plan06Text.Contains("严格新鲜包健康审计") -and
+        $plan06Text.Contains("不再创建新对话")) {
+        Write-Pass "Blueprint world-overlay ownership plan is archived with the 0.929 closeout, package delivery, and no further handoff."
+    }
+    else {
+        Write-FailHealth "Stage-06 closeout must move the blueprint world-overlay ownership plan to archive and mark 06 complete with package/fresh-audit scope."
+    }
+
+    if ($currentPlanIndexText -and
+        $currentPlanIndexText.Contains("当前没有正在推进的计划") -and
+        $currentPlanIndexText.Contains("文档/归档历史计划/蓝图创建选区UI所有权误拦修复/") -and
+        $archivePlanIndexText -and
+        $archivePlanIndexText.Contains("文档/归档历史计划/蓝图创建选区UI所有权误拦修复/") -and
+        $archivePlanIndexText.Contains("0.929-blueprint-world-overlay-ownership-closeout") -and
+        $archivePlanIndexText.Contains("自动接力已终止")) {
+        Write-Pass "Current and archived plan indices record the blueprint world-overlay ownership closeout and relay termination."
+    }
+    else {
+        Write-FailHealth "Stage-06 world-overlay ownership closeout must update current and archived plan indices."
+    }
+
+    if ($blueprintDocText -and
+        $blueprintDocText.Contains("0.929-blueprint-world-overlay-ownership-closeout") -and
+        $blueprintDocText.Contains("文档/归档历史计划/蓝图创建选区UI所有权误拦修复/00-基准.md") -and
+        $blueprintDocText.Contains("BlueprintWorldOverlayPointerOwnershipContractsStayWired") -and
+        $blueprintDocText.Contains("不新增用户可见蓝图行为") -and
+        $diagnosticsDocText -and
+        $diagnosticsDocText.Contains("0.929-blueprint-world-overlay-ownership-closeout") -and
+        $diagnosticsDocText.Contains("不新增诊断字段") -and
+        $diagnosticsDocText.Contains("BlueprintWorldOverlayLastInputTrace")) {
+        Write-Pass "Blueprint feature and diagnostics docs record the 0.929 closeout without expanding runtime or diagnostics scope."
+    }
+    else {
+        Write-FailHealth "Stage-06 world-overlay ownership closeout must update blueprint feature and diagnostics docs with no-new-runtime/no-new-diagnostics scope."
+    }
+
+    if ($updateIndexText -and
+        $updateIndexText.Contains("0.929-蓝图选区所有权验证收口-2606221601.md") -and
+        $updateRecordText -and
+        $updateRecordText.Contains('RuntimeVersion：`0.929-blueprint-world-overlay-ownership-closeout`') -and
+        $updateRecordText.Contains("JueMingZ-TestPackage") -and
+        $updateRecordText.Contains("-RequireFreshTestPackage") -and
+        $docHistoryIndexText -and
+        $docHistoryIndexText.Contains("蓝图选区所有权验证收口-2606221601.md") -and
+        $docHistoryRecordText -and
+        $docHistoryRecordText.Contains("0.929-blueprint-world-overlay-ownership-closeout")) {
+        Write-Pass "Stage-06 world-overlay ownership update record and document-change history are synchronized."
+    }
+    else {
+        Write-FailHealth "Stage-06 world-overlay ownership update record, update index, and document-change history must reference the 0.929 closeout."
     }
 }
 
@@ -7449,9 +7941,13 @@ function Invoke-GovernanceAudit {
         Test-BlueprintUiClickStage02Governance -RepoRoot $RepoRoot
         Test-BlueprintHotbarOwnershipStage03Governance -RepoRoot $RepoRoot
         Test-BlueprintHotbarDeadClickStage04Governance -RepoRoot $RepoRoot
+        Test-BlueprintHotbarPhysicalCoordinateStage04Governance -RepoRoot $RepoRoot
+        Test-BlueprintHotbarPhysicalCoordinateStage05CloseoutGovernance -RepoRoot $RepoRoot
         Test-BlueprintHotbarDeadClickStage05CloseoutGovernance -RepoRoot $RepoRoot
         Test-BlueprintUiClickStage04Governance -RepoRoot $RepoRoot
         Test-BlueprintUiClickStage05CloseoutGovernance -RepoRoot $RepoRoot
+        Test-BlueprintWorldOverlayPointerOwnershipStage05Governance -RepoRoot $RepoRoot
+        Test-BlueprintWorldOverlayPointerOwnershipStage06CloseoutGovernance -RepoRoot $RepoRoot
         Test-BlueprintFeedbackStage08Governance -RepoRoot $RepoRoot
         Test-BlueprintFeedbackStage09CloseoutGovernance -RepoRoot $RepoRoot
         Test-BlueprintLibraryStage10Governance -RepoRoot $RepoRoot

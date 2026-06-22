@@ -144,6 +144,11 @@ namespace JueMingZ.UI
             return active && leftDown && !legacyUiOwned && !vanillaUiOwned && !pointerUiOwned;
         }
 
+        internal static bool ShouldBlockPlacementForPointerOwnershipForTesting(UiPointerOwnershipDetails ownership)
+        {
+            return ShouldBlockPlacementForPointerOwnership(ownership);
+        }
+
         internal static void ResetInputForTesting()
         {
             _wasLeftDown = false;
@@ -166,11 +171,14 @@ namespace JueMingZ.UI
             _wasActive = true;
             var legacyUiOwned = IsLegacyWindowHit(raw);
             var vanillaUiOwned = IsVanillaUiBlockingWorldSelection();
-            var pointerUiOwned = UiPointerOwnershipService.IsPointerOwnedThisFrame();
+            var pointerOwnership = UiPointerOwnershipService.ResolveWorldPointerOwnership(raw);
+            var pointerUiOwned = pointerOwnership.PointerOwned;
+            var pointerBlocksPlacement = ShouldBlockPlacementForPointerOwnership(pointerOwnership);
+            var uiOwned = legacyUiOwned || vanillaUiOwned || pointerBlocksPlacement;
 
             if (afterPlayerInput)
             {
-                var shouldConsumeAfter = ShouldConsumeAfterPlayerInputForTesting(snapshot.Active, legacyUiOwned, vanillaUiOwned, pointerUiOwned, leftDown);
+                var shouldConsumeAfter = ShouldConsumeAfterPlayerInputForTesting(snapshot.Active, legacyUiOwned, vanillaUiOwned, pointerBlocksPlacement, leftDown);
                 BlueprintUiClickDiagnostics.RecordWorldOverlayInput(
                     "placement",
                     "after-player-input",
@@ -183,7 +191,8 @@ namespace JueMingZ.UI
                     shouldConsumeAfter,
                     false,
                     0,
-                    0);
+                    0,
+                    uiOwned);
                 if (shouldConsumeAfter)
                 {
                     UiMouseCaptureService.ConsumeMouseTriggerForOperationWindow("MouseLeft", out _);
@@ -208,13 +217,14 @@ namespace JueMingZ.UI
                 false,
                 worldTileHit,
                 tileX,
-                tileY);
+                tileY,
+                uiOwned);
 
             var input = BuildPointerInputForTesting(
                 snapshot.Active,
                 legacyUiOwned,
                 vanillaUiOwned,
-                pointerUiOwned,
+                pointerBlocksPlacement,
                 leftDown,
                 !justActivated && leftDown && !_wasLeftDown,
                 !leftDown && _wasLeftDown,
@@ -235,6 +245,19 @@ namespace JueMingZ.UI
             }
 
             _wasLeftDown = leftDown;
+        }
+
+        private static bool ShouldBlockPlacementForPointerOwnership(UiPointerOwnershipDetails ownership)
+        {
+            if (ownership == null || !ownership.PointerOwned)
+            {
+                return false;
+            }
+
+            // Match the creation world-overlay contract: pointer ownership only
+            // blocks placement when UI consumed left input or the mouse still
+            // hits the owner's bounds in the same coordinate domain.
+            return ownership.LeftConsumed || ownership.BoundsHit;
         }
 
         private static bool IsLegacyWindowHit(DiagnosticMouseState raw)

@@ -10,7 +10,7 @@ namespace JueMingZ.UI
 {
     public static class BlueprintHandheldActionBarOverlay
     {
-        private const string VisualContract = "ui-scale-bottom-action-bar+dynamic-buttons+legacy-ui-theme+vanilla-ui-skin+button-text-scale-0.78+create-enters-mask+exit-create-preserves-mask+save-captures-mask+clear-selection+disabled-save-tooltip+open-library-real+unimplemented-buttons-ui-only+mouse-consume+no-blueprint-refresh+no-library-refresh+no-input-action-queue";
+        private const string VisualContract = "physical-screen-bottom-action-bar+dynamic-buttons+legacy-ui-theme+vanilla-ui-skin+button-text-scale-0.78+create-enters-mask+exit-create-preserves-mask+save-captures-mask+clear-selection+disabled-save-tooltip+open-library-real+unimplemented-buttons-ui-only+mouse-consume+no-blueprint-refresh+no-library-refresh+no-input-action-queue";
         internal const float ButtonTextScale = 0.78f;
         private const float MinimumButtonTextScale = 0.52f;
 
@@ -179,40 +179,10 @@ namespace JueMingZ.UI
                 ScreenHeight = environment.ScreenHeight
             };
 
-            if (raw == null || !raw.UiScaleAvailable)
-            {
-                return resolved;
-            }
-
-            var scaleX = ResolveUiScale(raw.UiScaleX, raw.UiScale);
-            var scaleY = ResolveUiScale(raw.UiScaleY, raw.UiScale);
-            // The bar draws inside Terraria's active interface SpriteBatch, so
-            // the visual frame and hit-test must both use UI-scale logical extents.
-            resolved.ScreenWidth = ResolveUiExtent(resolved.ScreenWidth, scaleX, raw.UiTranslateX);
-            resolved.ScreenHeight = ResolveUiExtent(resolved.ScreenHeight, scaleY, raw.UiTranslateY);
+            // This overlay draws directly into the active interface SpriteBatch
+            // without pairing the F5 UiDrawTransform. Its visual layout target is
+            // therefore the draw/client screen extent, not ScreenWidth / UIScale.
             return resolved;
-        }
-
-        private static double ResolveUiScale(double axisScale, double fallbackScale)
-        {
-            if (axisScale > 0.01d)
-            {
-                return axisScale;
-            }
-
-            return fallbackScale > 0.01d ? fallbackScale : 1d;
-        }
-
-        private static int ResolveUiExtent(int screenSize, double scale, double translate)
-        {
-            var safeSize = Math.Max(1, screenSize);
-            if (scale <= 0.01d || Math.Abs(scale - 1d) <= 0.01d)
-            {
-                return safeSize;
-            }
-
-            var scaled = (int)Math.Round((safeSize - translate) / scale);
-            return scaled > 0 ? scaled : safeSize;
         }
 
         private static void PopulateDynamicBlueprintState(BlueprintHandheldActionBarEnvironment environment)

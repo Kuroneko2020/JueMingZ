@@ -196,6 +196,7 @@ namespace JueMingZ.Tests
         private static void BlueprintHandheldActionBarVisualStyleUsesLegacyThemeAndStableTextScale()
         {
             var contract = BlueprintHandheldActionBarOverlay.GetVisualContractForTesting();
+            AssertContains(contract, "physical-screen-bottom-action-bar");
             AssertContains(contract, "legacy-ui-theme");
             AssertContains(contract, "vanilla-ui-skin");
             AssertContains(contract, "button-text-scale-0.78");
@@ -276,6 +277,7 @@ namespace JueMingZ.Tests
                 }
 
                 var contract = BlueprintHandheldActionBarOverlay.GetVisualContractForTesting();
+                AssertContains(contract, "physical-screen-bottom-action-bar");
                 AssertContains(contract, "dynamic-buttons");
                 AssertContains(contract, "create-enters-mask");
                 AssertContains(contract, "save-captures-mask");
@@ -467,6 +469,14 @@ namespace JueMingZ.Tests
                 OsClientMouseX = 32,
                 OsClientMouseY = 48,
                 OsLeftDown = true,
+                UiScaleAvailable = true,
+                UiScaleMatrixAvailable = true,
+                UiScale = 1.35d,
+                UiScaleX = 1.35d,
+                UiScaleY = 1.35d,
+                UiTranslateX = 9d,
+                UiTranslateY = 11d,
+                UiScaleSource = "UIScaleMatrix",
                 ReadMode = "Terraria+OsClient/BlueprintHandheldOverlayGateBypass"
             };
 
@@ -476,6 +486,8 @@ namespace JueMingZ.Tests
                 mouse.ScrollDelta != -120 ||
                 mouse.X != 640 ||
                 mouse.Y != 650 ||
+                mouse.ReadMode.IndexOf("TerrariaRaw", StringComparison.Ordinal) < 0 ||
+                mouse.ReadMode.IndexOf("ScreenToUi", StringComparison.Ordinal) >= 0 ||
                 mouse.ReadMode.IndexOf("InterfaceOverlay", StringComparison.Ordinal) < 0)
             {
                 throw new InvalidOperationException("Expected handheld overlay mouse to keep Terraria in-process click and scroll when the global input gate is closed.");
@@ -504,6 +516,14 @@ namespace JueMingZ.Tests
                 OsClientMouseX = 640,
                 OsClientMouseY = 650,
                 OsLeftDown = true,
+                UiScaleAvailable = true,
+                UiScaleMatrixAvailable = true,
+                UiScale = 1.4d,
+                UiScaleX = 1.4d,
+                UiScaleY = 1.4d,
+                UiTranslateX = 17d,
+                UiTranslateY = 19d,
+                UiScaleSource = "UIScaleMatrix",
                 ReadMode = "Terraria+OsClient"
             };
 
@@ -512,18 +532,19 @@ namespace JueMingZ.Tests
                 !mouse.LeftDown ||
                 mouse.X != 640 ||
                 mouse.Y != 650 ||
-                mouse.ReadMode.IndexOf("OsClientRaw", StringComparison.Ordinal) < 0 ||
+                mouse.ReadMode.IndexOf("OsClientScreen", StringComparison.Ordinal) < 0 ||
+                mouse.ReadMode.IndexOf("ScreenToUi", StringComparison.Ordinal) >= 0 ||
                 mouse.ReadMode.IndexOf("InterfaceOverlay", StringComparison.Ordinal) < 0)
             {
-                throw new InvalidOperationException("Expected handheld overlay to prefer fresh OS client coordinates while the game input gate is open.");
+                throw new InvalidOperationException("Expected handheld overlay to prefer fresh OS client physical coordinates while the game input gate is open.");
             }
         }
 
-        private static void BlueprintHandheldActionBarUiScaleFrameAndMouseHitSameBottomBar()
+        private static void BlueprintHandheldActionBarPhysicalBottomCenterRejectsUiScaleLogicalExtent()
         {
             BlueprintHandheldActionBarState.ResetInteractionForTesting();
-            var physicalWidth = 1920;
-            var physicalHeight = 1080;
+            var physicalWidth = 2560;
+            var physicalHeight = 1400;
             var uiScale = 1.25d;
             var translateX = 12d;
             var translateY = 8d;
@@ -554,32 +575,43 @@ namespace JueMingZ.Tests
                 raw);
             var expectedLogicalWidth = (int)Math.Round((physicalWidth - translateX) / uiScale);
             var expectedLogicalHeight = (int)Math.Round((physicalHeight - translateY) / uiScale);
-            AssertIntEquals(frame.ScreenWidth, expectedLogicalWidth, "scaled handheld frame width");
-            AssertIntEquals(frame.ScreenHeight, expectedLogicalHeight, "scaled handheld frame height");
-            if (frame.Bounds.Bottom > expectedLogicalHeight)
+            var expectedLogicalCenterX = expectedLogicalWidth / 2;
+            AssertBlueprintHandheldPhysicalLayout(frame, physicalWidth, physicalHeight, "2560x1400 physical bottom-center with UI-scale matrix");
+
+            // The old 0.912 false positive used physical / UI scale as the visible layout target.
+            var oldLogicalBottomTop = Math.Max(0, expectedLogicalHeight - 34 - 48);
+            var oldLogicalBottom = Math.Max(0, expectedLogicalHeight - 34);
+            if (frame.Bounds.Y <= oldLogicalBottomTop ||
+                frame.Bounds.Bottom <= oldLogicalBottom ||
+                frame.Bounds.CenterX == expectedLogicalCenterX ||
+                frame.ScreenWidth == expectedLogicalWidth ||
+                frame.ScreenHeight == expectedLogicalHeight)
             {
-                throw new InvalidOperationException("Expected scaled handheld frame to stay inside the UI logical bottom edge.");
+                throw new InvalidOperationException("Expected handheld frame to reject the old UI-scale logical extent false positive and use physical screen bottom-center.");
             }
 
             var button = frame.Buttons[0];
-            raw.OsClientMouseX = BlueprintHandheldUiToScreenCoordinate(button.Rect.CenterX, uiScale, translateX);
-            raw.OsClientMouseY = BlueprintHandheldUiToScreenCoordinate(button.Rect.CenterY, uiScale, translateY);
+            raw.OsClientMouseX = button.Rect.CenterX;
+            raw.OsClientMouseY = button.Rect.CenterY;
             var mouse = LegacyUiInput.ReadMouseForBlueprintHandheldOverlay(
                 raw,
                 LegacyMainUiScale.ResolveForScreen(raw, physicalWidth, physicalHeight));
-            AssertIntEquals(mouse.X, button.Rect.CenterX, "scaled OS handheld mouse X");
-            AssertIntEquals(mouse.Y, button.Rect.CenterY, "scaled OS handheld mouse Y");
-            AssertContains(mouse.ReadMode, "OsClientScreenToUi");
+            AssertIntEquals(mouse.X, button.Rect.CenterX, "physical OS handheld mouse X");
+            AssertIntEquals(mouse.Y, button.Rect.CenterY, "physical OS handheld mouse Y");
+            AssertContains(mouse.ReadMode, "OsClientScreen");
             AssertContains(mouse.ReadMode, "UIScaleMatrix");
             AssertContains(mouse.ReadMode, "InterfaceOverlay");
-            AssertStringEquals(BlueprintHandheldActionBarState.HitTest(frame, mouse.X, mouse.Y), button.Id, "scaled OS handheld hit-test");
+            AssertDoesNotContain(mouse.ReadMode, "ScreenToUi");
+            AssertStringEquals(BlueprintHandheldActionBarState.HitTest(frame, mouse.X, mouse.Y), button.Id, "physical handheld hit-test");
 
+            var oldLogicalMouseX = (int)Math.Round((button.Rect.CenterX - translateX) / uiScale);
+            var oldLogicalMouseY = (int)Math.Round((button.Rect.CenterY - translateY) / uiScale);
             var stalePrefix = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
                 frame,
-                BlueprintHandheldPointer(0, 0, true, 0, true, false, mouse.ReadMode));
+                BlueprintHandheldPointer(oldLogicalMouseX, oldLogicalMouseY, true, 0, true, false, "Test/OldLogicalPrefix"));
             if (stalePrefix.Clicked || stalePrefix.ShouldCaptureMouse || stalePrefix.ShouldConsumeLeftInput)
             {
-                throw new InvalidOperationException("Expected scaled stale prefix coordinates outside the visual handheld frame to defer the edge.");
+                throw new InvalidOperationException("Expected old UI-scale logical prefix coordinates to stay outside the physical handheld frame.");
             }
 
             var afterPlayerInput = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
@@ -590,7 +622,7 @@ namespace JueMingZ.Tests
                 !afterPlayerInput.Clicked ||
                 !string.Equals(afterPlayerInput.HoveredButtonId, button.Id, StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("Expected scaled after-PlayerInput OS coordinate to replay and click the visual handheld button.");
+                throw new InvalidOperationException("Expected physical after-PlayerInput mouse coordinate to replay and click the visible handheld button.");
             }
 
             var repeatedAfterPlayerInput = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
@@ -598,16 +630,40 @@ namespace JueMingZ.Tests
                 BlueprintHandheldPointer(mouse.X, mouse.Y, true, 0, true, true, mouse.ReadMode));
             if (repeatedAfterPlayerInput.Clicked)
             {
-                throw new InvalidOperationException("Expected scaled prefix replay to remain single-use.");
+                throw new InvalidOperationException("Expected physical prefix replay to remain single-use.");
             }
+
+            var baseline1080 = BlueprintHandheldActionBarOverlay.BuildFrameForTesting(
+                BlueprintHandheldSettings(true),
+                BlueprintHandheldSnapshot(BlueprintSettings.DefaultToolItemId),
+                BlueprintHandheldEnvironment(1920, 1080));
+            raw.UiScale = 1.5d;
+            raw.UiScaleX = 1.5d;
+            raw.UiScaleY = 1.5d;
+            raw.UiTranslateX = -10d;
+            raw.UiTranslateY = 16d;
+            var scaled1080 = BlueprintHandheldActionBarOverlay.BuildFrameForTesting(
+                BlueprintHandheldSettings(true),
+                BlueprintHandheldSnapshot(BlueprintSettings.DefaultToolItemId),
+                BlueprintHandheldEnvironment(1920, 1080),
+                raw);
+            AssertBlueprintHandheldPhysicalLayout(scaled1080, 1920, 1080, "1920x1080 UI-scale matrix frame");
+            AssertStringEquals(scaled1080.LayoutSignature, baseline1080.LayoutSignature, "UI scale must not rewrite physical handheld layout");
+
+            var nonWide = BlueprintHandheldActionBarOverlay.BuildFrameForTesting(
+                BlueprintHandheldSettings(true),
+                BlueprintHandheldSnapshot(BlueprintSettings.DefaultToolItemId),
+                BlueprintHandheldEnvironment(1440, 900),
+                raw);
+            AssertBlueprintHandheldPhysicalLayout(nonWide, 1440, 900, "1440x900 physical frame");
 
             BlueprintHandheldActionBarState.ResetInteractionForTesting();
             var blank = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
                 frame,
-                BlueprintHandheldPointer(frame.Bounds.X + 1, frame.Bounds.CenterY, true, 0, true, true, mouse.ReadMode));
+                BlueprintHandheldPointer(frame.Bounds.X + 1, frame.Bounds.CenterY, true, 0, true, true, "Test/PhysicalScreenFrame"));
             if (!blank.ShouldCaptureMouse || !blank.ShouldConsumeLeftInput || blank.Clicked)
             {
-                throw new InvalidOperationException("Expected scaled handheld blank panel area to consume without submitting a command.");
+                throw new InvalidOperationException("Expected physical handheld blank panel area to consume without submitting a command.");
             }
 
             BlueprintHandheldActionBarState.ResetInteractionForTesting();
@@ -616,21 +672,17 @@ namespace JueMingZ.Tests
                 BlueprintHandheldSnapshot(BlueprintSettings.DefaultToolItemId),
                 BlueprintHandheldEnvironment(physicalWidth, physicalHeight, blueprintCreationActive: true),
                 raw);
+            AssertBlueprintHandheldPhysicalLayout(disabledFrame, physicalWidth, physicalHeight, "disabled 2560x1400 physical frame");
             var disabledSave = disabledFrame.Buttons[0];
-            raw.OsClientMouseX = BlueprintHandheldUiToScreenCoordinate(disabledSave.Rect.CenterX, uiScale, translateX);
-            raw.OsClientMouseY = BlueprintHandheldUiToScreenCoordinate(disabledSave.Rect.CenterY, uiScale, translateY);
-            var disabledMouse = LegacyUiInput.ReadMouseForBlueprintHandheldOverlay(
-                raw,
-                LegacyMainUiScale.ResolveForScreen(raw, physicalWidth, physicalHeight));
             var disabledPress = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
                 disabledFrame,
-                BlueprintHandheldPointer(disabledMouse.X, disabledMouse.Y, true, 0, true, true, disabledMouse.ReadMode));
+                BlueprintHandheldPointer(disabledSave.Rect.CenterX, disabledSave.Rect.CenterY, true, 0, true, true, "Test/PhysicalScreenFrame"));
             if (!disabledPress.ShouldCaptureMouse ||
                 !disabledPress.ShouldConsumeLeftInput ||
                 disabledPress.Clicked ||
                 !string.Equals(disabledPress.HoveredButtonId, BlueprintHandheldActionBarState.ButtonIdSave, StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("Expected scaled disabled save button to hover and consume without a command.");
+                throw new InvalidOperationException("Expected physical disabled save button to hover and consume without a command.");
             }
 
             BlueprintHandheldActionBarState.ResetInteractionForTesting();
@@ -643,9 +695,10 @@ namespace JueMingZ.Tests
             var terrariaMouse = LegacyUiInput.ReadMouseForBlueprintHandheldOverlay(
                 raw,
                 LegacyMainUiScale.ResolveForScreen(raw, physicalWidth, physicalHeight));
-            AssertIntEquals(terrariaMouse.X, button.Rect.CenterX, "scaled Terraria fallback handheld mouse X");
-            AssertIntEquals(terrariaMouse.Y, button.Rect.CenterY, "scaled Terraria fallback handheld mouse Y");
+            AssertIntEquals(terrariaMouse.X, button.Rect.CenterX, "physical Terraria fallback handheld mouse X");
+            AssertIntEquals(terrariaMouse.Y, button.Rect.CenterY, "physical Terraria fallback handheld mouse Y");
             AssertContains(terrariaMouse.ReadMode, "TerrariaRaw");
+            AssertDoesNotContain(terrariaMouse.ReadMode, "ScreenToUi");
             var terrariaPress = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
                 frame,
                 BlueprintHandheldPointer(terrariaMouse.X, terrariaMouse.Y, true, 0, true, true, terrariaMouse.ReadMode));
@@ -654,7 +707,7 @@ namespace JueMingZ.Tests
                 !terrariaPress.Clicked ||
                 !string.Equals(terrariaPress.HoveredButtonId, button.Id, StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("Expected scaled Terraria in-process coordinate to hit the same visual handheld button when OS fallback is absent.");
+                throw new InvalidOperationException("Expected Terraria in-process physical coordinate to hit the same visual handheld button when OS fallback is absent.");
             }
         }
 
@@ -1111,9 +1164,30 @@ namespace JueMingZ.Tests
             };
         }
 
-        private static int BlueprintHandheldUiToScreenCoordinate(int uiValue, double scale, double translate)
+        private static void AssertBlueprintHandheldPhysicalLayout(
+            BlueprintHandheldActionBarFrame frame,
+            int screenWidth,
+            int screenHeight,
+            string context)
         {
-            return (int)Math.Round(uiValue * scale + translate);
+            if (frame == null || !frame.Visible)
+            {
+                throw new InvalidOperationException("Expected visible blueprint handheld action bar before checking physical layout for " + context + ".");
+            }
+
+            const int expectedBottomMargin = 34;
+            const int expectedPanelHeight = 48;
+            AssertIntEquals(frame.ScreenWidth, screenWidth, "handheld physical screen width " + context);
+            AssertIntEquals(frame.ScreenHeight, screenHeight, "handheld physical screen height " + context);
+            AssertIntEquals(frame.Bounds.CenterX, screenWidth / 2, "handheld physical center X " + context);
+            AssertIntEquals(frame.Bounds.Y, Math.Max(0, screenHeight - expectedBottomMargin - expectedPanelHeight), "handheld physical top " + context);
+            AssertIntEquals(frame.Bounds.Bottom, Math.Max(expectedPanelHeight, screenHeight - expectedBottomMargin), "handheld physical bottom " + context);
+            if (frame.Bounds.X < 0 ||
+                frame.Bounds.Right > screenWidth ||
+                frame.Bounds.Bottom > screenHeight)
+            {
+                throw new InvalidOperationException("Expected blueprint handheld action bar to stay inside physical screen bounds for " + context + ".");
+            }
         }
 
         private static void AssertBlueprintHandheldHidden(BlueprintHandheldActionBarFrame frame, string expectedReason)

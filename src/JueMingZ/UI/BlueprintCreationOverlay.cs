@@ -160,6 +160,11 @@ namespace JueMingZ.UI
             return active && leftDown && !legacyUiOwned && !vanillaUiOwned && !pointerUiOwned;
         }
 
+        internal static bool ShouldBlockCreationForPointerOwnershipForTesting(UiPointerOwnershipDetails ownership)
+        {
+            return ShouldBlockCreationForPointerOwnership(ownership);
+        }
+
         internal static string GetVisualContractForTesting()
         {
             return VisualContract;
@@ -202,11 +207,14 @@ namespace JueMingZ.UI
             _wasActive = true;
             var legacyUiOwned = IsLegacyWindowHit(raw);
             var vanillaUiOwned = IsVanillaUiBlockingWorldSelection();
-            var pointerUiOwned = UiPointerOwnershipService.IsPointerOwnedThisFrame();
+            var pointerOwnership = UiPointerOwnershipService.ResolveWorldPointerOwnership(raw);
+            var pointerUiOwned = pointerOwnership.PointerOwned;
+            var pointerBlocksCreation = ShouldBlockCreationForPointerOwnership(pointerOwnership);
+            var uiOwned = legacyUiOwned || vanillaUiOwned || pointerBlocksCreation;
 
             if (afterPlayerInput)
             {
-                var shouldConsumeAfter = ShouldConsumeAfterPlayerInputForTesting(snapshot.Active, legacyUiOwned, vanillaUiOwned, pointerUiOwned, leftDown);
+                var shouldConsumeAfter = ShouldConsumeAfterPlayerInputForTesting(snapshot.Active, legacyUiOwned, vanillaUiOwned, pointerBlocksCreation, leftDown);
                 BlueprintUiClickDiagnostics.RecordWorldOverlayInput(
                     "creation",
                     "after-player-input",
@@ -219,7 +227,8 @@ namespace JueMingZ.UI
                     shouldConsumeAfter,
                     false,
                     0,
-                    0);
+                    0,
+                    uiOwned);
                 if (shouldConsumeAfter)
                 {
                     UiMouseCaptureService.ConsumeMouseTriggerForOperationWindow("MouseLeft", out _);
@@ -228,7 +237,6 @@ namespace JueMingZ.UI
                 return;
             }
 
-            var uiOwned = legacyUiOwned || vanillaUiOwned || pointerUiOwned;
             bool worldTileHit;
             int tileX;
             int tileY;
@@ -245,7 +253,8 @@ namespace JueMingZ.UI
                 false,
                 worldTileHit,
                 tileX,
-                tileY);
+                tileY,
+                uiOwned);
             var contentKnown = false;
             var hasSelectableContent = false;
             Func<int, int, bool> isSelectableTile = null;
@@ -264,7 +273,7 @@ namespace JueMingZ.UI
                 snapshot.Active,
                 legacyUiOwned,
                 vanillaUiOwned,
-                pointerUiOwned,
+                pointerBlocksCreation,
                 leftDown,
                 !justActivated && leftDown && !_wasLeftDown,
                 !leftDown && _wasLeftDown,
@@ -282,6 +291,19 @@ namespace JueMingZ.UI
             }
 
             _wasLeftDown = leftDown;
+        }
+
+        private static bool ShouldBlockCreationForPointerOwnership(UiPointerOwnershipDetails ownership)
+        {
+            if (ownership == null || !ownership.PointerOwned)
+            {
+                return false;
+            }
+
+            // Coarse pointer ownership may be a stale hover/capture from another UI.
+            // Creation only treats it as UI-owned when the UI consumed left input or
+            // the current world-overlay mouse is still inside the owner's bounds.
+            return ownership.LeftConsumed || ownership.BoundsHit;
         }
 
         private static bool IsLegacyWindowHit(DiagnosticMouseState raw)

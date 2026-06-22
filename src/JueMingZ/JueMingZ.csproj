@@ -7,10 +7,10 @@
     <Platforms>AnyCPU;x86</Platforms>
     <PlatformTarget>x86</PlatformTarget>
     <LangVersion>7.3</LangVersion>
-    <Version>0.917</Version>
-    <AssemblyVersion>0.917.0</AssemblyVersion>
-    <FileVersion>0.917.0</FileVersion>
-    <InformationalVersion>0.917-blueprint-hotbar-physical-coordinate-plan</InformationalVersion>
+    <Version>0.929</Version>
+    <AssemblyVersion>0.929.0</AssemblyVersion>
+    <FileVersion>0.929.0</FileVersion>
+    <InformationalVersion>0.929-blueprint-world-overlay-ownership-closeout</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Deterministic>true</Deterministic>
     <RestoreConfigFile>$(MSBuildThisFileDirectory)..\..\NuGet.Config</RestoreConfigFile>

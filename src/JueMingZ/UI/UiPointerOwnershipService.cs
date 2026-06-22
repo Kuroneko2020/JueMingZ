@@ -114,6 +114,23 @@ namespace JueMingZ.UI
             }
         }
 
+        public static UiPointerOwnershipDetails ResolveWorldPointerOwnership(DiagnosticMouseState raw)
+        {
+            var frameKey = UiInputFrameClock.CurrentFrameKey;
+            UiPointerOwnershipSnapshot snapshot;
+            lock (SyncRoot)
+            {
+                snapshot = IsCurrentFrameLocked(frameKey) ? _snapshot : UiPointerOwnershipSnapshot.Empty;
+            }
+
+            return UiPointerOwnershipDetails.Create(snapshot, raw);
+        }
+
+        public static bool IsPointerOwnerBoundsHitThisFrame(DiagnosticMouseState raw)
+        {
+            return ResolveWorldPointerOwnership(raw).BoundsHit;
+        }
+
         public static bool ResolveWorldUiOwned(bool legacyUiOwned, bool vanillaUiOwned)
         {
             return legacyUiOwned || vanillaUiOwned || IsPointerOwnedThisFrame();
@@ -160,6 +177,129 @@ namespace JueMingZ.UI
                    _snapshot.FrameKeyValid &&
                    _snapshot.FrameKey.Equals(frameKey);
         }
+    }
+
+    public sealed class UiPointerOwnershipDetails
+    {
+        private UiPointerOwnershipDetails(
+            string ownerId,
+            string ownerKind,
+            string reason,
+            bool pointerOwned,
+            bool leftOwned,
+            bool leftConsumed,
+            bool scrollOwned,
+            bool hasBounds,
+            LegacyUiRect bounds,
+            bool mouseAvailable,
+            int mouseX,
+            int mouseY,
+            string mouseSource,
+            bool boundsHit)
+        {
+            OwnerId = ownerId ?? string.Empty;
+            OwnerKind = ownerKind ?? string.Empty;
+            Reason = reason ?? string.Empty;
+            PointerOwned = pointerOwned;
+            LeftOwned = leftOwned;
+            LeftConsumed = leftConsumed;
+            ScrollOwned = scrollOwned;
+            HasBounds = hasBounds;
+            Bounds = bounds;
+            MouseAvailable = mouseAvailable;
+            MouseX = mouseX;
+            MouseY = mouseY;
+            MouseSource = mouseSource ?? string.Empty;
+            BoundsHit = boundsHit;
+        }
+
+        internal static UiPointerOwnershipDetails Create(UiPointerOwnershipSnapshot snapshot, DiagnosticMouseState raw)
+        {
+            snapshot = snapshot ?? UiPointerOwnershipSnapshot.Empty;
+            int mouseX;
+            int mouseY;
+            string mouseSource;
+            var mouseAvailable = TryResolveMouse(raw, out mouseX, out mouseY, out mouseSource);
+            // Pointer ownership only means a UI layer observed or captured this frame's pointer.
+            // LeftConsumed is the hard OS-left revival blocker; BoundsHit is the separate
+            // same-coordinate-domain query future world overlay gates can use.
+            var boundsHit = snapshot.PointerOwned &&
+                            snapshot.HasBounds &&
+                            mouseAvailable &&
+                            snapshot.Bounds.Contains(mouseX, mouseY);
+            return new UiPointerOwnershipDetails(
+                snapshot.OwnerId,
+                snapshot.OwnerKind,
+                snapshot.Reason,
+                snapshot.PointerOwned,
+                snapshot.LeftOwned,
+                snapshot.LeftConsumed,
+                snapshot.ScrollOwned,
+                snapshot.HasBounds,
+                snapshot.Bounds,
+                mouseAvailable,
+                mouseX,
+                mouseY,
+                mouseSource,
+                boundsHit);
+        }
+
+        private static bool TryResolveMouse(DiagnosticMouseState raw, out int mouseX, out int mouseY, out string source)
+        {
+            mouseX = -1;
+            mouseY = -1;
+            source = string.Empty;
+            if (raw == null)
+            {
+                return false;
+            }
+
+            if (raw.TerrariaReadAvailable && raw.TerrariaMouseX >= 0 && raw.TerrariaMouseY >= 0)
+            {
+                mouseX = raw.TerrariaMouseX;
+                mouseY = raw.TerrariaMouseY;
+                source = "Terraria";
+                return true;
+            }
+
+            if (raw.OsReadAvailable && raw.OsClientMouseX >= 0 && raw.OsClientMouseY >= 0)
+            {
+                mouseX = raw.OsClientMouseX;
+                mouseY = raw.OsClientMouseY;
+                source = "OsClient";
+                return true;
+            }
+
+            return false;
+        }
+
+        public string OwnerId { get; private set; }
+
+        public string OwnerKind { get; private set; }
+
+        public string Reason { get; private set; }
+
+        public bool PointerOwned { get; private set; }
+
+        public bool LeftOwned { get; private set; }
+
+        public bool LeftConsumed { get; private set; }
+
+        public bool ScrollOwned { get; private set; }
+
+        public bool HasBounds { get; private set; }
+
+        public LegacyUiRect Bounds { get; private set; }
+
+        public bool MouseAvailable { get; private set; }
+
+        public int MouseX { get; private set; }
+
+        public int MouseY { get; private set; }
+
+        public string MouseSource { get; private set; }
+
+        public bool BoundsHit { get; private set; }
     }
 
     public sealed class UiPointerOwnershipSnapshot

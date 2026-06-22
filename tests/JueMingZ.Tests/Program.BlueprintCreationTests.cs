@@ -5,6 +5,7 @@ using JueMingZ.Compat;
 using JueMingZ.Config;
 using JueMingZ.Hooks;
 using JueMingZ.UI;
+using JueMingZ.UI.Legacy;
 
 namespace JueMingZ.Tests
 {
@@ -215,6 +216,251 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void BlueprintCreationPointerOwnershipNarrowingKeepsWorldHoverAndMask()
+        {
+            ResetUiInputFrameTestState();
+            BlueprintCreationMaskState.ResetForTesting();
+            BlueprintUiClickDiagnostics.ResetForTesting();
+            try
+            {
+                BlueprintCreationMaskState.BeginCreate();
+                UiInputFrameClock.BeginUpdateFrame("test.blueprint-creation-pointer-narrow-outside");
+                UiPointerOwnershipService.RegisterPointerOwnerForCurrentFrame(
+                    "blueprint-hover-owner",
+                    "BlueprintHandheldActionBar",
+                    new LegacyUiRect(500, 500, 80, 48),
+                    false,
+                    false,
+                    false,
+                    "hover");
+
+                var rawOutside = new DiagnosticMouseState
+                {
+                    GameInputAvailable = true,
+                    TerrariaReadAvailable = true,
+                    TerrariaMouseX = 32,
+                    TerrariaMouseY = 32,
+                    OsReadAvailable = true,
+                    OsClientMouseX = 32,
+                    OsClientMouseY = 32,
+                    OsLeftDown = true,
+                    ReadMode = "TestWorld"
+                };
+                var outsideOwnership = UiPointerOwnershipService.ResolveWorldPointerOwnership(rawOutside);
+                var outsidePointerBlocksCreation = BlueprintCreationOverlay.ShouldBlockCreationForPointerOwnershipForTesting(outsideOwnership);
+                if (!outsideOwnership.PointerOwned ||
+                    outsideOwnership.LeftConsumed ||
+                    outsideOwnership.BoundsHit ||
+                    outsidePointerBlocksCreation)
+                {
+                    throw new InvalidOperationException("Expected out-of-bounds hover-only ownership not to block blueprint creation.");
+                }
+
+                BlueprintUiClickDiagnostics.RecordWorldOverlayInput(
+                    "creation",
+                    "prefix",
+                    true,
+                    rawOutside,
+                    false,
+                    false,
+                    outsideOwnership.PointerOwned,
+                    UiPointerOwnershipService.ResolveWorldLeftDown(rawOutside),
+                    false,
+                    true,
+                    2,
+                    2,
+                    false);
+                var trace = BlueprintUiClickDiagnostics.GetSnapshot().WorldOverlayInputTrace;
+                AssertContains(trace, "pointerUiOwned=true");
+                AssertContains(trace, "uiOwned=false");
+                AssertContains(trace, "pointerOwnerBoundsHit=false");
+                AssertContains(trace, "pointerLeftConsumed=false");
+
+                var hover = BlueprintCreationMaskState.HandlePointer(
+                    BlueprintCreationOverlay.BuildPointerInputForTesting(
+                        true,
+                        false,
+                        false,
+                        outsidePointerBlocksCreation,
+                        false,
+                        false,
+                        false,
+                        true,
+                        2,
+                        2,
+                        true,
+                        true,
+                        (x, y) => true));
+                if (hover == null ||
+                    hover.Snapshot == null ||
+                    !hover.Snapshot.HoverTileHit ||
+                    hover.Snapshot.HoverTileX != 2 ||
+                    hover.Snapshot.HoverTileY != 2)
+                {
+                    throw new InvalidOperationException("Expected out-of-bounds hover-only ownership to keep creation hover alive.");
+                }
+
+                var outsideLeftDown = UiPointerOwnershipService.ResolveWorldLeftDown(rawOutside);
+                BlueprintCreationMaskState.HandlePointer(
+                    BlueprintCreationOverlay.BuildPointerInputForTesting(
+                        true,
+                        false,
+                        false,
+                        outsidePointerBlocksCreation,
+                        outsideLeftDown,
+                        outsideLeftDown,
+                        false,
+                        true,
+                        2,
+                        2,
+                        true,
+                        true,
+                        (x, y) => true));
+                BlueprintCreationMaskState.HandlePointer(
+                    BlueprintCreationOverlay.BuildPointerInputForTesting(
+                        true,
+                        false,
+                        false,
+                        outsidePointerBlocksCreation,
+                        false,
+                        false,
+                        true,
+                        true,
+                        2,
+                        2,
+                        true,
+                        true,
+                        (x, y) => true));
+                var afterWorldClick = BlueprintCreationMaskState.GetSnapshot();
+                if (!HasBlueprintCell(afterWorldClick, 2, 2))
+                {
+                    throw new InvalidOperationException("Expected out-of-bounds hover-only ownership to allow creation mask clicks.");
+                }
+
+                UiInputFrameClock.BeginUpdateFrame("test.blueprint-creation-pointer-narrow-inside");
+                UiPointerOwnershipService.RegisterPointerOwnerForCurrentFrame(
+                    "blueprint-hover-owner",
+                    "BlueprintHandheldActionBar",
+                    new LegacyUiRect(20, 20, 80, 48),
+                    false,
+                    false,
+                    false,
+                    "hover");
+                var rawInside = new DiagnosticMouseState
+                {
+                    GameInputAvailable = true,
+                    TerrariaReadAvailable = true,
+                    TerrariaMouseX = 32,
+                    TerrariaMouseY = 32,
+                    OsReadAvailable = true,
+                    OsClientMouseX = 32,
+                    OsClientMouseY = 32,
+                    OsLeftDown = true
+                };
+                var insidePointerBlocksCreation = BlueprintCreationOverlay.ShouldBlockCreationForPointerOwnershipForTesting(
+                    UiPointerOwnershipService.ResolveWorldPointerOwnership(rawInside));
+                if (!insidePointerBlocksCreation)
+                {
+                    throw new InvalidOperationException("Expected current owner-bounds hits to keep creation UI-owned.");
+                }
+
+                var insideResult = BlueprintCreationMaskState.HandlePointer(
+                    BlueprintCreationOverlay.BuildPointerInputForTesting(
+                        true,
+                        false,
+                        false,
+                        insidePointerBlocksCreation,
+                        UiPointerOwnershipService.ResolveWorldLeftDown(rawInside),
+                        true,
+                        false,
+                        true,
+                        3,
+                        3,
+                        true,
+                        true,
+                        (x, y) => true));
+                if (insideResult == null ||
+                    !insideResult.ShouldConsumeLeftInput ||
+                    HasBlueprintCell(BlueprintCreationMaskState.GetSnapshot(), 3, 3))
+                {
+                    throw new InvalidOperationException("Expected owner-bounds hits to block creation mask changes.");
+                }
+
+                UiInputFrameClock.BeginUpdateFrame("test.blueprint-creation-pointer-narrow-consumed");
+                UiPointerOwnershipService.RegisterPointerOwnerForCurrentFrame(
+                    "blueprint-left-consumed",
+                    "BlueprintHandheldActionBar",
+                    new LegacyUiRect(500, 500, 80, 48),
+                    true,
+                    true,
+                    false,
+                    "left");
+                var rawConsumed = new DiagnosticMouseState
+                {
+                    GameInputAvailable = true,
+                    TerrariaReadAvailable = true,
+                    TerrariaMouseX = 32,
+                    TerrariaMouseY = 32,
+                    OsReadAvailable = true,
+                    OsClientMouseX = 32,
+                    OsClientMouseY = 32,
+                    OsLeftDown = true
+                };
+                if (!BlueprintCreationOverlay.ShouldBlockCreationForPointerOwnershipForTesting(UiPointerOwnershipService.ResolveWorldPointerOwnership(rawConsumed)) ||
+                    UiPointerOwnershipService.ResolveWorldLeftDown(rawConsumed))
+                {
+                    throw new InvalidOperationException("Expected left-consumed ownership to keep blocking OS-left revival for creation.");
+                }
+
+                var legacyResult = BlueprintCreationMaskState.HandlePointer(
+                    BlueprintCreationOverlay.BuildPointerInputForTesting(
+                        true,
+                        true,
+                        false,
+                        false,
+                        true,
+                        true,
+                        false,
+                        true,
+                        4,
+                        4,
+                        true,
+                        true,
+                        (x, y) => true));
+                var vanillaResult = BlueprintCreationMaskState.HandlePointer(
+                    BlueprintCreationOverlay.BuildPointerInputForTesting(
+                        true,
+                        false,
+                        true,
+                        false,
+                        true,
+                        true,
+                        false,
+                        true,
+                        5,
+                        5,
+                        true,
+                        true,
+                        (x, y) => true));
+                var finalSnapshot = BlueprintCreationMaskState.GetSnapshot();
+                if (legacyResult == null ||
+                    vanillaResult == null ||
+                    !legacyResult.ShouldConsumeLeftInput ||
+                    !vanillaResult.ShouldConsumeLeftInput ||
+                    HasBlueprintCell(finalSnapshot, 4, 4) ||
+                    HasBlueprintCell(finalSnapshot, 5, 5))
+                {
+                    throw new InvalidOperationException("Expected legacy and vanilla UI ownership to stay fail-closed for creation.");
+                }
+            }
+            finally
+            {
+                ResetUiInputFrameTestState();
+                BlueprintCreationMaskState.ResetForTesting();
+                BlueprintUiClickDiagnostics.ResetForTesting();
+            }
+        }
+
         private static void BlueprintUiPointerOwnershipBlocksWorldOverlayClicks()
         {
             ResetUiInputFrameTestState();
@@ -241,11 +487,13 @@ namespace JueMingZ.Tests
                     OsLeftDown = true
                 };
                 var consumedLeftDown = UiPointerOwnershipService.ResolveWorldLeftDown(osRevivedLeft);
+                var consumedPointerUiOwned = BlueprintCreationOverlay.ShouldBlockCreationForPointerOwnershipForTesting(
+                    UiPointerOwnershipService.ResolveWorldPointerOwnership(osRevivedLeft));
                 var creationUiInput = BlueprintCreationOverlay.BuildPointerInputForTesting(
                     true,
                     false,
                     false,
-                    UiPointerOwnershipService.IsPointerOwnedThisFrame(),
+                    consumedPointerUiOwned,
                     consumedLeftDown,
                     consumedLeftDown,
                     false,
@@ -285,11 +533,13 @@ namespace JueMingZ.Tests
                 }
 
                 RegisterHandheldOwnershipForWorldOverlayTest(disabledFrame, disabledPress, true);
+                var disabledPointerUiOwned = BlueprintCreationOverlay.ShouldBlockCreationForPointerOwnershipForTesting(
+                    UiPointerOwnershipService.ResolveWorldPointerOwnership(osRevivedLeft));
                 var disabledUiInput = BlueprintCreationOverlay.BuildPointerInputForTesting(
                     true,
                     false,
                     false,
-                    UiPointerOwnershipService.IsPointerOwnedThisFrame(),
+                    disabledPointerUiOwned,
                     UiPointerOwnershipService.ResolveWorldLeftDown(osRevivedLeft),
                     false,
                     false,
@@ -316,11 +566,13 @@ namespace JueMingZ.Tests
                 }
 
                 RegisterHandheldOwnershipForWorldOverlayTest(blankFrame, blankPress, true);
+                var blankPointerUiOwned = BlueprintCreationOverlay.ShouldBlockCreationForPointerOwnershipForTesting(
+                    UiPointerOwnershipService.ResolveWorldPointerOwnership(osRevivedLeft));
                 var blankUiInput = BlueprintCreationOverlay.BuildPointerInputForTesting(
                     true,
                     false,
                     false,
-                    UiPointerOwnershipService.IsPointerOwnedThisFrame(),
+                    blankPointerUiOwned,
                     UiPointerOwnershipService.ResolveWorldLeftDown(osRevivedLeft),
                     false,
                     false,
