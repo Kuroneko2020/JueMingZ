@@ -220,9 +220,8 @@ namespace JueMingZ.UI
             int mouseY;
             string mouseSource;
             var mouseAvailable = TryResolveMouse(raw, out mouseX, out mouseY, out mouseSource);
-            // Pointer ownership only means a UI layer observed or captured this frame's pointer.
-            // LeftConsumed is the hard OS-left revival blocker; BoundsHit is the separate
-            // same-coordinate-domain query future world overlay gates can use.
+            // Pointer ownership is only coarse diagnostics. LeftConsumed blocks world-left
+            // revival; BoundsHit is the separate same-domain hover/drag blocker.
             var boundsHit = snapshot.PointerOwned &&
                             snapshot.HasBounds &&
                             mouseAvailable &&
@@ -254,6 +253,18 @@ namespace JueMingZ.UI
                 return false;
             }
 
+            var hasOs = raw.OsReadAvailable && raw.OsClientMouseX >= 0 && raw.OsClientMouseY >= 0;
+            if (raw.GameInputAvailable && hasOs)
+            {
+                // Handheld owner bounds are registered in draw/client-screen
+                // coordinates. Prefer the same OS client mouse while the game
+                // input gate is open; Terraria raw stays as a fallback only.
+                mouseX = raw.OsClientMouseX;
+                mouseY = raw.OsClientMouseY;
+                source = "OsClient";
+                return true;
+            }
+
             if (raw.TerrariaReadAvailable && raw.TerrariaMouseX >= 0 && raw.TerrariaMouseY >= 0)
             {
                 mouseX = raw.TerrariaMouseX;
@@ -262,7 +273,7 @@ namespace JueMingZ.UI
                 return true;
             }
 
-            if (raw.OsReadAvailable && raw.OsClientMouseX >= 0 && raw.OsClientMouseY >= 0)
+            if (hasOs)
             {
                 mouseX = raw.OsClientMouseX;
                 mouseY = raw.OsClientMouseY;
@@ -300,6 +311,18 @@ namespace JueMingZ.UI
         public string MouseSource { get; private set; }
 
         public bool BoundsHit { get; private set; }
+
+        // Keep these semantics separate so a UI-consumed left click cannot be
+        // mistaken for the mouse currently hovering over UI bounds.
+        public bool PointerBlocksWorldLeft
+        {
+            get { return PointerOwned && LeftConsumed; }
+        }
+
+        public bool PointerBlocksHoverOrDrag
+        {
+            get { return PointerOwned && BoundsHit; }
+        }
     }
 
     public sealed class UiPointerOwnershipSnapshot

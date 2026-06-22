@@ -588,6 +588,8 @@ namespace JueMingZ.Automation.Blueprint
         public bool ContentKnown { get; set; }
         public bool HasSelectableContent { get; set; }
         public Func<int, int, bool> IsSelectableTile { get; set; }
+        public bool WorldLeftDown { get; set; }
+        public bool PhysicalLeftDown { get; set; }
         public bool LeftDown { get; set; }
         public bool LeftPressed { get; set; }
         public bool LeftReleased { get; set; }

@@ -48,11 +48,7 @@ namespace JueMingZ.Input
                 IsKeyDown);
             if (result != null && result.Triggered)
             {
-                DiagnosticActionRecorder.RecordHotkeyEvent(
-                    result.Chord,
-                    ScenarioNames.BlueprintActionHotkey,
-                    result.DiagnosticResultCode,
-                    result.Message);
+                RecordBlueprintActionHotkeyEvent(result);
             }
         }
 
@@ -450,6 +446,66 @@ namespace JueMingZ.Input
             {
                 return true;
             }
+        }
+
+        private static void RecordBlueprintActionHotkeyEvent(BlueprintEntryHotkeyDispatchResult result)
+        {
+            if (result == null)
+            {
+                return;
+            }
+
+            var metadata = BuildBlueprintActionHotkeyMetadata(result);
+            DiagnosticActionRecorder.RecordCustomEvent(
+                Guid.Empty,
+                ScenarioNames.BlueprintActionHotkey,
+                "Diagnostic",
+                result.Chord,
+                result.DiagnosticResultCode.ToString(),
+                result.DiagnosticResultCode.ToString(),
+                result.Message,
+                0,
+                "{}",
+                "{}",
+                metadata,
+                "Hotkey",
+                string.Empty,
+                string.Empty,
+                string.Empty);
+        }
+
+        private static string BuildBlueprintActionHotkeyMetadata(BlueprintEntryHotkeyDispatchResult result)
+        {
+            result = result ?? BlueprintEntryHotkeyDispatchResult.NoOp;
+            var trace = BlueprintUiClickDiagnostics.GetSnapshot();
+            return
+                "{" +
+                "\"targetId\":\"" + EscapeJson(result.TargetId) + "\"," +
+                "\"action\":\"" + EscapeJson(result.Action) + "\"," +
+                "\"resultCode\":\"" + EscapeJson(result.ResultCode) + "\"," +
+                "\"applied\":" + BoolRaw(result.Applied) + "," +
+                "\"creationClearTrace\":\"" + EscapeJson(trace.CreationLastClearReasonTrace) + "\"" +
+                "}";
+        }
+
+        internal static string BuildBlueprintActionHotkeyMetadataForTesting(BlueprintEntryHotkeyDispatchResult result)
+        {
+            return BuildBlueprintActionHotkeyMetadata(result);
+        }
+
+        private static string BoolRaw(bool value)
+        {
+            return value ? "true" : "false";
+        }
+
+        private static string EscapeJson(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return string.Empty;
+            }
+
+            return value.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", "\\r").Replace("\n", "\\n");
         }
 
         [DllImport("user32.dll")]

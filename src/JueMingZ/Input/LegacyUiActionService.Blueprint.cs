@@ -136,7 +136,7 @@ namespace JueMingZ.Input
                 library != null && !library.Succeeded ? library.Message : result.Message,
                 before,
                 BuildBlueprintUiStateJson(),
-                "{\"submitted\":false,\"implemented\":" + BoolRaw(!result.PlaceholderOnly) + ",\"uiOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"hotkeyFeatureId\":\"" + EscapeJson(targetId) + "\",\"action\":\"" + EscapeJson(normalizedAction) + "\",\"actionLabel\":\"" + EscapeJson(BuildBlueprintActionHotkeyLabel(targetId)) + "\",\"resultCode\":\"" + EscapeJson(resultCode) + "\",\"mode\":\"" + EscapeJson(result.Mode) + "\",\"changed\":" + BoolRaw(result.Changed || (library != null && library.Changed) || (capture != null && capture.Succeeded)) + ",\"placeholderOnly\":" + BoolRaw(result.PlaceholderOnly) + ",\"libraryOpen\":" + BoolRaw(BlueprintLibraryUiState.IsOpen) + ",\"captureAttempted\":" + BoolRaw(capture != null) + ",\"capturedCells\":" + IntRaw(capture == null ? 0 : capture.CapturedCellCount) + ",\"capturedLayers\":" + IntRaw(capture == null ? 0 : capture.CapturedLayerCount) + ",\"skippedAirCells\":" + IntRaw(capture == null ? 0 : capture.SkippedAirCellCount) + ",\"unavailableCells\":" + IntRaw(capture == null ? 0 : capture.UnavailableCellCount) + ",\"templateId\":\"" + EscapeJson(templateId) + "\",\"templateName\":\"" + EscapeJson(templateName) + "\",\"mouseCaptured\":" + BoolRaw(command != null && command.MouseCaptured) + "}",
+                "{\"submitted\":false,\"implemented\":" + BoolRaw(!result.PlaceholderOnly) + ",\"uiOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"hotkeyFeatureId\":\"" + EscapeJson(targetId) + "\",\"action\":\"" + EscapeJson(normalizedAction) + "\",\"actionLabel\":\"" + EscapeJson(BuildBlueprintActionHotkeyLabel(targetId)) + "\",\"resultCode\":\"" + EscapeJson(resultCode) + "\",\"mode\":\"" + EscapeJson(result.Mode) + "\",\"changed\":" + BoolRaw(result.Changed || (library != null && library.Changed) || (capture != null && capture.Succeeded)) + ",\"placeholderOnly\":" + BoolRaw(result.PlaceholderOnly) + ",\"libraryOpen\":" + BoolRaw(BlueprintLibraryUiState.IsOpen) + ",\"captureAttempted\":" + BoolRaw(capture != null) + ",\"capturedCells\":" + IntRaw(capture == null ? 0 : capture.CapturedCellCount) + ",\"capturedLayers\":" + IntRaw(capture == null ? 0 : capture.CapturedLayerCount) + ",\"skippedAirCells\":" + IntRaw(capture == null ? 0 : capture.SkippedAirCellCount) + ",\"unavailableCells\":" + IntRaw(capture == null ? 0 : capture.UnavailableCellCount) + ",\"templateId\":\"" + EscapeJson(templateId) + "\",\"templateName\":\"" + EscapeJson(templateName) + "\",\"mouseCaptured\":" + BoolRaw(command != null && command.MouseCaptured) + BuildBlueprintCreationActionMetadata() + "}",
                 "Button");
         }
 
@@ -395,7 +395,24 @@ namespace JueMingZ.Input
                    ",\"mouseReadMode\":\"" + EscapeJson(command == null ? string.Empty : command.MouseReadMode) + "\"" +
                    ",\"ownerId\":\"" + EscapeJson(ownerId) + "\"" +
                    ",\"inputTrace\":\"" + EscapeJson(trace.HandheldInputTrace) + "\"" +
-                   ",\"ownershipTrace\":\"" + EscapeJson(trace.HandheldOwnershipTrace) + "\"";
+                   ",\"ownershipTrace\":\"" + EscapeJson(trace.HandheldOwnershipTrace) + "\"" +
+                   ",\"creationClearTrace\":\"" + EscapeJson(trace.CreationLastClearReasonTrace) + "\"";
+        }
+
+        internal static string BuildBlueprintHandheldActionMetadataForTesting(LegacyUiCommand command, string buttonId, bool mouseCaptured)
+        {
+            return BuildBlueprintHandheldActionMetadata(command, buttonId, mouseCaptured);
+        }
+
+        private static string BuildBlueprintCreationActionMetadata()
+        {
+            var trace = BlueprintUiClickDiagnostics.GetSnapshot();
+            return ",\"creationClearTrace\":\"" + EscapeJson(trace.CreationLastClearReasonTrace) + "\"";
+        }
+
+        internal static string BuildBlueprintCreationActionMetadataForTesting()
+        {
+            return BuildBlueprintCreationActionMetadata();
         }
 
         private static void HandleBlueprintReplacementMode(LegacyUiCommand command, string payload)
@@ -596,7 +613,7 @@ namespace JueMingZ.Input
                 placed != null && !placed.Succeeded ? placed.Message : library != null && !library.Succeeded ? library.Message : result.Message,
                 before,
                 BuildBlueprintUiStateJson(),
-                "{\"submitted\":false,\"implemented\":" + BoolRaw(!result.PlaceholderOnly) + ",\"uiOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"action\":\"" + EscapeJson(payload) + "\",\"resultCode\":\"" + EscapeJson(resultCode) + "\",\"mode\":\"" + EscapeJson(result.Mode) + "\",\"changed\":" + BoolRaw(result.Changed || (library != null && library.Changed) || (placed != null && placed.Changed) || (eraseStart != null && eraseStart.Changed) || (capture != null && capture.Succeeded)) + ",\"placeholderOnly\":" + BoolRaw(result.PlaceholderOnly) + ",\"captureAttempted\":" + BoolRaw(capture != null) + ",\"capturedCells\":" + IntRaw(capture == null ? 0 : capture.CapturedCellCount) + ",\"capturedLayers\":" + IntRaw(capture == null ? 0 : capture.CapturedLayerCount) + ",\"skippedAirCells\":" + IntRaw(capture == null ? 0 : capture.SkippedAirCellCount) + ",\"unavailableCells\":" + IntRaw(capture == null ? 0 : capture.UnavailableCellCount) + ",\"templateId\":\"" + EscapeJson(templateId) + "\",\"templateName\":\"" + EscapeJson(templateName) + "\",\"instanceId\":\"" + EscapeJson(eraseStart == null ? placed == null ? string.Empty : placed.InstanceId : eraseStart.TargetInstanceId) + "\",\"instanceName\":\"" + EscapeJson(eraseStart == null ? placed == null ? string.Empty : placed.InstanceName : eraseStart.TargetInstanceName) + "\",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + "}",
+                "{\"submitted\":false,\"implemented\":" + BoolRaw(!result.PlaceholderOnly) + ",\"uiOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"action\":\"" + EscapeJson(payload) + "\",\"resultCode\":\"" + EscapeJson(resultCode) + "\",\"mode\":\"" + EscapeJson(result.Mode) + "\",\"changed\":" + BoolRaw(result.Changed || (library != null && library.Changed) || (placed != null && placed.Changed) || (eraseStart != null && eraseStart.Changed) || (capture != null && capture.Succeeded)) + ",\"placeholderOnly\":" + BoolRaw(result.PlaceholderOnly) + ",\"captureAttempted\":" + BoolRaw(capture != null) + ",\"capturedCells\":" + IntRaw(capture == null ? 0 : capture.CapturedCellCount) + ",\"capturedLayers\":" + IntRaw(capture == null ? 0 : capture.CapturedLayerCount) + ",\"skippedAirCells\":" + IntRaw(capture == null ? 0 : capture.SkippedAirCellCount) + ",\"unavailableCells\":" + IntRaw(capture == null ? 0 : capture.UnavailableCellCount) + ",\"templateId\":\"" + EscapeJson(templateId) + "\",\"templateName\":\"" + EscapeJson(templateName) + "\",\"instanceId\":\"" + EscapeJson(eraseStart == null ? placed == null ? string.Empty : placed.InstanceId : eraseStart.TargetInstanceId) + "\",\"instanceName\":\"" + EscapeJson(eraseStart == null ? placed == null ? string.Empty : placed.InstanceName : eraseStart.TargetInstanceName) + "\",\"mouseCaptured\":" + BoolRaw(command.MouseCaptured) + BuildBlueprintCreationActionMetadata() + "}",
                 "Button");
         }
 

@@ -14,7 +14,7 @@ namespace JueMingZ.UI
         private const int SelectedMaskAlpha = 30;
         private const int HoverMaskAlpha = 24;
         private const int DragMaskAlpha = 20;
-        private static bool _wasLeftDown;
+        private static bool _wasPhysicalLeftDown;
         private static bool _wasActive;
 
         public static bool DrawInterfaceLayer()
@@ -100,6 +100,7 @@ namespace JueMingZ.UI
                 vanillaUiOwned,
                 false,
                 leftDown,
+                leftDown,
                 leftPressed,
                 leftReleased,
                 worldTileHit,
@@ -125,12 +126,48 @@ namespace JueMingZ.UI
             bool hasSelectableContent = false,
             Func<int, int, bool> isSelectableTile = null)
         {
+            return BuildPointerInputForTesting(
+                active,
+                legacyUiOwned,
+                vanillaUiOwned,
+                pointerUiOwned,
+                leftDown,
+                leftDown,
+                leftPressed,
+                leftReleased,
+                worldTileHit,
+                tileX,
+                tileY,
+                contentKnown,
+                hasSelectableContent,
+                isSelectableTile);
+        }
+
+        internal static BlueprintCreationPointerInput BuildPointerInputForTesting(
+            bool active,
+            bool legacyUiOwned,
+            bool vanillaUiOwned,
+            bool pointerUiOwned,
+            bool worldLeftDown,
+            bool physicalLeftDown,
+            bool leftPressed,
+            bool leftReleased,
+            bool worldTileHit,
+            int tileX,
+            int tileY,
+            bool contentKnown = false,
+            bool hasSelectableContent = false,
+            Func<int, int, bool> isSelectableTile = null)
+        {
+            var inputActive = active;
             return new BlueprintCreationPointerInput
             {
                 UiOwned = legacyUiOwned || vanillaUiOwned || pointerUiOwned,
-                LeftDown = active && leftDown,
-                LeftPressed = active && leftPressed,
-                LeftReleased = active && leftReleased,
+                WorldLeftDown = inputActive && worldLeftDown,
+                PhysicalLeftDown = inputActive && physicalLeftDown,
+                LeftDown = inputActive && worldLeftDown,
+                LeftPressed = inputActive && leftPressed,
+                LeftReleased = inputActive && leftReleased,
                 WorldTileHit = worldTileHit,
                 TileX = tileX,
                 TileY = tileY,
@@ -138,6 +175,42 @@ namespace JueMingZ.UI
                 HasSelectableContent = hasSelectableContent,
                 IsSelectableTile = isSelectableTile
             };
+        }
+
+        internal static BlueprintCreationPointerInput BuildPointerInputFromPhysicalEdgesForTesting(
+            bool active,
+            bool legacyUiOwned,
+            bool vanillaUiOwned,
+            bool pointerUiOwned,
+            bool worldLeftDown,
+            bool physicalLeftDown,
+            bool wasPhysicalLeftDown,
+            bool justActivated,
+            bool worldTileHit,
+            int tileX,
+            int tileY,
+            bool contentKnown = false,
+            bool hasSelectableContent = false,
+            Func<int, int, bool> isSelectableTile = null)
+        {
+            var uiOwned = legacyUiOwned || vanillaUiOwned || pointerUiOwned;
+            var leftPressed = !justActivated && physicalLeftDown && !wasPhysicalLeftDown && worldLeftDown && !uiOwned;
+            var leftReleased = !physicalLeftDown && wasPhysicalLeftDown && !uiOwned;
+            return BuildPointerInputForTesting(
+                active,
+                legacyUiOwned,
+                vanillaUiOwned,
+                pointerUiOwned,
+                worldLeftDown,
+                physicalLeftDown,
+                leftPressed,
+                leftReleased,
+                worldTileHit,
+                tileX,
+                tileY,
+                contentKnown,
+                hasSelectableContent,
+                isSelectableTile);
         }
 
         internal static bool ShouldRegisterWorldOverlayForTesting()
@@ -187,7 +260,7 @@ namespace JueMingZ.UI
 
         internal static void ResetInputForTesting()
         {
-            _wasLeftDown = false;
+            _wasPhysicalLeftDown = false;
             _wasActive = false;
         }
 
@@ -197,24 +270,26 @@ namespace JueMingZ.UI
             if (!snapshot.Active)
             {
                 _wasActive = false;
-                _wasLeftDown = false;
+                _wasPhysicalLeftDown = false;
                 return;
             }
 
             var raw = DiagnosticMouseStateReader.Read();
-            var leftDown = UiPointerOwnershipService.ResolveWorldLeftDown(raw);
+            var worldLeftDown = UiPointerOwnershipService.ResolveWorldLeftDown(raw);
+            var physicalLeftDown = ResolvePhysicalLeftDown(raw);
             var justActivated = !_wasActive;
             _wasActive = true;
             var legacyUiOwned = IsLegacyWindowHit(raw);
             var vanillaUiOwned = IsVanillaUiBlockingWorldSelection();
             var pointerOwnership = UiPointerOwnershipService.ResolveWorldPointerOwnership(raw);
             var pointerUiOwned = pointerOwnership.PointerOwned;
-            var pointerBlocksCreation = ShouldBlockCreationForPointerOwnership(pointerOwnership);
-            var uiOwned = legacyUiOwned || vanillaUiOwned || pointerBlocksCreation;
+            var pointerBlocksHoverOrDrag = ShouldBlockCreationForPointerOwnership(pointerOwnership);
+            var pointerBlocksCreation = pointerBlocksHoverOrDrag;
+            var uiOwned = legacyUiOwned || vanillaUiOwned || pointerBlocksHoverOrDrag;
 
             if (afterPlayerInput)
             {
-                var shouldConsumeAfter = ShouldConsumeAfterPlayerInputForTesting(snapshot.Active, legacyUiOwned, vanillaUiOwned, pointerBlocksCreation, leftDown);
+                var shouldConsumeAfter = ShouldConsumeAfterPlayerInputForTesting(snapshot.Active, legacyUiOwned, vanillaUiOwned, pointerBlocksCreation, worldLeftDown);
                 BlueprintUiClickDiagnostics.RecordWorldOverlayInput(
                     "creation",
                     "after-player-input",
@@ -223,7 +298,7 @@ namespace JueMingZ.UI
                     legacyUiOwned,
                     vanillaUiOwned,
                     pointerUiOwned,
-                    leftDown,
+                    worldLeftDown,
                     shouldConsumeAfter,
                     false,
                     0,
@@ -249,7 +324,7 @@ namespace JueMingZ.UI
                 legacyUiOwned,
                 vanillaUiOwned,
                 pointerUiOwned,
-                leftDown,
+                worldLeftDown,
                 false,
                 worldTileHit,
                 tileX,
@@ -269,14 +344,19 @@ namespace JueMingZ.UI
                 };
             }
 
-            var input = BuildPointerInputForTesting(
+            // Press/release edges must follow the physical button. The resolved
+            // world-left value is allowed to go false when UI consumes the click,
+            // so deriving LeftReleased from it would turn a consume into a fake
+            // mouse release and break creation drag state.
+            var input = BuildPointerInputFromPhysicalEdgesForTesting(
                 snapshot.Active,
                 legacyUiOwned,
                 vanillaUiOwned,
                 pointerBlocksCreation,
-                leftDown,
-                !justActivated && leftDown && !_wasLeftDown,
-                !leftDown && _wasLeftDown,
+                worldLeftDown,
+                physicalLeftDown,
+                _wasPhysicalLeftDown,
+                justActivated,
                 worldTileHit,
                 tileX,
                 tileY,
@@ -284,13 +364,42 @@ namespace JueMingZ.UI
                 hasSelectableContent,
                 isSelectableTile);
             var result = BlueprintCreationMaskState.HandlePointer(input);
+            BlueprintUiClickDiagnostics.RecordCreationStateTransition(
+                "prefix",
+                raw,
+                legacyUiOwned,
+                vanillaUiOwned,
+                pointerUiOwned,
+                pointerBlocksCreation,
+                worldLeftDown,
+                worldTileHit,
+                tileX,
+                tileY,
+                input,
+                snapshot,
+                result);
             if (result != null && result.ShouldConsumeLeftInput && !legacyUiOwned)
             {
                 UiMouseCaptureService.CaptureForOperationWindowPreserveMouseButtons();
                 UiMouseCaptureService.ConsumeMouseTriggerForOperationWindow("MouseLeft", out _);
             }
 
-            _wasLeftDown = leftDown;
+            _wasPhysicalLeftDown = physicalLeftDown;
+        }
+
+        internal static bool ResolvePhysicalLeftDownForTesting(DiagnosticMouseState raw)
+        {
+            return ResolvePhysicalLeftDown(raw);
+        }
+
+        private static bool ResolvePhysicalLeftDown(DiagnosticMouseState raw)
+        {
+            if (raw == null || !raw.GameInputAvailable)
+            {
+                return false;
+            }
+
+            return raw.TerrariaLeftDown || raw.OsLeftDown;
         }
 
         private static bool ShouldBlockCreationForPointerOwnership(UiPointerOwnershipDetails ownership)
@@ -300,10 +409,10 @@ namespace JueMingZ.UI
                 return false;
             }
 
-            // Coarse pointer ownership may be a stale hover/capture from another UI.
-            // Creation only treats it as UI-owned when the UI consumed left input or
-            // the current world-overlay mouse is still inside the owner's bounds.
-            return ownership.LeftConsumed || ownership.BoundsHit;
+            // LeftConsumed is handled by ResolveWorldLeftDown so OS left cannot
+            // revive. Creation hover/drag only stops when the mouse still hits
+            // the owner's bounds.
+            return ownership.PointerBlocksHoverOrDrag;
         }
 
         private static bool IsLegacyWindowHit(DiagnosticMouseState raw)

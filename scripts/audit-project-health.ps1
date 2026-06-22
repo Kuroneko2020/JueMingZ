@@ -5375,6 +5375,8 @@ function Test-BlueprintUiClickStage02Governance {
         $ownershipText.Contains("RegisterPointerOwnerForCurrentFrame") -and
         $ownershipText.Contains("ResolveWorldLeftDown") -and
         $ownershipText.Contains("IsLeftConsumedThisFrame") -and
+        $ownershipText.Contains("PointerBlocksWorldLeft") -and
+        $ownershipText.Contains("PointerBlocksHoverOrDrag") -and
         $ownershipText.Contains("OS physical buttons cannot be cleared") -and
         $ownershipText.Contains("LeftConsumed")) {
         Write-Pass "Blueprint UI click stage 02 has a shared frame-local pointer ownership and consumed-left primitive."
@@ -5410,9 +5412,9 @@ function Test-BlueprintUiClickStage02Governance {
         $creationText.Contains("UiPointerOwnershipService.ResolveWorldPointerOwnership(raw)") -and
         $creationText.Contains("pointerUiOwned") -and
         $creationText.Contains("pointerBlocksCreation") -and
-        $creationText.Contains("legacyUiOwned || vanillaUiOwned || pointerBlocksCreation") -and
+        $creationText.Contains("legacyUiOwned || vanillaUiOwned || pointerBlocksHoverOrDrag") -and
         $creationText.Contains("ShouldBlockCreationForPointerOwnership") -and
-        $creationText.Contains("ownership.LeftConsumed || ownership.BoundsHit")
+        $creationText.Contains("ownership.PointerBlocksHoverOrDrag")
     $placementPointerGateOk =
         $placementText -and
         $placementText.Contains("UiPointerOwnershipService.ResolveWorldLeftDown(raw)") -and
@@ -5421,7 +5423,7 @@ function Test-BlueprintUiClickStage02Governance {
         $placementText.Contains("pointerBlocksPlacement") -and
         $placementText.Contains("legacyUiOwned || vanillaUiOwned || pointerBlocksPlacement") -and
         $placementText.Contains("ShouldBlockPlacementForPointerOwnership") -and
-        $placementText.Contains("ownership.LeftConsumed || ownership.BoundsHit")
+        $placementText.Contains("ownership.PointerBlocksWorldLeft || ownership.PointerBlocksHoverOrDrag")
     $erasePointerGateOk =
         $eraseText -and
         $eraseText.Contains("UiPointerOwnershipService.ResolveWorldLeftDown(raw)") -and
@@ -5430,7 +5432,7 @@ function Test-BlueprintUiClickStage02Governance {
         $eraseText.Contains("pointerBlocksErase") -and
         $eraseText.Contains("legacyUiOwned || vanillaUiOwned || pointerBlocksErase") -and
         $eraseText.Contains("ShouldBlockEraseForPointerOwnership") -and
-        $eraseText.Contains("ownership.LeftConsumed || ownership.BoundsHit")
+        $eraseText.Contains("ownership.PointerBlocksWorldLeft || ownership.PointerBlocksHoverOrDrag")
     $worldOverlayOk =
         $creationPointerGateOk -and
         $placementPointerGateOk -and
@@ -6130,14 +6132,14 @@ function Test-BlueprintUiClickStage04Governance {
         $creationText.Contains("UiPointerOwnershipService.ResolveWorldPointerOwnership(raw)") -and
         $placementText.Contains("UiPointerOwnershipService.ResolveWorldPointerOwnership(raw)") -and
         $eraseText.Contains("UiPointerOwnershipService.ResolveWorldPointerOwnership(raw)") -and
-        $creationText.Contains("legacyUiOwned || vanillaUiOwned || pointerBlocksCreation") -and
+        $creationText.Contains("legacyUiOwned || vanillaUiOwned || pointerBlocksHoverOrDrag") -and
         $placementText.Contains("legacyUiOwned || vanillaUiOwned || pointerBlocksPlacement") -and
         $eraseText.Contains("legacyUiOwned || vanillaUiOwned || pointerBlocksErase") -and
-        $creationText.Contains("ownership.LeftConsumed || ownership.BoundsHit") -and
-        $placementText.Contains("ownership.LeftConsumed || ownership.BoundsHit") -and
-        $eraseText.Contains("ownership.LeftConsumed || ownership.BoundsHit")
+        $creationText.Contains("ownership.PointerBlocksHoverOrDrag") -and
+        $placementText.Contains("ownership.PointerBlocksWorldLeft || ownership.PointerBlocksHoverOrDrag") -and
+        $eraseText.Contains("ownership.PointerBlocksWorldLeft || ownership.PointerBlocksHoverOrDrag")
     if ($worldOverlayOk) {
-        Write-Pass "Blueprint UI click stage 04 keeps the shared ownership primitive and all world overlay ownership queries wired."
+        Write-Pass "Blueprint UI click stage 04 keeps the shared ownership primitive and all world overlay ownership queries wired with split world-left and hover blockers."
     }
     else {
         Write-FailHealth "Blueprint UI click stage 04 must keep UiPointerOwnershipService, handheld owner registration, and creation/placement/erase ownership queries wired."
@@ -6262,14 +6264,14 @@ function Test-BlueprintWorldOverlayPointerOwnershipStage05Governance {
         $creationText.Contains("ShouldBlockCreationForPointerOwnership") -and
         $placementText.Contains("ShouldBlockPlacementForPointerOwnership") -and
         $eraseText.Contains("ShouldBlockEraseForPointerOwnership") -and
-        $creationText.Contains("ownership.LeftConsumed || ownership.BoundsHit") -and
-        $placementText.Contains("ownership.LeftConsumed || ownership.BoundsHit") -and
-        $eraseText.Contains("ownership.LeftConsumed || ownership.BoundsHit")
+        $creationText.Contains("ownership.PointerBlocksHoverOrDrag") -and
+        $placementText.Contains("ownership.PointerBlocksWorldLeft || ownership.PointerBlocksHoverOrDrag") -and
+        $eraseText.Contains("ownership.PointerBlocksWorldLeft || ownership.PointerBlocksHoverOrDrag")
     if ($worldOverlayNarrowGateOk) {
-        Write-Pass "Blueprint world overlays keep the narrow pointer ownership gate: LeftConsumed or owner-bounds hit, not coarse pointer ownership alone."
+        Write-Pass "Blueprint world overlays keep split pointer ownership gates: creation hover uses bounds hit, adjacent click gates also include consumed-left."
     }
     else {
-        Write-FailHealth "Blueprint creation, placement, and erase overlays must keep ResolveWorldPointerOwnership(raw) and block pointer ownership only on LeftConsumed or owner bounds hit."
+        Write-FailHealth "Blueprint creation, placement, and erase overlays must keep ResolveWorldPointerOwnership(raw) and split consumed-left from owner bounds hit."
     }
 
     if ($aggregateTestText -and $programText -and
@@ -6340,6 +6342,1105 @@ function Test-BlueprintWorldOverlayPointerOwnershipStage05Governance {
     }
     else {
         Write-FailHealth "Blueprint stage-05 must synchronize update record/index and document-change history with the aggregate regression and health audit."
+    }
+}
+
+function Get-BlueprintCreationFlickerPlanSegments {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $currentPlanDirPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图创建闪烁修复版")
+    if (Test-Path -LiteralPath $currentPlanDirPath) {
+        return @("当前在做计划", "蓝图创建闪烁修复版")
+    }
+
+    return @("归档历史计划", "蓝图创建闪烁修复版")
+}
+
+function Test-BlueprintCreationFlickerPointerOwnershipStage02Governance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $ownershipPath = Join-Path $RepoRoot "src\JueMingZ\UI\UiPointerOwnershipService.cs"
+    $creationPath = Join-Path $RepoRoot "src\JueMingZ\UI\BlueprintCreationOverlay.cs"
+    $placementPath = Join-Path $RepoRoot "src\JueMingZ\UI\BlueprintPlacementPreviewOverlay.cs"
+    $erasePath = Join-Path $RepoRoot "src\JueMingZ\UI\BlueprintEraseRegionOverlay.cs"
+    $diagnosticsPath = Join-Path $RepoRoot "src\JueMingZ\Automation\Blueprint\BlueprintUiClickDiagnostics.cs"
+    $testPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintHandheldUiClickOwnershipTests.cs"
+    $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
+    $functionDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $planRootSegments = Get-BlueprintCreationFlickerPlanSegments -RepoRoot $RepoRoot
+    $plan00Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments ($planRootSegments + @("00-基准.md"))
+    $plan02Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments ($planRootSegments + @("02-pointer所有权语义拆分.md"))
+    $currentPlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "索引.md")
+    $updateRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "0.938-蓝图pointer所有权语义拆分-2606222329.md")
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $docHistoryPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "蓝图pointer所有权语义拆分-2606222329.md")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+
+    $ownershipText = Read-TextIfExists -Path $ownershipPath
+    $creationText = Read-TextIfExists -Path $creationPath
+    $placementText = Read-TextIfExists -Path $placementPath
+    $eraseText = Read-TextIfExists -Path $erasePath
+    $diagnosticsText = Read-TextIfExists -Path $diagnosticsPath
+    $testText = Read-TextIfExists -Path $testPath
+    $programText = Read-TextIfExists -Path $programPath
+    $functionDocText = Read-TextIfExists -Path $functionDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $plan00Text = Read-TextIfExists -Path $plan00Path
+    $plan02Text = Read-TextIfExists -Path $plan02Path
+    $currentPlanIndexText = Read-TextIfExists -Path $currentPlanIndexPath
+    $updateRecordText = Read-TextIfExists -Path $updateRecordPath
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $docHistoryText = Read-TextIfExists -Path $docHistoryPath
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+
+    if ($ownershipText -and $creationText -and $placementText -and $eraseText -and $diagnosticsText -and
+        $ownershipText.Contains("PointerBlocksWorldLeft") -and
+        $ownershipText.Contains("PointerBlocksHoverOrDrag") -and
+        $creationText.Contains("ownership.PointerBlocksHoverOrDrag") -and
+        -not $creationText.Contains("return ownership.LeftConsumed || ownership.BoundsHit") -and
+        $placementText.Contains("ownership.PointerBlocksWorldLeft || ownership.PointerBlocksHoverOrDrag") -and
+        $eraseText.Contains("ownership.PointerBlocksWorldLeft || ownership.PointerBlocksHoverOrDrag") -and
+        $diagnosticsText.Contains("pointerBlocksWorldLeft") -and
+        $diagnosticsText.Contains("pointerBlocksHoverOrDrag")) {
+        Write-Pass "Blueprint creation flicker stage 02 splits pointer-owned diagnostics, world-left blocking, and hover/drag blocking."
+    }
+    else {
+        Write-FailHealth "Blueprint creation flicker stage 02 must split pointerBlocksWorldLeft from pointerBlocksHoverOrDrag and keep diagnostics explicit."
+    }
+
+    if ($testText -and $programText -and
+        $testText.Contains("BlueprintPointerOwnershipSemanticsSplitBlocksWorldLeftNotHover") -and
+        $testText.Contains("pointerBlocksWorldLeft=true") -and
+        $testText.Contains("pointerBlocksHoverOrDrag=false") -and
+        $testText.Contains("pointerBlocksCreation=false") -and
+        $programText.Contains("blueprint pointer ownership semantics split blocks world left not hover")) {
+        Write-Pass "Blueprint creation flicker stage 02 targeted console regression is registered."
+    }
+    else {
+        Write-FailHealth "Blueprint creation flicker stage 02 must register the targeted pointer ownership semantics regression."
+    }
+
+    if ($functionDocText -and $diagnosticsDocText -and $plan00Text -and $plan02Text -and $currentPlanIndexText -and
+        $functionDocText.Contains("0.938-blueprint-pointer-ownership-semantics") -and
+        $functionDocText.Contains("pointerBlocksWorldLeft") -and
+        $functionDocText.Contains("pointerBlocksHoverOrDrag") -and
+        $diagnosticsDocText.Contains("0.938-blueprint-pointer-ownership-semantics") -and
+        $diagnosticsDocText.Contains("pointerBlocksWorldLeft") -and
+        $diagnosticsDocText.Contains("pointerBlocksHoverOrDrag") -and
+        $plan00Text.Contains('`02-pointer所有权语义拆分.md` 已完成') -and
+        $plan00Text.Contains('03-物理左键边沿与创建状态机.md') -and
+        $plan02Text.Contains("状态：已完成") -and
+        $plan02Text.Contains('RuntimeVersion：`0.938-blueprint-pointer-ownership-semantics`') -and
+        $plan02Text.Contains("BlueprintPointerOwnershipSemanticsSplitBlocksWorldLeftNotHover") -and
+        $plan02Text.Contains("Test-BlueprintCreationFlickerPointerOwnershipStage02Governance") -and
+        $plan02Text.Contains("不生成测试包") -and
+        $plan02Text.Contains("未新增 AI 经验笔记") -and
+        ($currentPlanIndexText.Contains("03-物理左键边沿与创建状态机.md") -or
+            $currentPlanIndexText.Contains("06-验证打包与归档收口.md") -or
+            $currentPlanIndexText.Contains("文档/归档历史计划/蓝图创建闪烁修复版/"))) {
+        Write-Pass "Blueprint creation flicker stage 02 plan, function doc, diagnostics doc, and current plan index are synchronized."
+    }
+    else {
+        Write-FailHealth "Blueprint creation flicker stage 02 docs must record completion, split diagnostics, no-package boundary, and 03 handoff."
+    }
+
+    if ($updateRecordText -and $updateIndexText -and $docHistoryText -and $docHistoryIndexText -and
+        $updateRecordText.Contains('RuntimeVersion：`0.938-blueprint-pointer-ownership-semantics`') -and
+        $updateRecordText.Contains("BlueprintPointerOwnershipSemanticsSplitBlocksWorldLeftNotHover") -and
+        $updateRecordText.Contains("Test-BlueprintCreationFlickerPointerOwnershipStage02Governance") -and
+        $updateRecordText.Contains("不生成测试包") -and
+        $updateRecordText.Contains("未新增 AI 经验笔记") -and
+        $updateIndexText.Contains("0.938-蓝图pointer所有权语义拆分-2606222329.md") -and
+        $docHistoryText.Contains("0.938-blueprint-pointer-ownership-semantics") -and
+        $docHistoryText.Contains("Test-BlueprintCreationFlickerPointerOwnershipStage02Governance") -and
+        $docHistoryIndexText.Contains("蓝图pointer所有权语义拆分-2606222329.md")) {
+        Write-Pass "Blueprint creation flicker stage 02 update record and document-change history are synchronized."
+    }
+    else {
+        Write-FailHealth "Blueprint creation flicker stage 02 must synchronize update record/index and document-change history."
+    }
+}
+
+function Test-BlueprintCreationFlickerPhysicalLeftStage03Governance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $creationPath = Join-Path $RepoRoot "src\JueMingZ\UI\BlueprintCreationOverlay.cs"
+    $maskPath = Join-Path $RepoRoot "src\JueMingZ\Automation\Blueprint\BlueprintCreationMaskState.cs"
+    $diagnosticsPath = Join-Path $RepoRoot "src\JueMingZ\Automation\Blueprint\BlueprintUiClickDiagnostics.cs"
+    $testPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintHandheldUiClickOwnershipTests.cs"
+    $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
+    $functionDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $planRootSegments = Get-BlueprintCreationFlickerPlanSegments -RepoRoot $RepoRoot
+    $plan00Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments ($planRootSegments + @("00-基准.md"))
+    $plan03Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments ($planRootSegments + @("03-物理左键边沿与创建状态机.md"))
+    $currentPlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "索引.md")
+    $updateRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "0.939-蓝图物理左键边沿状态机-2606222348.md")
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $docHistoryPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "蓝图物理左键边沿状态机-2606222348.md")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+
+    $creationText = Read-TextIfExists -Path $creationPath
+    $maskText = Read-TextIfExists -Path $maskPath
+    $diagnosticsText = Read-TextIfExists -Path $diagnosticsPath
+    $testText = Read-TextIfExists -Path $testPath
+    $programText = Read-TextIfExists -Path $programPath
+    $functionDocText = Read-TextIfExists -Path $functionDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $plan00Text = Read-TextIfExists -Path $plan00Path
+    $plan03Text = Read-TextIfExists -Path $plan03Path
+    $currentPlanIndexText = Read-TextIfExists -Path $currentPlanIndexPath
+    $updateRecordText = Read-TextIfExists -Path $updateRecordPath
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $docHistoryText = Read-TextIfExists -Path $docHistoryPath
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+
+    if ($creationText -and $maskText -and $diagnosticsText -and
+        $creationText.Contains("_wasPhysicalLeftDown") -and
+        $creationText.Contains("ResolvePhysicalLeftDown(raw)") -and
+        $creationText.Contains("BuildPointerInputFromPhysicalEdgesForTesting") -and
+        $creationText.Contains("deriving LeftReleased from it would turn a consume into a fake") -and
+        $creationText.Contains("UiPointerOwnershipService.ResolveWorldLeftDown(raw)") -and
+        -not $creationText.Contains("!leftDown && _wasLeftDown") -and
+        $maskText.Contains("WorldLeftDown") -and
+        $maskText.Contains("PhysicalLeftDown") -and
+        $diagnosticsText.Contains("physicalLeft")) {
+        Write-Pass "Blueprint creation flicker stage 03 separates physical-left edges from resolved world-left and records physicalLeft diagnostics."
+    }
+    else {
+        Write-FailHealth "Blueprint creation flicker stage 03 must derive creation press/release from physical-left edges while keeping ResolveWorldLeftDown as the world-left blocker."
+    }
+
+    if ($testText -and $programText -and
+        $testText.Contains("BlueprintCreationPhysicalLeftEdgesIgnoreConsumedWorldLeft") -and
+        $testText.Contains("physicalLeft=true") -and
+        $testText.Contains("leftReleased=false") -and
+        $testText.Contains("physicalLeft=false") -and
+        $programText.Contains("blueprint creation physical left edges ignore consumed world left")) {
+        Write-Pass "Blueprint creation flicker stage 03 targeted physical-left console regression is registered."
+    }
+    else {
+        Write-FailHealth "Blueprint creation flicker stage 03 must register a targeted consumed-left physical-edge regression."
+    }
+
+    if ($functionDocText -and $diagnosticsDocText -and $plan00Text -and $plan03Text -and $currentPlanIndexText -and
+        $functionDocText.Contains("0.939-blueprint-physical-left-edges") -and
+        $functionDocText.Contains("physicalLeft") -and
+        $diagnosticsDocText.Contains("0.939-blueprint-physical-left-edges") -and
+        $diagnosticsDocText.Contains("physicalLeft") -and
+        $plan00Text.Contains('`03-物理左键边沿与创建状态机.md` 已完成') -and
+        $plan00Text.Contains("04-坐标域与相邻overlay一致性.md") -and
+        $plan03Text.Contains("状态：已完成") -and
+        $plan03Text.Contains('RuntimeVersion：`0.939-blueprint-physical-left-edges`') -and
+        $plan03Text.Contains("BlueprintCreationPhysicalLeftEdgesIgnoreConsumedWorldLeft") -and
+        $plan03Text.Contains("Test-BlueprintCreationFlickerPhysicalLeftStage03Governance") -and
+        $plan03Text.Contains("不生成测试包") -and
+        $plan03Text.Contains("未新增 AI 经验笔记") -and
+        ($currentPlanIndexText.Contains("04-坐标域与相邻overlay一致性.md") -or
+            $currentPlanIndexText.Contains("06-验证打包与归档收口.md") -or
+            $currentPlanIndexText.Contains("文档/归档历史计划/蓝图创建闪烁修复版/"))) {
+        Write-Pass "Blueprint creation flicker stage 03 plan, function doc, diagnostics doc, and current plan index are synchronized."
+    }
+    else {
+        Write-FailHealth "Blueprint creation flicker stage 03 docs must record completion, physicalLeft diagnostics, no-package boundary, and 04 handoff."
+    }
+
+    if ($updateRecordText -and $updateIndexText -and $docHistoryText -and $docHistoryIndexText -and
+        $updateRecordText.Contains('RuntimeVersion：`0.939-blueprint-physical-left-edges`') -and
+        $updateRecordText.Contains("BlueprintCreationPhysicalLeftEdgesIgnoreConsumedWorldLeft") -and
+        $updateRecordText.Contains("Test-BlueprintCreationFlickerPhysicalLeftStage03Governance") -and
+        $updateRecordText.Contains("不生成测试包") -and
+        $updateRecordText.Contains("未新增 AI 经验笔记") -and
+        $updateIndexText.Contains("0.939-蓝图物理左键边沿状态机-2606222348.md") -and
+        $docHistoryText.Contains("0.939-blueprint-physical-left-edges") -and
+        $docHistoryText.Contains("Test-BlueprintCreationFlickerPhysicalLeftStage03Governance") -and
+        $docHistoryIndexText.Contains("蓝图物理左键边沿状态机-2606222348.md")) {
+        Write-Pass "Blueprint creation flicker stage 03 update record and document-change history are synchronized."
+    }
+    else {
+        Write-FailHealth "Blueprint creation flicker stage 03 must synchronize update record/index and document-change history."
+    }
+}
+
+function Test-BlueprintCreationFlickerCoordinateDomainStage04Governance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $ownershipPath = Join-Path $RepoRoot "src\JueMingZ\UI\UiPointerOwnershipService.cs"
+    $placementPath = Join-Path $RepoRoot "src\JueMingZ\UI\BlueprintPlacementPreviewOverlay.cs"
+    $erasePath = Join-Path $RepoRoot "src\JueMingZ\UI\BlueprintEraseRegionOverlay.cs"
+    $testPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintHandheldUiClickOwnershipTests.cs"
+    $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
+    $functionDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $planRootSegments = Get-BlueprintCreationFlickerPlanSegments -RepoRoot $RepoRoot
+    $plan00Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments ($planRootSegments + @("00-基准.md"))
+    $plan04Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments ($planRootSegments + @("04-坐标域与相邻overlay一致性.md"))
+    $currentPlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "索引.md")
+    $updateRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "0.940-蓝图坐标域相邻overlay一致性-2606230001.md")
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $docHistoryPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "蓝图坐标域相邻overlay一致性-2606230001.md")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+
+    $ownershipText = Read-TextIfExists -Path $ownershipPath
+    $placementText = Read-TextIfExists -Path $placementPath
+    $eraseText = Read-TextIfExists -Path $erasePath
+    $testText = Read-TextIfExists -Path $testPath
+    $programText = Read-TextIfExists -Path $programPath
+    $functionDocText = Read-TextIfExists -Path $functionDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $plan00Text = Read-TextIfExists -Path $plan00Path
+    $plan04Text = Read-TextIfExists -Path $plan04Path
+    $currentPlanIndexText = Read-TextIfExists -Path $currentPlanIndexPath
+    $updateRecordText = Read-TextIfExists -Path $updateRecordPath
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $docHistoryText = Read-TextIfExists -Path $docHistoryPath
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+
+    if ($ownershipText -and $placementText -and $eraseText -and
+        $ownershipText.Contains("raw.GameInputAvailable && hasOs") -and
+        $ownershipText.Contains("Handheld owner bounds are registered in draw/client-screen") -and
+        $ownershipText.Contains('source = "OsClient"') -and
+        $placementText.Contains("ownership.PointerBlocksWorldLeft || ownership.PointerBlocksHoverOrDrag") -and
+        $eraseText.Contains("ownership.PointerBlocksWorldLeft || ownership.PointerBlocksHoverOrDrag")) {
+        Write-Pass "Blueprint creation flicker stage 04 keeps handheld owner-bounds hit testing in the OS client coordinate domain while preserving placement/erase click blocking."
+    }
+    else {
+        Write-FailHealth "Blueprint creation flicker stage 04 must prefer OS client mouse for handheld owner bounds and keep placement/erase strict pointer blocking."
+    }
+
+    if ($testText -and $programText -and
+        $testText.Contains("BlueprintHandheldOwnerBoundsUseOsClientCoordinateDomain") -and
+        $testText.Contains("pointerOwnerMouseSource=OsClient") -and
+        $testText.Contains("Terraria raw must not make handheld owner bounds hit") -and
+        $testText.Contains("BlueprintPlacementErasePointerOwnershipNarrowingKeepsWorldInput") -and
+        $programText.Contains("blueprint handheld owner bounds use OS client coordinate domain")) {
+        Write-Pass "Blueprint creation flicker stage 04 targeted coordinate-domain and adjacent overlay console regressions are registered."
+    }
+    else {
+        Write-FailHealth "Blueprint creation flicker stage 04 must register handheld owner coordinate-domain and adjacent overlay regressions."
+    }
+
+    if ($functionDocText -and $diagnosticsDocText -and $plan00Text -and $plan04Text -and $currentPlanIndexText -and
+        $functionDocText.Contains("0.940-blueprint-coordinate-domain-overlay-consistency") -and
+        $functionDocText.Contains("BlueprintHandheldOwnerBoundsUseOsClientCoordinateDomain") -and
+        $functionDocText.Contains("Test-BlueprintCreationFlickerCoordinateDomainStage04Governance") -and
+        $diagnosticsDocText.Contains("0.940-blueprint-coordinate-domain-overlay-consistency") -and
+        $diagnosticsDocText.Contains("pointerOwnerMouseSource=OsClient") -and
+        $plan00Text.Contains('`04-坐标域与相邻overlay一致性.md` 已完成') -and
+        $plan00Text.Contains("05-回归测试与审计防线.md") -and
+        $plan04Text.Contains("状态：已完成") -and
+        $plan04Text.Contains('RuntimeVersion：`0.940-blueprint-coordinate-domain-overlay-consistency`') -and
+        $plan04Text.Contains("BlueprintHandheldOwnerBoundsUseOsClientCoordinateDomain") -and
+        $plan04Text.Contains("Test-BlueprintCreationFlickerCoordinateDomainStage04Governance") -and
+        $plan04Text.Contains("不生成测试包") -and
+        $plan04Text.Contains("未新增 AI 经验笔记") -and
+        ($currentPlanIndexText.Contains("05-回归测试与审计防线.md") -or
+            $currentPlanIndexText.Contains("06-验证打包与归档收口.md") -or
+            $currentPlanIndexText.Contains("文档/归档历史计划/蓝图创建闪烁修复版/"))) {
+        Write-Pass "Blueprint creation flicker stage 04 plan, function doc, diagnostics doc, and current plan index are synchronized."
+    }
+    else {
+        Write-FailHealth "Blueprint creation flicker stage 04 docs must record coordinate-domain consistency, no-package boundary, and 05 handoff."
+    }
+
+    if ($updateRecordText -and $updateIndexText -and $docHistoryText -and $docHistoryIndexText -and
+        $updateRecordText.Contains('RuntimeVersion：`0.940-blueprint-coordinate-domain-overlay-consistency`') -and
+        $updateRecordText.Contains("BlueprintHandheldOwnerBoundsUseOsClientCoordinateDomain") -and
+        $updateRecordText.Contains("Test-BlueprintCreationFlickerCoordinateDomainStage04Governance") -and
+        $updateRecordText.Contains("不生成测试包") -and
+        $updateRecordText.Contains("未新增 AI 经验笔记") -and
+        $updateIndexText.Contains("0.940-蓝图坐标域相邻overlay一致性-2606230001.md") -and
+        $docHistoryText.Contains("0.940-blueprint-coordinate-domain-overlay-consistency") -and
+        $docHistoryText.Contains("Test-BlueprintCreationFlickerCoordinateDomainStage04Governance") -and
+        $docHistoryIndexText.Contains("蓝图坐标域相邻overlay一致性-2606230001.md")) {
+        Write-Pass "Blueprint creation flicker stage 04 update record and document-change history are synchronized."
+    }
+    else {
+        Write-FailHealth "Blueprint creation flicker stage 04 must synchronize update record/index and document-change history."
+    }
+}
+
+function Test-BlueprintCreationFlickerStage05Governance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $ownershipPath = Join-Path $RepoRoot "src\JueMingZ\UI\UiPointerOwnershipService.cs"
+    $creationPath = Join-Path $RepoRoot "src\JueMingZ\UI\BlueprintCreationOverlay.cs"
+    $placementPath = Join-Path $RepoRoot "src\JueMingZ\UI\BlueprintPlacementPreviewOverlay.cs"
+    $erasePath = Join-Path $RepoRoot "src\JueMingZ\UI\BlueprintEraseRegionOverlay.cs"
+    $diagnosticsPath = Join-Path $RepoRoot "src\JueMingZ\Automation\Blueprint\BlueprintUiClickDiagnostics.cs"
+    $testPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintHandheldUiClickOwnershipTests.cs"
+    $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
+    $functionDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $planRootSegments = Get-BlueprintCreationFlickerPlanSegments -RepoRoot $RepoRoot
+    $plan00Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments ($planRootSegments + @("00-基准.md"))
+    $plan05Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments ($planRootSegments + @("05-回归测试与审计防线.md"))
+    $currentPlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "索引.md")
+    $updateRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "0.941-蓝图创建闪烁回归审计-2606230018.md")
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $docHistoryPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "蓝图创建闪烁回归审计-2606230018.md")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+
+    $ownershipText = Read-TextIfExists -Path $ownershipPath
+    $creationText = Read-TextIfExists -Path $creationPath
+    $placementText = Read-TextIfExists -Path $placementPath
+    $eraseText = Read-TextIfExists -Path $erasePath
+    $diagnosticsText = Read-TextIfExists -Path $diagnosticsPath
+    $testText = Read-TextIfExists -Path $testPath
+    $programText = Read-TextIfExists -Path $programPath
+    $functionDocText = Read-TextIfExists -Path $functionDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $plan00Text = Read-TextIfExists -Path $plan00Path
+    $plan05Text = Read-TextIfExists -Path $plan05Path
+    $currentPlanIndexText = Read-TextIfExists -Path $currentPlanIndexPath
+    $updateRecordText = Read-TextIfExists -Path $updateRecordPath
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $docHistoryText = Read-TextIfExists -Path $docHistoryPath
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+
+    if ($ownershipText -and $creationText -and $placementText -and $eraseText -and $diagnosticsText -and
+        $ownershipText.Contains("PointerBlocksWorldLeft") -and
+        $ownershipText.Contains("PointerBlocksHoverOrDrag") -and
+        $ownershipText.Contains("Handheld owner bounds are registered in draw/client-screen") -and
+        $creationText.Contains("ResolvePhysicalLeftDown(raw)") -and
+        $creationText.Contains("deriving LeftReleased from it would turn a consume into a fake") -and
+        $creationText.Contains("ownership.PointerBlocksHoverOrDrag") -and
+        $placementText.Contains("ownership.PointerBlocksWorldLeft || ownership.PointerBlocksHoverOrDrag") -and
+        $eraseText.Contains("ownership.PointerBlocksWorldLeft || ownership.PointerBlocksHoverOrDrag") -and
+        $diagnosticsText.Contains("pointerBlocksWorldLeft") -and
+        $diagnosticsText.Contains("pointerBlocksHoverOrDrag") -and
+        $diagnosticsText.Contains("physicalLeft")) {
+        Write-Pass "Blueprint creation flicker stage 05 keeps the repaired ownership, physical-left, coordinate-domain, adjacent overlay, and diagnostics contracts wired."
+    }
+    else {
+        Write-FailHealth "Blueprint creation flicker stage 05 must keep split pointer ownership, physical-left edges, OS-client owner bounds, placement/erase gates, and diagnostics anchors wired."
+    }
+
+    if ($testText -and $programText -and
+        $testText.Contains("BlueprintCreationFlickerFixContractsStayWired") -and
+        $testText.Contains("BlueprintPointerOwnershipSemanticsSplitBlocksWorldLeftNotHover") -and
+        $testText.Contains("BlueprintCreationPhysicalLeftEdgesIgnoreConsumedWorldLeft") -and
+        $testText.Contains("BlueprintHandheldOwnerBoundsUseOsClientCoordinateDomain") -and
+        $testText.Contains("BlueprintWorldOverlayOwnershipDiagnosticsIncludeSnapshotDetails") -and
+        $testText.Contains("BlueprintWorldOverlayPointerOwnershipContractsStayWired") -and
+        $testText.Contains("BlueprintCreationDiagnosticContractsStayWired") -and
+        $programText.Contains("blueprint creation flicker fix contracts stay wired")) {
+        Write-Pass "Blueprint creation flicker stage 05 aggregate console regression is registered."
+    }
+    else {
+        Write-FailHealth "Blueprint creation flicker stage 05 must register BlueprintCreationFlickerFixContractsStayWired and reuse the stage 02-04 plus diagnostic aggregate regressions."
+    }
+
+    if ($functionDocText -and $diagnosticsDocText -and
+        $functionDocText.Contains("0.941-blueprint-creation-flicker-audit") -and
+        $functionDocText.Contains("BlueprintCreationFlickerFixContractsStayWired") -and
+        $functionDocText.Contains("Test-BlueprintCreationFlickerStage05Governance") -and
+        $diagnosticsDocText.Contains("0.941-blueprint-creation-flicker-audit") -and
+        $diagnosticsDocText.Contains("BlueprintCreationFlickerFixContractsStayWired") -and
+        $diagnosticsDocText.Contains("Test-BlueprintCreationFlickerStage05Governance") -and
+        $diagnosticsDocText.Contains("不新增 trace JSONL")) {
+        Write-Pass "Blueprint function and diagnostics docs describe the creation flicker stage 05 audit boundary."
+    }
+    else {
+        Write-FailHealth "Blueprint function and diagnostics docs must describe 0.941, the aggregate regression, scoped health audit, and no-trace boundary."
+    }
+
+    if ($plan00Text -and $plan05Text -and $currentPlanIndexText -and
+        $plan00Text.Contains('`05-回归测试与审计防线.md` 已完成') -and
+        $plan00Text.Contains("0.941-blueprint-creation-flicker-audit") -and
+        $plan00Text.Contains("06-验证打包与归档收口.md") -and
+        $plan05Text.Contains("状态：已完成") -and
+        $plan05Text.Contains('RuntimeVersion：`0.941-blueprint-creation-flicker-audit`') -and
+        $plan05Text.Contains("BlueprintCreationFlickerFixContractsStayWired") -and
+        $plan05Text.Contains("Test-BlueprintCreationFlickerStage05Governance") -and
+        $plan05Text.Contains("不生成测试包") -and
+        $plan05Text.Contains("未新增 AI 经验笔记") -and
+        $currentPlanIndexText.Contains("0.941-blueprint-creation-flicker-audit") -and
+        ($currentPlanIndexText.Contains("06-验证打包与归档收口.md") -or
+            $currentPlanIndexText.Contains("文档/归档历史计划/蓝图创建闪烁修复版/"))) {
+        Write-Pass "Blueprint creation flicker stage 05 plan files record completion, aggregate regression, scoped audit, no-package boundary, and 06 handoff."
+    }
+    else {
+        Write-FailHealth "Blueprint creation flicker stage 05 plan files must record completion, aggregate regression, scoped audit, no-package/no-experience-note review, and 06 handoff."
+    }
+
+    if ($updateRecordText -and $updateIndexText -and $docHistoryText -and $docHistoryIndexText -and
+        $updateRecordText.Contains('RuntimeVersion：`0.941-blueprint-creation-flicker-audit`') -and
+        $updateRecordText.Contains("BlueprintCreationFlickerFixContractsStayWired") -and
+        $updateRecordText.Contains("Test-BlueprintCreationFlickerStage05Governance") -and
+        $updateRecordText.Contains("不生成测试包") -and
+        $updateRecordText.Contains("本地验证不等于用户实机验收") -and
+        $updateRecordText.Contains("未新增 AI 经验笔记") -and
+        $updateIndexText.Contains("0.941-蓝图创建闪烁回归审计-2606230018.md") -and
+        $docHistoryText.Contains("0.941-blueprint-creation-flicker-audit") -and
+        $docHistoryText.Contains("BlueprintCreationFlickerFixContractsStayWired") -and
+        $docHistoryText.Contains("Test-BlueprintCreationFlickerStage05Governance") -and
+        $docHistoryIndexText.Contains("蓝图创建闪烁回归审计-2606230018.md")) {
+        Write-Pass "Blueprint creation flicker stage 05 update record and document-change history are synchronized."
+    }
+    else {
+        Write-FailHealth "Blueprint creation flicker stage 05 must synchronize update record/index and document-change history with the aggregate regression and health audit."
+    }
+}
+
+function Test-BlueprintCreationFlickerStage06CloseoutGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $auditPath = Join-Path $RepoRoot "scripts\audit-project-health.ps1"
+    $currentPlanDirPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图创建闪烁修复版")
+    $archivedPlan00Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图创建闪烁修复版", "00-基准.md")
+    $archivedPlan06Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图创建闪烁修复版", "06-验证打包与归档收口.md")
+    $currentPlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "索引.md")
+    $archivePlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "索引.md")
+    $blueprintDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $updateRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "0.942-蓝图创建闪烁验证收口-2606230024.md")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+    $docHistoryRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "蓝图创建闪烁验证收口-2606230024.md")
+
+    $auditText = Read-TextIfExists -Path $auditPath
+    $plan00Text = Read-TextIfExists -Path $archivedPlan00Path
+    $plan06Text = Read-TextIfExists -Path $archivedPlan06Path
+    $currentPlanIndexText = Read-TextIfExists -Path $currentPlanIndexPath
+    $archivePlanIndexText = Read-TextIfExists -Path $archivePlanIndexPath
+    $blueprintDocText = Read-TextIfExists -Path $blueprintDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $updateRecordText = Read-TextIfExists -Path $updateRecordPath
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+    $docHistoryRecordText = Read-TextIfExists -Path $docHistoryRecordPath
+
+    if ($auditText -and
+        $auditText.Contains("Test-BlueprintCreationFlickerStage06CloseoutGovernance") -and
+        $auditText.Contains("0.942-blueprint-creation-flicker-closeout") -and
+        $auditText.Contains("0.942-蓝图创建闪烁验证收口-2606230024.md")) {
+        Write-Pass "Blueprint creation flicker stage 06 closeout health audit is present and wired to the 0.942 closeout contract."
+    }
+    else {
+        Write-FailHealth "Blueprint creation flicker stage 06 closeout health audit must lock the 0.942 closeout contract and update record."
+    }
+
+    if (-not (Test-Path -LiteralPath $currentPlanDirPath) -and
+        $plan00Text -and
+        $plan00Text.Contains('状态：`06-验证打包与归档收口` 已完成') -and
+        $plan00Text.Contains("0.942-blueprint-creation-flicker-closeout") -and
+        $plan00Text.Contains("自动串行接力终止") -and
+        $plan06Text -and
+        $plan06Text.Contains("状态：已完成") -and
+        $plan06Text.Contains("0.942-blueprint-creation-flicker-closeout") -and
+        $plan06Text.Contains("JueMingZ-TestPackage") -and
+        $plan06Text.Contains("严格新鲜包健康审计") -and
+        $plan06Text.Contains("不再创建新对话")) {
+        Write-Pass "Blueprint creation flicker plan is archived with the 0.942 closeout, package delivery, and no further handoff."
+    }
+    else {
+        Write-FailHealth "Stage-06 closeout must move the blueprint creation flicker plan to archive and mark 06 complete with package/fresh-audit scope."
+    }
+
+    if ($currentPlanIndexText -and
+        $currentPlanIndexText.Contains("当前没有正在推进的计划") -and
+        $currentPlanIndexText.Contains("文档/归档历史计划/蓝图创建闪烁修复版/") -and
+        $currentPlanIndexText.Contains("0.941-blueprint-creation-flicker-audit") -and
+        $archivePlanIndexText -and
+        $archivePlanIndexText.Contains("文档/归档历史计划/蓝图创建闪烁修复版/") -and
+        $archivePlanIndexText.Contains("0.942-blueprint-creation-flicker-closeout") -and
+        $archivePlanIndexText.Contains("自动接力已终止")) {
+        Write-Pass "Current and archived plan indices record the blueprint creation flicker closeout and relay termination."
+    }
+    else {
+        Write-FailHealth "Stage-06 blueprint creation flicker closeout must update current and archived plan indices."
+    }
+
+    if ($blueprintDocText -and
+        $blueprintDocText.Contains("0.942-blueprint-creation-flicker-closeout") -and
+        $blueprintDocText.Contains("文档/归档历史计划/蓝图创建闪烁修复版/00-基准.md") -and
+        $blueprintDocText.Contains("BlueprintCreationFlickerFixContractsStayWired") -and
+        $blueprintDocText.Contains("不新增蓝图用户可见行为") -and
+        $diagnosticsDocText -and
+        $diagnosticsDocText.Contains("0.942-blueprint-creation-flicker-closeout") -and
+        $diagnosticsDocText.Contains("不新增诊断字段") -and
+        $diagnosticsDocText.Contains("不新增 trace JSONL")) {
+        Write-Pass "Blueprint feature and diagnostics docs record the 0.942 closeout without expanding runtime or diagnostics scope."
+    }
+    else {
+        Write-FailHealth "Stage-06 blueprint creation flicker closeout must update blueprint feature and diagnostics docs with no-new-runtime/no-new-diagnostics scope."
+    }
+
+    if ($updateIndexText -and
+        $updateIndexText.Contains("0.942-蓝图创建闪烁验证收口-2606230024.md") -and
+        $updateRecordText -and
+        $updateRecordText.Contains('RuntimeVersion：`0.942-blueprint-creation-flicker-closeout`') -and
+        $updateRecordText.Contains("JueMingZ-TestPackage") -and
+        $updateRecordText.Contains("-RequireFreshTestPackage") -and
+        $updateRecordText.Contains("BlueprintCreationFlickerFixContractsStayWired") -and
+        $docHistoryIndexText -and
+        $docHistoryIndexText.Contains("蓝图创建闪烁验证收口-2606230024.md") -and
+        $docHistoryRecordText -and
+        $docHistoryRecordText.Contains("0.942-blueprint-creation-flicker-closeout")) {
+        Write-Pass "Stage-06 blueprint creation flicker update record and document-change history are synchronized."
+    }
+    else {
+        Write-FailHealth "Stage-06 blueprint creation flicker update record, update index, and document-change history must reference the 0.942 closeout."
+    }
+}
+
+function Test-BlueprintCreationInputPhaseTraceStage02Governance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $diagnosticsPath = Join-Path $RepoRoot "src\JueMingZ\Automation\Blueprint\BlueprintUiClickDiagnostics.cs"
+    $snapshotPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\DiagnosticSnapshot.cs"
+    $writerPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\DiagnosticSnapshotWriter.Json.cs"
+    $builderPath = Join-Path $RepoRoot "src\JueMingZ\Runtime\Diagnostics\RuntimeDiagnosticSnapshotBuilder.Blueprint.cs"
+    $testPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintHandheldUiClickOwnershipTests.cs"
+    $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
+    $functionDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $plan00Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图创建闪烁诊断版", "00-基准.md")
+    $plan02Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图创建闪烁诊断版", "02-prefix与after诊断分槽.md")
+    $currentPlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "索引.md")
+    $archivePlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "索引.md")
+    $updateRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "0.932-蓝图创建输入阶段分槽-2606221949.md")
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $docHistoryPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "蓝图创建输入阶段分槽-2606221949.md")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+
+    if (-not (Test-Path -LiteralPath $plan00Path)) {
+        $plan00Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图创建闪烁诊断版", "00-基准.md")
+    }
+
+    if (-not (Test-Path -LiteralPath $plan02Path)) {
+        $plan02Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图创建闪烁诊断版", "02-prefix与after诊断分槽.md")
+    }
+
+    $diagnosticsText = Read-TextIfExists -Path $diagnosticsPath
+    $snapshotText = Read-TextIfExists -Path $snapshotPath
+    $writerText = Read-TextIfExists -Path $writerPath
+    $builderText = Read-TextIfExists -Path $builderPath
+    $testText = Read-TextIfExists -Path $testPath
+    $programText = Read-TextIfExists -Path $programPath
+    $functionDocText = Read-TextIfExists -Path $functionDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $plan00Text = Read-TextIfExists -Path $plan00Path
+    $plan02Text = Read-TextIfExists -Path $plan02Path
+    $currentPlanIndexText = Read-TextIfExists -Path $currentPlanIndexPath
+    $archivePlanIndexText = Read-TextIfExists -Path $archivePlanIndexPath
+    if ($archivePlanIndexText) {
+        $currentPlanIndexText = "$currentPlanIndexText`n$archivePlanIndexText"
+    }
+    $updateRecordText = Read-TextIfExists -Path $updateRecordPath
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $docHistoryText = Read-TextIfExists -Path $docHistoryPath
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+
+    $requiredFields = @(
+        "BlueprintCreationPrefixWorldOverlayInputTrace",
+        "BlueprintCreationAfterPlayerInputWorldOverlayInputTrace"
+    )
+    $missingFields = @()
+    foreach ($field in $requiredFields) {
+        if (-not ($snapshotText -and $snapshotText.Contains($field) -and
+                  $writerText -and $writerText.Contains($field) -and
+                  $builderText -and $builderText.Contains($field))) {
+            $missingFields += $field
+        }
+    }
+
+    if ($missingFields.Count -eq 0 -and
+        $diagnosticsText -and
+        $diagnosticsText.Contains("CreationPrefixWorldOverlayInputTrace") -and
+        $diagnosticsText.Contains("CreationAfterPlayerInputWorldOverlayInputTrace") -and
+        $diagnosticsText.Contains("_worldOverlayInputTrace = trace") -and
+        $diagnosticsText.Contains("IsCreationPrefix") -and
+        $diagnosticsText.Contains("IsCreationAfterPlayerInput") -and
+        $diagnosticsText.Contains("after-player-input replay cannot hide the prefix facts")) {
+        Write-Pass "Blueprint creation world-overlay phase traces keep fixed prefix/after slots while preserving the legacy last-summary field."
+    }
+    else {
+        Write-FailHealth "Blueprint stage-02 diagnostics must wire BlueprintCreationPrefixWorldOverlayInputTrace and BlueprintCreationAfterPlayerInputWorldOverlayInputTrace through DTO/writer/builder and keep BlueprintWorldOverlayLastInputTrace as the legacy last summary. Missing: $($missingFields -join ', ')"
+    }
+
+    if ($testText -and $programText -and
+        $testText.Contains("BlueprintCreationWorldOverlayPhaseTraceSlotsKeepPrefixAndAfter") -and
+        $testText.Contains("TestCreationPrefix") -and
+        $testText.Contains("TestCreationAfter") -and
+        $testText.Contains("OnlyAfter") -and
+        $testText.Contains("BlueprintCreationPrefixWorldOverlayInputTrace") -and
+        $testText.Contains("BlueprintCreationAfterPlayerInputWorldOverlayInputTrace") -and
+        $testText.Contains("Creation prefix world overlay trace must not be overwritten by after-player-input") -and
+        $programText.Contains("blueprint creation world overlay phase trace slots keep prefix and after")) {
+        Write-Pass "Blueprint stage-02 console regression locks prefix/after separation, only-after empty-prefix behavior, and snapshot JSON fields."
+    }
+    else {
+        Write-FailHealth "Blueprint stage-02 must register a console regression for creation prefix/after phase slots, JSON output, and only-after empty-prefix behavior."
+    }
+
+    if ($functionDocText -and $diagnosticsDocText -and
+        $functionDocText.Contains("0.932-blueprint-creation-input-phase-trace") -and
+        $functionDocText.Contains("BlueprintCreationPrefixWorldOverlayInputTrace") -and
+        $functionDocText.Contains("BlueprintCreationAfterPlayerInputWorldOverlayInputTrace") -and
+        $functionDocText.Contains("BlueprintWorldOverlayLastInputTrace") -and
+        $functionDocText.Contains("不改变 creation / placement / erase") -and
+        $diagnosticsDocText.Contains("0.932-blueprint-creation-input-phase-trace") -and
+        $diagnosticsDocText.Contains("BlueprintCreationPrefixWorldOverlayInputTrace") -and
+        $diagnosticsDocText.Contains("BlueprintCreationAfterPlayerInputWorldOverlayInputTrace") -and
+        $diagnosticsDocText.Contains("兼容摘要") -and
+        $diagnosticsDocText.Contains("不新增 trace JSONL")) {
+        Write-Pass "Blueprint function and diagnostics docs describe the stage-02 phase trace fields, compatibility summary, and no-behavior-change boundary."
+    }
+    else {
+        Write-FailHealth "Blueprint stage-02 docs must describe 0.932 phase trace fields, the compatibility summary, no trace JSONL, and no behavior-change boundary."
+    }
+
+    if ($plan00Text -and $plan02Text -and $currentPlanIndexText -and
+        $plan00Text.Contains('`02-prefix与after诊断分槽`') -and
+        $plan00Text.Contains('已完成，RuntimeVersion `0.932-blueprint-creation-input-phase-trace`') -and
+        ($plan00Text.Contains('下一入口为 `03-创建状态机清空原因追踪.md`') -or
+            $plan00Text.Contains('下一入口为 `04-诊断回归与审计防线.md`') -or
+            $plan00Text.Contains('下一入口为 `05-验证打包与回传口径.md`') -or
+            $plan00Text.Contains("0.935-blueprint-creation-diagnostic-package")) -and
+        $plan02Text.Contains("状态：已完成") -and
+        $plan02Text.Contains('RuntimeVersion：`0.932-blueprint-creation-input-phase-trace`') -and
+        $plan02Text.Contains("BlueprintCreationWorldOverlayPhaseTraceSlotsKeepPrefixAndAfter") -and
+        $plan02Text.Contains("Test-BlueprintCreationInputPhaseTraceStage02Governance") -and
+        $plan02Text.Contains("不生成测试包") -and
+        $plan02Text.Contains('不实现、修改或验证 `03`') -and
+        ($currentPlanIndexText.Contains('已完成 `02-prefix与after诊断分槽.md`') -or
+            $currentPlanIndexText.Contains('`02` 已把 creation prefix') -or
+            $currentPlanIndexText.Contains("0.935-blueprint-creation-diagnostic-package")) -and
+        ($currentPlanIndexText.Contains('后续唯一入口为 `03-创建状态机清空原因追踪.md`') -or
+            $currentPlanIndexText.Contains('后续唯一入口为 `04-诊断回归与审计防线.md`') -or
+            $currentPlanIndexText.Contains('后续唯一入口为 `05-验证打包与回传口径.md`') -or
+            $currentPlanIndexText.Contains("0.935-blueprint-creation-diagnostic-package"))) {
+        Write-Pass "Blueprint diagnostic stage-02 plan files record completion, no-package boundary, scoped regression/audit, and stage-03 handoff."
+    }
+    else {
+        Write-FailHealth "Blueprint diagnostic stage-02 plan files must record completion, 0.932 version, scoped regression/audit, no-package/no-03 boundary, and stage-03 handoff."
+    }
+
+    if ($updateRecordText -and $updateIndexText -and $docHistoryText -and $docHistoryIndexText -and
+        $updateRecordText.Contains("0.932-blueprint-creation-input-phase-trace") -and
+        $updateRecordText.Contains("BlueprintCreationWorldOverlayPhaseTraceSlotsKeepPrefixAndAfter") -and
+        $updateRecordText.Contains("Test-BlueprintCreationInputPhaseTraceStage02Governance") -and
+        $updateRecordText.Contains("不生成测试包") -and
+        $updateRecordText.Contains("本地验证不等于用户实机验收") -and
+        $updateRecordText.Contains("未新增 AI 经验笔记") -and
+        $updateIndexText.Contains("0.932-蓝图创建输入阶段分槽-2606221949.md") -and
+        $docHistoryText.Contains("BlueprintCreationPrefixWorldOverlayInputTrace") -and
+        $docHistoryText.Contains("Test-BlueprintCreationInputPhaseTraceStage02Governance") -and
+        $docHistoryIndexText.Contains("蓝图创建输入阶段分槽-2606221949.md")) {
+        Write-Pass "Blueprint diagnostic stage-02 update record and document-change history are synchronized."
+    }
+    else {
+        Write-FailHealth "Blueprint diagnostic stage-02 must synchronize update record/index and document-change history with phase trace fields and scoped audit."
+    }
+}
+
+function Test-BlueprintCreationClearReasonTraceStage03Governance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $diagnosticsPath = Join-Path $RepoRoot "src\JueMingZ\Automation\Blueprint\BlueprintUiClickDiagnostics.cs"
+    $creationOverlayPath = Join-Path $RepoRoot "src\JueMingZ\UI\BlueprintCreationOverlay.cs"
+    $snapshotPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\DiagnosticSnapshot.cs"
+    $writerPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\DiagnosticSnapshotWriter.Json.cs"
+    $builderPath = Join-Path $RepoRoot "src\JueMingZ\Runtime\Diagnostics\RuntimeDiagnosticSnapshotBuilder.Blueprint.cs"
+    $actionServicePath = Join-Path $RepoRoot "src\JueMingZ\Input\LegacyUiActionService.Blueprint.cs"
+    $hotkeyServicePath = Join-Path $RepoRoot "src\JueMingZ\Input\BlueprintEntryHotkeyService.cs"
+    $testPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintHandheldUiClickOwnershipTests.cs"
+    $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
+    $functionDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $plan00Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图创建闪烁诊断版", "00-基准.md")
+    $plan03Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图创建闪烁诊断版", "03-创建状态机清空原因追踪.md")
+    $currentPlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "索引.md")
+    $archivePlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "索引.md")
+    $updateRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "0.933-蓝图创建清空原因追踪-2606222034.md")
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $docHistoryPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "蓝图创建清空原因追踪-2606222034.md")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+
+    if (-not (Test-Path -LiteralPath $plan00Path)) {
+        $plan00Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图创建闪烁诊断版", "00-基准.md")
+    }
+
+    if (-not (Test-Path -LiteralPath $plan03Path)) {
+        $plan03Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图创建闪烁诊断版", "03-创建状态机清空原因追踪.md")
+    }
+
+    $diagnosticsText = Read-TextIfExists -Path $diagnosticsPath
+    $creationOverlayText = Read-TextIfExists -Path $creationOverlayPath
+    $snapshotText = Read-TextIfExists -Path $snapshotPath
+    $writerText = Read-TextIfExists -Path $writerPath
+    $builderText = Read-TextIfExists -Path $builderPath
+    $actionServiceText = Read-TextIfExists -Path $actionServicePath
+    $hotkeyServiceText = Read-TextIfExists -Path $hotkeyServicePath
+    $testText = Read-TextIfExists -Path $testPath
+    $programText = Read-TextIfExists -Path $programPath
+    $functionDocText = Read-TextIfExists -Path $functionDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $plan00Text = Read-TextIfExists -Path $plan00Path
+    $plan03Text = Read-TextIfExists -Path $plan03Path
+    $currentPlanIndexText = Read-TextIfExists -Path $currentPlanIndexPath
+    $archivePlanIndexText = Read-TextIfExists -Path $archivePlanIndexPath
+    if ($archivePlanIndexText) {
+        $currentPlanIndexText = "$currentPlanIndexText`n$archivePlanIndexText"
+    }
+    $updateRecordText = Read-TextIfExists -Path $updateRecordPath
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $docHistoryText = Read-TextIfExists -Path $docHistoryPath
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+
+    if ($diagnosticsText -and $creationOverlayText -and
+        $diagnosticsText.Contains("CreationLastClearReasonTrace") -and
+        $diagnosticsText.Contains("RecordCreationStateTransition") -and
+        $diagnosticsText.Contains("beforeDragging") -and
+        $diagnosticsText.Contains("afterDragging") -and
+        $diagnosticsText.Contains("beforeMaskCount") -and
+        $diagnosticsText.Contains("worldMouseSource") -and
+        $diagnosticsText.Contains("pointerBlocksCreation") -and
+        $diagnosticsText.Contains("This is diagnostics only") -and
+        $creationOverlayText.Contains("BlueprintUiClickDiagnostics.RecordCreationStateTransition") -and
+        $creationOverlayText.Contains("UiPointerOwnershipService.ResolveWorldLeftDown(raw)") -and
+        $creationOverlayText.Contains("BlueprintCreationMaskState.HandlePointer(input)")) {
+        Write-Pass "Blueprint stage-03 records creation clear/stop reasons after HandlePointer without changing world input decisions."
+    }
+    else {
+        Write-FailHealth "Blueprint stage-03 diagnostics must record creation clear/stop reasons, before/after state, mouse source, and UI ownership details without changing HandlePointer or ResolveWorldLeftDown behavior."
+    }
+
+    if ($snapshotText -and $writerText -and $builderText -and
+        $snapshotText.Contains("BlueprintCreationLastClearReasonTrace") -and
+        $writerText.Contains("BlueprintCreationLastClearReasonTrace") -and
+        $builderText.Contains("BlueprintCreationLastClearReasonTrace")) {
+        Write-Pass "Blueprint stage-03 runtime snapshot wires BlueprintCreationLastClearReasonTrace through DTO, builder, and JSON writer."
+    }
+    else {
+        Write-FailHealth "Blueprint stage-03 must wire BlueprintCreationLastClearReasonTrace through DiagnosticSnapshot, builder, and JSON writer."
+    }
+
+    if ($actionServiceText -and $hotkeyServiceText -and
+        $actionServiceText.Contains("creationClearTrace") -and
+        $actionServiceText.Contains("BuildBlueprintCreationActionMetadata") -and
+        $hotkeyServiceText.Contains("RecordBlueprintActionHotkeyEvent") -and
+        $hotkeyServiceText.Contains("creationClearTrace") -and
+        $hotkeyServiceText.Contains("ScenarioNames.BlueprintActionHotkey")) {
+        Write-Pass "Blueprint stage-03 action events attach the latest creation clear trace to handheld, F5 entry, and hotkey metadata."
+    }
+    else {
+        Write-FailHealth "Blueprint stage-03 must attach creationClearTrace to related blueprint action event metadata."
+    }
+
+    if ($testText -and $programText -and
+        $testText.Contains("BlueprintCreationClearReasonTraceRecordsStateAndCoordinates") -and
+        $testText.Contains("reason=uiOwned") -and
+        $testText.Contains("reason=worldMiss") -and
+        $testText.Contains("reason=selectionToggled") -and
+        $testText.Contains("BlueprintCreationLastClearReasonTrace") -and
+        $programText.Contains("blueprint creation clear reason trace records state and coordinates")) {
+        Write-Pass "Blueprint stage-03 console regression locks UI-owned, world-miss, and release clear reason traces."
+    }
+    else {
+        Write-FailHealth "Blueprint stage-03 must register a console regression for creation clear reason trace fields and JSON output."
+    }
+
+    if ($functionDocText -and $diagnosticsDocText -and
+        $functionDocText.Contains("0.933-blueprint-creation-clear-reason-trace") -and
+        $functionDocText.Contains("BlueprintCreationLastClearReasonTrace") -and
+        $functionDocText.Contains("creationClearTrace") -and
+        $diagnosticsDocText.Contains("0.933-blueprint-creation-clear-reason-trace") -and
+        $diagnosticsDocText.Contains("BlueprintCreationLastClearReasonTrace") -and
+        $diagnosticsDocText.Contains("creationClearTrace") -and
+        $diagnosticsDocText.Contains('不改变 `HandlePointer(...)`')) {
+        Write-Pass "Blueprint function and diagnostics docs describe the stage-03 clear reason trace and no-behavior-change boundary."
+    }
+    else {
+        Write-FailHealth "Blueprint stage-03 docs must describe 0.933 clear reason trace fields, action metadata, and no behavior-change boundary."
+    }
+
+    if ($plan00Text -and $plan03Text -and $currentPlanIndexText -and
+        ($plan00Text.Contains('`03-创建状态机清空原因追踪` 已完成') -or
+            $plan00Text.Contains('已完成，RuntimeVersion `0.933-blueprint-creation-clear-reason-trace`')) -and
+        ($plan00Text.Contains('下一入口为 `04-诊断回归与审计防线.md`') -or
+            $plan00Text.Contains('下一入口为 `05-验证打包与回传口径.md`') -or
+            $plan00Text.Contains("0.935-blueprint-creation-diagnostic-package")) -and
+        $plan00Text.Contains("0.933-blueprint-creation-clear-reason-trace") -and
+        $plan03Text.Contains("状态：已完成") -and
+        $plan03Text.Contains('RuntimeVersion 已推进到 `0.933-blueprint-creation-clear-reason-trace`') -and
+        $plan03Text.Contains("BlueprintCreationClearReasonTraceRecordsStateAndCoordinates") -and
+        $plan03Text.Contains("Test-BlueprintCreationClearReasonTraceStage03Governance") -and
+        $plan03Text.Contains("不生成测试包") -and
+        $plan03Text.Contains('不在本会话实现、修改或验证 `04`') -and
+        ($currentPlanIndexText.Contains('已完成 `03-创建状态机清空原因追踪.md`') -or
+            $currentPlanIndexText.Contains('`03` 已接入 `BlueprintCreationLastClearReasonTrace`') -or
+            $currentPlanIndexText.Contains("0.935-blueprint-creation-diagnostic-package")) -and
+        ($currentPlanIndexText.Contains('后续唯一入口为 `04-诊断回归与审计防线.md`') -or
+            $currentPlanIndexText.Contains('后续唯一入口为 `05-验证打包与回传口径.md`') -or
+            $currentPlanIndexText.Contains("0.935-blueprint-creation-diagnostic-package"))) {
+        Write-Pass "Blueprint diagnostic stage-03 plan files record completion, no-package boundary, scoped regression/audit, and stage-04 handoff."
+    }
+    else {
+        Write-FailHealth "Blueprint diagnostic stage-03 plan files must record completion, 0.933 version, scoped regression/audit, no-package/no-04 boundary, and stage-04 handoff."
+    }
+
+    if ($updateRecordText -and $updateIndexText -and $docHistoryText -and $docHistoryIndexText -and
+        $updateRecordText.Contains("0.933-blueprint-creation-clear-reason-trace") -and
+        $updateRecordText.Contains("BlueprintCreationClearReasonTraceRecordsStateAndCoordinates") -and
+        $updateRecordText.Contains("Test-BlueprintCreationClearReasonTraceStage03Governance") -and
+        $updateRecordText.Contains("不生成测试包") -and
+        $updateRecordText.Contains("本地验证不等于用户实机验收") -and
+        $updateRecordText.Contains("未新增 AI 经验笔记") -and
+        $updateIndexText.Contains("0.933-蓝图创建清空原因追踪-2606222034.md") -and
+        $docHistoryText.Contains("BlueprintCreationLastClearReasonTrace") -and
+        $docHistoryText.Contains("Test-BlueprintCreationClearReasonTraceStage03Governance") -and
+        $docHistoryIndexText.Contains("蓝图创建清空原因追踪-2606222034.md")) {
+        Write-Pass "Blueprint diagnostic stage-03 update record and document-change history are synchronized."
+    }
+    else {
+        Write-FailHealth "Blueprint diagnostic stage-03 must synchronize update record/index and document-change history with clear reason trace fields and scoped audit."
+    }
+}
+
+function Test-BlueprintCreationDiagnosticStage04Governance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $actionServicePath = Join-Path $RepoRoot "src\JueMingZ\Input\LegacyUiActionService.Blueprint.cs"
+    $hotkeyServicePath = Join-Path $RepoRoot "src\JueMingZ\Input\BlueprintEntryHotkeyService.cs"
+    $testPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintHandheldUiClickOwnershipTests.cs"
+    $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
+    $auditPath = Join-Path $RepoRoot "scripts\audit-project-health.ps1"
+    $functionDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $plan00Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图创建闪烁诊断版", "00-基准.md")
+    $plan04Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图创建闪烁诊断版", "04-诊断回归与审计防线.md")
+    $currentPlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "索引.md")
+    $archivePlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "索引.md")
+    $updateRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "0.934-蓝图创建诊断回归审计-2606222054.md")
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $docHistoryPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "蓝图创建诊断回归审计-2606222054.md")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+
+    if (-not (Test-Path -LiteralPath $plan00Path)) {
+        $plan00Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图创建闪烁诊断版", "00-基准.md")
+    }
+
+    if (-not (Test-Path -LiteralPath $plan04Path)) {
+        $plan04Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图创建闪烁诊断版", "04-诊断回归与审计防线.md")
+    }
+
+    $actionServiceText = Read-TextIfExists -Path $actionServicePath
+    $hotkeyServiceText = Read-TextIfExists -Path $hotkeyServicePath
+    $testText = Read-TextIfExists -Path $testPath
+    $programText = Read-TextIfExists -Path $programPath
+    $auditText = Read-TextIfExists -Path $auditPath
+    $functionDocText = Read-TextIfExists -Path $functionDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $plan00Text = Read-TextIfExists -Path $plan00Path
+    $plan04Text = Read-TextIfExists -Path $plan04Path
+    $currentPlanIndexText = Read-TextIfExists -Path $currentPlanIndexPath
+    $archivePlanIndexText = Read-TextIfExists -Path $archivePlanIndexPath
+    if ($archivePlanIndexText) {
+        $currentPlanIndexText = "$currentPlanIndexText`n$archivePlanIndexText"
+    }
+    $updateRecordText = Read-TextIfExists -Path $updateRecordPath
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $docHistoryText = Read-TextIfExists -Path $docHistoryPath
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+
+    if ($testText -and $programText -and
+        $testText.Contains("BlueprintCreationDiagnosticContractsStayWired") -and
+        $testText.Contains("BlueprintCreationActionMetadataCarriesClearTrace") -and
+        $testText.Contains("BlueprintCreationWorldOverlayPhaseTraceSlotsKeepPrefixAndAfter") -and
+        $testText.Contains("BlueprintCreationClearReasonTraceRecordsStateAndCoordinates") -and
+        $testText.Contains("BlueprintWorldOverlayPointerOwnershipContractsStayWired") -and
+        $testText.Contains("BlueprintHotbarPhysicalCoordinateRegressionContractsStayWired") -and
+        $testText.Contains("worldMouseSource=OsClient") -and
+        $testText.Contains("creationClearTrace") -and
+        $programText.Contains("blueprint creation diagnostic contracts stay wired")) {
+        Write-Pass "Blueprint stage-04 aggregate regression locks phase slots, clear reasons, coordinate source, action metadata, and adjacent world-overlay/hotbar/hotkey paths."
+    }
+    else {
+        Write-FailHealth "Blueprint stage-04 must register BlueprintCreationDiagnosticContractsStayWired and cover phase slots, clear reason traces, action metadata, adjacent world-overlay ownership, hotbar physical coordinates, and hotkey paths."
+    }
+
+    if ($actionServiceText -and $hotkeyServiceText -and
+        $actionServiceText.Contains("BuildBlueprintCreationActionMetadataForTesting") -and
+        $actionServiceText.Contains("BuildBlueprintHandheldActionMetadataForTesting") -and
+        $actionServiceText.Contains("creationClearTrace") -and
+        $hotkeyServiceText.Contains("BuildBlueprintActionHotkeyMetadata") -and
+        $hotkeyServiceText.Contains("BuildBlueprintActionHotkeyMetadataForTesting") -and
+        $hotkeyServiceText.Contains("creationClearTrace")) {
+        Write-Pass "Blueprint stage-04 action metadata tests read the same creationClearTrace fragments used by F5 entry, handheld bar, and hotkey events."
+    }
+    else {
+        Write-FailHealth "Blueprint stage-04 must keep creationClearTrace metadata test seams wired to F5 entry, handheld bar, and Hotkey.BlueprintAction event metadata."
+    }
+
+    if ($auditText -and
+        $auditText.Contains("Test-BlueprintCreationDiagnosticStage04Governance") -and
+        $auditText.Contains("Test-BlueprintCreationDiagnosticStage04Governance -RepoRoot `$RepoRoot") -and
+        $auditText.Contains("BlueprintCreationDiagnosticContractsStayWired")) {
+        Write-Pass "Blueprint scoped health audit includes the stage-04 diagnostic aggregate governance anchor."
+    }
+    else {
+        Write-FailHealth "Blueprint scoped health audit must call Test-BlueprintCreationDiagnosticStage04Governance and describe the aggregate diagnostic contract."
+    }
+
+    if ($functionDocText -and $diagnosticsDocText -and
+        $functionDocText.Contains("0.934-blueprint-creation-diagnostic-audit") -and
+        $functionDocText.Contains("BlueprintCreationDiagnosticContractsStayWired") -and
+        $functionDocText.Contains("Test-BlueprintCreationDiagnosticStage04Governance") -and
+        $functionDocText.Contains("不生成测试包") -and
+        $functionDocText.Contains("不代表蓝图创建闪烁已修复") -and
+        $diagnosticsDocText.Contains("0.934-blueprint-creation-diagnostic-audit") -and
+        $diagnosticsDocText.Contains("DiagnosticLifecycle=ActiveInvestigation") -and
+        $diagnosticsDocText.Contains("BlueprintCreationDiagnosticContractsStayWired") -and
+        $diagnosticsDocText.Contains("Test-BlueprintCreationDiagnosticStage04Governance") -and
+        $diagnosticsDocText.Contains("不新增 trace JSONL")) {
+        Write-Pass "Blueprint function and diagnostics docs describe the stage-04 aggregate regression, diagnostic lifecycle, and no-package/no-behavior-change boundary."
+    }
+    else {
+        Write-FailHealth "Blueprint stage-04 docs must describe 0.934 aggregate diagnostics, ActiveInvestigation fields, no trace JSONL, no-package, and no-fix boundary."
+    }
+
+    if ($plan00Text -and $plan04Text -and $currentPlanIndexText -and
+        $plan00Text.Contains('`04-诊断回归与审计防线`') -and
+        $plan00Text.Contains('已完成，RuntimeVersion `0.934-blueprint-creation-diagnostic-audit`') -and
+        ($plan00Text.Contains('下一入口为 `05-验证打包与回传口径.md`') -or
+            $plan00Text.Contains("0.935-blueprint-creation-diagnostic-package")) -and
+        $plan04Text.Contains("状态：已完成") -and
+        $plan04Text.Contains('RuntimeVersion：`0.934-blueprint-creation-diagnostic-audit`') -and
+        $plan04Text.Contains("BlueprintCreationDiagnosticContractsStayWired") -and
+        $plan04Text.Contains("Test-BlueprintCreationDiagnosticStage04Governance") -and
+        $plan04Text.Contains("不生成测试包") -and
+        $plan04Text.Contains('不在本会话实现、修改或验证 `05`') -and
+        (($currentPlanIndexText.Contains('已完成 `04-诊断回归与审计防线.md`') -and
+            $currentPlanIndexText.Contains('后续唯一入口为 `05-验证打包与回传口径.md`')) -or
+            ($currentPlanIndexText.Contains("文档/归档历史计划/蓝图创建闪烁诊断版/") -and
+                $currentPlanIndexText.Contains("0.935-blueprint-creation-diagnostic-package")))) {
+        Write-Pass "Blueprint diagnostic stage-04 plan files record completion, scoped regression/audit, no-package boundary, and stage-05 handoff."
+    }
+    else {
+        Write-FailHealth "Blueprint diagnostic stage-04 plan files must record completion, 0.934 version, aggregate regression/audit, no-package/no-05 boundary, and stage-05 handoff."
+    }
+
+    if ($updateRecordText -and $updateIndexText -and $docHistoryText -and $docHistoryIndexText -and
+        $updateRecordText.Contains("0.934-blueprint-creation-diagnostic-audit") -and
+        $updateRecordText.Contains("BlueprintCreationDiagnosticContractsStayWired") -and
+        $updateRecordText.Contains("Test-BlueprintCreationDiagnosticStage04Governance") -and
+        $updateRecordText.Contains("不生成测试包") -and
+        $updateRecordText.Contains("本地验证不等于用户实机验收") -and
+        $updateRecordText.Contains("未新增 AI 经验笔记") -and
+        $updateIndexText.Contains("0.934-蓝图创建诊断回归审计-2606222054.md") -and
+        $docHistoryText.Contains("BlueprintCreationDiagnosticContractsStayWired") -and
+        $docHistoryText.Contains("Test-BlueprintCreationDiagnosticStage04Governance") -and
+        $docHistoryIndexText.Contains("蓝图创建诊断回归审计-2606222054.md")) {
+        Write-Pass "Blueprint diagnostic stage-04 update record and document-change history are synchronized."
+    }
+    else {
+        Write-FailHealth "Blueprint diagnostic stage-04 must synchronize update record/index and document-change history with aggregate regression and scoped audit."
+    }
+}
+
+function Test-BlueprintCreationDiagnosticStage05CloseoutGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $auditPath = Join-Path $RepoRoot "scripts\audit-project-health.ps1"
+    $currentPlanDirPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图创建闪烁诊断版")
+    $archivedPlan00Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图创建闪烁诊断版", "00-基准.md")
+    $archivedPlan05Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图创建闪烁诊断版", "05-验证打包与回传口径.md")
+    $currentPlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "索引.md")
+    $archivePlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "索引.md")
+    $blueprintDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $updateRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "0.935-蓝图创建诊断包验证收口-2606222116.md")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+    $docHistoryRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "蓝图创建诊断包验证收口-2606222116.md")
+
+    $auditText = Read-TextIfExists -Path $auditPath
+    $plan00Text = Read-TextIfExists -Path $archivedPlan00Path
+    $plan05Text = Read-TextIfExists -Path $archivedPlan05Path
+    $currentPlanIndexText = Read-TextIfExists -Path $currentPlanIndexPath
+    $archivePlanIndexText = Read-TextIfExists -Path $archivePlanIndexPath
+    $blueprintDocText = Read-TextIfExists -Path $blueprintDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $updateRecordText = Read-TextIfExists -Path $updateRecordPath
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+    $docHistoryRecordText = Read-TextIfExists -Path $docHistoryRecordPath
+
+    if ($auditText -and
+        $auditText.Contains("Test-BlueprintCreationDiagnosticStage05CloseoutGovernance") -and
+        $auditText.Contains("0.935-blueprint-creation-diagnostic-package") -and
+        $auditText.Contains("0.935-蓝图创建诊断包验证收口-2606222116.md")) {
+        Write-Pass "Blueprint creation diagnostic stage-05 closeout health audit is present and wired to the 0.935 diagnostic package contract."
+    }
+    else {
+        Write-FailHealth "Blueprint creation diagnostic stage-05 closeout health audit must lock the 0.935 package closeout contract and update record."
+    }
+
+    if (-not (Test-Path -LiteralPath $currentPlanDirPath) -and
+        $plan00Text -and
+        $plan00Text.Contains('状态：`05-验证打包与回传口径` 已完成') -and
+        $plan00Text.Contains("0.935-blueprint-creation-diagnostic-package") -and
+        $plan00Text.Contains("自动串行接力终止") -and
+        $plan05Text -and
+        $plan05Text.Contains("状态：已完成") -and
+        $plan05Text.Contains("0.935-blueprint-creation-diagnostic-package") -and
+        $plan05Text.Contains("JueMingZ-TestPackage") -and
+        $plan05Text.Contains("严格新鲜包健康审计") -and
+        $plan05Text.Contains("Test-BlueprintCreationDiagnosticStage05CloseoutGovernance") -and
+        $plan05Text.Contains("不再创建新对话")) {
+        Write-Pass "Blueprint creation diagnostic plan is archived with the 0.935 package delivery and no further handoff."
+    }
+    else {
+        Write-FailHealth "Stage-05 closeout must move the blueprint creation diagnostic plan to archive and mark 05 complete with package/fresh-audit scope."
+    }
+
+    if ($currentPlanIndexText -and
+        $currentPlanIndexText.Contains("当前没有正在推进的计划") -and
+        $currentPlanIndexText.Contains("文档/归档历史计划/蓝图创建闪烁诊断版/") -and
+        $archivePlanIndexText -and
+        $archivePlanIndexText.Contains("文档/归档历史计划/蓝图创建闪烁诊断版/") -and
+        $archivePlanIndexText.Contains("0.935-blueprint-creation-diagnostic-package") -and
+        $archivePlanIndexText.Contains("自动接力已终止")) {
+        Write-Pass "Current and archived plan indices record the blueprint creation diagnostic package closeout and relay termination."
+    }
+    else {
+        Write-FailHealth "Stage-05 creation diagnostic closeout must update current and archived plan indices."
+    }
+
+    if ($blueprintDocText -and
+        $blueprintDocText.Contains("0.935-blueprint-creation-diagnostic-package") -and
+        $blueprintDocText.Contains("文档/归档历史计划/蓝图创建闪烁诊断版/00-基准.md") -and
+        $blueprintDocText.Contains("不修复蓝图创建闪烁") -and
+        $blueprintDocText.Contains("不新增 trace JSONL") -and
+        $diagnosticsDocText -and
+        $diagnosticsDocText.Contains("0.935-blueprint-creation-diagnostic-package") -and
+        $diagnosticsDocText.Contains("DiagnosticLifecycle=ActiveInvestigation") -and
+        $diagnosticsDocText.Contains("runtime-snapshot.json") -and
+        $diagnosticsDocText.Contains("action-events-YYYYMMDD.jsonl")) {
+        Write-Pass "Blueprint feature and diagnostics docs record the 0.935 diagnostic package closeout without claiming a behavior fix."
+    }
+    else {
+        Write-FailHealth "Stage-05 creation diagnostic closeout must update blueprint feature and diagnostics docs with no-fix/no-new-trace and user return-file scope."
+    }
+
+    if ($updateIndexText -and
+        $updateIndexText.Contains("0.935-蓝图创建诊断包验证收口-2606222116.md") -and
+        $updateRecordText -and
+        $updateRecordText.Contains('RuntimeVersion：`0.935-blueprint-creation-diagnostic-package`') -and
+        $updateRecordText.Contains("JueMingZ-TestPackage") -and
+        $updateRecordText.Contains("-RequireFreshTestPackage") -and
+        $docHistoryIndexText -and
+        $docHistoryIndexText.Contains("蓝图创建诊断包验证收口-2606222116.md") -and
+        $docHistoryRecordText -and
+        $docHistoryRecordText.Contains("0.935-blueprint-creation-diagnostic-package")) {
+        Write-Pass "Stage-05 blueprint creation diagnostic update record and document-change history are synchronized."
+    }
+    else {
+        Write-FailHealth "Stage-05 creation diagnostic update record, update index, and document-change history must reference the 0.935 package closeout."
     }
 }
 
@@ -7947,6 +9048,15 @@ function Invoke-GovernanceAudit {
         Test-BlueprintUiClickStage04Governance -RepoRoot $RepoRoot
         Test-BlueprintUiClickStage05CloseoutGovernance -RepoRoot $RepoRoot
         Test-BlueprintWorldOverlayPointerOwnershipStage05Governance -RepoRoot $RepoRoot
+        Test-BlueprintCreationFlickerPointerOwnershipStage02Governance -RepoRoot $RepoRoot
+        Test-BlueprintCreationFlickerPhysicalLeftStage03Governance -RepoRoot $RepoRoot
+        Test-BlueprintCreationFlickerCoordinateDomainStage04Governance -RepoRoot $RepoRoot
+        Test-BlueprintCreationFlickerStage05Governance -RepoRoot $RepoRoot
+        Test-BlueprintCreationFlickerStage06CloseoutGovernance -RepoRoot $RepoRoot
+        Test-BlueprintCreationInputPhaseTraceStage02Governance -RepoRoot $RepoRoot
+        Test-BlueprintCreationClearReasonTraceStage03Governance -RepoRoot $RepoRoot
+        Test-BlueprintCreationDiagnosticStage04Governance -RepoRoot $RepoRoot
+        Test-BlueprintCreationDiagnosticStage05CloseoutGovernance -RepoRoot $RepoRoot
         Test-BlueprintWorldOverlayPointerOwnershipStage06CloseoutGovernance -RepoRoot $RepoRoot
         Test-BlueprintFeedbackStage08Governance -RepoRoot $RepoRoot
         Test-BlueprintFeedbackStage09CloseoutGovernance -RepoRoot $RepoRoot

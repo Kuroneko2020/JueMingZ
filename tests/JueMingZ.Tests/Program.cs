@@ -1107,10 +1107,17 @@ namespace JueMingZ.Tests
             Run("blueprint creation mask drag toggles rectangle", ref failed, BlueprintCreationMaskDragTogglesRectangle);
             Run("blueprint creation mask selects air and tracks bounds", ref failed, BlueprintCreationMaskSelectsAirAndTracksBounds);
             Run("blueprint creation UI hit consumes without changing mask", ref failed, BlueprintCreationUiHitConsumesWithoutChangingMask);
+            Run("blueprint pointer ownership semantics split blocks world left not hover", ref failed, BlueprintPointerOwnershipSemanticsSplitBlocksWorldLeftNotHover);
+            Run("blueprint creation physical left edges ignore consumed world left", ref failed, BlueprintCreationPhysicalLeftEdgesIgnoreConsumedWorldLeft);
             Run("blueprint creation pointer ownership narrowing keeps world hover and mask", ref failed, BlueprintCreationPointerOwnershipNarrowingKeepsWorldHoverAndMask);
             Run("blueprint placement erase pointer ownership narrowing keeps world input", ref failed, BlueprintPlacementErasePointerOwnershipNarrowingKeepsWorldInput);
             Run("blueprint UI pointer ownership blocks world overlay clicks", ref failed, BlueprintUiPointerOwnershipBlocksWorldOverlayClicks);
             Run("blueprint world overlay ownership diagnostics include snapshot details", ref failed, BlueprintWorldOverlayOwnershipDiagnosticsIncludeSnapshotDetails);
+            Run("blueprint handheld owner bounds use OS client coordinate domain", ref failed, BlueprintHandheldOwnerBoundsUseOsClientCoordinateDomain);
+            Run("blueprint creation world overlay phase trace slots keep prefix and after", ref failed, BlueprintCreationWorldOverlayPhaseTraceSlotsKeepPrefixAndAfter);
+            Run("blueprint creation clear reason trace records state and coordinates", ref failed, BlueprintCreationClearReasonTraceRecordsStateAndCoordinates);
+            Run("blueprint creation diagnostic contracts stay wired", ref failed, BlueprintCreationDiagnosticContractsStayWired);
+            Run("blueprint creation flicker fix contracts stay wired", ref failed, BlueprintCreationFlickerFixContractsStayWired);
             Run("blueprint handheld action bar ownership registration consumes left for bar hits", ref failed, BlueprintHandheldActionBarOwnershipRegistrationConsumesLeftForBarHits);
             Run("blueprint handheld UI click ownership contracts stay wired", ref failed, BlueprintHandheldUiClickOwnershipContractsStayWired);
             Run("blueprint world overlay pointer ownership contracts stay wired", ref failed, BlueprintWorldOverlayPointerOwnershipContractsStayWired);

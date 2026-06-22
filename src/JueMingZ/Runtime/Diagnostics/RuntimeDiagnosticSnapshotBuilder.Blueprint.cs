@@ -27,6 +27,9 @@ namespace JueMingZ.Runtime
             snapshot.BlueprintHandheldActionBarLastInputTrace = uiClick.HandheldInputTrace;
             snapshot.BlueprintHandheldActionBarLastOwnershipTrace = uiClick.HandheldOwnershipTrace;
             snapshot.BlueprintWorldOverlayLastInputTrace = uiClick.WorldOverlayInputTrace;
+            snapshot.BlueprintCreationPrefixWorldOverlayInputTrace = uiClick.CreationPrefixWorldOverlayInputTrace;
+            snapshot.BlueprintCreationAfterPlayerInputWorldOverlayInputTrace = uiClick.CreationAfterPlayerInputWorldOverlayInputTrace;
+            snapshot.BlueprintCreationLastClearReasonTrace = uiClick.CreationLastClearReasonTrace;
 
             var mirror = BlueprintMirrorService.GetDiagnostics();
             snapshot.BlueprintMirrorLastStatus = mirror.LastStatus;

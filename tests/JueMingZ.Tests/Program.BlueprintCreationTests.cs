@@ -406,10 +406,13 @@ namespace JueMingZ.Tests
                     OsClientMouseY = 32,
                     OsLeftDown = true
                 };
-                if (!BlueprintCreationOverlay.ShouldBlockCreationForPointerOwnershipForTesting(UiPointerOwnershipService.ResolveWorldPointerOwnership(rawConsumed)) ||
+                var consumedOwnership = UiPointerOwnershipService.ResolveWorldPointerOwnership(rawConsumed);
+                if (!consumedOwnership.PointerBlocksWorldLeft ||
+                    consumedOwnership.PointerBlocksHoverOrDrag ||
+                    BlueprintCreationOverlay.ShouldBlockCreationForPointerOwnershipForTesting(consumedOwnership) ||
                     UiPointerOwnershipService.ResolveWorldLeftDown(rawConsumed))
                 {
-                    throw new InvalidOperationException("Expected left-consumed ownership to keep blocking OS-left revival for creation.");
+                    throw new InvalidOperationException("Expected left-consumed ownership to block OS-left revival without becoming creation UI-owned.");
                 }
 
                 var legacyResult = BlueprintCreationMaskState.HandlePointer(
@@ -487,8 +490,8 @@ namespace JueMingZ.Tests
                     OsLeftDown = true
                 };
                 var consumedLeftDown = UiPointerOwnershipService.ResolveWorldLeftDown(osRevivedLeft);
-                var consumedPointerUiOwned = BlueprintCreationOverlay.ShouldBlockCreationForPointerOwnershipForTesting(
-                    UiPointerOwnershipService.ResolveWorldPointerOwnership(osRevivedLeft));
+                var consumedOwnership = UiPointerOwnershipService.ResolveWorldPointerOwnership(osRevivedLeft);
+                var consumedPointerUiOwned = BlueprintCreationOverlay.ShouldBlockCreationForPointerOwnershipForTesting(consumedOwnership);
                 var creationUiInput = BlueprintCreationOverlay.BuildPointerInputForTesting(
                     true,
                     false,
@@ -510,12 +513,15 @@ namespace JueMingZ.Tests
 
                 var creationUiResult = BlueprintCreationMaskState.HandlePointer(creationUiInput);
                 var after = BlueprintCreationMaskState.GetSnapshot();
-                if (!creationUiResult.ShouldConsumeLeftInput ||
+                if (!consumedOwnership.PointerBlocksWorldLeft ||
+                    consumedOwnership.PointerBlocksHoverOrDrag ||
+                    creationUiInput.UiOwned ||
+                    creationUiResult.ShouldConsumeLeftInput ||
                     after.SelectedCount != before.SelectedCount ||
                     !HasBlueprintCell(after, 30, 40) ||
                     HasBlueprintCell(after, 99, 99))
                 {
-                    throw new InvalidOperationException("Expected handheld button ownership to block creation mask changes from revived OS left.");
+                    throw new InvalidOperationException("Expected handheld button ownership to block creation mask changes from revived OS left without becoming hover UI-owned.");
                 }
 
                 BlueprintHandheldActionBarState.ResetInteractionForTesting();

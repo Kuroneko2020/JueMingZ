@@ -260,10 +260,10 @@ namespace JueMingZ.UI
                 return false;
             }
 
-            // Match the creation world-overlay contract: pointer ownership only
-            // blocks erase when UI consumed left input or the mouse still hits
-            // the owner's bounds in the same coordinate domain.
-            return ownership.LeftConsumed || ownership.BoundsHit;
+            // Erase keeps the stricter click-blocking contract in this phase:
+            // UI-consumed left blocks world erase, and bounds hit blocks
+            // hover/drag in the same coordinate domain.
+            return ownership.PointerBlocksWorldLeft || ownership.PointerBlocksHoverOrDrag;
         }
 
         private static bool IsLegacyWindowHit(DiagnosticMouseState raw)

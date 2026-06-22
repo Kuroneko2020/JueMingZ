@@ -882,6 +882,9 @@ namespace JueMingZ.Diagnostics
         public string BlueprintHandheldActionBarLastInputTrace { get; set; }
         public string BlueprintHandheldActionBarLastOwnershipTrace { get; set; }
         public string BlueprintWorldOverlayLastInputTrace { get; set; }
+        public string BlueprintCreationPrefixWorldOverlayInputTrace { get; set; }
+        public string BlueprintCreationAfterPlayerInputWorldOverlayInputTrace { get; set; }
+        public string BlueprintCreationLastClearReasonTrace { get; set; }
         public string BlueprintMirrorLastStatus { get; set; }
         public string BlueprintMirrorLastMessage { get; set; }
         public string BlueprintMirrorMode { get; set; }
@@ -1768,6 +1771,9 @@ namespace JueMingZ.Diagnostics
             BlueprintHandheldActionBarLastInputTrace = string.Empty;
             BlueprintHandheldActionBarLastOwnershipTrace = string.Empty;
             BlueprintWorldOverlayLastInputTrace = string.Empty;
+            BlueprintCreationPrefixWorldOverlayInputTrace = string.Empty;
+            BlueprintCreationAfterPlayerInputWorldOverlayInputTrace = string.Empty;
+            BlueprintCreationLastClearReasonTrace = string.Empty;
             BlueprintMirrorLastStatus = string.Empty;
             BlueprintMirrorLastMessage = string.Empty;
             BlueprintMirrorMode = string.Empty;

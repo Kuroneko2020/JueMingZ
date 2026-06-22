@@ -897,6 +897,9 @@ namespace JueMingZ.Diagnostics
             Append(builder, "BlueprintHandheldActionBarLastInputTrace", snapshot.BlueprintHandheldActionBarLastInputTrace, true);
             Append(builder, "BlueprintHandheldActionBarLastOwnershipTrace", snapshot.BlueprintHandheldActionBarLastOwnershipTrace, true);
             Append(builder, "BlueprintWorldOverlayLastInputTrace", snapshot.BlueprintWorldOverlayLastInputTrace, true);
+            Append(builder, "BlueprintCreationPrefixWorldOverlayInputTrace", snapshot.BlueprintCreationPrefixWorldOverlayInputTrace, true);
+            Append(builder, "BlueprintCreationAfterPlayerInputWorldOverlayInputTrace", snapshot.BlueprintCreationAfterPlayerInputWorldOverlayInputTrace, true);
+            Append(builder, "BlueprintCreationLastClearReasonTrace", snapshot.BlueprintCreationLastClearReasonTrace, true);
             Append(builder, "BlueprintMirrorLastStatus", snapshot.BlueprintMirrorLastStatus, true);
             Append(builder, "BlueprintMirrorLastMessage", snapshot.BlueprintMirrorLastMessage, true);
             Append(builder, "BlueprintMirrorMode", snapshot.BlueprintMirrorMode, true);

@@ -37,7 +37,7 @@ namespace JueMingZ.Runtime
         private static long _lastRuntimeUpdateStartTimestamp;
         private static readonly RuntimeTickPipeline TickPipeline = CreateTickPipeline();
 
-        public const string Version = "0.929-blueprint-world-overlay-ownership-closeout";
+        public const string Version = "0.942-blueprint-creation-flicker-closeout";
 
         public static RuntimeState State { get; private set; } = new RuntimeState();
         public static FeatureRegistry FeatureRegistry { get; private set; }
