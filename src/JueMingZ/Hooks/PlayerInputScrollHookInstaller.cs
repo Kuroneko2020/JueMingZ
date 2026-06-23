@@ -194,6 +194,7 @@ namespace JueMingZ.Hooks
                 BlueprintCreationOverlay.UpdateAfterPlayerInputGuard();
                 BlueprintPlacementPreviewOverlay.UpdateAfterPlayerInputGuard();
                 BlueprintEraseRegionOverlay.UpdateAfterPlayerInputGuard();
+                BlueprintPlacedInstanceTransformOverlay.UpdateAfterPlayerInputGuard();
                 SearchItemPickRuntimeService.UpdateAfterPlayerInputGuard();
                 LegacyUiInput.UpdateAfterPlayerInputGuard(phase);
             }

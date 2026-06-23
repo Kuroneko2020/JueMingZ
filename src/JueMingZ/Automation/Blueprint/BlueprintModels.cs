@@ -431,6 +431,9 @@ namespace JueMingZ.Automation.Blueprint
         [DataMember(Order = 14)]
         public string UpdatedUtc { get; set; }
 
+        [DataMember(Order = 15)]
+        public string AutoPlacementProgressState { get; set; }
+
         public BlueprintWorldInstanceRecord()
         {
             InstanceId = string.Empty;
@@ -443,6 +446,7 @@ namespace JueMingZ.Automation.Blueprint
             TemplateSnapshot = new BlueprintTemplateRecord();
             CreatedUtc = string.Empty;
             UpdatedUtc = string.Empty;
+            AutoPlacementProgressState = string.Empty;
         }
 
         public BlueprintWorldInstanceRecord Clone()
@@ -462,7 +466,8 @@ namespace JueMingZ.Automation.Blueprint
                 EraseMask = CloneEraseMask(EraseMask),
                 TemplateSnapshot = TemplateSnapshot == null ? new BlueprintTemplateRecord() : TemplateSnapshot.Clone(),
                 CreatedUtc = CreatedUtc ?? string.Empty,
-                UpdatedUtc = UpdatedUtc ?? string.Empty
+                UpdatedUtc = UpdatedUtc ?? string.Empty,
+                AutoPlacementProgressState = AutoPlacementProgressState ?? string.Empty
             };
         }
 

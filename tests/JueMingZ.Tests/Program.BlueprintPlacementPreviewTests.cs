@@ -128,6 +128,79 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void BlueprintPlacementConfirmRefreshesProjectionAndPlacedList()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-placement-refresh-projection");
+            try
+            {
+                var templateStore = new BlueprintTemplateLibraryStore();
+                var instanceStore = new BlueprintWorldInstanceStore();
+                var reader = new FakeBlueprintWorldTileReader();
+                var context = BlueprintPlacementWorldContext.Success("pair-stage04-placement", "world-stage04-placement");
+                BlueprintTemplateRecord template;
+                RequireBlueprintSuccess(
+                    templateStore.CreateTemplate(CreateProjectionTileOnlyTemplate("04 可见实例", 77), out template),
+                    "create stage04 placement template");
+                reader.Set(25, 35, new BlueprintWorldTileSnapshot());
+
+                BlueprintEntryState.ResetForTesting();
+                BlueprintPlacementPreviewState.SetPlacementDependenciesForTesting(templateStore, instanceStore, context);
+                BlueprintPlacedInstanceUiState.SetDependenciesForTesting(instanceStore, context, false);
+                BlueprintProjectionService.SetDependenciesForTesting(instanceStore, context, reader, true);
+
+                var begin = BlueprintEntryState.SelectTemplateForPlacement(template);
+                if (!begin.Succeeded)
+                {
+                    throw new InvalidOperationException("Expected stage04 template selection to enter placement preview.");
+                }
+
+                var result = BlueprintPlacementPreviewState.HandlePointer(new BlueprintPlacementPointerInput
+                {
+                    WorldTileHit = true,
+                    TileX = 25,
+                    TileY = 35,
+                    LeftDown = true,
+                    LeftPressed = true
+                });
+                BlueprintEntryState.MarkPlacementConfirmed(result);
+                BlueprintPlacedInstanceUiState.NotifyInstanceCreated(result.Instance);
+                if (!result.Succeeded || !result.PlacedInstance || result.Instance == null)
+                {
+                    throw new InvalidOperationException("Expected stage04 placement confirm to create a placed instance.");
+                }
+
+                var placed = BlueprintPlacedInstanceUiState.GetSnapshot();
+                if (!placed.LoadSucceeded ||
+                    placed.Instances.Count != 1 ||
+                    !string.Equals(placed.SelectedInstanceId, result.Instance.InstanceId, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected stage04 placement confirm to refresh the current-world placed blueprint list.");
+                }
+
+                var diagnostics = BlueprintProjectionService.GetDiagnostics();
+                var cached = BlueprintProjectionService.GetCachedSnapshotForDraw();
+                if (diagnostics.EffectiveLayerCount != 1 ||
+                    cached == null ||
+                    !cached.LoadSucceeded ||
+                    cached.ProjectedLayers == null ||
+                    cached.ProjectedLayers.Count != 1 ||
+                    !string.Equals(cached.ProjectedLayers[0].InstanceId, result.Instance.InstanceId, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected stage04 placement confirm to refresh projection cache outside Draw so the placed instance can be displayed.");
+                }
+            }
+            finally
+            {
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintPlacementPreviewState.ResetForTesting();
+                BlueprintPlacedInstanceUiState.ResetForTesting();
+                BlueprintLibraryUiState.ResetForTesting();
+                BlueprintTemplateLibraryStore.ResetTestingHooks();
+                BlueprintEntryState.ResetForTesting();
+                restore();
+            }
+        }
+
         private static void BlueprintPlacementUiHitConsumesWithoutCreatingInstance()
         {
             BlueprintPlacementPreviewState.ResetForTesting();

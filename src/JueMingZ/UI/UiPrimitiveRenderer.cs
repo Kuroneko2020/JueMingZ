@@ -628,7 +628,7 @@ namespace JueMingZ.UI
             return new Rectangle(x, y, width, height);
         }
 
-        private static bool DrawTextureSourceRectClipped(object spriteBatch, object texture, int destX, int destY, int destWidth, int destHeight, int sourceX, int sourceY, int sourceWidth, int sourceHeight, int clipX, int clipY, int clipWidth, int clipHeight, int r, int g, int b, int a)
+        public static bool DrawTextureSourceRectClipped(object spriteBatch, object texture, int destX, int destY, int destWidth, int destHeight, int sourceX, int sourceY, int sourceWidth, int sourceHeight, int clipX, int clipY, int clipWidth, int clipHeight, int r, int g, int b, int a)
         {
             int ix;
             int iy;

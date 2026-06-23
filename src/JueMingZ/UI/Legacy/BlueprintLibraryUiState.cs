@@ -17,6 +17,7 @@ namespace JueMingZ.UI.Legacy
         public string LastResultCode { get; set; }
         public string LastExportPath { get; set; }
         public string LastImportPath { get; set; }
+        public string ExpandedMaterialTemplateId { get; set; }
         public bool IsOpen { get; set; }
         public int PageIndex { get; set; }
         public int PageCount { get; set; }
@@ -36,6 +37,7 @@ namespace JueMingZ.UI.Legacy
             LastResultCode = string.Empty;
             LastExportPath = string.Empty;
             LastImportPath = string.Empty;
+            ExpandedMaterialTemplateId = string.Empty;
             PageSize = BlueprintLibraryUiState.PageSize;
         }
     }
@@ -115,6 +117,8 @@ namespace JueMingZ.UI.Legacy
         private static readonly object SyncRoot = new object();
         private static BlueprintTemplateLibraryStore _store;
         private static BlueprintTemplateLibraryStore _testingStore;
+        private static IBlueprintFileDialogService _fileDialogService = new BlueprintWindowsFileDialogService();
+        private static IBlueprintFileDialogService _testingFileDialogService;
         private static string _storeRoot = string.Empty;
         private static bool _loaded;
         private static BlueprintTemplateLibrarySnapshot _snapshot = new BlueprintTemplateLibrarySnapshot(new List<BlueprintTemplateRecord>(), string.Empty, 0);
@@ -125,6 +129,7 @@ namespace JueMingZ.UI.Legacy
         private static string _lastResultCode = string.Empty;
         private static string _lastExportPath = string.Empty;
         private static string _lastImportPath = string.Empty;
+        private static string _expandedMaterialTemplateId = string.Empty;
         private static bool _isOpen;
         private static int _pageIndex;
         private static int _revision;
@@ -308,13 +313,50 @@ namespace JueMingZ.UI.Legacy
         public static BlueprintLibraryCommandResult ExportTemplate(string templateId)
         {
             BlueprintTemplateLibraryStore store;
+            IBlueprintFileDialogService dialogs;
+            string initialDirectory;
+            string defaultFileName;
             lock (SyncRoot)
             {
+                EnsureLoadedLocked();
+                BlueprintTemplateRecord template;
+                if (!TryFindTemplateLocked(templateId, out template))
+                {
+                    RecordNoticeLocked("missingTemplate", "蓝图模板不存在。", templateId, false);
+                    return CreateResultLocked(false, false, false, "Failed", "missingTemplate", _lastNotice, templateId, string.Empty, string.Empty);
+                }
+
                 store = ResolveStoreLocked();
+                dialogs = ResolveFileDialogServiceLocked();
+                initialDirectory = BlueprintStoragePaths.BuildDefaultExportDirectory(store.RootDirectory);
+                defaultFileName = BlueprintStoragePaths.BuildDefaultExportFileName(DateTime.Now);
+            }
+
+            var dialog = dialogs.ChooseExportJsonPath(initialDirectory, defaultFileName);
+            if (dialog == null || !dialog.Succeeded)
+            {
+                var resultCode = dialog == null ? "dialogFailed" : dialog.ResultCode;
+                var message = dialog == null ? "文件保存窗口不可用。" : dialog.Message;
+                lock (SyncRoot)
+                {
+                    _lastExportPath = string.Empty;
+                    RecordNoticeLocked(resultCode, "模板导出取消或失败：" + message, templateId, false);
+                    return CreateResultLocked(false, false, false, "Failed", resultCode, _lastNotice, templateId, string.Empty, string.Empty);
+                }
+            }
+
+            if (dialog.Cancelled)
+            {
+                lock (SyncRoot)
+                {
+                    _lastExportPath = string.Empty;
+                    RecordNoticeLocked(dialog.ResultCode, dialog.Message, templateId, false);
+                    return CreateResultLocked(true, false, false, "NotApplicable", dialog.ResultCode, _lastNotice, templateId, string.Empty, string.Empty);
+                }
             }
 
             string savedPath;
-            var write = store.ExportTemplate(templateId, string.Empty, out savedPath);
+            var write = store.ExportTemplate(templateId, dialog.Path, out savedPath);
             lock (SyncRoot)
             {
                 if (write.Succeeded)
@@ -339,13 +381,40 @@ namespace JueMingZ.UI.Legacy
         public static BlueprintLibraryCommandResult ImportTemplate()
         {
             BlueprintTemplateLibraryStore store;
+            IBlueprintFileDialogService dialogs;
+            string initialDirectory;
             lock (SyncRoot)
             {
                 store = ResolveStoreLocked();
+                dialogs = ResolveFileDialogServiceLocked();
+                initialDirectory = BlueprintStoragePaths.BuildDefaultImportDirectory(store.RootDirectory);
+            }
+
+            var dialog = dialogs.ChooseImportJsonPath(initialDirectory);
+            if (dialog == null || !dialog.Succeeded)
+            {
+                var resultCode = dialog == null ? "dialogFailed" : dialog.ResultCode;
+                var message = dialog == null ? "文件选择窗口不可用。" : dialog.Message;
+                lock (SyncRoot)
+                {
+                    _lastImportPath = string.Empty;
+                    RecordNoticeLocked(resultCode, "模板导入取消或失败：" + message, string.Empty, false);
+                    return CreateResultLocked(false, false, false, "Failed", resultCode, _lastNotice, string.Empty, string.Empty, string.Empty, string.Empty);
+                }
+            }
+
+            if (dialog.Cancelled)
+            {
+                lock (SyncRoot)
+                {
+                    _lastImportPath = string.Empty;
+                    RecordNoticeLocked(dialog.ResultCode, dialog.Message, string.Empty, false);
+                    return CreateResultLocked(true, false, false, "NotApplicable", dialog.ResultCode, _lastNotice, string.Empty, string.Empty, string.Empty, string.Empty);
+                }
             }
 
             BlueprintTemplateRecord imported;
-            var write = store.ImportTemplate(string.Empty, out imported);
+            var write = store.ImportTemplate(dialog.Path, out imported);
             lock (SyncRoot)
             {
                 _lastImportPath = write == null ? string.Empty : write.Path ?? string.Empty;
@@ -369,6 +438,32 @@ namespace JueMingZ.UI.Legacy
                     importedId,
                     write.Succeeded);
                 return CreateResultLocked(write.Succeeded, write.Succeeded, false, write.Succeeded ? "Succeeded" : "Failed", write.ResultCode, _lastNotice, importedId, importedName, string.Empty, _lastImportPath);
+            }
+        }
+
+        public static BlueprintLibraryCommandResult ToggleMaterialList(string templateId)
+        {
+            var normalizedId = BlueprintTemplateLibraryStore.NormalizeId(templateId);
+            lock (SyncRoot)
+            {
+                EnsureLoadedLocked();
+                BlueprintTemplateRecord template;
+                if (!TryFindTemplateLocked(normalizedId, out template))
+                {
+                    RecordNoticeLocked("missingTemplate", "蓝图模板不存在。", normalizedId, false);
+                    return CreateResultLocked(false, false, false, "Failed", "missingTemplate", _lastNotice, normalizedId, string.Empty, string.Empty);
+                }
+
+                var expanded = !string.Equals(_expandedMaterialTemplateId, normalizedId, StringComparison.OrdinalIgnoreCase);
+                _expandedMaterialTemplateId = expanded ? normalizedId : string.Empty;
+                _selectedTemplateId = normalizedId;
+                _deleteConfirmTemplateId = string.Empty;
+                RecordNoticeLocked(
+                    expanded ? "materialsExpanded" : "materialsCollapsed",
+                    expanded ? "材料列表已展开。" : "材料列表已收起。",
+                    normalizedId,
+                    true);
+                return CreateResultLocked(true, true, false, "Succeeded", _lastResultCode, _lastNotice, normalizedId, template.Name, string.Empty);
             }
         }
 
@@ -446,6 +541,38 @@ namespace JueMingZ.UI.Legacy
                    " / 材料 " + Count(template.Materials).ToString(CultureInfo.InvariantCulture);
         }
 
+        public static string BuildTemplateMaterialListText(BlueprintTemplateRecord template, int maxItems)
+        {
+            if (template == null || template.Materials == null || template.Materials.Count <= 0)
+            {
+                return "材料列表：无";
+            }
+
+            maxItems = Math.Max(1, maxItems);
+            var parts = new List<string>();
+            for (var index = 0; index < template.Materials.Count && parts.Count < maxItems; index++)
+            {
+                var material = template.Materials[index];
+                if (material == null || material.ItemId <= 0 || material.RequiredStack <= 0)
+                {
+                    continue;
+                }
+
+                var name = string.IsNullOrWhiteSpace(material.DisplayNameSnapshot)
+                    ? "#" + material.ItemId.ToString(CultureInfo.InvariantCulture)
+                    : material.DisplayNameSnapshot.Trim();
+                parts.Add(name + " x" + material.RequiredStack.ToString(CultureInfo.InvariantCulture));
+            }
+
+            if (parts.Count <= 0)
+            {
+                return "材料列表：无";
+            }
+
+            var suffix = template.Materials.Count > parts.Count ? " 等" : string.Empty;
+            return "材料列表：" + string.Join("、", parts.ToArray()) + suffix;
+        }
+
         public static string BuildUiStateJson()
         {
             lock (SyncRoot)
@@ -462,7 +589,8 @@ namespace JueMingZ.UI.Legacy
                        "\"lastResultCode\":\"" + EscapeJson(_lastResultCode) + "\"," +
                        "\"isOpen\":" + BoolRaw(_isOpen) + "," +
                        "\"lastExportPath\":\"" + EscapeJson(_lastExportPath) + "\"," +
-                       "\"lastImportPath\":\"" + EscapeJson(_lastImportPath) + "\"" +
+                       "\"lastImportPath\":\"" + EscapeJson(_lastImportPath) + "\"," +
+                       "\"expandedMaterialTemplateId\":\"" + EscapeJson(_expandedMaterialTemplateId) + "\"" +
                        "}";
             }
         }
@@ -485,6 +613,7 @@ namespace JueMingZ.UI.Legacy
                     hash = hash * 31 + StringComparer.Ordinal.GetHashCode(_lastResultCode ?? string.Empty);
                     hash = hash * 31 + StringComparer.Ordinal.GetHashCode(_lastExportPath ?? string.Empty);
                     hash = hash * 31 + StringComparer.Ordinal.GetHashCode(_lastImportPath ?? string.Empty);
+                    hash = hash * 31 + StringComparer.Ordinal.GetHashCode(_expandedMaterialTemplateId ?? string.Empty);
                     hash = hash * 31 + (LegacyTextInput.IsAnyFocused ? 1 : 0);
                     return hash;
                 }
@@ -523,6 +652,7 @@ namespace JueMingZ.UI.Legacy
                 _lastResultCode = string.Empty;
                 _lastExportPath = string.Empty;
                 _lastImportPath = string.Empty;
+                _expandedMaterialTemplateId = string.Empty;
                 _isOpen = false;
                 if (reload)
                 {
@@ -537,6 +667,7 @@ namespace JueMingZ.UI.Legacy
             {
                 _store = null;
                 _testingStore = null;
+                _testingFileDialogService = null;
                 _storeRoot = string.Empty;
                 _loaded = false;
                 _snapshot = new BlueprintTemplateLibrarySnapshot(new List<BlueprintTemplateRecord>(), string.Empty, 0);
@@ -547,15 +678,29 @@ namespace JueMingZ.UI.Legacy
                 _lastResultCode = string.Empty;
                 _lastExportPath = string.Empty;
                 _lastImportPath = string.Empty;
+                _expandedMaterialTemplateId = string.Empty;
                 _isOpen = false;
                 _pageIndex = 0;
                 _revision = 0;
             }
         }
 
+        internal static void SetFileDialogServiceForTesting(IBlueprintFileDialogService service)
+        {
+            lock (SyncRoot)
+            {
+                _testingFileDialogService = service;
+            }
+        }
+
         internal static int GetPageSizeForTesting()
         {
             return PageSize;
+        }
+
+        internal static string BuildDefaultExportFileNameForTesting(DateTime localTime)
+        {
+            return BlueprintStoragePaths.BuildDefaultExportFileName(localTime);
         }
 
         private static BlueprintLibraryUiSnapshot BuildSnapshotLocked()
@@ -577,6 +722,7 @@ namespace JueMingZ.UI.Legacy
                 LastResultCode = _lastResultCode,
                 LastExportPath = _lastExportPath,
                 LastImportPath = _lastImportPath,
+                ExpandedMaterialTemplateId = _expandedMaterialTemplateId,
                 IsOpen = _isOpen,
                 PageIndex = _pageIndex,
                 PageCount = pageCount,
@@ -650,6 +796,11 @@ namespace JueMingZ.UI.Legacy
             {
                 _deleteConfirmTemplateId = string.Empty;
             }
+
+            if (!TemplateExistsLocked(_expandedMaterialTemplateId))
+            {
+                _expandedMaterialTemplateId = string.Empty;
+            }
         }
 
         private static BlueprintTemplateLibraryStore ResolveStoreLocked()
@@ -668,6 +819,11 @@ namespace JueMingZ.UI.Legacy
             }
 
             return _store;
+        }
+
+        private static IBlueprintFileDialogService ResolveFileDialogServiceLocked()
+        {
+            return _testingFileDialogService ?? _fileDialogService ?? new BlueprintWindowsFileDialogService();
         }
 
         private static void RecordNoticeLocked(string resultCode, string message, string templateId, bool changed)

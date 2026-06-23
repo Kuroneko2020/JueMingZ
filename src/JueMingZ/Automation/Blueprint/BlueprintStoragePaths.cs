@@ -42,7 +42,17 @@ namespace JueMingZ.Automation.Blueprint
                 id = Guid.NewGuid().ToString("N");
             }
 
-            return Path.Combine(NormalizeRoot(rootDirectory), BlueprintStorageConstants.ExportDirectoryName, name + "-" + id + ".json");
+            return Path.Combine(BuildDefaultExportDirectory(rootDirectory), name + "-" + id + ".json");
+        }
+
+        public static string BuildDefaultExportDirectory(string rootDirectory)
+        {
+            return Path.Combine(NormalizeRoot(rootDirectory), BlueprintStorageConstants.ExportDirectoryName);
+        }
+
+        public static string BuildDefaultExportFileName(DateTime localTime)
+        {
+            return "JM-" + localTime.ToString("yyMMdd", CultureInfo.InvariantCulture) + "0000.json";
         }
 
         public static string BuildDefaultImportDirectory(string rootDirectory)

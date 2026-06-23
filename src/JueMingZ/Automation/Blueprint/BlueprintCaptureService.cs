@@ -164,7 +164,7 @@ namespace JueMingZ.Automation.Blueprint
             {
                 return BlueprintCaptureResult.Failure(
                     "emptyContent",
-                    "选区内没有可保存的 Tile、Wall、wire 或 actuator 内容；纯空气选区不会生成空蓝图模板。",
+                    "选区内啥也没有喔",
                     null,
                     null,
                     mask.SelectedCount,

@@ -124,6 +124,11 @@ namespace JueMingZ.Tests
                 }
 
                 BlueprintLibraryUiState.SetStoreForTesting(store, true);
+                var fakeDialog = new FakeBlueprintFileDialogService
+                {
+                    ExportPath = Path.Combine(BlueprintStoragePaths.BuildDefaultExportDirectory(store.RootDirectory), "stage02-two-column-export.json")
+                };
+                BlueprintLibraryUiState.SetFileDialogServiceForTesting(fakeDialog);
                 var opened = BlueprintLibraryUiState.OpenLibrary();
                 if (!opened.Succeeded || !BlueprintLibraryUiState.IsOpen)
                 {
@@ -165,19 +170,36 @@ namespace JueMingZ.Tests
                 AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "stage06-two-column-fixed-cards");
                 AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "preview-scales-to-fit");
                 AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "stage07-name-edit-delete-confirm");
-                AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "stage08-import-long-button-export-real");
+                AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "stage08-import-export-windows-dialog");
                 AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "stage09-layout-use-real-template-snapshot");
+                AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "stage02-title-row-tools");
+                AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "card-material-toggle");
                 AssertContains(
                     LegacyMainWindow.BuildBlueprintLibraryLayoutCommandIdForTesting("use", wide.TemplateId),
                     "blueprint-library:layout-use:");
+                AssertContains(
+                    LegacyMainWindow.BuildBlueprintLibraryLayoutCommandIdForTesting("materials", wide.TemplateId),
+                    "blueprint-library:layout-materials:");
 
-                var toolbar = new LegacyUiRect(12, 34, 456, 34);
+                var toolbar = new LegacyUiRect(12, 34, 456, 42);
                 var importRect = LegacyMainWindow.CalculateBlueprintLibraryImportButtonRectForTesting(toolbar);
-                if (importRect.Width <= toolbar.Width / 2 ||
-                    importRect.Height != 34 ||
+                var prevRect = LegacyMainWindow.CalculateBlueprintLibraryPreviousButtonRectForTesting(toolbar);
+                var nextRect = LegacyMainWindow.CalculateBlueprintLibraryNextButtonRectForTesting(toolbar);
+                if (importRect.Width >= toolbar.Width / 3 ||
+                    importRect.Height != 24 ||
+                    importRect.X <= toolbar.X ||
+                    prevRect.X <= importRect.X ||
+                    nextRect.X <= prevRect.X ||
                     !string.Equals(LegacyMainWindow.GetBlueprintLibraryImportElementIdForTesting(), "blueprint-library:import", StringComparison.Ordinal))
                 {
-                    throw new InvalidOperationException("Expected stage 08 to expose a long top import button like the notes add button.");
+                    throw new InvalidOperationException("Expected stage 02 to expose compact title-row import and page buttons.");
+                }
+
+                if (LegacyMainWindow.GetBlueprintLibraryHeaderToolTooltipLinesForTesting("import") != null ||
+                    LegacyMainWindow.GetBlueprintLibraryHeaderToolTooltipLinesForTesting("page-prev") != null ||
+                    LegacyMainWindow.GetBlueprintLibraryHeaderToolTooltipLinesForTesting("page-next") != null)
+                {
+                    throw new InvalidOperationException("Stage 02 title-row import and page tools should not use hover instructions.");
                 }
 
                 int originX;
@@ -209,11 +231,15 @@ namespace JueMingZ.Tests
 
                 var beforeProjectionSignature = BlueprintProjectionService.BuildStateSignature();
                 var beforeMaterialSignature = BlueprintMaterialService.BuildStateSignature();
+                var materialsShell = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("layout-materials", wide.TemplateId);
                 var useShell = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("layout-use", wide.TemplateId);
                 var exportShell = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("layout-export", wide.TemplateId);
                 var nameShell = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("layout-name", wide.TemplateId);
                 var deleteShell = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("layout-delete", wide.TemplateId);
-                if (useShell == null || exportShell == null || deleteShell == null || nameShell == null ||
+                if (materialsShell == null || useShell == null || exportShell == null || deleteShell == null || nameShell == null ||
+                    materialsShell.PlaceholderOnly ||
+                    !materialsShell.Succeeded ||
+                    !string.Equals(materialsShell.ResultCode, "materialsExpanded", StringComparison.Ordinal) ||
                     useShell.PlaceholderOnly ||
                     !useShell.Succeeded ||
                     !string.Equals(useShell.ResultCode, "previewStarted", StringComparison.Ordinal) ||
@@ -225,6 +251,11 @@ namespace JueMingZ.Tests
                     !string.Equals(deleteShell.ResultCode, "deleteConfirmArmed", StringComparison.Ordinal))
                 {
                     throw new InvalidOperationException("Expected stage 09 to make layout-use real while layout-export, name, and delete stay real UI commands.");
+                }
+
+                if (!string.Equals(BlueprintLibraryUiState.GetSnapshot().ExpandedMaterialTemplateId, wide.TemplateId, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected stage 02 materials button to expand the selected template material list.");
                 }
 
                 var previewAfterUse = BlueprintPlacementPreviewState.GetSnapshot();
@@ -414,6 +445,11 @@ namespace JueMingZ.Tests
                 File.Copy(exportPath, importPath, true);
 
                 BlueprintLibraryUiState.SetStoreForTesting(store, true);
+                var fakeDialog = new FakeBlueprintFileDialogService
+                {
+                    ImportPath = importPath
+                };
+                BlueprintLibraryUiState.SetFileDialogServiceForTesting(fakeDialog);
                 RequireBlueprintCommandSuccess(BlueprintLibraryUiState.OpenLibrary(), "open stage08 blueprint library");
 
                 var imported = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("import", string.Empty);
@@ -436,7 +472,8 @@ namespace JueMingZ.Tests
                     throw new InvalidOperationException("Expected stage08 import to suffix duplicate names without overwriting the original template.");
                 }
 
-                var expectedFailedExportPath = BlueprintStoragePaths.BuildDefaultExportPath(store.RootDirectory, source);
+                var expectedFailedExportPath = Path.Combine(BlueprintStoragePaths.BuildDefaultExportDirectory(store.RootDirectory), "stage08-write-failed.json");
+                fakeDialog.ExportPath = expectedFailedExportPath;
                 BlueprintTemplateLibraryStore.SetCommitFailurePredicateForTesting(
                     path => string.Equals(path, expectedFailedExportPath, StringComparison.OrdinalIgnoreCase));
                 var failedExport = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("layout-export", source.TemplateId);
@@ -459,6 +496,114 @@ namespace JueMingZ.Tests
             {
                 BlueprintTemplateLibraryStore.ResetTestingHooks();
                 BlueprintLibraryUiState.ResetForTesting();
+                restore();
+            }
+        }
+
+        private static void BlueprintLibraryStage02FileDialogAndMaterialContracts()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-library-stage02-file-dialog-materials");
+            try
+            {
+                var store = new BlueprintTemplateLibraryStore();
+                BlueprintTemplateRecord template;
+                RequireBlueprintSuccess(store.CreateTemplate(CreateSampleBlueprintTemplate("Stage02 Dialog"), out template), "create stage02 dialog blueprint");
+
+                var fakeDialog = new FakeBlueprintFileDialogService
+                {
+                    CancelImport = true,
+                    ExportPath = Path.Combine(BlueprintStoragePaths.BuildDefaultExportDirectory(store.RootDirectory), "stage02-export.json")
+                };
+                BlueprintLibraryUiState.SetStoreForTesting(store, true);
+                BlueprintLibraryUiState.SetFileDialogServiceForTesting(fakeDialog);
+                RequireBlueprintCommandSuccess(BlueprintLibraryUiState.OpenLibrary(), "open stage02 blueprint library");
+
+                AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "stage02-title-row-tools");
+                AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "card-material-toggle");
+                AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "card-buttons-no-tooltips");
+                AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "summary-placed-count");
+                AssertContains(LegacyMainWindow.GetBlueprintPlacedInstanceVisualContractForTesting(), "same-content-submenu");
+                AssertStringEquals(
+                    BlueprintLibraryUiState.BuildDefaultExportFileNameForTesting(new DateTime(2026, 6, 23, 15, 4, 0)),
+                    "JM-2606230000.json",
+                    "stage02 default export file name");
+
+                var header = new LegacyUiRect(12, 34, 456, 42);
+                var importRect = LegacyMainWindow.CalculateBlueprintLibraryImportButtonRectForTesting(header);
+                var prevRect = LegacyMainWindow.CalculateBlueprintLibraryPreviousButtonRectForTesting(header);
+                var nextRect = LegacyMainWindow.CalculateBlueprintLibraryNextButtonRectForTesting(header);
+                if (importRect.X <= header.X ||
+                    importRect.Right >= prevRect.X ||
+                    prevRect.Right >= nextRect.X ||
+                    importRect.Height != 24)
+                {
+                    throw new InvalidOperationException("Stage 02 title-row tools must fit without falling back to the old long import button.");
+                }
+
+                var materialText = LegacyMainWindow.BuildBlueprintTemplateMaterialListTextForTesting(template, 4);
+                AssertContains(materialText, "木材 x4");
+
+                var projectionSignature = BlueprintProjectionService.BuildStateSignature();
+                var materialSignature = BlueprintMaterialService.BuildStateSignature();
+                var expanded = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("layout-materials", template.TemplateId);
+                var collapsed = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("layout-materials", template.TemplateId);
+                if (expanded == null ||
+                    collapsed == null ||
+                    !expanded.Succeeded ||
+                    !collapsed.Succeeded ||
+                    !string.Equals(expanded.ResultCode, "materialsExpanded", StringComparison.Ordinal) ||
+                    !string.Equals(collapsed.ResultCode, "materialsCollapsed", StringComparison.Ordinal) ||
+                    !string.IsNullOrWhiteSpace(BlueprintLibraryUiState.GetSnapshot().ExpandedMaterialTemplateId))
+                {
+                    throw new InvalidOperationException("Stage 02 material list button must toggle template-local expanded state only.");
+                }
+
+                if (BlueprintProjectionService.BuildStateSignature() != projectionSignature ||
+                    BlueprintMaterialService.BuildStateSignature() != materialSignature)
+                {
+                    throw new InvalidOperationException("Stage 02 material list toggle must not refresh projection or runtime material caches.");
+                }
+
+                var cancelledImport = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("import", string.Empty);
+                if (cancelledImport == null ||
+                    !cancelledImport.Succeeded ||
+                    cancelledImport.Changed ||
+                    !string.Equals(cancelledImport.Outcome, "NotApplicable", StringComparison.Ordinal) ||
+                    !string.Equals(cancelledImport.ResultCode, "dialogCancelled", StringComparison.Ordinal) ||
+                    !string.IsNullOrWhiteSpace(BlueprintLibraryUiState.GetSnapshot().LastImportPath) ||
+                    !string.Equals(fakeDialog.LastImportInitialDirectory, BlueprintStoragePaths.BuildDefaultImportDirectory(store.RootDirectory), StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException("Stage 02 import cancel must be a no-op and expose the default import directory to the dialog wrapper.");
+                }
+
+                var exported = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("layout-export", template.TemplateId);
+                if (exported == null ||
+                    !exported.Succeeded ||
+                    !File.Exists(fakeDialog.ExportPath) ||
+                    !string.Equals(BlueprintLibraryUiState.GetSnapshot().LastExportPath, fakeDialog.ExportPath, StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(fakeDialog.LastExportInitialDirectory, BlueprintStoragePaths.BuildDefaultExportDirectory(store.RootDirectory), StringComparison.OrdinalIgnoreCase) ||
+                    !fakeDialog.LastExportDefaultFileName.StartsWith("JM-", StringComparison.Ordinal) ||
+                    !fakeDialog.LastExportDefaultFileName.EndsWith("0000.json", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Stage 02 export must route through the dialog wrapper with a stable export directory and JM date file name.");
+                }
+
+                fakeDialog.FailExport = true;
+                var failedExport = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("layout-export", template.TemplateId);
+                if (failedExport == null ||
+                    failedExport.Succeeded ||
+                    !string.Equals(failedExport.ResultCode, "dialogFailed", StringComparison.Ordinal) ||
+                    !string.IsNullOrWhiteSpace(BlueprintLibraryUiState.GetSnapshot().LastExportPath))
+                {
+                    throw new InvalidOperationException("Stage 02 export dialog failure must fail closed and clear stale export diagnostics.");
+                }
+            }
+            finally
+            {
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintLibraryUiState.ResetForTesting();
+                BlueprintTemplateLibraryStore.ResetTestingHooks();
                 restore();
             }
         }
@@ -602,6 +747,7 @@ namespace JueMingZ.Tests
             BlueprintLibraryTwoColumnCardsPreviewAndLayoutButtons();
             BlueprintLibraryStage07NamingRenameDeleteConfirmKeepsInstances();
             BlueprintLibraryStage08ImportExportDiagnostics();
+            BlueprintLibraryStage02FileDialogAndMaterialContracts();
             BlueprintLibraryStage09UseSnapshotAndInstanceBoundary();
         }
 
@@ -614,6 +760,10 @@ namespace JueMingZ.Tests
                 BlueprintTemplateRecord template;
                 RequireBlueprintSuccess(store.CreateTemplate(CreateSampleBlueprintTemplate("旧名"), out template), "create command blueprint");
                 BlueprintLibraryUiState.SetStoreForTesting(store, true);
+                BlueprintLibraryUiState.SetFileDialogServiceForTesting(new FakeBlueprintFileDialogService
+                {
+                    ExportPath = Path.Combine(BlueprintStoragePaths.BuildDefaultExportDirectory(store.RootDirectory), "commands-export.json")
+                });
                 BlueprintEntryState.ResetForTesting();
 
                 var inputId = LegacyMainWindow.BuildBlueprintLibraryNameInputIdForTesting(template.TemplateId);
@@ -693,6 +843,64 @@ namespace JueMingZ.Tests
                 BlueprintLibraryUiState.ResetForTesting();
                 BlueprintTemplateLibraryStore.ResetTestingHooks();
                 restore();
+            }
+        }
+
+        private sealed class FakeBlueprintFileDialogService : IBlueprintFileDialogService
+        {
+            public bool CancelImport { get; set; }
+            public bool CancelExport { get; set; }
+            public bool FailImport { get; set; }
+            public bool FailExport { get; set; }
+            public string ImportPath { get; set; }
+            public string ExportPath { get; set; }
+            public string LastImportInitialDirectory { get; private set; }
+            public string LastExportInitialDirectory { get; private set; }
+            public string LastExportDefaultFileName { get; private set; }
+
+            public FakeBlueprintFileDialogService()
+            {
+                ImportPath = string.Empty;
+                ExportPath = string.Empty;
+                LastImportInitialDirectory = string.Empty;
+                LastExportInitialDirectory = string.Empty;
+                LastExportDefaultFileName = string.Empty;
+            }
+
+            public BlueprintFileDialogResult ChooseImportJsonPath(string initialDirectory)
+            {
+                LastImportInitialDirectory = initialDirectory ?? string.Empty;
+                if (FailImport)
+                {
+                    return BlueprintFileDialogResult.Failed("dialogFailed", "fake import failed");
+                }
+
+                if (CancelImport)
+                {
+                    return BlueprintFileDialogResult.CancelledResult("dialogCancelled", "导入已取消。");
+                }
+
+                return BlueprintFileDialogResult.Selected(ImportPath ?? string.Empty);
+            }
+
+            public BlueprintFileDialogResult ChooseExportJsonPath(string initialDirectory, string defaultFileName)
+            {
+                LastExportInitialDirectory = initialDirectory ?? string.Empty;
+                LastExportDefaultFileName = defaultFileName ?? string.Empty;
+                if (FailExport)
+                {
+                    return BlueprintFileDialogResult.Failed("dialogFailed", "fake export failed");
+                }
+
+                if (CancelExport)
+                {
+                    return BlueprintFileDialogResult.CancelledResult("dialogCancelled", "导出已取消。");
+                }
+
+                var selected = string.IsNullOrWhiteSpace(ExportPath)
+                    ? Path.Combine(LastExportInitialDirectory, LastExportDefaultFileName)
+                    : ExportPath;
+                return BlueprintFileDialogResult.Selected(selected);
             }
         }
 

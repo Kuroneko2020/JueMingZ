@@ -182,6 +182,13 @@ namespace JueMingZ.Automation.Blueprint
                         return BlueprintEraseCommandResult.Create(false, false, _lastResultCode, _lastNotice, normalizedId, string.Empty);
                     }
                 }
+                else if (!HasVisibleInstances(world == null ? null : world.Instances))
+                {
+                    ResetActiveLocked();
+                    _lastResultCode = "noVisibleInstances";
+                    _lastNotice = "当前世界没有可修改的可见蓝图实例。";
+                    return BlueprintEraseCommandResult.Create(false, false, _lastResultCode, _lastNotice, string.Empty, string.Empty);
+                }
 
                 var changed = !_active ||
                               _dragging ||
@@ -639,6 +646,19 @@ namespace JueMingZ.Automation.Blueprint
                     cell.X == relativeX &&
                     cell.Y == relativeY &&
                     HasContentLayer(cell))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasVisibleInstances(IReadOnlyList<BlueprintWorldInstanceRecord> instances)
+        {
+            for (var index = 0; instances != null && index < instances.Count; index++)
+            {
+                if (instances[index] != null && !instances[index].Hidden)
                 {
                     return true;
                 }

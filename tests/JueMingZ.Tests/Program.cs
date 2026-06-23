@@ -1069,6 +1069,7 @@ namespace JueMingZ.Tests
             Run("blueprint library two-column cards preview and layout buttons", ref failed, BlueprintLibraryTwoColumnCardsPreviewAndLayoutButtons);
             Run("blueprint library stage 07 naming rename delete confirm keeps instances", ref failed, BlueprintLibraryStage07NamingRenameDeleteConfirmKeepsInstances);
             Run("blueprint library stage 08 import export diagnostics", ref failed, BlueprintLibraryStage08ImportExportDiagnostics);
+            Run("blueprint library stage 02 file dialog and material contracts", ref failed, BlueprintLibraryStage02FileDialogAndMaterialContracts);
             Run("blueprint library stage 09 use snapshot and instance boundary", ref failed, BlueprintLibraryStage09UseSnapshotAndInstanceBoundary);
             Run("blueprint library stage 10 diagnostics audit contracts stay wired", ref failed, BlueprintLibraryStage10DiagnosticsAuditContractsStayWired);
             Run("blueprint library commands rename delete use and export", ref failed, BlueprintLibraryCommandsRenameDeleteUseAndExport);
@@ -1098,7 +1099,7 @@ namespace JueMingZ.Tests
             Run("blueprint handheld action bar gate-open mouse prefers OS client coordinate", ref failed, BlueprintHandheldActionBarGateOpenMousePrefersOsClientCoordinate);
             Run("blueprint handheld action bar physical bottom-center rejects UI-scale logical extent", ref failed, BlueprintHandheldActionBarPhysicalBottomCenterRejectsUiScaleLogicalExtent);
             Run("blueprint handheld action bar display gates stay visible and UI-only", ref failed, BlueprintHandheldActionBarDisplayGatesStayVisibleAndUiOnly);
-            Run("blueprint handheld action bar real commands and unimplemented buttons", ref failed, BlueprintHandheldActionBarRealCommandsAndUnimplementedButtons);
+            Run("blueprint handheld action bar real commands and deferred placed commands", ref failed, BlueprintHandheldActionBarRealCommandsAndDeferredPlacedCommands);
             Run("blueprint handheld action bar diagnostics snapshot json", ref failed, BlueprintHandheldActionBarDiagnosticsSnapshotJson);
             Run("blueprint feedback diagnostics audit fields stay wired", ref failed, BlueprintFeedbackDiagnosticsAuditFieldsStayWired);
             Run("blueprint second feedback stage 07 audit contracts stay wired", ref failed, BlueprintSecondFeedbackStage07AuditContractsStayWired);
@@ -1134,6 +1135,7 @@ namespace JueMingZ.Tests
             Run("blueprint placement preview uses upper-left center anchor for even size", ref failed, BlueprintPlacementPreviewUsesUpperLeftCenterAnchorForEvenSize);
             Run("blueprint library use enters placement preview with template snapshot", ref failed, BlueprintLibraryUseEntersPlacementPreviewWithTemplateSnapshot);
             Run("blueprint placement confirm creates world instance only", ref failed, BlueprintPlacementConfirmCreatesWorldInstanceOnly);
+            Run("blueprint placement confirm refreshes projection and placed list", ref failed, BlueprintPlacementConfirmRefreshesProjectionAndPlacedList);
             Run("blueprint placement UI hit consumes without creating instance", ref failed, BlueprintPlacementUiHitConsumesWithoutCreatingInstance);
             Run("blueprint placement overlay routes and pointer contract", ref failed, BlueprintPlacementOverlayRoutesAndPointerContract);
             Run("blueprint mirror horizontal mirrors preview coordinates anchor and slope", ref failed, BlueprintMirrorHorizontalMirrorsPreviewCoordinatesAnchorAndSlope);
@@ -1143,15 +1145,21 @@ namespace JueMingZ.Tests
             Run("blueprint mirror diagnostics write runtime snapshot json", ref failed, BlueprintMirrorDiagnosticsWriteRuntimeSnapshotJson);
             Run("blueprint placed instances UI state loads current world and keeps snapshots", ref failed, BlueprintPlacedInstancesUiStateLoadsCurrentWorldAndKeepsSnapshots);
             Run("blueprint placed instance commands toggle remove select and layer", ref failed, BlueprintPlacedInstanceCommandsToggleRemoveSelectAndLayer);
+            Run("blueprint placed instance clear all current world keeps templates and refreshes caches", ref failed, BlueprintPlacedInstanceClearAllCurrentWorldKeepsTemplatesAndRefreshesCaches);
+            Run("blueprint placed instance move keeps snapshot state and refreshes caches", ref failed, BlueprintPlacedInstanceMoveKeepsSnapshotStateAndRefreshesCaches);
+            Run("blueprint placed instance mirror uses service and fails closed", ref failed, BlueprintPlacedInstanceMirrorUsesServiceAndFailsClosed);
+            Run("blueprint world instances persist hidden erase layer and snapshots on reload", ref failed, BlueprintWorldInstancesPersistHiddenEraseLayerAndSnapshotsOnReload);
             Run("blueprint projection classifies fulfilled missing and conflict", ref failed, BlueprintProjectionClassifiesFulfilledMissingAndConflict);
             Run("blueprint projection ignores air-only template bounds", ref failed, BlueprintProjectionIgnoresAirOnlyTemplateBounds);
             Run("blueprint projection composes layer order and skips hidden", ref failed, BlueprintProjectionComposesLayerOrderAndSkipsHidden);
+            Run("blueprint projection stage 04 later instance covers earlier without mutating snapshots", ref failed, BlueprintProjectionStage04LaterInstanceCoversEarlierWithoutMutatingSnapshots);
             Run("blueprint projection cache avoids immediate recompute", ref failed, BlueprintProjectionCacheAvoidsImmediateRecompute);
             Run("blueprint projection replacement rules fulfill configured same category", ref failed, BlueprintProjectionReplacementRulesFulfillConfiguredSameCategory);
             Run("blueprint projection UI overlay and diagnostics contracts", ref failed, BlueprintProjectionUiOverlayAndDiagnosticsContracts);
             Run("blueprint materials count only missing effective projection layers", ref failed, BlueprintMaterialsCountOnlyMissingEffectiveProjectionLayers);
             Run("blueprint materials ignore air-only template bounds", ref failed, BlueprintMaterialsIgnoreAirOnlyTemplateBounds);
             Run("blueprint materials read main inventory and void bag availability", ref failed, BlueprintMaterialsReadMainInventoryAndVoidBagAvailability);
+            Run("blueprint placed list refreshes material comparison without draw scan", ref failed, BlueprintPlacedListRefreshesMaterialComparisonWithoutDrawScan);
             Run("blueprint materials use replacement item when configured", ref failed, BlueprintMaterialsUseReplacementItemWhenConfigured);
             Run("blueprint material window routes and consumes input", ref failed, BlueprintMaterialWindowRoutesAndConsumesInput);
             Run("blueprint material diagnostics write runtime snapshot json", ref failed, BlueprintMaterialDiagnosticsWriteRuntimeSnapshotJson);
@@ -1168,6 +1176,7 @@ namespace JueMingZ.Tests
             Run("blueprint auto placement diagnostics write runtime snapshot json", ref failed, BlueprintAutoPlacementDiagnosticsWriteRuntimeSnapshotJson);
             Run("blueprint diagnostics aggregate runtime snapshot json", ref failed, BlueprintDiagnosticsAggregateRuntimeSnapshotJson);
             Run("blueprint diagnostics performance counters average costs", ref failed, BlueprintDiagnosticsPerformanceCountersAverageCosts);
+            Run("blueprint placement stage 08 regression diagnostics contracts stay wired", ref failed, BlueprintPlacementStage08RegressionDiagnosticsContractsStayWired);
             Run("user notes tab keeps hotkeys page id and note icon", ref failed, UserNotesTabKeepsHotkeysPageIdAndUsesNoteIcon);
             Run("user notes layout uses two columns and caps card height", ref failed, UserNotesLayoutUsesTwoColumnsAndCapsCardHeight);
             Run("user notes card body viewport matches layout and scroll", ref failed, UserNotesCardBodyViewportMatchesLayoutAndScroll);

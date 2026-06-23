@@ -149,6 +149,54 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void BlueprintPlacedListRefreshesMaterialComparisonWithoutDrawScan()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-placed-material-comparison");
+            try
+            {
+                var store = new BlueprintWorldInstanceStore();
+                var reader = new FakeBlueprintWorldTileReader();
+                var inventory = new FakeBlueprintMaterialInventoryReader(
+                    new Dictionary<int, int> { { 501, 3 } },
+                    new Dictionary<int, int> { { 501, 4 } });
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(store.CreateInstanceFromTemplate("pair-placed-material", "world-placed-material", CreateSingleMaterialTemplate("需求", 21, 501, 10), 3, 4, 0, out instance), "create placed material instance");
+                BlueprintProjectionService.SetDependenciesForTesting(store, BlueprintPlacementWorldContext.Success("pair-placed-material", "world-placed-material"), reader, true);
+                BlueprintMaterialService.SetInventoryReaderForTesting(inventory, true);
+                BlueprintPlacedInstanceUiState.SetDependenciesForTesting(store, BlueprintPlacementWorldContext.Success("pair-placed-material", "world-placed-material"), true);
+
+                var open = BlueprintPlacedInstanceUiState.OpenManagement();
+                if (!open.Succeeded || inventory.ReadCount != 1)
+                {
+                    throw new InvalidOperationException("Expected placed list open to force exactly one material comparison refresh.");
+                }
+
+                AssertContains(LegacyMainWindow.GetBlueprintPlacedInstanceVisualContractForTesting(), "material-comparison");
+                AssertContains(LegacyMainWindow.GetBlueprintPlacedInstanceVisualContractForTesting(), "cancel-display");
+                AssertContains(LegacyMainWindow.GetBlueprintMaterialVisualContractForTesting(), "placed-list-comparison");
+                var comparison = LegacyMainWindow.BuildBlueprintPlacedMaterialComparisonForTesting(1);
+                AssertContains(comparison, "需求材料");
+                AssertContains(comparison, "需要 10");
+                AssertContains(comparison, "已有 7");
+                AssertContains(comparison, "缺 3");
+                AssertContains(comparison, "主包 3");
+                AssertContains(comparison, "虚空袋 4");
+                LegacyMainWindow.BuildBlueprintPlacedMaterialComparisonForTesting(1);
+                if (inventory.ReadCount != 1)
+                {
+                    throw new InvalidOperationException("Expected placed-list material comparison draw helper to read the cached material snapshot only.");
+                }
+            }
+            finally
+            {
+                BlueprintPlacedInstanceUiState.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialWindowOverlay.ResetForTesting();
+                restore();
+            }
+        }
+
         private static void BlueprintMaterialsUseReplacementItemWhenConfigured()
         {
             var restore = PushTemporaryConfigDirectory("blueprint-material-replacement");

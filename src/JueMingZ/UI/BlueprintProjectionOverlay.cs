@@ -10,7 +10,7 @@ namespace JueMingZ.UI
     {
         private const int TileSize = 16;
         private const int MaxDrawLayersPerFrame = 1536;
-        private const string VisualContract = "placed-instance-projection+fulfilled-missing-conflict+hidden-skip+layer-order-cover";
+        private const string VisualContract = "placed-instance-projection+appearance-ghost+yellow-missing+red-conflict+fulfilled-no-mask+hidden-skip+layer-order-cover+draw-cache-only";
 
         public static bool DrawInterfaceLayer()
         {
@@ -58,6 +58,21 @@ namespace JueMingZ.UI
             return ResolveProjectionColor(status);
         }
 
+        internal static int ResolveProjectionFillAlphaForTesting(string status)
+        {
+            return ResolveProjectionFillAlpha(status);
+        }
+
+        internal static bool ShouldDrawProjectionLayerForTesting(string status)
+        {
+            return BlueprintProjectionGhostRenderer.ShouldDrawLayerForTesting(status);
+        }
+
+        internal static int ResolveLayerDrawPassForTesting(string layerKind)
+        {
+            return BlueprintProjectionGhostRenderer.ResolveLayerDrawPassForTesting(layerKind);
+        }
+
         private static bool ShouldDraw(BlueprintProjectionSnapshot snapshot)
         {
             return snapshot != null &&
@@ -73,30 +88,36 @@ namespace JueMingZ.UI
             var screenPosition = TerrariaMainCompat.ScreenPosition;
             var layers = snapshot.ProjectedLayers;
             var max = Math.Min(layers.Count, MaxDrawLayersPerFrame);
-            for (var index = 0; index < max; index++)
+            for (var pass = 0; pass <= 2; pass++)
             {
-                var layer = layers[index];
-                if (layer == null)
+                for (var index = 0; index < max; index++)
                 {
-                    continue;
-                }
+                    var layer = layers[index];
+                    if (layer == null ||
+                        BlueprintProjectionGhostRenderer.ResolveLayerDrawPass(layer.LayerKind) != pass ||
+                        !BlueprintProjectionGhostRenderer.ShouldDrawLayer(layer.Status))
+                    {
+                        continue;
+                    }
 
-                var x = (int)Math.Round(layer.WorldTileX * TileSize - screenPosition.X);
-                var y = (int)Math.Round(layer.WorldTileY * TileSize - screenPosition.Y);
-                if (x >= clipWidth || y >= clipHeight || x + TileSize <= 0 || y + TileSize <= 0)
-                {
-                    continue;
-                }
+                    var x = (int)Math.Round(layer.WorldTileX * TileSize - screenPosition.X);
+                    var y = (int)Math.Round(layer.WorldTileY * TileSize - screenPosition.Y);
+                    if (x >= clipWidth || y >= clipHeight || x + TileSize <= 0 || y + TileSize <= 0)
+                    {
+                        continue;
+                    }
 
-                var color = ResolveProjectionColor(layer.Status);
-                var fillAlpha = string.Equals(layer.Status, BlueprintProjectionLayerStatuses.Fulfilled, StringComparison.Ordinal)
-                    ? 38
-                    : 70;
-                var borderAlpha = string.Equals(layer.Status, BlueprintProjectionLayerStatuses.Fulfilled, StringComparison.Ordinal)
-                    ? 132
-                    : 190;
-                UiPrimitiveRenderer.DrawFilledRectClipped(spriteBatch, x, y, TileSize, TileSize, 0, 0, clipWidth, clipHeight, color[0], color[1], color[2], fillAlpha);
-                UiPrimitiveRenderer.DrawRectBorderClipped(spriteBatch, x, y, TileSize, TileSize, 1, 0, 0, clipWidth, clipHeight, color[0], color[1], color[2], borderAlpha);
+                    var color = ResolveProjectionColor(layer.Status);
+                    var fillAlpha = ResolveProjectionFillAlpha(layer.Status);
+                    var borderAlpha = ResolveProjectionBorderAlpha(layer.Status);
+                    if (BlueprintProjectionGhostRenderer.DrawLayer(spriteBatch, layer, x, y, clipWidth, clipHeight, color[0], color[1], color[2], fillAlpha, borderAlpha))
+                    {
+                        continue;
+                    }
+
+                    UiPrimitiveRenderer.DrawFilledRectClipped(spriteBatch, x, y, TileSize, TileSize, 0, 0, clipWidth, clipHeight, color[0], color[1], color[2], fillAlpha);
+                    UiPrimitiveRenderer.DrawRectBorderClipped(spriteBatch, x, y, TileSize, TileSize, 1, 0, 0, clipWidth, clipHeight, color[0], color[1], color[2], borderAlpha);
+                }
             }
         }
 
@@ -104,12 +125,12 @@ namespace JueMingZ.UI
         {
             if (string.Equals(status, BlueprintProjectionLayerStatuses.Fulfilled, StringComparison.Ordinal))
             {
-                return new[] { 96, 206, 128 };
+                return new[] { 0, 0, 0 };
             }
 
             if (string.Equals(status, BlueprintProjectionLayerStatuses.Missing, StringComparison.Ordinal))
             {
-                return new[] { 236, 178, 82 };
+                return new[] { 248, 216, 72 };
             }
 
             if (string.Equals(status, BlueprintProjectionLayerStatuses.Conflict, StringComparison.Ordinal))
@@ -118,6 +139,41 @@ namespace JueMingZ.UI
             }
 
             return new[] { 156, 164, 180 };
+        }
+
+        private static int ResolveProjectionFillAlpha(string status)
+        {
+            if (string.Equals(status, BlueprintProjectionLayerStatuses.Fulfilled, StringComparison.Ordinal))
+            {
+                return 0;
+            }
+
+            if (string.Equals(status, BlueprintProjectionLayerStatuses.Conflict, StringComparison.Ordinal))
+            {
+                return 176;
+            }
+
+            if (string.Equals(status, BlueprintProjectionLayerStatuses.Missing, StringComparison.Ordinal))
+            {
+                return 142;
+            }
+
+            return 118;
+        }
+
+        private static int ResolveProjectionBorderAlpha(string status)
+        {
+            if (string.Equals(status, BlueprintProjectionLayerStatuses.Fulfilled, StringComparison.Ordinal))
+            {
+                return 0;
+            }
+
+            if (string.Equals(status, BlueprintProjectionLayerStatuses.Conflict, StringComparison.Ordinal))
+            {
+                return 232;
+            }
+
+            return 205;
         }
     }
 }

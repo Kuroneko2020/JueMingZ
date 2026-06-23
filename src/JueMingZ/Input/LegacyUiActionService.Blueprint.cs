@@ -227,6 +227,7 @@ namespace JueMingZ.Input
             payload = (payload ?? string.Empty).Trim();
             if (string.Equals(payload, BlueprintHandheldActionBarState.ButtonIdCreate, StringComparison.OrdinalIgnoreCase))
             {
+                BlueprintPlacedInstanceTransformState.Cancel();
                 var entry = BlueprintEntryState.ApplyCommand(
                     BlueprintEntryCommands.StartCreate,
                     ConfigService.AppSettings ?? AppSettings.CreateDefault());
@@ -251,6 +252,7 @@ namespace JueMingZ.Input
 
             if (string.Equals(payload, BlueprintHandheldActionBarState.ButtonIdSave, StringComparison.OrdinalIgnoreCase))
             {
+                BlueprintPlacedInstanceTransformState.Cancel();
                 var entry = BlueprintEntryState.ApplyCommand(
                     BlueprintEntryCommands.FinishCreateSave,
                     ConfigService.AppSettings ?? AppSettings.CreateDefault());
@@ -293,6 +295,7 @@ namespace JueMingZ.Input
 
             if (string.Equals(payload, BlueprintHandheldActionBarState.ButtonIdExitCreate, StringComparison.OrdinalIgnoreCase))
             {
+                BlueprintPlacedInstanceTransformState.Cancel();
                 var entry = BlueprintEntryState.ApplyCommand(
                     BlueprintEntryCommands.ExitCreate,
                     ConfigService.AppSettings ?? AppSettings.CreateDefault());
@@ -317,6 +320,7 @@ namespace JueMingZ.Input
 
             if (string.Equals(payload, BlueprintHandheldActionBarState.ButtonIdClearSelection, StringComparison.OrdinalIgnoreCase))
             {
+                BlueprintPlacedInstanceTransformState.Cancel();
                 var entry = BlueprintEntryState.ApplyCommand(
                     BlueprintEntryCommands.ClearSelection,
                     ConfigService.AppSettings ?? AppSettings.CreateDefault());
@@ -341,6 +345,7 @@ namespace JueMingZ.Input
 
             if (string.Equals(payload, BlueprintHandheldActionBarState.ButtonIdOpenLibrary, StringComparison.OrdinalIgnoreCase))
             {
+                BlueprintPlacedInstanceTransformState.Cancel();
                 var library = BlueprintLibraryUiState.OpenLibrary();
                 RevealBlueprintLibraryMenuIfOpened(library);
                 var entry = BlueprintEntryState.ApplyCommand(
@@ -364,6 +369,129 @@ namespace JueMingZ.Input
                     before,
                     BuildBlueprintUiStateJson(),
                     "{\"submitted\":false,\"implemented\":true,\"uiOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"action\":\"" + EscapeJson(commandResult.ButtonId) + "\",\"entryAction\":\"" + EscapeJson(BlueprintEntryCommands.OpenLibrary) + "\",\"buttonLabel\":\"" + EscapeJson(commandResult.ButtonLabel) + "\",\"resultCode\":\"" + EscapeJson(resultCode) + "\",\"entryResultCode\":\"" + EscapeJson(entry.ResultCode) + "\",\"mode\":\"" + EscapeJson(entry.Mode) + "\",\"changed\":" + BoolRaw(entry.Changed || (library != null && library.Changed)) + ",\"placeholderOnly\":" + BoolRaw(entry.PlaceholderOnly) + ",\"heldItemType\":" + IntRaw(commandResult.HeldItemType) + ",\"visibleReason\":\"" + EscapeJson(BlueprintHandheldActionBarState.HiddenReasonNone) + "\",\"blockedReason\":\"\"" + BuildBlueprintHandheldActionMetadata(command, commandResult.ButtonId, commandResult.MouseCaptured) + "}",
+                    "Button");
+                return;
+            }
+
+            if (string.Equals(payload, BlueprintHandheldActionBarState.ButtonIdOpenPlacedList, StringComparison.OrdinalIgnoreCase))
+            {
+                BlueprintPlacedInstanceTransformState.Cancel();
+                var placed = BlueprintPlacedInstanceUiState.OpenManagement();
+                RevealBlueprintPlacedMenuIfOpened(placed);
+                var entry = BlueprintEntryState.ApplyCommand(
+                    BlueprintEntryCommands.OpenPlacedInstances,
+                    ConfigService.AppSettings ?? AppSettings.CreateDefault());
+                var resultCode = placed == null || string.IsNullOrWhiteSpace(placed.ResultCode)
+                    ? entry.ResultCode
+                    : placed.ResultCode;
+                var commandResult = BlueprintHandheldActionBarState.RecordCommandResultClick(
+                    payload,
+                    command == null ? 0 : command.IntValue,
+                    command != null && command.MouseCaptured,
+                    entry.ResultCode,
+                    placed != null && !string.IsNullOrWhiteSpace(placed.Message) ? placed.Message : entry.Message);
+                Record(
+                    command,
+                    "Ui.Blueprint.HandheldActionBar",
+                    "UI",
+                    placed != null && !placed.Succeeded ? "Failed" : entry.Succeeded ? (entry.Changed || (placed != null && placed.Changed) ? "Succeeded" : "NotApplicable") : "Failed",
+                    placed != null && !placed.Succeeded ? placed.Message : entry.Message,
+                    before,
+                    BuildBlueprintUiStateJson(),
+                    "{\"submitted\":false,\"implemented\":true,\"uiOnly\":true,\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"action\":\"" + EscapeJson(commandResult.ButtonId) + "\",\"entryAction\":\"" + EscapeJson(BlueprintEntryCommands.OpenPlacedInstances) + "\",\"buttonLabel\":\"" + EscapeJson(commandResult.ButtonLabel) + "\",\"resultCode\":\"" + EscapeJson(resultCode) + "\",\"entryResultCode\":\"" + EscapeJson(entry.ResultCode) + "\",\"mode\":\"" + EscapeJson(entry.Mode) + "\",\"changed\":" + BoolRaw(entry.Changed || (placed != null && placed.Changed)) + ",\"placeholderOnly\":" + BoolRaw(entry.PlaceholderOnly) + ",\"heldItemType\":" + IntRaw(commandResult.HeldItemType) + ",\"visibleReason\":\"" + EscapeJson(BlueprintHandheldActionBarState.HiddenReasonNone) + "\",\"blockedReason\":\"\"" + BuildBlueprintHandheldActionMetadata(command, commandResult.ButtonId, commandResult.MouseCaptured) + "}",
+                    "Button");
+                return;
+            }
+
+            if (string.Equals(payload, BlueprintHandheldActionBarState.ButtonIdClearPlaced, StringComparison.OrdinalIgnoreCase))
+            {
+                var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
+                var entryModeBeforeClear = BlueprintEntryState.GetSnapshot(settings).Mode;
+                var clear = BlueprintPlacedInstanceUiState.ClearAllCurrentWorld();
+                BlueprintPlacedInstanceTransformState.Cancel();
+                BlueprintEntryCommandResult entryReset = null;
+                if (clear != null &&
+                    clear.Succeeded &&
+                    clear.Changed &&
+                    (string.Equals(entryModeBeforeClear, BlueprintEntryModes.PlacedManagement, StringComparison.Ordinal) ||
+                     string.Equals(entryModeBeforeClear, BlueprintEntryModes.PlacementPreview, StringComparison.Ordinal) ||
+                     string.Equals(entryModeBeforeClear, BlueprintEntryModes.EraseRegion, StringComparison.Ordinal)))
+                {
+                    entryReset = BlueprintEntryState.ApplyCommand(BlueprintEntryCommands.Cancel, settings);
+                }
+
+                var commandResult = BlueprintHandheldActionBarState.RecordCommandResultClick(
+                    payload,
+                    command == null ? 0 : command.IntValue,
+                    command != null && command.MouseCaptured,
+                    clear == null ? "clearPlacedUnknown" : clear.ResultCode,
+                    clear == null ? "清空放置结果未知。" : clear.Message);
+                Record(
+                    command,
+                    "Ui.Blueprint.HandheldActionBar",
+                    "UI",
+                    clear == null ? "Failed" : clear.Outcome,
+                    clear == null ? "清空放置结果未知。" : clear.Message,
+                    before,
+                    BuildBlueprintUiStateJson(),
+                    "{\"submitted\":false,\"implemented\":true,\"uiOnly\":false,\"storeMutation\":true,\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"action\":\"" + EscapeJson(commandResult.ButtonId) + "\",\"buttonLabel\":\"" + EscapeJson(commandResult.ButtonLabel) + "\",\"resultCode\":\"" + EscapeJson(commandResult.ResultCode) + "\",\"entryResultCode\":\"" + EscapeJson(entryReset == null ? string.Empty : entryReset.ResultCode) + "\",\"changed\":" + BoolRaw(clear != null && clear.Changed) + ",\"heldItemType\":" + IntRaw(commandResult.HeldItemType) + ",\"visibleReason\":\"" + EscapeJson(BlueprintHandheldActionBarState.HiddenReasonNone) + "\",\"blockedReason\":\"\"" + BuildBlueprintHandheldActionMetadata(command, commandResult.ButtonId, commandResult.MouseCaptured) + "}",
+                    "Button");
+                return;
+            }
+
+            if (string.Equals(payload, BlueprintHandheldActionBarState.ButtonIdRegionModify, StringComparison.OrdinalIgnoreCase))
+            {
+                BlueprintCreationMaskState.Cancel();
+                BlueprintPlacementPreviewState.Cancel();
+                BlueprintPlacedInstanceTransformState.Cancel();
+                var eraseStart = BlueprintEraseRegionState.BeginErase(string.Empty);
+                var entry = BlueprintEntryState.MarkEraseStarted(eraseStart);
+                var commandResult = BlueprintHandheldActionBarState.RecordCommandResultClick(
+                    payload,
+                    command == null ? 0 : command.IntValue,
+                    command != null && command.MouseCaptured,
+                    entry.ResultCode,
+                    entry.Message);
+                Record(
+                    command,
+                    "Ui.Blueprint.HandheldActionBar",
+                    "UI",
+                    entry.Succeeded ? (entry.Changed ? "Succeeded" : "NotApplicable") : "Failed",
+                    entry.Message,
+                    before,
+                    BuildBlueprintUiStateJson(),
+                    "{\"submitted\":false,\"implemented\":true,\"uiOnly\":false,\"eraseInputActive\":" + BoolRaw(entry.Succeeded) + ",\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"action\":\"" + EscapeJson(commandResult.ButtonId) + "\",\"entryAction\":\"" + EscapeJson(BlueprintEntryCommands.StartErase) + "\",\"buttonLabel\":\"" + EscapeJson(commandResult.ButtonLabel) + "\",\"resultCode\":\"" + EscapeJson(commandResult.ResultCode) + "\",\"mode\":\"" + EscapeJson(entry.Mode) + "\",\"changed\":" + BoolRaw(entry.Changed) + ",\"targetInstanceId\":\"" + EscapeJson(eraseStart == null ? string.Empty : eraseStart.TargetInstanceId) + "\",\"targetInstanceName\":\"" + EscapeJson(eraseStart == null ? string.Empty : eraseStart.TargetInstanceName) + "\",\"heldItemType\":" + IntRaw(commandResult.HeldItemType) + ",\"visibleReason\":\"" + EscapeJson(BlueprintHandheldActionBarState.HiddenReasonNone) + "\",\"blockedReason\":\"\"" + BuildBlueprintHandheldActionMetadata(command, commandResult.ButtonId, commandResult.MouseCaptured) + "}",
+                    "Button");
+                return;
+            }
+
+            if (string.Equals(payload, BlueprintHandheldActionBarState.ButtonIdMove, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(payload, BlueprintHandheldActionBarState.ButtonIdMirror, StringComparison.OrdinalIgnoreCase))
+            {
+                BlueprintCreationMaskState.Cancel();
+                BlueprintPlacementPreviewState.Cancel();
+                BlueprintEraseRegionState.Cancel();
+                var transformStart = string.Equals(payload, BlueprintHandheldActionBarState.ButtonIdMirror, StringComparison.OrdinalIgnoreCase)
+                    ? BlueprintPlacedInstanceTransformState.BeginMirror()
+                    : BlueprintPlacedInstanceTransformState.BeginMove();
+                var entry = transformStart != null && transformStart.Succeeded
+                    ? BlueprintEntryState.ApplyCommand(BlueprintEntryCommands.OpenPlacedInstances, ConfigService.AppSettings ?? AppSettings.CreateDefault())
+                    : null;
+                var commandResult = BlueprintHandheldActionBarState.RecordCommandResultClick(
+                    payload,
+                    command == null ? 0 : command.IntValue,
+                    command != null && command.MouseCaptured,
+                    transformStart == null ? "transformUnknown" : transformStart.ResultCode,
+                    transformStart == null ? "蓝图移动 / 镜像启动结果未知。" : transformStart.Message);
+                Record(
+                    command,
+                    "Ui.Blueprint.HandheldActionBar",
+                    "UI",
+                    transformStart == null ? "Failed" : transformStart.Succeeded ? (transformStart.Changed ? "Succeeded" : "NotApplicable") : "Failed",
+                    transformStart == null ? "蓝图移动 / 镜像启动结果未知。" : transformStart.Message,
+                    before,
+                    BuildBlueprintUiStateJson(),
+                    "{\"submitted\":false,\"implemented\":true,\"uiOnly\":false,\"transformInputActive\":" + BoolRaw(transformStart != null && transformStart.Succeeded) + ",\"featureId\":\"" + EscapeJson(FeatureIds.BlueprintMain) + "\",\"action\":\"" + EscapeJson(commandResult.ButtonId) + "\",\"entryAction\":\"" + EscapeJson(BlueprintEntryCommands.OpenPlacedInstances) + "\",\"buttonLabel\":\"" + EscapeJson(commandResult.ButtonLabel) + "\",\"resultCode\":\"" + EscapeJson(commandResult.ResultCode) + "\",\"entryResultCode\":\"" + EscapeJson(entry == null ? string.Empty : entry.ResultCode) + "\",\"mode\":\"" + EscapeJson(entry == null ? string.Empty : entry.Mode) + "\",\"transformMode\":\"" + EscapeJson(transformStart == null ? string.Empty : transformStart.Mode) + "\",\"transformPhase\":\"" + EscapeJson(transformStart == null ? string.Empty : transformStart.Phase) + "\",\"changed\":" + BoolRaw(transformStart != null && transformStart.Changed) + ",\"heldItemType\":" + IntRaw(commandResult.HeldItemType) + ",\"visibleReason\":\"" + EscapeJson(BlueprintHandheldActionBarState.HiddenReasonNone) + "\",\"blockedReason\":\"\"" + BuildBlueprintHandheldActionMetadata(command, commandResult.ButtonId, commandResult.MouseCaptured) + "}",
                     "Button");
                 return;
             }
@@ -553,6 +681,7 @@ namespace JueMingZ.Input
             else if (string.Equals(payload, BlueprintEntryCommands.OpenPlacedInstances, StringComparison.OrdinalIgnoreCase))
             {
                 placed = BlueprintPlacedInstanceUiState.OpenManagement();
+                RevealBlueprintPlacedMenuIfOpened(placed);
             }
             else if (string.Equals(payload, BlueprintEntryCommands.OpenMaterials, StringComparison.OrdinalIgnoreCase))
             {
@@ -673,6 +802,11 @@ namespace JueMingZ.Input
                 return HandleBlueprintLibraryAction(command, "export", templateId);
             }
 
+            if (string.Equals(action, "layout-materials", StringComparison.OrdinalIgnoreCase))
+            {
+                return HandleBlueprintLibraryAction(command, "materials", templateId);
+            }
+
             if (string.Equals(action, "layout-use", StringComparison.OrdinalIgnoreCase))
             {
                 return HandleBlueprintLibraryAction(command, "use", templateId);
@@ -739,6 +873,12 @@ namespace JueMingZ.Input
             {
                 LegacyTextInput.ClearFocus();
                 return BlueprintLibraryUiState.UseTemplate(templateId);
+            }
+
+            if (string.Equals(action, "materials", StringComparison.OrdinalIgnoreCase))
+            {
+                LegacyTextInput.ClearFocus();
+                return BlueprintLibraryUiState.ToggleMaterialList(templateId);
             }
 
             if (string.Equals(action, "export", StringComparison.OrdinalIgnoreCase))
@@ -875,6 +1015,7 @@ namespace JueMingZ.Input
                    "\"creationMask\":" + BlueprintCreationMaskState.BuildUiStateJson() + "," +
                    "\"placementPreview\":" + BlueprintPlacementPreviewState.BuildUiStateJson() + "," +
                    "\"eraseRegion\":" + BlueprintEraseRegionState.BuildUiStateJson() + "," +
+                   "\"placedTransform\":" + BlueprintPlacedInstanceTransformState.BuildUiStateJson() + "," +
                    "\"mirror\":" + BlueprintMirrorService.BuildUiStateJson() + "," +
                    "\"projection\":" + BlueprintProjectionService.BuildUiStateJson() + "," +
                    "\"materials\":" + BlueprintMaterialService.BuildUiStateJson() + "," +
@@ -998,6 +1139,19 @@ namespace JueMingZ.Input
         private static void RevealBlueprintLibraryMenuIfOpened(BlueprintLibraryCommandResult library)
         {
             if (library != null && !library.Succeeded)
+            {
+                return;
+            }
+
+            LegacyTextInput.ClearFocus();
+            LegacyMainUiState.SelectPage("blueprint");
+            LegacyMainUiState.SetScrollOffset(0, 0);
+            LegacyMainUiState.SetVisible(true);
+        }
+
+        private static void RevealBlueprintPlacedMenuIfOpened(BlueprintPlacedInstanceCommandResult placed)
+        {
+            if (placed != null && !placed.Succeeded)
             {
                 return;
             }

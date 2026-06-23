@@ -392,6 +392,15 @@ namespace JueMingZ.Automation.Blueprint
             }
         }
 
+        internal static BlueprintMaterialSnapshot ForceRefreshForPlacedInstanceList()
+        {
+            var projection = BlueprintProjectionService.GetSnapshot();
+            lock (SyncRoot)
+            {
+                return ResolveSnapshotLocked(projection, true).Clone();
+            }
+        }
+
         public static string BuildUiStateJson()
         {
             var snapshot = GetDiagnostics();

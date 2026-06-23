@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using JueMingZ.Automation.Blueprint;
+using JueMingZ.Diagnostics;
 using JueMingZ.Records;
 
 namespace JueMingZ.UI.Legacy
@@ -146,6 +147,7 @@ namespace JueMingZ.UI.Legacy
 
         public static BlueprintPlacedInstanceCommandResult OpenManagement()
         {
+            BlueprintPlacedInstanceCommandResult result;
             lock (SyncRoot)
             {
                 RefreshLocked();
@@ -160,8 +162,11 @@ namespace JueMingZ.UI.Legacy
                     "当前世界已放置蓝图 " + GetInstanceCountLocked().ToString(CultureInfo.InvariantCulture) + " 个。",
                     _selectedInstanceId,
                     false);
-                return CreateResultLocked(true, false, "Succeeded", _lastResultCode, _lastNotice, _selectedInstanceId, GetSelectedInstanceNameLocked());
+                result = CreateResultLocked(true, false, "Succeeded", _lastResultCode, _lastNotice, _selectedInstanceId, GetSelectedInstanceNameLocked());
             }
+
+            RefreshProjectionAfterWorldInstancesChanged();
+            return result;
         }
 
         public static BlueprintPlacedInstanceCommandResult MovePage(int delta)
@@ -205,6 +210,7 @@ namespace JueMingZ.UI.Legacy
         public static BlueprintPlacedInstanceCommandResult ToggleHidden(string instanceId)
         {
             var normalizedId = BlueprintTemplateLibraryStore.NormalizeId(instanceId);
+            BlueprintPlacedInstanceCommandResult result;
             lock (SyncRoot)
             {
                 RefreshLocked();
@@ -230,13 +236,17 @@ namespace JueMingZ.UI.Legacy
                 _removeConfirmInstanceId = string.Empty;
                 var resultCode = instance.Hidden ? "hidden" : "shown";
                 RecordNoticeLocked(resultCode, instance.Hidden ? "蓝图实例已隐藏。" : "蓝图实例已显示。", normalizedId, true);
-                return CreateResultLocked(true, true, "Succeeded", _lastResultCode, _lastNotice, normalizedId, instance.Name);
+                result = CreateResultLocked(true, true, "Succeeded", _lastResultCode, _lastNotice, normalizedId, instance.Name);
             }
+
+            RefreshProjectionAfterWorldInstancesChanged();
+            return result;
         }
 
         public static BlueprintPlacedInstanceCommandResult RequestRemoveOrConfirm(string instanceId)
         {
             var normalizedId = BlueprintTemplateLibraryStore.NormalizeId(instanceId);
+            BlueprintPlacedInstanceCommandResult result;
             lock (SyncRoot)
             {
                 EnsureLoadedLocked();
@@ -277,13 +287,17 @@ namespace JueMingZ.UI.Legacy
 
                 _removeConfirmInstanceId = string.Empty;
                 RecordNoticeLocked("removed", "蓝图实例已移除；模板和世界内容未修改。", _selectedInstanceId, true);
-                return CreateResultLocked(true, true, "Succeeded", _lastResultCode, _lastNotice, normalizedId, instance.Name);
+                result = CreateResultLocked(true, true, "Succeeded", _lastResultCode, _lastNotice, normalizedId, instance.Name);
             }
+
+            RefreshProjectionAfterWorldInstancesChanged();
+            return result;
         }
 
         public static BlueprintPlacedInstanceCommandResult MoveLayer(string instanceId, int delta)
         {
             var normalizedId = BlueprintTemplateLibraryStore.NormalizeId(instanceId);
+            BlueprintPlacedInstanceCommandResult result;
             lock (SyncRoot)
             {
                 RefreshLocked();
@@ -322,8 +336,57 @@ namespace JueMingZ.UI.Legacy
                 _removeConfirmInstanceId = string.Empty;
                 var resultCode = delta > 0 ? "layerRaised" : "layerLowered";
                 RecordNoticeLocked(resultCode, delta > 0 ? "蓝图实例层级已上移。" : "蓝图实例层级已下移。", normalizedId, true);
-                return CreateResultLocked(true, true, "Succeeded", _lastResultCode, _lastNotice, normalizedId, temp.Name);
+                result = CreateResultLocked(true, true, "Succeeded", _lastResultCode, _lastNotice, normalizedId, temp.Name);
             }
+
+            RefreshProjectionAfterWorldInstancesChanged();
+            return result;
+        }
+
+        public static BlueprintPlacedInstanceCommandResult ClearAllCurrentWorld()
+        {
+            BlueprintPlacedInstanceCommandResult result;
+            lock (SyncRoot)
+            {
+                RefreshLocked();
+                if (_lastLoadResult == null || !_lastLoadResult.Succeeded)
+                {
+                    RecordNoticeLocked("loadFailed", "当前世界蓝图实例读取失败：" + (_lastLoadResult == null ? string.Empty : _lastLoadResult.Message), string.Empty, false);
+                    return CreateResultLocked(false, false, "Failed", "loadFailed", _lastNotice, string.Empty, string.Empty);
+                }
+
+                var removedCount = GetInstanceCountLocked();
+                if (removedCount <= 0)
+                {
+                    _selectedInstanceId = string.Empty;
+                    _removeConfirmInstanceId = string.Empty;
+                    RecordNoticeLocked("clearPlacedEmpty", "当前世界没有已放置蓝图。", string.Empty, false);
+                    return CreateResultLocked(true, false, "NotApplicable", _lastResultCode, _lastNotice, string.Empty, string.Empty);
+                }
+
+                // Stage 06 clear is current-world instance governance only: it
+                // removes placed instance records while leaving library templates
+                // and Terraria world tiles/walls untouched.
+                var save = SaveCurrentWorldLocked(new List<BlueprintWorldInstanceRecord>());
+                if (!save.Succeeded)
+                {
+                    RecordNoticeLocked(save.ResultCode, "清空当前世界已放置蓝图失败：" + save.Message, string.Empty, false);
+                    return CreateResultLocked(false, false, "Failed", _lastResultCode, _lastNotice, string.Empty, string.Empty);
+                }
+
+                _selectedInstanceId = string.Empty;
+                _removeConfirmInstanceId = string.Empty;
+                RecordNoticeLocked(
+                    "clearPlaced",
+                    "已清空当前世界 " + removedCount.ToString(CultureInfo.InvariantCulture) + " 个已放置蓝图；模板和世界内容未修改。",
+                    string.Empty,
+                    true);
+                result = CreateResultLocked(true, true, "Succeeded", _lastResultCode, _lastNotice, string.Empty, string.Empty);
+            }
+
+            BlueprintEraseRegionState.Cancel();
+            RefreshProjectionAfterWorldInstancesChanged();
+            return result;
         }
 
         public static void NotifyInstanceCreated(BlueprintWorldInstanceRecord instance)
@@ -340,6 +403,8 @@ namespace JueMingZ.UI.Legacy
                 _removeConfirmInstanceId = string.Empty;
                 RecordNoticeLocked("instanceCreated", "新蓝图实例已加入当前世界列表。", _selectedInstanceId, true);
             }
+
+            RefreshProjectionAfterWorldInstancesChanged();
         }
 
         public static void NotifyInstancesChanged(string preferredSelectedInstanceId)
@@ -357,6 +422,8 @@ namespace JueMingZ.UI.Legacy
                 _removeConfirmInstanceId = string.Empty;
                 RecordNoticeLocked("instancesChanged", "当前世界蓝图实例数据已刷新。", _selectedInstanceId, true);
             }
+
+            RefreshProjectionAfterWorldInstancesChanged();
         }
 
         public static string BuildInstanceSummary(BlueprintWorldInstanceRecord instance)
@@ -575,6 +642,37 @@ namespace JueMingZ.UI.Legacy
             }
 
             return result;
+        }
+
+        private static void RefreshProjectionAfterWorldInstancesChanged()
+        {
+            // Instance open/mutation is the explicit boundary for projection and material comparison refreshes;
+            // draw paths keep reading the cached snapshots.
+            try
+            {
+                BlueprintProjectionService.RefreshAfterWorldInstancesChanged();
+            }
+            catch (Exception error)
+            {
+                LogThrottle.WarnThrottled(
+                    "blueprint-placed-projection-refresh-failed",
+                    TimeSpan.FromSeconds(10),
+                    "BlueprintPlacedInstanceUiState",
+                    "Blueprint placed-instance projection refresh failed; the instance store mutation remains saved. " + error.Message);
+            }
+
+            try
+            {
+                BlueprintMaterialService.ForceRefreshForPlacedInstanceList();
+            }
+            catch (Exception error)
+            {
+                LogThrottle.WarnThrottled(
+                    "blueprint-placed-material-refresh-failed",
+                    TimeSpan.FromSeconds(10),
+                    "BlueprintPlacedInstanceUiState",
+                    "Blueprint placed-instance material comparison refresh failed; the instance store mutation remains saved. " + error.Message);
+            }
         }
 
         private static BlueprintWorldInstanceStore ResolveStoreLocked()

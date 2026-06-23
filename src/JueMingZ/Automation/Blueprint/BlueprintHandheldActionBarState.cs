@@ -30,14 +30,19 @@ namespace JueMingZ.Automation.Blueprint
         public const string HiddenReasonSelectedItemMismatch = "selected-item-mismatch";
         public const string HiddenReasonScreenUnavailable = "screen-unavailable";
         public const string ResultCodeUiOnlyNotImplemented = "uiOnlyNotImplemented";
+        public const string ResultCodeEntryWiredDeferred = "entryWiredDeferred";
         public const string ButtonIdCreate = "create";
         public const string ButtonIdSave = "save";
         public const string ButtonIdExitCreate = "exit-create";
         public const string ButtonIdClearSelection = "clear-selection";
         public const string ButtonIdOpenLibrary = "open-library";
-        public const string ButtonIdDelete = "delete";
+        public const string ButtonIdOpenPlacedList = "open-placed";
+        public const string ButtonIdClearPlaced = "clear-placed";
+        public const string ButtonIdDelete = ButtonIdClearPlaced;
         public const string ButtonIdMove = "move";
-        public const string ButtonIdRedMap = "red-map";
+        public const string ButtonIdRegionModify = "region-modify";
+        public const string ButtonIdRedMap = ButtonIdRegionModify;
+        public const string ButtonIdMirror = "mirror";
         public const string SaveDisabledTooltip = "还没有创建蓝图呢";
         public const string PointerOwnershipReasonLeft = "left";
         public const string PointerOwnershipReasonScroll = "scroll";
@@ -59,11 +64,13 @@ namespace JueMingZ.Automation.Blueprint
             new BlueprintHandheldActionBarButtonDefinition(ButtonIdCreate, "创建蓝图", 0, "创建新的蓝图选区"),
             new BlueprintHandheldActionBarButtonDefinition(ButtonIdSave, "保存蓝图", 0, "保存当前蓝图选区"),
             new BlueprintHandheldActionBarButtonDefinition(ButtonIdExitCreate, "退出创建", 1, "退出创建并保留当前选区"),
-            new BlueprintHandheldActionBarButtonDefinition(ButtonIdClearSelection, "清除已有选区", 2, "只清除当前蓝图创建选区"),
+            new BlueprintHandheldActionBarButtonDefinition(ButtonIdClearSelection, "清除选区", 2, "清除所有选区"),
             new BlueprintHandheldActionBarButtonDefinition(ButtonIdOpenLibrary, "打开蓝图库", 1, "打开蓝图库"),
-            new BlueprintHandheldActionBarButtonDefinition(ButtonIdDelete, "删除蓝图", 3, "删除已经放置的蓝图或已经选区待创建的区域"),
-            new BlueprintHandheldActionBarButtonDefinition(ButtonIdMove, "移动蓝图", 4, "移动已经放置的蓝图或已经选区待创建的区域"),
-            new BlueprintHandheldActionBarButtonDefinition(ButtonIdRedMap, "红图", 5, "对已放置的蓝图区域进行修改")
+            new BlueprintHandheldActionBarButtonDefinition(ButtonIdOpenPlacedList, "已放置蓝图列表", 2, "打开当前世界已放置蓝图列表"),
+            new BlueprintHandheldActionBarButtonDefinition(ButtonIdClearPlaced, "清空放置", 3, "清空当前世界已放置蓝图"),
+            new BlueprintHandheldActionBarButtonDefinition(ButtonIdMove, "移动蓝图", 4, "只能移动已放置蓝图"),
+            new BlueprintHandheldActionBarButtonDefinition(ButtonIdRegionModify, "区域修改", 5, "对已经放置蓝图进行内容修剪"),
+            new BlueprintHandheldActionBarButtonDefinition(ButtonIdMirror, "镜像", 6, "镜像已放置蓝图")
         };
         private static string _hoveredButtonId = string.Empty;
         private static string _pressedButtonId = string.Empty;
@@ -353,6 +360,36 @@ namespace JueMingZ.Automation.Blueprint
                 mouseCaptured);
         }
 
+        internal static BlueprintHandheldActionBarCommandResult RecordDeferredBusinessClick(
+            string buttonId,
+            int heldItemType,
+            bool mouseCaptured)
+        {
+            // Stage 03 owns command identity and player-facing feedback only.
+            // Later stages must replace these entries with their narrow services.
+            var definition = FindButtonDefinition(buttonId);
+            var normalizedButtonId = definition == null ? buttonId ?? string.Empty : definition.Id;
+            var label = definition == null ? buttonId ?? string.Empty : definition.Label;
+            var message = BuildDeferredBusinessMessage(normalizedButtonId, label);
+            lock (InteractionSyncRoot)
+            {
+                _lastClickedButtonId = normalizedButtonId;
+                _lastClickedButtonLabel = label;
+                _lastHeldItemType = heldItemType;
+                _lastResultCode = ResultCodeEntryWiredDeferred;
+                _lastNotice = message;
+            }
+
+            return new BlueprintHandheldActionBarCommandResult(
+                true,
+                normalizedButtonId,
+                label,
+                ResultCodeEntryWiredDeferred,
+                message,
+                heldItemType,
+                mouseCaptured);
+        }
+
         internal static BlueprintHandheldActionBarInteractionSnapshot GetInteractionSnapshotForTesting()
         {
             lock (InteractionSyncRoot)
@@ -497,9 +534,11 @@ namespace JueMingZ.Automation.Blueprint
 
                 if (environment.BlueprintHasPlacedInstances)
                 {
-                    definitions.Add(BuildButtonSpec(ButtonIdDelete, true, string.Empty));
+                    definitions.Add(BuildButtonSpec(ButtonIdOpenPlacedList, true, string.Empty));
+                    definitions.Add(BuildButtonSpec(ButtonIdClearPlaced, true, string.Empty));
                     definitions.Add(BuildButtonSpec(ButtonIdMove, true, string.Empty));
-                    definitions.Add(BuildButtonSpec(ButtonIdRedMap, true, string.Empty));
+                    definitions.Add(BuildButtonSpec(ButtonIdRegionModify, true, string.Empty));
+                    definitions.Add(BuildButtonSpec(ButtonIdMirror, true, string.Empty));
                 }
             }
 
@@ -622,6 +661,31 @@ namespace JueMingZ.Automation.Blueprint
             }
 
             return null;
+        }
+
+        private static string BuildDeferredBusinessMessage(string buttonId, string label)
+        {
+            if (string.Equals(buttonId, ButtonIdClearPlaced, StringComparison.Ordinal))
+            {
+                return "清空放置入口已接线，真实清空放置业务在 06 阶段实现。";
+            }
+
+            if (string.Equals(buttonId, ButtonIdMove, StringComparison.Ordinal))
+            {
+                return "移动蓝图会进入已放置实例选择状态。";
+            }
+
+            if (string.Equals(buttonId, ButtonIdRegionModify, StringComparison.Ordinal))
+            {
+                return "区域修改入口已接线，真实区域修改业务在 06 阶段实现。";
+            }
+
+            if (string.Equals(buttonId, ButtonIdMirror, StringComparison.Ordinal))
+            {
+                return "镜像会进入已放置实例选择状态。";
+            }
+
+            return (string.IsNullOrWhiteSpace(label) ? "蓝图手持按钮" : label) + "入口已接线，业务在后续阶段实现。";
         }
 
         private static BlueprintHandheldActionBarButtonFrame FindButtonFrame(BlueprintHandheldActionBarFrame frame, string buttonId)

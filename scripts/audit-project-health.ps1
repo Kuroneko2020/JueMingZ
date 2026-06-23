@@ -5091,9 +5091,16 @@ function Test-BlueprintHandheldActionBarGovernance {
         $stateText.Contains("CommandElementPrefix") -and
         $stateText.Contains("blueprint-handheld-action-bar:") -and
         $stateText.Contains("ResultCodeUiOnlyNotImplemented") -and
+        $stateText.Contains("ResultCodeEntryWiredDeferred") -and
         $stateText.Contains("ButtonIdSave") -and
         $stateText.Contains("ButtonIdClearSelection") -and
-        $stateText.Contains("清除已有选区") -and
+        $stateText.Contains("ButtonIdOpenPlacedList") -and
+        $stateText.Contains("ButtonIdClearPlaced") -and
+        $stateText.Contains("ButtonIdRegionModify") -and
+        $stateText.Contains("ButtonIdMirror") -and
+        $stateText.Contains("清除选区") -and
+        $stateText.Contains("已放置蓝图列表") -and
+        $stateText.Contains("RecordDeferredBusinessClick") -and
         $stateText.Contains("BlueprintCreationHasPendingSelection") -and
         $stateText.Contains("BlueprintHasPlacedInstances") -and
         $stateText.Contains("Tooltip") -and
@@ -5110,10 +5117,10 @@ function Test-BlueprintHandheldActionBarGovernance {
         $stateText.Contains("_lastOwnershipReason") -and
         $stateText.Contains("input.MouseReadMode") -and
         $stateText.Contains("BlueprintHandheldActionBarDiagnostics")) {
-        Write-Pass "Blueprint handheld action bar state owns dedicated command ids, dynamic matrix inputs including clear-selection, tooltips, split command/capture click memory, postfix replay memory, UI pointer owner metadata, and lightweight diagnostics."
+        Write-Pass "Blueprint handheld action bar state owns dedicated command ids, stage-03 placed-list/deferred command ids, dynamic matrix inputs including clear-selection, tooltips, split command/capture click memory, postfix replay memory, UI pointer owner metadata, and lightweight diagnostics."
     }
     else {
-        Write-FailHealth "Blueprint handheld action bar state must keep dedicated command ids, dynamic matrix inputs including clear-selection, tooltips, split command/capture click memory, postfix stale-edge replay memory, UI pointer owner metadata, and lightweight diagnostics ownership."
+        Write-FailHealth "Blueprint handheld action bar state must keep dedicated command ids, stage-03 placed-list/deferred command ids, dynamic matrix inputs including clear-selection, tooltips, split command/capture click memory, postfix stale-edge replay memory, UI pointer owner metadata, and lightweight diagnostics ownership."
     }
 
     if ($stateText -and
@@ -5132,7 +5139,8 @@ function Test-BlueprintHandheldActionBarGovernance {
         $overlayText.Contains("save-captures-mask") -and
         $overlayText.Contains("clear-selection") -and
         $overlayText.Contains("open-library-real") -and
-        $overlayText.Contains("unimplemented-buttons-ui-only") -and
+        $overlayText.Contains("open-placed-list-real") -and
+        $overlayText.Contains("stage03-deferred-placed-commands") -and
         $overlayText.Contains("mouse-consume") -and
         $overlayText.Contains("legacy-ui-theme") -and
         $overlayText.Contains("vanilla-ui-skin") -and
@@ -5157,10 +5165,10 @@ function Test-BlueprintHandheldActionBarGovernance {
         -not $overlayText.Contains("InputActionQueue") -and
         -not $overlayText.Contains("ForceRefreshForMaterialWindow") -and
         -not $overlayText.Contains("ForceRefreshForAutoPlacement")) {
-        Write-Pass "Blueprint handheld overlay remains draw/input-only, uses cached dynamic state, uses the legacy UI theme skin path, uses its dedicated gate-bypass mouse reader, and does not refresh blueprint caches or submit InputActionQueue actions."
+        Write-Pass "Blueprint handheld overlay remains draw/input-only, exposes the stage-03 placed-list/deferred command contract, uses cached dynamic state, uses the legacy UI theme skin path, uses its dedicated gate-bypass mouse reader, and does not refresh blueprint caches or submit InputActionQueue actions."
     }
     else {
-        Write-FailHealth "Blueprint handheld overlay must expose dynamic create/save/open-library/UI-only contract, use cached state and LegacyUiTheme skin rendering with 0.78 base text scale, use the dedicated gate-bypass mouse reader, and avoid blueprint refresh or InputActionQueue calls."
+        Write-FailHealth "Blueprint handheld overlay must expose dynamic create/save/open-library/open-placed/deferred-command contract, use cached state and LegacyUiTheme skin rendering with 0.78 base text scale, use the dedicated gate-bypass mouse reader, and avoid blueprint refresh or InputActionQueue calls."
     }
 
     if ($diagnosticMouseReaderText -and $legacyUiInputMouseText -and
@@ -5195,6 +5203,15 @@ function Test-BlueprintHandheldActionBarGovernance {
         $uiActionText,
         "private\s+static\s+void\s+HandleBlueprintHandheldActionBarCommand[\s\S]*?private\s+static\s+void\s+HandleBlueprintReplacementMode")
     $handlerText = if ($handlerMatch.Success) { $handlerMatch.Value } else { "" }
+    $hasStage03DeferredBusiness = $handlerText.Contains("RecordDeferredBusinessClick") -and
+        $handlerText.Contains("ResultCodeEntryWiredDeferred") -and
+        $handlerText.Contains("deferredBusiness")
+    $hasStage07PlacedBusiness = $handlerText.Contains("BlueprintPlacedInstanceUiState.ClearAllCurrentWorld") -and
+        $handlerText.Contains("BlueprintEraseRegionState.BeginErase") -and
+        $handlerText.Contains("BlueprintPlacedInstanceTransformState.BeginMove") -and
+        $handlerText.Contains("BlueprintPlacedInstanceTransformState.BeginMirror") -and
+        $handlerText.Contains("transformInputActive") -and
+        $handlerText.Contains('\"uiOnly\":false')
     if ($handlerText.Contains("Ui.Blueprint.HandheldActionBar") -and
         $handlerText.Contains("RecordCommandResultClick") -and
         $handlerText.Contains("RecordPlaceholderClick") -and
@@ -5207,6 +5224,9 @@ function Test-BlueprintHandheldActionBarGovernance {
         $handlerText.Contains("BlueprintEntryCommands.ClearSelection") -and
         $handlerText.Contains("BlueprintLibraryUiState.OpenLibrary") -and
         $handlerText.Contains("BlueprintEntryCommands.OpenLibrary") -and
+        $handlerText.Contains("BlueprintPlacedInstanceUiState.OpenManagement") -and
+        $handlerText.Contains("BlueprintEntryCommands.OpenPlacedInstances") -and
+        ($hasStage03DeferredBusiness -or $hasStage07PlacedBusiness) -and
         $handlerText.Contains("BlueprintEntryState.ApplyCommand") -and
         $handlerText.Contains('\"submitted\":false') -and
         $handlerText.Contains('BoolRaw(!entry.PlaceholderOnly)') -and
@@ -5221,10 +5241,10 @@ function Test-BlueprintHandheldActionBarGovernance {
         $handlerText.Contains("result.ResultCode") -and
         -not $handlerText.Contains("InputActionQueue") -and
         -not $handlerText.Contains("ForceRefresh")) {
-        Write-Pass "Blueprint handheld action bar command handler wires create/save/clear-selection/open-library to real UI state commands while delete/move/red remain placeholders."
+        Write-Pass "Blueprint handheld action bar command handler wires create/save/clear-selection/open-library/open-placed and accepts either stage-03 deferred placed commands or current real placed-instance governance without InputActionQueue paths."
     }
     else {
-        Write-FailHealth "Blueprint handheld action bar handler must wire create/save/clear-selection/open-library to real UI state commands, keep delete/move/red placeholder-only, and avoid refresh/InputActionQueue paths."
+        Write-FailHealth "Blueprint handheld action bar handler must wire create/save/clear-selection/open-library/open-placed to real UI state commands, and keep either stage-03 deferred placed commands or current real placed-instance governance without InputActionQueue paths."
     }
 
     $requiredSnapshotFields = @(
@@ -5272,8 +5292,14 @@ function Test-BlueprintHandheldActionBarGovernance {
         $testText.Contains("no-library-refresh") -and
         $testText.Contains("clear-selection") -and
         $testText.Contains("ButtonIdClearSelection") -and
+        $testText.Contains("ButtonIdOpenPlacedList") -and
+        $testText.Contains("ButtonIdClearPlaced") -and
+        $testText.Contains("ButtonIdRegionModify") -and
+        $testText.Contains("ButtonIdMirror") -and
+        $testText.Contains("ResultCodeEntryWiredDeferred") -and
+        $testText.Contains("stage03-deferred-placed-commands") -and
         $testText.Contains("selectionCleared") -and
-        $testText.Contains("BlueprintHandheldActionBarRealCommandsAndUnimplementedButtons") -and
+        $testText.Contains("BlueprintHandheldActionBarRealCommandsAndDeferredPlacedCommands") -and
         $testText.Contains("BlueprintHandheldActionBarDiagnosticsSnapshotJson") -and
         $testText.Contains("LastMouseReadMode") -and
         $testText.Contains("LastOwnershipReason") -and
@@ -5288,13 +5314,13 @@ function Test-BlueprintHandheldActionBarGovernance {
         $programText.Contains("blueprint handheld action bar gate-closed mouse keeps Terraria click") -and
         $programText.Contains("blueprint handheld action bar gate-open mouse prefers OS client coordinate") -and
         $programText.Contains("blueprint handheld action bar physical bottom-center rejects UI-scale logical extent") -and
-        $programText.Contains("blueprint handheld action bar real commands and unimplemented buttons") -and
+        $programText.Contains("blueprint handheld action bar real commands and deferred placed commands") -and
         $programText.Contains("blueprint handheld action bar visual style uses legacy theme and stable text scale") -and
         $programText.Contains("blueprint handheld action bar diagnostics snapshot json")) {
-        Write-Pass "Blueprint handheld action bar console tests cover dynamic buttons, clear-selection, display-gate visibility, post-PlayerInput command timing, stale prefix edge replay, gate-open OS coordinates, physical bottom-center frame hit-test, gate-closed Terraria mouse input, themed visual scale, no-scan, real create/save/open-library commands, UI-only delete/move/red commands, and snapshot JSON."
+        Write-Pass "Blueprint handheld action bar console tests cover dynamic buttons, clear-selection, display-gate visibility, post-PlayerInput command timing, stale prefix edge replay, gate-open OS coordinates, physical bottom-center frame hit-test, gate-closed Terraria mouse input, themed visual scale, no-scan, real create/save/open-library/open-placed commands, stage-03 deferred placed commands, and snapshot JSON."
     }
     else {
-        Write-FailHealth "Blueprint handheld action bar tests must cover dynamic buttons, clear-selection, display-gate visibility, post-PlayerInput command timing, stale prefix edge replay, gate-open OS coordinates, physical bottom-center frame hit-test, gate-closed Terraria mouse input, themed visual scale, no-scan, real create/save/open-library commands, UI-only delete/move/red commands, and snapshot JSON diagnostics."
+        Write-FailHealth "Blueprint handheld action bar tests must cover dynamic buttons, clear-selection, display-gate visibility, post-PlayerInput command timing, stale prefix edge replay, gate-open OS coordinates, physical bottom-center frame hit-test, gate-closed Terraria mouse input, themed visual scale, no-scan, real create/save/open-library/open-placed commands, stage-03 deferred placed commands, and snapshot JSON diagnostics."
     }
 
     if ($functionDocText -and $diagnosticsDocText -and $plan04Text -and $plan07Text -and
@@ -5307,11 +5333,14 @@ function Test-BlueprintHandheldActionBarGovernance {
         $functionDocText.Contains("mouseReadMode") -and
         $functionDocText.Contains("ownerId") -and
         $functionDocText.Contains("保存蓝图") -and
-        $functionDocText.Contains("清除已有选区") -and
+        $functionDocText.Contains("清除选区") -and
         $functionDocText.Contains("after-PlayerInput") -and
         $functionDocText.Contains("BlueprintHandheldOverlayGateBypass") -and
         $functionDocText.Contains("打开蓝图库") -and
-        $functionDocText.Contains("删除已经放置的蓝图或已经选区待创建的区域") -and
+        $functionDocText.Contains("已放置蓝图列表") -and
+        $functionDocText.Contains("entryWiredDeferred") -and
+        $functionDocText.Contains("open-placed-list-real") -and
+        $functionDocText.Contains("stage03-deferred-placed-commands") -and
         $diagnosticsDocText.Contains("BlueprintHandheldActionBarVisible") -and
         $diagnosticsDocText.Contains("BlueprintHandheldActionBarLastMouseReadMode") -and
         $diagnosticsDocText.Contains("BlueprintHandheldActionBarLastOwnershipReason") -and
@@ -5321,12 +5350,14 @@ function Test-BlueprintHandheldActionBarGovernance {
         $diagnosticsDocText.Contains("DiagnosticLifecycle=Stabilization") -and
         $diagnosticsDocText.Contains("save-captures-mask") -and
         $diagnosticsDocText.Contains("clear-selection") -and
+        $diagnosticsDocText.Contains("entryWiredDeferred") -and
+        $diagnosticsDocText.Contains("stage03-deferred-placed-commands") -and
         $plan04Text.Contains("0.871-blueprint-handheld-diagnostics-audit") -and
         $plan07Text.Contains("0.878-blueprint-handheld-dynamic-actions")) {
         Write-Pass "Blueprint handheld action bar function, diagnostics, stage-04, and stage-07 plan docs are synchronized."
     }
     else {
-        Write-FailHealth "Blueprint handheld action bar docs must describe dynamic buttons, real save/library commands, UI-only delete/move/red events, snapshot summary fields, Stabilization lifecycle, and 0.878 stage-07 completion."
+        Write-FailHealth "Blueprint handheld action bar docs must describe dynamic buttons, real save/library/placed-list commands, stage-03 deferred placed commands, snapshot summary fields, Stabilization lifecycle, and 0.878 stage-07 completion."
     }
 }
 
@@ -6152,7 +6183,7 @@ function Test-BlueprintUiClickStage04Governance {
         $aggregateTestText.Contains("BlueprintHandheldActionBarInputCapturesOnlyInsideBar") -and
         $aggregateTestText.Contains("BlueprintHandheldActionBarAfterPlayerInputGuardSubmitsFreshClickEdge") -and
         $aggregateTestText.Contains("BlueprintHandheldActionBarPostfixReplaysStalePrefixPress") -and
-        $aggregateTestText.Contains("BlueprintHandheldActionBarRealCommandsAndUnimplementedButtons") -and
+        $aggregateTestText.Contains("BlueprintHandheldActionBarRealCommandsAndDeferredPlacedCommands") -and
         $aggregateTestText.Contains("BlueprintHandheldActionBarDiagnosticsSnapshotJson") -and
         $programText.Contains("blueprint handheld UI click ownership contracts stay wired")) {
         Write-Pass "Blueprint UI click stage 04 aggregate console regression is registered and reuses the stage 02/03 behavior contracts."
@@ -7763,8 +7794,12 @@ function Test-BlueprintActionShortcutGovernance {
         $uiText.Contains("stage06-two-column-fixed-cards") -and
         $uiText.Contains("preview-scales-to-fit") -and
         $uiText.Contains("stage07-name-edit-delete-confirm") -and
-        $uiText.Contains("stage08-import-long-button-export-real") -and
+        $uiText.Contains("stage08-import-export-windows-dialog") -and
         $uiText.Contains("stage09-layout-use-real-template-snapshot") -and
+        $uiText.Contains("stage02-title-row-tools") -and
+        $uiText.Contains("card-material-toggle") -and
+        $uiText.Contains("card-buttons-no-tooltips") -and
+        $uiText.Contains("summary-placed-count") -and
         $uiText.Contains("CalculateBlueprintLibraryImportButtonRect") -and
         $uiText.Contains('BuildCommandId("import", string.Empty)') -and
         $uiText.Contains("BlueprintLibraryCardColumns = 2") -and
@@ -7774,20 +7809,23 @@ function Test-BlueprintActionShortcutGovernance {
         $uiText.Contains("BlueprintLibraryPreviewMaxDrawCells") -and
         $uiText.Contains("DrawBlueprintTemplateNameInput") -and
         $uiText.Contains("ConfirmNameAction") -and
-        $uiText.Contains("再次点击确认删除模板") -and
+        $uiText.Contains('deleteConfirming ? "确认" : "删除"') -and
         $uiText.Contains('"layout-use"') -and
         $uiText.Contains('"layout-export"') -and
-        $uiText.Contains('导出当前模板到 blueprints/exports') -and
+        $uiText.Contains('"layout-materials"') -and
         $uiActionText.Contains('"layout-name"') -and
         $uiActionText.Contains('HandleBlueprintLibraryAction(command, "name", templateId)') -and
         $uiActionText.Contains('HandleBlueprintLibraryAction(command, "delete", templateId)') -and
         $uiActionText.Contains('HandleBlueprintLibraryAction(command, "export", templateId)') -and
         $uiActionText.Contains('HandleBlueprintLibraryAction(command, "use", templateId)') -and
+        $uiActionText.Contains('HandleBlueprintLibraryAction(command, "materials", templateId)') -and
         $uiActionText.Contains("BlueprintLibraryUiState.ImportTemplate") -and
+        $uiActionText.Contains("BlueprintLibraryUiState.ToggleMaterialList") -and
         $uiActionText.Contains('\"importPath\"') -and
         $uiActionText.Contains('"layout-use"') -and
         $uiActionText.Contains('"layout-export"') -and
         $uiActionText.Contains('"layout-delete"') -and
+        $uiActionText.Contains('"layout-materials"') -and
         $uiActionText.Contains("PlaceholderOnly") -and
         $templateStoreText.Contains("ImportTemplate") -and
         $templateStoreText.Contains("ResolveImportPath") -and
@@ -7795,7 +7833,11 @@ function Test-BlueprintActionShortcutGovernance {
         $templateStoreText.Contains("draft.TemplateId = string.Empty") -and
         $storagePathsText.Contains("BuildDefaultImportDirectory") -and
         $storagePathsText.Contains("ImportDirectoryName") -and
+        $storagePathsText.Contains("BuildDefaultExportDirectory") -and
+        $storagePathsText.Contains("BuildDefaultExportFileName") -and
         $libraryTestText.Contains("BlueprintLibraryTwoColumnCardsPreviewAndLayoutButtons") -and
+        $libraryTestText.Contains("BlueprintLibraryStage02FileDialogAndMaterialContracts") -and
+        $libraryTestText.Contains("FakeBlueprintFileDialogService") -and
         $libraryTestText.Contains("BlueprintLibraryStage07NamingRenameDeleteConfirmKeepsInstances") -and
         $libraryTestText.Contains("BlueprintLibraryStage08ImportExportDiagnostics") -and
         $libraryTestText.Contains("BlueprintLibraryStage09UseSnapshotAndInstanceBoundary") -and
@@ -7810,14 +7852,15 @@ function Test-BlueprintActionShortcutGovernance {
         $storageTestText.Contains("BlueprintTemplateImportUsesSuffixAndKeepsExistingLibraryOnFailure") -and
         $storageTestText.Contains("Shared Import 2") -and
         $programText.Contains("blueprint library two-column cards preview and layout buttons") -and
+        $programText.Contains("blueprint library stage 02 file dialog and material contracts") -and
         $programText.Contains("blueprint library stage 07 naming rename delete confirm keeps instances") -and
         $programText.Contains("blueprint library stage 08 import export diagnostics") -and
         $programText.Contains("blueprint library stage 09 use snapshot and instance boundary") -and
         $programText.Contains("blueprint template import uses suffix and keeps existing library on failure")) {
-        Write-Pass "Blueprint library keeps two-column fixed cards, preview scaling, stage 07 name/delete commands, stage 08 import/export, stage 09 real use snapshot boundary, and registered regression coverage."
+        Write-Pass "Blueprint library keeps two-column fixed cards, preview scaling, stage 02 Windows dialog/material UI, stage 07 name/delete commands, stage 08 import/export, stage 09 real use snapshot boundary, and registered regression coverage."
     }
     else {
-        Write-FailHealth "Blueprint library must keep two-column fixed cards, preview scaling, stage 07 name/delete commands, stage 08 import/export, stage 09 real use snapshot boundary, and registered tests."
+        Write-FailHealth "Blueprint library must keep two-column fixed cards, preview scaling, stage 02 Windows dialog/material UI, stage 07 name/delete commands, stage 08 import/export, stage 09 real use snapshot boundary, and registered tests."
     }
 
     if ($testText -and
@@ -7875,6 +7918,1482 @@ function Test-BlueprintActionShortcutGovernance {
     }
     else {
         Write-FailHealth "Blueprint docs and stage-03 plan must describe blueprint.create/blueprint.save, tooltips, and the 0.874 completion record."
+    }
+}
+
+function Join-BlueprintPlacementPlanPath {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$Leaf
+    )
+
+    $currentPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图放置与实例治理修复", $Leaf)
+    if (Test-Path -LiteralPath $currentPath) {
+        return $currentPath
+    }
+
+    return Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图放置与实例治理修复", $Leaf)
+}
+
+function Test-BlueprintPlacementVersionMetadata {
+    param(
+        [string]$RuntimeText,
+        [string]$CsprojText,
+        [Parameter(Mandatory = $true)][string[]]$AllowedRuntimeVersions
+    )
+
+    if (-not $RuntimeText -or -not $CsprojText) {
+        return $false
+    }
+
+    foreach ($runtimeVersion in $AllowedRuntimeVersions) {
+        $versionPrefix = ($runtimeVersion -split '-', 2)[0]
+        if ($RuntimeText.Contains($runtimeVersion) -and
+            $CsprojText.Contains("<Version>$versionPrefix</Version>") -and
+            $CsprojText.Contains("<AssemblyVersion>$versionPrefix.0</AssemblyVersion>") -and
+            $CsprojText.Contains("<FileVersion>$versionPrefix.0</FileVersion>") -and
+            $CsprojText.Contains("<InformationalVersion>$runtimeVersion</InformationalVersion>")) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
+function Test-BlueprintPlacementStage02LibraryUiGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $dialogPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\BlueprintFileDialogService.cs"
+    $libraryStatePath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\BlueprintLibraryUiState.cs"
+    $mainWindowPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.Blueprint.cs"
+    $actionPath = Join-Path $RepoRoot "src\JueMingZ\Input\LegacyUiActionService.Blueprint.cs"
+    $storagePath = Join-Path $RepoRoot "src\JueMingZ\Automation\Blueprint\BlueprintStoragePaths.cs"
+    $csprojPath = Join-Path $RepoRoot "src\JueMingZ\JueMingZ.csproj"
+    $libraryTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintLibraryTests.cs"
+    $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
+    $auditPath = Join-Path $RepoRoot "scripts\audit-project-health.ps1"
+    $functionDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $plan00Path = Join-BlueprintPlacementPlanPath -RepoRoot $RepoRoot -Leaf "00-基准.md"
+    $plan02Path = Join-BlueprintPlacementPlanPath -RepoRoot $RepoRoot -Leaf "02-F5蓝图库与文件选择UI.md"
+    $currentPlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "索引.md")
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $updateDirectory = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+    $docHistoryDirectory = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史")
+
+    $updateRecordPath = ""
+    if (Test-Path -LiteralPath $updateDirectory) {
+        $record = Get-ChildItem -LiteralPath $updateDirectory -Filter "0.947-F5蓝图库文件选择UI-*.md" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($record) {
+            $updateRecordPath = $record.FullName
+        }
+    }
+
+    $docHistoryRecordPath = ""
+    if (Test-Path -LiteralPath $docHistoryDirectory) {
+        $record = Get-ChildItem -LiteralPath $docHistoryDirectory -Filter "蓝图F5蓝图库文件选择UI-*.md" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($record) {
+            $docHistoryRecordPath = $record.FullName
+        }
+    }
+
+    $dialogText = Read-TextIfExists -Path $dialogPath
+    $libraryStateText = Read-TextIfExists -Path $libraryStatePath
+    $mainWindowText = Read-TextIfExists -Path $mainWindowPath
+    $actionText = Read-TextIfExists -Path $actionPath
+    $storageText = Read-TextIfExists -Path $storagePath
+    $csprojText = Read-TextIfExists -Path $csprojPath
+    $libraryTestText = Read-TextIfExists -Path $libraryTestPath
+    $programText = Read-TextIfExists -Path $programPath
+    $auditText = Read-TextIfExists -Path $auditPath
+    $functionDocText = Read-TextIfExists -Path $functionDocPath
+    $plan00Text = Read-TextIfExists -Path $plan00Path
+    $plan02Text = Read-TextIfExists -Path $plan02Path
+    $currentPlanIndexText = Read-TextIfExists -Path $currentPlanIndexPath
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $updateRecordText = if ([string]::IsNullOrWhiteSpace($updateRecordPath)) { $null } else { Read-TextIfExists -Path $updateRecordPath }
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+    $docHistoryRecordText = if ([string]::IsNullOrWhiteSpace($docHistoryRecordPath)) { $null } else { Read-TextIfExists -Path $docHistoryRecordPath }
+
+    if ($dialogText -and
+        $dialogText.Contains("IBlueprintFileDialogService") -and
+        $dialogText.Contains("OpenFileDialog") -and
+        $dialogText.Contains("SaveFileDialog") -and
+        $dialogText.Contains("dialogCancelled") -and
+        $dialogText.Contains("dialogUnavailable") -and
+        $csprojText -and
+        $csprojText.Contains("System.Windows.Forms")) {
+        Write-Pass "Blueprint stage 02 keeps Windows file dialogs behind the narrow BlueprintFileDialogService wrapper."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 02 file dialogs must stay behind IBlueprintFileDialogService with OpenFileDialog/SaveFileDialog and System.Windows.Forms reference."
+    }
+
+    if ($libraryStateText -and
+        $libraryStateText.Contains("SetFileDialogServiceForTesting") -and
+        $libraryStateText.Contains("ChooseImportJsonPath") -and
+        $libraryStateText.Contains("ChooseExportJsonPath") -and
+        $libraryStateText.Contains("ToggleMaterialList") -and
+        $libraryStateText.Contains("BuildTemplateMaterialListText") -and
+        $libraryStateText.Contains("ExpandedMaterialTemplateId") -and
+        $storageText -and
+        $storageText.Contains("BuildDefaultExportDirectory") -and
+        $storageText.Contains("BuildDefaultExportFileName")) {
+        Write-Pass "Blueprint library UI state uses dialog-selected paths and template-local material expansion without broad refresh work."
+    }
+    else {
+        Write-FailHealth "Blueprint library UI state must route import/export through the dialog wrapper and keep material expansion as template-local UI state."
+    }
+
+    if ($mainWindowText -and
+        $mainWindowText.Contains("stage02-title-row-tools") -and
+        $mainWindowText.Contains("card-material-toggle") -and
+        $mainWindowText.Contains("card-buttons-no-tooltips") -and
+        $mainWindowText.Contains("summary-placed-count") -and
+        $mainWindowText.Contains("DrawBlueprintPlacedSubmenu") -and
+        $mainWindowText.Contains("已放置蓝图列表") -and
+        $mainWindowText.Contains("layout-materials") -and
+        $mainWindowText.Contains('"放置"') -and
+        $actionText -and
+        $actionText.Contains("layout-materials") -and
+        $actionText.Contains("ToggleMaterialList")) {
+        Write-Pass "Blueprint stage 02 F5 UI exposes title-row tools, placed-list submenu, card material toggle, and no-tooltip card actions."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 02 F5 UI must expose title-row import/paging, placed-list submenu, card material toggle, and route layout-materials to UI state only."
+    }
+
+    if ($libraryTestText -and
+        $libraryTestText.Contains("BlueprintLibraryStage02FileDialogAndMaterialContracts") -and
+        $libraryTestText.Contains("FakeBlueprintFileDialogService") -and
+        $libraryTestText.Contains("layout-materials") -and
+        $libraryTestText.Contains("BuildDefaultExportFileNameForTesting") -and
+        $programText -and
+        $programText.Contains("blueprint library stage 02 file dialog and material contracts")) {
+        Write-Pass "Blueprint stage 02 console regression covers file-dialog routing, default export names, and material-list toggling."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 02 must keep the file-dialog/material console regression registered."
+    }
+
+    if ($auditText -and
+        $auditText.Contains("Test-BlueprintPlacementStage02LibraryUiGovernance") -and
+        $auditText.Contains("0.947-F5蓝图库文件选择UI")) {
+        Write-Pass "Blueprint scoped health audit includes the stage 02 library UI governance check."
+    }
+    else {
+        Write-FailHealth "Blueprint scoped health audit must include Test-BlueprintPlacementStage02LibraryUiGovernance and the 0.947 record anchor."
+    }
+
+    if ($plan02Text -and
+        $plan02Text.Contains("状态：已完成") -and
+        $plan02Text.Contains('RuntimeVersion：`0.947-blueprint-library-file-dialog-ui`') -and
+        $plan02Text.Contains("OpenFileDialog") -and
+        $plan02Text.Contains("SaveFileDialog") -and
+        $plan02Text.Contains("BlueprintLibraryStage02FileDialogAndMaterialContracts") -and
+        $plan02Text.Contains("Test-BlueprintPlacementStage02LibraryUiGovernance") -and
+        $plan02Text.Contains("本轮不生成测试包") -and
+        $plan00Text -and
+        $plan00Text.Contains("02-F5蓝图库与文件选择UI.md") -and
+        ($plan00Text.Contains("0.950-blueprint-visual-material-contrast") -or
+            $plan00Text.Contains("0.951-blueprint-clear-placed-region-trim") -or
+            $plan00Text.Contains("0.952-blueprint-move-mirror-governance") -or
+            $plan00Text.Contains("0.953-blueprint-placement-regression-audit") -or
+            $plan00Text.Contains("0.954-blueprint-placement-closeout")) -and
+        $plan00Text.Contains("03-手持快捷栏命令矩阵.md") -and
+        $currentPlanIndexText -and
+        $currentPlanIndexText.Contains("蓝图放置与实例治理修复") -and
+        ($currentPlanIndexText.Contains("0.950-blueprint-visual-material-contrast") -or
+            $currentPlanIndexText.Contains("0.951-blueprint-clear-placed-region-trim") -or
+            $currentPlanIndexText.Contains("0.952-blueprint-move-mirror-governance") -or
+            $currentPlanIndexText.Contains("0.953-blueprint-placement-regression-audit") -or
+            $currentPlanIndexText.Contains("0.954-blueprint-placement-closeout"))) {
+        Write-Pass "Blueprint placement plan files keep stage 02 completion evidence while current status has advanced beyond 0.947."
+    }
+    else {
+        Write-FailHealth "Blueprint placement plan files must keep stage 02 completion evidence while allowing the current plan index to advance beyond 0.947."
+    }
+
+    if ($functionDocText -and
+        $functionDocText.Contains("0.947-blueprint-library-file-dialog-ui") -and
+        $functionDocText.Contains("Windows 文件选择窗口") -and
+        $functionDocText.Contains("材料列表") -and
+        $updateIndexText -and
+        $updateIndexText.Contains("0.947-F5蓝图库文件选择UI") -and
+        $updateRecordText -and
+        $updateRecordText.Contains('RuntimeVersion：`0.947-blueprint-library-file-dialog-ui`') -and
+        $updateRecordText.Contains("BlueprintLibraryStage02FileDialogAndMaterialContracts") -and
+        $updateRecordText.Contains("Test-BlueprintPlacementStage02LibraryUiGovernance") -and
+        $docHistoryIndexText -and
+        $docHistoryIndexText.Contains("蓝图F5蓝图库文件选择UI") -and
+        $docHistoryRecordText -and
+        $docHistoryRecordText.Contains("0.947-blueprint-library-file-dialog-ui") -and
+        $docHistoryRecordText.Contains("本轮不生成测试包")) {
+        Write-Pass "Blueprint stage 02 feature doc, update record, and document history are synchronized."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 02 must synchronize feature doc, update index/record, and document history."
+    }
+}
+
+function Test-BlueprintPlacementStage03HandheldCommandMatrixGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $statePath = Join-Path $RepoRoot "src\JueMingZ\Automation\Blueprint\BlueprintHandheldActionBarState.cs"
+    $overlayPath = Join-Path $RepoRoot "src\JueMingZ\UI\BlueprintHandheldActionBarOverlay.cs"
+    $actionPath = Join-Path $RepoRoot "src\JueMingZ\Input\LegacyUiActionService.Blueprint.cs"
+    $capturePath = Join-Path $RepoRoot "src\JueMingZ\Automation\Blueprint\BlueprintCaptureService.cs"
+    $handheldTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintHandheldActionBarTests.cs"
+    $captureTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintCaptureTests.cs"
+    $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
+    $csprojPath = Join-Path $RepoRoot "src\JueMingZ\JueMingZ.csproj"
+    $runtimePath = Join-Path $RepoRoot "src\JueMingZ\Runtime\JueMingZRuntime.cs"
+    $functionDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $plan00Path = Join-BlueprintPlacementPlanPath -RepoRoot $RepoRoot -Leaf "00-基准.md"
+    $plan03Path = Join-BlueprintPlacementPlanPath -RepoRoot $RepoRoot -Leaf "03-手持快捷栏命令矩阵.md"
+    $currentPlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "索引.md")
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $updateDirectory = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+    $docHistoryDirectory = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史")
+
+    $updateRecordPath = ""
+    if (Test-Path -LiteralPath $updateDirectory) {
+        $record = Get-ChildItem -LiteralPath $updateDirectory -Filter "0.948-手持快捷栏命令矩阵-*.md" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($record) {
+            $updateRecordPath = $record.FullName
+        }
+    }
+
+    $docHistoryRecordPath = ""
+    if (Test-Path -LiteralPath $docHistoryDirectory) {
+        $record = Get-ChildItem -LiteralPath $docHistoryDirectory -Filter "蓝图手持快捷栏命令矩阵-*.md" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($record) {
+            $docHistoryRecordPath = $record.FullName
+        }
+    }
+
+    $stateText = Read-TextIfExists -Path $statePath
+    $overlayText = Read-TextIfExists -Path $overlayPath
+    $actionText = Read-TextIfExists -Path $actionPath
+    $captureText = Read-TextIfExists -Path $capturePath
+    $handheldTestText = Read-TextIfExists -Path $handheldTestPath
+    $captureTestText = Read-TextIfExists -Path $captureTestPath
+    $programText = Read-TextIfExists -Path $programPath
+    $csprojText = Read-TextIfExists -Path $csprojPath
+    $runtimeText = Read-TextIfExists -Path $runtimePath
+    $functionDocText = Read-TextIfExists -Path $functionDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $plan00Text = Read-TextIfExists -Path $plan00Path
+    $plan03Text = Read-TextIfExists -Path $plan03Path
+    $currentPlanIndexText = Read-TextIfExists -Path $currentPlanIndexPath
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $updateRecordText = if ([string]::IsNullOrWhiteSpace($updateRecordPath)) { $null } else { Read-TextIfExists -Path $updateRecordPath }
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+    $docHistoryRecordText = if ([string]::IsNullOrWhiteSpace($docHistoryRecordPath)) { $null } else { Read-TextIfExists -Path $docHistoryRecordPath }
+
+    if (Test-BlueprintPlacementVersionMetadata -RuntimeText $runtimeText -CsprojText $csprojText -AllowedRuntimeVersions @(
+            "0.950-blueprint-visual-material-contrast",
+            "0.951-blueprint-clear-placed-region-trim",
+            "0.952-blueprint-move-mirror-governance",
+            "0.953-blueprint-placement-regression-audit",
+            "0.954-blueprint-placement-closeout")) {
+        Write-Pass "Blueprint stage 03 evidence is preserved while current version metadata has advanced to a later blueprint placement stage."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 03 evidence must remain documented while current RuntimeVersion and project metadata advance to 0.950-blueprint-visual-material-contrast."
+    }
+
+    if ($stateText -and
+        $stateText.Contains("ButtonIdOpenPlacedList") -and
+        $stateText.Contains("ButtonIdClearPlaced") -and
+        $stateText.Contains("ButtonIdRegionModify") -and
+        $stateText.Contains("ButtonIdMirror") -and
+        $stateText.Contains("ResultCodeEntryWiredDeferred") -and
+        $stateText.Contains("已放置蓝图列表") -and
+        $stateText.Contains("清空放置") -and
+        $stateText.Contains("区域修改") -and
+        $stateText.Contains("镜像") -and
+        $stateText.Contains("清除选区") -and
+        $stateText.Contains("清除所有选区") -and
+        $stateText.Contains("RecordDeferredBusinessClick") -and
+        $captureText -and
+        $captureText.Contains("选区内啥也没有喔") -and
+        $overlayText -and
+        $overlayText.Contains("open-placed-list-real") -and
+        $overlayText.Contains("stage03-deferred-placed-commands")) {
+        Write-Pass "Blueprint stage 03 handheld state exposes placed-list, clear/move/region/mirror, create-state clear text, pure-air message, and visual contract tokens."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 03 handheld state must expose the placed-list/deferred command matrix, create-state clear text, pure-air message, and visual contract tokens."
+    }
+
+    if ($actionText -and
+        $actionText.Contains("BlueprintPlacedInstanceUiState.OpenManagement") -and
+        $actionText.Contains("BlueprintEntryCommands.OpenPlacedInstances") -and
+        $actionText.Contains("RevealBlueprintPlacedMenuIfOpened") -and
+        (($actionText.Contains("IsBlueprintHandheldDeferredBusinessButton") -and
+                $actionText.Contains("RecordDeferredBusinessClick") -and
+                $actionText.Contains("ResultCodeEntryWiredDeferred") -and
+                $actionText.Contains("deferredBusiness")) -or
+            ($actionText.Contains("BlueprintPlacedInstanceTransformState.BeginMove") -and
+                $actionText.Contains("BlueprintPlacedInstanceTransformState.BeginMirror") -and
+                $actionText.Contains("transformInputActive")))) {
+        Write-Pass "Blueprint stage 03 handheld action handler opens the placed-list UI; later stages may replace deferred move/mirror with real handlers."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 03 handheld action handler must open placed-list UI and record deferred clear/move/region/mirror commands with entryWiredDeferred."
+    }
+
+    if ($handheldTestText -and
+        $handheldTestText.Contains("BlueprintHandheldActionBarRealCommandsAndDeferredPlacedCommands") -and
+        $handheldTestText.Contains("ButtonIdOpenPlacedList") -and
+        $handheldTestText.Contains("ButtonIdClearPlaced") -and
+        $handheldTestText.Contains("ButtonIdRegionModify") -and
+        $handheldTestText.Contains("ButtonIdMirror") -and
+        $handheldTestText.Contains("ResultCodeEntryWiredDeferred") -and
+        $captureTestText -and
+        $captureTestText.Contains("BlueprintCaptureRejectsPureAirSelectionExplicitly") -and
+        $captureTestText.Contains("emptyContent") -and
+        $programText -and
+        $programText.Contains("blueprint capture rejects pure air selection explicitly") -and
+        $programText.Contains("blueprint handheld action bar real commands and deferred placed commands")) {
+        Write-Pass "Blueprint stage 03 console tests cover placed-list opening, deferred commands, new clear text, and pure-air messaging."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 03 must keep registered console tests for placed-list opening, deferred commands, new clear text, and pure-air messaging."
+    }
+
+    if ($functionDocText -and
+        $functionDocText.Contains("0.948-blueprint-handheld-command-matrix") -and
+        $functionDocText.Contains("已放置蓝图列表") -and
+        $functionDocText.Contains("entryWiredDeferred") -and
+        $functionDocText.Contains("选区内啥也没有喔") -and
+        $functionDocText.Contains("open-placed-list-real") -and
+        $functionDocText.Contains("stage03-deferred-placed-commands") -and
+        $diagnosticsDocText -and
+        $diagnosticsDocText.Contains("entryWiredDeferred") -and
+        $diagnosticsDocText.Contains("stage03-deferred-placed-commands") -and
+        $diagnosticsDocText.Contains("选区内啥也没有喔")) {
+        Write-Pass "Blueprint stage 03 function and diagnostics docs describe placed-list, deferred commands, pure-air messaging, and visual contract tokens."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 03 function and diagnostics docs must describe placed-list, deferred commands, pure-air messaging, and visual contract tokens."
+    }
+
+    if ($plan03Text -and
+        $plan03Text.Contains("状态：已完成") -and
+        $plan03Text.Contains('RuntimeVersion：`0.948-blueprint-handheld-command-matrix`') -and
+        $plan03Text.Contains('未在本会话实现或验证 `04`') -and
+        $plan03Text.Contains("不生成测试包") -and
+        $plan03Text.Contains("Test-BlueprintPlacementStage03HandheldCommandMatrixGovernance") -and
+        $plan00Text -and
+        ($plan00Text.Contains("0.950-blueprint-visual-material-contrast") -or
+            $plan00Text.Contains("0.951-blueprint-clear-placed-region-trim") -or
+            $plan00Text.Contains("0.952-blueprint-move-mirror-governance") -or
+            $plan00Text.Contains("0.953-blueprint-placement-regression-audit") -or
+            $plan00Text.Contains("0.954-blueprint-placement-closeout")) -and
+        ($plan00Text.Contains('下一入口为 `06-清空放置与区域修改.md`') -or
+            $plan00Text.Contains('下一入口为 `07-移动与镜像治理.md`') -or
+            $plan00Text.Contains('下一入口为 `08-回归诊断与审计防线.md`') -or
+            $plan00Text.Contains('下一入口为 `09-验证打包与归档收口.md`')) -and
+        $currentPlanIndexText -and
+        ($currentPlanIndexText.Contains("0.950-blueprint-visual-material-contrast") -or
+            $currentPlanIndexText.Contains("0.951-blueprint-clear-placed-region-trim") -or
+            $currentPlanIndexText.Contains("0.952-blueprint-move-mirror-governance") -or
+            $currentPlanIndexText.Contains("0.953-blueprint-placement-regression-audit") -or
+            $currentPlanIndexText.Contains("0.954-blueprint-placement-closeout")) -and
+        ($currentPlanIndexText.Contains('下一入口为 `06-清空放置与区域修改.md`') -or
+            $currentPlanIndexText.Contains('下一入口为 `07-移动与镜像治理.md`') -or
+            $currentPlanIndexText.Contains('下一入口为 `08-回归诊断与审计防线.md`') -or
+            $currentPlanIndexText.Contains('下一入口为 `09-验证打包与归档收口.md`'))) {
+        Write-Pass "Blueprint placement plan files preserve stage 03 completion while current status has advanced to a later blueprint placement stage."
+    }
+    else {
+        Write-FailHealth "Blueprint placement plan files must record stage 03 completion, 0.948 version, no-package scope, and main-project locked next-stage boundary."
+    }
+
+    if ($updateIndexText -and
+        $updateIndexText.Contains("0.948-手持快捷栏命令矩阵") -and
+        $updateRecordText -and
+        $updateRecordText.Contains('RuntimeVersion：`0.948-blueprint-handheld-command-matrix`') -and
+        $updateRecordText.Contains("Test-BlueprintPlacementStage03HandheldCommandMatrixGovernance") -and
+        $updateRecordText.Contains("不生成测试包") -and
+        $docHistoryIndexText -and
+        $docHistoryIndexText.Contains("蓝图手持快捷栏命令矩阵") -and
+        $docHistoryRecordText -and
+        $docHistoryRecordText.Contains("0.948-blueprint-handheld-command-matrix") -and
+        $docHistoryRecordText.Contains("不生成测试包")) {
+        Write-Pass "Blueprint stage 03 update record and document-change history are synchronized."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 03 must synchronize update index/record and document-change history for 0.948."
+    }
+}
+
+function Test-BlueprintPlacementStage04InstancePersistenceGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $projectionPath = Join-Path $RepoRoot "src\JueMingZ\Automation\Blueprint\BlueprintProjectionService.cs"
+    $placedStatePath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\BlueprintPlacedInstanceUiState.cs"
+    $instanceStorePath = Join-Path $RepoRoot "src\JueMingZ\Automation\Blueprint\BlueprintWorldInstanceStore.cs"
+    $placementTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintPlacementPreviewTests.cs"
+    $placedTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintPlacedInstanceTests.cs"
+    $projectionTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintProjectionTests.cs"
+    $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
+    $csprojPath = Join-Path $RepoRoot "src\JueMingZ\JueMingZ.csproj"
+    $runtimePath = Join-Path $RepoRoot "src\JueMingZ\Runtime\JueMingZRuntime.cs"
+    $auditPath = Join-Path $RepoRoot "scripts\audit-project-health.ps1"
+    $functionDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $plan00Path = Join-BlueprintPlacementPlanPath -RepoRoot $RepoRoot -Leaf "00-基准.md"
+    $plan04Path = Join-BlueprintPlacementPlanPath -RepoRoot $RepoRoot -Leaf "04-放置实例持久化与重叠解析.md"
+    $currentPlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "索引.md")
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $updateDirectory = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+    $docHistoryDirectory = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史")
+
+    $updateRecordPath = ""
+    if (Test-Path -LiteralPath $updateDirectory) {
+        $record = Get-ChildItem -LiteralPath $updateDirectory -Filter "0.949-放置实例持久化与重叠解析-*.md" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($record) {
+            $updateRecordPath = $record.FullName
+        }
+    }
+
+    $docHistoryRecordPath = ""
+    if (Test-Path -LiteralPath $docHistoryDirectory) {
+        $record = Get-ChildItem -LiteralPath $docHistoryDirectory -Filter "蓝图放置实例持久化重叠解析-*.md" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($record) {
+            $docHistoryRecordPath = $record.FullName
+        }
+    }
+
+    $projectionText = Read-TextIfExists -Path $projectionPath
+    $placedStateText = Read-TextIfExists -Path $placedStatePath
+    $instanceStoreText = Read-TextIfExists -Path $instanceStorePath
+    $placementTestText = Read-TextIfExists -Path $placementTestPath
+    $placedTestText = Read-TextIfExists -Path $placedTestPath
+    $projectionTestText = Read-TextIfExists -Path $projectionTestPath
+    $programText = Read-TextIfExists -Path $programPath
+    $csprojText = Read-TextIfExists -Path $csprojPath
+    $runtimeText = Read-TextIfExists -Path $runtimePath
+    $auditText = Read-TextIfExists -Path $auditPath
+    $functionDocText = Read-TextIfExists -Path $functionDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $plan00Text = Read-TextIfExists -Path $plan00Path
+    $plan04Text = Read-TextIfExists -Path $plan04Path
+    $currentPlanIndexText = Read-TextIfExists -Path $currentPlanIndexPath
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $updateRecordText = if ([string]::IsNullOrWhiteSpace($updateRecordPath)) { $null } else { Read-TextIfExists -Path $updateRecordPath }
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+    $docHistoryRecordText = if ([string]::IsNullOrWhiteSpace($docHistoryRecordPath)) { $null } else { Read-TextIfExists -Path $docHistoryRecordPath }
+
+    if (Test-BlueprintPlacementVersionMetadata -RuntimeText $runtimeText -CsprojText $csprojText -AllowedRuntimeVersions @(
+            "0.950-blueprint-visual-material-contrast",
+            "0.951-blueprint-clear-placed-region-trim",
+            "0.952-blueprint-move-mirror-governance",
+            "0.953-blueprint-placement-regression-audit",
+            "0.954-blueprint-placement-closeout")) {
+        Write-Pass "Blueprint stage 04 evidence is preserved while current version metadata has advanced to a later blueprint placement stage."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 04 evidence must remain documented while current RuntimeVersion and project metadata advance to 0.950-blueprint-visual-material-contrast."
+    }
+
+    if ($projectionText -and
+        $projectionText.Contains("RefreshAfterWorldInstancesChanged") -and
+        $projectionText.Contains("Instance writes are the explicit mutation boundary") -and
+        $projectionText.Contains("Overlap is resolved only in this transient") -and
+        $placedStateText -and
+        $placedStateText.Contains("RefreshProjectionAfterWorldInstancesChanged") -and
+        $placedStateText.Contains("NotifyInstanceCreated") -and
+        $placedStateText.Contains("OpenManagement") -and
+        -not $placedStateText.Contains("ForceRefreshForMaterialWindow") -and
+        $instanceStoreText -and
+        $instanceStoreText.Contains("TemplateSnapshot = template.Clone()") -and
+        $instanceStoreText.Contains("Placed instances own a snapshot copy")) {
+        Write-Pass "Blueprint stage 04 keeps projection refresh at explicit instance mutation boundaries and preserves placed template snapshots."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 04 must refresh projection after instance mutations, avoid stage-05 material refresh, and keep placed snapshots isolated from templates."
+    }
+
+    if ($placementTestText -and
+        $placementTestText.Contains("BlueprintPlacementConfirmRefreshesProjectionAndPlacedList") -and
+        $placedTestText -and
+        $placedTestText.Contains("BlueprintWorldInstancesPersistHiddenEraseLayerAndSnapshotsOnReload") -and
+        $projectionTestText -and
+        $projectionTestText.Contains("BlueprintProjectionStage04LaterInstanceCoversEarlierWithoutMutatingSnapshots") -and
+        $projectionTestText.Contains("HasProjectedLayerAt") -and
+        $programText -and
+        $programText.Contains("blueprint placement confirm refreshes projection and placed list") -and
+        $programText.Contains("blueprint world instances persist hidden erase layer and snapshots on reload") -and
+        $programText.Contains("blueprint projection stage 04 later instance covers earlier without mutating snapshots")) {
+        Write-Pass "Blueprint stage 04 console regressions cover placement confirm refresh, persisted instance fields, and transient overlap resolution."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 04 must keep placement/storage/projection regressions registered in the console test runner."
+    }
+
+    if ($auditText -and
+        $auditText.Contains("Test-BlueprintPlacementStage04InstancePersistenceGovernance") -and
+        $auditText.Contains("0.949-放置实例持久化与重叠解析")) {
+        Write-Pass "Blueprint scoped health audit includes the stage 04 instance persistence governance check."
+    }
+    else {
+        Write-FailHealth "Blueprint scoped health audit must include Test-BlueprintPlacementStage04InstancePersistenceGovernance and the 0.949 record anchor."
+    }
+
+    if ($functionDocText -and
+        $functionDocText.Contains("0.949-blueprint-placement-instance-persistence") -and
+        $functionDocText.Contains("RefreshAfterWorldInstancesChanged") -and
+        $functionDocText.Contains("重叠") -and
+        $functionDocText.Contains("05") -and
+        $diagnosticsDocText -and
+        $diagnosticsDocText.Contains("0.949-blueprint-placement-instance-persistence") -and
+        $diagnosticsDocText.Contains("RefreshAfterWorldInstancesChanged") -and
+        $diagnosticsDocText.Contains("draw / hit-test") -and
+        $diagnosticsDocText.Contains("Test-BlueprintPlacementStage04InstancePersistenceGovernance")) {
+        Write-Pass "Blueprint stage 04 function and diagnostics docs describe instance persistence, projection refresh, and the stage-05 boundary."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 04 function and diagnostics docs must describe 0.949 projection refresh, overlap semantics, and the stage-05 boundary."
+    }
+
+    if ($plan04Text -and
+        $plan04Text.Contains("状态：已完成") -and
+        $plan04Text.Contains('RuntimeVersion：`0.949-blueprint-placement-instance-persistence`') -and
+        $plan04Text.Contains('未在本会话实现或验证 `05`') -and
+        $plan04Text.Contains("不生成测试包") -and
+        $plan04Text.Contains("Test-BlueprintPlacementStage04InstancePersistenceGovernance") -and
+        $plan00Text -and
+        ($plan00Text.Contains("0.950-blueprint-visual-material-contrast") -or
+            $plan00Text.Contains("0.951-blueprint-clear-placed-region-trim") -or
+            $plan00Text.Contains("0.952-blueprint-move-mirror-governance") -or
+            $plan00Text.Contains("0.953-blueprint-placement-regression-audit") -or
+            $plan00Text.Contains("0.954-blueprint-placement-closeout")) -and
+        ($plan00Text.Contains('下一入口为 `06-清空放置与区域修改.md`') -or
+            $plan00Text.Contains('下一入口为 `07-移动与镜像治理.md`') -or
+            $plan00Text.Contains('下一入口为 `08-回归诊断与审计防线.md`') -or
+            $plan00Text.Contains('下一入口为 `09-验证打包与归档收口.md`')) -and
+        $currentPlanIndexText -and
+        ($currentPlanIndexText.Contains("0.950-blueprint-visual-material-contrast") -or
+            $currentPlanIndexText.Contains("0.951-blueprint-clear-placed-region-trim") -or
+            $currentPlanIndexText.Contains("0.952-blueprint-move-mirror-governance") -or
+            $currentPlanIndexText.Contains("0.953-blueprint-placement-regression-audit") -or
+            $currentPlanIndexText.Contains("0.954-blueprint-placement-closeout")) -and
+        ($currentPlanIndexText.Contains('下一入口为 `06-清空放置与区域修改.md`') -or
+            $currentPlanIndexText.Contains('下一入口为 `07-移动与镜像治理.md`') -or
+            $currentPlanIndexText.Contains('下一入口为 `08-回归诊断与审计防线.md`') -or
+            $currentPlanIndexText.Contains('下一入口为 `09-验证打包与归档收口.md`'))) {
+        Write-Pass "Blueprint placement plan files record stage 04 completion while current status has advanced to a later blueprint placement stage."
+    }
+    else {
+        Write-FailHealth "Blueprint placement plan files must record stage 04 completion, 0.949 version, no-package scope, and next-stage boundary."
+    }
+
+    if ($updateIndexText -and
+        $updateIndexText.Contains("0.949-放置实例持久化与重叠解析") -and
+        $updateRecordText -and
+        $updateRecordText.Contains('RuntimeVersion：`0.949-blueprint-placement-instance-persistence`') -and
+        $updateRecordText.Contains("Test-BlueprintPlacementStage04InstancePersistenceGovernance") -and
+        $updateRecordText.Contains("不生成测试包") -and
+        $docHistoryIndexText -and
+        $docHistoryIndexText.Contains("蓝图放置实例持久化重叠解析") -and
+        $docHistoryRecordText -and
+        $docHistoryRecordText.Contains("0.949-blueprint-placement-instance-persistence") -and
+        $docHistoryRecordText.Contains("不生成测试包")) {
+        Write-Pass "Blueprint stage 04 update record and document-change history are synchronized."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 04 must synchronize update index/record and document-change history for 0.949."
+    }
+}
+
+function Test-BlueprintPlacementStage05VisualMaterialGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $overlayPath = Join-Path $RepoRoot "src\JueMingZ\UI\BlueprintProjectionOverlay.cs"
+    $ghostPath = Join-Path $RepoRoot "src\JueMingZ\UI\BlueprintProjectionGhostRenderer.cs"
+    $primitivePath = Join-Path $RepoRoot "src\JueMingZ\UI\UiPrimitiveRenderer.cs"
+    $materialPath = Join-Path $RepoRoot "src\JueMingZ\Automation\Blueprint\BlueprintMaterialService.cs"
+    $placedStatePath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\BlueprintPlacedInstanceUiState.cs"
+    $placedUiPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.Blueprint.Placed.cs"
+    $legacyBlueprintPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.Blueprint.cs"
+    $projectionTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintProjectionTests.cs"
+    $materialTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintMaterialTests.cs"
+    $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
+    $csprojPath = Join-Path $RepoRoot "src\JueMingZ\JueMingZ.csproj"
+    $runtimePath = Join-Path $RepoRoot "src\JueMingZ\Runtime\JueMingZRuntime.cs"
+    $auditPath = Join-Path $RepoRoot "scripts\audit-project-health.ps1"
+    $functionDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $plan00Path = Join-BlueprintPlacementPlanPath -RepoRoot $RepoRoot -Leaf "00-基准.md"
+    $plan05Path = Join-BlueprintPlacementPlanPath -RepoRoot $RepoRoot -Leaf "05-世界虚影与材料对照.md"
+    $currentPlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "索引.md")
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $updateDirectory = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+    $docHistoryDirectory = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史")
+
+    $updateRecordPath = ""
+    if (Test-Path -LiteralPath $updateDirectory) {
+        $record = Get-ChildItem -LiteralPath $updateDirectory -Filter "0.950-世界虚影与材料对照-*.md" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($record) {
+            $updateRecordPath = $record.FullName
+        }
+    }
+
+    $docHistoryRecordPath = ""
+    if (Test-Path -LiteralPath $docHistoryDirectory) {
+        $record = Get-ChildItem -LiteralPath $docHistoryDirectory -Filter "蓝图世界虚影与材料对照-*.md" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($record) {
+            $docHistoryRecordPath = $record.FullName
+        }
+    }
+
+    $overlayText = Read-TextIfExists -Path $overlayPath
+    $ghostText = Read-TextIfExists -Path $ghostPath
+    $primitiveText = Read-TextIfExists -Path $primitivePath
+    $materialText = Read-TextIfExists -Path $materialPath
+    $placedStateText = Read-TextIfExists -Path $placedStatePath
+    $placedUiText = Read-TextIfExists -Path $placedUiPath
+    $legacyBlueprintText = Read-TextIfExists -Path $legacyBlueprintPath
+    $projectionTestText = Read-TextIfExists -Path $projectionTestPath
+    $materialTestText = Read-TextIfExists -Path $materialTestPath
+    $programText = Read-TextIfExists -Path $programPath
+    $csprojText = Read-TextIfExists -Path $csprojPath
+    $runtimeText = Read-TextIfExists -Path $runtimePath
+    $auditText = Read-TextIfExists -Path $auditPath
+    $functionDocText = Read-TextIfExists -Path $functionDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $plan00Text = Read-TextIfExists -Path $plan00Path
+    $plan05Text = Read-TextIfExists -Path $plan05Path
+    $currentPlanIndexText = Read-TextIfExists -Path $currentPlanIndexPath
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $updateRecordText = if ([string]::IsNullOrWhiteSpace($updateRecordPath)) { $null } else { Read-TextIfExists -Path $updateRecordPath }
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+    $docHistoryRecordText = if ([string]::IsNullOrWhiteSpace($docHistoryRecordPath)) { $null } else { Read-TextIfExists -Path $docHistoryRecordPath }
+
+    if (Test-BlueprintPlacementVersionMetadata -RuntimeText $runtimeText -CsprojText $csprojText -AllowedRuntimeVersions @(
+            "0.950-blueprint-visual-material-contrast",
+            "0.951-blueprint-clear-placed-region-trim",
+            "0.952-blueprint-move-mirror-governance",
+            "0.953-blueprint-placement-regression-audit",
+            "0.954-blueprint-placement-closeout")) {
+        Write-Pass "Blueprint stage 05 version metadata is synchronized or has advanced to stage 06."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 05 must synchronize RuntimeVersion and project version metadata to 0.950-blueprint-visual-material-contrast."
+    }
+
+    if ($overlayText -and
+        $overlayText.Contains("appearance-ghost") -and
+        $overlayText.Contains("yellow-missing") -and
+        $overlayText.Contains("red-conflict") -and
+        $overlayText.Contains("fulfilled-no-mask") -and
+        $overlayText.Contains("GetCachedSnapshotForDraw") -and
+        $ghostText -and
+        $ghostText.Contains("TextureAssets.Tile") -and
+        $ghostText.Contains("TextureAssets.Wall") -and
+        $ghostText.Contains("TryGetTileAndRequestIfNotReady") -and
+        $ghostText.Contains("TryGetWallAndRequestIfNotReady") -and
+        $ghostText.Contains("BlueprintCaptureWireFlags") -and
+        $primitiveText -and
+        $primitiveText.Contains("public static bool DrawTextureSourceRectClipped")) {
+        Write-Pass "Blueprint stage 05 world projection draws tile, wall, wire, and actuator appearance ghosts from cached projection data."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 05 projection overlay must use cached projection data, appearance ghost contracts, Terraria tile/wall textures, paint-system lookups, and source-rect drawing."
+    }
+
+    if ($materialText -and
+        $materialText.Contains("ForceRefreshForPlacedInstanceList") -and
+        $materialText.Contains("GetCachedSnapshotForDraw") -and
+        $placedStateText -and
+        $placedStateText.Contains("ForceRefreshForPlacedInstanceList") -and
+        $placedStateText.Contains("draw paths keep reading the cached snapshots") -and
+        $placedUiText -and
+        $placedUiText.Contains("BuildBlueprintPlacedMaterialLines") -and
+        $placedUiText.Contains("取消显示") -and
+        $placedUiText.Contains("虚空袋") -and
+        $placedUiText.Contains("GetCachedSnapshotForDraw") -and
+        $legacyBlueprintText -and
+        $legacyBlueprintText.Contains("placed-list-comparison") -and
+        $legacyBlueprintText.Contains("materials-cache-only")) {
+        Write-Pass "Blueprint stage 05 placed list refreshes material comparison at explicit instance boundaries and draws cached backpack/void-bag counts."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 05 placed list must expose cancel-display text, material comparison rows, explicit placed-list refresh, and cache-only draw behavior."
+    }
+
+    if ($projectionTestText -and
+        $projectionTestText.Contains("stage-05 yellow ghost semantics") -and
+        $projectionTestText.Contains("ShouldDrawProjectionLayerForTesting") -and
+        $materialTestText -and
+        $materialTestText.Contains("BlueprintPlacedListRefreshesMaterialComparisonWithoutDrawScan") -and
+        $materialTestText.Contains("ReadCount != 1") -and
+        $programText -and
+        $programText.Contains("blueprint placed list refreshes material comparison without draw scan")) {
+        Write-Pass "Blueprint stage 05 console regressions cover visual semantics and placed-list material cache behavior."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 05 projection/material regressions must be present and registered in the console test runner."
+    }
+
+    if ($auditText -and
+        $auditText.Contains("Test-BlueprintPlacementStage05VisualMaterialGovernance") -and
+        $auditText.Contains("0.950-世界虚影与材料对照")) {
+        Write-Pass "Blueprint scoped health audit includes the stage 05 visual/material governance check."
+    }
+    else {
+        Write-FailHealth "Blueprint scoped health audit must include Test-BlueprintPlacementStage05VisualMaterialGovernance and the 0.950 record anchor."
+    }
+
+    if ($functionDocText -and
+        $functionDocText.Contains("0.950-blueprint-visual-material-contrast") -and
+        $functionDocText.Contains("appearance-ghost") -and
+        $functionDocText.Contains("取消显示") -and
+        $functionDocText.Contains("虚空袋") -and
+        $diagnosticsDocText -and
+        $diagnosticsDocText.Contains("0.950-blueprint-visual-material-contrast") -and
+        $diagnosticsDocText.Contains("ForceRefreshForPlacedInstanceList") -and
+        $diagnosticsDocText.Contains("Test-BlueprintPlacementStage05VisualMaterialGovernance")) {
+        Write-Pass "Blueprint stage 05 function and diagnostics docs describe world ghost semantics and placed-list material refresh boundaries."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 05 function and diagnostics docs must describe 0.950 ghost/material semantics and the scoped health audit."
+    }
+
+    if ($plan05Text -and
+        $plan05Text.Contains("状态：已完成") -and
+        $plan05Text.Contains('RuntimeVersion：`0.950-blueprint-visual-material-contrast`') -and
+        $plan05Text.Contains('未在本会话实现或验证 `06`') -and
+        $plan05Text.Contains("不生成测试包") -and
+        $plan05Text.Contains("Test-BlueprintPlacementStage05VisualMaterialGovernance") -and
+        $plan00Text -and
+        ($plan00Text.Contains("0.950-blueprint-visual-material-contrast") -or
+            $plan00Text.Contains("0.951-blueprint-clear-placed-region-trim") -or
+            $plan00Text.Contains("0.952-blueprint-move-mirror-governance") -or
+            $plan00Text.Contains("0.953-blueprint-placement-regression-audit") -or
+            $plan00Text.Contains("0.954-blueprint-placement-closeout")) -and
+        ($plan00Text.Contains('下一入口为 `06-清空放置与区域修改.md`') -or
+            $plan00Text.Contains('下一入口为 `07-移动与镜像治理.md`') -or
+            $plan00Text.Contains('下一入口为 `08-回归诊断与审计防线.md`') -or
+            $plan00Text.Contains('下一入口为 `09-验证打包与归档收口.md`')) -and
+        $currentPlanIndexText -and
+        ($currentPlanIndexText.Contains("0.950-blueprint-visual-material-contrast") -or
+            $currentPlanIndexText.Contains("0.951-blueprint-clear-placed-region-trim") -or
+            $currentPlanIndexText.Contains("0.952-blueprint-move-mirror-governance") -or
+            $currentPlanIndexText.Contains("0.953-blueprint-placement-regression-audit") -or
+            $currentPlanIndexText.Contains("0.954-blueprint-placement-closeout")) -and
+        ($currentPlanIndexText.Contains('下一入口为 `06-清空放置与区域修改.md`') -or
+            $currentPlanIndexText.Contains('下一入口为 `07-移动与镜像治理.md`') -or
+            $currentPlanIndexText.Contains('下一入口为 `08-回归诊断与审计防线.md`') -or
+            $currentPlanIndexText.Contains('下一入口为 `09-验证打包与归档收口.md`'))) {
+        Write-Pass "Blueprint placement plan files record stage 05 completion, no-package scope, and next-stage boundary."
+    }
+    else {
+        Write-FailHealth "Blueprint placement plan files must record stage 05 completion, 0.950 version, no-package scope, and main-project locked next-stage boundary."
+    }
+
+    if ($updateIndexText -and
+        $updateIndexText.Contains("0.950-世界虚影与材料对照") -and
+        $updateRecordText -and
+        $updateRecordText.Contains('RuntimeVersion：`0.950-blueprint-visual-material-contrast`') -and
+        $updateRecordText.Contains("Test-BlueprintPlacementStage05VisualMaterialGovernance") -and
+        $updateRecordText.Contains("不生成测试包") -and
+        $docHistoryIndexText -and
+        $docHistoryIndexText.Contains("蓝图世界虚影与材料对照") -and
+        $docHistoryRecordText -and
+        $docHistoryRecordText.Contains("0.950-blueprint-visual-material-contrast") -and
+        $docHistoryRecordText.Contains("不生成测试包")) {
+        Write-Pass "Blueprint stage 05 update record and document-change history are synchronized."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 05 must synchronize update index/record and document-change history for 0.950."
+    }
+}
+
+function Test-BlueprintPlacementStage06ClearRegionGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $placedStatePath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\BlueprintPlacedInstanceUiState.cs"
+    $eraseStatePath = Join-Path $RepoRoot "src\JueMingZ\Automation\Blueprint\BlueprintEraseRegionState.cs"
+    $actionPath = Join-Path $RepoRoot "src\JueMingZ\Input\LegacyUiActionService.Blueprint.cs"
+    $handheldStatePath = Join-Path $RepoRoot "src\JueMingZ\Automation\Blueprint\BlueprintHandheldActionBarState.cs"
+    $placedTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintPlacedInstanceTests.cs"
+    $handheldTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintHandheldActionBarTests.cs"
+    $eraseTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintEraseTests.cs"
+    $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
+    $csprojPath = Join-Path $RepoRoot "src\JueMingZ\JueMingZ.csproj"
+    $runtimePath = Join-Path $RepoRoot "src\JueMingZ\Runtime\JueMingZRuntime.cs"
+    $auditPath = Join-Path $RepoRoot "scripts\audit-project-health.ps1"
+    $functionDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $plan00Path = Join-BlueprintPlacementPlanPath -RepoRoot $RepoRoot -Leaf "00-基准.md"
+    $plan06Path = Join-BlueprintPlacementPlanPath -RepoRoot $RepoRoot -Leaf "06-清空放置与区域修改.md"
+    $currentPlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "索引.md")
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $updateDirectory = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+    $docHistoryDirectory = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史")
+
+    $updateRecordPath = ""
+    if (Test-Path -LiteralPath $updateDirectory) {
+        $record = Get-ChildItem -LiteralPath $updateDirectory -Filter "0.951-清空放置与区域修改-*.md" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($record) {
+            $updateRecordPath = $record.FullName
+        }
+    }
+
+    $docHistoryRecordPath = ""
+    if (Test-Path -LiteralPath $docHistoryDirectory) {
+        $record = Get-ChildItem -LiteralPath $docHistoryDirectory -Filter "蓝图清空放置与区域修改-*.md" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($record) {
+            $docHistoryRecordPath = $record.FullName
+        }
+    }
+
+    $placedStateText = Read-TextIfExists -Path $placedStatePath
+    $eraseStateText = Read-TextIfExists -Path $eraseStatePath
+    $actionText = Read-TextIfExists -Path $actionPath
+    $handheldStateText = Read-TextIfExists -Path $handheldStatePath
+    $placedTestText = Read-TextIfExists -Path $placedTestPath
+    $handheldTestText = Read-TextIfExists -Path $handheldTestPath
+    $eraseTestText = Read-TextIfExists -Path $eraseTestPath
+    $programText = Read-TextIfExists -Path $programPath
+    $csprojText = Read-TextIfExists -Path $csprojPath
+    $runtimeText = Read-TextIfExists -Path $runtimePath
+    $auditText = Read-TextIfExists -Path $auditPath
+    $functionDocText = Read-TextIfExists -Path $functionDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $plan00Text = Read-TextIfExists -Path $plan00Path
+    $plan06Text = Read-TextIfExists -Path $plan06Path
+    $currentPlanIndexText = Read-TextIfExists -Path $currentPlanIndexPath
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $updateRecordText = if ([string]::IsNullOrWhiteSpace($updateRecordPath)) { $null } else { Read-TextIfExists -Path $updateRecordPath }
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+    $docHistoryRecordText = if ([string]::IsNullOrWhiteSpace($docHistoryRecordPath)) { $null } else { Read-TextIfExists -Path $docHistoryRecordPath }
+
+    if (Test-BlueprintPlacementVersionMetadata -RuntimeText $runtimeText -CsprojText $csprojText -AllowedRuntimeVersions @(
+            "0.951-blueprint-clear-placed-region-trim",
+            "0.952-blueprint-move-mirror-governance",
+            "0.953-blueprint-placement-regression-audit",
+            "0.954-blueprint-placement-closeout")) {
+        Write-Pass "Blueprint stage 06 version metadata is synchronized or has advanced to stage 07."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 06 must synchronize RuntimeVersion and project version metadata to 0.951-blueprint-clear-placed-region-trim."
+    }
+
+    if ($placedStateText -and
+        $placedStateText.Contains("ClearAllCurrentWorld") -and
+        $placedStateText.Contains("模板和世界内容未修改") -and
+        $placedStateText.Contains("RefreshProjectionAfterWorldInstancesChanged") -and
+        $eraseStateText -and
+        $eraseStateText.Contains("noVisibleInstances") -and
+        $eraseStateText.Contains("MaxEraseCells") -and
+        $actionText -and
+        $actionText.Contains("ButtonIdClearPlaced") -and
+        $actionText.Contains("ClearAllCurrentWorld") -and
+        $actionText.Contains("ButtonIdRegionModify") -and
+        $actionText.Contains("BeginErase(string.Empty)") -and
+        $actionText.Contains('\"uiOnly\":false') -and
+        $handheldStateText -and
+        $handheldStateText.Contains("ButtonIdClearPlaced") -and
+        $handheldStateText.Contains("ButtonIdRegionModify")) {
+        Write-Pass "Blueprint stage 06 handheld clear and region-modify commands route to real placed-instance governance."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 06 must route handheld clear-placed and region-modify to real instance clearing / erase-mask services, not deferred placeholders."
+    }
+
+    if ($placedTestText -and
+        $placedTestText.Contains("BlueprintPlacedInstanceClearAllCurrentWorldKeepsTemplatesAndRefreshesCaches") -and
+        $placedTestText.Contains("Clear-all must affect only the current world instance file") -and
+        $handheldTestText -and
+        $handheldTestText.Contains("handheld clear-placed command result") -and
+        $handheldTestText.Contains("handheld region-modify starts erase mode") -and
+        $eraseTestText -and
+        $eraseTestText.Contains("BlueprintEraseSelectionPrefersSelectedAndTopLayerFallback") -and
+        $programText -and
+        $programText.Contains("blueprint placed instance clear all current world keeps templates and refreshes caches")) {
+        Write-Pass "Blueprint stage 06 console regressions cover clear-all, handheld real routing, and erase region priority."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 06 must register clear-all / region-modify console regressions and keep erase priority tests wired."
+    }
+
+    if ($auditText -and
+        $auditText.Contains("Test-BlueprintPlacementStage06ClearRegionGovernance") -and
+        $auditText.Contains("0.951-清空放置与区域修改")) {
+        Write-Pass "Blueprint scoped health audit includes the stage 06 clear/region governance check."
+    }
+    else {
+        Write-FailHealth "Blueprint scoped health audit must include Test-BlueprintPlacementStage06ClearRegionGovernance and the 0.951 record anchor."
+    }
+
+    if ($functionDocText -and
+        $functionDocText.Contains("0.951-blueprint-clear-placed-region-trim") -and
+        $functionDocText.Contains("clearPlaced") -and
+        $functionDocText.Contains("eraseStartedHoverTarget") -and
+        $diagnosticsDocText -and
+        $diagnosticsDocText.Contains("0.951-blueprint-clear-placed-region-trim") -and
+        $diagnosticsDocText.Contains("ClearAllCurrentWorld") -and
+        $diagnosticsDocText.Contains("Test-BlueprintPlacementStage06ClearRegionGovernance")) {
+        Write-Pass "Blueprint stage 06 function and diagnostics docs describe clear/region command semantics."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 06 function and diagnostics docs must describe 0.951 clear/region semantics and the scoped health audit."
+    }
+
+    if ($plan06Text -and
+        $plan06Text.Contains("状态：已完成") -and
+        $plan06Text.Contains('RuntimeVersion：`0.951-blueprint-clear-placed-region-trim`') -and
+        $plan06Text.Contains('未在本会话实现或验证 `07`') -and
+        $plan06Text.Contains("Test-BlueprintPlacementStage06ClearRegionGovernance") -and
+        $plan00Text -and
+        ($plan00Text.Contains("0.951-blueprint-clear-placed-region-trim") -or
+            $plan00Text.Contains("0.952-blueprint-move-mirror-governance") -or
+            $plan00Text.Contains("0.953-blueprint-placement-regression-audit") -or
+            $plan00Text.Contains("0.954-blueprint-placement-closeout")) -and
+        ($plan00Text.Contains('下一入口为 `07-移动与镜像治理.md`') -or
+            $plan00Text.Contains('下一入口为 `08-回归诊断与审计防线.md`') -or
+            $plan00Text.Contains('下一入口为 `09-验证打包与归档收口.md`')) -and
+        $currentPlanIndexText -and
+        ($currentPlanIndexText.Contains("0.951-blueprint-clear-placed-region-trim") -or
+            $currentPlanIndexText.Contains("0.952-blueprint-move-mirror-governance") -or
+            $currentPlanIndexText.Contains("0.953-blueprint-placement-regression-audit") -or
+            $currentPlanIndexText.Contains("0.954-blueprint-placement-closeout")) -and
+        ($currentPlanIndexText.Contains('下一入口为 `07-移动与镜像治理.md`') -or
+            $currentPlanIndexText.Contains('下一入口为 `08-回归诊断与审计防线.md`') -or
+            $currentPlanIndexText.Contains('下一入口为 `09-验证打包与归档收口.md`'))) {
+        Write-Pass "Blueprint placement plan files record stage 06 completion, no-package scope, and next-stage boundary."
+    }
+    else {
+        Write-FailHealth "Blueprint placement plan files must record stage 06 completion, 0.951 version, no-package scope, and main-project locked next-stage boundary."
+    }
+
+    if ($updateIndexText -and
+        $updateIndexText.Contains("0.951-清空放置与区域修改") -and
+        $updateRecordText -and
+        $updateRecordText.Contains('RuntimeVersion：`0.951-blueprint-clear-placed-region-trim`') -and
+        $updateRecordText.Contains("Test-BlueprintPlacementStage06ClearRegionGovernance") -and
+        $updateRecordText.Contains("不生成测试包") -and
+        $docHistoryIndexText -and
+        $docHistoryIndexText.Contains("蓝图清空放置与区域修改") -and
+        $docHistoryRecordText -and
+        $docHistoryRecordText.Contains("0.951-blueprint-clear-placed-region-trim") -and
+        $docHistoryRecordText.Contains("不生成测试包")) {
+        Write-Pass "Blueprint stage 06 update record and document-change history are synchronized."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 06 must synchronize update index/record and document-change history for 0.951."
+    }
+}
+
+function Test-BlueprintPlacementStage07MoveMirrorGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $modelPath = Join-Path $RepoRoot "src\JueMingZ\Automation\Blueprint\BlueprintModels.cs"
+    $transformStatePath = Join-Path $RepoRoot "src\JueMingZ\Automation\Blueprint\BlueprintPlacedInstanceTransformState.cs"
+    $transformOverlayPath = Join-Path $RepoRoot "src\JueMingZ\UI\BlueprintPlacedInstanceTransformOverlay.cs"
+    $actionPath = Join-Path $RepoRoot "src\JueMingZ\Input\LegacyUiActionService.Blueprint.cs"
+    $handheldStatePath = Join-Path $RepoRoot "src\JueMingZ\Automation\Blueprint\BlueprintHandheldActionBarState.cs"
+    $hookPath = Join-Path $RepoRoot "src\JueMingZ\Bootstrap\HookInstaller.cs"
+    $inputHookPath = Join-Path $RepoRoot "src\JueMingZ\Hooks\PlayerInputScrollHookInstaller.cs"
+    $placedTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintPlacedInstanceTests.cs"
+    $handheldTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintHandheldActionBarTests.cs"
+    $eraseTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintEraseTests.cs"
+    $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
+    $csprojPath = Join-Path $RepoRoot "src\JueMingZ\JueMingZ.csproj"
+    $runtimePath = Join-Path $RepoRoot "src\JueMingZ\Runtime\JueMingZRuntime.cs"
+    $auditPath = Join-Path $RepoRoot "scripts\audit-project-health.ps1"
+    $functionDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $plan00Path = Join-BlueprintPlacementPlanPath -RepoRoot $RepoRoot -Leaf "00-基准.md"
+    $plan07Path = Join-BlueprintPlacementPlanPath -RepoRoot $RepoRoot -Leaf "07-移动与镜像治理.md"
+    $currentPlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "索引.md")
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $updateDirectory = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+    $docHistoryDirectory = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史")
+
+    $updateRecordPath = ""
+    if (Test-Path -LiteralPath $updateDirectory) {
+        $record = Get-ChildItem -LiteralPath $updateDirectory -Filter "0.952-移动与镜像治理-*.md" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($record) {
+            $updateRecordPath = $record.FullName
+        }
+    }
+
+    $docHistoryRecordPath = ""
+    if (Test-Path -LiteralPath $docHistoryDirectory) {
+        $record = Get-ChildItem -LiteralPath $docHistoryDirectory -Filter "蓝图移动与镜像治理-*.md" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($record) {
+            $docHistoryRecordPath = $record.FullName
+        }
+    }
+
+    $modelText = Read-TextIfExists -Path $modelPath
+    $transformStateText = Read-TextIfExists -Path $transformStatePath
+    $transformOverlayText = Read-TextIfExists -Path $transformOverlayPath
+    $actionText = Read-TextIfExists -Path $actionPath
+    $handheldStateText = Read-TextIfExists -Path $handheldStatePath
+    $hookText = Read-TextIfExists -Path $hookPath
+    $inputHookText = Read-TextIfExists -Path $inputHookPath
+    $placedTestText = Read-TextIfExists -Path $placedTestPath
+    $handheldTestText = Read-TextIfExists -Path $handheldTestPath
+    $eraseTestText = Read-TextIfExists -Path $eraseTestPath
+    $programText = Read-TextIfExists -Path $programPath
+    $csprojText = Read-TextIfExists -Path $csprojPath
+    $runtimeText = Read-TextIfExists -Path $runtimePath
+    $auditText = Read-TextIfExists -Path $auditPath
+    $functionDocText = Read-TextIfExists -Path $functionDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $plan00Text = Read-TextIfExists -Path $plan00Path
+    $plan07Text = Read-TextIfExists -Path $plan07Path
+    $currentPlanIndexText = Read-TextIfExists -Path $currentPlanIndexPath
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $updateRecordText = if ([string]::IsNullOrWhiteSpace($updateRecordPath)) { $null } else { Read-TextIfExists -Path $updateRecordPath }
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+    $docHistoryRecordText = if ([string]::IsNullOrWhiteSpace($docHistoryRecordPath)) { $null } else { Read-TextIfExists -Path $docHistoryRecordPath }
+
+    if (Test-BlueprintPlacementVersionMetadata -RuntimeText $runtimeText -CsprojText $csprojText -AllowedRuntimeVersions @(
+            "0.952-blueprint-move-mirror-governance",
+            "0.953-blueprint-placement-regression-audit",
+            "0.954-blueprint-placement-closeout")) {
+        Write-Pass "Blueprint stage 07 version metadata is synchronized or has advanced to stage 08."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 07 must synchronize RuntimeVersion and project version metadata to 0.952-blueprint-move-mirror-governance."
+    }
+
+    if ($modelText -and
+        $modelText.Contains("AutoPlacementProgressState") -and
+        $transformStateText -and
+        $transformStateText.Contains("BeginMove") -and
+        $transformStateText.Contains("BeginMirror") -and
+        $transformStateText.Contains("TryMirrorHorizontal") -and
+        $transformStateText.Contains("autoPlacementProgressActive") -and
+        $transformStateText.Contains("RefreshAfterInstanceMutation") -and
+        $transformStateText.Contains("模板、世界实物") -and
+        -not $transformStateText.Contains("InputActionQueue") -and
+        $transformOverlayText -and
+        $transformOverlayText.Contains("placed-transform") -and
+        $transformOverlayText.Contains("ShouldBlockTransformForPointerOwnership") -and
+        $hookText.Contains("BlueprintPlacedInstanceTransformOverlay.UpdatePrefixGuard") -and
+        $inputHookText.Contains("BlueprintPlacedInstanceTransformOverlay.UpdateAfterPlayerInputGuard")) {
+        Write-Pass "Blueprint stage 07 transform state moves/mirrors placed instances only, blocks auto-progress markers, and registers world input guards."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 07 must add a placed-instance transform state/overlay, auto-progress fail-closed marker, cache refresh, and no ActionQueue/world-tile mutation path."
+    }
+
+    if ($actionText -and
+        $actionText.Contains("BlueprintPlacedInstanceTransformState.BeginMove") -and
+        $actionText.Contains("BlueprintPlacedInstanceTransformState.BeginMirror") -and
+        $actionText.Contains("transformInputActive") -and
+        $actionText.Contains('\"uiOnly\":false') -and
+        $actionText.Contains("placedTransform") -and
+        $handheldStateText -and
+        $handheldStateText.Contains('new BlueprintHandheldActionBarButtonDefinition(ButtonIdMove, "移动蓝图", 4, "只能移动已放置蓝图")') -and
+        $handheldStateText.Contains('new BlueprintHandheldActionBarButtonDefinition(ButtonIdMirror, "镜像", 6, "镜像已放置蓝图")')) {
+        Write-Pass "Blueprint stage 07 handheld move/mirror buttons route to real placed-instance transform selection."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 07 handheld move/mirror commands must start real transform selection and expose placedTransform UI state."
+    }
+
+    if ($placedTestText -and
+        $placedTestText.Contains("BlueprintPlacedInstanceMoveKeepsSnapshotStateAndRefreshesCaches") -and
+        $placedTestText.Contains("BlueprintPlacedInstanceMirrorUsesServiceAndFailsClosed") -and
+        $placedTestText.Contains("autoPlacementProgressActive") -and
+        $handheldTestText -and
+        $handheldTestText.Contains("handheld move starts transform mode") -and
+        $handheldTestText.Contains("handheld mirror starts transform mode") -and
+        $eraseTestText -and
+        $eraseTestText.Contains("RefreshAfterWorldInstancesChanged") -and
+        $programText -and
+        $programText.Contains("blueprint placed instance move keeps snapshot state and refreshes caches") -and
+        $programText.Contains("blueprint placed instance mirror uses service and fails closed")) {
+        Write-Pass "Blueprint stage 07 console regressions cover move, mirror fail-closed, auto-progress marker, handheld routing, and cache refresh boundaries."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 07 must register move/mirror console regressions and keep direct erase-state projection refresh tests deterministic."
+    }
+
+    if ($auditText -and
+        $auditText.Contains("Test-BlueprintPlacementStage07MoveMirrorGovernance") -and
+        $auditText.Contains("0.952-移动与镜像治理")) {
+        Write-Pass "Blueprint scoped health audit includes the stage 07 move/mirror governance check."
+    }
+    else {
+        Write-FailHealth "Blueprint scoped health audit must include Test-BlueprintPlacementStage07MoveMirrorGovernance and the 0.952 record anchor."
+    }
+
+    if ($functionDocText -and
+        $functionDocText.Contains("0.952-blueprint-move-mirror-governance") -and
+        $functionDocText.Contains("moveTargetSelectStarted") -and
+        $functionDocText.Contains("mirrorTargetSelectStarted") -and
+        $functionDocText.Contains("autoPlacementProgressActive") -and
+        $diagnosticsDocText -and
+        $diagnosticsDocText.Contains("0.952-blueprint-move-mirror-governance") -and
+        $diagnosticsDocText.Contains("placedTransform") -and
+        $diagnosticsDocText.Contains("Test-BlueprintPlacementStage07MoveMirrorGovernance")) {
+        Write-Pass "Blueprint stage 07 function and diagnostics docs describe move/mirror semantics and action-event state."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 07 function and diagnostics docs must describe 0.952 move/mirror semantics, placedTransform diagnostics, and the scoped health audit."
+    }
+
+    if ($plan07Text -and
+        $plan07Text.Contains("状态：已完成") -and
+        $plan07Text.Contains('RuntimeVersion：`0.952-blueprint-move-mirror-governance`') -and
+        $plan07Text.Contains('未在本会话实现或验证 `08`') -and
+        $plan07Text.Contains("不生成测试包") -and
+        $plan07Text.Contains("Test-BlueprintPlacementStage07MoveMirrorGovernance") -and
+        $plan00Text -and
+        ($plan00Text.Contains("0.952-blueprint-move-mirror-governance") -or
+            $plan00Text.Contains("0.953-blueprint-placement-regression-audit") -or
+            $plan00Text.Contains("0.954-blueprint-placement-closeout")) -and
+        ($plan00Text.Contains('下一入口为 `08-回归诊断与审计防线.md`') -or
+            $plan00Text.Contains('下一入口为 `09-验证打包与归档收口.md`')) -and
+        $currentPlanIndexText -and
+        ($currentPlanIndexText.Contains("0.952-blueprint-move-mirror-governance") -or
+            $currentPlanIndexText.Contains("0.953-blueprint-placement-regression-audit") -or
+            $currentPlanIndexText.Contains("0.954-blueprint-placement-closeout")) -and
+        ($currentPlanIndexText.Contains('下一入口为 `08-回归诊断与审计防线.md`') -or
+            $currentPlanIndexText.Contains('下一入口为 `09-验证打包与归档收口.md`'))) {
+        Write-Pass "Blueprint placement plan files record stage 07 completion, no-package scope, and next-stage boundary."
+    }
+    else {
+        Write-FailHealth "Blueprint placement plan files must record stage 07 completion, 0.952 version, no-package scope, and main-project locked next-stage boundary."
+    }
+
+    if ($updateIndexText -and
+        $updateIndexText.Contains("0.952-移动与镜像治理") -and
+        $updateRecordText -and
+        $updateRecordText.Contains('RuntimeVersion：`0.952-blueprint-move-mirror-governance`') -and
+        $updateRecordText.Contains("Test-BlueprintPlacementStage07MoveMirrorGovernance") -and
+        $updateRecordText.Contains("不生成测试包") -and
+        $docHistoryIndexText -and
+        $docHistoryIndexText.Contains("蓝图移动与镜像治理") -and
+        $docHistoryRecordText -and
+        $docHistoryRecordText.Contains("0.952-blueprint-move-mirror-governance") -and
+        $docHistoryRecordText.Contains("不生成测试包")) {
+        Write-Pass "Blueprint stage 07 update record and document-change history are synchronized."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 07 must synchronize update index/record and document-change history for 0.952."
+    }
+}
+
+function Test-BlueprintPlacementStage08RegressionDiagnosticsGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $diagnosticsTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintDiagnosticsTests.cs"
+    $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
+    $auditPath = Join-Path $RepoRoot "scripts\audit-project-health.ps1"
+    $csprojPath = Join-Path $RepoRoot "src\JueMingZ\JueMingZ.csproj"
+    $runtimePath = Join-Path $RepoRoot "src\JueMingZ\Runtime\JueMingZRuntime.cs"
+    $actionPath = Join-Path $RepoRoot "src\JueMingZ\Input\LegacyUiActionService.Blueprint.cs"
+    $compatDirectory = Join-Path $RepoRoot "src\JueMingZ\Compat"
+    $functionDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $plan00Path = Join-BlueprintPlacementPlanPath -RepoRoot $RepoRoot -Leaf "00-基准.md"
+    $plan08Path = Join-BlueprintPlacementPlanPath -RepoRoot $RepoRoot -Leaf "08-回归诊断与审计防线.md"
+    $currentPlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "索引.md")
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $updateDirectory = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+    $docHistoryDirectory = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史")
+
+    $updateRecordPath = ""
+    if (Test-Path -LiteralPath $updateDirectory) {
+        $record = Get-ChildItem -LiteralPath $updateDirectory -Filter "0.953-蓝图回归诊断审计-*.md" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($record) {
+            $updateRecordPath = $record.FullName
+        }
+    }
+
+    $docHistoryRecordPath = ""
+    if (Test-Path -LiteralPath $docHistoryDirectory) {
+        $record = Get-ChildItem -LiteralPath $docHistoryDirectory -Filter "蓝图回归诊断审计-*.md" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($record) {
+            $docHistoryRecordPath = $record.FullName
+        }
+    }
+
+    $diagnosticsTestText = Read-TextIfExists -Path $diagnosticsTestPath
+    $programText = Read-TextIfExists -Path $programPath
+    $auditText = Read-TextIfExists -Path $auditPath
+    $csprojText = Read-TextIfExists -Path $csprojPath
+    $runtimeText = Read-TextIfExists -Path $runtimePath
+    $actionText = Read-TextIfExists -Path $actionPath
+    $functionDocText = Read-TextIfExists -Path $functionDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $plan00Text = Read-TextIfExists -Path $plan00Path
+    $plan08Text = Read-TextIfExists -Path $plan08Path
+    $currentPlanIndexText = Read-TextIfExists -Path $currentPlanIndexPath
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $updateRecordText = if ([string]::IsNullOrWhiteSpace($updateRecordPath)) { $null } else { Read-TextIfExists -Path $updateRecordPath }
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+    $docHistoryRecordText = if ([string]::IsNullOrWhiteSpace($docHistoryRecordPath)) { $null } else { Read-TextIfExists -Path $docHistoryRecordPath }
+
+    $compatText = ""
+    if (Test-Path -LiteralPath $compatDirectory) {
+        foreach ($compatFile in Get-ChildItem -LiteralPath $compatDirectory -Filter "*.cs" -File -ErrorAction SilentlyContinue) {
+            $compatText += "`n" + (Read-TextIfExists -Path $compatFile.FullName)
+        }
+    }
+
+    if (Test-BlueprintPlacementVersionMetadata -RuntimeText $runtimeText -CsprojText $csprojText -AllowedRuntimeVersions @(
+            "0.953-blueprint-placement-regression-audit",
+            "0.954-blueprint-placement-closeout")) {
+        Write-Pass "Blueprint stage 08 version metadata is synchronized or has advanced to stage 09 closeout."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 08 must synchronize RuntimeVersion and project version metadata to 0.953-blueprint-placement-regression-audit."
+    }
+
+    if ($diagnosticsTestText -and
+        $diagnosticsTestText.Contains("BlueprintPlacementStage08RegressionDiagnosticsContractsStayWired") -and
+        $diagnosticsTestText.Contains("BlueprintLibraryStage10DiagnosticsAuditContractsStayWired") -and
+        $diagnosticsTestText.Contains("BlueprintHandheldUiClickOwnershipContractsStayWired") -and
+        $diagnosticsTestText.Contains("BlueprintCreationFlickerFixContractsStayWired") -and
+        $diagnosticsTestText.Contains("BlueprintMenuUiStateDoesNotRefreshProjectionOrMaterials") -and
+        $diagnosticsTestText.Contains("BlueprintHandheldActionBarRealCommandsAndDeferredPlacedCommands") -and
+        $diagnosticsTestText.Contains("BlueprintPlacementConfirmRefreshesProjectionAndPlacedList") -and
+        $diagnosticsTestText.Contains("BlueprintProjectionStage04LaterInstanceCoversEarlierWithoutMutatingSnapshots") -and
+        $diagnosticsTestText.Contains("BlueprintProjectionUiOverlayAndDiagnosticsContracts") -and
+        $diagnosticsTestText.Contains("BlueprintPlacedListRefreshesMaterialComparisonWithoutDrawScan") -and
+        $diagnosticsTestText.Contains("BlueprintPlacedInstanceClearAllCurrentWorldKeepsTemplatesAndRefreshesCaches") -and
+        $diagnosticsTestText.Contains("BlueprintEraseSingleInstanceClipsProjectionAndMaterials") -and
+        $diagnosticsTestText.Contains("BlueprintPlacedInstanceMoveKeepsSnapshotStateAndRefreshesCaches") -and
+        $diagnosticsTestText.Contains("BlueprintPlacedInstanceMirrorUsesServiceAndFailsClosed") -and
+        $diagnosticsTestText.Contains("BlueprintDiagnosticsAggregateRuntimeSnapshotJson") -and
+        $programText -and
+        $programText.Contains("blueprint placement stage 08 regression diagnostics contracts stay wired")) {
+        Write-Pass "Blueprint stage 08 aggregate regression test is registered and reuses stage 02-07 plus old creation/ownership contracts."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 08 must register an aggregate console regression covering library UI, handheld, placement, projection/materials, clear/erase, move/mirror, diagnostics, and ownership contracts."
+    }
+
+    if ($auditText -and
+        $auditText.Contains("Test-BlueprintPlacementStage08RegressionDiagnosticsGovernance") -and
+        $auditText.Contains("0.953-blueprint-placement-regression-audit") -and
+        $auditText.Contains("BlueprintPlacementStage08RegressionDiagnosticsContractsStayWired")) {
+        Write-Pass "Blueprint scoped health audit includes the stage 08 regression diagnostics governance check."
+    }
+    else {
+        Write-FailHealth "Blueprint scoped health audit must include Test-BlueprintPlacementStage08RegressionDiagnosticsGovernance and the 0.953 record anchor."
+    }
+
+    if ($runtimeText -and
+        -not $runtimeText.Contains("BlueprintPlacedInstanceTransformState.BeginMove") -and
+        -not $runtimeText.Contains("BlueprintPlacedInstanceTransformState.BeginMirror") -and
+        -not $runtimeText.Contains("ClearAllCurrentWorld") -and
+        -not $compatText.Contains("BlueprintPlacedInstanceTransformState") -and
+        -not $compatText.Contains("BlueprintWorldInstanceStore") -and
+        $actionText -and
+        $actionText.Contains("BlueprintPlacedInstanceUiState.ClearAllCurrentWorld") -and
+        $actionText.Contains("BlueprintPlacedInstanceTransformState.BeginMove") -and
+        $actionText.Contains("BlueprintPlacedInstanceTransformState.BeginMirror")) {
+        Write-Pass "Blueprint stage 08 keeps placed-instance business out of Runtime and Compat while preserving the UI command router as a thin entry."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 08 must keep placed-instance business out of Runtime/Compat and preserve only the existing thin UI command routing."
+    }
+
+    if ($functionDocText -and
+        $functionDocText.Contains("0.953-blueprint-placement-regression-audit") -and
+        $functionDocText.Contains("BlueprintPlacementStage08RegressionDiagnosticsContractsStayWired") -and
+        $functionDocText.Contains("不新增用户可见蓝图行为") -and
+        $diagnosticsDocText -and
+        $diagnosticsDocText.Contains("0.953-blueprint-placement-regression-audit") -and
+        $diagnosticsDocText.Contains("BlueprintPlacementStage08RegressionDiagnosticsContractsStayWired") -and
+        $diagnosticsDocText.Contains("不新增 trace JSONL") -and
+        $diagnosticsDocText.Contains("Test-BlueprintPlacementStage08RegressionDiagnosticsGovernance")) {
+        Write-Pass "Blueprint stage 08 function and diagnostics docs describe aggregate regression/audit scope without new runtime diagnostics."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 08 function and diagnostics docs must describe the 0.953 aggregate regression/audit scope without new runtime diagnostics."
+    }
+
+    if ($plan08Text -and
+        $plan08Text.Contains("状态：已完成") -and
+        $plan08Text.Contains('RuntimeVersion：`0.953-blueprint-placement-regression-audit`') -and
+        $plan08Text.Contains("BlueprintPlacementStage08RegressionDiagnosticsContractsStayWired") -and
+        $plan08Text.Contains("Test-BlueprintPlacementStage08RegressionDiagnosticsGovernance") -and
+        $plan08Text.Contains("未生成测试包") -and
+        $plan08Text.Contains('未实现、修改或验证 `09`') -and
+        $plan00Text -and
+        ($plan00Text.Contains("0.953-blueprint-placement-regression-audit") -or
+            $plan00Text.Contains("0.954-blueprint-placement-closeout")) -and
+        ($plan00Text.Contains('下一入口为 `09-验证打包与归档收口.md`') -or
+            $plan00Text.Contains("已完成并归档")) -and
+        $currentPlanIndexText -and
+        ($currentPlanIndexText.Contains("0.953-blueprint-placement-regression-audit") -or
+            $currentPlanIndexText.Contains("0.954-blueprint-placement-closeout")) -and
+        ($currentPlanIndexText.Contains('下一入口为 `09-验证打包与归档收口.md`') -or
+            $currentPlanIndexText.Contains("已按 `09-验证打包与归档收口.md` 完成"))) {
+        Write-Pass "Blueprint placement plan files record stage 08 completion, no-package scope, and next-stage boundary."
+    }
+    else {
+        Write-FailHealth "Blueprint placement plan files must record stage 08 completion, 0.953 version, no-package scope, and stage 09 boundary."
+    }
+
+    if ($updateIndexText -and
+        $updateIndexText.Contains("0.953-蓝图回归诊断审计") -and
+        $updateRecordText -and
+        $updateRecordText.Contains('RuntimeVersion：`0.953-blueprint-placement-regression-audit`') -and
+        $updateRecordText.Contains("BlueprintPlacementStage08RegressionDiagnosticsContractsStayWired") -and
+        $updateRecordText.Contains("Test-BlueprintPlacementStage08RegressionDiagnosticsGovernance") -and
+        $updateRecordText.Contains("不生成测试包") -and
+        $docHistoryIndexText -and
+        $docHistoryIndexText.Contains("蓝图回归诊断审计") -and
+        $docHistoryRecordText -and
+        $docHistoryRecordText.Contains("0.953-blueprint-placement-regression-audit") -and
+        $docHistoryRecordText.Contains("不生成测试包")) {
+        Write-Pass "Blueprint stage 08 update record and document-change history are synchronized."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 08 must synchronize update index/record and document-change history for 0.953."
+    }
+}
+
+function Test-BlueprintPlacementStage09CloseoutGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $auditPath = Join-Path $RepoRoot "scripts\audit-project-health.ps1"
+    $csprojPath = Join-Path $RepoRoot "src\JueMingZ\JueMingZ.csproj"
+    $runtimePath = Join-Path $RepoRoot "src\JueMingZ\Runtime\JueMingZRuntime.cs"
+    $functionDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $currentPlanDirectory = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图放置与实例治理修复")
+    $archivePlanDirectory = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图放置与实例治理修复")
+    $plan00Path = Join-BlueprintPlacementPlanPath -RepoRoot $RepoRoot -Leaf "00-基准.md"
+    $plan09Path = Join-BlueprintPlacementPlanPath -RepoRoot $RepoRoot -Leaf "09-验证打包与归档收口.md"
+    $currentPlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "索引.md")
+    $archivePlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "索引.md")
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $updateDirectory = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+    $docHistoryDirectory = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史")
+
+    $updateRecordPath = ""
+    if (Test-Path -LiteralPath $updateDirectory) {
+        $record = Get-ChildItem -LiteralPath $updateDirectory -Filter "0.954-蓝图放置治理验证收口-*.md" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($record) {
+            $updateRecordPath = $record.FullName
+        }
+    }
+
+    $docHistoryRecordPath = ""
+    if (Test-Path -LiteralPath $docHistoryDirectory) {
+        $record = Get-ChildItem -LiteralPath $docHistoryDirectory -Filter "蓝图放置治理验证收口-*.md" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($record) {
+            $docHistoryRecordPath = $record.FullName
+        }
+    }
+
+    $auditText = Read-TextIfExists -Path $auditPath
+    $csprojText = Read-TextIfExists -Path $csprojPath
+    $runtimeText = Read-TextIfExists -Path $runtimePath
+    $functionDocText = Read-TextIfExists -Path $functionDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $plan00Text = Read-TextIfExists -Path $plan00Path
+    $plan09Text = Read-TextIfExists -Path $plan09Path
+    $currentPlanIndexText = Read-TextIfExists -Path $currentPlanIndexPath
+    $archivePlanIndexText = Read-TextIfExists -Path $archivePlanIndexPath
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $updateRecordText = if ([string]::IsNullOrWhiteSpace($updateRecordPath)) { $null } else { Read-TextIfExists -Path $updateRecordPath }
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+    $docHistoryRecordText = if ([string]::IsNullOrWhiteSpace($docHistoryRecordPath)) { $null } else { Read-TextIfExists -Path $docHistoryRecordPath }
+
+    if (Test-BlueprintPlacementVersionMetadata -RuntimeText $runtimeText -CsprojText $csprojText -AllowedRuntimeVersions @("0.954-blueprint-placement-closeout")) {
+        Write-Pass "Blueprint stage 09 closeout version metadata is synchronized."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 09 must synchronize RuntimeVersion and project version metadata to 0.954-blueprint-placement-closeout."
+    }
+
+    if ((Test-Path -LiteralPath $archivePlanDirectory) -and
+        -not (Test-Path -LiteralPath $currentPlanDirectory) -and
+        $plan00Text -and
+        $plan00Text.Contains("状态：已完成") -and
+        $plan00Text.Contains("0.954-blueprint-placement-closeout") -and
+        $plan09Text -and
+        $plan09Text.Contains("状态：已完成") -and
+        $plan09Text.Contains("JueMingZ-TestPackage") -and
+        $plan09Text.Contains("-RequireFreshTestPackage") -and
+        $plan09Text.Contains("不创建后续")) {
+        Write-Pass "Blueprint placement plan is archived with stage 09 closeout, default package, strict freshness audit, and relay termination recorded."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 09 must archive the placement plan and mark 00/09 complete with package, strict freshness audit, and no-next-thread scope."
+    }
+
+    if ($currentPlanIndexText -and
+        $currentPlanIndexText.Contains("当前没有正在推进的计划") -and
+        $currentPlanIndexText.Contains("蓝图放置与实例治理修复") -and
+        $currentPlanIndexText.Contains("0.954-blueprint-placement-closeout") -and
+        $archivePlanIndexText -and
+        $archivePlanIndexText.Contains("蓝图放置与实例治理修复") -and
+        $archivePlanIndexText.Contains("0.954-blueprint-placement-closeout") -and
+        $archivePlanIndexText.Contains("JueMingZ-TestPackage")) {
+        Write-Pass "Blueprint stage 09 current and archive plan indexes are synchronized."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 09 must remove the plan from current work and add a 0.954 closeout entry to archive/current indexes."
+    }
+
+    if ($functionDocText -and
+        $functionDocText.Contains("0.954-blueprint-placement-closeout") -and
+        $functionDocText.Contains('默认 `JueMingZ-TestPackage`') -and
+        $functionDocText.Contains("严格新鲜包健康审计") -and
+        $diagnosticsDocText -and
+        $diagnosticsDocText.Contains("0.954-blueprint-placement-closeout") -and
+        $diagnosticsDocText.Contains("不新增 runtime snapshot 字段") -and
+        $diagnosticsDocText.Contains("不新增 trace JSONL")) {
+        Write-Pass "Blueprint stage 09 function and diagnostics docs describe closeout/package scope without new diagnostics."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 09 function and diagnostics docs must describe 0.954 closeout, default package, strict freshness audit, and no new diagnostics."
+    }
+
+    if ($updateIndexText -and
+        $updateIndexText.Contains("0.954-蓝图放置治理验证收口") -and
+        $updateRecordText -and
+        $updateRecordText.Contains('RuntimeVersion：`0.954-blueprint-placement-closeout`') -and
+        $updateRecordText.Contains("JueMingZ-TestPackage") -and
+        $updateRecordText.Contains("-RequireFreshTestPackage") -and
+        $updateRecordText.Contains("不生成源码包") -and
+        $docHistoryIndexText -and
+        $docHistoryIndexText.Contains("蓝图放置治理验证收口") -and
+        $docHistoryRecordText -and
+        $docHistoryRecordText.Contains("0.954-blueprint-placement-closeout") -and
+        $docHistoryRecordText.Contains("严格新鲜包健康审计")) {
+        Write-Pass "Blueprint stage 09 update record and document-change history are synchronized."
+    }
+    else {
+        Write-FailHealth "Blueprint stage 09 must synchronize update index/record and document-change history for 0.954 closeout."
+    }
+
+    if ($auditText -and
+        $auditText.Contains("Test-BlueprintPlacementStage09CloseoutGovernance") -and
+        $auditText.Contains("0.954-blueprint-placement-closeout") -and
+        $auditText.Contains("Join-BlueprintPlacementPlanPath")) {
+        Write-Pass "Blueprint scoped health audit includes the stage 09 closeout governance check and archived-plan path resolution."
+    }
+    else {
+        Write-FailHealth "Blueprint scoped health audit must include Test-BlueprintPlacementStage09CloseoutGovernance and archived-plan path resolution."
     }
 }
 
@@ -9060,6 +10579,14 @@ function Invoke-GovernanceAudit {
         Test-BlueprintWorldOverlayPointerOwnershipStage06CloseoutGovernance -RepoRoot $RepoRoot
         Test-BlueprintFeedbackStage08Governance -RepoRoot $RepoRoot
         Test-BlueprintFeedbackStage09CloseoutGovernance -RepoRoot $RepoRoot
+        Test-BlueprintPlacementStage02LibraryUiGovernance -RepoRoot $RepoRoot
+        Test-BlueprintPlacementStage03HandheldCommandMatrixGovernance -RepoRoot $RepoRoot
+        Test-BlueprintPlacementStage04InstancePersistenceGovernance -RepoRoot $RepoRoot
+        Test-BlueprintPlacementStage05VisualMaterialGovernance -RepoRoot $RepoRoot
+        Test-BlueprintPlacementStage06ClearRegionGovernance -RepoRoot $RepoRoot
+        Test-BlueprintPlacementStage07MoveMirrorGovernance -RepoRoot $RepoRoot
+        Test-BlueprintPlacementStage08RegressionDiagnosticsGovernance -RepoRoot $RepoRoot
+        Test-BlueprintPlacementStage09CloseoutGovernance -RepoRoot $RepoRoot
         Test-BlueprintLibraryStage10Governance -RepoRoot $RepoRoot
         Test-BlueprintLibraryStage11CloseoutGovernance -RepoRoot $RepoRoot
     }

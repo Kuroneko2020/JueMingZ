@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Runtime.Serialization.Json;
 using System.Text;
+using System.Threading;
 using JueMingZ.Config;
 using JueMingZ.Diagnostics;
 
@@ -802,6 +803,34 @@ namespace JueMingZ.Automation.Information.Notes
             }
 
             public void Commit()
+            {
+                IOException lastIoError = null;
+                for (var attempt = 0; attempt < 4; attempt++)
+                {
+                    try
+                    {
+                        CommitOnce();
+                        return;
+                    }
+                    catch (IOException error)
+                    {
+                        lastIoError = error;
+                        if (attempt >= 3)
+                        {
+                            throw;
+                        }
+
+                        Thread.Sleep(15 * (attempt + 1));
+                    }
+                }
+
+                if (lastIoError != null)
+                {
+                    throw lastIoError;
+                }
+            }
+
+            private void CommitOnce()
             {
                 if (ShouldFailCommit(_targetPath))
                 {

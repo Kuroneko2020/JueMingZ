@@ -226,8 +226,10 @@ namespace JueMingZ.Tests
             AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "stage06-two-column-fixed-cards");
             AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "preview-scales-to-fit");
             AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "stage07-name-edit-delete-confirm");
-            AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "stage08-import-long-button-export-real");
+            AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "stage08-import-export-windows-dialog");
             AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "stage09-layout-use-real-template-snapshot");
+            AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "stage02-title-row-tools");
+            AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "card-material-toggle");
             AssertContains(LegacyMainWindow.GetBlueprintPlacedInstanceVisualContractForTesting(), "main-menu-open-row");
             AssertContains(LegacyMainWindow.GetBlueprintCreationVisualContractForTesting(), "drag-toggle");
             AssertContains(LegacyMainWindow.GetBlueprintCreationVisualContractForTesting(), "air-select");

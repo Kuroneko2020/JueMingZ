@@ -242,13 +242,20 @@ namespace JueMingZ.Tests
                 LeftDown = true,
                 LeftPressed = true
             });
-            return BlueprintEraseRegionState.HandlePointer(new BlueprintErasePointerInput
+            var result = BlueprintEraseRegionState.HandlePointer(new BlueprintErasePointerInput
             {
                 WorldTileHit = true,
                 TileX = tileX,
                 TileY = tileY,
                 LeftReleased = true
             });
+            if (result != null && result.ErasedRegion)
+            {
+                BlueprintProjectionService.RefreshAfterWorldInstancesChanged();
+                BlueprintMaterialService.ForceRefreshForPlacedInstanceList();
+            }
+
+            return result;
         }
 
         private static BlueprintTemplateRecord CreateEraseMaterialTemplate()

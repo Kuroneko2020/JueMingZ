@@ -90,12 +90,16 @@ namespace JueMingZ.Tests
                 placed,
                 BlueprintHandheldActionBarState.ButtonIdCreate,
                 BlueprintHandheldActionBarState.ButtonIdOpenLibrary,
-                BlueprintHandheldActionBarState.ButtonIdDelete,
+                BlueprintHandheldActionBarState.ButtonIdOpenPlacedList,
+                BlueprintHandheldActionBarState.ButtonIdClearPlaced,
                 BlueprintHandheldActionBarState.ButtonIdMove,
-                BlueprintHandheldActionBarState.ButtonIdRedMap);
-            AssertBlueprintHandheldButton(placed, BlueprintHandheldActionBarState.ButtonIdDelete, "删除蓝图", "删除已经放置的蓝图或已经选区待创建的区域");
-            AssertBlueprintHandheldButton(placed, BlueprintHandheldActionBarState.ButtonIdMove, "移动蓝图", "移动已经放置的蓝图或已经选区待创建的区域");
-            AssertBlueprintHandheldButton(placed, BlueprintHandheldActionBarState.ButtonIdRedMap, "红图", "对已放置的蓝图区域进行修改");
+                BlueprintHandheldActionBarState.ButtonIdRegionModify,
+                BlueprintHandheldActionBarState.ButtonIdMirror);
+            AssertBlueprintHandheldButton(placed, BlueprintHandheldActionBarState.ButtonIdOpenPlacedList, "已放置蓝图列表", "打开当前世界已放置蓝图列表");
+            AssertBlueprintHandheldButton(placed, BlueprintHandheldActionBarState.ButtonIdClearPlaced, "清空放置", "清空当前世界已放置蓝图");
+            AssertBlueprintHandheldButton(placed, BlueprintHandheldActionBarState.ButtonIdMove, "移动蓝图", "只能移动已放置蓝图");
+            AssertBlueprintHandheldButton(placed, BlueprintHandheldActionBarState.ButtonIdRegionModify, "区域修改", "对已经放置蓝图进行内容修剪");
+            AssertBlueprintHandheldButton(placed, BlueprintHandheldActionBarState.ButtonIdMirror, "镜像", "镜像已放置蓝图");
 
             AssertBlueprintHandheldButtons(
                 BuildBlueprintHandheldFrame(
@@ -128,8 +132,8 @@ namespace JueMingZ.Tests
                     BlueprintSettings.DefaultToolItemId,
                     BlueprintHandheldEnvironment(1280, 720, blueprintCreationActive: true, blueprintCreationHasPendingSelection: true, blueprintCreationSelectedCount: 3)),
                 BlueprintHandheldActionBarState.ButtonIdClearSelection,
-                "清除已有选区",
-                "只清除当前蓝图创建选区");
+                "清除选区",
+                "清除所有选区");
 
             var exitedWithPreservedMask = BuildBlueprintHandheldFrame(
                 true,
@@ -283,7 +287,8 @@ namespace JueMingZ.Tests
                 AssertContains(contract, "save-captures-mask");
                 AssertContains(contract, "clear-selection");
                 AssertContains(contract, "open-library-real");
-                AssertContains(contract, "unimplemented-buttons-ui-only");
+                AssertContains(contract, "open-placed-list-real");
+                AssertContains(contract, "stage03-deferred-placed-commands");
                 AssertContains(contract, "no-blueprint-refresh");
                 AssertContains(contract, "no-library-refresh");
                 AssertContains(contract, "mouse-consume");
@@ -742,7 +747,7 @@ namespace JueMingZ.Tests
             AssertStringEquals(interaction.LastResultCode, string.Empty, "display gate must not submit a command");
         }
 
-        private static void BlueprintHandheldActionBarRealCommandsAndUnimplementedButtons()
+        private static void BlueprintHandheldActionBarRealCommandsAndDeferredPlacedCommands()
         {
             var restore = PushTemporaryConfigDirectory("blueprint-handheld-real-commands");
             BlueprintHandheldActionBarState.ResetInteractionForTesting();
@@ -807,7 +812,7 @@ namespace JueMingZ.Tests
                     throw new InvalidOperationException("Expected handheld create to resume the mask preserved by exit-create.");
                 }
 
-                LegacyUiActionService.HandleBlueprintHandheldActionBarCommandForTesting(BuildBlueprintHandheldCommand(BlueprintHandheldActionBarState.ButtonIdClearSelection, "清除已有选区"));
+                LegacyUiActionService.HandleBlueprintHandheldActionBarCommandForTesting(BuildBlueprintHandheldCommand(BlueprintHandheldActionBarState.ButtonIdClearSelection, "清除选区"));
                 var cleared = BlueprintHandheldActionBarState.GetInteractionSnapshotForTesting();
                 AssertStringEquals(cleared.LastClickedButtonId, BlueprintHandheldActionBarState.ButtonIdClearSelection, "handheld clear-selection clicked id");
                 AssertStringEquals(cleared.LastResultCode, "selectionCleared", "handheld clear-selection command result");
@@ -855,22 +860,120 @@ namespace JueMingZ.Tests
                 AssertStringEquals(openLibrary.LastClickedButtonId, BlueprintHandheldActionBarState.ButtonIdOpenLibrary, "handheld open-library clicked id");
                 AssertStringEquals(openLibrary.LastResultCode, "libraryOpened", "handheld open-library command result");
 
-                var before = BlueprintEntryState.GetSnapshot(settings);
-                AssertBlueprintHandheldPlaceholderCommand(BlueprintHandheldActionBarState.ButtonIdDelete, "删除蓝图");
-                AssertBlueprintHandheldPlaceholderCommand(BlueprintHandheldActionBarState.ButtonIdMove, "移动蓝图");
-                AssertBlueprintHandheldPlaceholderCommand(BlueprintHandheldActionBarState.ButtonIdRedMap, "红图");
-                var after = BlueprintEntryState.GetSnapshot(settings);
-                AssertStringEquals(after.Mode, before.Mode, "handheld unimplemented command must not change blueprint entry mode");
-                AssertStringEquals(after.SelectedTemplateId, before.SelectedTemplateId, "handheld unimplemented command must not select a template");
+                var instanceStore = new BlueprintWorldInstanceStore();
+                BlueprintWorldInstanceRecord placedInstance;
+                RequireBlueprintSuccess(
+                    instanceStore.CreateInstanceFromTemplate("pair-handheld-03", "world-handheld-03", snapshot.Templates[0], 7, 8, 0, out placedInstance),
+                    "create handheld stage 03 placed instance");
+                var placedContext = BlueprintPlacementWorldContext.Success("pair-handheld-03", "world-handheld-03");
+                BlueprintPlacedInstanceUiState.SetDependenciesForTesting(
+                    instanceStore,
+                    placedContext,
+                    true);
+                BlueprintEraseRegionState.SetDependenciesForTesting(instanceStore, placedContext);
+                LegacyUiActionService.HandleBlueprintHandheldActionBarCommandForTesting(BuildBlueprintHandheldCommand(BlueprintHandheldActionBarState.ButtonIdOpenPlacedList, "已放置蓝图列表"));
+                var openPlaced = BlueprintHandheldActionBarState.GetInteractionSnapshotForTesting();
+                AssertStringEquals(openPlaced.LastClickedButtonId, BlueprintHandheldActionBarState.ButtonIdOpenPlacedList, "handheld open-placed clicked id");
+                AssertStringEquals(openPlaced.LastResultCode, "placedManagementOpened", "handheld open-placed command result");
+                AssertStringEquals(BlueprintEntryState.GetSnapshot(settings).Mode, BlueprintEntryModes.PlacedManagement, "handheld open-placed entry mode");
+                var placedSnapshot = BlueprintPlacedInstanceUiState.GetSnapshot();
+                if (!LegacyMainUiState.Visible ||
+                    !string.Equals(LegacyMainUiState.SelectedPageId, "blueprint", StringComparison.Ordinal) ||
+                    !placedSnapshot.LoadSucceeded ||
+                    placedSnapshot.Instances.Count != 1)
+                {
+                    throw new InvalidOperationException("Expected handheld open-placed command to reveal the current-world placed blueprint list.");
+                }
+
+                LegacyUiActionService.HandleBlueprintHandheldActionBarCommandForTesting(BuildBlueprintHandheldCommand(BlueprintHandheldActionBarState.ButtonIdRegionModify, "区域修改"));
+                var regionModify = BlueprintHandheldActionBarState.GetInteractionSnapshotForTesting();
+                AssertStringEquals(regionModify.LastClickedButtonId, BlueprintHandheldActionBarState.ButtonIdRegionModify, "handheld region-modify clicked id");
+                AssertStringEquals(regionModify.LastResultCode, "eraseStartedHoverTarget", "handheld region-modify starts erase mode");
+                AssertStringEquals(BlueprintEntryState.GetSnapshot(settings).Mode, BlueprintEntryModes.EraseRegion, "handheld region-modify entry mode");
+                var eraseSnapshot = BlueprintEraseRegionState.GetSnapshot();
+                if (!eraseSnapshot.Active || eraseSnapshot.HasFixedTarget)
+                {
+                    throw new InvalidOperationException("Expected handheld region-modify to enter hover-target erase mode for placed instance trimming.");
+                }
+
+                LegacyUiActionService.HandleBlueprintHandheldActionBarCommandForTesting(BuildBlueprintHandheldCommand(BlueprintHandheldActionBarState.ButtonIdClearPlaced, "清空放置"));
+                var clearPlaced = BlueprintHandheldActionBarState.GetInteractionSnapshotForTesting();
+                AssertStringEquals(clearPlaced.LastClickedButtonId, BlueprintHandheldActionBarState.ButtonIdClearPlaced, "handheld clear-placed clicked id");
+                AssertStringEquals(clearPlaced.LastResultCode, "clearPlaced", "handheld clear-placed command result");
+                AssertStringEquals(BlueprintEntryState.GetSnapshot(settings).Mode, BlueprintEntryModes.Tool, "handheld clear-placed returns to tool mode after erase");
+                if (BlueprintEraseRegionState.GetSnapshot().Active)
+                {
+                    throw new InvalidOperationException("Expected clear-placed to cancel active region-modify erase mode.");
+                }
+
+                BlueprintWorldInstanceSnapshot clearedInstances;
+                RequireBlueprintSuccess(instanceStore.TryLoadWorld("pair-handheld-03", out clearedInstances), "load stage 06 clear-placed instances");
+                if (clearedInstances.Instances.Count != 0 || BlueprintPlacedInstanceUiState.GetCachedSummary().InstanceCount != 0)
+                {
+                    throw new InvalidOperationException("Expected handheld clear-placed to clear current-world placed blueprint instances and cached summary.");
+                }
+
+                BlueprintTemplateLibrarySnapshot templatesAfterClear;
+                RequireBlueprintSuccess(store.TryLoad(out templatesAfterClear), "load templates after handheld clear-placed");
+                if (templatesAfterClear.Templates.Count != 1)
+                {
+                    throw new InvalidOperationException("Expected handheld clear-placed not to delete blueprint library templates.");
+                }
+
+                BlueprintWorldInstanceRecord transformInstance;
+                RequireBlueprintSuccess(
+                    instanceStore.CreateInstanceFromTemplate("pair-handheld-03", "world-handheld-03", templatesAfterClear.Templates[0], 17, 18, 0, out transformInstance),
+                    "create handheld stage 07 transform instance");
+                BlueprintPlacedInstanceTransformState.SetDependenciesForTesting(instanceStore, placedContext);
+                BlueprintPlacedInstanceUiState.SetDependenciesForTesting(
+                    instanceStore,
+                    placedContext,
+                    true);
+
+                LegacyUiActionService.HandleBlueprintHandheldActionBarCommandForTesting(BuildBlueprintHandheldCommand(BlueprintHandheldActionBarState.ButtonIdMove, "移动蓝图"));
+                var moveStart = BlueprintHandheldActionBarState.GetInteractionSnapshotForTesting();
+                AssertStringEquals(moveStart.LastClickedButtonId, BlueprintHandheldActionBarState.ButtonIdMove, "handheld move clicked id");
+                AssertStringEquals(moveStart.LastResultCode, "moveTargetSelectStarted", "handheld move starts transform mode");
+                AssertStringEquals(BlueprintEntryState.GetSnapshot(settings).Mode, BlueprintEntryModes.PlacedManagement, "handheld move enters placed management mode");
+                var moveTransform = BlueprintPlacedInstanceTransformState.GetSnapshot();
+                if (!moveTransform.Active ||
+                    !string.Equals(moveTransform.Mode, BlueprintPlacedInstanceTransformModes.Move, StringComparison.Ordinal) ||
+                    !string.Equals(moveTransform.Phase, BlueprintPlacedInstanceTransformPhases.SelectTarget, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected handheld move to wait for a placed-instance world click.");
+                }
+
+                LegacyUiActionService.HandleBlueprintHandheldActionBarCommandForTesting(BuildBlueprintHandheldCommand(BlueprintHandheldActionBarState.ButtonIdMirror, "镜像"));
+                var mirrorStart = BlueprintHandheldActionBarState.GetInteractionSnapshotForTesting();
+                AssertStringEquals(mirrorStart.LastClickedButtonId, BlueprintHandheldActionBarState.ButtonIdMirror, "handheld mirror clicked id");
+                AssertStringEquals(mirrorStart.LastResultCode, "mirrorTargetSelectStarted", "handheld mirror starts transform mode");
+                var mirrorTransform = BlueprintPlacedInstanceTransformState.GetSnapshot();
+                if (!mirrorTransform.Active ||
+                    !string.Equals(mirrorTransform.Mode, BlueprintPlacedInstanceTransformModes.Mirror, StringComparison.Ordinal) ||
+                    !string.Equals(mirrorTransform.Phase, BlueprintPlacedInstanceTransformPhases.SelectTarget, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected handheld mirror to wait for a placed-instance world click.");
+                }
+
+                BlueprintWorldInstanceSnapshot unchangedInstances;
+                RequireBlueprintSuccess(instanceStore.TryLoadWorld("pair-handheld-03", out unchangedInstances), "load stage 07 transform start instances");
+                if (unchangedInstances.Instances.Count != 1 ||
+                    FindPlacedInstance(unchangedInstances, transformInstance.InstanceId).OriginTileX != 17)
+                {
+                    throw new InvalidOperationException("Expected stage 07 handheld move/mirror button clicks not to mutate placed blueprint instances before a world target click.");
+                }
             }
             finally
             {
                 BlueprintCaptureService.ResetForTesting();
                 BlueprintLibraryUiState.ResetForTesting();
+                BlueprintPlacedInstanceUiState.ResetForTesting();
                 BlueprintTemplateLibraryStore.ResetTestingHooks();
                 BlueprintEntryState.ResetForTesting();
                 BlueprintCreationMaskState.ResetForTesting();
+                BlueprintPlacedInstanceTransformState.ResetForTesting();
                 BlueprintHandheldActionBarState.ResetInteractionForTesting();
+                LegacyMainUiState.SetVisible(false);
                 restore();
             }
         }
@@ -1031,15 +1134,18 @@ namespace JueMingZ.Tests
             };
         }
 
-        private static void AssertBlueprintHandheldPlaceholderCommand(string buttonId, string label)
+        private static void AssertBlueprintHandheldDeferredCommand(string buttonId, string label, string expectedStage)
         {
             LegacyUiActionService.HandleBlueprintHandheldActionBarCommandForTesting(BuildBlueprintHandheldCommand(buttonId, label));
             var interaction = BlueprintHandheldActionBarState.GetInteractionSnapshotForTesting();
-            AssertStringEquals(interaction.LastClickedButtonId, buttonId, "handheld placeholder clicked id");
-            AssertStringEquals(interaction.LastClickedButtonLabel, label, "handheld placeholder clicked label");
-            AssertStringEquals(interaction.LastResultCode, BlueprintHandheldActionBarState.ResultCodeUiOnlyNotImplemented, "handheld placeholder command result");
-            AssertIntEquals(interaction.LastHeldItemType, BlueprintSettings.DefaultToolItemId, "handheld placeholder held item type");
+            AssertStringEquals(interaction.LastClickedButtonId, buttonId, "handheld deferred clicked id");
+            AssertStringEquals(interaction.LastClickedButtonLabel, label, "handheld deferred clicked label");
+            AssertStringEquals(interaction.LastResultCode, BlueprintHandheldActionBarState.ResultCodeEntryWiredDeferred, "handheld deferred command result");
+            AssertIntEquals(interaction.LastHeldItemType, BlueprintSettings.DefaultToolItemId, "handheld deferred held item type");
             AssertContains(interaction.LastNotice, label);
+            AssertContains(interaction.LastNotice, "入口已接线");
+            AssertContains(interaction.LastNotice, expectedStage + " 阶段");
+            AssertDoesNotContain(interaction.LastNotice, "暂未接入");
         }
 
         private static BlueprintHandheldActionBarFrame BuildBlueprintHandheldFrame(

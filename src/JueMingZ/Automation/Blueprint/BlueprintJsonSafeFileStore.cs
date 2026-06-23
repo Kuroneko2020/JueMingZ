@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Runtime.Serialization.Json;
+using System.Threading;
 using JueMingZ.Diagnostics;
 
 namespace JueMingZ.Automation.Blueprint
@@ -85,7 +86,7 @@ namespace JueMingZ.Automation.Blueprint
                     stream.Flush(true);
                 }
 
-                CommitPreparedFile(tempPath, path);
+                CommitPreparedFileWithRetry(tempPath, path);
                 return BlueprintStorageOperationResult.Success("saved", "saved", path);
             }
             catch (Exception error)
@@ -154,6 +155,34 @@ namespace JueMingZ.Automation.Blueprint
                 }
 
                 throw;
+            }
+        }
+
+        private static void CommitPreparedFileWithRetry(string tempPath, string targetPath)
+        {
+            IOException lastIoError = null;
+            for (var attempt = 0; attempt < 4; attempt++)
+            {
+                try
+                {
+                    CommitPreparedFile(tempPath, targetPath);
+                    return;
+                }
+                catch (IOException error)
+                {
+                    lastIoError = error;
+                    if (attempt >= 3)
+                    {
+                        throw;
+                    }
+
+                    Thread.Sleep(15 * (attempt + 1));
+                }
+            }
+
+            if (lastIoError != null)
+            {
+                throw lastIoError;
             }
         }
 

@@ -466,6 +466,7 @@ namespace JueMingZ.Tests
 
         private static void BlueprintUiPointerOwnershipBlocksWorldOverlayClicks()
         {
+            var restore = PushTemporaryConfigDirectory("blueprint-ui-pointer-ownership-stage06");
             ResetUiInputFrameTestState();
             BlueprintCreationMaskState.ResetForTesting();
             BlueprintPlacementPreviewState.ResetForTesting();
@@ -657,8 +658,20 @@ namespace JueMingZ.Tests
                     throw new InvalidOperationException("Expected UI-owned placement click to consume without confirming an instance.");
                 }
 
+                var eraseStore = new BlueprintWorldInstanceStore();
+                BlueprintWorldInstanceRecord eraseInstance;
+                RequireBlueprintSuccess(
+                    eraseStore.CreateInstanceFromTemplate(
+                        "pair-ui-owned",
+                        "world-ui-owned",
+                        CreateProjectionTileOnlyTemplate("UI ownership erase", 77),
+                        12,
+                        13,
+                        0,
+                        out eraseInstance),
+                    "create erase target instance for UI ownership test");
                 BlueprintEraseRegionState.SetDependenciesForTesting(
-                    new BlueprintWorldInstanceStore(),
+                    eraseStore,
                     BlueprintPlacementWorldContext.Success("pair-ui-owned", "world-ui-owned"));
                 var beginErase = BlueprintEraseRegionState.BeginErase(string.Empty);
                 if (!beginErase.Succeeded)
@@ -697,6 +710,7 @@ namespace JueMingZ.Tests
                 BlueprintPlacementPreviewState.ResetForTesting();
                 BlueprintEraseRegionState.ResetForTesting();
                 BlueprintHandheldActionBarState.ResetInteractionForTesting();
+                restore();
             }
         }
 

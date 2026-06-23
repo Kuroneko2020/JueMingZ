@@ -10,9 +10,9 @@ namespace JueMingZ.UI
 {
     public static class BlueprintHandheldActionBarOverlay
     {
-        private const string VisualContract = "physical-screen-bottom-action-bar+dynamic-buttons+legacy-ui-theme+vanilla-ui-skin+button-text-scale-0.78+create-enters-mask+exit-create-preserves-mask+save-captures-mask+clear-selection+disabled-save-tooltip+open-library-real+unimplemented-buttons-ui-only+mouse-consume+no-blueprint-refresh+no-library-refresh+no-input-action-queue";
+        private const string VisualContract = "physical-screen-bottom-action-bar+dynamic-buttons+legacy-ui-theme+vanilla-ui-skin+button-text-scale-0.78+create-enters-mask+exit-create-preserves-mask+save-captures-mask+clear-selection+disabled-save-tooltip+open-library-real+open-placed-list-real+stage03-deferred-placed-commands+mouse-consume+no-blueprint-refresh+no-library-refresh+no-input-action-queue";
         internal const float ButtonTextScale = 0.78f;
-        private const float MinimumButtonTextScale = 0.52f;
+        private const float MinimumButtonTextScale = 0.32f;
 
         public static bool DrawInterfaceLayer()
         {

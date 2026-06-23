@@ -156,5 +156,25 @@ namespace JueMingZ.Tests
                 restore();
             }
         }
+
+        private static void BlueprintPlacementStage08RegressionDiagnosticsContractsStayWired()
+        {
+            BlueprintLibraryStage10DiagnosticsAuditContractsStayWired();
+            BlueprintHandheldUiClickOwnershipContractsStayWired();
+            BlueprintCreationFlickerFixContractsStayWired();
+            BlueprintMenuUiStateDoesNotRefreshProjectionOrMaterials();
+            BlueprintHandheldActionBarDynamicButtonMatrix();
+            BlueprintHandheldActionBarRealCommandsAndDeferredPlacedCommands();
+            BlueprintPlacementConfirmRefreshesProjectionAndPlacedList();
+            BlueprintPlacementUiHitConsumesWithoutCreatingInstance();
+            BlueprintProjectionStage04LaterInstanceCoversEarlierWithoutMutatingSnapshots();
+            BlueprintProjectionUiOverlayAndDiagnosticsContracts();
+            BlueprintPlacedListRefreshesMaterialComparisonWithoutDrawScan();
+            BlueprintPlacedInstanceClearAllCurrentWorldKeepsTemplatesAndRefreshesCaches();
+            BlueprintEraseSingleInstanceClipsProjectionAndMaterials();
+            BlueprintPlacedInstanceMoveKeepsSnapshotStateAndRefreshesCaches();
+            BlueprintPlacedInstanceMirrorUsesServiceAndFailsClosed();
+            BlueprintDiagnosticsAggregateRuntimeSnapshotJson();
+        }
     }
 }

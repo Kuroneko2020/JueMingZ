@@ -28,7 +28,7 @@ namespace JueMingZ.Tests
             BlueprintHandheldActionBarInputCapturesOnlyInsideBar();
             BlueprintHandheldActionBarAfterPlayerInputGuardSubmitsFreshClickEdge();
             BlueprintHandheldActionBarPostfixReplaysStalePrefixPress();
-            BlueprintHandheldActionBarRealCommandsAndUnimplementedButtons();
+            BlueprintHandheldActionBarRealCommandsAndDeferredPlacedCommands();
             BlueprintHandheldActionBarDiagnosticsSnapshotJson();
         }
 

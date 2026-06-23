@@ -103,6 +103,9 @@ namespace JueMingZ.Automation.Blueprint
                 Hidden = false,
                 LayerOrder = layerOrder,
                 MaterialWindowVisible = true,
+                // Placed instances own a snapshot copy. Later template rename,
+                // delete, erase, move, or overlap resolution must not write back
+                // to the blueprint library template.
                 TemplateSnapshot = template.Clone(),
                 CreatedUtc = now,
                 UpdatedUtc = now

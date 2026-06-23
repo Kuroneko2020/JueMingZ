@@ -114,6 +114,105 @@ namespace JueMingZ.UI.Legacy
             return hovered;
         }
 
+        private static LegacyUiElement DrawBlueprintPlacedMaterialPanel(
+            object spriteBatch,
+            LegacyScrollArea area,
+            int contentY)
+        {
+            var snapshot = BlueprintMaterialService.GetCachedSnapshotForDraw();
+            var rect = new LegacyUiRect(area.Viewport.X, area.ToScreenY(contentY), area.Viewport.Width, BlueprintPlacedMaterialPanelHeight);
+            if (!area.IsVisible(rect))
+            {
+                return null;
+            }
+
+            LegacyUiTheme.DrawSubPanelClipped(spriteBatch, rect, area.Viewport);
+            UiTextRenderer.DrawTextClipped(
+                spriteBatch,
+                BuildBlueprintMaterialSummary(snapshot),
+                rect.X + 10,
+                rect.Y + 7,
+                rect.Width - 20,
+                15,
+                area.Viewport.X,
+                area.Viewport.Y,
+                area.Viewport.Width,
+                area.Viewport.Height,
+                238,
+                238,
+                226,
+                255,
+                0.62f);
+
+            var lines = BuildBlueprintPlacedMaterialLines(snapshot, 2);
+            if (lines.Count <= 0)
+            {
+                var emptyText = snapshot == null || !snapshot.LoadSucceeded
+                    ? "材料对照待刷新"
+                    : "没有需要补齐的缺失材料";
+                UiTextRenderer.DrawTextClipped(
+                    spriteBatch,
+                    emptyText,
+                    rect.X + 10,
+                    rect.Y + 30,
+                    rect.Width - 20,
+                    14,
+                    area.Viewport.X,
+                    area.Viewport.Y,
+                    area.Viewport.Width,
+                    area.Viewport.Height,
+                    198,
+                    210,
+                    228,
+                    226,
+                    0.54f);
+                return null;
+            }
+
+            for (var index = 0; index < lines.Count; index++)
+            {
+                UiTextRenderer.DrawTextClipped(
+                    spriteBatch,
+                    UiTextRenderer.Ellipsize(lines[index], rect.Width - 20, 0.54f),
+                    rect.X + 10,
+                    rect.Y + 29 + index * 18,
+                    rect.Width - 20,
+                    14,
+                    area.Viewport.X,
+                    area.Viewport.Y,
+                    area.Viewport.Width,
+                    area.Viewport.Height,
+                    206,
+                    218,
+                    238,
+                    235,
+                    0.54f);
+            }
+
+            var itemCount = snapshot == null || snapshot.Items == null ? 0 : snapshot.Items.Count;
+            if (itemCount > lines.Count)
+            {
+                UiTextRenderer.DrawTextClipped(
+                    spriteBatch,
+                    "其余 " + (itemCount - lines.Count).ToString(CultureInfo.InvariantCulture) + " 项",
+                    rect.X + 10,
+                    rect.Y + 64,
+                    rect.Width - 20,
+                    11,
+                    area.Viewport.X,
+                    area.Viewport.Y,
+                    area.Viewport.Width,
+                    area.Viewport.Height,
+                    170,
+                    184,
+                    202,
+                    210,
+                    0.48f);
+            }
+
+            return null;
+        }
+
         private static LegacyUiElement DrawBlueprintPlacedRow(
             object spriteBatch,
             LegacyScrollArea area,
@@ -145,12 +244,12 @@ namespace JueMingZ.UI.Legacy
             const int gap = 5;
             var buttonY = card.Y + 5;
             var removeConfirm = string.Equals(instance.InstanceId, snapshot.RemoveConfirmInstanceId, StringComparison.OrdinalIgnoreCase);
-            var smallWidth = card.Width < 460 ? 40 : 46;
+            var smallWidth = card.Width < 460 ? 48 : 58;
             var x = card.Right - 4 - smallWidth;
             var hovered = (LegacyUiElement)null;
             hovered = DrawBlueprintSmallButton(spriteBatch, mouse, elements, area.Viewport, new LegacyUiRect(x, buttonY, smallWidth, RowModeButtonHeight), BlueprintPlacedInstanceUiState.BuildCommandId("remove", instance.InstanceId), removeConfirm ? "确认" : "移除", removeConfirm ? "再次点击移除实例数据" : "移除实例数据") ?? hovered;
             x -= smallWidth + gap;
-            hovered = DrawBlueprintSmallButton(spriteBatch, mouse, elements, area.Viewport, new LegacyUiRect(x, buttonY, smallWidth, RowModeButtonHeight), BlueprintPlacedInstanceUiState.BuildCommandId("toggle-hidden", instance.InstanceId), instance.Hidden ? "显示" : "隐藏", instance.Hidden ? "显示该实例" : "隐藏该实例") ?? hovered;
+            hovered = DrawBlueprintSmallButton(spriteBatch, mouse, elements, area.Viewport, new LegacyUiRect(x, buttonY, smallWidth, RowModeButtonHeight), BlueprintPlacedInstanceUiState.BuildCommandId("toggle-hidden", instance.InstanceId), instance.Hidden ? "恢复显示" : "取消显示", instance.Hidden ? "恢复显示该实例" : "取消显示该实例") ?? hovered;
             x -= smallWidth + gap;
             hovered = DrawBlueprintSmallButton(spriteBatch, mouse, elements, area.Viewport, new LegacyUiRect(x, buttonY, smallWidth, RowModeButtonHeight), BlueprintPlacedInstanceUiState.BuildCommandId("layer-up", instance.InstanceId), "上层", "提高实例层级") ?? hovered;
             x -= smallWidth + gap;
@@ -158,7 +257,7 @@ namespace JueMingZ.UI.Legacy
             x -= smallWidth + gap;
             hovered = DrawBlueprintSmallButton(spriteBatch, mouse, elements, area.Viewport, new LegacyUiRect(x, buttonY, smallWidth, RowModeButtonHeight), BlueprintPlacedInstanceUiState.BuildCommandId("select", instance.InstanceId), "选中", "选中该实例") ?? hovered;
 
-            var textWidth = Math.Max(80, x - gap - card.X - 8);
+            var textWidth = Math.Max(1, x - gap - card.X - 8);
             var title = (instance.Hidden ? "[隐藏] " : string.Empty) + (instance.Name ?? string.Empty);
             UiTextRenderer.DrawTextClipped(
                 spriteBatch,
@@ -193,6 +292,37 @@ namespace JueMingZ.UI.Legacy
                 226,
                 0.52f);
             return hovered;
+        }
+
+        private static List<string> BuildBlueprintPlacedMaterialLines(BlueprintMaterialSnapshot snapshot, int maxItems)
+        {
+            var lines = new List<string>();
+            if (snapshot == null || snapshot.Items == null || snapshot.Items.Count <= 0 || maxItems <= 0)
+            {
+                return lines;
+            }
+
+            var count = Math.Min(maxItems, snapshot.Items.Count);
+            for (var index = 0; index < count; index++)
+            {
+                var item = snapshot.Items[index];
+                if (item == null)
+                {
+                    continue;
+                }
+
+                var name = string.IsNullOrWhiteSpace(item.DisplayName)
+                    ? "#" + item.ItemId.ToString(CultureInfo.InvariantCulture)
+                    : item.DisplayName.Trim();
+                lines.Add(name +
+                          "：需要 " + item.RequiredStack.ToString(CultureInfo.InvariantCulture) +
+                          " / 已有 " + item.AvailableStack.ToString(CultureInfo.InvariantCulture) +
+                          " / 缺 " + item.MissingStack.ToString(CultureInfo.InvariantCulture) +
+                          " / 主包 " + item.MainInventoryStack.ToString(CultureInfo.InvariantCulture) +
+                          " / 虚空袋 " + item.VoidBagStack.ToString(CultureInfo.InvariantCulture));
+            }
+
+            return lines;
         }
     }
 }

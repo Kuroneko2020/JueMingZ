@@ -154,6 +154,7 @@ namespace JueMingZ.Bootstrap
                     BlueprintCreationOverlay.UpdatePrefixGuard();
                     BlueprintPlacementPreviewOverlay.UpdatePrefixGuard();
                     BlueprintEraseRegionOverlay.UpdatePrefixGuard();
+                    BlueprintPlacedInstanceTransformOverlay.UpdatePrefixGuard();
                     LegacyUiInput.UpdatePrefixGuard();
                     SearchItemPickRuntimeService.UpdatePrefixGuard();
                     MapQuickAnnouncementRuntimeService.UpdatePrefixGuard();

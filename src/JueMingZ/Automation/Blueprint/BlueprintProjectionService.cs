@@ -216,6 +216,16 @@ namespace JueMingZ.Automation.Blueprint
             }
         }
 
+        internal static BlueprintProjectionSnapshot RefreshAfterWorldInstancesChanged()
+        {
+            lock (SyncRoot)
+            {
+                // Instance writes are the explicit mutation boundary allowed to
+                // refresh projection data; draw and hit-test paths stay cache-only.
+                return ResolveSnapshotLocked(true).CloneSummary();
+            }
+        }
+
         internal static BlueprintProjectionSnapshot GetCachedSnapshotForDraw()
         {
             lock (SyncRoot)
@@ -429,6 +439,10 @@ namespace JueMingZ.Automation.Blueprint
                         var key = candidate.BuildCoverageKey();
                         if (effective.ContainsKey(key))
                         {
+                            // Overlap is resolved only in this transient
+                            // projection map: the later / higher layer wins for
+                            // display and automation, while both instance
+                            // snapshots remain complete on disk.
                             snapshot.CoveredLayerCount++;
                             effective[key] = candidate;
                             continue;

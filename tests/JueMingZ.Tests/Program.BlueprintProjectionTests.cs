@@ -155,6 +155,63 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void BlueprintProjectionStage04LaterInstanceCoversEarlierWithoutMutatingSnapshots()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-projection-stage04-overlap");
+            try
+            {
+                var store = new BlueprintWorldInstanceStore();
+                var reader = new FakeBlueprintWorldTileReader();
+                var fullTemplate = CreateProjectionTwoTileTemplate("04 完整模板", 41, 42);
+                var coverTemplate = CreateProjectionTileOnlyTemplate("04 后放覆盖", 99);
+                BlueprintWorldInstanceRecord lower;
+                BlueprintWorldInstanceRecord upper;
+                BlueprintWorldInstanceRecord replacedFull;
+                RequireBlueprintSuccess(store.CreateInstanceFromTemplate("pair-stage04-overlap", "world-stage04-overlap", fullTemplate, 10, 20, 0, out lower), "create lower stage04 projection instance");
+                RequireBlueprintSuccess(store.CreateInstanceFromTemplate("pair-stage04-overlap", "world-stage04-overlap", coverTemplate, 10, 20, 1, out upper), "create upper stage04 projection instance");
+                RequireBlueprintSuccess(store.CreateInstanceFromTemplate("pair-stage04-overlap", "world-stage04-overlap", fullTemplate, 30, 20, 2, out replacedFull), "create re-placed full stage04 projection instance");
+
+                reader.Set(10, 20, new BlueprintWorldTileSnapshot());
+                reader.Set(11, 20, new BlueprintWorldTileSnapshot());
+                reader.Set(30, 20, new BlueprintWorldTileSnapshot());
+                reader.Set(31, 20, new BlueprintWorldTileSnapshot());
+                BlueprintProjectionService.SetDependenciesForTesting(
+                    store,
+                    BlueprintPlacementWorldContext.Success("pair-stage04-overlap", "world-stage04-overlap"),
+                    reader,
+                    true);
+
+                var snapshot = BlueprintProjectionService.GetSnapshot();
+                if (!snapshot.LoadSucceeded ||
+                    snapshot.CoveredLayerCount != 1 ||
+                    snapshot.EffectiveLayerCount != 4 ||
+                    !HasProjectedLayerAt(snapshot.ProjectedLayers, upper.InstanceId, BlueprintLayerKinds.Tile, 10, 20) ||
+                    HasProjectedLayerAt(snapshot.ProjectedLayers, lower.InstanceId, BlueprintLayerKinds.Tile, 10, 20) ||
+                    !HasProjectedLayerAt(snapshot.ProjectedLayers, lower.InstanceId, BlueprintLayerKinds.Tile, 11, 20) ||
+                    !HasProjectedLayerAt(snapshot.ProjectedLayers, replacedFull.InstanceId, BlueprintLayerKinds.Tile, 30, 20) ||
+                    !HasProjectedLayerAt(snapshot.ProjectedLayers, replacedFull.InstanceId, BlueprintLayerKinds.Tile, 31, 20))
+                {
+                    throw new InvalidOperationException("Expected stage04 overlap projection to let the later instance cover only the shared coordinate while keeping non-overlapped cells.");
+                }
+
+                BlueprintWorldInstanceSnapshot stored;
+                RequireBlueprintSuccess(store.TryLoadWorld("pair-stage04-overlap", out stored), "load stage04 overlap instances");
+                var lowerStored = FindPlacedInstance(stored, lower.InstanceId);
+                var replacedStored = FindPlacedInstance(stored, replacedFull.InstanceId);
+                if (fullTemplate.Cells.Count != 2 ||
+                    lowerStored.TemplateSnapshot.Cells.Count != 2 ||
+                    replacedStored.TemplateSnapshot.Cells.Count != 2)
+                {
+                    throw new InvalidOperationException("Stage04 overlap resolution must not trim templates or placed instance snapshots.");
+                }
+            }
+            finally
+            {
+                BlueprintProjectionService.ResetForTesting();
+                restore();
+            }
+        }
+
         private static void BlueprintProjectionCacheAvoidsImmediateRecompute()
         {
             var restore = PushTemporaryConfigDirectory("blueprint-projection-cache");
@@ -253,13 +310,32 @@ namespace JueMingZ.Tests
                     throw new InvalidOperationException("Expected blueprint projection overlay to register as a world overlay.");
                 }
 
-                AssertContains(BlueprintProjectionOverlay.GetVisualContractForTesting(), "fulfilled-missing-conflict");
+                AssertContains(BlueprintProjectionOverlay.GetVisualContractForTesting(), "appearance-ghost");
+                AssertContains(BlueprintProjectionOverlay.GetVisualContractForTesting(), "yellow-missing");
+                AssertContains(BlueprintProjectionOverlay.GetVisualContractForTesting(), "red-conflict");
+                AssertContains(BlueprintProjectionOverlay.GetVisualContractForTesting(), "fulfilled-no-mask");
+                AssertContains(LegacyMainWindow.GetBlueprintProjectionVisualContractForTesting(), "appearance-ghost");
                 AssertContains(LegacyMainWindow.GetBlueprintProjectionVisualContractForTesting(), "layer-cover");
                 AssertContains(LegacyMainWindow.BuildBlueprintProjectionSummaryForTesting(), "投影：有效");
+                var missingColor = BlueprintProjectionOverlay.ResolveProjectionColorForTesting(BlueprintProjectionLayerStatuses.Missing);
+                if (missingColor == null || missingColor.Length != 3 || missingColor[0] < 240 || missingColor[1] < 200 || missingColor[2] > 120)
+                {
+                    throw new InvalidOperationException("Expected blueprint projection missing color to use the stage-05 yellow ghost semantics.");
+                }
+
                 var conflictColor = BlueprintProjectionOverlay.ResolveProjectionColorForTesting(BlueprintProjectionLayerStatuses.Conflict);
                 if (conflictColor == null || conflictColor.Length != 3 || conflictColor[0] <= conflictColor[1])
                 {
                     throw new InvalidOperationException("Expected blueprint projection conflict color to emphasize red.");
+                }
+
+                if (BlueprintProjectionOverlay.ResolveProjectionFillAlphaForTesting(BlueprintProjectionLayerStatuses.Fulfilled) != 0 ||
+                    BlueprintProjectionOverlay.ShouldDrawProjectionLayerForTesting(BlueprintProjectionLayerStatuses.Fulfilled) ||
+                    !BlueprintProjectionOverlay.ShouldDrawProjectionLayerForTesting(BlueprintProjectionLayerStatuses.Missing) ||
+                    BlueprintProjectionOverlay.ResolveLayerDrawPassForTesting(BlueprintLayerKinds.Wall) >= BlueprintProjectionOverlay.ResolveLayerDrawPassForTesting(BlueprintLayerKinds.Tile) ||
+                    BlueprintProjectionOverlay.ResolveLayerDrawPassForTesting(BlueprintLayerKinds.Wire) <= BlueprintProjectionOverlay.ResolveLayerDrawPassForTesting(BlueprintLayerKinds.Tile))
+                {
+                    throw new InvalidOperationException("Expected stage-05 projection overlay to draw wall/tile/wire ghosts in order and skip fulfilled masks.");
                 }
 
                 var runtimeSnapshot = RuntimeDiagnosticSnapshotBuilder.Build(new RuntimeDiagnosticSnapshotContext
@@ -317,6 +393,21 @@ namespace JueMingZ.Tests
                 LayerKind = BlueprintLayerKinds.Wall,
                 ContentId = wallType
             });
+            return template;
+        }
+
+        private static BlueprintTemplateRecord CreateProjectionTwoTileTemplate(string name, int firstTileType, int secondTileType)
+        {
+            var template = new BlueprintTemplateRecord
+            {
+                Name = name,
+                Width = 2,
+                Height = 1,
+                AnchorX = 0,
+                AnchorY = 0
+            };
+            template.Cells.Add(CreateTileCell(0, 0, firstTileType));
+            template.Cells.Add(CreateTileCell(1, 0, secondTileType));
             return template;
         }
 
@@ -379,6 +470,29 @@ namespace JueMingZ.Tests
                 if (layer != null &&
                     string.Equals(layer.InstanceId, instanceId, StringComparison.Ordinal) &&
                     string.Equals(layer.LayerKind, layerKind, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasProjectedLayerAt(
+            System.Collections.Generic.IReadOnlyList<BlueprintProjectionCellSnapshot> layers,
+            string instanceId,
+            string layerKind,
+            int worldTileX,
+            int worldTileY)
+        {
+            for (var index = 0; layers != null && index < layers.Count; index++)
+            {
+                var layer = layers[index];
+                if (layer != null &&
+                    string.Equals(layer.InstanceId, instanceId, StringComparison.Ordinal) &&
+                    string.Equals(layer.LayerKind, layerKind, StringComparison.OrdinalIgnoreCase) &&
+                    layer.WorldTileX == worldTileX &&
+                    layer.WorldTileY == worldTileY)
                 {
                     return true;
                 }
