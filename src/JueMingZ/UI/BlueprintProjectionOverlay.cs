@@ -10,14 +10,15 @@ namespace JueMingZ.UI
     {
         private const int TileSize = 16;
         private const int MaxDrawLayersPerFrame = 1536;
-        private const string VisualContract = "placed-instance-projection+appearance-ghost+yellow-missing+red-conflict+fulfilled-no-mask+hidden-skip+layer-order-cover+draw-cache-only";
+        private const string VisualContract = "placed-instance-projection+appearance-ghost+yellow-missing+red-conflict+fulfilled-no-mask+completed-progress+no-cell-border+move-floating-follow-preview+hidden-skip+layer-order-cover+draw-cache-only";
 
         public static bool DrawInterfaceLayer()
         {
             try
             {
                 var snapshot = BlueprintProjectionService.GetCachedSnapshotForDraw();
-                if (!ShouldDraw(snapshot))
+                var floating = BlueprintPlacedInstanceTransformState.GetFloatingProjectionForDraw();
+                if (!ShouldDraw(snapshot) && !ShouldDraw(floating))
                 {
                     return true;
                 }
@@ -29,6 +30,7 @@ namespace JueMingZ.UI
                 }
 
                 DrawProjection(spriteBatch, snapshot);
+                DrawProjection(spriteBatch, floating);
             }
             catch (Exception error)
             {
@@ -63,6 +65,11 @@ namespace JueMingZ.UI
             return ResolveProjectionFillAlpha(status);
         }
 
+        internal static int ResolveProjectionBorderAlphaForTesting(string status)
+        {
+            return ResolveProjectionBorderAlpha(status);
+        }
+
         internal static bool ShouldDrawProjectionLayerForTesting(string status)
         {
             return BlueprintProjectionGhostRenderer.ShouldDrawLayerForTesting(status);
@@ -83,6 +90,11 @@ namespace JueMingZ.UI
 
         private static void DrawProjection(object spriteBatch, BlueprintProjectionSnapshot snapshot)
         {
+            if (!ShouldDraw(snapshot))
+            {
+                return;
+            }
+
             var clipWidth = Math.Max(1, TerrariaMainCompat.ScreenWidth);
             var clipHeight = Math.Max(1, TerrariaMainCompat.ScreenHeight);
             var screenPosition = TerrariaMainCompat.ScreenPosition;
@@ -128,6 +140,11 @@ namespace JueMingZ.UI
                 return new[] { 0, 0, 0 };
             }
 
+            if (string.Equals(status, BlueprintProjectionLayerStatuses.Completed, StringComparison.Ordinal))
+            {
+                return new[] { 0, 0, 0 };
+            }
+
             if (string.Equals(status, BlueprintProjectionLayerStatuses.Missing, StringComparison.Ordinal))
             {
                 return new[] { 248, 216, 72 };
@@ -148,6 +165,11 @@ namespace JueMingZ.UI
                 return 0;
             }
 
+            if (string.Equals(status, BlueprintProjectionLayerStatuses.Completed, StringComparison.Ordinal))
+            {
+                return 0;
+            }
+
             if (string.Equals(status, BlueprintProjectionLayerStatuses.Conflict, StringComparison.Ordinal))
             {
                 return 176;
@@ -163,17 +185,7 @@ namespace JueMingZ.UI
 
         private static int ResolveProjectionBorderAlpha(string status)
         {
-            if (string.Equals(status, BlueprintProjectionLayerStatuses.Fulfilled, StringComparison.Ordinal))
-            {
-                return 0;
-            }
-
-            if (string.Equals(status, BlueprintProjectionLayerStatuses.Conflict, StringComparison.Ordinal))
-            {
-                return 232;
-            }
-
-            return 205;
+            return 0;
         }
     }
 }

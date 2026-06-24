@@ -260,6 +260,21 @@ namespace JueMingZ.UI.Legacy
                 return FeatureIds.BlueprintLibraryAction;
             }
 
+            if (string.Equals(targetId, FeatureIds.BlueprintMoveAction, StringComparison.OrdinalIgnoreCase))
+            {
+                return FeatureIds.BlueprintMoveAction;
+            }
+
+            if (string.Equals(targetId, FeatureIds.BlueprintRegionAction, StringComparison.OrdinalIgnoreCase))
+            {
+                return FeatureIds.BlueprintRegionAction;
+            }
+
+            if (string.Equals(targetId, FeatureIds.BlueprintMirrorAction, StringComparison.OrdinalIgnoreCase))
+            {
+                return FeatureIds.BlueprintMirrorAction;
+            }
+
             return string.Empty;
         }
 
@@ -268,6 +283,9 @@ namespace JueMingZ.UI.Legacy
             var normalized = NormalizeBlueprintHotkeyTargetId(targetId);
             return string.Equals(normalized, FeatureIds.BlueprintCreateAction, StringComparison.Ordinal) ||
                    string.Equals(normalized, FeatureIds.BlueprintSaveAction, StringComparison.Ordinal) ||
+                   string.Equals(normalized, FeatureIds.BlueprintMoveAction, StringComparison.Ordinal) ||
+                   string.Equals(normalized, FeatureIds.BlueprintRegionAction, StringComparison.Ordinal) ||
+                   string.Equals(normalized, FeatureIds.BlueprintMirrorAction, StringComparison.Ordinal) ||
                    string.Equals(normalized, FeatureIds.BlueprintLibraryAction, StringComparison.Ordinal);
         }
 

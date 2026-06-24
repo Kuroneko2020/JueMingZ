@@ -165,16 +165,37 @@ namespace JueMingZ.Tests
             BlueprintMenuUiStateDoesNotRefreshProjectionOrMaterials();
             BlueprintHandheldActionBarDynamicButtonMatrix();
             BlueprintHandheldActionBarRealCommandsAndDeferredPlacedCommands();
+            BlueprintRegionActionShortcutAndHotkeyShareEraseState();
+            BlueprintMirrorActionShortcutAndHotkeyShareTransformState();
             BlueprintPlacementConfirmRefreshesProjectionAndPlacedList();
             BlueprintPlacementUiHitConsumesWithoutCreatingInstance();
             BlueprintProjectionStage04LaterInstanceCoversEarlierWithoutMutatingSnapshots();
             BlueprintProjectionUiOverlayAndDiagnosticsContracts();
             BlueprintPlacedListRefreshesMaterialComparisonWithoutDrawScan();
+            BlueprintPlacedListStage03LayoutMaterialAndCards();
             BlueprintPlacedInstanceClearAllCurrentWorldKeepsTemplatesAndRefreshesCaches();
             BlueprintEraseSingleInstanceClipsProjectionAndMaterials();
+            BlueprintEraseRegionStage07ContinuousHoverAndCancelOnly();
             BlueprintPlacedInstanceMoveKeepsSnapshotStateAndRefreshesCaches();
+            BlueprintPlacedInstanceMoveBlocksCompletedProgressAndKeepsOriginalPosition();
             BlueprintPlacedInstanceMirrorUsesServiceAndFailsClosed();
             BlueprintDiagnosticsAggregateRuntimeSnapshotJson();
+        }
+
+        private static void BlueprintFeedbackStage11RegressionDiagnosticsContractsStayWired()
+        {
+            BlueprintPlacementStage08RegressionDiagnosticsContractsStayWired();
+            FeatureCatalogExposesBlueprintEntryAsPlannedPlaceholder();
+            BlueprintHandheldActionBarStage04ButtonHitBoundsMatchVisibleRects();
+            BlueprintHandheldActionBarStage04NoticeTimingAndScale();
+            BlueprintHandheldActionBarStage04MouseReaderCachesPrefixAndPostfixSeparately();
+            BlueprintProjectionStage05CompletedProgressPersistsAndSkipsDugCells();
+            BlueprintMaterialsStage05SubtractCompletedProgressFromDemand();
+            BlueprintAutoPlacementSubmitsActionQueueAndVerifiesPlacement();
+            BlueprintAutoPlacementUsesConfiguredReplacementMaterial();
+            BlueprintAutoPlacementVoidBagOnlyMaterialsFailClosedWithReason();
+            BlueprintAutoPlacementReplacementFailClosedWhenDisabledOrWrongCategory();
+            BlueprintAutoPlacementDiagnosticsWriteRuntimeSnapshotJson();
         }
     }
 }

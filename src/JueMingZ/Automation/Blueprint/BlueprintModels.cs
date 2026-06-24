@@ -387,6 +387,34 @@ namespace JueMingZ.Automation.Blueprint
     }
 
     [DataContract]
+    public sealed class BlueprintCompletedLayerRecord
+    {
+        [DataMember(Order = 1)]
+        public int X { get; set; }
+
+        [DataMember(Order = 2)]
+        public int Y { get; set; }
+
+        [DataMember(Order = 3)]
+        public string LayerKind { get; set; }
+
+        [DataMember(Order = 4)]
+        public string CoverageGroup { get; set; }
+
+        [DataMember(Order = 5)]
+        public int ContentId { get; set; }
+
+        [DataMember(Order = 6)]
+        public int Style { get; set; }
+
+        public BlueprintCompletedLayerRecord()
+        {
+            LayerKind = string.Empty;
+            CoverageGroup = string.Empty;
+        }
+    }
+
+    [DataContract]
     public sealed class BlueprintWorldInstanceRecord
     {
         [DataMember(Order = 1)]
@@ -434,6 +462,9 @@ namespace JueMingZ.Automation.Blueprint
         [DataMember(Order = 15)]
         public string AutoPlacementProgressState { get; set; }
 
+        [DataMember(Order = 16)]
+        public List<BlueprintCompletedLayerRecord> CompletedLayers { get; set; }
+
         public BlueprintWorldInstanceRecord()
         {
             InstanceId = string.Empty;
@@ -447,6 +478,7 @@ namespace JueMingZ.Automation.Blueprint
             CreatedUtc = string.Empty;
             UpdatedUtc = string.Empty;
             AutoPlacementProgressState = string.Empty;
+            CompletedLayers = new List<BlueprintCompletedLayerRecord>();
         }
 
         public BlueprintWorldInstanceRecord Clone()
@@ -467,7 +499,8 @@ namespace JueMingZ.Automation.Blueprint
                 TemplateSnapshot = TemplateSnapshot == null ? new BlueprintTemplateRecord() : TemplateSnapshot.Clone(),
                 CreatedUtc = CreatedUtc ?? string.Empty,
                 UpdatedUtc = UpdatedUtc ?? string.Empty,
-                AutoPlacementProgressState = AutoPlacementProgressState ?? string.Empty
+                AutoPlacementProgressState = AutoPlacementProgressState ?? string.Empty,
+                CompletedLayers = CloneCompletedLayers(CompletedLayers)
             };
         }
 
@@ -485,6 +518,34 @@ namespace JueMingZ.Automation.Blueprint
                 if (cell != null)
                 {
                     clone.Add(new BlueprintEraseMaskCellRecord { X = cell.X, Y = cell.Y });
+                }
+            }
+
+            return clone;
+        }
+
+        private static List<BlueprintCompletedLayerRecord> CloneCompletedLayers(IList<BlueprintCompletedLayerRecord> source)
+        {
+            var clone = new List<BlueprintCompletedLayerRecord>();
+            if (source == null)
+            {
+                return clone;
+            }
+
+            for (var index = 0; index < source.Count; index++)
+            {
+                var layer = source[index];
+                if (layer != null)
+                {
+                    clone.Add(new BlueprintCompletedLayerRecord
+                    {
+                        X = layer.X,
+                        Y = layer.Y,
+                        LayerKind = layer.LayerKind ?? string.Empty,
+                        CoverageGroup = layer.CoverageGroup ?? string.Empty,
+                        ContentId = layer.ContentId,
+                        Style = layer.Style
+                    });
                 }
             }
 

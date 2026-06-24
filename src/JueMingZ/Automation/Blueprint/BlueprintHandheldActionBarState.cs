@@ -44,6 +44,14 @@ namespace JueMingZ.Automation.Blueprint
         public const string ButtonIdRedMap = ButtonIdRegionModify;
         public const string ButtonIdMirror = "mirror";
         public const string SaveDisabledTooltip = "还没有创建蓝图呢";
+        public const string MoveButtonTooltip = "点击蓝图使其进入浮动状态重新放置";
+        public const string MoveCancelButtonLabel = "取消移动";
+        public const string MoveCancelButtonTooltip = "取消移动并回到原位置";
+        public const string RegionModifyButtonTooltip = "进入区域修改，拖选修剪已放置蓝图";
+        public const string RegionModifyCancelButtonLabel = "取消修改";
+        public const string RegionModifyCancelButtonTooltip = "取消修改并停止红色遮罩";
+        public const string MirrorCancelButtonLabel = "取消镜像";
+        public const string MirrorCancelButtonTooltip = "取消镜像选择";
         public const string PointerOwnershipReasonLeft = "left";
         public const string PointerOwnershipReasonScroll = "scroll";
         public const string PointerOwnershipReasonHover = "hover";
@@ -68,8 +76,8 @@ namespace JueMingZ.Automation.Blueprint
             new BlueprintHandheldActionBarButtonDefinition(ButtonIdOpenLibrary, "打开蓝图库", 1, "打开蓝图库"),
             new BlueprintHandheldActionBarButtonDefinition(ButtonIdOpenPlacedList, "已放置蓝图列表", 2, "打开当前世界已放置蓝图列表"),
             new BlueprintHandheldActionBarButtonDefinition(ButtonIdClearPlaced, "清空放置", 3, "清空当前世界已放置蓝图"),
-            new BlueprintHandheldActionBarButtonDefinition(ButtonIdMove, "移动蓝图", 4, "只能移动已放置蓝图"),
-            new BlueprintHandheldActionBarButtonDefinition(ButtonIdRegionModify, "区域修改", 5, "对已经放置蓝图进行内容修剪"),
+            new BlueprintHandheldActionBarButtonDefinition(ButtonIdMove, "移动蓝图", 4, MoveButtonTooltip),
+            new BlueprintHandheldActionBarButtonDefinition(ButtonIdRegionModify, "区域修改", 5, RegionModifyButtonTooltip),
             new BlueprintHandheldActionBarButtonDefinition(ButtonIdMirror, "镜像", 6, "镜像已放置蓝图")
         };
         private static string _hoveredButtonId = string.Empty;
@@ -480,7 +488,7 @@ namespace JueMingZ.Automation.Blueprint
                 var x = bounds.X + padding + index * (buttonWidth + gap);
                 buttons.Add(new BlueprintHandheldActionBarButtonFrame(
                     definition.Definition.Id,
-                    definition.Definition.Label,
+                    definition.Label,
                     definition.Definition.Order,
                     definition.Tooltip,
                     definition.Enabled,
@@ -514,6 +522,15 @@ namespace JueMingZ.Automation.Blueprint
             var pendingCapture = environment.BlueprintCreationCompletedPendingCapture;
             var creatingOrPendingCapture = creating || pendingCapture;
             var hasSelectedCells = environment.BlueprintCreationSelectedCount > 0;
+            var transform = BlueprintPlacedInstanceTransformState.GetSnapshot();
+            var moving = transform != null &&
+                         transform.Active &&
+                         string.Equals(transform.Mode, BlueprintPlacedInstanceTransformModes.Move, StringComparison.Ordinal);
+            var mirroring = transform != null &&
+                            transform.Active &&
+                            string.Equals(transform.Mode, BlueprintPlacedInstanceTransformModes.Mirror, StringComparison.Ordinal);
+            var erase = BlueprintEraseRegionState.GetSnapshot();
+            var regionModifying = erase != null && erase.Active;
 
             if (creatingOrPendingCapture)
             {
@@ -536,9 +553,21 @@ namespace JueMingZ.Automation.Blueprint
                 {
                     definitions.Add(BuildButtonSpec(ButtonIdOpenPlacedList, true, string.Empty));
                     definitions.Add(BuildButtonSpec(ButtonIdClearPlaced, true, string.Empty));
-                    definitions.Add(BuildButtonSpec(ButtonIdMove, true, string.Empty));
-                    definitions.Add(BuildButtonSpec(ButtonIdRegionModify, true, string.Empty));
-                    definitions.Add(BuildButtonSpec(ButtonIdMirror, true, string.Empty));
+                    definitions.Add(BuildButtonSpec(
+                        ButtonIdMove,
+                        true,
+                        moving ? MoveCancelButtonTooltip : MoveButtonTooltip,
+                        moving ? MoveCancelButtonLabel : string.Empty));
+                    definitions.Add(BuildButtonSpec(
+                        ButtonIdRegionModify,
+                        true,
+                        regionModifying ? RegionModifyCancelButtonTooltip : RegionModifyButtonTooltip,
+                        regionModifying ? RegionModifyCancelButtonLabel : string.Empty));
+                    definitions.Add(BuildButtonSpec(
+                        ButtonIdMirror,
+                        true,
+                        mirroring ? MirrorCancelButtonTooltip : string.Empty,
+                        mirroring ? MirrorCancelButtonLabel : string.Empty));
                 }
             }
 
@@ -555,13 +584,22 @@ namespace JueMingZ.Automation.Blueprint
 
         private static BlueprintHandheldActionBarButtonSpec BuildButtonSpec(string buttonId, bool enabled, string tooltipOverride)
         {
+            return BuildButtonSpec(buttonId, enabled, tooltipOverride, string.Empty);
+        }
+
+        private static BlueprintHandheldActionBarButtonSpec BuildButtonSpec(string buttonId, bool enabled, string tooltipOverride, string labelOverride)
+        {
             var definition = FindButtonDefinition(buttonId);
             if (definition == null)
             {
                 return null;
             }
 
-            return new BlueprintHandheldActionBarButtonSpec(definition, enabled, string.IsNullOrWhiteSpace(tooltipOverride) ? definition.Tooltip : tooltipOverride);
+            return new BlueprintHandheldActionBarButtonSpec(
+                definition,
+                enabled,
+                string.IsNullOrWhiteSpace(tooltipOverride) ? definition.Tooltip : tooltipOverride,
+                string.IsNullOrWhiteSpace(labelOverride) ? definition.Label : labelOverride);
         }
 
         private static BlueprintHandheldActionBarFrame Hidden(string reason, int toolItemId, int selectedItemType)
@@ -677,7 +715,7 @@ namespace JueMingZ.Automation.Blueprint
 
             if (string.Equals(buttonId, ButtonIdRegionModify, StringComparison.Ordinal))
             {
-                return "区域修改入口已接线，真实区域修改业务在 06 阶段实现。";
+                return "区域修改会进入已放置蓝图区域修剪状态。";
             }
 
             if (string.Equals(buttonId, ButtonIdMirror, StringComparison.Ordinal))
@@ -838,16 +876,18 @@ namespace JueMingZ.Automation.Blueprint
 
     internal sealed class BlueprintHandheldActionBarButtonSpec
     {
-        public BlueprintHandheldActionBarButtonSpec(BlueprintHandheldActionBarButtonDefinition definition, bool enabled, string tooltip)
+        public BlueprintHandheldActionBarButtonSpec(BlueprintHandheldActionBarButtonDefinition definition, bool enabled, string tooltip, string label)
         {
             Definition = definition;
             Enabled = enabled;
             Tooltip = tooltip ?? string.Empty;
+            Label = label ?? string.Empty;
         }
 
         public BlueprintHandheldActionBarButtonDefinition Definition { get; private set; }
         public bool Enabled { get; private set; }
         public string Tooltip { get; private set; }
+        public string Label { get; private set; }
     }
 
     public sealed class BlueprintHandheldActionBarButtonDefinition

@@ -179,6 +179,7 @@ namespace JueMingZ.UI.Legacy
             {
                 var changed = _isOpen;
                 _isOpen = false;
+                _expandedMaterialTemplateId = string.Empty;
                 RecordNoticeLocked(changed ? "closed" : "closeNoop", changed ? "已返回蓝图主菜单。" : "蓝图库未打开。", string.Empty, changed);
                 return CreateResultLocked(true, changed, false, changed ? "Succeeded" : "NotApplicable", _lastResultCode, _lastNotice, string.Empty, string.Empty, string.Empty);
             }
@@ -467,6 +468,25 @@ namespace JueMingZ.UI.Legacy
             }
         }
 
+        public static BlueprintLibraryCommandResult CloseMaterialList(string templateId)
+        {
+            var normalizedId = BlueprintTemplateLibraryStore.NormalizeId(templateId);
+            lock (SyncRoot)
+            {
+                EnsureLoadedLocked();
+                var changed = !string.IsNullOrWhiteSpace(_expandedMaterialTemplateId) &&
+                              (string.IsNullOrWhiteSpace(normalizedId) ||
+                               string.Equals(_expandedMaterialTemplateId, normalizedId, StringComparison.OrdinalIgnoreCase));
+                if (changed)
+                {
+                    _expandedMaterialTemplateId = string.Empty;
+                }
+
+                RecordNoticeLocked(changed ? "materialsClosed" : "materialsCloseNoop", changed ? "材料清单已关闭。" : "材料清单未打开。", normalizedId, changed);
+                return CreateResultLocked(true, changed, false, changed ? "Succeeded" : "NotApplicable", _lastResultCode, _lastNotice, normalizedId, string.Empty, string.Empty);
+            }
+        }
+
         public static BlueprintLibraryCommandResult UseTemplate(string templateId)
         {
             lock (SyncRoot)
@@ -482,6 +502,14 @@ namespace JueMingZ.UI.Legacy
                 _selectedTemplateId = template.TemplateId;
                 _deleteConfirmTemplateId = string.Empty;
                 var entry = BlueprintEntryState.SelectTemplateForPlacement(template);
+                if (entry.Succeeded)
+                {
+                    // Entering placement preview hands control back to the world overlay;
+                    // close the library state so reopening F5 cannot stack the old submenu.
+                    _isOpen = false;
+                    _expandedMaterialTemplateId = string.Empty;
+                }
+
                 RecordNoticeLocked("templateSelected", entry.Message, template.TemplateId, true);
                 return CreateResultLocked(entry.Succeeded, entry.Changed, false, entry.Succeeded ? "Succeeded" : "Failed", entry.ResultCode, _lastNotice, template.TemplateId, template.Name, string.Empty);
             }
@@ -571,6 +599,57 @@ namespace JueMingZ.UI.Legacy
 
             var suffix = template.Materials.Count > parts.Count ? " 等" : string.Empty;
             return "材料列表：" + string.Join("、", parts.ToArray()) + suffix;
+        }
+
+        public static List<string> BuildTemplateMaterialLines(BlueprintTemplateRecord template)
+        {
+            var lines = new List<string>();
+            if (template == null || template.Materials == null || template.Materials.Count <= 0)
+            {
+                lines.Add("无");
+                return lines;
+            }
+
+            for (var index = 0; index < template.Materials.Count; index++)
+            {
+                var material = template.Materials[index];
+                if (material == null || material.ItemId <= 0 || material.RequiredStack <= 0)
+                {
+                    continue;
+                }
+
+                var name = string.IsNullOrWhiteSpace(material.DisplayNameSnapshot)
+                    ? "#" + material.ItemId.ToString(CultureInfo.InvariantCulture)
+                    : material.DisplayNameSnapshot.Trim();
+                lines.Add(name + " x" + material.RequiredStack.ToString(CultureInfo.InvariantCulture));
+            }
+
+            if (lines.Count <= 0)
+            {
+                lines.Add("无");
+            }
+
+            return lines;
+        }
+
+        public static BlueprintTemplateRecord GetExpandedMaterialTemplate(BlueprintLibraryUiSnapshot snapshot)
+        {
+            if (snapshot == null || snapshot.Templates == null || string.IsNullOrWhiteSpace(snapshot.ExpandedMaterialTemplateId))
+            {
+                return null;
+            }
+
+            var expandedId = BlueprintTemplateLibraryStore.NormalizeId(snapshot.ExpandedMaterialTemplateId);
+            for (var index = 0; index < snapshot.Templates.Count; index++)
+            {
+                var template = snapshot.Templates[index];
+                if (template != null && string.Equals(template.TemplateId, expandedId, StringComparison.OrdinalIgnoreCase))
+                {
+                    return template;
+                }
+            }
+
+            return null;
         }
 
         public static string BuildUiStateJson()

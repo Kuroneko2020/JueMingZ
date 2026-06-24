@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using JueMingZ.Automation.Blueprint;
 using JueMingZ.Config;
@@ -232,14 +233,21 @@ namespace JueMingZ.Tests
                 var beforeProjectionSignature = BlueprintProjectionService.BuildStateSignature();
                 var beforeMaterialSignature = BlueprintMaterialService.BuildStateSignature();
                 var materialsShell = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("layout-materials", wide.TemplateId);
+                if (materialsShell == null ||
+                    materialsShell.PlaceholderOnly ||
+                    !materialsShell.Succeeded ||
+                    !string.Equals(materialsShell.ResultCode, "materialsExpanded", StringComparison.Ordinal) ||
+                    !string.Equals(BlueprintLibraryUiState.GetSnapshot().ExpandedMaterialTemplateId, wide.TemplateId, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected stage 02 materials button to open the selected template material modal.");
+                }
+
+                LegacyMainUiState.SetVisible(true);
                 var useShell = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("layout-use", wide.TemplateId);
                 var exportShell = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("layout-export", wide.TemplateId);
                 var nameShell = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("layout-name", wide.TemplateId);
                 var deleteShell = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("layout-delete", wide.TemplateId);
-                if (materialsShell == null || useShell == null || exportShell == null || deleteShell == null || nameShell == null ||
-                    materialsShell.PlaceholderOnly ||
-                    !materialsShell.Succeeded ||
-                    !string.Equals(materialsShell.ResultCode, "materialsExpanded", StringComparison.Ordinal) ||
+                if (useShell == null || exportShell == null || deleteShell == null || nameShell == null ||
                     useShell.PlaceholderOnly ||
                     !useShell.Succeeded ||
                     !string.Equals(useShell.ResultCode, "previewStarted", StringComparison.Ordinal) ||
@@ -253,9 +261,11 @@ namespace JueMingZ.Tests
                     throw new InvalidOperationException("Expected stage 09 to make layout-use real while layout-export, name, and delete stay real UI commands.");
                 }
 
-                if (!string.Equals(BlueprintLibraryUiState.GetSnapshot().ExpandedMaterialTemplateId, wide.TemplateId, StringComparison.Ordinal))
+                if (BlueprintLibraryUiState.IsOpen ||
+                    !string.IsNullOrWhiteSpace(BlueprintLibraryUiState.GetSnapshot().ExpandedMaterialTemplateId) ||
+                    LegacyMainUiState.Visible)
                 {
-                    throw new InvalidOperationException("Expected stage 02 materials button to expand the selected template material list.");
+                    throw new InvalidOperationException("Expected layout-use to close the blueprint library submenu, material modal, and F5 main menu.");
                 }
 
                 var previewAfterUse = BlueprintPlacementPreviewState.GetSnapshot();
@@ -292,6 +302,7 @@ namespace JueMingZ.Tests
                 BlueprintMaterialService.ResetForTesting();
                 BlueprintLibraryUiState.ResetForTesting();
                 BlueprintTemplateLibraryStore.ResetTestingHooks();
+                LegacyMainUiState.SetVisible(false);
                 restore();
             }
         }
@@ -520,9 +531,33 @@ namespace JueMingZ.Tests
 
                 AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "stage02-title-row-tools");
                 AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "card-material-toggle");
+                AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "card-material-modal");
                 AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "card-buttons-no-tooltips");
                 AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "summary-placed-count");
+                AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "summary-only");
+                AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "no-empty-gap-text");
+                AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "larger-card-summary");
+                AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "use-closes-f5");
+                AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "mutual-submenus");
                 AssertContains(LegacyMainWindow.GetBlueprintPlacedInstanceVisualContractForTesting(), "same-content-submenu");
+                AssertStringEquals(
+                    LegacyMainWindow.BuildBlueprintLibraryHeaderSummaryForTesting(3, 2),
+                    "共保存3个蓝图，已放置2个蓝图",
+                    "stage02 library summary only keeps saved and placed counts");
+                var noGapTemplate = CreateSampleBlueprintTemplate("Stage02 No Gap");
+                noGapTemplate.MissingCapabilityFlags.Clear();
+                AssertStringEquals(
+                    LegacyMainWindow.BuildBlueprintCapabilityTextForTesting(noGapTemplate),
+                    string.Empty,
+                    "stage02 library cards hide the old empty capability gap text");
+                AssertContains(
+                    LegacyMainWindow.BuildBlueprintCapabilityTextForTesting(template),
+                    "liquid-not-supported");
+                if (LegacyMainWindow.GetBlueprintLibraryCardSummaryTextScaleForTesting() <= 0.52f)
+                {
+                    throw new InvalidOperationException("Stage 02 blueprint library card summary text scale should be larger than the old compact baseline.");
+                }
+
                 AssertStringEquals(
                     BlueprintLibraryUiState.BuildDefaultExportFileNameForTesting(new DateTime(2026, 6, 23, 15, 4, 0)),
                     "JM-2606230000.json",
@@ -542,20 +577,81 @@ namespace JueMingZ.Tests
 
                 var materialText = LegacyMainWindow.BuildBlueprintTemplateMaterialListTextForTesting(template, 4);
                 AssertContains(materialText, "木材 x4");
+                var materialLines = BlueprintLibraryUiState.BuildTemplateMaterialLines(template);
+                if (materialLines.Count != 1 ||
+                    !string.Equals(materialLines[0], "木材 x4", StringComparison.Ordinal) ||
+                    materialLines[0].Contains("已有"))
+                {
+                    throw new InvalidOperationException("Stage 02 material modal must list template material requirements without player-owned counts.");
+                }
 
                 var projectionSignature = BlueprintProjectionService.BuildStateSignature();
                 var materialSignature = BlueprintMaterialService.BuildStateSignature();
                 var expanded = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("layout-materials", template.TemplateId);
-                var collapsed = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("layout-materials", template.TemplateId);
                 if (expanded == null ||
-                    collapsed == null ||
                     !expanded.Succeeded ||
-                    !collapsed.Succeeded ||
                     !string.Equals(expanded.ResultCode, "materialsExpanded", StringComparison.Ordinal) ||
-                    !string.Equals(collapsed.ResultCode, "materialsCollapsed", StringComparison.Ordinal) ||
+                    !string.Equals(BlueprintLibraryUiState.GetSnapshot().ExpandedMaterialTemplateId, template.TemplateId, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Stage 02 material list button must open template-local modal state only.");
+                }
+
+                var coordinator = LegacyUiOverlayCoordinator.Current;
+                coordinator.ResetForTesting();
+                var viewport = new LegacyUiRect(20, 20, 460, 260);
+                var area = LegacyScrollArea.Create(viewport, 620, 0);
+                var elements = new List<LegacyUiElement>
+                {
+                    CreateLegacyUiElementForTesting("blueprint-entry:open-placed", "Lower", "button", viewport)
+                };
+                var mouse = new LegacyMouseSnapshot
+                {
+                    ReadAvailable = true,
+                    LeftPressed = true
+                };
+
+                coordinator.BeginFrame("blueprint");
+                if (!LegacyMainWindow.RegisterBlueprintLibraryMaterialModalOverlayForTesting(area))
+                {
+                    throw new InvalidOperationException("Expected blueprint library material list to register as a modal overlay.");
+                }
+
+                coordinator.DrawOverlays(null, mouse, new LegacyUiRect(0, 0, 560, 340), "blueprint", AppSettings.CreateDefault(), elements);
+                var modal = FindLegacyUiElementForTesting(elements, LegacyMainWindow.GetBlueprintLibraryMaterialModalElementIdForTesting());
+                mouse.X = modal.Rect.X + 12;
+                mouse.Y = modal.Rect.Y + 40;
+                var hovered = LegacyUiElementFrame.ResolveHoveredElement(null, elements, mouse, coordinator);
+                bool blocked;
+                var clickId = LegacyMainWindow.ResolveClickableElementIdForTesting(elements, mouse, out blocked);
+                if (hovered == null || string.Equals(hovered.Id, "blueprint-entry:open-placed", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected blueprint library material modal to own hover above lower blueprint rows.");
+                }
+
+                if (!blocked || clickId.Length != 0)
+                {
+                    throw new InvalidOperationException("Expected blueprint library material modal blocker to stop lower blueprint row clicks.");
+                }
+
+                var close = FindLegacyUiElementForTesting(elements, LegacyMainWindow.BuildBlueprintLibraryMaterialCloseCommandIdForTesting(template.TemplateId));
+                mouse.X = close.Rect.X + Math.Max(1, close.Rect.Width / 2);
+                mouse.Y = close.Rect.Y + Math.Max(1, close.Rect.Height / 2);
+                hovered = LegacyUiElementFrame.ResolveHoveredElement(null, elements, mouse, coordinator);
+                clickId = LegacyMainWindow.ResolveClickableElementIdForTesting(elements, mouse, out blocked);
+                coordinator.EndFrame();
+                if (hovered == null || hovered.Id != close.Id || blocked || clickId != close.Id)
+                {
+                    throw new InvalidOperationException("Expected blueprint library material modal close button to remain clickable above the modal blocker.");
+                }
+
+                var collapsed = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("materials-close", template.TemplateId);
+                if (collapsed == null ||
+                    !collapsed.Succeeded ||
+                    !collapsed.Changed ||
+                    !string.Equals(collapsed.ResultCode, "materialsClosed", StringComparison.Ordinal) ||
                     !string.IsNullOrWhiteSpace(BlueprintLibraryUiState.GetSnapshot().ExpandedMaterialTemplateId))
                 {
-                    throw new InvalidOperationException("Stage 02 material list button must toggle template-local expanded state only.");
+                    throw new InvalidOperationException("Stage 02 material modal close command must collapse only the selected template material state.");
                 }
 
                 if (BlueprintProjectionService.BuildStateSignature() != projectionSignature ||
@@ -600,10 +696,89 @@ namespace JueMingZ.Tests
             }
             finally
             {
+                LegacyUiOverlayCoordinator.Current.ResetForTesting();
                 BlueprintProjectionService.ResetForTesting();
                 BlueprintMaterialService.ResetForTesting();
                 BlueprintLibraryUiState.ResetForTesting();
                 BlueprintTemplateLibraryStore.ResetTestingHooks();
+                restore();
+            }
+        }
+
+        private static void BlueprintLibraryStage02MutualSubmenusAndUseCloseF5()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-library-stage02-mutual-submenus");
+            try
+            {
+                var templateStore = new BlueprintTemplateLibraryStore();
+                var instanceStore = new BlueprintWorldInstanceStore();
+                BlueprintTemplateRecord template;
+                RequireBlueprintSuccess(templateStore.CreateTemplate(CreateSampleBlueprintTemplate("Stage02 Mutual"), out template), "create stage02 mutual blueprint");
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(
+                    instanceStore.CreateInstanceFromTemplate("stage02-pair", "stage02-world", template, 12, 18, 1, out instance),
+                    "create stage02 placed instance");
+
+                BlueprintEntryState.ResetForTesting();
+                BlueprintLibraryUiState.SetStoreForTesting(templateStore, true);
+                BlueprintPlacedInstanceUiState.SetDependenciesForTesting(
+                    instanceStore,
+                    BlueprintPlacementWorldContext.Success("stage02-pair", "stage02-world"),
+                    true);
+                BlueprintPlacementPreviewState.SetPlacementDependenciesForTesting(
+                    templateStore,
+                    instanceStore,
+                    BlueprintPlacementWorldContext.Success("stage02-pair", "stage02-world"));
+
+                RequireBlueprintCommandSuccess(BlueprintLibraryUiState.OpenLibrary(), "open stage02 mutual library");
+                LegacyMainUiState.SetVisible(true);
+                LegacyUiActionService.HandleBlueprintEntryCommandForTesting(new LegacyUiCommand
+                {
+                    ElementId = LegacyMainWindow.GetBlueprintPlacedOpenElementIdForTesting(),
+                    Label = "已放置蓝图列表",
+                    Kind = "button",
+                    MouseCaptured = true
+                });
+                if (BlueprintLibraryUiState.IsOpen ||
+                    !string.Equals(BlueprintEntryState.GetSnapshot(AppSettings.CreateDefault()).Mode, BlueprintEntryModes.PlacedManagement, StringComparison.Ordinal) ||
+                    !LegacyMainUiState.Visible)
+                {
+                    throw new InvalidOperationException("Opening placed blueprints must close the library submenu and show the placed submenu.");
+                }
+
+                LegacyUiActionService.HandleBlueprintActionEntryCommandForTesting(new LegacyUiCommand
+                {
+                    ElementId = LegacyMainWindow.GetBlueprintLibraryActionElementIdForTesting(),
+                    Label = "蓝图库:打开",
+                    Kind = "button",
+                    MouseCaptured = true
+                });
+                if (!BlueprintLibraryUiState.IsOpen ||
+                    string.Equals(BlueprintEntryState.GetSnapshot(AppSettings.CreateDefault()).Mode, BlueprintEntryModes.PlacedManagement, StringComparison.Ordinal) ||
+                    !LegacyMainUiState.Visible)
+                {
+                    throw new InvalidOperationException("Opening the blueprint library must close the placed submenu state.");
+                }
+
+                var use = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("layout-use", template.TemplateId);
+                if (use == null ||
+                    !use.Succeeded ||
+                    !string.Equals(use.ResultCode, "previewStarted", StringComparison.Ordinal) ||
+                    BlueprintLibraryUiState.IsOpen ||
+                    LegacyMainUiState.Visible ||
+                    !string.Equals(BlueprintEntryState.GetSnapshot(AppSettings.CreateDefault()).Mode, BlueprintEntryModes.PlacementPreview, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Placing from the blueprint library must enter world preview and close F5.");
+                }
+            }
+            finally
+            {
+                BlueprintEntryState.ResetForTesting();
+                BlueprintPlacementPreviewState.ResetForTesting();
+                BlueprintPlacedInstanceUiState.ResetForTesting();
+                BlueprintLibraryUiState.ResetForTesting();
+                BlueprintTemplateLibraryStore.ResetTestingHooks();
+                LegacyMainUiState.SetVisible(false);
                 restore();
             }
         }
@@ -748,6 +923,7 @@ namespace JueMingZ.Tests
             BlueprintLibraryStage07NamingRenameDeleteConfirmKeepsInstances();
             BlueprintLibraryStage08ImportExportDiagnostics();
             BlueprintLibraryStage02FileDialogAndMaterialContracts();
+            BlueprintLibraryStage02MutualSubmenusAndUseCloseF5();
             BlueprintLibraryStage09UseSnapshotAndInstanceBoundary();
         }
 

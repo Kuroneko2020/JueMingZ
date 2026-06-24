@@ -26,28 +26,40 @@ namespace JueMingZ.UI.Legacy
         private const int BlueprintLibraryCardButtonGap = 4;
         private const int BlueprintLibraryCardActionWidth = 38;
         private const int BlueprintLibraryMaterialButtonWidth = 58;
+        private const float BlueprintLibraryCardSummaryTextScale = 0.62f;
+        private const string BlueprintLibraryMaterialModalElementId = "blueprint-library-material-modal";
+        private const int BlueprintLibraryMaterialModalMinWidth = 280;
+        private const int BlueprintLibraryMaterialModalMaxWidth = 420;
+        private const int BlueprintLibraryMaterialModalHeaderHeight = 42;
+        private const int BlueprintLibraryMaterialModalRowHeight = 22;
+        private const int BlueprintLibraryMaterialModalPadding = 14;
         private const int BlueprintLibraryPreviewMaxDrawCells = 768;
-        private const int BlueprintPlacedToolbarHeight = 34;
-        private const int BlueprintPlacedMaterialPanelHeight = 78;
+        private const int BlueprintPlacedMaterialPanelMinHeight = 64;
+        private const int BlueprintPlacedMaterialPanelHeaderHeight = 30;
+        private const int BlueprintPlacedMaterialPanelRowHeight = 24;
+        private const int BlueprintPlacedMaterialPanelBottomPadding = 10;
+        private const float BlueprintPlacedMaterialLineTextScale = 0.84f;
+        private const string BlueprintPlacedMaterialModalElementId = "blueprint-placed-material-modal";
         private const int BlueprintPlacedEmptyHeight = 58;
-        private const int BlueprintPlacedRowHeight = 46;
-        private const int BlueprintPlacedRowGap = 5;
+        private const int BlueprintPlacedCardColumns = BlueprintLibraryCardColumns;
+        private const int BlueprintPlacedRowHeight = BlueprintLibraryCardHeight;
+        private const int BlueprintPlacedRowGap = BlueprintLibraryCardGap;
         private const int BlueprintLibraryPreviewGridSize = 70;
         private const string BlueprintStatusBarElementId = "blueprint-status-bar";
-        private const string BlueprintLibraryVisualContract = "main-menu-hotkey-open-row+same-content-submenu+stage06-two-column-fixed-cards+preview-scales-to-fit+stage07-name-edit-delete-confirm+stage08-import-export-windows-dialog+stage09-layout-use-real-template-snapshot+stage02-title-row-tools+card-material-toggle+card-buttons-no-tooltips+summary-placed-count+hit-owned+state-paged-6";
-        private const string BlueprintPlacedInstanceVisualContract = "main-menu-open-row+same-content-submenu+current-world-list+paged-5+select+cancel-display+two-step-remove+layer-up-down+template-snapshot-isolated+material-comparison+materials-cache-only";
+        private const string BlueprintLibraryVisualContract = "main-menu-hotkey-open-row+same-content-submenu+stage06-two-column-fixed-cards+preview-scales-to-fit+stage07-name-edit-delete-confirm+stage08-import-export-windows-dialog+stage09-layout-use-real-template-snapshot+stage02-title-row-tools+card-material-toggle+card-material-modal+card-buttons-no-tooltips+summary-placed-count+summary-only+no-empty-gap-text+larger-card-summary+use-closes-f5+mutual-submenus+hit-owned+state-paged-6";
+        private const string BlueprintPlacedInstanceVisualContract = "main-menu-open-row+same-content-submenu+current-world-list+paged-5+stage03-title-count+stage03-header-page-back+stage03-material-total-all-lines+stage03-card-preview+stage03-library-sized-cards+read-only-name+hide-show-cancel-place+card-material-modal+template-snapshot-isolated+material-comparison+materials-cache-only";
         private const string BlueprintCreationVisualContract = "world-mask+single-toggle+drag-toggle+multi-region+ui-owned-consume+world-hover+air-select+low-alpha-no-border+continuous-mask+clear-selection+finish-cancel+placement-preview+center-anchor+left-click-instance";
-        private const string BlueprintProjectionVisualContract = "world-projection+appearance-ghost+yellow-missing+red-conflict+fulfilled-no-mask+hidden-skip+layer-cover";
+        private const string BlueprintProjectionVisualContract = "world-projection+appearance-ghost+yellow-missing+red-conflict+fulfilled-no-mask+completed-progress+no-cell-border+move-floating-follow-preview+hidden-skip+layer-cover";
         private const string BlueprintMaterialVisualContract = "aggregate-materials+main-inventory+void-bag+floating-window+placed-list-comparison+cache-only-draw";
-        private const string BlueprintEraseVisualContract = "instance-erase-region+selected-priority+top-layer-fallback+store-mask-only";
+        private const string BlueprintEraseVisualContract = "instance-erase-region+selected-priority+top-layer-fallback+store-mask-only+stage07-continuous-region-edit+cursor-red-follow-mask+cancel-only-exit";
         private const int BlueprintTopSettingRowCount = 3;
-        private const int BlueprintActionShortcutRowCount = 3;
+        private const int BlueprintActionShortcutRowCount = 6;
         private const int BlueprintMenuOpenRowCount = 1;
         private const int BlueprintActionHotkeyInputMaxWidth = 132;
         private const string BlueprintEntryElementPrefix = "blueprint-entry:";
         private const string BlueprintActionHotkeyElementPrefix = "blueprint-action-hotkey:";
         private const string BlueprintActionEntryElementPrefix = "blueprint-action-entry:";
-        private const string BlueprintActionShortcutVisualContract = "stage05-f5-create-save-library-rows+short-hotkey-fields+auto-mining-hotkey-shape+action-hotkeys-not-blueprint-main+real-create-save-library-entry+start-create-toggle-exit-label";
+        private const string BlueprintActionShortcutVisualContract = "stage06-f5-create-save-move-library-rows+stage07-region-modify-row+stage08-mirror-row+short-hotkey-fields+auto-mining-hotkey-shape+action-hotkeys-not-blueprint-main+real-create-save-library-entry+real-move-entry+real-region-entry+real-mirror-entry+start-create-toggle-exit-label+move-toggle-cancel-label+region-toggle-cancel-label+mirror-toggle-cancel-label";
         private const string BlueprintActionHotkeyTooltipPrimary = "双击录入采集按键。";
         private const string BlueprintActionHotkeyTooltipCancel = "Esc 取消录入。";
         private const string BlueprintActionHotkeyTooltipClear = "Backspace 删除绑定。";
@@ -56,10 +68,25 @@ namespace JueMingZ.UI.Legacy
         private const string BlueprintExitCreateActionButtonText = "退出";
         private const string BlueprintExitCreateActionButtonTooltip = "退出创建蓝图";
         private const string BlueprintSaveActionButtonTooltip = "保存当前选区为蓝图";
+        private const string BlueprintMoveActionButtonText = "开始";
+        private const string BlueprintMoveActionButtonTooltip = "点击蓝图使其进入浮动状态重新放置";
+        private const string BlueprintMoveActionDisabledTooltip = "当前世界没有可移动的已放置蓝图。";
+        private const string BlueprintCancelMoveActionButtonText = "取消";
+        private const string BlueprintCancelMoveActionButtonTooltip = "取消移动并回到原位置";
+        private const string BlueprintRegionActionButtonText = "开始";
+        private const string BlueprintRegionActionButtonTooltip = "进入区域修改，拖选修剪已放置蓝图";
+        private const string BlueprintRegionActionDisabledTooltip = "当前世界没有可修改的已放置蓝图。";
+        private const string BlueprintCancelRegionActionButtonText = "取消";
+        private const string BlueprintCancelRegionActionButtonTooltip = "取消修改并停止红色遮罩";
+        private const string BlueprintMirrorActionButtonText = "开始";
+        private const string BlueprintMirrorActionButtonTooltip = "选择已放置蓝图并水平镜像一次";
+        private const string BlueprintMirrorActionDisabledTooltip = "当前世界没有可镜像的已放置蓝图。";
+        private const string BlueprintCancelMirrorActionButtonText = "取消";
+        private const string BlueprintCancelMirrorActionButtonTooltip = "取消镜像选择";
         private const string BlueprintLibraryActionButtonTooltip = "打开蓝图库。";
         private const string BlueprintReplacementConfigPopupElementId = "blueprint-replacement-config-popup";
         private const string BlueprintReplacementVisualContract = "same-kind-replacement+config-popup+8-disabled-default-categories";
-        private const string BlueprintAutoPlacementVisualContract = "auto-placement-stage15-replacement-rules+dependency-order+item-use-bridge+projection-verification";
+        private const string BlueprintAutoPlacementVisualContract = "auto-placement-stage15-replacement-rules+dependency-order+item-use-bridge+projection-verification+main-inventory-execution+void-bag-fail-closed";
         private const string BlueprintMirrorVisualContract = "preview-horizontal-mirror+anchor-flip+slope-map+fail-closed-frame-matrix";
         private static readonly BlueprintReplacementOptionDefinition[] BlueprintReplacementOptions =
         {
@@ -85,6 +112,30 @@ namespace JueMingZ.UI.Legacy
             public string Id { get; private set; }
             public string Label { get; private set; }
             public string Tooltip { get; private set; }
+        }
+
+        private sealed class BlueprintLibraryMaterialModalState
+        {
+            public BlueprintLibraryMaterialModalState(LegacyScrollArea area, BlueprintTemplateRecord template)
+            {
+                Area = area;
+                Template = template;
+            }
+
+            public LegacyScrollArea Area { get; private set; }
+            public BlueprintTemplateRecord Template { get; private set; }
+        }
+
+        private sealed class BlueprintPlacedMaterialModalState
+        {
+            public BlueprintPlacedMaterialModalState(LegacyScrollArea area, BlueprintWorldInstanceRecord instance)
+            {
+                Area = area;
+                Instance = instance;
+            }
+
+            public LegacyScrollArea Area { get; private set; }
+            public BlueprintWorldInstanceRecord Instance { get; private set; }
         }
 
         private static LegacyUiElement DrawBlueprintPage(
@@ -164,6 +215,63 @@ namespace JueMingZ.UI.Legacy
                 "按下保存按键...",
                 "保存",
                 BlueprintSaveActionButtonTooltip) ?? hovered;
+            y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
+
+            var moveActionIsCancel = IsBlueprintMoveActionCancelState();
+            var moveActionEnabled = moveActionIsCancel || HasBlueprintPlacedInstancesForActionShortcut();
+            hovered = DrawBlueprintActionShortcutRow(
+                spriteBatch,
+                area,
+                mouse,
+                elements,
+                y,
+                "移动已放置蓝图",
+                FeatureIds.BlueprintMoveAction,
+                BlueprintEntryCommands.StartMove,
+                "双击移动按键",
+                "按下移动按键...",
+                moveActionIsCancel ? BlueprintCancelMoveActionButtonText : BlueprintMoveActionButtonText,
+                moveActionIsCancel ? BlueprintCancelMoveActionButtonTooltip : BlueprintMoveActionButtonTooltip,
+                moveActionEnabled,
+                moveActionEnabled ? string.Empty : BlueprintMoveActionDisabledTooltip) ?? hovered;
+            y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
+
+            var regionActionIsCancel = IsBlueprintRegionActionCancelState();
+            var regionActionEnabled = regionActionIsCancel || HasBlueprintPlacedInstancesForActionShortcut();
+            hovered = DrawBlueprintActionShortcutRow(
+                spriteBatch,
+                area,
+                mouse,
+                elements,
+                y,
+                "区域修改已放置蓝图",
+                FeatureIds.BlueprintRegionAction,
+                BlueprintEntryCommands.StartRegionModify,
+                "双击修改按键",
+                "按下修改按键...",
+                regionActionIsCancel ? BlueprintCancelRegionActionButtonText : BlueprintRegionActionButtonText,
+                regionActionIsCancel ? BlueprintCancelRegionActionButtonTooltip : BlueprintRegionActionButtonTooltip,
+                regionActionEnabled,
+                regionActionEnabled ? string.Empty : BlueprintRegionActionDisabledTooltip) ?? hovered;
+            y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SettingRowGap;
+
+            var mirrorActionIsCancel = IsBlueprintMirrorActionCancelState();
+            var mirrorActionEnabled = mirrorActionIsCancel || HasBlueprintPlacedInstancesForActionShortcut();
+            hovered = DrawBlueprintActionShortcutRow(
+                spriteBatch,
+                area,
+                mouse,
+                elements,
+                y,
+                "镜像已放置蓝图",
+                FeatureIds.BlueprintMirrorAction,
+                BlueprintEntryCommands.StartMirror,
+                "双击镜像按键",
+                "按下镜像按键...",
+                mirrorActionIsCancel ? BlueprintCancelMirrorActionButtonText : BlueprintMirrorActionButtonText,
+                mirrorActionIsCancel ? BlueprintCancelMirrorActionButtonTooltip : BlueprintMirrorActionButtonTooltip,
+                mirrorActionEnabled,
+                mirrorActionEnabled ? string.Empty : BlueprintMirrorActionDisabledTooltip) ?? hovered;
             y += LegacyUiMetrics.RowHeight + LegacyUiMetrics.SectionGap;
 
             hovered = DrawBlueprintActionShortcutRow(
@@ -197,7 +305,9 @@ namespace JueMingZ.UI.Legacy
             string emptyText,
             string capturingText,
             string buttonText,
-            string buttonTooltip)
+            string buttonTooltip,
+            bool buttonEnabled = true,
+            string buttonDisabledTooltip = "")
         {
             var row = new LegacyUiRect(area.Viewport.X, area.ToScreenY(contentY), area.Viewport.Width, LegacyUiMetrics.RowHeight);
             if (!area.IsVisible(row))
@@ -224,7 +334,17 @@ namespace JueMingZ.UI.Legacy
 
             var hovered = (LegacyUiElement)null;
             hovered = DrawBlueprintActionHotkeyInput(spriteBatch, mouse, elements, area.Viewport, inputRect, hotkeyTargetId, label, inputText, capturing) ?? hovered;
-            hovered = DrawBlueprintActionButton(spriteBatch, mouse, elements, area.Viewport, buttonRect, action, label, buttonText, buttonTooltip) ?? hovered;
+            hovered = DrawBlueprintActionButton(
+                spriteBatch,
+                mouse,
+                elements,
+                area.Viewport,
+                buttonRect,
+                action,
+                label,
+                buttonText,
+                buttonEnabled,
+                buttonEnabled || string.IsNullOrWhiteSpace(buttonDisabledTooltip) ? buttonTooltip : buttonDisabledTooltip) ?? hovered;
             return hovered;
         }
 
@@ -291,16 +411,17 @@ namespace JueMingZ.UI.Legacy
             string action,
             string label,
             string text,
+            bool enabled,
             string tooltip)
         {
             var elementId = BlueprintActionEntryElementPrefix + (action ?? string.Empty);
             var hit = rect.Intersect(clip);
             var elementRect = hit.Width > 0 && hit.Height > 0 ? hit : rect;
-            var hovered = IsFrameElementHovered(elementId, elementRect, mouse);
-            LegacyUiTheme.DrawButtonClipped(spriteBatch, rect, hovered, hovered && mouse != null && mouse.LeftDown, false, true, clip);
-            var contentRect = LegacyUiTheme.GetSelectedButtonContentRect(rect, false, true);
-            UiTextRenderer.DrawCenteredTextClipped(spriteBatch, text, rect.X + 3, contentRect.Y, rect.Width - 6, contentRect.Height, clip.X, clip.Y, clip.Width, clip.Height, 230, 232, 224, 255, LegacyUiMetrics.RowButtonTextScale);
-            var element = AddFrameElement(elements, elementId, "蓝图:" + label + ":" + text, "button", elementRect, tooltipLines: string.IsNullOrWhiteSpace(tooltip) ? null : new[] { tooltip });
+            var hovered = enabled && IsFrameElementHovered(elementId, elementRect, mouse);
+            LegacyUiTheme.DrawButtonClipped(spriteBatch, rect, hovered, hovered && mouse != null && mouse.LeftDown, false, enabled, clip);
+            var contentRect = LegacyUiTheme.GetSelectedButtonContentRect(rect, false, enabled);
+            UiTextRenderer.DrawCenteredTextClipped(spriteBatch, text, rect.X + 3, contentRect.Y, rect.Width - 6, contentRect.Height, clip.X, clip.Y, clip.Width, clip.Height, enabled ? 230 : 150, enabled ? 232 : 156, enabled ? 224 : 170, 255, LegacyUiMetrics.RowButtonTextScale);
+            var element = AddFrameElement(elements, elementId, "蓝图:" + label + ":" + text, "button", elementRect, enabled: enabled, tooltipLines: string.IsNullOrWhiteSpace(tooltip) ? null : new[] { tooltip });
             RecordFrameElementHover(element, hovered);
             return hovered ? element : null;
         }
@@ -329,6 +450,37 @@ namespace JueMingZ.UI.Legacy
             return IsBlueprintCreateActionExitState(settings)
                 ? BlueprintExitCreateActionButtonTooltip
                 : BlueprintCreateActionButtonTooltip;
+        }
+
+        private static bool IsBlueprintMoveActionCancelState()
+        {
+            var snapshot = BlueprintPlacedInstanceTransformState.GetSnapshot();
+            return snapshot != null &&
+                   snapshot.Active &&
+                   string.Equals(snapshot.Mode, BlueprintPlacedInstanceTransformModes.Move, StringComparison.Ordinal);
+        }
+
+        private static bool IsBlueprintRegionActionCancelState()
+        {
+            var snapshot = BlueprintEraseRegionState.GetSnapshot();
+            return snapshot != null && snapshot.Active;
+        }
+
+        private static bool IsBlueprintMirrorActionCancelState()
+        {
+            var snapshot = BlueprintPlacedInstanceTransformState.GetSnapshot();
+            return snapshot != null &&
+                   snapshot.Active &&
+                   string.Equals(snapshot.Mode, BlueprintPlacedInstanceTransformModes.Mirror, StringComparison.Ordinal);
+        }
+
+        private static bool HasBlueprintPlacedInstancesForActionShortcut()
+        {
+            var placed = BlueprintPlacedInstanceUiState.GetCachedSummary();
+            var projection = BlueprintProjectionService.GetDiagnostics();
+            return Math.Max(
+                placed == null ? 0 : placed.InstanceCount,
+                projection == null ? 0 : projection.VisibleInstanceCount) > 0;
         }
 
         private static LegacyUiElement DrawBlueprintOpenRow(
@@ -394,11 +546,7 @@ namespace JueMingZ.UI.Legacy
             var count = snapshot == null || snapshot.Templates == null ? 0 : snapshot.Templates.Count;
             var placed = BlueprintPlacedInstanceUiState.GetCachedSummary();
             var placedCount = placed == null ? 0 : placed.InstanceCount;
-            var detail = "共保存" + count.ToString(CultureInfo.InvariantCulture) + "个蓝图，已放置" + placedCount.ToString(CultureInfo.InvariantCulture) + "个蓝图";
-            if (snapshot != null && !string.IsNullOrWhiteSpace(snapshot.LastNotice))
-            {
-                detail += " · " + snapshot.LastNotice;
-            }
+            var detail = BuildBlueprintLibraryHeaderSummary(count, placedCount);
 
             UiTextRenderer.DrawTextClipped(
                 spriteBatch,
@@ -441,6 +589,7 @@ namespace JueMingZ.UI.Legacy
 
             var y = BlueprintLibrarySubmenuHeaderHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawBlueprintLibraryList(spriteBatch, area, mouse, elements, y, snapshot) ?? hovered;
+            RegisterBlueprintLibraryMaterialModalOverlay(area, snapshot);
             return hovered;
         }
 
@@ -458,12 +607,16 @@ namespace JueMingZ.UI.Legacy
             }
 
             LegacyUiTheme.DrawRowClipped(spriteBatch, row, area.Viewport);
+            LegacyUiRect prevRect;
+            LegacyUiRect nextRect;
+            LegacyUiRect backRect;
+            CalculateBlueprintPlacedHeaderButtonRects(row, out prevRect, out nextRect, out backRect);
             UiTextRenderer.DrawTextClipped(
                 spriteBatch,
                 "已放置蓝图列表",
                 row.X + 10,
                 row.Y + 5,
-                Math.Max(1, row.Width - 78),
+                Math.Max(1, prevRect.X - row.X - 18),
                 16,
                 area.Viewport.X,
                 area.Viewport.Y,
@@ -476,19 +629,15 @@ namespace JueMingZ.UI.Legacy
                 0.76f);
             var count = snapshot == null || snapshot.Instances == null ? 0 : snapshot.Instances.Count;
             var detail = snapshot != null && snapshot.LoadSucceeded
-                ? "当前世界已放置" + count.ToString(CultureInfo.InvariantCulture) + "个蓝图"
+                ? BuildBlueprintPlacedHeaderSummary(count)
                 : "当前世界实例读取失败";
-            if (snapshot != null && !string.IsNullOrWhiteSpace(snapshot.LastNotice))
-            {
-                detail += " · " + snapshot.LastNotice;
-            }
 
             UiTextRenderer.DrawTextClipped(
                 spriteBatch,
                 detail,
                 row.X + 10,
                 row.Y + 24,
-                Math.Max(1, row.Width - 78),
+                Math.Max(1, prevRect.X - row.X - 18),
                 12,
                 area.Viewport.X,
                 area.Viewport.Y,
@@ -500,8 +649,25 @@ namespace JueMingZ.UI.Legacy
                 230,
                 0.54f);
 
-            var backRect = new LegacyUiRect(row.Right - 64, row.Y + 8, 54, RowModeButtonHeight);
             var hovered = (LegacyUiElement)null;
+            hovered = DrawBlueprintSmallButton(
+                spriteBatch,
+                mouse,
+                elements,
+                area.Viewport,
+                prevRect,
+                BlueprintPlacedInstanceUiState.BuildCommandId("page-prev", string.Empty),
+                "上一页",
+                null) ?? hovered;
+            hovered = DrawBlueprintSmallButton(
+                spriteBatch,
+                mouse,
+                elements,
+                area.Viewport,
+                nextRect,
+                BlueprintPlacedInstanceUiState.BuildCommandId("page-next", string.Empty),
+                "下一页",
+                null) ?? hovered;
             hovered = DrawBlueprintSmallButton(
                 spriteBatch,
                 mouse,
@@ -513,11 +679,11 @@ namespace JueMingZ.UI.Legacy
                 "返回蓝图主菜单") ?? hovered;
 
             var y = BlueprintLibrarySubmenuHeaderHeight + LegacyUiMetrics.SettingRowGap;
-            hovered = DrawBlueprintPlacedToolbar(spriteBatch, area, mouse, elements, y, snapshot) ?? hovered;
-            y += BlueprintPlacedToolbarHeight + LegacyUiMetrics.SettingRowGap;
+            var materialHeight = CalculateBlueprintPlacedMaterialPanelHeight(BlueprintMaterialService.GetCachedSnapshotForDraw());
             hovered = DrawBlueprintPlacedMaterialPanel(spriteBatch, area, y) ?? hovered;
-            y += BlueprintPlacedMaterialPanelHeight + LegacyUiMetrics.SettingRowGap;
+            y += materialHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawBlueprintPlacedList(spriteBatch, area, mouse, elements, y, snapshot) ?? hovered;
+            RegisterBlueprintPlacedMaterialModalOverlay(area, snapshot);
             return hovered;
         }
 
@@ -1100,7 +1266,7 @@ namespace JueMingZ.UI.Legacy
                 210,
                 228,
                 226,
-                0.52f);
+                BlueprintLibraryCardSummaryTextScale);
             hovered = DrawBlueprintSmallButton(
                 spriteBatch,
                 mouse,
@@ -1111,29 +1277,14 @@ namespace JueMingZ.UI.Legacy
                 "材料",
                 null,
                 materialExpanded) ?? hovered;
-            UiTextRenderer.DrawTextClipped(
-                spriteBatch,
-                BuildBlueprintCapabilityText(template),
-                innerX,
-                previewRect.Bottom + 22,
-                innerWidth,
-                13,
-                area.Viewport.X,
-                area.Viewport.Y,
-                area.Viewport.Width,
-                area.Viewport.Height,
-                218,
-                198,
-                128,
-                226,
-                0.50f);
-            if (materialExpanded)
+            var capability = BuildBlueprintCapabilityText(template);
+            if (!string.IsNullOrWhiteSpace(capability))
             {
                 UiTextRenderer.DrawTextClipped(
                     spriteBatch,
-                    UiTextRenderer.Ellipsize(BlueprintLibraryUiState.BuildTemplateMaterialListText(template, 4), innerWidth, 0.50f),
+                    capability,
                     innerX,
-                    previewRect.Bottom + 38,
+                    previewRect.Bottom + 25,
                     innerWidth,
                     13,
                     area.Viewport.X,
@@ -1141,12 +1292,129 @@ namespace JueMingZ.UI.Legacy
                     area.Viewport.Width,
                     area.Viewport.Height,
                     206,
-                    218,
-                    238,
+                    198,
+                    128,
                     226,
                     0.50f);
             }
             return hovered;
+        }
+
+        private static bool RegisterBlueprintLibraryMaterialModalOverlay(LegacyScrollArea area, BlueprintLibraryUiSnapshot snapshot)
+        {
+            var template = BlueprintLibraryUiState.GetExpandedMaterialTemplate(snapshot);
+            if (area == null || template == null)
+            {
+                return false;
+            }
+
+            var bounds = CalculateBlueprintLibraryMaterialModalRect(area.Viewport, template);
+            return LegacyUiOverlayCoordinator.Current.Register(new LegacyUiOverlayRequest
+            {
+                Id = BlueprintLibraryMaterialModalElementId,
+                OwnerPageId = "blueprint",
+                Bounds = bounds,
+                Kind = LegacyUiOverlayKind.Modal,
+                ZIndex = 24,
+                CacheSignature = BuildBlueprintLibraryMaterialModalCacheSignature(template),
+                State = new BlueprintLibraryMaterialModalState(area, template),
+                Draw = DrawBlueprintLibraryMaterialModalOverlay
+            });
+        }
+
+        private static void DrawBlueprintLibraryMaterialModalOverlay(LegacyUiContext context, LegacyUiOverlayRequest request)
+        {
+            var state = request == null ? null : request.State as BlueprintLibraryMaterialModalState;
+            var elements = context == null ? null : context.Elements as List<LegacyUiElement>;
+            if (context == null || state == null || state.Area == null || state.Template == null || elements == null)
+            {
+                return;
+            }
+
+            DrawBlueprintLibraryMaterialModal(context.SpriteBatch, state.Area, context.Mouse, elements, state.Template);
+        }
+
+        private static LegacyUiElement DrawBlueprintLibraryMaterialModal(
+            object spriteBatch,
+            LegacyScrollArea area,
+            LegacyMouseSnapshot mouse,
+            List<LegacyUiElement> elements,
+            BlueprintTemplateRecord template)
+        {
+            var bounds = CalculateBlueprintLibraryMaterialModalRect(area.Viewport, template);
+            var context = LegacyUiContext.ForScrollArea(spriteBatch, mouse, area, elements, ConfigService.AppSettings ?? AppSettings.CreateDefault());
+            new LegacyPopupPanelControl
+            {
+                Id = BlueprintLibraryMaterialModalElementId,
+                Label = "蓝图库材料清单",
+                Kind = "blocker",
+                Bounds = bounds
+            }.Draw(context);
+
+            var title = string.IsNullOrWhiteSpace(template.Name) ? "材料清单" : "材料清单：" + template.Name.Trim();
+            UiTextRenderer.DrawTextClipped(
+                spriteBatch,
+                UiTextRenderer.Ellipsize(title, Math.Max(1, bounds.Width - 84), 0.82f),
+                bounds.X + 16,
+                bounds.Y + 11,
+                Math.Max(1, bounds.Width - 84),
+                20,
+                area.Viewport.X,
+                area.Viewport.Y,
+                area.Viewport.Width,
+                area.Viewport.Height,
+                238,
+                238,
+                226,
+                255,
+                0.82f);
+
+            var closeRect = new LegacyUiRect(bounds.Right - 58, bounds.Y + 8, 44, 22);
+            var hovered = DrawBlueprintSmallButton(
+                spriteBatch,
+                mouse,
+                elements,
+                area.Viewport,
+                closeRect,
+                BlueprintLibraryUiState.BuildCommandId("materials-close", template.TemplateId),
+                "关闭",
+                "关闭材料清单") ?? null;
+
+            var lines = BlueprintLibraryUiState.BuildTemplateMaterialLines(template);
+            var columns = ResolveBlueprintLibraryMaterialModalColumns(bounds.Width, lines.Count);
+            var columnGap = 10;
+            var contentX = bounds.X + BlueprintLibraryMaterialModalPadding;
+            var contentY = bounds.Y + BlueprintLibraryMaterialModalHeaderHeight;
+            var contentWidth = Math.Max(1, bounds.Width - BlueprintLibraryMaterialModalPadding * 2);
+            var columnWidth = Math.Max(1, (contentWidth - Math.Max(0, columns - 1) * columnGap) / columns);
+            for (var index = 0; index < lines.Count; index++)
+            {
+                var column = index % columns;
+                var row = index / columns;
+                var rect = new LegacyUiRect(
+                    contentX + column * (columnWidth + columnGap),
+                    contentY + row * BlueprintLibraryMaterialModalRowHeight,
+                    columnWidth,
+                    BlueprintLibraryMaterialModalRowHeight);
+                UiTextRenderer.DrawTextClipped(
+                    spriteBatch,
+                    UiTextRenderer.Ellipsize(lines[index], Math.Max(1, rect.Width - 4), 0.66f),
+                    rect.X + 2,
+                    rect.Y + 3,
+                    rect.Width - 4,
+                    rect.Height - 4,
+                    area.Viewport.X,
+                    area.Viewport.Y,
+                    area.Viewport.Width,
+                    area.Viewport.Height,
+                    218,
+                    226,
+                    238,
+                    245,
+                    0.66f);
+            }
+
+            return context.HoveredElement ?? hovered;
         }
 
         private static LegacyUiElement DrawBlueprintTemplateNameShellButton(
@@ -1432,9 +1700,7 @@ namespace JueMingZ.UI.Legacy
                 var placed = BlueprintPlacedInstanceUiState.GetSnapshot();
                 return BlueprintLibrarySubmenuHeaderHeight +
                        LegacyUiMetrics.SettingRowGap +
-                       BlueprintPlacedToolbarHeight +
-                       LegacyUiMetrics.SettingRowGap +
-                       BlueprintPlacedMaterialPanelHeight +
+                       CalculateBlueprintPlacedMaterialPanelHeight(BlueprintMaterialService.GetCachedSnapshotForDraw()) +
                        LegacyUiMetrics.SettingRowGap +
                        CalculateBlueprintPlacedListHeight(placed) +
                        PageContentBottomPadding;
@@ -1468,6 +1734,12 @@ namespace JueMingZ.UI.Legacy
 
             var rows = (visibleCount + BlueprintLibraryCardColumns - 1) / BlueprintLibraryCardColumns;
             return rows * BlueprintLibraryCardHeight + Math.Max(0, rows - 1) * BlueprintLibraryCardGap;
+        }
+
+        private static string BuildBlueprintLibraryHeaderSummary(int templateCount, int placedCount)
+        {
+            return "共保存" + Math.Max(0, templateCount).ToString(CultureInfo.InvariantCulture) +
+                   "个蓝图，已放置" + Math.Max(0, placedCount).ToString(CultureInfo.InvariantCulture) + "个蓝图";
         }
 
         private static void CalculateBlueprintLibraryHeaderButtonRects(
@@ -1512,19 +1784,115 @@ namespace JueMingZ.UI.Legacy
                 BlueprintLibraryCardHeight);
         }
 
+        private static LegacyUiRect CalculateBlueprintLibraryMaterialModalRect(LegacyUiRect viewport, BlueprintTemplateRecord template)
+        {
+            var lines = BlueprintLibraryUiState.BuildTemplateMaterialLines(template);
+            var width = ClampInt(
+                Math.Min(BlueprintLibraryMaterialModalMaxWidth, Math.Max(BlueprintLibraryMaterialModalMinWidth, viewport.Width - 24)),
+                Math.Min(BlueprintLibraryMaterialModalMinWidth, Math.Max(1, viewport.Width - 12)),
+                Math.Max(1, viewport.Width - 12));
+            var columns = ResolveBlueprintLibraryMaterialModalColumns(width, lines.Count);
+            var rows = (lines.Count + columns - 1) / columns;
+            var desiredHeight = BlueprintLibraryMaterialModalHeaderHeight +
+                                rows * BlueprintLibraryMaterialModalRowHeight +
+                                BlueprintLibraryMaterialModalPadding;
+            var height = ClampInt(desiredHeight, 96, Math.Max(96, viewport.Height - 12));
+            var x = viewport.X + Math.Max(0, (viewport.Width - width) / 2);
+            var y = viewport.Y + Math.Max(0, (viewport.Height - height) / 2);
+            return new LegacyUiRect(x, y, width, height);
+        }
+
+        private static int ResolveBlueprintLibraryMaterialModalColumns(int width, int lineCount)
+        {
+            return width >= 360 && lineCount > 8 ? 2 : 1;
+        }
+
+        private static int BuildBlueprintLibraryMaterialModalCacheSignature(BlueprintTemplateRecord template)
+        {
+            unchecked
+            {
+                var hash = 17;
+                hash = hash * 31 + StringComparer.Ordinal.GetHashCode(template == null ? string.Empty : template.TemplateId ?? string.Empty);
+                hash = hash * 31 + StringComparer.Ordinal.GetHashCode(template == null ? string.Empty : template.Name ?? string.Empty);
+                var lines = BlueprintLibraryUiState.BuildTemplateMaterialLines(template);
+                for (var index = 0; index < lines.Count; index++)
+                {
+                    hash = hash * 31 + StringComparer.Ordinal.GetHashCode(lines[index] ?? string.Empty);
+                }
+
+                return hash;
+            }
+        }
+
         private static int CalculateBlueprintPlacedListHeight(BlueprintPlacedInstanceUiSnapshot placed)
         {
             placed = placed ?? BlueprintPlacedInstanceUiState.GetSnapshot();
-            return !placed.LoadSucceeded || placed.Instances == null || placed.Instances.Count <= 0
-                ? BlueprintPlacedEmptyHeight
-                : placed.VisibleCount * BlueprintPlacedRowHeight + Math.Max(0, placed.VisibleCount - 1) * BlueprintPlacedRowGap;
+            return CalculateBlueprintPlacedListHeight(
+                placed.LoadSucceeded,
+                placed.Instances == null ? 0 : placed.Instances.Count,
+                placed.VisibleCount);
+        }
+
+        private static int CalculateBlueprintPlacedListHeight(bool loadSucceeded, int instanceCount, int visibleCount)
+        {
+            if (!loadSucceeded || instanceCount <= 0 || visibleCount <= 0)
+            {
+                return BlueprintPlacedEmptyHeight;
+            }
+
+            var rows = (visibleCount + BlueprintPlacedCardColumns - 1) / BlueprintPlacedCardColumns;
+            return rows * BlueprintPlacedRowHeight + Math.Max(0, rows - 1) * BlueprintPlacedRowGap;
+        }
+
+        private static int CalculateBlueprintPlacedMaterialPanelHeight(BlueprintMaterialSnapshot snapshot)
+        {
+            var lineCount = BuildBlueprintPlacedMaterialLines(snapshot, int.MaxValue).Count;
+            var contentLines = Math.Max(1, lineCount);
+            var desired = BlueprintPlacedMaterialPanelHeaderHeight +
+                          contentLines * BlueprintPlacedMaterialPanelRowHeight +
+                          BlueprintPlacedMaterialPanelBottomPadding;
+            return Math.Max(BlueprintPlacedMaterialPanelMinHeight, desired);
+        }
+
+        private static void CalculateBlueprintPlacedHeaderButtonRects(
+            LegacyUiRect headerRect,
+            out LegacyUiRect prevRect,
+            out LegacyUiRect nextRect,
+            out LegacyUiRect backRect)
+        {
+            var buttonY = headerRect.Y + 8;
+            const int gap = 6;
+            var backWidth = 54;
+            var pageWidth = 52;
+            backRect = new LegacyUiRect(headerRect.Right - 10 - backWidth, buttonY, backWidth, RowModeButtonHeight);
+            nextRect = new LegacyUiRect(backRect.X - gap - pageWidth, buttonY, pageWidth, RowModeButtonHeight);
+            prevRect = new LegacyUiRect(nextRect.X - gap - pageWidth, buttonY, pageWidth, RowModeButtonHeight);
+        }
+
+        private static LegacyUiRect CalculateBlueprintPlacedCardRect(LegacyUiRect viewport, int screenY, int visibleIndex)
+        {
+            visibleIndex = Math.Max(0, visibleIndex);
+            var column = visibleIndex % BlueprintPlacedCardColumns;
+            var row = visibleIndex / BlueprintPlacedCardColumns;
+            var totalGap = BlueprintPlacedRowGap * (BlueprintPlacedCardColumns - 1);
+            var width = Math.Max(1, (viewport.Width - totalGap) / BlueprintPlacedCardColumns);
+            return new LegacyUiRect(
+                viewport.X + column * (width + BlueprintPlacedRowGap),
+                screenY + row * (BlueprintPlacedRowHeight + BlueprintPlacedRowGap),
+                width,
+                BlueprintPlacedRowHeight);
+        }
+
+        private static string BuildBlueprintPlacedHeaderSummary(int placedCount)
+        {
+            return "当前世界已放置" + Math.Max(0, placedCount).ToString(CultureInfo.InvariantCulture) + "个蓝图";
         }
 
         private static string BuildBlueprintCapabilityText(BlueprintTemplateRecord template)
         {
             if (template == null || template.MissingCapabilityFlags == null || template.MissingCapabilityFlags.Count <= 0)
             {
-                return "缺口：无";
+                return string.Empty;
             }
 
             return "缺口：" + UiTextRenderer.Ellipsize(string.Join(" / ", template.MissingCapabilityFlags.ToArray()), 220, 0.58f);
@@ -1683,7 +2051,8 @@ namespace JueMingZ.UI.Legacy
                 return "自动摆放：无候选 / 跳过完成 " + snapshot.SkippedFulfilledLayerCount.ToString(CultureInfo.InvariantCulture) +
                        " / 冲突 " + snapshot.SkippedConflictLayerCount.ToString(CultureInfo.InvariantCulture) +
                        " / 暂不支持 " + snapshot.SkippedUnsupportedLayerCount.ToString(CultureInfo.InvariantCulture) +
-                       " / 缺材料 " + snapshot.SkippedInsufficientMaterialLayerCount.ToString(CultureInfo.InvariantCulture);
+                       " / 缺材料 " + snapshot.SkippedInsufficientMaterialLayerCount.ToString(CultureInfo.InvariantCulture) +
+                       " / 虚空袋需移入主包 " + snapshot.SkippedVoidBagOnlyLayerCount.ToString(CultureInfo.InvariantCulture);
             }
 
             return "自动摆放：候选 " + snapshot.CandidateCount.ToString(CultureInfo.InvariantCulture) +
@@ -1781,6 +2150,21 @@ namespace JueMingZ.UI.Legacy
             return BlueprintActionHotkeyElementPrefix + FeatureIds.BlueprintLibraryAction;
         }
 
+        internal static string GetBlueprintMoveActionHotkeyElementIdForTesting()
+        {
+            return BlueprintActionHotkeyElementPrefix + FeatureIds.BlueprintMoveAction;
+        }
+
+        internal static string GetBlueprintRegionActionHotkeyElementIdForTesting()
+        {
+            return BlueprintActionHotkeyElementPrefix + FeatureIds.BlueprintRegionAction;
+        }
+
+        internal static string GetBlueprintMirrorActionHotkeyElementIdForTesting()
+        {
+            return BlueprintActionHotkeyElementPrefix + FeatureIds.BlueprintMirrorAction;
+        }
+
         internal static string GetBlueprintCreateActionElementIdForTesting()
         {
             return BlueprintActionEntryElementPrefix + BlueprintEntryCommands.StartCreate;
@@ -1794,6 +2178,21 @@ namespace JueMingZ.UI.Legacy
         internal static string GetBlueprintLibraryActionElementIdForTesting()
         {
             return BlueprintActionEntryElementPrefix + BlueprintEntryCommands.OpenLibrary;
+        }
+
+        internal static string GetBlueprintMoveActionElementIdForTesting()
+        {
+            return BlueprintActionEntryElementPrefix + BlueprintEntryCommands.StartMove;
+        }
+
+        internal static string GetBlueprintRegionActionElementIdForTesting()
+        {
+            return BlueprintActionEntryElementPrefix + BlueprintEntryCommands.StartRegionModify;
+        }
+
+        internal static string GetBlueprintMirrorActionElementIdForTesting()
+        {
+            return BlueprintActionEntryElementPrefix + BlueprintEntryCommands.StartMirror;
         }
 
         internal static int GetBlueprintActionHotkeyInputMaxWidthForTesting()
@@ -1824,6 +2223,48 @@ namespace JueMingZ.UI.Legacy
         internal static string GetBlueprintCreateActionButtonTooltipForTesting(AppSettings settings)
         {
             return GetBlueprintCreateActionButtonTooltip(settings);
+        }
+
+        internal static string GetBlueprintMoveActionButtonTextForTesting()
+        {
+            return IsBlueprintMoveActionCancelState()
+                ? BlueprintCancelMoveActionButtonText
+                : BlueprintMoveActionButtonText;
+        }
+
+        internal static string GetBlueprintMoveActionButtonTooltipForTesting()
+        {
+            return IsBlueprintMoveActionCancelState()
+                ? BlueprintCancelMoveActionButtonTooltip
+                : BlueprintMoveActionButtonTooltip;
+        }
+
+        internal static string GetBlueprintRegionActionButtonTextForTesting()
+        {
+            return IsBlueprintRegionActionCancelState()
+                ? BlueprintCancelRegionActionButtonText
+                : BlueprintRegionActionButtonText;
+        }
+
+        internal static string GetBlueprintRegionActionButtonTooltipForTesting()
+        {
+            return IsBlueprintRegionActionCancelState()
+                ? BlueprintCancelRegionActionButtonTooltip
+                : BlueprintRegionActionButtonTooltip;
+        }
+
+        internal static string GetBlueprintMirrorActionButtonTextForTesting()
+        {
+            return IsBlueprintMirrorActionCancelState()
+                ? BlueprintCancelMirrorActionButtonText
+                : BlueprintMirrorActionButtonText;
+        }
+
+        internal static string GetBlueprintMirrorActionButtonTooltipForTesting()
+        {
+            return IsBlueprintMirrorActionCancelState()
+                ? BlueprintCancelMirrorActionButtonTooltip
+                : BlueprintMirrorActionButtonTooltip;
         }
 
         internal static string GetBlueprintLibraryOpenElementIdForTesting()
@@ -1906,6 +2347,36 @@ namespace JueMingZ.UI.Legacy
         internal static string BuildBlueprintLibraryLayoutCommandIdForTesting(string action, string templateId)
         {
             return BlueprintLibraryUiState.BuildCommandId("layout-" + (action ?? string.Empty), templateId);
+        }
+
+        internal static string BuildBlueprintLibraryMaterialCloseCommandIdForTesting(string templateId)
+        {
+            return BlueprintLibraryUiState.BuildCommandId("materials-close", templateId);
+        }
+
+        internal static string GetBlueprintLibraryMaterialModalElementIdForTesting()
+        {
+            return BlueprintLibraryMaterialModalElementId;
+        }
+
+        internal static bool RegisterBlueprintLibraryMaterialModalOverlayForTesting(LegacyScrollArea area)
+        {
+            return RegisterBlueprintLibraryMaterialModalOverlay(area, BlueprintLibraryUiState.GetSnapshot());
+        }
+
+        internal static string BuildBlueprintLibraryHeaderSummaryForTesting(int templateCount, int placedCount)
+        {
+            return BuildBlueprintLibraryHeaderSummary(templateCount, placedCount);
+        }
+
+        internal static string BuildBlueprintCapabilityTextForTesting(BlueprintTemplateRecord template)
+        {
+            return BuildBlueprintCapabilityText(template);
+        }
+
+        internal static float GetBlueprintLibraryCardSummaryTextScaleForTesting()
+        {
+            return BlueprintLibraryCardSummaryTextScale;
         }
 
         internal static LegacyUiRect GetBlueprintLibrarySubmenuContentBoundsForTesting(LegacyUiRect viewport)
@@ -2021,6 +2492,56 @@ namespace JueMingZ.UI.Legacy
         internal static string BuildBlueprintPlacedInstanceCommandIdForTesting(string action, string instanceId)
         {
             return BlueprintPlacedInstanceUiState.BuildCommandId(action, instanceId);
+        }
+
+        internal static string GetBlueprintPlacedMaterialModalElementIdForTesting()
+        {
+            return BlueprintPlacedMaterialModalElementId;
+        }
+
+        internal static string BuildBlueprintPlacedMaterialCloseCommandIdForTesting(string instanceId)
+        {
+            return BlueprintPlacedInstanceUiState.BuildCommandId("materials-close", instanceId);
+        }
+
+        internal static bool RegisterBlueprintPlacedMaterialModalOverlayForTesting(LegacyScrollArea area)
+        {
+            return RegisterBlueprintPlacedMaterialModalOverlay(area, BlueprintPlacedInstanceUiState.GetSnapshot());
+        }
+
+        internal static int CalculateBlueprintPlacedListHeightForTesting(bool loadSucceeded, int instanceCount, int visibleCount)
+        {
+            return CalculateBlueprintPlacedListHeight(loadSucceeded, instanceCount, visibleCount);
+        }
+
+        internal static int CalculateBlueprintPlacedMaterialPanelHeightForTesting()
+        {
+            return CalculateBlueprintPlacedMaterialPanelHeight(BlueprintMaterialService.GetCachedSnapshotForDraw());
+        }
+
+        internal static string BuildBlueprintPlacedHeaderSummaryForTesting(int placedCount)
+        {
+            return BuildBlueprintPlacedHeaderSummary(placedCount);
+        }
+
+        internal static string BuildBlueprintPlacedMaterialSummaryForTesting()
+        {
+            return BuildBlueprintPlacedMaterialSummary(BlueprintMaterialService.GetCachedSnapshotForDraw());
+        }
+
+        internal static float GetBlueprintPlacedMaterialLineTextScaleForTesting()
+        {
+            return BlueprintPlacedMaterialLineTextScale;
+        }
+
+        internal static LegacyUiRect CalculateBlueprintPlacedCardRectForTesting(LegacyUiRect viewport, int screenY, int visibleIndex)
+        {
+            return CalculateBlueprintPlacedCardRect(viewport, screenY, visibleIndex);
+        }
+
+        internal static string BuildBlueprintPlacedInstanceMaterialListTextForTesting(BlueprintWorldInstanceRecord instance)
+        {
+            return string.Join("\n", BuildBlueprintPlacedInstanceMaterialLines(instance).ToArray());
         }
 
         internal static string BuildBlueprintPlacementSummaryForTesting()

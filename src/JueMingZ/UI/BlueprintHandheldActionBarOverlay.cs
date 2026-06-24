@@ -10,8 +10,9 @@ namespace JueMingZ.UI
 {
     public static class BlueprintHandheldActionBarOverlay
     {
-        private const string VisualContract = "physical-screen-bottom-action-bar+dynamic-buttons+legacy-ui-theme+vanilla-ui-skin+button-text-scale-0.78+create-enters-mask+exit-create-preserves-mask+save-captures-mask+clear-selection+disabled-save-tooltip+open-library-real+open-placed-list-real+stage03-deferred-placed-commands+mouse-consume+no-blueprint-refresh+no-library-refresh+no-input-action-queue";
+        private const string VisualContract = "physical-screen-bottom-action-bar+dynamic-buttons+legacy-ui-theme+vanilla-ui-skin+button-text-scale-0.78+notice-text-scale-0.78+create-enters-mask+exit-create-preserves-mask+save-captures-mask+clear-selection+disabled-save-tooltip+open-library-real+open-placed-list-real+stage03-deferred-placed-commands+stage04-after-player-input-cache+stage04-active-status-notice+mouse-consume+no-blueprint-refresh+no-library-refresh+no-input-action-queue";
         internal const float ButtonTextScale = 0.78f;
+        internal const float NoticeTextScale = 0.78f;
         private const float MinimumButtonTextScale = 0.32f;
 
         public static bool DrawInterfaceLayer()
@@ -74,6 +75,11 @@ namespace JueMingZ.UI
         internal static float ResolveButtonTextScaleForTesting(string label, int availableWidth)
         {
             return ResolveButtonTextScale(label, availableWidth);
+        }
+
+        internal static string ResolveNoticeForTesting(BlueprintHandheldActionBarFrame frame)
+        {
+            return ResolveNotice(frame);
         }
 
         internal static BlueprintHandheldActionBarFrame BuildFrameForTesting(
@@ -214,7 +220,13 @@ namespace JueMingZ.UI
             try
             {
                 var gameState = GameStateReader.LastSnapshot;
-                var raw = DiagnosticMouseStateReader.ReadForBlueprintHandheldActionBarOverlay();
+                // Prefix and after-PlayerInput run in the same Terraria frame but
+                // can observe different in-process mouse coordinates; keep their
+                // diagnostic reads in separate cache slots so the postfix can see
+                // PlayerInput-refreshed positions instead of replaying stale prefix data.
+                var raw = afterPlayerInput
+                    ? DiagnosticMouseStateReader.ReadForBlueprintHandheldActionBarOverlayAfterPlayerInput()
+                    : DiagnosticMouseStateReader.ReadForBlueprintHandheldActionBarOverlay();
                 var frame = BuildFrame(RuntimeSettingsSnapshotProvider.GetCurrent(), gameState, ReadEnvironment(gameState, raw));
                 var mouse = LegacyUiInput.ReadMouseForBlueprintHandheldOverlay(raw, LegacyMainUiScale.Resolve(raw));
                 var pointerInput = new BlueprintHandheldActionBarPointerInput
@@ -396,14 +408,14 @@ namespace JueMingZ.UI
                 return;
             }
 
-            var y = Math.Max(0, bounds.Y - 20);
+            var y = Math.Max(0, bounds.Y - 24);
             UiTextRenderer.DrawCenteredTextClipped(
                 spriteBatch,
                 notice,
                 bounds.X,
                 y,
                 bounds.Width,
-                18,
+                22,
                 0,
                 0,
                 Math.Max(1, frame.ScreenWidth),
@@ -412,7 +424,7 @@ namespace JueMingZ.UI
                 218,
                 150,
                 242,
-                0.58f);
+                NoticeTextScale);
         }
 
         private static string ResolveNotice(BlueprintHandheldActionBarFrame frame)
@@ -423,7 +435,44 @@ namespace JueMingZ.UI
                 return hovered.Tooltip;
             }
 
-            return frame == null ? string.Empty : frame.LastNotice;
+            return ResolveActiveStatusNotice();
+        }
+
+        private static string ResolveActiveStatusNotice()
+        {
+            var transform = BlueprintPlacedInstanceTransformState.GetSnapshot();
+            if (transform != null &&
+                transform.Active &&
+                !string.IsNullOrWhiteSpace(transform.LastNotice))
+            {
+                return transform.LastNotice;
+            }
+
+            var erase = BlueprintEraseRegionState.GetSnapshot();
+            if (erase != null &&
+                erase.Active &&
+                !string.IsNullOrWhiteSpace(erase.LastNotice))
+            {
+                return erase.LastNotice;
+            }
+
+            var preview = BlueprintPlacementPreviewState.GetSnapshot();
+            if (preview != null &&
+                preview.Active &&
+                !string.IsNullOrWhiteSpace(preview.LastNotice))
+            {
+                return preview.LastNotice;
+            }
+
+            var creation = BlueprintCreationMaskState.GetSnapshot();
+            if (creation != null &&
+                (creation.Active || creation.CompletedPendingCapture) &&
+                !string.IsNullOrWhiteSpace(creation.LastNotice))
+            {
+                return creation.LastNotice;
+            }
+
+            return string.Empty;
         }
 
         private static void DrawButton(object spriteBatch, BlueprintHandheldActionBarButtonFrame button, LegacyUiRect clip, BlueprintHandheldActionBarFrame frame)

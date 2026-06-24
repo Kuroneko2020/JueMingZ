@@ -103,6 +103,24 @@ namespace JueMingZ.Tests
                 };
                 instance.EraseMask.Add(new BlueprintEraseMaskCellRecord { X = 1, Y = 0 });
                 instance.EraseMask.Add(new BlueprintEraseMaskCellRecord { X = 1, Y = 0 });
+                instance.CompletedLayers.Add(new BlueprintCompletedLayerRecord
+                {
+                    X = 0,
+                    Y = 0,
+                    LayerKind = BlueprintLayerKinds.Tile,
+                    CoverageGroup = BlueprintLayerKinds.Tile,
+                    ContentId = 17,
+                    Style = 0
+                });
+                instance.CompletedLayers.Add(new BlueprintCompletedLayerRecord
+                {
+                    X = 0,
+                    Y = 0,
+                    LayerKind = BlueprintLayerKinds.Tile,
+                    CoverageGroup = BlueprintLayerKinds.Tile,
+                    ContentId = 17,
+                    Style = 0
+                });
 
                 BlueprintWorldInstanceSnapshot saved;
                 RequireBlueprintSuccess(
@@ -125,6 +143,15 @@ namespace JueMingZ.Tests
                 if (roundtrip.EraseMask.Count != 1 || roundtrip.EraseMask[0].X != 1 || roundtrip.EraseMask[0].Y != 0)
                 {
                     throw new InvalidOperationException("Expected erase mask to persist and deduplicate cells.");
+                }
+
+                if (roundtrip.CompletedLayers.Count != 1 ||
+                    roundtrip.CompletedLayers[0].X != 0 ||
+                    roundtrip.CompletedLayers[0].Y != 0 ||
+                    !string.Equals(roundtrip.CompletedLayers[0].LayerKind, BlueprintLayerKinds.Tile, StringComparison.Ordinal) ||
+                    roundtrip.CompletedLayers[0].ContentId != 17)
+                {
+                    throw new InvalidOperationException("Expected completed projection layers to persist and deduplicate by per-instance layer identity.");
                 }
 
                 var cell = roundtrip.TemplateSnapshot.Cells[0];

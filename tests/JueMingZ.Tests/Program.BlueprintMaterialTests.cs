@@ -7,6 +7,7 @@ using JueMingZ.Hooks;
 using JueMingZ.Runtime;
 using JueMingZ.UI;
 using JueMingZ.UI.Legacy;
+using JueMingZ.UI.Legacy.Framework;
 
 namespace JueMingZ.Tests
 {
@@ -110,6 +111,69 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void BlueprintMaterialsStage05SubtractCompletedProgressFromDemand()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-material-stage05-completed-progress");
+            try
+            {
+                var store = new BlueprintWorldInstanceStore();
+                var reader = new FakeBlueprintWorldTileReader();
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(store.CreateInstanceFromTemplate("pair-material-stage05", "world-material-stage05", CreateStage05NineCellMaterialTemplate(), 20, 30, 0, out instance), "create stage05 material instance");
+                reader.Set(20, 30, new BlueprintWorldTileSnapshot { Active = true, TileType = 100 });
+                BlueprintProjectionService.SetDependenciesForTesting(
+                    store,
+                    BlueprintPlacementWorldContext.Success("pair-material-stage05", "world-material-stage05"),
+                    reader,
+                    true);
+                BlueprintMaterialService.SetInventoryReaderForTesting(new FakeBlueprintMaterialInventoryReader(), true);
+
+                var firstProjection = BlueprintProjectionService.GetSnapshot();
+                var firstMaterials = BlueprintMaterialService.GetSnapshot();
+                if (!firstProjection.LoadSucceeded ||
+                    firstProjection.FulfilledLayerCount != 1 ||
+                    firstProjection.MissingLayerCount != 8 ||
+                    firstMaterials.RequiredItemCount != 1 ||
+                    firstMaterials.RequiredStackTotal != 8 ||
+                    firstMaterials.ProjectionMissingLayerCount != 8 ||
+                    firstMaterials.SkippedFulfilledLayerCount != 1)
+                {
+                    throw new InvalidOperationException("Expected stage05 materials to subtract the first fulfilled layer from the 9-cell requirement.");
+                }
+
+                reader.Set(20, 30, new BlueprintWorldTileSnapshot());
+                BlueprintProjectionService.SetDependenciesForTesting(
+                    store,
+                    BlueprintPlacementWorldContext.Success("pair-material-stage05", "world-material-stage05"),
+                    reader,
+                    true);
+                BlueprintMaterialService.SetInventoryReaderForTesting(new FakeBlueprintMaterialInventoryReader(), true);
+
+                var secondProjection = BlueprintProjectionService.GetSnapshot();
+                var secondMaterials = BlueprintMaterialService.GetSnapshot();
+                if (!secondProjection.LoadSucceeded ||
+                    secondProjection.FulfilledLayerCount != 0 ||
+                    secondProjection.CompletedLayerCount != 1 ||
+                    secondProjection.MissingLayerCount != 8 ||
+                    secondMaterials.RequiredItemCount != 1 ||
+                    secondMaterials.RequiredStackTotal != 8 ||
+                    secondMaterials.ProjectionMissingLayerCount != 8 ||
+                    secondMaterials.SkippedFulfilledLayerCount != 1 ||
+                    secondMaterials.Items.Count != 1 ||
+                    secondMaterials.Items[0].RequiredStack != 8)
+                {
+                    throw new InvalidOperationException("Expected stage05 materials to keep completed progress deducted after the completed cell is mined again.");
+                }
+            }
+            finally
+            {
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialWindowOverlay.ResetForTesting();
+                restore();
+            }
+        }
+
         private static void BlueprintMaterialsReadMainInventoryAndVoidBagAvailability()
         {
             var restore = PushTemporaryConfigDirectory("blueprint-material-inventory");
@@ -172,7 +236,7 @@ namespace JueMingZ.Tests
                 }
 
                 AssertContains(LegacyMainWindow.GetBlueprintPlacedInstanceVisualContractForTesting(), "material-comparison");
-                AssertContains(LegacyMainWindow.GetBlueprintPlacedInstanceVisualContractForTesting(), "cancel-display");
+                AssertContains(LegacyMainWindow.GetBlueprintPlacedInstanceVisualContractForTesting(), "hide-show-cancel-place");
                 AssertContains(LegacyMainWindow.GetBlueprintMaterialVisualContractForTesting(), "placed-list-comparison");
                 var comparison = LegacyMainWindow.BuildBlueprintPlacedMaterialComparisonForTesting(1);
                 AssertContains(comparison, "需求材料");
@@ -189,6 +253,154 @@ namespace JueMingZ.Tests
             }
             finally
             {
+                BlueprintPlacedInstanceUiState.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialWindowOverlay.ResetForTesting();
+                restore();
+            }
+        }
+
+        private static void BlueprintPlacedListStage03LayoutMaterialAndCards()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-placed-stage03-layout-materials");
+            try
+            {
+                var store = new BlueprintWorldInstanceStore();
+                var reader = new FakeBlueprintWorldTileReader();
+                var inventory = new FakeBlueprintMaterialInventoryReader(
+                    new Dictionary<int, int> { { 501, 3 } },
+                    new Dictionary<int, int> { { 501, 4 }, { 502, 1 } });
+                BlueprintWorldInstanceRecord wood;
+                BlueprintWorldInstanceRecord stone;
+                RequireBlueprintSuccess(store.CreateInstanceFromTemplate("pair-stage03", "world-stage03", CreateSingleMaterialTemplate("木材需求", 21, 501, 10), 3, 4, 0, out wood), "create stage03 wood material instance");
+                RequireBlueprintSuccess(store.CreateInstanceFromTemplate("pair-stage03", "world-stage03", CreateSingleMaterialTemplate("石材需求", 22, 502, 5), 6, 4, 1, out stone), "create stage03 stone material instance");
+
+                BlueprintProjectionService.SetDependenciesForTesting(store, BlueprintPlacementWorldContext.Success("pair-stage03", "world-stage03"), reader, true);
+                BlueprintMaterialService.SetInventoryReaderForTesting(inventory, true);
+                BlueprintPlacedInstanceUiState.SetDependenciesForTesting(store, BlueprintPlacementWorldContext.Success("pair-stage03", "world-stage03"), true);
+
+                var open = BlueprintPlacedInstanceUiState.OpenManagement();
+                if (!open.Succeeded || inventory.ReadCount != 1)
+                {
+                    throw new InvalidOperationException("Expected stage 03 placed list open to refresh aggregate materials once.");
+                }
+
+                var contract = LegacyMainWindow.GetBlueprintPlacedInstanceVisualContractForTesting();
+                AssertContains(contract, "stage03-title-count");
+                AssertContains(contract, "stage03-header-page-back");
+                AssertContains(contract, "stage03-material-total-all-lines");
+                AssertContains(contract, "stage03-card-preview");
+                AssertContains(contract, "stage03-library-sized-cards");
+                AssertContains(contract, "read-only-name");
+                AssertContains(contract, "hide-show-cancel-place");
+                AssertContains(contract, "card-material-modal");
+                AssertDoesNotContain(contract, "select");
+                AssertDoesNotContain(contract, "cancel-display");
+                AssertDoesNotContain(contract, "layer-up-down");
+
+                AssertStringEquals(
+                    LegacyMainWindow.BuildBlueprintPlacedHeaderSummaryForTesting(2),
+                    "当前世界已放置2个蓝图",
+                    "stage03 placed header count text");
+                var summary = LegacyMainWindow.BuildBlueprintPlacedMaterialSummaryForTesting();
+                AssertContains(summary, "材料总计");
+                AssertContains(summary, "总量 15");
+                AssertContains(summary, "已有 8");
+                AssertContains(summary, "仍缺 7");
+
+                var allMaterials = LegacyMainWindow.BuildBlueprintPlacedMaterialComparisonForTesting(int.MaxValue);
+                AssertContains(allMaterials, "木材需求材料");
+                AssertContains(allMaterials, "石材需求材料");
+                AssertContains(allMaterials, "需要 10");
+                AssertContains(allMaterials, "需要 5");
+                if (LegacyMainWindow.GetBlueprintPlacedMaterialLineTextScaleForTesting() < 0.84f)
+                {
+                    throw new InvalidOperationException("Expected stage 03 placed material line text scale to increase by 0.3 from the old 0.54 baseline.");
+                }
+
+                if (LegacyMainWindow.CalculateBlueprintPlacedMaterialPanelHeightForTesting() <= 78)
+                {
+                    throw new InvalidOperationException("Expected stage 03 material panel height to grow when all material rows are shown.");
+                }
+
+                var viewport = new LegacyUiRect(20, 20, 460, 260);
+                var card0 = LegacyMainWindow.CalculateBlueprintPlacedCardRectForTesting(viewport, 40, 0);
+                var card1 = LegacyMainWindow.CalculateBlueprintPlacedCardRectForTesting(viewport, 40, 1);
+                if (card0.Height != card1.Height ||
+                    card0.Y != card1.Y ||
+                    card1.X <= card0.X ||
+                    LegacyMainWindow.CalculateBlueprintPlacedListHeightForTesting(true, 2, 2) != card0.Height)
+                {
+                    throw new InvalidOperationException("Expected stage 03 placed cards to use two-column library-sized layout.");
+                }
+
+                RunPlacedInstanceCommand("materials", wood.InstanceId);
+                var materialSnapshot = BlueprintPlacedInstanceUiState.GetSnapshot();
+                if (!string.Equals(materialSnapshot.ExpandedMaterialInstanceId, wood.InstanceId, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected stage 03 placed material button to open the selected instance material modal.");
+                }
+
+                var modalText = LegacyMainWindow.BuildBlueprintPlacedInstanceMaterialListTextForTesting(wood);
+                AssertContains(modalText, "木材需求材料 x10");
+                var projectionSignature = BlueprintProjectionService.BuildStateSignature();
+                var materialSignature = BlueprintMaterialService.BuildStateSignature();
+                var elements = new List<LegacyUiElement>
+                {
+                    CreateLegacyUiElementForTesting("blueprint-entry:start-create", "Lower", "button", viewport)
+                };
+                var mouse = new LegacyMouseSnapshot
+                {
+                    ReadAvailable = true,
+                    LeftPressed = true
+                };
+                var area = LegacyScrollArea.Create(viewport, 620, 0);
+                var coordinator = LegacyUiOverlayCoordinator.Current;
+                coordinator.ResetForTesting();
+                coordinator.BeginFrame("blueprint");
+                if (!LegacyMainWindow.RegisterBlueprintPlacedMaterialModalOverlayForTesting(area))
+                {
+                    throw new InvalidOperationException("Expected stage 03 placed material list to register as a modal overlay.");
+                }
+
+                coordinator.DrawOverlays(null, mouse, new LegacyUiRect(0, 0, 560, 340), "blueprint", AppSettings.CreateDefault(), elements);
+                var modal = FindLegacyUiElementForTesting(elements, LegacyMainWindow.GetBlueprintPlacedMaterialModalElementIdForTesting());
+                mouse.X = modal.Rect.X + 12;
+                mouse.Y = modal.Rect.Y + 40;
+                bool blocked;
+                var clickId = LegacyMainWindow.ResolveClickableElementIdForTesting(elements, mouse, out blocked);
+                if (!blocked || clickId.Length != 0)
+                {
+                    throw new InvalidOperationException("Expected stage 03 placed material modal blocker to stop lower blueprint page clicks.");
+                }
+
+                var close = FindLegacyUiElementForTesting(elements, LegacyMainWindow.BuildBlueprintPlacedMaterialCloseCommandIdForTesting(wood.InstanceId));
+                mouse.X = close.Rect.X + Math.Max(1, close.Rect.Width / 2);
+                mouse.Y = close.Rect.Y + Math.Max(1, close.Rect.Height / 2);
+                clickId = LegacyMainWindow.ResolveClickableElementIdForTesting(elements, mouse, out blocked);
+                coordinator.EndFrame();
+                if (blocked || clickId != close.Id)
+                {
+                    throw new InvalidOperationException("Expected stage 03 placed material modal close button to remain clickable above the modal blocker.");
+                }
+
+                RunPlacedInstanceCommand("materials-close", wood.InstanceId);
+                if (!string.IsNullOrWhiteSpace(BlueprintPlacedInstanceUiState.GetSnapshot().ExpandedMaterialInstanceId))
+                {
+                    throw new InvalidOperationException("Expected stage 03 placed material close command to clear modal state.");
+                }
+
+                if (BlueprintProjectionService.BuildStateSignature() != projectionSignature ||
+                    BlueprintMaterialService.BuildStateSignature() != materialSignature ||
+                    inventory.ReadCount != 1)
+                {
+                    throw new InvalidOperationException("Expected stage 03 placed material modal draw and close to read only cached projection/material state.");
+                }
+            }
+            finally
+            {
+                LegacyUiOverlayCoordinator.Current.ResetForTesting();
                 BlueprintPlacedInstanceUiState.ResetForTesting();
                 BlueprintMaterialService.ResetForTesting();
                 BlueprintProjectionService.ResetForTesting();
@@ -358,6 +570,26 @@ namespace JueMingZ.Tests
                 BlueprintMaterialWindowOverlay.ResetForTesting();
                 restore();
             }
+        }
+
+        private static BlueprintTemplateRecord CreateStage05NineCellMaterialTemplate()
+        {
+            var template = new BlueprintTemplateRecord
+            {
+                Name = "05 九格材料",
+                Width = 9,
+                Height = 1,
+                AnchorX = 0,
+                AnchorY = 0
+            };
+
+            for (var index = 0; index < 9; index++)
+            {
+                template.Cells.Add(CreateMaterialTileCell(index, 0, 100 + index, 501, 1, "05材料"));
+            }
+
+            AddMaterialEntries(template);
+            return template;
         }
 
         private static BlueprintTemplateRecord CreateMixedMaterialTemplate()

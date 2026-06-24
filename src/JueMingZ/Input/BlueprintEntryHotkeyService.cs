@@ -31,6 +31,9 @@ namespace JueMingZ.Input
                 FeatureToggleHotkeyChord chord;
                 return TryGetActionChord(settings, FeatureIds.BlueprintCreateAction, out chord) ||
                        TryGetActionChord(settings, FeatureIds.BlueprintSaveAction, out chord) ||
+                       TryGetActionChord(settings, FeatureIds.BlueprintMoveAction, out chord) ||
+                       TryGetActionChord(settings, FeatureIds.BlueprintRegionAction, out chord) ||
+                       TryGetActionChord(settings, FeatureIds.BlueprintMirrorAction, out chord) ||
                        TryGetActionChord(settings, FeatureIds.BlueprintLibraryAction, out chord);
             }
         }
@@ -121,6 +124,54 @@ namespace JueMingZ.Input
                 return result;
             }
 
+            result = TryTickTarget(
+                appSettings,
+                hotkeySettings,
+                gameState,
+                FeatureIds.BlueprintMoveAction,
+                BlueprintEntryCommands.StartMove,
+                gameInputAvailable,
+                gateReason,
+                foreground,
+                textInputFocused,
+                isKeyDown);
+            if (result.Triggered)
+            {
+                return result;
+            }
+
+            result = TryTickTarget(
+                appSettings,
+                hotkeySettings,
+                gameState,
+                FeatureIds.BlueprintRegionAction,
+                BlueprintEntryCommands.StartRegionModify,
+                gameInputAvailable,
+                gateReason,
+                foreground,
+                textInputFocused,
+                isKeyDown);
+            if (result.Triggered)
+            {
+                return result;
+            }
+
+            result = TryTickTarget(
+                appSettings,
+                hotkeySettings,
+                gameState,
+                FeatureIds.BlueprintMirrorAction,
+                BlueprintEntryCommands.StartMirror,
+                gameInputAvailable,
+                gateReason,
+                foreground,
+                textInputFocused,
+                isKeyDown);
+            if (result.Triggered)
+            {
+                return result;
+            }
+
             return TryTickTarget(
                 appSettings,
                 hotkeySettings,
@@ -183,6 +234,21 @@ namespace JueMingZ.Input
             string action,
             string chord)
         {
+            if (string.Equals(action, BlueprintEntryCommands.StartMove, StringComparison.Ordinal))
+            {
+                return ApplyBlueprintMoveAction(appSettings, targetId, action, chord);
+            }
+
+            if (string.Equals(action, BlueprintEntryCommands.StartRegionModify, StringComparison.Ordinal))
+            {
+                return ApplyBlueprintRegionAction(appSettings, targetId, action, chord);
+            }
+
+            if (string.Equals(action, BlueprintEntryCommands.StartMirror, StringComparison.Ordinal))
+            {
+                return ApplyBlueprintMirrorAction(appSettings, targetId, action, chord);
+            }
+
             var result = BlueprintEntryState.ApplyCommand(action, appSettings ?? AppSettings.CreateDefault());
             BlueprintCaptureResult capture = null;
             if (result.Succeeded &&
@@ -216,6 +282,93 @@ namespace JueMingZ.Input
             }
 
             return BlueprintEntryHotkeyDispatchResult.FromApply(targetId, action, chord, result, capture);
+        }
+
+        private static BlueprintEntryHotkeyDispatchResult ApplyBlueprintMoveAction(
+            AppSettings appSettings,
+            string targetId,
+            string action,
+            string chord)
+        {
+            var transform = BlueprintPlacedInstanceTransformState.GetSnapshot();
+            BlueprintPlacedInstanceTransformCommandResult move;
+            BlueprintEntryCommandResult entry = null;
+            var startedMove = false;
+            if (transform != null &&
+                transform.Active &&
+                string.Equals(transform.Mode, BlueprintPlacedInstanceTransformModes.Move, StringComparison.Ordinal))
+            {
+                move = BlueprintPlacedInstanceTransformState.Cancel();
+            }
+            else
+            {
+                BlueprintCreationMaskState.Cancel();
+                BlueprintPlacementPreviewState.Cancel();
+                BlueprintEraseRegionState.Cancel();
+                move = BlueprintPlacedInstanceTransformState.BeginMove();
+                if (move != null && move.Succeeded)
+                {
+                    entry = BlueprintEntryState.ApplyCommand(BlueprintEntryCommands.OpenPlacedInstances, appSettings ?? AppSettings.CreateDefault());
+                    LegacyMainUiState.SetVisible(false);
+                    startedMove = true;
+                }
+            }
+
+            return BlueprintEntryHotkeyDispatchResult.FromTransform(targetId, action, chord, move, entry, startedMove);
+        }
+
+        private static BlueprintEntryHotkeyDispatchResult ApplyBlueprintRegionAction(
+            AppSettings appSettings,
+            string targetId,
+            string action,
+            string chord)
+        {
+            var before = BlueprintEraseRegionState.GetSnapshot();
+            var result = BlueprintEntryState.ApplyCommand(action, appSettings ?? AppSettings.CreateDefault());
+            var after = BlueprintEraseRegionState.GetSnapshot();
+            var startedRegion = result.Succeeded &&
+                                (before == null || !before.Active) &&
+                                after != null &&
+                                after.Active;
+            if (startedRegion)
+            {
+                LegacyMainUiState.SetVisible(false);
+            }
+
+            return BlueprintEntryHotkeyDispatchResult.FromApply(targetId, action, chord, result, null);
+        }
+
+        private static BlueprintEntryHotkeyDispatchResult ApplyBlueprintMirrorAction(
+            AppSettings appSettings,
+            string targetId,
+            string action,
+            string chord)
+        {
+            var transform = BlueprintPlacedInstanceTransformState.GetSnapshot();
+            BlueprintPlacedInstanceTransformCommandResult mirror;
+            BlueprintEntryCommandResult entry = null;
+            var startedMirror = false;
+            if (transform != null &&
+                transform.Active &&
+                string.Equals(transform.Mode, BlueprintPlacedInstanceTransformModes.Mirror, StringComparison.Ordinal))
+            {
+                mirror = BlueprintPlacedInstanceTransformState.Cancel();
+            }
+            else
+            {
+                BlueprintCreationMaskState.Cancel();
+                BlueprintPlacementPreviewState.Cancel();
+                BlueprintEraseRegionState.Cancel();
+                mirror = BlueprintPlacedInstanceTransformState.BeginMirror();
+                if (mirror != null && mirror.Succeeded)
+                {
+                    entry = BlueprintEntryState.ApplyCommand(BlueprintEntryCommands.OpenPlacedInstances, appSettings ?? AppSettings.CreateDefault());
+                    LegacyMainUiState.SetVisible(false);
+                    startedMirror = true;
+                }
+            }
+
+            return BlueprintEntryHotkeyDispatchResult.FromTransform(targetId, action, chord, mirror, entry, startedMirror);
         }
 
         private static bool TryGetActionChord(HotkeySettings settings, string targetId, out FeatureToggleHotkeyChord chord)
@@ -588,6 +741,33 @@ namespace JueMingZ.Input
                 ResultCode = resultCode ?? string.Empty,
                 Reason = resultCode ?? string.Empty,
                 Message = entry.Message ?? string.Empty,
+                DiagnosticResultCode = diagnostic
+            };
+        }
+
+        public static BlueprintEntryHotkeyDispatchResult FromTransform(
+            string targetId,
+            string action,
+            string chord,
+            BlueprintPlacedInstanceTransformCommandResult transform,
+            BlueprintEntryCommandResult entry,
+            bool startedMove)
+        {
+            transform = transform ?? BlueprintPlacedInstanceTransformCommandResult.Create(false, false, BlueprintPlacedInstanceTransformModes.Move, string.Empty, "transformUnknown", "蓝图移动快捷键执行失败。", string.Empty, string.Empty);
+            var applied = transform.Succeeded && transform.Changed && (entry == null || entry.Succeeded);
+            var diagnostic = applied
+                ? DiagnosticResultCode.Succeeded
+                : transform.Succeeded ? DiagnosticResultCode.NotApplicable : DiagnosticResultCode.Failed;
+            return new BlueprintEntryHotkeyDispatchResult
+            {
+                Triggered = true,
+                Applied = applied,
+                Chord = chord ?? string.Empty,
+                TargetId = targetId ?? string.Empty,
+                Action = action ?? string.Empty,
+                ResultCode = transform.ResultCode ?? string.Empty,
+                Reason = transform.ResultCode ?? string.Empty,
+                Message = transform.Message ?? string.Empty,
                 DiagnosticResultCode = diagnostic
             };
         }

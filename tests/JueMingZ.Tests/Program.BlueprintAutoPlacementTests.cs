@@ -367,6 +367,7 @@ namespace JueMingZ.Tests
 
                 var request = BlueprintAutoPlacementService.BuildRequestForTesting(result.Candidate, "pair-auto-replace", "world-auto-replace");
                 if (!string.Equals(request.Metadata["BlueprintContractStage"], "15", StringComparison.Ordinal) ||
+                    !string.Equals(request.Metadata[ActionMetadataKeys.BlueprintMaterialExecutionScope], "mainInventory0-49", StringComparison.Ordinal) ||
                     !string.Equals(request.Metadata[ActionMetadataKeys.BlueprintReplacementApplied], "true", StringComparison.Ordinal) ||
                     !string.Equals(request.Metadata[ActionMetadataKeys.BlueprintReplacementCategory], BlueprintReplacementCategories.Torch, StringComparison.Ordinal) ||
                     request.Metadata[ActionMetadataKeys.BlueprintMaterialItemId] != "104" ||
@@ -378,6 +379,60 @@ namespace JueMingZ.Tests
             finally
             {
                 ResetReplacementItemsForTesting();
+                BlueprintAutoPlacementService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialWindowOverlay.ResetForTesting();
+                restore();
+            }
+        }
+
+        private static void BlueprintAutoPlacementVoidBagOnlyMaterialsFailClosedWithReason()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-auto-placement-void-bag");
+            try
+            {
+                BlueprintAutoPlacementService.ResetForTesting();
+                var store = new BlueprintWorldInstanceStore();
+                var reader = new FakeBlueprintWorldTileReader();
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(store.CreateInstanceFromTemplate("pair-auto-void-bag", "world-auto-void-bag", CreateSingleMaterialTemplate("虚空袋材料", 41, 951, 2), 22, 23, 0, out instance), "create void-bag-only auto placement instance");
+                BlueprintProjectionService.SetDependenciesForTesting(store, BlueprintPlacementWorldContext.Success("pair-auto-void-bag", "world-auto-void-bag"), reader, true);
+                BlueprintMaterialService.SetInventoryReaderForTesting(new FakeBlueprintMaterialInventoryReader(
+                    new Dictionary<int, int>(),
+                    new Dictionary<int, int> { { 951, 2 } }), true);
+
+                var settings = AppSettings.CreateDefault();
+                settings.BlueprintAutoPlacementEnabled = true;
+                var queue = new InputActionQueue();
+                var tick = BlueprintAutoPlacementService.TickForTesting(queue, CreateBlueprintInWorldSnapshot(), RuntimeSettingsSnapshot.FromSettings(settings));
+                if (tick.Submitted ||
+                    tick.Candidate != null ||
+                    queue.GetSnapshot().PendingCount != 0 ||
+                    tick.Snapshot.CandidateCount != 0 ||
+                    tick.Snapshot.SkippedVoidBagOnlyLayerCount != 1 ||
+                    tick.Snapshot.SkippedInsufficientMaterialLayerCount != 0 ||
+                    !string.Equals(tick.Snapshot.ResultCode, "voidBagMaterialNotExecutable", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected void-bag-only blueprint materials to stay fail-closed before ActionQueue submission.");
+                }
+
+                AssertContains(tick.Snapshot.Message, "虚空袋");
+                AssertContains(tick.Snapshot.Message, "主背包 0-49");
+                AssertContains(BlueprintAutoPlacementService.BuildUiStateJson(), "\"skippedVoidBagOnlyLayerCount\":1");
+                AssertContains(LegacyMainWindow.BuildBlueprintAutoPlacementSummaryForTesting(), "虚空袋需移入主包 1");
+
+                var runtimeSnapshot = RuntimeDiagnosticSnapshotBuilder.Build(new RuntimeDiagnosticSnapshotContext
+                {
+                    Initialized = true,
+                    Version = "test-blueprint-auto-placement-void-bag"
+                });
+                var json = InvokeDiagnosticSnapshotJson(runtimeSnapshot);
+                AssertContains(json, "\"BlueprintAutoPlacementLastStatus\": \"voidBagMaterialNotExecutable\"");
+                AssertContains(json, "\"BlueprintAutoPlacementSkippedVoidBagOnlyLayerCount\": 1");
+            }
+            finally
+            {
                 BlueprintAutoPlacementService.ResetForTesting();
                 BlueprintMaterialService.ResetForTesting();
                 BlueprintProjectionService.ResetForTesting();
@@ -471,9 +526,12 @@ namespace JueMingZ.Tests
                 AssertContains(json, "\"BlueprintAutoPlacementSelectedReplacementApplied\": false");
                 AssertContains(json, "\"BlueprintAutoPlacementSubmittedCount\": 1");
                 AssertContains(json, "\"BlueprintAutoPlacementSkippedUnsupportedLayerCount\": 0");
+                AssertContains(json, "\"BlueprintAutoPlacementSkippedVoidBagOnlyLayerCount\": 0");
                 AssertContains(json, "\"BlueprintAutoPlacementSucceededCount\": 0");
                 AssertContains(BlueprintAutoPlacementService.BuildUiStateJson(), "\"lastAdmissionStatus\":\"Accepted\"");
                 AssertContains(LegacyMainWindow.GetBlueprintAutoPlacementVisualContractForTesting(), "stage15");
+                AssertContains(LegacyMainWindow.GetBlueprintAutoPlacementVisualContractForTesting(), "main-inventory-execution");
+                AssertContains(LegacyMainWindow.GetBlueprintAutoPlacementVisualContractForTesting(), "void-bag-fail-closed");
                 AssertContains(LegacyMainWindow.BuildBlueprintAutoPlacementSummaryForTesting(), "自动摆放：候选 1");
             }
             finally

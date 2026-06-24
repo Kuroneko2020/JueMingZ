@@ -563,7 +563,8 @@ namespace JueMingZ.Automation.Blueprint
                     continue;
                 }
 
-                if (string.Equals(layer.Status, BlueprintProjectionLayerStatuses.Fulfilled, StringComparison.Ordinal))
+                if (string.Equals(layer.Status, BlueprintProjectionLayerStatuses.Fulfilled, StringComparison.Ordinal) ||
+                    string.Equals(layer.Status, BlueprintProjectionLayerStatuses.Completed, StringComparison.Ordinal))
                 {
                     snapshot.SkippedFulfilledLayerCount++;
                     continue;
@@ -752,6 +753,7 @@ namespace JueMingZ.Automation.Blueprint
             builder.Append(projection.LastResolvedUtc.HasValue ? projection.LastResolvedUtc.Value.Ticks.ToString(CultureInfo.InvariantCulture) : "0").Append('|');
             builder.Append(projection.ResultCode ?? string.Empty).Append('|');
             builder.Append(projection.FulfilledLayerCount.ToString(CultureInfo.InvariantCulture)).Append('|');
+            builder.Append(projection.CompletedLayerCount.ToString(CultureInfo.InvariantCulture)).Append('|');
             builder.Append(projection.MissingLayerCount.ToString(CultureInfo.InvariantCulture)).Append('|');
             builder.Append(projection.ConflictLayerCount.ToString(CultureInfo.InvariantCulture)).Append('|');
             builder.Append(projection.UnavailableLayerCount.ToString(CultureInfo.InvariantCulture)).Append('|');

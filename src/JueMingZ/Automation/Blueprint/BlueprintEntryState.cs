@@ -69,6 +69,9 @@ namespace JueMingZ.Automation.Blueprint
         public const string StartCreate = "start-create";
         public const string OpenLibrary = "open-library";
         public const string OpenPlacedInstances = "open-placed";
+        public const string StartMove = "start-move";
+        public const string StartRegionModify = "start-region-modify";
+        public const string StartMirror = "start-mirror";
         public const string OpenMaterials = "open-materials";
         public const string StartErase = "start-erase";
         public const string ClearSelection = "clear-selection";
@@ -196,6 +199,16 @@ namespace JueMingZ.Automation.Blueprint
                     BlueprintCreationPromptService.NotifyCreateStarted(started);
                     return started;
                 case BlueprintEntryCommands.OpenLibrary:
+                    if (IsCurrentMode(BlueprintEntryModes.PlacedManagement))
+                    {
+                        return SetMode(
+                            BlueprintEntryModes.Tool,
+                            "ui",
+                            "libraryOpened",
+                            "蓝图库已打开。",
+                            false);
+                    }
+
                     return RecordNotice(
                         "ui",
                         "libraryOpened",
@@ -226,6 +239,17 @@ namespace JueMingZ.Automation.Blueprint
                 case BlueprintEntryCommands.StartErase:
                     BlueprintCreationMaskState.Cancel();
                     BlueprintPlacementPreviewState.Cancel();
+                    return MarkEraseStarted(BlueprintEraseRegionState.BeginErase(string.Empty));
+                case BlueprintEntryCommands.StartRegionModify:
+                    var erase = BlueprintEraseRegionState.GetSnapshot();
+                    if (erase != null && erase.Active)
+                    {
+                        return MarkEraseCancelled(BlueprintEraseRegionState.Cancel());
+                    }
+
+                    BlueprintCreationMaskState.Cancel();
+                    BlueprintPlacementPreviewState.Cancel();
+                    BlueprintPlacedInstanceTransformState.Cancel();
                     return MarkEraseStarted(BlueprintEraseRegionState.BeginErase(string.Empty));
                 case BlueprintEntryCommands.ClearSelection:
                     return ApplyCreationSelectionResult(BlueprintCreationMaskState.ClearSelection(), BlueprintEntryModes.Creating, false);
@@ -413,6 +437,30 @@ namespace JueMingZ.Automation.Blueprint
                     _mode = BlueprintEntryModes.EraseRegion;
                     _selectedTemplateId = string.Empty;
                     _selectedTemplateName = erase.TargetInstanceName ?? string.Empty;
+                }
+
+                _lastSource = "erase";
+                _lastNotice = erase.Message ?? string.Empty;
+                return BlueprintEntryCommandResult.Create(
+                    erase.Succeeded,
+                    erase.Changed,
+                    false,
+                    erase.ResultCode,
+                    _lastNotice,
+                    _mode);
+            }
+        }
+
+        public static BlueprintEntryCommandResult MarkEraseCancelled(BlueprintEraseCommandResult erase)
+        {
+            erase = erase ?? BlueprintEraseCommandResult.Create(false, false, "unknown", "蓝图区域修改取消结果未知。", string.Empty, string.Empty);
+            lock (SyncRoot)
+            {
+                if (erase.Succeeded)
+                {
+                    _mode = BlueprintEntryModes.Tool;
+                    _selectedTemplateId = string.Empty;
+                    _selectedTemplateName = string.Empty;
                 }
 
                 _lastSource = "erase";

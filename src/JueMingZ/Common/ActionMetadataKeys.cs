@@ -31,6 +31,7 @@ namespace JueMingZ.Common
         public const string BlueprintOriginalMaterialItemId = "BlueprintOriginalMaterialItemId";
         public const string BlueprintMaterialStack = "BlueprintMaterialStack";
         public const string BlueprintMaterialAvailableStack = "BlueprintMaterialAvailableStack";
+        public const string BlueprintMaterialExecutionScope = "BlueprintMaterialExecutionScope";
         public const string BlueprintReplacementApplied = "BlueprintReplacementApplied";
         public const string BlueprintReplacementCategory = "BlueprintReplacementCategory";
         public const string BlueprintAdmissionKey = "BlueprintAdmissionKey";

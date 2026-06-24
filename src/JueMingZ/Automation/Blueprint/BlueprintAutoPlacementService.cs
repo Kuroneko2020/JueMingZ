@@ -18,6 +18,7 @@ namespace JueMingZ.Automation.Blueprint
             InstanceName = string.Empty;
             LayerKind = string.Empty;
             CoverageGroup = string.Empty;
+            MaterialExecutionScope = string.Empty;
             ReplacementCategory = string.Empty;
             AdmissionKey = string.Empty;
         }
@@ -44,6 +45,7 @@ namespace JueMingZ.Automation.Blueprint
         public int OriginalMaterialItemId { get; set; }
         public int MaterialStack { get; set; }
         public int MaterialAvailableStack { get; set; }
+        public string MaterialExecutionScope { get; set; }
         public bool ReplacementApplied { get; set; }
         public string ReplacementCategory { get; set; }
         public int PlacementPhase { get; set; }
@@ -75,6 +77,7 @@ namespace JueMingZ.Automation.Blueprint
                 OriginalMaterialItemId = OriginalMaterialItemId,
                 MaterialStack = MaterialStack,
                 MaterialAvailableStack = MaterialAvailableStack,
+                MaterialExecutionScope = MaterialExecutionScope ?? string.Empty,
                 ReplacementApplied = ReplacementApplied,
                 ReplacementCategory = ReplacementCategory ?? string.Empty,
                 PlacementPhase = PlacementPhase,
@@ -117,6 +120,7 @@ namespace JueMingZ.Automation.Blueprint
         public int SkippedUnsupportedLayerCount { get; set; }
         public int SkippedNoMaterialLayerCount { get; set; }
         public int SkippedInsufficientMaterialLayerCount { get; set; }
+        public int SkippedVoidBagOnlyLayerCount { get; set; }
         public string SelectedInstanceId { get; set; }
         public string SelectedInstanceName { get; set; }
         public int SelectedLayerOrder { get; set; }
@@ -159,6 +163,7 @@ namespace JueMingZ.Automation.Blueprint
                 SkippedUnsupportedLayerCount = SkippedUnsupportedLayerCount,
                 SkippedNoMaterialLayerCount = SkippedNoMaterialLayerCount,
                 SkippedInsufficientMaterialLayerCount = SkippedInsufficientMaterialLayerCount,
+                SkippedVoidBagOnlyLayerCount = SkippedVoidBagOnlyLayerCount,
                 SelectedInstanceId = SelectedInstanceId ?? string.Empty,
                 SelectedInstanceName = SelectedInstanceName ?? string.Empty,
                 SelectedLayerOrder = SelectedLayerOrder,
@@ -255,6 +260,7 @@ namespace JueMingZ.Automation.Blueprint
             AppendRaw(builder, "failClosedCount", snapshot.FailClosedCount.ToString(CultureInfo.InvariantCulture), true);
             AppendRaw(builder, "succeededCount", snapshot.SucceededCount.ToString(CultureInfo.InvariantCulture), true);
             AppendRaw(builder, "attemptedButUnverifiedCount", snapshot.AttemptedButUnverifiedCount.ToString(CultureInfo.InvariantCulture), true);
+            AppendRaw(builder, "skippedVoidBagOnlyLayerCount", snapshot.SkippedVoidBagOnlyLayerCount.ToString(CultureInfo.InvariantCulture), true);
             builder.Append('}');
             return builder.ToString();
         }
@@ -482,8 +488,17 @@ namespace JueMingZ.Automation.Blueprint
             snapshot.CandidateCount = candidates.Count;
             if (candidates.Count <= 0)
             {
-                snapshot.ResultCode = "noCandidate";
-                snapshot.Message = "当前有效投影没有可提交的自动摆放候选。";
+                if (snapshot.SkippedVoidBagOnlyLayerCount > 0)
+                {
+                    snapshot.ResultCode = "voidBagMaterialNotExecutable";
+                    snapshot.Message = "材料面板可见虚空袋材料，但自动摆放当前只能从主背包 0-49 使用物品；请先把材料移入主背包。";
+                }
+                else
+                {
+                    snapshot.ResultCode = "noCandidate";
+                    snapshot.Message = "当前有效投影没有可提交的自动摆放候选。";
+                }
+
                 FinishResolveSnapshot(snapshot, operationStart);
                 return result;
             }
@@ -502,7 +517,8 @@ namespace JueMingZ.Automation.Blueprint
             BlueprintReplacementSettings replacementSettings)
         {
             var candidates = new List<BlueprintAutoPlacementCandidate>();
-            var availability = BuildAvailabilityMap(materials);
+            var mainAvailability = BuildMainInventoryAvailabilityMap(materials);
+            var combinedAvailability = BuildCombinedInventoryAvailabilityMap(materials);
             var layers = projection == null ? null : projection.AllProjectedLayers;
             for (var index = 0; layers != null && index < layers.Count; index++)
             {
@@ -549,11 +565,19 @@ namespace JueMingZ.Automation.Blueprint
                 }
 
                 BlueprintReplacementMaterialChoice materialChoice;
-                if (!BlueprintReplacementRuleService.TryChooseMaterialForAutoPlacement(layer, replacementSettings, availability, out materialChoice) ||
+                if (!BlueprintReplacementRuleService.TryChooseMaterialForAutoPlacement(layer, replacementSettings, mainAvailability, out materialChoice) ||
                     materialChoice == null ||
                     materialChoice.MaterialItemId <= 0)
                 {
-                    snapshot.SkippedInsufficientMaterialLayerCount++;
+                    if (CanBeSatisfiedOnlyWithVoidBagContribution(layer, replacementSettings, mainAvailability, combinedAvailability))
+                    {
+                        snapshot.SkippedVoidBagOnlyLayerCount++;
+                    }
+                    else
+                    {
+                        snapshot.SkippedInsufficientMaterialLayerCount++;
+                    }
+
                     continue;
                 }
 
@@ -581,6 +605,7 @@ namespace JueMingZ.Automation.Blueprint
                     OriginalMaterialItemId = materialChoice.OriginalMaterialItemId > 0 ? materialChoice.OriginalMaterialItemId : layer.MaterialItemId,
                     MaterialStack = layer.MaterialStack,
                     MaterialAvailableStack = materialChoice.AvailableStack,
+                    MaterialExecutionScope = "mainInventory0-49",
                     ReplacementApplied = materialChoice.ReplacementApplied,
                     ReplacementCategory = materialChoice.Category ?? string.Empty,
                     PlacementPhase = ResolvePlacementPhase(layer),
@@ -642,7 +667,7 @@ namespace JueMingZ.Automation.Blueprint
             }
         }
 
-        private static Dictionary<int, int> BuildAvailabilityMap(BlueprintMaterialSnapshot materials)
+        private static Dictionary<int, int> BuildMainInventoryAvailabilityMap(BlueprintMaterialSnapshot materials)
         {
             var map = new Dictionary<int, int>();
             var items = materials == null ? null : materials.Items;
@@ -658,6 +683,56 @@ namespace JueMingZ.Automation.Blueprint
             }
 
             return map;
+        }
+
+        private static Dictionary<int, int> BuildCombinedInventoryAvailabilityMap(BlueprintMaterialSnapshot materials)
+        {
+            var map = new Dictionary<int, int>();
+            var items = materials == null ? null : materials.Items;
+            for (var index = 0; items != null && index < items.Count; index++)
+            {
+                var item = items[index];
+                if (item == null || item.ItemId <= 0)
+                {
+                    continue;
+                }
+
+                map[item.ItemId] = item.AvailableStack;
+            }
+
+            return map;
+        }
+
+        private static bool CanBeSatisfiedOnlyWithVoidBagContribution(
+            BlueprintProjectionCellSnapshot layer,
+            BlueprintReplacementSettings replacementSettings,
+            IDictionary<int, int> mainAvailability,
+            IDictionary<int, int> combinedAvailability)
+        {
+            BlueprintReplacementMaterialChoice combinedChoice;
+            if (!BlueprintReplacementRuleService.TryChooseMaterialForAutoPlacement(layer, replacementSettings, combinedAvailability, out combinedChoice) ||
+                combinedChoice == null ||
+                combinedChoice.MaterialItemId <= 0 ||
+                combinedChoice.AvailableStack < layer.MaterialStack)
+            {
+                return false;
+            }
+
+            // ItemUseBridge can only drive vanilla item use from main inventory slots 0-49.
+            // Void Bag availability stays visible in material UI, but it cannot become an
+            // auto-placement candidate until there is a queue-owned inventory movement path.
+            return GetAvailableStack(mainAvailability, combinedChoice.MaterialItemId) < layer.MaterialStack;
+        }
+
+        private static int GetAvailableStack(IDictionary<int, int> availability, int itemId)
+        {
+            if (availability == null || itemId <= 0)
+            {
+                return 0;
+            }
+
+            int value;
+            return availability.TryGetValue(itemId, out value) ? Math.Max(0, value) : 0;
         }
 
         internal static bool IsStage13SupportedLayerForTesting(BlueprintProjectionCellSnapshot layer, out string reason)
@@ -868,6 +943,7 @@ namespace JueMingZ.Automation.Blueprint
             request.Metadata[ActionMetadataKeys.BlueprintOriginalMaterialItemId] = (candidate.OriginalMaterialItemId > 0 ? candidate.OriginalMaterialItemId : candidate.MaterialItemId).ToString(CultureInfo.InvariantCulture);
             request.Metadata[ActionMetadataKeys.BlueprintMaterialStack] = candidate.MaterialStack.ToString(CultureInfo.InvariantCulture);
             request.Metadata[ActionMetadataKeys.BlueprintMaterialAvailableStack] = candidate.MaterialAvailableStack.ToString(CultureInfo.InvariantCulture);
+            request.Metadata[ActionMetadataKeys.BlueprintMaterialExecutionScope] = string.IsNullOrWhiteSpace(candidate.MaterialExecutionScope) ? "mainInventory0-49" : candidate.MaterialExecutionScope;
             request.Metadata[ActionMetadataKeys.BlueprintReplacementApplied] = candidate.ReplacementApplied ? "true" : "false";
             request.Metadata[ActionMetadataKeys.BlueprintReplacementCategory] = candidate.ReplacementCategory ?? string.Empty;
             request.Metadata[ActionMetadataKeys.BlueprintAdmissionKey] = request.AdmissionKey ?? string.Empty;

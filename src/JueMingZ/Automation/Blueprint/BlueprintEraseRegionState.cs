@@ -31,6 +31,9 @@ namespace JueMingZ.Automation.Blueprint
         public int DragStartY { get; set; }
         public int DragCurrentX { get; set; }
         public int DragCurrentY { get; set; }
+        public bool HasHoverTile { get; set; }
+        public int HoverTileX { get; set; }
+        public int HoverTileY { get; set; }
         public int LastErasedCellCount { get; set; }
         public int TotalEraseCellCount { get; set; }
         public string LastNotice { get; set; }
@@ -125,6 +128,9 @@ namespace JueMingZ.Automation.Blueprint
         private static int _dragStartY;
         private static int _dragCurrentX;
         private static int _dragCurrentY;
+        private static bool _hasHoverTile;
+        private static int _hoverTileX;
+        private static int _hoverTileY;
         private static int _lastErasedCellCount;
         private static int _totalEraseCellCount;
         private static string _lastNotice = "擦除区域待命。";
@@ -202,8 +208,8 @@ namespace JueMingZ.Automation.Blueprint
                 _lastInputOwner = "ui";
                 _lastResultCode = target == null ? "eraseStartedHoverTarget" : "eraseStartedSelectedTarget";
                 _lastNotice = target == null
-                    ? "擦除模式已启动；在世界中按住左键从最上层蓝图选择目标并拖选区域。"
-                    : "擦除模式已启动；目标实例 " + _targetInstanceName + "。拖选区域后将不可逆裁切该实例投影。";
+                    ? "正在修改已放置蓝图区域。按住左键拖选修剪，点击取消修改结束。"
+                    : "正在修改已放置蓝图区域。目标实例 " + _targetInstanceName + "，点击取消修改结束。";
                 return BlueprintEraseCommandResult.Create(true, changed, _lastResultCode, _lastNotice, _targetInstanceId, _targetInstanceName);
             }
         }
@@ -216,7 +222,7 @@ namespace JueMingZ.Automation.Blueprint
                 ResetActiveLocked();
                 _lastInputOwner = "ui";
                 _lastResultCode = "eraseCancelled";
-                _lastNotice = "已取消蓝图实例擦除模式。";
+                _lastNotice = "已取消已放置蓝图区域修改。";
                 return BlueprintEraseCommandResult.Create(true, changed, _lastResultCode, _lastNotice, string.Empty, string.Empty);
             }
         }
@@ -233,8 +239,9 @@ namespace JueMingZ.Automation.Blueprint
 
                 if (input.UiOwned)
                 {
-                    var changed = _dragging;
+                    var changed = _dragging || _hasHoverTile;
                     _dragging = false;
+                    ClearHoverLocked();
                     _lastInputOwner = "ui";
                     _lastResultCode = "uiOwned";
                     _lastNotice = "鼠标命中 UI；擦除区域未变化。";
@@ -245,14 +252,16 @@ namespace JueMingZ.Automation.Blueprint
                 {
                     if (!input.WorldTileHit)
                     {
-                        var changed = _dragging;
+                        var changed = _dragging || _hasHoverTile;
                         _dragging = false;
+                        ClearHoverLocked();
                         _lastInputOwner = "world-outside";
                         _lastResultCode = "worldMiss";
                         _lastNotice = "鼠标未命中有效世界格；擦除区域未变化。";
                         return BuildInteractionResultLocked(true, changed, true, true, false, 0, _lastResultCode, _lastNotice);
                     }
 
+                    UpdateHoverLocked(input.TileX, input.TileY);
                     TargetResolution target;
                     if (!ResolveTargetForPointerLocked(input.TileX, input.TileY, out target))
                     {
@@ -282,6 +291,7 @@ namespace JueMingZ.Automation.Blueprint
                     {
                         _dragCurrentX = input.TileX;
                         _dragCurrentY = input.TileY;
+                        UpdateHoverLocked(input.TileX, input.TileY);
                         _lastInputOwner = "world";
                         _lastResultCode = "dragUpdated";
                         _lastNotice = "正在拖选蓝图擦除区域。";
@@ -304,6 +314,7 @@ namespace JueMingZ.Automation.Blueprint
 
                     _dragCurrentX = input.TileX;
                     _dragCurrentY = input.TileY;
+                    UpdateHoverLocked(input.TileX, input.TileY);
                     return ApplyEraseRectangleLocked();
                 }
 
@@ -315,7 +326,22 @@ namespace JueMingZ.Automation.Blueprint
                     return BuildInteractionResultLocked(true, false, true, true, false, 0, _lastResultCode, _lastNotice);
                 }
 
-                return BuildInteractionResultLocked(true, false, false, true, false, 0, "idle", _lastNotice);
+                if (input.WorldTileHit)
+                {
+                    var hoverChanged = UpdateHoverLocked(input.TileX, input.TileY);
+                    if (hoverChanged)
+                    {
+                        _lastInputOwner = "world-hover";
+                        _lastResultCode = "hoverUpdated";
+                        _lastNotice = "正在修改已放置蓝图区域。按住左键拖选修剪，点击取消修改结束。";
+                    }
+
+                    return BuildInteractionResultLocked(true, hoverChanged, false, true, false, 0, _lastResultCode, _lastNotice);
+                }
+
+                var clearedHover = _hasHoverTile;
+                ClearHoverLocked();
+                return BuildInteractionResultLocked(true, clearedHover, false, true, false, 0, "idle", _lastNotice);
             }
         }
 
@@ -330,6 +356,9 @@ namespace JueMingZ.Automation.Blueprint
                    "\"targetInstanceName\":\"" + EscapeJson(snapshot.TargetInstanceName) + "\"," +
                    "\"worldPairKey\":\"" + EscapeJson(snapshot.WorldPairKey) + "\"," +
                    "\"worldKey\":\"" + EscapeJson(snapshot.WorldKey) + "\"," +
+                   "\"hasHoverTile\":" + BoolRaw(snapshot.HasHoverTile) + "," +
+                   "\"hoverTileX\":" + IntRaw(snapshot.HoverTileX) + "," +
+                   "\"hoverTileY\":" + IntRaw(snapshot.HoverTileY) + "," +
                    "\"lastErasedCellCount\":" + IntRaw(snapshot.LastErasedCellCount) + "," +
                    "\"totalEraseCellCount\":" + IntRaw(snapshot.TotalEraseCellCount) + "," +
                    "\"lastResultCode\":\"" + EscapeJson(snapshot.LastResultCode) + "\"," +
@@ -353,6 +382,9 @@ namespace JueMingZ.Automation.Blueprint
                 hash = hash * 31 + snapshot.DragStartY;
                 hash = hash * 31 + snapshot.DragCurrentX;
                 hash = hash * 31 + snapshot.DragCurrentY;
+                hash = hash * 31 + (snapshot.HasHoverTile ? 1 : 0);
+                hash = hash * 31 + snapshot.HoverTileX;
+                hash = hash * 31 + snapshot.HoverTileY;
                 hash = hash * 31 + snapshot.LastErasedCellCount;
                 hash = hash * 31 + snapshot.TotalEraseCellCount;
                 hash = hash * 31 + StringComparer.Ordinal.GetHashCode(snapshot.LastResultCode ?? string.Empty);
@@ -468,7 +500,7 @@ namespace JueMingZ.Automation.Blueprint
             ApplyTargetLocked(savedTarget, true);
             _lastResultCode = "erased";
             _lastNotice = "已擦除实例 " + _targetInstanceName + " 的 " + added.ToString(CultureInfo.InvariantCulture) +
-                          " 个蓝图单元；模板和世界内容未修改。";
+                          " 个蓝图单元；可继续拖选修改，模板和世界内容未修改。";
             return BuildInteractionResultLocked(true, true, true, true, true, added, _lastResultCode, _lastNotice);
         }
 
@@ -803,6 +835,9 @@ namespace JueMingZ.Automation.Blueprint
                 DragStartY = _dragStartY,
                 DragCurrentX = _dragCurrentX,
                 DragCurrentY = _dragCurrentY,
+                HasHoverTile = _hasHoverTile,
+                HoverTileX = _hoverTileX,
+                HoverTileY = _hoverTileY,
                 LastErasedCellCount = _lastErasedCellCount,
                 TotalEraseCellCount = _totalEraseCellCount,
                 LastNotice = _lastNotice,
@@ -849,8 +884,25 @@ namespace JueMingZ.Automation.Blueprint
             _dragStartY = 0;
             _dragCurrentX = 0;
             _dragCurrentY = 0;
+            ClearHoverLocked();
             _lastErasedCellCount = 0;
             _totalEraseCellCount = 0;
+        }
+
+        private static bool UpdateHoverLocked(int tileX, int tileY)
+        {
+            var changed = !_hasHoverTile || _hoverTileX != tileX || _hoverTileY != tileY;
+            _hasHoverTile = true;
+            _hoverTileX = tileX;
+            _hoverTileY = tileY;
+            return changed;
+        }
+
+        private static void ClearHoverLocked()
+        {
+            _hasHoverTile = false;
+            _hoverTileX = 0;
+            _hoverTileY = 0;
         }
 
         private static void ResetAllLocked()

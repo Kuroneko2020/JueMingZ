@@ -97,8 +97,8 @@ namespace JueMingZ.Tests
                 BlueprintHandheldActionBarState.ButtonIdMirror);
             AssertBlueprintHandheldButton(placed, BlueprintHandheldActionBarState.ButtonIdOpenPlacedList, "已放置蓝图列表", "打开当前世界已放置蓝图列表");
             AssertBlueprintHandheldButton(placed, BlueprintHandheldActionBarState.ButtonIdClearPlaced, "清空放置", "清空当前世界已放置蓝图");
-            AssertBlueprintHandheldButton(placed, BlueprintHandheldActionBarState.ButtonIdMove, "移动蓝图", "只能移动已放置蓝图");
-            AssertBlueprintHandheldButton(placed, BlueprintHandheldActionBarState.ButtonIdRegionModify, "区域修改", "对已经放置蓝图进行内容修剪");
+            AssertBlueprintHandheldButton(placed, BlueprintHandheldActionBarState.ButtonIdMove, "移动蓝图", "点击蓝图使其进入浮动状态重新放置");
+            AssertBlueprintHandheldButton(placed, BlueprintHandheldActionBarState.ButtonIdRegionModify, "区域修改", "进入区域修改，拖选修剪已放置蓝图");
             AssertBlueprintHandheldButton(placed, BlueprintHandheldActionBarState.ButtonIdMirror, "镜像", "镜像已放置蓝图");
 
             AssertBlueprintHandheldButtons(
@@ -204,10 +204,16 @@ namespace JueMingZ.Tests
             AssertContains(contract, "legacy-ui-theme");
             AssertContains(contract, "vanilla-ui-skin");
             AssertContains(contract, "button-text-scale-0.78");
+            AssertContains(contract, "notice-text-scale-0.78");
 
             if (Math.Abs(BlueprintHandheldActionBarOverlay.ButtonTextScale - 0.78f) > 0.001f)
             {
                 throw new InvalidOperationException("Expected blueprint handheld button text scale to be old 0.58 + 0.2.");
+            }
+
+            if (Math.Abs(BlueprintHandheldActionBarOverlay.NoticeTextScale - 0.78f) > 0.001f)
+            {
+                throw new InvalidOperationException("Expected blueprint handheld status notice text scale to match the enlarged button text scale.");
             }
 
             var normal = BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId, BlueprintHandheldEnvironment(1280, 720));
@@ -241,6 +247,182 @@ namespace JueMingZ.Tests
                 {
                     throw new InvalidOperationException("Expected compact blueprint handheld button text to shrink before it overflows.");
                 }
+            }
+        }
+
+        private static void BlueprintHandheldActionBarStage04ButtonHitBoundsMatchVisibleRects()
+        {
+            BlueprintHandheldActionBarState.ResetInteractionForTesting();
+            var empty = BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId);
+            AssertBlueprintHandheldButtons(
+                empty,
+                BlueprintHandheldActionBarState.ButtonIdCreate,
+                BlueprintHandheldActionBarState.ButtonIdOpenLibrary);
+            AssertBlueprintHandheldButtonHitBounds(empty, "empty two-button handheld bar");
+            AssertBlueprintHandheldPanelGapConsumesWithoutCommand(empty, "empty two-button handheld bar");
+
+            var outside = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
+                empty,
+                BlueprintHandheldPointer(empty.Bounds.X - 1, empty.Bounds.CenterY, true, 0, true, true, "Test/Stage04Outside"));
+            if (outside.ShouldCaptureMouse || outside.ShouldConsumeLeftInput || outside.Clicked)
+            {
+                throw new InvalidOperationException("Expected handheld click just outside the visual panel to pass through.");
+            }
+
+            BlueprintHandheldActionBarState.ResetInteractionForTesting();
+            var placed = BuildBlueprintHandheldFrame(
+                true,
+                BlueprintSettings.DefaultToolItemId,
+                BlueprintHandheldEnvironment(1280, 720, blueprintHasPlacedInstances: true, blueprintPlacedInstanceCount: 2));
+            AssertBlueprintHandheldButtons(
+                placed,
+                BlueprintHandheldActionBarState.ButtonIdCreate,
+                BlueprintHandheldActionBarState.ButtonIdOpenLibrary,
+                BlueprintHandheldActionBarState.ButtonIdOpenPlacedList,
+                BlueprintHandheldActionBarState.ButtonIdClearPlaced,
+                BlueprintHandheldActionBarState.ButtonIdMove,
+                BlueprintHandheldActionBarState.ButtonIdRegionModify,
+                BlueprintHandheldActionBarState.ButtonIdMirror);
+            AssertBlueprintHandheldButtonHitBounds(placed, "placed seven-button handheld bar");
+            AssertBlueprintHandheldPanelGapConsumesWithoutCommand(placed, "placed seven-button handheld bar");
+        }
+
+        private static void BlueprintHandheldActionBarStage04NoticeTimingAndScale()
+        {
+            var contract = BlueprintHandheldActionBarOverlay.GetVisualContractForTesting();
+            AssertContains(contract, "stage04-active-status-notice");
+            AssertContains(contract, "stage04-after-player-input-cache");
+            AssertContains(contract, "notice-text-scale-0.78");
+
+            BlueprintHandheldActionBarState.ResetInteractionForTesting();
+            BlueprintCreationMaskState.ResetForTesting();
+            BlueprintPlacedInstanceTransformState.ResetForTesting();
+            BlueprintEraseRegionState.ResetForTesting();
+            BlueprintPlacementPreviewState.ResetForTesting();
+
+            BlueprintHandheldActionBarState.RecordCommandResultClick(
+                BlueprintHandheldActionBarState.ButtonIdOpenLibrary,
+                BlueprintSettings.DefaultToolItemId,
+                true,
+                "libraryOpened",
+                "蓝图库已打开。");
+            var idleFrame = BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId);
+            AssertStringEquals(BlueprintHandheldActionBarOverlay.ResolveNoticeForTesting(idleFrame), string.Empty, "idle handheld notice after one-shot command");
+
+            var openLibrary = FindBlueprintHandheldButton(idleFrame, BlueprintHandheldActionBarState.ButtonIdOpenLibrary);
+            BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
+                idleFrame,
+                BlueprintHandheldPointer(openLibrary.Rect.CenterX, openLibrary.Rect.CenterY, false, 0, true, true, "Test/Stage04Hover"));
+            var hoveredFrame = BuildBlueprintHandheldFrame(true, BlueprintSettings.DefaultToolItemId);
+            AssertStringEquals(BlueprintHandheldActionBarOverlay.ResolveNoticeForTesting(hoveredFrame), "打开蓝图库", "hovered handheld notice");
+
+            BlueprintHandheldActionBarState.ResetInteractionForTesting();
+            BlueprintCreationMaskState.BeginCreate();
+            var creatingFrame = BuildBlueprintHandheldFrame(
+                true,
+                BlueprintSettings.DefaultToolItemId,
+                BlueprintHandheldEnvironment(1280, 720, blueprintCreationActive: true));
+            AssertContains(BlueprintHandheldActionBarOverlay.ResolveNoticeForTesting(creatingFrame), "创建中");
+
+            var restore = PushTemporaryConfigDirectory("blueprint-handheld-stage04-status");
+            try
+            {
+                BlueprintCreationMaskState.ResetForTesting();
+                BlueprintPlacedInstanceTransformState.ResetForTesting();
+                BlueprintEraseRegionState.ResetForTesting();
+                var instanceStore = new BlueprintWorldInstanceStore();
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(
+                    instanceStore.CreateInstanceFromTemplate(
+                        "pair-handheld-stage04-status",
+                        "world-handheld-stage04-status",
+                        CreateSingleMaterialTemplate("状态提示", 21, 501, 1),
+                        10,
+                        20,
+                        0,
+                        out instance),
+                    "create handheld stage04 status instance");
+                var context = BlueprintPlacementWorldContext.Success("pair-handheld-stage04-status", "world-handheld-stage04-status");
+                BlueprintPlacedInstanceTransformState.SetDependenciesForTesting(instanceStore, context);
+                BlueprintEraseRegionState.SetDependenciesForTesting(instanceStore, context);
+
+                var moveStatus = BlueprintPlacedInstanceTransformState.BeginMove();
+                if (!moveStatus.Succeeded)
+                {
+                    throw new InvalidOperationException("Expected handheld stage04 move status to start: " + moveStatus.ResultCode + " " + moveStatus.Message);
+                }
+
+                var moveFrame = BuildBlueprintHandheldFrame(
+                    true,
+                    BlueprintSettings.DefaultToolItemId,
+                    BlueprintHandheldEnvironment(1280, 720, blueprintHasPlacedInstances: true, blueprintPlacedInstanceCount: 1));
+                AssertContains(BlueprintHandheldActionBarOverlay.ResolveNoticeForTesting(moveFrame), "请点击一个已放置蓝图作为移动目标");
+
+                var mirrorStatus = BlueprintPlacedInstanceTransformState.BeginMirror();
+                if (!mirrorStatus.Succeeded)
+                {
+                    throw new InvalidOperationException("Expected handheld stage04 mirror status to start: " + mirrorStatus.ResultCode + " " + mirrorStatus.Message);
+                }
+
+                var mirrorFrame = BuildBlueprintHandheldFrame(
+                    true,
+                    BlueprintSettings.DefaultToolItemId,
+                    BlueprintHandheldEnvironment(1280, 720, blueprintHasPlacedInstances: true, blueprintPlacedInstanceCount: 1));
+                AssertContains(BlueprintHandheldActionBarOverlay.ResolveNoticeForTesting(mirrorFrame), "请点击一个已放置蓝图进行镜像");
+
+                BlueprintPlacedInstanceTransformState.ResetForTesting();
+                var eraseStatus = BlueprintEraseRegionState.BeginErase(string.Empty);
+                if (!eraseStatus.Succeeded)
+                {
+                    throw new InvalidOperationException("Expected handheld stage04 region status to start: " + eraseStatus.ResultCode + " " + eraseStatus.Message);
+                }
+
+                var eraseFrame = BuildBlueprintHandheldFrame(
+                    true,
+                    BlueprintSettings.DefaultToolItemId,
+                    BlueprintHandheldEnvironment(1280, 720, blueprintHasPlacedInstances: true, blueprintPlacedInstanceCount: 1));
+                AssertContains(BlueprintHandheldActionBarOverlay.ResolveNoticeForTesting(eraseFrame), "正在修改已放置蓝图区域");
+            }
+            finally
+            {
+                BlueprintPlacedInstanceTransformState.ResetForTesting();
+                BlueprintEraseRegionState.ResetForTesting();
+                BlueprintCreationMaskState.ResetForTesting();
+                restore();
+            }
+        }
+
+        private static void BlueprintHandheldActionBarStage04MouseReaderCachesPrefixAndPostfixSeparately()
+        {
+            ResetUiInputFrameTestState();
+            DiagnosticMouseStateReader.ResetForTesting();
+            try
+            {
+                UiInputFrameClock.BeginUpdateFrame("test.blueprint-handheld-stage04-cache");
+                var prefix = DiagnosticMouseStateReader.ReadForBlueprintHandheldActionBarOverlay();
+                var prefixAgain = DiagnosticMouseStateReader.ReadForBlueprintHandheldActionBarOverlay();
+                var afterPlayerInput = DiagnosticMouseStateReader.ReadForBlueprintHandheldActionBarOverlayAfterPlayerInput();
+                var afterPlayerInputAgain = DiagnosticMouseStateReader.ReadForBlueprintHandheldActionBarOverlayAfterPlayerInput();
+
+                if (!object.ReferenceEquals(prefix, prefixAgain))
+                {
+                    throw new InvalidOperationException("Expected blueprint handheld prefix mouse reader to keep a same-frame cache slot.");
+                }
+
+                if (object.ReferenceEquals(prefix, afterPlayerInput))
+                {
+                    throw new InvalidOperationException("Expected blueprint handheld after-PlayerInput mouse reader to use a separate same-frame cache slot.");
+                }
+
+                if (!object.ReferenceEquals(afterPlayerInput, afterPlayerInputAgain))
+                {
+                    throw new InvalidOperationException("Expected blueprint handheld after-PlayerInput mouse reader to cache inside its own phase slot.");
+                }
+            }
+            finally
+            {
+                DiagnosticMouseStateReader.ResetForTesting();
+                ResetUiInputFrameTestState();
             }
         }
 
@@ -896,6 +1078,23 @@ namespace JueMingZ.Tests
                     throw new InvalidOperationException("Expected handheld region-modify to enter hover-target erase mode for placed instance trimming.");
                 }
 
+                var regionFrame = BlueprintHandheldActionBarOverlay.BuildFrameForTesting(
+                    BlueprintHandheldSettings(true),
+                    BlueprintHandheldSnapshot(BlueprintSettings.DefaultToolItemId),
+                    BlueprintHandheldEnvironment(1280, 720, blueprintHasPlacedInstances: true, blueprintPlacedInstanceCount: 1));
+                AssertBlueprintHandheldButton(regionFrame, BlueprintHandheldActionBarState.ButtonIdRegionModify, "取消修改", "取消修改并停止红色遮罩");
+                LegacyUiActionService.HandleBlueprintHandheldActionBarCommandForTesting(BuildBlueprintHandheldCommand(BlueprintHandheldActionBarState.ButtonIdRegionModify, "取消修改"));
+                var regionCancel = BlueprintHandheldActionBarState.GetInteractionSnapshotForTesting();
+                AssertStringEquals(regionCancel.LastClickedButtonId, BlueprintHandheldActionBarState.ButtonIdRegionModify, "handheld region-modify cancel clicked id");
+                AssertStringEquals(regionCancel.LastResultCode, "eraseCancelled", "handheld region-modify cancel result");
+                if (BlueprintEraseRegionState.GetSnapshot().Active ||
+                    !string.Equals(BlueprintEntryState.GetSnapshot(settings).Mode, BlueprintEntryModes.Tool, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected handheld region-modify cancel button to stop only the shared region modify state.");
+                }
+
+                LegacyUiActionService.HandleBlueprintHandheldActionBarCommandForTesting(BuildBlueprintHandheldCommand(BlueprintHandheldActionBarState.ButtonIdRegionModify, "区域修改"));
+
                 LegacyUiActionService.HandleBlueprintHandheldActionBarCommandForTesting(BuildBlueprintHandheldCommand(BlueprintHandheldActionBarState.ButtonIdClearPlaced, "清空放置"));
                 var clearPlaced = BlueprintHandheldActionBarState.GetInteractionSnapshotForTesting();
                 AssertStringEquals(clearPlaced.LastClickedButtonId, BlueprintHandheldActionBarState.ButtonIdClearPlaced, "handheld clear-placed clicked id");
@@ -943,6 +1142,15 @@ namespace JueMingZ.Tests
                     throw new InvalidOperationException("Expected handheld move to wait for a placed-instance world click.");
                 }
 
+                AssertBlueprintHandheldButton(
+                    BuildBlueprintHandheldFrame(
+                        true,
+                        BlueprintSettings.DefaultToolItemId,
+                        BlueprintHandheldEnvironment(1280, 720, blueprintHasPlacedInstances: true, blueprintPlacedInstanceCount: 1)),
+                    BlueprintHandheldActionBarState.ButtonIdMove,
+                    "取消移动",
+                    "取消移动并回到原位置");
+
                 LegacyUiActionService.HandleBlueprintHandheldActionBarCommandForTesting(BuildBlueprintHandheldCommand(BlueprintHandheldActionBarState.ButtonIdMirror, "镜像"));
                 var mirrorStart = BlueprintHandheldActionBarState.GetInteractionSnapshotForTesting();
                 AssertStringEquals(mirrorStart.LastClickedButtonId, BlueprintHandheldActionBarState.ButtonIdMirror, "handheld mirror clicked id");
@@ -954,6 +1162,15 @@ namespace JueMingZ.Tests
                 {
                     throw new InvalidOperationException("Expected handheld mirror to wait for a placed-instance world click.");
                 }
+
+                AssertBlueprintHandheldButton(
+                    BuildBlueprintHandheldFrame(
+                        true,
+                        BlueprintSettings.DefaultToolItemId,
+                        BlueprintHandheldEnvironment(1280, 720, blueprintHasPlacedInstances: true, blueprintPlacedInstanceCount: 1)),
+                    BlueprintHandheldActionBarState.ButtonIdMirror,
+                    "取消镜像",
+                    "取消镜像选择");
 
                 BlueprintWorldInstanceSnapshot unchangedInstances;
                 RequireBlueprintSuccess(instanceStore.TryLoadWorld("pair-handheld-03", out unchangedInstances), "load stage 07 transform start instances");
@@ -1294,6 +1511,77 @@ namespace JueMingZ.Tests
             {
                 throw new InvalidOperationException("Expected blueprint handheld action bar to stay inside physical screen bounds for " + context + ".");
             }
+        }
+
+        private static void AssertBlueprintHandheldButtonHitBounds(BlueprintHandheldActionBarFrame frame, string context)
+        {
+            AssertBlueprintHandheldVisible(frame, context);
+            for (var index = 0; index < frame.Buttons.Count; index++)
+            {
+                var button = frame.Buttons[index];
+                var rect = button.Rect;
+                AssertStringEquals(BlueprintHandheldActionBarState.HitTest(frame, rect.X, rect.CenterY), button.Id, context + " left edge " + button.Id);
+                AssertStringEquals(BlueprintHandheldActionBarState.HitTest(frame, rect.CenterX, rect.CenterY), button.Id, context + " center " + button.Id);
+                AssertStringEquals(BlueprintHandheldActionBarState.HitTest(frame, rect.Right - 1, rect.CenterY), button.Id, context + " right inside " + button.Id);
+                AssertStringEquals(BlueprintHandheldActionBarState.HitTest(frame, rect.CenterX, rect.Y), button.Id, context + " top edge " + button.Id);
+                AssertStringEquals(BlueprintHandheldActionBarState.HitTest(frame, rect.CenterX, rect.Bottom - 1), button.Id, context + " bottom inside " + button.Id);
+
+                var rightExclusive = BlueprintHandheldActionBarState.HitTest(frame, rect.Right, rect.CenterY);
+                if (string.Equals(rightExclusive, button.Id, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected handheld button right edge to be exclusive for " + context + " " + button.Id + ".");
+                }
+
+                var bottomExclusive = BlueprintHandheldActionBarState.HitTest(frame, rect.CenterX, rect.Bottom);
+                if (string.Equals(bottomExclusive, button.Id, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected handheld button bottom edge to be exclusive for " + context + " " + button.Id + ".");
+                }
+            }
+        }
+
+        private static void AssertBlueprintHandheldPanelGapConsumesWithoutCommand(BlueprintHandheldActionBarFrame frame, string context)
+        {
+            AssertBlueprintHandheldVisible(frame, context);
+            for (var index = 0; index < frame.Buttons.Count - 1; index++)
+            {
+                var left = frame.Buttons[index];
+                var right = frame.Buttons[index + 1];
+                if (right.Rect.X <= left.Rect.Right)
+                {
+                    continue;
+                }
+
+                var gapX = left.Rect.Right + (right.Rect.X - left.Rect.Right) / 2;
+                AssertStringEquals(BlueprintHandheldActionBarState.HitTest(frame, gapX, frame.Bounds.CenterY), string.Empty, context + " gap hit " + index);
+                BlueprintHandheldActionBarState.ResetInteractionForTesting();
+                var gap = BlueprintHandheldActionBarOverlay.HandlePointerForTesting(
+                    frame,
+                    BlueprintHandheldPointer(gapX, frame.Bounds.CenterY, true, 0, true, true, "Test/Stage04Gap"));
+                if (!gap.ShouldCaptureMouse || !gap.ShouldConsumeLeftInput || gap.Clicked)
+                {
+                    throw new InvalidOperationException("Expected handheld panel gap to consume left without submitting a command for " + context + ".");
+                }
+            }
+        }
+
+        private static BlueprintHandheldActionBarButtonFrame FindBlueprintHandheldButton(BlueprintHandheldActionBarFrame frame, string buttonId)
+        {
+            if (frame == null || frame.Buttons == null)
+            {
+                throw new InvalidOperationException("Expected blueprint handheld frame before finding button " + buttonId + ".");
+            }
+
+            for (var index = 0; index < frame.Buttons.Count; index++)
+            {
+                var button = frame.Buttons[index];
+                if (button != null && string.Equals(button.Id, buttonId, StringComparison.Ordinal))
+                {
+                    return button;
+                }
+            }
+
+            throw new InvalidOperationException("Expected blueprint handheld button " + buttonId + " to exist.");
         }
 
         private static void AssertBlueprintHandheldHidden(BlueprintHandheldActionBarFrame frame, string expectedReason)

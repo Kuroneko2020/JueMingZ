@@ -934,6 +934,7 @@ namespace JueMingZ.Diagnostics
             Append(builder, "BlueprintProjectionHiddenInstanceCount", snapshot.BlueprintProjectionHiddenInstanceCount, true);
             Append(builder, "BlueprintProjectionEffectiveLayerCount", snapshot.BlueprintProjectionEffectiveLayerCount, true);
             Append(builder, "BlueprintProjectionFulfilledLayerCount", snapshot.BlueprintProjectionFulfilledLayerCount, true);
+            Append(builder, "BlueprintProjectionCompletedLayerCount", snapshot.BlueprintProjectionCompletedLayerCount, true);
             Append(builder, "BlueprintProjectionMissingLayerCount", snapshot.BlueprintProjectionMissingLayerCount, true);
             Append(builder, "BlueprintProjectionConflictLayerCount", snapshot.BlueprintProjectionConflictLayerCount, true);
             Append(builder, "BlueprintProjectionCoveredLayerCount", snapshot.BlueprintProjectionCoveredLayerCount, true);
@@ -1000,6 +1001,7 @@ namespace JueMingZ.Diagnostics
             Append(builder, "BlueprintAutoPlacementSkippedUnsupportedLayerCount", snapshot.BlueprintAutoPlacementSkippedUnsupportedLayerCount, true);
             Append(builder, "BlueprintAutoPlacementSkippedNoMaterialLayerCount", snapshot.BlueprintAutoPlacementSkippedNoMaterialLayerCount, true);
             Append(builder, "BlueprintAutoPlacementSkippedInsufficientMaterialLayerCount", snapshot.BlueprintAutoPlacementSkippedInsufficientMaterialLayerCount, true);
+            Append(builder, "BlueprintAutoPlacementSkippedVoidBagOnlyLayerCount", snapshot.BlueprintAutoPlacementSkippedVoidBagOnlyLayerCount, true);
             Append(builder, "BlueprintAutoPlacementSelectedInstanceId", snapshot.BlueprintAutoPlacementSelectedInstanceId, true);
             Append(builder, "BlueprintAutoPlacementSelectedInstanceName", snapshot.BlueprintAutoPlacementSelectedInstanceName, true);
             Append(builder, "BlueprintAutoPlacementSelectedLayerOrder", snapshot.BlueprintAutoPlacementSelectedLayerOrder, true);

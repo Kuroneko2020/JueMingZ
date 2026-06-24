@@ -318,6 +318,35 @@ namespace JueMingZ.Tests
                     throw new InvalidOperationException("Expected move target click to select the placed instance.");
                 }
 
+                var floating = BlueprintPlacedInstanceTransformState.GetFloatingProjectionForTesting();
+                if (floating == null ||
+                    floating.ProjectedLayers.Count != 1 ||
+                    floating.ProjectedLayers[0].WorldTileX != 11 ||
+                    floating.ProjectedLayers[0].WorldTileY != 20 ||
+                    !string.Equals(floating.ResultCode, "moveFloatingPreview", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected selected move target to create a floating projection at the original instance position.");
+                }
+
+                var hover = BlueprintPlacedInstanceTransformState.HandlePointer(new BlueprintPlacedInstanceTransformPointerInput
+                {
+                    WorldTileHit = true,
+                    TileX = 40,
+                    TileY = 50,
+                    LeftDown = false,
+                    LeftPressed = false
+                });
+                floating = BlueprintPlacedInstanceTransformState.GetFloatingProjectionForTesting();
+                if (!hover.Succeeded ||
+                    !string.Equals(hover.ResultCode, "hover", StringComparison.Ordinal) ||
+                    floating == null ||
+                    floating.ProjectedLayers.Count != 1 ||
+                    floating.ProjectedLayers[0].WorldTileX != 40 ||
+                    floating.ProjectedLayers[0].WorldTileY != 50)
+                {
+                    throw new InvalidOperationException("Expected floating move projection to follow the pointer while waiting for confirm click.");
+                }
+
                 var moved = BlueprintPlacedInstanceTransformState.HandlePointer(new BlueprintPlacedInstanceTransformPointerInput
                 {
                     WorldTileHit = true,
@@ -331,6 +360,11 @@ namespace JueMingZ.Tests
                     !string.Equals(moved.ResultCode, "moveApplied", StringComparison.Ordinal))
                 {
                     throw new InvalidOperationException("Expected second move click to persist the new origin.");
+                }
+
+                if (BlueprintPlacedInstanceTransformState.GetFloatingProjectionForTesting() != null)
+                {
+                    throw new InvalidOperationException("Expected floating move projection to be cleared after confirm.");
                 }
 
                 RequireBlueprintSuccess(instanceStore.TryLoadWorld("pair-move", out saved), "load moved instance");
@@ -378,6 +412,80 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void BlueprintPlacedInstanceMoveBlocksCompletedProgressAndKeepsOriginalPosition()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-placed-transform-completed-block");
+            try
+            {
+                BlueprintPlacedInstanceTransformState.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+
+                var templateStore = new BlueprintTemplateLibraryStore();
+                var instanceStore = new BlueprintWorldInstanceStore();
+                BlueprintTemplateRecord template;
+                RequireBlueprintSuccess(templateStore.CreateTemplate(CreateSampleBlueprintTemplate("已完成移动阻止"), out template), "create completed move block template");
+
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(instanceStore.CreateInstanceFromTemplate("pair-move-completed", "world-move-completed", template, 15, 25, 0, out instance), "create completed move block instance");
+
+                BlueprintWorldInstanceSnapshot saved;
+                RequireBlueprintSuccess(instanceStore.TryLoadWorld("pair-move-completed", out saved), "load completed move block instance");
+                var edited = saved.Instances[0].Clone();
+                edited.CompletedLayers.Add(new BlueprintCompletedLayerRecord
+                {
+                    X = 0,
+                    Y = 0,
+                    LayerKind = BlueprintLayerKinds.Tile,
+                    CoverageGroup = BlueprintLayerKinds.Tile,
+                    ContentId = 17,
+                    Style = 0
+                });
+                RequireBlueprintSuccess(instanceStore.SaveWorldInstances("pair-move-completed", "world-move-completed", new List<BlueprintWorldInstanceRecord> { edited }, out saved), "save completed move block progress");
+
+                var context = BlueprintPlacementWorldContext.Success("pair-move-completed", "world-move-completed");
+                BlueprintPlacedInstanceTransformState.SetDependenciesForTesting(instanceStore, context);
+
+                var start = BlueprintPlacedInstanceTransformState.BeginMove();
+                if (!start.Succeeded)
+                {
+                    throw new InvalidOperationException("Expected completed-progress move setup to enter target selection before the specific target click is rejected.");
+                }
+
+                var select = BlueprintPlacedInstanceTransformState.HandlePointer(new BlueprintPlacedInstanceTransformPointerInput
+                {
+                    WorldTileHit = true,
+                    TileX = 15,
+                    TileY = 25,
+                    LeftDown = true,
+                    LeftPressed = true
+                });
+                if (select.Succeeded ||
+                    select.Changed ||
+                    !string.Equals(select.ResultCode, "moveBlockedByPlacedProgress", StringComparison.Ordinal) ||
+                    BlueprintPlacedInstanceTransformState.GetFloatingProjectionForTesting() != null)
+                {
+                    throw new InvalidOperationException("Expected completed-progress move target to fail closed without entering floating placement.");
+                }
+
+                RequireBlueprintSuccess(instanceStore.TryLoadWorld("pair-move-completed", out saved), "reload completed move block instance");
+                var stored = FindPlacedInstance(saved, instance.InstanceId);
+                if (stored == null ||
+                    stored.OriginTileX != 15 ||
+                    stored.OriginTileY != 25 ||
+                    stored.CompletedLayers.Count != 1)
+                {
+                    throw new InvalidOperationException("Rejected completed-progress move must keep the original origin and completed progress.");
+                }
+            }
+            finally
+            {
+                BlueprintPlacedInstanceTransformState.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintTemplateLibraryStore.ResetTestingHooks();
+                restore();
+            }
+        }
+
         private static void BlueprintPlacedInstanceMirrorUsesServiceAndFailsClosed()
         {
             var restore = PushTemporaryConfigDirectory("blueprint-placed-transform-mirror");
@@ -394,16 +502,20 @@ namespace JueMingZ.Tests
                 BlueprintTemplateRecord mirrorable;
                 BlueprintTemplateRecord unsupported;
                 BlueprintTemplateRecord progressTemplate;
+                BlueprintTemplateRecord completedTemplate;
                 RequireBlueprintSuccess(templateStore.CreateTemplate(CreateMirrorableBlueprintTemplate("实例镜像"), out mirrorable), "create mirrorable template");
                 RequireBlueprintSuccess(templateStore.CreateTemplate(CreateDirectionalFurnitureBlueprintTemplate(), out unsupported), "create unsupported mirror template");
                 RequireBlueprintSuccess(templateStore.CreateTemplate(CreateMirrorableBlueprintTemplate("进度镜像"), out progressTemplate), "create progress mirror template");
+                RequireBlueprintSuccess(templateStore.CreateTemplate(CreateMirrorableBlueprintTemplate("已完成进度镜像"), out completedTemplate), "create completed-progress mirror template");
 
                 BlueprintWorldInstanceRecord mirrorableInstance;
                 BlueprintWorldInstanceRecord unsupportedInstance;
                 BlueprintWorldInstanceRecord progressInstance;
+                BlueprintWorldInstanceRecord completedInstance;
                 RequireBlueprintSuccess(instanceStore.CreateInstanceFromTemplate("pair-mirror-instance", "world-mirror-instance", mirrorable, 20, 30, 0, out mirrorableInstance), "create mirrorable instance");
                 RequireBlueprintSuccess(instanceStore.CreateInstanceFromTemplate("pair-mirror-instance", "world-mirror-instance", unsupported, 50, 60, 1, out unsupportedInstance), "create unsupported instance");
                 RequireBlueprintSuccess(instanceStore.CreateInstanceFromTemplate("pair-mirror-instance", "world-mirror-instance", progressTemplate, 80, 90, 2, out progressInstance), "create progress instance");
+                RequireBlueprintSuccess(instanceStore.CreateInstanceFromTemplate("pair-mirror-instance", "world-mirror-instance", completedTemplate, 110, 120, 3, out completedInstance), "create completed-progress instance");
 
                 BlueprintWorldInstanceSnapshot saved;
                 RequireBlueprintSuccess(instanceStore.TryLoadWorld("pair-mirror-instance", out saved), "load progress instance");
@@ -414,6 +526,18 @@ namespace JueMingZ.Tests
                     if (string.Equals(clone.InstanceId, progressInstance.InstanceId, StringComparison.Ordinal))
                     {
                         clone.AutoPlacementProgressState = "started";
+                    }
+                    else if (string.Equals(clone.InstanceId, completedInstance.InstanceId, StringComparison.Ordinal))
+                    {
+                        clone.CompletedLayers.Add(new BlueprintCompletedLayerRecord
+                        {
+                            X = 0,
+                            Y = 0,
+                            LayerKind = BlueprintLayerKinds.Tile,
+                            CoverageGroup = BlueprintLayerKinds.Tile,
+                            ContentId = 17,
+                            Style = 0
+                        });
                     }
 
                     edited.Add(clone);
@@ -468,6 +592,8 @@ namespace JueMingZ.Tests
                 var unsupportedBefore = FindPlacedInstance(saved, unsupportedInstance.InstanceId).TemplateSnapshot.Clone();
                 RequireBlueprintSuccess(instanceStore.TryLoadWorld("pair-mirror-instance", out saved), "load before progress mirror");
                 var progressBefore = FindPlacedInstance(saved, progressInstance.InstanceId).TemplateSnapshot.Clone();
+                RequireBlueprintSuccess(instanceStore.TryLoadWorld("pair-mirror-instance", out saved), "load before completed-progress mirror");
+                var completedBefore = FindPlacedInstance(saved, completedInstance.InstanceId).TemplateSnapshot.Clone();
 
                 BlueprintPlacedInstanceTransformState.BeginMirror();
                 var blocked = BlueprintPlacedInstanceTransformState.HandlePointer(new BlueprintPlacedInstanceTransformPointerInput
@@ -516,6 +642,31 @@ namespace JueMingZ.Tests
                     progressAfter.Cells.Count != progressBefore.Cells.Count)
                 {
                     throw new InvalidOperationException("Auto-placement progress mirror block must leave the instance snapshot unchanged.");
+                }
+
+                BlueprintPlacedInstanceTransformState.BeginMirror();
+                var completedBlocked = BlueprintPlacedInstanceTransformState.HandlePointer(new BlueprintPlacedInstanceTransformPointerInput
+                {
+                    WorldTileHit = true,
+                    TileX = 110,
+                    TileY = 120,
+                    LeftDown = true,
+                    LeftPressed = true
+                });
+                if (completedBlocked.Succeeded ||
+                    completedBlocked.Changed ||
+                    !string.Equals(completedBlocked.ResultCode, "mirrorBlockedByPlacedProgress", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected CompletedLayers to block placed-instance mirror.");
+                }
+
+                RequireBlueprintSuccess(instanceStore.TryLoadWorld("pair-mirror-instance", out saved), "load after completed-progress blocked mirror");
+                var completedAfter = FindPlacedInstance(saved, completedInstance.InstanceId);
+                if (FindLayerAt(completedAfter.TemplateSnapshot, 0, 0, BlueprintLayerKinds.Tile) == null ||
+                    completedAfter.TemplateSnapshot.Cells.Count != completedBefore.Cells.Count ||
+                    completedAfter.CompletedLayers.Count != 1)
+                {
+                    throw new InvalidOperationException("Completed-progress mirror block must leave the instance snapshot and progress unchanged.");
                 }
             }
             finally

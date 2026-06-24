@@ -153,6 +153,97 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void BlueprintEraseRegionStage07ContinuousHoverAndCancelOnly()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-region-stage07-continuous");
+            try
+            {
+                BlueprintEraseRegionState.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+
+                var store = new BlueprintWorldInstanceStore();
+                var reader = new FakeBlueprintWorldTileReader();
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(store.CreateInstanceFromTemplate("pair-region-07", "world-region-07", CreateEraseMaterialTemplate(), 30, 40, 0, out instance), "create stage07 region instance");
+
+                var context = BlueprintPlacementWorldContext.Success("pair-region-07", "world-region-07");
+                BlueprintEraseRegionState.SetDependenciesForTesting(store, context);
+                BlueprintProjectionService.SetDependenciesForTesting(store, context, reader, true);
+                BlueprintMaterialService.SetInventoryReaderForTesting(new FakeBlueprintMaterialInventoryReader(), true);
+
+                var begin = BlueprintEraseRegionState.BeginErase(string.Empty);
+                if (!begin.Succeeded ||
+                    !string.Equals(begin.ResultCode, "eraseStartedHoverTarget", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected stage07 region modify to start in hover-target mode.");
+                }
+
+                var hover = BlueprintEraseRegionState.HandlePointer(new BlueprintErasePointerInput
+                {
+                    WorldTileHit = true,
+                    TileX = 30,
+                    TileY = 40
+                });
+                var hoverSnapshot = BlueprintEraseRegionState.GetSnapshot();
+                if (!hover.Succeeded ||
+                    !hoverSnapshot.Active ||
+                    !hoverSnapshot.HasHoverTile ||
+                    hoverSnapshot.HoverTileX != 30 ||
+                    hoverSnapshot.HoverTileY != 40 ||
+                    hover.ShouldConsumeLeftInput)
+                {
+                    throw new InvalidOperationException("Expected stage07 active region modify to track a red hover mask without consuming a non-click frame.");
+                }
+
+                BlueprintEraseRegionState.HandlePointer(new BlueprintErasePointerInput
+                {
+                    WorldTileHit = true,
+                    TileX = 30,
+                    TileY = 40,
+                    LeftDown = true,
+                    LeftPressed = true
+                });
+                var erased = BlueprintEraseRegionState.HandlePointer(new BlueprintErasePointerInput
+                {
+                    WorldTileHit = true,
+                    TileX = 30,
+                    TileY = 40,
+                    LeftReleased = true
+                });
+                var afterErase = BlueprintEraseRegionState.GetSnapshot();
+                if (!erased.ErasedRegion ||
+                    erased.ErasedCellCount != 1 ||
+                    !afterErase.Active ||
+                    afterErase.Dragging ||
+                    !afterErase.HasHoverTile ||
+                    afterErase.LastErasedCellCount != 1)
+                {
+                    throw new InvalidOperationException("Expected stage07 region modify to persist one erased cell but remain active until explicit cancel.");
+                }
+
+                AssertContains(BlueprintEraseRegionOverlay.GetVisualContractForTesting(), "cursor-red-follow-mask");
+                AssertContains(BlueprintEraseRegionOverlay.GetVisualContractForTesting(), "cancel-only-exit");
+                AssertContains(LegacyMainWindow.GetBlueprintEraseVisualContractForTesting(), "stage07-continuous-region-edit");
+
+                var cancel = BlueprintEraseRegionState.Cancel();
+                if (!cancel.Succeeded ||
+                    !cancel.Changed ||
+                    BlueprintEraseRegionState.GetSnapshot().Active ||
+                    BlueprintEraseRegionState.GetSnapshot().HasHoverTile)
+                {
+                    throw new InvalidOperationException("Expected explicit cancel to be the only exit from stage07 continuous region modify.");
+                }
+            }
+            finally
+            {
+                BlueprintEraseRegionState.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                restore();
+            }
+        }
+
         private static void BlueprintEraseUiOverlayAndDiagnosticsContracts()
         {
             var restore = PushTemporaryConfigDirectory("blueprint-erase-contracts");

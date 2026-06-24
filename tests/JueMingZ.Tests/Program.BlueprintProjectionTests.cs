@@ -212,6 +212,78 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void BlueprintProjectionStage05CompletedProgressPersistsAndSkipsDugCells()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-projection-stage05-completed-progress");
+            try
+            {
+                var store = new BlueprintWorldInstanceStore();
+                var reader = new FakeBlueprintWorldTileReader();
+                var template = CreateProjectionTwoTileTemplate("05 完成进度", 41, 42);
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(store.CreateInstanceFromTemplate("pair-stage05-progress", "world-stage05-progress", template, 10, 20, 0, out instance), "create stage05 projection instance");
+
+                reader.Set(10, 20, new BlueprintWorldTileSnapshot { Active = true, TileType = 41 });
+                reader.Set(11, 20, new BlueprintWorldTileSnapshot { Active = true, TileType = 99 });
+                BlueprintProjectionService.SetDependenciesForTesting(
+                    store,
+                    BlueprintPlacementWorldContext.Success("pair-stage05-progress", "world-stage05-progress"),
+                    reader,
+                    true);
+
+                var first = BlueprintProjectionService.GetSnapshot();
+                if (!first.LoadSucceeded ||
+                    first.FulfilledLayerCount != 1 ||
+                    first.CompletedLayerCount != 0 ||
+                    first.ConflictLayerCount != 1 ||
+                    first.MissingLayerCount != 0)
+                {
+                    throw new InvalidOperationException("Expected stage05 first projection to persist only the newly fulfilled layer while keeping unfinished wrong content as conflict.");
+                }
+
+                BlueprintWorldInstanceSnapshot stored;
+                RequireBlueprintSuccess(store.TryLoadWorld("pair-stage05-progress", out stored), "load stage05 completed progress");
+                var storedInstance = FindPlacedInstance(stored, instance.InstanceId);
+                if (storedInstance.CompletedLayers.Count != 1 ||
+                    storedInstance.TemplateSnapshot.Cells.Count != 2 ||
+                    template.Cells.Count != 2)
+                {
+                    throw new InvalidOperationException("Expected stage05 completed progress to be stored on the placed instance without trimming the template snapshot.");
+                }
+
+                reader.Set(10, 20, new BlueprintWorldTileSnapshot());
+                BlueprintProjectionService.SetDependenciesForTesting(
+                    store,
+                    BlueprintPlacementWorldContext.Success("pair-stage05-progress", "world-stage05-progress"),
+                    reader,
+                    true);
+
+                var second = BlueprintProjectionService.GetSnapshot();
+                var completedLayer = FindProjectedLayerAt(second.ProjectedLayers, instance.InstanceId, BlueprintLayerKinds.Tile, 10, 20);
+                var conflictLayer = FindProjectedLayerAt(second.ProjectedLayers, instance.InstanceId, BlueprintLayerKinds.Tile, 11, 20);
+                if (!second.LoadSucceeded ||
+                    second.FulfilledLayerCount != 0 ||
+                    second.CompletedLayerCount != 1 ||
+                    second.ConflictLayerCount != 1 ||
+                    second.MissingLayerCount != 0 ||
+                    completedLayer == null ||
+                    conflictLayer == null ||
+                    !string.Equals(completedLayer.Status, BlueprintProjectionLayerStatuses.Completed, StringComparison.Ordinal) ||
+                    !string.Equals(conflictLayer.Status, BlueprintProjectionLayerStatuses.Conflict, StringComparison.Ordinal) ||
+                    BlueprintProjectionOverlay.ShouldDrawProjectionLayerForTesting(BlueprintProjectionLayerStatuses.Completed))
+                {
+                    throw new InvalidOperationException("Expected stage05 completed cells to stay hidden after being dug while unfinished wrong cells remain red conflicts.");
+                }
+
+                AssertContains(BlueprintProjectionService.BuildUiStateJson(), "\"completedLayerCount\":1");
+            }
+            finally
+            {
+                BlueprintProjectionService.ResetForTesting();
+                restore();
+            }
+        }
+
         private static void BlueprintProjectionCacheAvoidsImmediateRecompute()
         {
             var restore = PushTemporaryConfigDirectory("blueprint-projection-cache");
@@ -221,7 +293,7 @@ namespace JueMingZ.Tests
                 var reader = new FakeBlueprintWorldTileReader();
                 BlueprintWorldInstanceRecord instance;
                 RequireBlueprintSuccess(store.CreateInstanceFromTemplate("pair-cache", "world-cache", CreateProjectionTileOnlyTemplate("缓存", 21), 4, 5, 0, out instance), "create cache projection instance");
-                reader.Set(4, 5, new BlueprintWorldTileSnapshot { Active = true, TileType = 21 });
+                reader.Set(4, 5, new BlueprintWorldTileSnapshot());
                 BlueprintProjectionService.SetDependenciesForTesting(
                     store,
                     BlueprintPlacementWorldContext.Success("pair-cache", "world-cache"),
@@ -314,7 +386,11 @@ namespace JueMingZ.Tests
                 AssertContains(BlueprintProjectionOverlay.GetVisualContractForTesting(), "yellow-missing");
                 AssertContains(BlueprintProjectionOverlay.GetVisualContractForTesting(), "red-conflict");
                 AssertContains(BlueprintProjectionOverlay.GetVisualContractForTesting(), "fulfilled-no-mask");
+                AssertContains(BlueprintProjectionOverlay.GetVisualContractForTesting(), "completed-progress");
+                AssertContains(BlueprintProjectionOverlay.GetVisualContractForTesting(), "no-cell-border");
+                AssertContains(BlueprintProjectionOverlay.GetVisualContractForTesting(), "move-floating-follow-preview");
                 AssertContains(LegacyMainWindow.GetBlueprintProjectionVisualContractForTesting(), "appearance-ghost");
+                AssertContains(LegacyMainWindow.GetBlueprintProjectionVisualContractForTesting(), "move-floating-follow-preview");
                 AssertContains(LegacyMainWindow.GetBlueprintProjectionVisualContractForTesting(), "layer-cover");
                 AssertContains(LegacyMainWindow.BuildBlueprintProjectionSummaryForTesting(), "投影：有效");
                 var missingColor = BlueprintProjectionOverlay.ResolveProjectionColorForTesting(BlueprintProjectionLayerStatuses.Missing);
@@ -330,12 +406,16 @@ namespace JueMingZ.Tests
                 }
 
                 if (BlueprintProjectionOverlay.ResolveProjectionFillAlphaForTesting(BlueprintProjectionLayerStatuses.Fulfilled) != 0 ||
+                    BlueprintProjectionOverlay.ResolveProjectionFillAlphaForTesting(BlueprintProjectionLayerStatuses.Completed) != 0 ||
+                    BlueprintProjectionOverlay.ResolveProjectionBorderAlphaForTesting(BlueprintProjectionLayerStatuses.Missing) != 0 ||
+                    BlueprintProjectionOverlay.ResolveProjectionBorderAlphaForTesting(BlueprintProjectionLayerStatuses.Conflict) != 0 ||
                     BlueprintProjectionOverlay.ShouldDrawProjectionLayerForTesting(BlueprintProjectionLayerStatuses.Fulfilled) ||
+                    BlueprintProjectionOverlay.ShouldDrawProjectionLayerForTesting(BlueprintProjectionLayerStatuses.Completed) ||
                     !BlueprintProjectionOverlay.ShouldDrawProjectionLayerForTesting(BlueprintProjectionLayerStatuses.Missing) ||
                     BlueprintProjectionOverlay.ResolveLayerDrawPassForTesting(BlueprintLayerKinds.Wall) >= BlueprintProjectionOverlay.ResolveLayerDrawPassForTesting(BlueprintLayerKinds.Tile) ||
                     BlueprintProjectionOverlay.ResolveLayerDrawPassForTesting(BlueprintLayerKinds.Wire) <= BlueprintProjectionOverlay.ResolveLayerDrawPassForTesting(BlueprintLayerKinds.Tile))
                 {
-                    throw new InvalidOperationException("Expected stage-05 projection overlay to draw wall/tile/wire ghosts in order and skip fulfilled masks.");
+                    throw new InvalidOperationException("Expected stage-05 projection overlay to draw wall/tile/wire ghosts in order, hide completed cells and skip per-cell borders.");
                 }
 
                 var runtimeSnapshot = RuntimeDiagnosticSnapshotBuilder.Build(new RuntimeDiagnosticSnapshotContext
@@ -347,6 +427,7 @@ namespace JueMingZ.Tests
                 AssertContains(json, "\"BlueprintProjectionLastStatus\": \"resolved\"");
                 AssertContains(json, "\"BlueprintProjectionEffectiveLayerCount\": 1");
                 AssertContains(json, "\"BlueprintProjectionFulfilledLayerCount\": 1");
+                AssertContains(json, "\"BlueprintProjectionCompletedLayerCount\": 0");
             }
             finally
             {
@@ -499,6 +580,29 @@ namespace JueMingZ.Tests
             }
 
             return false;
+        }
+
+        private static BlueprintProjectionCellSnapshot FindProjectedLayerAt(
+            System.Collections.Generic.IReadOnlyList<BlueprintProjectionCellSnapshot> layers,
+            string instanceId,
+            string layerKind,
+            int worldTileX,
+            int worldTileY)
+        {
+            for (var index = 0; layers != null && index < layers.Count; index++)
+            {
+                var layer = layers[index];
+                if (layer != null &&
+                    string.Equals(layer.InstanceId, instanceId, StringComparison.Ordinal) &&
+                    string.Equals(layer.LayerKind, layerKind, StringComparison.OrdinalIgnoreCase) &&
+                    layer.WorldTileX == worldTileX &&
+                    layer.WorldTileY == worldTileY)
+                {
+                    return layer;
+                }
+            }
+
+            return null;
         }
     }
 }

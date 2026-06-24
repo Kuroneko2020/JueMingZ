@@ -15,12 +15,15 @@ namespace JueMingZ.UI
         private static DiagnosticMouseState _cachedReadState;
         private static DiagnosticMouseState _cachedFullscreenMapOverlayReadState;
         private static DiagnosticMouseState _cachedBlueprintHandheldActionBarOverlayReadState;
+        private static DiagnosticMouseState _cachedBlueprintHandheldActionBarAfterPlayerInputReadState;
         private static UiInputFrameKey _cachedFrameKey;
         private static UiInputFrameKey _cachedFullscreenMapOverlayFrameKey;
         private static UiInputFrameKey _cachedBlueprintHandheldActionBarOverlayFrameKey;
+        private static UiInputFrameKey _cachedBlueprintHandheldActionBarAfterPlayerInputFrameKey;
         private static bool _cachedFrameKeyValid;
         private static bool _cachedFullscreenMapOverlayFrameKeyValid;
         private static bool _cachedBlueprintHandheldActionBarOverlayFrameKeyValid;
+        private static bool _cachedBlueprintHandheldActionBarAfterPlayerInputFrameKeyValid;
         private static FieldInfo _mouseXField;
         private static FieldInfo _mouseYField;
         private static FieldInfo _mouseLeftField;
@@ -53,6 +56,11 @@ namespace JueMingZ.UI
             return ReadCore(GateClosedMousePreserveMode.BlueprintHandheldActionBarOverlay);
         }
 
+        internal static DiagnosticMouseState ReadForBlueprintHandheldActionBarOverlayAfterPlayerInput()
+        {
+            return ReadCore(GateClosedMousePreserveMode.BlueprintHandheldActionBarOverlayAfterPlayerInput);
+        }
+
         private static DiagnosticMouseState ReadCore(GateClosedMousePreserveMode preserveMode)
         {
             var preserveTerrariaInputWhenGateClosed = preserveMode != GateClosedMousePreserveMode.None;
@@ -73,6 +81,12 @@ namespace JueMingZ.UI
                     cachedState = _cachedBlueprintHandheldActionBarOverlayReadState;
                     cachedKey = _cachedBlueprintHandheldActionBarOverlayFrameKey;
                     cachedKeyValid = _cachedBlueprintHandheldActionBarOverlayFrameKeyValid;
+                }
+                else if (preserveMode == GateClosedMousePreserveMode.BlueprintHandheldActionBarOverlayAfterPlayerInput)
+                {
+                    cachedState = _cachedBlueprintHandheldActionBarAfterPlayerInputReadState;
+                    cachedKey = _cachedBlueprintHandheldActionBarAfterPlayerInputFrameKey;
+                    cachedKeyValid = _cachedBlueprintHandheldActionBarAfterPlayerInputFrameKeyValid;
                 }
 
                 if (frameKey.IsValid &&
@@ -152,6 +166,12 @@ namespace JueMingZ.UI
                         _cachedBlueprintHandheldActionBarOverlayFrameKey = frameKey;
                         _cachedBlueprintHandheldActionBarOverlayFrameKeyValid = true;
                     }
+                    else if (preserveMode == GateClosedMousePreserveMode.BlueprintHandheldActionBarOverlayAfterPlayerInput)
+                    {
+                        _cachedBlueprintHandheldActionBarAfterPlayerInputReadState = state;
+                        _cachedBlueprintHandheldActionBarAfterPlayerInputFrameKey = frameKey;
+                        _cachedBlueprintHandheldActionBarAfterPlayerInputFrameKeyValid = true;
+                    }
                     else
                     {
                         _cachedReadState = state;
@@ -173,6 +193,12 @@ namespace JueMingZ.UI
                         _cachedBlueprintHandheldActionBarOverlayFrameKey = UiInputFrameKey.None;
                         _cachedBlueprintHandheldActionBarOverlayFrameKeyValid = false;
                     }
+                    else if (preserveMode == GateClosedMousePreserveMode.BlueprintHandheldActionBarOverlayAfterPlayerInput)
+                    {
+                        _cachedBlueprintHandheldActionBarAfterPlayerInputReadState = null;
+                        _cachedBlueprintHandheldActionBarAfterPlayerInputFrameKey = UiInputFrameKey.None;
+                        _cachedBlueprintHandheldActionBarAfterPlayerInputFrameKeyValid = false;
+                    }
                     else
                     {
                         _cachedReadState = null;
@@ -192,12 +218,15 @@ namespace JueMingZ.UI
                 _cachedReadState = null;
                 _cachedFullscreenMapOverlayReadState = null;
                 _cachedBlueprintHandheldActionBarOverlayReadState = null;
+                _cachedBlueprintHandheldActionBarAfterPlayerInputReadState = null;
                 _cachedFrameKey = UiInputFrameKey.None;
                 _cachedFullscreenMapOverlayFrameKey = UiInputFrameKey.None;
                 _cachedBlueprintHandheldActionBarOverlayFrameKey = UiInputFrameKey.None;
+                _cachedBlueprintHandheldActionBarAfterPlayerInputFrameKey = UiInputFrameKey.None;
                 _cachedFrameKeyValid = false;
                 _cachedFullscreenMapOverlayFrameKeyValid = false;
                 _cachedBlueprintHandheldActionBarOverlayFrameKeyValid = false;
+                _cachedBlueprintHandheldActionBarAfterPlayerInputFrameKeyValid = false;
                 _mainResolved = false;
                 _mouseXField = null;
                 _mouseYField = null;
@@ -496,7 +525,8 @@ namespace JueMingZ.UI
                 return "FullscreenOverlayGateBypass";
             }
 
-            if (preserveMode == GateClosedMousePreserveMode.BlueprintHandheldActionBarOverlay)
+            if (preserveMode == GateClosedMousePreserveMode.BlueprintHandheldActionBarOverlay ||
+                preserveMode == GateClosedMousePreserveMode.BlueprintHandheldActionBarOverlayAfterPlayerInput)
             {
                 return "BlueprintHandheldOverlayGateBypass";
             }
@@ -540,7 +570,8 @@ namespace JueMingZ.UI
         {
             None,
             FullscreenMapOverlay,
-            BlueprintHandheldActionBarOverlay
+            BlueprintHandheldActionBarOverlay,
+            BlueprintHandheldActionBarOverlayAfterPlayerInput
         }
     }
 }

@@ -300,6 +300,7 @@ namespace JueMingZ.Actions.Executors
                 OriginalMaterialItemId = GetMetadataInt(execution, ActionMetadataKeys.BlueprintOriginalMaterialItemId, 0),
                 MaterialStack = GetMetadataInt(execution, ActionMetadataKeys.BlueprintMaterialStack, 0),
                 MaterialAvailableStack = GetMetadataInt(execution, ActionMetadataKeys.BlueprintMaterialAvailableStack, 0),
+                MaterialExecutionScope = GetMetadataString(execution, ActionMetadataKeys.BlueprintMaterialExecutionScope, string.Empty),
                 ReplacementApplied = GetMetadataBool(execution, ActionMetadataKeys.BlueprintReplacementApplied),
                 ReplacementCategory = GetMetadataString(execution, ActionMetadataKeys.BlueprintReplacementCategory, string.Empty),
                 AdmissionKey = GetMetadataString(execution, ActionMetadataKeys.BlueprintAdmissionKey, string.Empty)
@@ -390,6 +391,7 @@ namespace JueMingZ.Actions.Executors
             AppendRaw(builder, "materialStack", IntRaw(candidate == null ? 0 : candidate.MaterialStack), true);
             AppendRaw(builder, "replacementApplied", BoolRaw(candidate != null && candidate.ReplacementApplied), true);
             AppendString(builder, "replacementCategory", candidate == null ? string.Empty : candidate.ReplacementCategory, true);
+            AppendString(builder, "materialExecutionScope", candidate == null ? string.Empty : candidate.MaterialExecutionScope, true);
             AppendRaw(builder, "materialSlot", SlotRaw(plan == null ? -1 : plan.MaterialSlot), true);
             AppendString(builder, "materialItemName", plan == null ? string.Empty : plan.MaterialItemName, true);
             builder.Append('}');
@@ -428,6 +430,7 @@ namespace JueMingZ.Actions.Executors
             AppendString(builder, "replacementCategory", candidate == null ? string.Empty : candidate.ReplacementCategory, true);
             AppendRaw(builder, "originalMaterialItemId", IntRaw(candidate == null ? 0 : candidate.OriginalMaterialItemId), true);
             AppendRaw(builder, "materialItemId", IntRaw(candidate == null ? 0 : candidate.MaterialItemId), true);
+            AppendString(builder, "materialExecutionScope", candidate == null ? string.Empty : candidate.MaterialExecutionScope, true);
             AppendString(builder, "admissionKey", candidate == null ? string.Empty : candidate.AdmissionKey, true);
             builder.Append('}');
             return builder.ToString();

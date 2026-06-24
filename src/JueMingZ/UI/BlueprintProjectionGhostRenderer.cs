@@ -73,7 +73,8 @@ namespace JueMingZ.UI
 
         internal static bool ShouldDrawLayer(string status)
         {
-            return !string.Equals(status, BlueprintProjectionLayerStatuses.Fulfilled, StringComparison.Ordinal);
+            return !string.Equals(status, BlueprintProjectionLayerStatuses.Fulfilled, StringComparison.Ordinal) &&
+                   !string.Equals(status, BlueprintProjectionLayerStatuses.Completed, StringComparison.Ordinal);
         }
 
         internal static int ResolveLayerDrawPass(string layerKind)
@@ -153,7 +154,11 @@ namespace JueMingZ.UI
                 ok |= DrawInvisibleCoatingMarker(spriteBatch, x, y, clipWidth, clipHeight, r, g, b, borderAlpha);
             }
 
-            ok |= UiPrimitiveRenderer.DrawRectBorderClipped(spriteBatch, x, y, TileSize, TileSize, 1, 0, 0, clipWidth, clipHeight, r, g, b, borderAlpha);
+            if (borderAlpha > 0)
+            {
+                ok |= UiPrimitiveRenderer.DrawRectBorderClipped(spriteBatch, x, y, TileSize, TileSize, 1, 0, 0, clipWidth, clipHeight, r, g, b, borderAlpha);
+            }
+
             return ok;
         }
 
@@ -199,7 +204,11 @@ namespace JueMingZ.UI
                 ok |= DrawInvisibleCoatingMarker(spriteBatch, x, y, clipWidth, clipHeight, r, g, b, borderAlpha);
             }
 
-            ok |= UiPrimitiveRenderer.DrawRectBorderClipped(spriteBatch, x, y, TileSize, TileSize, 1, 0, 0, clipWidth, clipHeight, r, g, b, Math.Max(80, borderAlpha - 42));
+            if (borderAlpha > 0)
+            {
+                ok |= UiPrimitiveRenderer.DrawRectBorderClipped(spriteBatch, x, y, TileSize, TileSize, 1, 0, 0, clipWidth, clipHeight, r, g, b, Math.Max(1, borderAlpha - 42));
+            }
+
             return ok;
         }
 
@@ -228,7 +237,9 @@ namespace JueMingZ.UI
                 ok |= UiPrimitiveRenderer.DrawFilledRectClipped(spriteBatch, x + 10, y + 2, 2, TileSize - 4, 0, 0, clipWidth, clipHeight, r, g, b, lineAlpha);
             }
 
-            return ok || UiPrimitiveRenderer.DrawRectBorderClipped(spriteBatch, x + 3, y + 3, TileSize - 6, TileSize - 6, 1, 0, 0, clipWidth, clipHeight, r, g, b, borderAlpha);
+            return borderAlpha > 0
+                ? ok || UiPrimitiveRenderer.DrawRectBorderClipped(spriteBatch, x + 3, y + 3, TileSize - 6, TileSize - 6, 1, 0, 0, clipWidth, clipHeight, r, g, b, borderAlpha)
+                : ok;
         }
 
         private static bool DrawActuator(object spriteBatch, int x, int y, int clipWidth, int clipHeight, int r, int g, int b, int alpha, int borderAlpha)
@@ -264,7 +275,11 @@ namespace JueMingZ.UI
             }
 
             ok |= UiPrimitiveRenderer.DrawFilledRectClipped(spriteBatch, x + 5, y + 5, 6, 6, 0, 0, clipWidth, clipHeight, r, g, b, Math.Min(255, alpha + 24));
-            ok |= UiPrimitiveRenderer.DrawRectBorderClipped(spriteBatch, x + 4, y + 4, 8, 8, 1, 0, 0, clipWidth, clipHeight, r, g, b, borderAlpha);
+            if (borderAlpha > 0)
+            {
+                ok |= UiPrimitiveRenderer.DrawRectBorderClipped(spriteBatch, x + 4, y + 4, 8, 8, 1, 0, 0, clipWidth, clipHeight, r, g, b, borderAlpha);
+            }
+
             return ok;
         }
 

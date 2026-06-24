@@ -50,6 +50,13 @@ namespace JueMingZ.Tests
             }
 
             AssertContains(feature.Notes, "ActionQueue 契约");
+            AssertContains(feature.Notes, "ItemUseBridge");
+            AssertContains(feature.Notes, "同类替换");
+            AssertContains(feature.Notes, "镜像");
+            if (feature.Notes.IndexOf("实际 Tile/Wall 自动摆放、替换和镜像仍未实现", StringComparison.Ordinal) >= 0)
+            {
+                throw new InvalidOperationException("Blueprint main feature note must not describe stage-15 auto placement, replacement, and mirror as wholly unimplemented.");
+            }
         }
 
         private static void BlueprintEntrySettingsDefaultAndNormalize()
@@ -243,9 +250,9 @@ namespace JueMingZ.Tests
                 throw new InvalidOperationException("Expected blueprint menu to keep only the placed-blueprint deferred open row after the library row becomes an action hotkey row.");
             }
 
-            if (LegacyMainWindow.GetBlueprintActionShortcutRowCountForTesting() != 3)
+            if (LegacyMainWindow.GetBlueprintActionShortcutRowCountForTesting() != 6)
             {
-                throw new InvalidOperationException("Expected blueprint menu to expose create/save/library action shortcut rows.");
+                throw new InvalidOperationException("Expected blueprint menu to expose create/save/move/region/mirror/library action shortcut rows.");
             }
 
             AssertStringEquals(
@@ -261,6 +268,18 @@ namespace JueMingZ.Tests
                 "blueprint-action-hotkey:" + FeatureIds.BlueprintLibraryAction,
                 "blueprint library action hotkey field id");
             AssertStringEquals(
+                LegacyMainWindow.GetBlueprintMoveActionHotkeyElementIdForTesting(),
+                "blueprint-action-hotkey:" + FeatureIds.BlueprintMoveAction,
+                "blueprint move action hotkey field id");
+            AssertStringEquals(
+                LegacyMainWindow.GetBlueprintRegionActionHotkeyElementIdForTesting(),
+                "blueprint-action-hotkey:" + FeatureIds.BlueprintRegionAction,
+                "blueprint region action hotkey field id");
+            AssertStringEquals(
+                LegacyMainWindow.GetBlueprintMirrorActionHotkeyElementIdForTesting(),
+                "blueprint-action-hotkey:" + FeatureIds.BlueprintMirrorAction,
+                "blueprint mirror action hotkey field id");
+            AssertStringEquals(
                 LegacyMainWindow.GetBlueprintCreateActionElementIdForTesting(),
                 "blueprint-action-entry:" + BlueprintEntryCommands.StartCreate,
                 "blueprint create action button id");
@@ -272,8 +291,24 @@ namespace JueMingZ.Tests
                 LegacyMainWindow.GetBlueprintLibraryActionElementIdForTesting(),
                 "blueprint-action-entry:" + BlueprintEntryCommands.OpenLibrary,
                 "blueprint library action button id");
+            AssertStringEquals(
+                LegacyMainWindow.GetBlueprintMoveActionElementIdForTesting(),
+                "blueprint-action-entry:" + BlueprintEntryCommands.StartMove,
+                "blueprint move action button id");
+            AssertStringEquals(
+                LegacyMainWindow.GetBlueprintRegionActionElementIdForTesting(),
+                "blueprint-action-entry:" + BlueprintEntryCommands.StartRegionModify,
+                "blueprint region action button id");
+            AssertStringEquals(
+                LegacyMainWindow.GetBlueprintMirrorActionElementIdForTesting(),
+                "blueprint-action-entry:" + BlueprintEntryCommands.StartMirror,
+                "blueprint mirror action button id");
             AssertContains(LegacyMainWindow.GetBlueprintActionShortcutVisualContractForTesting(), "auto-mining-hotkey-shape");
             AssertContains(LegacyMainWindow.GetBlueprintActionShortcutVisualContractForTesting(), "real-create-save-library-entry");
+            AssertContains(LegacyMainWindow.GetBlueprintActionShortcutVisualContractForTesting(), "real-move-entry");
+            AssertContains(LegacyMainWindow.GetBlueprintActionShortcutVisualContractForTesting(), "real-region-entry");
+            AssertContains(LegacyMainWindow.GetBlueprintActionShortcutVisualContractForTesting(), "stage08-mirror-row");
+            AssertContains(LegacyMainWindow.GetBlueprintActionShortcutVisualContractForTesting(), "real-mirror-entry");
             AssertContains(LegacyMainWindow.GetBlueprintActionShortcutVisualContractForTesting(), "short-hotkey-fields");
 
             if (LegacyMainWindow.GetBlueprintActionHotkeyInputMaxWidthForTesting() >= 160 ||
@@ -444,6 +479,388 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void BlueprintMoveActionShortcutAndHotkeyShareTransformState()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-move-action-shortcut");
+            try
+            {
+                ConfigService.Initialize();
+                BlueprintEntryState.ResetForTesting();
+                BlueprintLibraryUiState.ResetForTesting();
+                BlueprintPlacedInstanceUiState.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintPlacedInstanceTransformState.ResetForTesting();
+                BlueprintEntryHotkeyService.ResetForTesting();
+
+                var templateStore = new BlueprintTemplateLibraryStore();
+                var instanceStore = new BlueprintWorldInstanceStore();
+                BlueprintTemplateRecord template;
+                RequireBlueprintSuccess(templateStore.CreateTemplate(CreateEraseMaterialTemplate(), out template), "create move action template");
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(instanceStore.CreateInstanceFromTemplate("pair-move-action", "world-move-action", template, 10, 20, 0, out instance), "create move action instance");
+
+                var context = BlueprintPlacementWorldContext.Success("pair-move-action", "world-move-action");
+                BlueprintPlacedInstanceTransformState.SetDependenciesForTesting(instanceStore, context);
+                BlueprintPlacedInstanceUiState.SetDependenciesForTesting(instanceStore, context, true);
+                BlueprintProjectionService.SetDependenciesForTesting(instanceStore, context, new FakeBlueprintWorldTileReader(), true);
+                BlueprintProjectionService.GetSnapshot();
+
+                AssertStringEquals(LegacyMainWindow.GetBlueprintMoveActionButtonTextForTesting(), "开始", "blueprint move action idle button text");
+                AssertStringEquals(LegacyMainWindow.GetBlueprintMoveActionButtonTooltipForTesting(), "点击蓝图使其进入浮动状态重新放置", "blueprint move action idle tooltip");
+
+                LegacyMainUiState.SetVisible(true);
+                LegacyMainUiState.SelectPage("blueprint");
+                LegacyUiActionService.HandleBlueprintActionEntryCommandForTesting(new LegacyUiCommand
+                {
+                    ElementId = LegacyMainWindow.GetBlueprintMoveActionElementIdForTesting(),
+                    Label = "蓝图:移动已放置蓝图:开始",
+                    Kind = "button",
+                    MouseCaptured = true
+                });
+
+                var started = BlueprintPlacedInstanceTransformState.GetSnapshot();
+                if (!started.Active ||
+                    !string.Equals(started.Mode, BlueprintPlacedInstanceTransformModes.Move, StringComparison.Ordinal) ||
+                    !string.Equals(started.Phase, BlueprintPlacedInstanceTransformPhases.SelectTarget, StringComparison.Ordinal) ||
+                    !string.Equals(BlueprintEntryState.GetSnapshot(AppSettings.CreateDefault()).Mode, BlueprintEntryModes.PlacedManagement, StringComparison.Ordinal) ||
+                    LegacyMainUiState.Visible)
+                {
+                    throw new InvalidOperationException("Expected F5 move action row to enter shared move target selection and close F5.");
+                }
+
+                AssertStringEquals(LegacyMainWindow.GetBlueprintMoveActionButtonTextForTesting(), "取消", "blueprint move action cancel button text");
+                AssertStringEquals(LegacyMainWindow.GetBlueprintMoveActionButtonTooltipForTesting(), "取消移动并回到原位置", "blueprint move action cancel tooltip");
+
+                var hotkeys = HotkeySettings.CreateDefault();
+                hotkeys.HotkeysByFeatureId[FeatureIds.BlueprintMoveAction] = "Alt+M";
+                var cancelHotkey = BlueprintEntryHotkeyService.TickForTesting(
+                    AppSettings.CreateDefault(),
+                    hotkeys,
+                    new Dictionary<int, bool> { [0x12] = true, ['M'] = true },
+                    true,
+                    string.Empty,
+                    false);
+                if (!cancelHotkey.Triggered ||
+                    !cancelHotkey.Applied ||
+                    !string.Equals(cancelHotkey.Action, BlueprintEntryCommands.StartMove, StringComparison.Ordinal) ||
+                    !string.Equals(cancelHotkey.ResultCode, "transformCancelled", StringComparison.Ordinal) ||
+                    BlueprintPlacedInstanceTransformState.GetSnapshot().Active)
+                {
+                    throw new InvalidOperationException("Expected blueprint move action hotkey to cancel the active shared move state.");
+                }
+
+                BlueprintEntryHotkeyService.TickForTesting(
+                    AppSettings.CreateDefault(),
+                    hotkeys,
+                    new Dictionary<int, bool> { [0x12] = true, ['M'] = false },
+                    true,
+                    string.Empty,
+                    false);
+                var restartHotkey = BlueprintEntryHotkeyService.TickForTesting(
+                    AppSettings.CreateDefault(),
+                    hotkeys,
+                    new Dictionary<int, bool> { [0x12] = true, ['M'] = true },
+                    true,
+                    string.Empty,
+                    false);
+                if (!restartHotkey.Triggered ||
+                    !restartHotkey.Applied ||
+                    !BlueprintPlacedInstanceTransformState.GetSnapshot().Active ||
+                    !string.Equals(BlueprintPlacedInstanceTransformState.GetSnapshot().Mode, BlueprintPlacedInstanceTransformModes.Move, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected blueprint move action hotkey to restart shared move state after cancellation.");
+                }
+
+                BlueprintPlacedInstanceTransformState.ResetForTesting();
+                BlueprintEntryHotkeyService.ResetForTesting();
+                var emptyStore = new BlueprintWorldInstanceStore();
+                BlueprintPlacedInstanceTransformState.SetDependenciesForTesting(emptyStore, BlueprintPlacementWorldContext.Success("pair-move-empty", "world-move-empty"));
+                var emptyHotkey = BlueprintEntryHotkeyService.TickForTesting(
+                    AppSettings.CreateDefault(),
+                    hotkeys,
+                    new Dictionary<int, bool> { [0x12] = true, ['M'] = true },
+                    true,
+                    string.Empty,
+                    false);
+                if (!emptyHotkey.Triggered ||
+                    emptyHotkey.Applied ||
+                    !string.Equals(emptyHotkey.ResultCode, "noVisibleInstances", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected blueprint move action hotkey to fail closed when no placed instance exists.");
+                }
+            }
+            finally
+            {
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintEntryState.ResetForTesting();
+                BlueprintLibraryUiState.ResetForTesting();
+                BlueprintPlacedInstanceUiState.ResetForTesting();
+                BlueprintPlacedInstanceTransformState.ResetForTesting();
+                BlueprintEntryHotkeyService.ResetForTesting();
+                LegacyMainUiState.SetVisible(false);
+                ConfigService.ResetSettingsForTesting();
+                BlueprintTemplateLibraryStore.ResetTestingHooks();
+                restore();
+            }
+        }
+
+        private static void BlueprintRegionActionShortcutAndHotkeyShareEraseState()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-region-action-shortcut");
+            try
+            {
+                ConfigService.Initialize();
+                BlueprintEntryState.ResetForTesting();
+                BlueprintLibraryUiState.ResetForTesting();
+                BlueprintPlacedInstanceUiState.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintEraseRegionState.ResetForTesting();
+                BlueprintEntryHotkeyService.ResetForTesting();
+
+                var templateStore = new BlueprintTemplateLibraryStore();
+                var instanceStore = new BlueprintWorldInstanceStore();
+                BlueprintTemplateRecord template;
+                RequireBlueprintSuccess(templateStore.CreateTemplate(CreateEraseMaterialTemplate(), out template), "create region action template");
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(instanceStore.CreateInstanceFromTemplate("pair-region-action", "world-region-action", template, 10, 20, 0, out instance), "create region action instance");
+
+                var context = BlueprintPlacementWorldContext.Success("pair-region-action", "world-region-action");
+                BlueprintEraseRegionState.SetDependenciesForTesting(instanceStore, context);
+                BlueprintPlacedInstanceUiState.SetDependenciesForTesting(instanceStore, context, true);
+                BlueprintProjectionService.SetDependenciesForTesting(instanceStore, context, new FakeBlueprintWorldTileReader(), true);
+                BlueprintProjectionService.GetSnapshot();
+
+                AssertStringEquals(LegacyMainWindow.GetBlueprintRegionActionButtonTextForTesting(), "开始", "blueprint region action idle button text");
+                AssertStringEquals(LegacyMainWindow.GetBlueprintRegionActionButtonTooltipForTesting(), "进入区域修改，拖选修剪已放置蓝图", "blueprint region action idle tooltip");
+
+                LegacyMainUiState.SetVisible(true);
+                LegacyMainUiState.SelectPage("blueprint");
+                LegacyUiActionService.HandleBlueprintActionEntryCommandForTesting(new LegacyUiCommand
+                {
+                    ElementId = LegacyMainWindow.GetBlueprintRegionActionElementIdForTesting(),
+                    Label = "蓝图:区域修改已放置蓝图:开始",
+                    Kind = "button",
+                    MouseCaptured = true
+                });
+
+                var started = BlueprintEraseRegionState.GetSnapshot();
+                if (!started.Active ||
+                    started.HasFixedTarget ||
+                    !string.Equals(BlueprintEntryState.GetSnapshot(AppSettings.CreateDefault()).Mode, BlueprintEntryModes.EraseRegion, StringComparison.Ordinal) ||
+                    LegacyMainUiState.Visible)
+                {
+                    throw new InvalidOperationException("Expected F5 region action row to enter shared hover-target region modify state and close F5.");
+                }
+
+                AssertStringEquals(LegacyMainWindow.GetBlueprintRegionActionButtonTextForTesting(), "取消", "blueprint region action cancel button text");
+                AssertStringEquals(LegacyMainWindow.GetBlueprintRegionActionButtonTooltipForTesting(), "取消修改并停止红色遮罩", "blueprint region action cancel tooltip");
+
+                var hotkeys = HotkeySettings.CreateDefault();
+                hotkeys.HotkeysByFeatureId[FeatureIds.BlueprintRegionAction] = "Alt+R";
+                var cancelHotkey = BlueprintEntryHotkeyService.TickForTesting(
+                    AppSettings.CreateDefault(),
+                    hotkeys,
+                    new Dictionary<int, bool> { [0x12] = true, ['R'] = true },
+                    true,
+                    string.Empty,
+                    false);
+                if (!cancelHotkey.Triggered ||
+                    !cancelHotkey.Applied ||
+                    !string.Equals(cancelHotkey.Action, BlueprintEntryCommands.StartRegionModify, StringComparison.Ordinal) ||
+                    !string.Equals(cancelHotkey.ResultCode, "eraseCancelled", StringComparison.Ordinal) ||
+                    BlueprintEraseRegionState.GetSnapshot().Active)
+                {
+                    throw new InvalidOperationException("Expected blueprint region action hotkey to cancel the active shared region modify state.");
+                }
+
+                BlueprintEntryHotkeyService.TickForTesting(
+                    AppSettings.CreateDefault(),
+                    hotkeys,
+                    new Dictionary<int, bool> { [0x12] = true, ['R'] = false },
+                    true,
+                    string.Empty,
+                    false);
+                var restartHotkey = BlueprintEntryHotkeyService.TickForTesting(
+                    AppSettings.CreateDefault(),
+                    hotkeys,
+                    new Dictionary<int, bool> { [0x12] = true, ['R'] = true },
+                    true,
+                    string.Empty,
+                    false);
+                if (!restartHotkey.Triggered ||
+                    !restartHotkey.Applied ||
+                    !BlueprintEraseRegionState.GetSnapshot().Active ||
+                    !string.Equals(BlueprintEntryState.GetSnapshot(AppSettings.CreateDefault()).Mode, BlueprintEntryModes.EraseRegion, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected blueprint region action hotkey to restart shared region modify state after cancellation.");
+                }
+
+                BlueprintEraseRegionState.ResetForTesting();
+                BlueprintEntryHotkeyService.ResetForTesting();
+                var emptyStore = new BlueprintWorldInstanceStore();
+                BlueprintEraseRegionState.SetDependenciesForTesting(emptyStore, BlueprintPlacementWorldContext.Success("pair-region-empty", "world-region-empty"));
+                var emptyHotkey = BlueprintEntryHotkeyService.TickForTesting(
+                    AppSettings.CreateDefault(),
+                    hotkeys,
+                    new Dictionary<int, bool> { [0x12] = true, ['R'] = true },
+                    true,
+                    string.Empty,
+                    false);
+                if (!emptyHotkey.Triggered ||
+                    emptyHotkey.Applied ||
+                    !string.Equals(emptyHotkey.ResultCode, "noVisibleInstances", StringComparison.Ordinal) ||
+                    BlueprintEraseRegionState.GetSnapshot().Active)
+                {
+                    throw new InvalidOperationException("Expected blueprint region action hotkey to fail closed when no placed instance exists.");
+                }
+            }
+            finally
+            {
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintEntryState.ResetForTesting();
+                BlueprintLibraryUiState.ResetForTesting();
+                BlueprintPlacedInstanceUiState.ResetForTesting();
+                BlueprintEraseRegionState.ResetForTesting();
+                BlueprintEntryHotkeyService.ResetForTesting();
+                LegacyMainUiState.SetVisible(false);
+                ConfigService.ResetSettingsForTesting();
+                BlueprintTemplateLibraryStore.ResetTestingHooks();
+                restore();
+            }
+        }
+
+        private static void BlueprintMirrorActionShortcutAndHotkeyShareTransformState()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-mirror-action-shortcut");
+            try
+            {
+                ConfigService.Initialize();
+                BlueprintEntryState.ResetForTesting();
+                BlueprintLibraryUiState.ResetForTesting();
+                BlueprintPlacedInstanceUiState.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintPlacedInstanceTransformState.ResetForTesting();
+                BlueprintEntryHotkeyService.ResetForTesting();
+
+                var templateStore = new BlueprintTemplateLibraryStore();
+                var instanceStore = new BlueprintWorldInstanceStore();
+                BlueprintTemplateRecord template;
+                RequireBlueprintSuccess(templateStore.CreateTemplate(CreateMirrorableBlueprintTemplate("镜像动作"), out template), "create mirror action template");
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(instanceStore.CreateInstanceFromTemplate("pair-mirror-action", "world-mirror-action", template, 10, 20, 0, out instance), "create mirror action instance");
+
+                var context = BlueprintPlacementWorldContext.Success("pair-mirror-action", "world-mirror-action");
+                BlueprintPlacedInstanceTransformState.SetDependenciesForTesting(instanceStore, context);
+                BlueprintPlacedInstanceUiState.SetDependenciesForTesting(instanceStore, context, true);
+                BlueprintProjectionService.SetDependenciesForTesting(instanceStore, context, new FakeBlueprintWorldTileReader(), true);
+                BlueprintProjectionService.GetSnapshot();
+
+                AssertStringEquals(LegacyMainWindow.GetBlueprintMirrorActionButtonTextForTesting(), "开始", "blueprint mirror action idle button text");
+                AssertStringEquals(LegacyMainWindow.GetBlueprintMirrorActionButtonTooltipForTesting(), "选择已放置蓝图并水平镜像一次", "blueprint mirror action idle tooltip");
+
+                LegacyMainUiState.SetVisible(true);
+                LegacyMainUiState.SelectPage("blueprint");
+                LegacyUiActionService.HandleBlueprintActionEntryCommandForTesting(new LegacyUiCommand
+                {
+                    ElementId = LegacyMainWindow.GetBlueprintMirrorActionElementIdForTesting(),
+                    Label = "蓝图:镜像已放置蓝图:开始",
+                    Kind = "button",
+                    MouseCaptured = true
+                });
+
+                var started = BlueprintPlacedInstanceTransformState.GetSnapshot();
+                if (!started.Active ||
+                    !string.Equals(started.Mode, BlueprintPlacedInstanceTransformModes.Mirror, StringComparison.Ordinal) ||
+                    !string.Equals(started.Phase, BlueprintPlacedInstanceTransformPhases.SelectTarget, StringComparison.Ordinal) ||
+                    !string.Equals(BlueprintEntryState.GetSnapshot(AppSettings.CreateDefault()).Mode, BlueprintEntryModes.PlacedManagement, StringComparison.Ordinal) ||
+                    LegacyMainUiState.Visible)
+                {
+                    throw new InvalidOperationException("Expected F5 mirror action row to enter shared mirror target selection and close F5.");
+                }
+
+                AssertStringEquals(LegacyMainWindow.GetBlueprintMirrorActionButtonTextForTesting(), "取消", "blueprint mirror action cancel button text");
+                AssertStringEquals(LegacyMainWindow.GetBlueprintMirrorActionButtonTooltipForTesting(), "取消镜像选择", "blueprint mirror action cancel tooltip");
+
+                var hotkeys = HotkeySettings.CreateDefault();
+                hotkeys.HotkeysByFeatureId[FeatureIds.BlueprintMirrorAction] = "Alt+I";
+                var cancelHotkey = BlueprintEntryHotkeyService.TickForTesting(
+                    AppSettings.CreateDefault(),
+                    hotkeys,
+                    new Dictionary<int, bool> { [0x12] = true, ['I'] = true },
+                    true,
+                    string.Empty,
+                    false);
+                if (!cancelHotkey.Triggered ||
+                    !cancelHotkey.Applied ||
+                    !string.Equals(cancelHotkey.Action, BlueprintEntryCommands.StartMirror, StringComparison.Ordinal) ||
+                    !string.Equals(cancelHotkey.ResultCode, "transformCancelled", StringComparison.Ordinal) ||
+                    BlueprintPlacedInstanceTransformState.GetSnapshot().Active)
+                {
+                    throw new InvalidOperationException("Expected blueprint mirror action hotkey to cancel the active shared mirror state.");
+                }
+
+                BlueprintEntryHotkeyService.TickForTesting(
+                    AppSettings.CreateDefault(),
+                    hotkeys,
+                    new Dictionary<int, bool> { [0x12] = true, ['I'] = false },
+                    true,
+                    string.Empty,
+                    false);
+                var restartHotkey = BlueprintEntryHotkeyService.TickForTesting(
+                    AppSettings.CreateDefault(),
+                    hotkeys,
+                    new Dictionary<int, bool> { [0x12] = true, ['I'] = true },
+                    true,
+                    string.Empty,
+                    false);
+                if (!restartHotkey.Triggered ||
+                    !restartHotkey.Applied ||
+                    !BlueprintPlacedInstanceTransformState.GetSnapshot().Active ||
+                    !string.Equals(BlueprintPlacedInstanceTransformState.GetSnapshot().Mode, BlueprintPlacedInstanceTransformModes.Mirror, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected blueprint mirror action hotkey to restart shared mirror state after cancellation.");
+                }
+
+                BlueprintPlacedInstanceTransformState.ResetForTesting();
+                BlueprintEntryHotkeyService.ResetForTesting();
+                var emptyStore = new BlueprintWorldInstanceStore();
+                BlueprintPlacedInstanceTransformState.SetDependenciesForTesting(emptyStore, BlueprintPlacementWorldContext.Success("pair-mirror-empty", "world-mirror-empty"));
+                var emptyHotkey = BlueprintEntryHotkeyService.TickForTesting(
+                    AppSettings.CreateDefault(),
+                    hotkeys,
+                    new Dictionary<int, bool> { [0x12] = true, ['I'] = true },
+                    true,
+                    string.Empty,
+                    false);
+                if (!emptyHotkey.Triggered ||
+                    emptyHotkey.Applied ||
+                    !string.Equals(emptyHotkey.ResultCode, "noVisibleInstances", StringComparison.Ordinal) ||
+                    BlueprintPlacedInstanceTransformState.GetSnapshot().Active)
+                {
+                    throw new InvalidOperationException("Expected blueprint mirror action hotkey to fail closed when no placed instance exists.");
+                }
+            }
+            finally
+            {
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintEntryState.ResetForTesting();
+                BlueprintLibraryUiState.ResetForTesting();
+                BlueprintPlacedInstanceUiState.ResetForTesting();
+                BlueprintPlacedInstanceTransformState.ResetForTesting();
+                BlueprintEntryHotkeyService.ResetForTesting();
+                LegacyMainUiState.SetVisible(false);
+                ConfigService.ResetSettingsForTesting();
+                BlueprintTemplateLibraryStore.ResetTestingHooks();
+                restore();
+            }
+        }
+
         private static void BlueprintActionHotkeysUseSeparateKeysAndConflictSources()
         {
             var hotkeys = HotkeySettings.CreateDefault();
@@ -500,6 +917,45 @@ namespace JueMingZ.Tests
             if (!LegacyMainWindow.TryApplyBlueprintActionHotkeyForTesting(
                     hotkeys,
                     AppSettings.CreateDefault(),
+                    FeatureIds.BlueprintMoveAction,
+                    "Alt+M",
+                    out message,
+                    out changed) ||
+                !changed ||
+                !string.Equals(hotkeys.HotkeysByFeatureId[FeatureIds.BlueprintMoveAction], "Alt+M", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected blueprint move action hotkey to save under its own action key.");
+            }
+
+            if (!LegacyMainWindow.TryApplyBlueprintActionHotkeyForTesting(
+                    hotkeys,
+                    AppSettings.CreateDefault(),
+                    FeatureIds.BlueprintRegionAction,
+                    "Alt+R",
+                    out message,
+                    out changed) ||
+                !changed ||
+                !string.Equals(hotkeys.HotkeysByFeatureId[FeatureIds.BlueprintRegionAction], "Alt+R", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected blueprint region action hotkey to save under its own action key.");
+            }
+
+            if (!LegacyMainWindow.TryApplyBlueprintActionHotkeyForTesting(
+                    hotkeys,
+                    AppSettings.CreateDefault(),
+                    FeatureIds.BlueprintMirrorAction,
+                    "Alt+I",
+                    out message,
+                    out changed) ||
+                !changed ||
+                !string.Equals(hotkeys.HotkeysByFeatureId[FeatureIds.BlueprintMirrorAction], "Alt+I", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected blueprint mirror action hotkey to save under its own action key.");
+            }
+
+            if (!LegacyMainWindow.TryApplyBlueprintActionHotkeyForTesting(
+                    hotkeys,
+                    AppSettings.CreateDefault(),
                     FeatureIds.BlueprintLibraryAction,
                     "Alt+L",
                     out message,
@@ -521,6 +977,42 @@ namespace JueMingZ.Tests
                 !string.Equals(conflict.OwnerTargetId, FeatureIds.BlueprintSaveAction, StringComparison.Ordinal))
             {
                 throw new InvalidOperationException("Expected feature toggle conflict registry to report blueprint action hotkeys.");
+            }
+
+            if (!FeatureToggleHotkeyConflictRegistry.TryFindConflict(
+                    hotkeys,
+                    AppSettings.CreateDefault(),
+                    "buff.auto_heal",
+                    "Alt+M",
+                    out conflict) ||
+                conflict.ConflictType != FeatureToggleHotkeyConflictType.BlueprintAction ||
+                !string.Equals(conflict.OwnerTargetId, FeatureIds.BlueprintMoveAction, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected feature toggle conflict registry to report blueprint move action hotkeys.");
+            }
+
+            if (!FeatureToggleHotkeyConflictRegistry.TryFindConflict(
+                    hotkeys,
+                    AppSettings.CreateDefault(),
+                    "buff.auto_heal",
+                    "Alt+R",
+                    out conflict) ||
+                conflict.ConflictType != FeatureToggleHotkeyConflictType.BlueprintAction ||
+                !string.Equals(conflict.OwnerTargetId, FeatureIds.BlueprintRegionAction, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected feature toggle conflict registry to report blueprint region action hotkeys.");
+            }
+
+            if (!FeatureToggleHotkeyConflictRegistry.TryFindConflict(
+                    hotkeys,
+                    AppSettings.CreateDefault(),
+                    "buff.auto_heal",
+                    "Alt+I",
+                    out conflict) ||
+                conflict.ConflictType != FeatureToggleHotkeyConflictType.BlueprintAction ||
+                !string.Equals(conflict.OwnerTargetId, FeatureIds.BlueprintMirrorAction, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected feature toggle conflict registry to report blueprint mirror action hotkeys.");
             }
 
             if (!FeatureToggleHotkeyConflictRegistry.TryFindConflict(
@@ -572,6 +1064,27 @@ namespace JueMingZ.Tests
                 !LegacyMainWindow.TryApplyBlueprintActionHotkeyForTesting(
                     hotkeys,
                     AppSettings.CreateDefault(),
+                    FeatureIds.BlueprintMoveAction,
+                    "Alt+M",
+                    out message,
+                    out changed) ||
+                !LegacyMainWindow.TryApplyBlueprintActionHotkeyForTesting(
+                    hotkeys,
+                    AppSettings.CreateDefault(),
+                    FeatureIds.BlueprintRegionAction,
+                    "Alt+R",
+                    out message,
+                    out changed) ||
+                !LegacyMainWindow.TryApplyBlueprintActionHotkeyForTesting(
+                    hotkeys,
+                    AppSettings.CreateDefault(),
+                    FeatureIds.BlueprintMirrorAction,
+                    "Alt+I",
+                    out message,
+                    out changed) ||
+                !LegacyMainWindow.TryApplyBlueprintActionHotkeyForTesting(
+                    hotkeys,
+                    AppSettings.CreateDefault(),
                     FeatureIds.BlueprintLibraryAction,
                     "Alt+L",
                     out message,
@@ -584,9 +1097,42 @@ namespace JueMingZ.Tests
                 !changed ||
                 hotkeys.HotkeysByFeatureId.ContainsKey(FeatureIds.BlueprintCreateAction) ||
                 !hotkeys.HotkeysByFeatureId.ContainsKey(FeatureIds.BlueprintSaveAction) ||
+                !hotkeys.HotkeysByFeatureId.ContainsKey(FeatureIds.BlueprintMoveAction) ||
+                !hotkeys.HotkeysByFeatureId.ContainsKey(FeatureIds.BlueprintRegionAction) ||
+                !hotkeys.HotkeysByFeatureId.ContainsKey(FeatureIds.BlueprintMirrorAction) ||
                 !hotkeys.HotkeysByFeatureId.ContainsKey(FeatureIds.BlueprintLibraryAction))
             {
                 throw new InvalidOperationException("Expected Backspace clear to remove only the targeted blueprint action hotkey.");
+            }
+
+            if (!LegacyMainWindow.TryClearBlueprintActionHotkeyForTesting(hotkeys, FeatureIds.BlueprintMoveAction, out changed) ||
+                !changed ||
+                hotkeys.HotkeysByFeatureId.ContainsKey(FeatureIds.BlueprintMoveAction) ||
+                !hotkeys.HotkeysByFeatureId.ContainsKey(FeatureIds.BlueprintSaveAction) ||
+                !hotkeys.HotkeysByFeatureId.ContainsKey(FeatureIds.BlueprintRegionAction) ||
+                !hotkeys.HotkeysByFeatureId.ContainsKey(FeatureIds.BlueprintMirrorAction) ||
+                !hotkeys.HotkeysByFeatureId.ContainsKey(FeatureIds.BlueprintLibraryAction))
+            {
+                throw new InvalidOperationException("Expected Backspace clear to remove only the targeted blueprint move action hotkey.");
+            }
+
+            if (!LegacyMainWindow.TryClearBlueprintActionHotkeyForTesting(hotkeys, FeatureIds.BlueprintRegionAction, out changed) ||
+                !changed ||
+                hotkeys.HotkeysByFeatureId.ContainsKey(FeatureIds.BlueprintRegionAction) ||
+                !hotkeys.HotkeysByFeatureId.ContainsKey(FeatureIds.BlueprintSaveAction) ||
+                !hotkeys.HotkeysByFeatureId.ContainsKey(FeatureIds.BlueprintMirrorAction) ||
+                !hotkeys.HotkeysByFeatureId.ContainsKey(FeatureIds.BlueprintLibraryAction))
+            {
+                throw new InvalidOperationException("Expected Backspace clear to remove only the targeted blueprint region action hotkey.");
+            }
+
+            if (!LegacyMainWindow.TryClearBlueprintActionHotkeyForTesting(hotkeys, FeatureIds.BlueprintMirrorAction, out changed) ||
+                !changed ||
+                hotkeys.HotkeysByFeatureId.ContainsKey(FeatureIds.BlueprintMirrorAction) ||
+                !hotkeys.HotkeysByFeatureId.ContainsKey(FeatureIds.BlueprintSaveAction) ||
+                !hotkeys.HotkeysByFeatureId.ContainsKey(FeatureIds.BlueprintLibraryAction))
+            {
+                throw new InvalidOperationException("Expected Backspace clear to remove only the targeted blueprint mirror action hotkey.");
             }
 
             if (!LegacyMainWindow.TryClearBlueprintActionHotkeyForTesting(hotkeys, FeatureIds.BlueprintLibraryAction, out changed) ||

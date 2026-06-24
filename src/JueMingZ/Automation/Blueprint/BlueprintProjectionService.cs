@@ -10,6 +10,7 @@ namespace JueMingZ.Automation.Blueprint
     internal static class BlueprintProjectionLayerStatuses
     {
         public const string Fulfilled = "fulfilled";
+        public const string Completed = "completed";
         public const string Missing = "missing";
         public const string Conflict = "conflict";
         public const string Covered = "covered";
@@ -78,6 +79,7 @@ namespace JueMingZ.Automation.Blueprint
         public int HiddenInstanceCount { get; set; }
         public int EffectiveLayerCount { get; set; }
         public int FulfilledLayerCount { get; set; }
+        public int CompletedLayerCount { get; set; }
         public int MissingLayerCount { get; set; }
         public int ConflictLayerCount { get; set; }
         public int CoveredLayerCount { get; set; }
@@ -116,6 +118,7 @@ namespace JueMingZ.Automation.Blueprint
                 HiddenInstanceCount = HiddenInstanceCount,
                 EffectiveLayerCount = EffectiveLayerCount,
                 FulfilledLayerCount = FulfilledLayerCount,
+                CompletedLayerCount = CompletedLayerCount,
                 MissingLayerCount = MissingLayerCount,
                 ConflictLayerCount = ConflictLayerCount,
                 CoveredLayerCount = CoveredLayerCount,
@@ -249,6 +252,7 @@ namespace JueMingZ.Automation.Blueprint
                    "\"hiddenInstanceCount\":" + snapshot.HiddenInstanceCount.ToString(CultureInfo.InvariantCulture) + "," +
                    "\"effectiveLayerCount\":" + snapshot.EffectiveLayerCount.ToString(CultureInfo.InvariantCulture) + "," +
                    "\"fulfilledLayerCount\":" + snapshot.FulfilledLayerCount.ToString(CultureInfo.InvariantCulture) + "," +
+                   "\"completedLayerCount\":" + snapshot.CompletedLayerCount.ToString(CultureInfo.InvariantCulture) + "," +
                    "\"missingLayerCount\":" + snapshot.MissingLayerCount.ToString(CultureInfo.InvariantCulture) + "," +
                    "\"conflictLayerCount\":" + snapshot.ConflictLayerCount.ToString(CultureInfo.InvariantCulture) + "," +
                    "\"coveredLayerCount\":" + snapshot.CoveredLayerCount.ToString(CultureInfo.InvariantCulture) + "," +
@@ -271,6 +275,7 @@ namespace JueMingZ.Automation.Blueprint
                 hash = hash * 31 + snapshot.HiddenInstanceCount;
                 hash = hash * 31 + snapshot.EffectiveLayerCount;
                 hash = hash * 31 + snapshot.FulfilledLayerCount;
+                hash = hash * 31 + snapshot.CompletedLayerCount;
                 hash = hash * 31 + snapshot.MissingLayerCount;
                 hash = hash * 31 + snapshot.ConflictLayerCount;
                 hash = hash * 31 + snapshot.CoveredLayerCount;
@@ -355,6 +360,7 @@ namespace JueMingZ.Automation.Blueprint
             _cacheMissCount++;
             var watch = Stopwatch.StartNew();
             var result = BuildProjectionSnapshot(context, worldSnapshot, instances, reader, signature);
+            PersistCompletedProgressIfNeeded(store, context, instances, result.AllProjectedLayers);
             watch.Stop();
             result.LastResolveElapsedMs = watch.Elapsed.TotalMilliseconds;
             result.LastResolvedUtc = now;
@@ -457,6 +463,7 @@ namespace JueMingZ.Automation.Blueprint
             var projected = new List<BlueprintProjectionCellSnapshot>();
             var allProjected = new List<BlueprintProjectionCellSnapshot>();
             var replacementSettings = BlueprintReplacementRuleService.GetSettingsFromCurrentConfig();
+            var completedKeysByInstance = BuildCompletedKeySets(instances);
             for (var index = 0; index < order.Count; index++)
             {
                 var key = order[index];
@@ -467,7 +474,9 @@ namespace JueMingZ.Automation.Blueprint
                 }
 
                 var projectedLayer = candidate.ToSnapshot();
-                projectedLayer.Status = ClassifyLayer(candidate, reader, replacementSettings);
+                projectedLayer.Status = IsCandidateCompleted(candidate, completedKeysByInstance)
+                    ? BlueprintProjectionLayerStatuses.Completed
+                    : ClassifyLayer(candidate, reader, replacementSettings);
                 CountStatus(snapshot, projectedLayer.Status);
                 allProjected.Add(projectedLayer);
                 if (projected.Count < MaxProjectedLayersForOverlay)
@@ -491,6 +500,195 @@ namespace JueMingZ.Automation.Blueprint
             }
 
             return snapshot;
+        }
+
+        private static void PersistCompletedProgressIfNeeded(
+            BlueprintWorldInstanceStore store,
+            BlueprintPlacementWorldContext context,
+            IList<BlueprintWorldInstanceRecord> instances,
+            IReadOnlyList<BlueprintProjectionCellSnapshot> layers)
+        {
+            if (store == null || context == null || !context.Succeeded || instances == null || layers == null || layers.Count <= 0)
+            {
+                return;
+            }
+
+            var byInstance = new Dictionary<string, BlueprintWorldInstanceRecord>(StringComparer.Ordinal);
+            for (var index = 0; index < instances.Count; index++)
+            {
+                var instance = instances[index];
+                if (instance != null && !string.IsNullOrWhiteSpace(instance.InstanceId) && !byInstance.ContainsKey(instance.InstanceId))
+                {
+                    byInstance.Add(instance.InstanceId, instance);
+                }
+            }
+
+            var changed = false;
+            var now = BlueprintStorageConstants.FormatUtc(DateTime.UtcNow);
+            for (var index = 0; index < layers.Count; index++)
+            {
+                var layer = layers[index];
+                if (layer == null ||
+                    !string.Equals(layer.Status, BlueprintProjectionLayerStatuses.Fulfilled, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                BlueprintWorldInstanceRecord instance;
+                if (!byInstance.TryGetValue(layer.InstanceId ?? string.Empty, out instance) || instance == null)
+                {
+                    continue;
+                }
+
+                if (AddCompletedLayer(instance, layer))
+                {
+                    instance.UpdatedUtc = now;
+                    changed = true;
+                }
+            }
+
+            if (!changed)
+            {
+                return;
+            }
+
+            BlueprintWorldInstanceSnapshot ignored;
+            store.SaveWorldInstances(context.WorldPairKey, context.WorldKey, instances, out ignored);
+        }
+
+        private static Dictionary<string, HashSet<string>> BuildCompletedKeySets(IList<BlueprintWorldInstanceRecord> instances)
+        {
+            var result = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+            for (var index = 0; instances != null && index < instances.Count; index++)
+            {
+                var instance = instances[index];
+                if (instance == null || string.IsNullOrWhiteSpace(instance.InstanceId))
+                {
+                    continue;
+                }
+
+                var set = new HashSet<string>(StringComparer.Ordinal);
+                var completed = instance.CompletedLayers;
+                for (var layerIndex = 0; completed != null && layerIndex < completed.Count; layerIndex++)
+                {
+                    var layer = completed[layerIndex];
+                    if (layer == null)
+                    {
+                        continue;
+                    }
+
+                    var key = BuildCompletionKey(layer.X, layer.Y, layer.LayerKind, layer.CoverageGroup, layer.ContentId, layer.Style);
+                    if (key.Length > 0)
+                    {
+                        set.Add(key);
+                    }
+                }
+
+                result[instance.InstanceId] = set;
+            }
+
+            return result;
+        }
+
+        private static bool IsCandidateCompleted(
+            BlueprintProjectionCandidate candidate,
+            IDictionary<string, HashSet<string>> completedKeysByInstance)
+        {
+            if (candidate == null || candidate.Instance == null || completedKeysByInstance == null)
+            {
+                return false;
+            }
+
+            HashSet<string> keys;
+            if (!completedKeysByInstance.TryGetValue(candidate.Instance.InstanceId ?? string.Empty, out keys) ||
+                keys == null ||
+                keys.Count <= 0)
+            {
+                return false;
+            }
+
+            return keys.Contains(BuildCompletionKey(
+                candidate.Cell == null ? 0 : candidate.Cell.X,
+                candidate.Cell == null ? 0 : candidate.Cell.Y,
+                candidate.Layer == null ? string.Empty : candidate.Layer.LayerKind,
+                candidate.CoverageGroup,
+                candidate.Layer == null ? 0 : candidate.Layer.ContentId,
+                candidate.Layer == null ? 0 : candidate.Layer.Style));
+        }
+
+        private static bool AddCompletedLayer(BlueprintWorldInstanceRecord instance, BlueprintProjectionCellSnapshot layer)
+        {
+            if (instance == null || layer == null)
+            {
+                return false;
+            }
+
+            if (instance.CompletedLayers == null)
+            {
+                instance.CompletedLayers = new List<BlueprintCompletedLayerRecord>();
+            }
+
+            var key = BuildCompletionKey(layer.RelativeX, layer.RelativeY, layer.LayerKind, layer.CoverageGroup, layer.ContentId, layer.Style);
+            if (key.Length <= 0)
+            {
+                return false;
+            }
+
+            for (var index = 0; index < instance.CompletedLayers.Count; index++)
+            {
+                var completed = instance.CompletedLayers[index];
+                if (completed != null &&
+                    string.Equals(
+                        BuildCompletionKey(completed.X, completed.Y, completed.LayerKind, completed.CoverageGroup, completed.ContentId, completed.Style),
+                        key,
+                        StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+
+            // Completion progress is an instance-local promise: once a target
+            // layer has matched the world, later mining must not resurrect its
+            // ghost or material demand. The blueprint library template remains
+            // untouched.
+            instance.CompletedLayers.Add(new BlueprintCompletedLayerRecord
+            {
+                X = layer.RelativeX,
+                Y = layer.RelativeY,
+                LayerKind = NormalizeLayerKind(layer.LayerKind),
+                CoverageGroup = NormalizeLayerKind(layer.CoverageGroup),
+                ContentId = layer.ContentId,
+                Style = layer.Style
+            });
+            return true;
+        }
+
+        private static string BuildCompletionKey(
+            int x,
+            int y,
+            string layerKind,
+            string coverageGroup,
+            int contentId,
+            int style)
+        {
+            var normalizedKind = NormalizeLayerKind(layerKind);
+            var normalizedGroup = NormalizeLayerKind(coverageGroup);
+            if (normalizedGroup.Length <= 0)
+            {
+                normalizedGroup = ResolveCoverageGroup(normalizedKind);
+            }
+
+            if (normalizedKind.Length <= 0 || normalizedGroup.Length <= 0)
+            {
+                return string.Empty;
+            }
+
+            return x.ToString(CultureInfo.InvariantCulture) + ":" +
+                   y.ToString(CultureInfo.InvariantCulture) + ":" +
+                   normalizedKind + ":" +
+                   normalizedGroup + ":" +
+                   contentId.ToString(CultureInfo.InvariantCulture) + ":" +
+                   style.ToString(CultureInfo.InvariantCulture);
         }
 
         private static string ClassifyLayer(
@@ -615,6 +813,10 @@ namespace JueMingZ.Automation.Blueprint
             {
                 snapshot.FulfilledLayerCount++;
             }
+            else if (string.Equals(status, BlueprintProjectionLayerStatuses.Completed, StringComparison.Ordinal))
+            {
+                snapshot.CompletedLayerCount++;
+            }
             else if (string.Equals(status, BlueprintProjectionLayerStatuses.Missing, StringComparison.Ordinal))
             {
                 snapshot.MissingLayerCount++;
@@ -699,6 +901,8 @@ namespace JueMingZ.Automation.Blueprint
                 builder.Append(instance.UpdatedUtc ?? string.Empty).Append(':');
                 AppendEraseMaskSignature(builder, instance.EraseMask);
                 builder.Append(':');
+                AppendCompletedLayerSignature(builder, instance.CompletedLayers);
+                builder.Append(':');
                 var template = instance.TemplateSnapshot;
                 builder.Append(template == null ? string.Empty : template.TemplateId ?? string.Empty).Append(':');
                 builder.Append(template == null ? string.Empty : template.UpdatedUtc ?? string.Empty).Append(':');
@@ -761,6 +965,45 @@ namespace JueMingZ.Automation.Blueprint
 
                 builder.Append(cells[index].X.ToString(CultureInfo.InvariantCulture)).Append(':');
                 builder.Append(cells[index].Y.ToString(CultureInfo.InvariantCulture));
+            }
+
+            builder.Append(']');
+        }
+
+        private static void AppendCompletedLayerSignature(StringBuilder builder, IList<BlueprintCompletedLayerRecord> completedLayers)
+        {
+            if (completedLayers == null || completedLayers.Count <= 0)
+            {
+                builder.Append("completed=0");
+                return;
+            }
+
+            var keys = new List<string>();
+            for (var index = 0; index < completedLayers.Count; index++)
+            {
+                var layer = completedLayers[index];
+                if (layer == null)
+                {
+                    continue;
+                }
+
+                var key = BuildCompletionKey(layer.X, layer.Y, layer.LayerKind, layer.CoverageGroup, layer.ContentId, layer.Style);
+                if (key.Length > 0)
+                {
+                    keys.Add(key);
+                }
+            }
+
+            keys.Sort(StringComparer.Ordinal);
+            builder.Append("completed=").Append(keys.Count.ToString(CultureInfo.InvariantCulture)).Append('[');
+            for (var index = 0; index < keys.Count; index++)
+            {
+                if (index > 0)
+                {
+                    builder.Append(',');
+                }
+
+                builder.Append(keys[index]);
             }
 
             builder.Append(']');

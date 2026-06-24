@@ -220,6 +220,39 @@ namespace JueMingZ.Config
                 return true;
             }
 
+            if (TryFindBlueprintActionConflict(
+                    hotkeys,
+                    currentTargetId,
+                    FeatureIds.BlueprintMoveAction,
+                    "蓝图移动快捷键",
+                    chord,
+                    out conflict))
+            {
+                return true;
+            }
+
+            if (TryFindBlueprintActionConflict(
+                    hotkeys,
+                    currentTargetId,
+                    FeatureIds.BlueprintRegionAction,
+                    "蓝图区域修改快捷键",
+                    chord,
+                    out conflict))
+            {
+                return true;
+            }
+
+            if (TryFindBlueprintActionConflict(
+                    hotkeys,
+                    currentTargetId,
+                    FeatureIds.BlueprintMirrorAction,
+                    "蓝图镜像快捷键",
+                    chord,
+                    out conflict))
+            {
+                return true;
+            }
+
             return TryFindBlueprintActionConflict(
                 hotkeys,
                 currentTargetId,

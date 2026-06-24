@@ -53,6 +53,7 @@ namespace JueMingZ.Runtime
             snapshot.BlueprintProjectionHiddenInstanceCount = projection.HiddenInstanceCount;
             snapshot.BlueprintProjectionEffectiveLayerCount = projection.EffectiveLayerCount;
             snapshot.BlueprintProjectionFulfilledLayerCount = projection.FulfilledLayerCount;
+            snapshot.BlueprintProjectionCompletedLayerCount = projection.CompletedLayerCount;
             snapshot.BlueprintProjectionMissingLayerCount = projection.MissingLayerCount;
             snapshot.BlueprintProjectionConflictLayerCount = projection.ConflictLayerCount;
             snapshot.BlueprintProjectionCoveredLayerCount = projection.CoveredLayerCount;
@@ -121,6 +122,7 @@ namespace JueMingZ.Runtime
             snapshot.BlueprintAutoPlacementSkippedUnsupportedLayerCount = autoPlacement.SkippedUnsupportedLayerCount;
             snapshot.BlueprintAutoPlacementSkippedNoMaterialLayerCount = autoPlacement.SkippedNoMaterialLayerCount;
             snapshot.BlueprintAutoPlacementSkippedInsufficientMaterialLayerCount = autoPlacement.SkippedInsufficientMaterialLayerCount;
+            snapshot.BlueprintAutoPlacementSkippedVoidBagOnlyLayerCount = autoPlacement.SkippedVoidBagOnlyLayerCount;
             snapshot.BlueprintAutoPlacementSelectedInstanceId = autoPlacement.SelectedInstanceId;
             snapshot.BlueprintAutoPlacementSelectedInstanceName = autoPlacement.SelectedInstanceName;
             snapshot.BlueprintAutoPlacementSelectedLayerOrder = autoPlacement.SelectedLayerOrder;

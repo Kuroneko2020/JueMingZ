@@ -10,7 +10,7 @@ namespace JueMingZ.UI
     public static class BlueprintEraseRegionOverlay
     {
         private const int TileSize = 16;
-        private const string VisualContract = "instance-erase-region+selected-priority+top-layer-fallback+store-mask-only";
+        private const string VisualContract = "instance-erase-region+selected-priority+top-layer-fallback+store-mask-only+stage07-continuous-region-edit+cursor-red-follow-mask+cancel-only-exit";
         private static bool _wasLeftDown;
         private static bool _wasActive;
 
@@ -327,7 +327,7 @@ namespace JueMingZ.UI
 
         private static bool ShouldDraw(BlueprintEraseRegionSnapshot snapshot)
         {
-            return snapshot != null && snapshot.Active && snapshot.Dragging;
+            return snapshot != null && snapshot.Active && (snapshot.Dragging || snapshot.HasHoverTile);
         }
 
         private static void DrawEraseRegion(object spriteBatch, BlueprintEraseRegionSnapshot snapshot)
@@ -335,10 +335,21 @@ namespace JueMingZ.UI
             var clipWidth = Math.Max(1, TerrariaMainCompat.ScreenWidth);
             var clipHeight = Math.Max(1, TerrariaMainCompat.ScreenHeight);
             var screenPosition = TerrariaMainCompat.ScreenPosition;
+            if (!snapshot.Dragging && snapshot.HasHoverTile)
+            {
+                DrawEraseRect(spriteBatch, snapshot.HoverTileX, snapshot.HoverTileX, snapshot.HoverTileY, snapshot.HoverTileY, screenPosition, clipWidth, clipHeight);
+                return;
+            }
+
             var minX = Math.Min(snapshot.DragStartX, snapshot.DragCurrentX);
             var maxX = Math.Max(snapshot.DragStartX, snapshot.DragCurrentX);
             var minY = Math.Min(snapshot.DragStartY, snapshot.DragCurrentY);
             var maxY = Math.Max(snapshot.DragStartY, snapshot.DragCurrentY);
+            DrawEraseRect(spriteBatch, minX, maxX, minY, maxY, screenPosition, clipWidth, clipHeight);
+        }
+
+        private static void DrawEraseRect(object spriteBatch, int minX, int maxX, int minY, int maxY, Vector2 screenPosition, int clipWidth, int clipHeight)
+        {
             var x = (int)Math.Round(minX * TileSize - screenPosition.X);
             var y = (int)Math.Round(minY * TileSize - screenPosition.Y);
             var width = Math.Max(TileSize, (maxX - minX + 1) * TileSize);

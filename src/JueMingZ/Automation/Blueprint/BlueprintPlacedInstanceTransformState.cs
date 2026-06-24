@@ -124,6 +124,7 @@ namespace JueMingZ.Automation.Blueprint
     internal static class BlueprintPlacedInstanceTransformState
     {
         private static readonly object SyncRoot = new object();
+        private const int MaxFloatingPreviewLayers = 2048;
 
         private static BlueprintWorldInstanceStore _store;
         private static BlueprintWorldInstanceStore _testingStore;
@@ -142,6 +143,9 @@ namespace JueMingZ.Automation.Blueprint
         private static int _grabOffsetY;
         private static int _lastOriginTileX;
         private static int _lastOriginTileY;
+        private static int _floatingOriginTileX;
+        private static int _floatingOriginTileY;
+        private static BlueprintProjectionSnapshot _floatingProjection;
         private static string _lastNotice = "蓝图移动 / 镜像待命。";
         private static string _lastInputOwner = string.Empty;
         private static string _lastResultCode = "idle";
@@ -151,6 +155,22 @@ namespace JueMingZ.Automation.Blueprint
             lock (SyncRoot)
             {
                 return BuildSnapshotLocked();
+            }
+        }
+
+        internal static BlueprintProjectionSnapshot GetFloatingProjectionForDraw()
+        {
+            lock (SyncRoot)
+            {
+                return _floatingProjection;
+            }
+        }
+
+        internal static BlueprintProjectionSnapshot GetFloatingProjectionForTesting()
+        {
+            lock (SyncRoot)
+            {
+                return _floatingProjection == null ? null : _floatingProjection.Clone();
             }
         }
 
@@ -169,6 +189,7 @@ namespace JueMingZ.Automation.Blueprint
             lock (SyncRoot)
             {
                 var changed = _active;
+                var wasMove = string.Equals(_mode, BlueprintPlacedInstanceTransformModes.Move, StringComparison.Ordinal);
                 _active = false;
                 _mode = string.Empty;
                 _phase = string.Empty;
@@ -177,9 +198,12 @@ namespace JueMingZ.Automation.Blueprint
                 _targetLayerOrder = 0;
                 _grabOffsetX = 0;
                 _grabOffsetY = 0;
+                ClearFloatingPreviewLocked();
                 _lastInputOwner = "ui";
                 _lastResultCode = "transformCancelled";
-                _lastNotice = "已取消蓝图移动 / 镜像。";
+                _lastNotice = wasMove
+                    ? "已取消蓝图移动，原位置未改变。"
+                    : "已取消蓝图移动 / 镜像。";
                 return BlueprintPlacedInstanceTransformCommandResult.Create(
                     true,
                     changed,
@@ -222,6 +246,12 @@ namespace JueMingZ.Automation.Blueprint
                 {
                     _lastInputOwner = "world";
                     _lastResultCode = "hover";
+                    if (string.Equals(_mode, BlueprintPlacedInstanceTransformModes.Move, StringComparison.Ordinal) &&
+                        string.Equals(_phase, BlueprintPlacedInstanceTransformPhases.PlaceTarget, StringComparison.Ordinal))
+                    {
+                        UpdateMoveFloatingPreviewLocked(input.TileX, input.TileY);
+                    }
+
                     return BuildInteractionResultLocked(true, false, false, true, false, _lastResultCode, _lastNotice);
                 }
 
@@ -344,6 +374,7 @@ namespace JueMingZ.Automation.Blueprint
                 _targetLayerOrder = 0;
                 _grabOffsetX = 0;
                 _grabOffsetY = 0;
+                ClearFloatingPreviewLocked();
                 _lastInputOwner = "ui";
                 _lastResultCode = string.Equals(mode, BlueprintPlacedInstanceTransformModes.Move, StringComparison.Ordinal)
                     ? "moveTargetSelectStarted"
@@ -380,6 +411,17 @@ namespace JueMingZ.Automation.Blueprint
 
             if (string.Equals(_mode, BlueprintPlacedInstanceTransformModes.Move, StringComparison.Ordinal))
             {
+                if (HasMoveBlockingProgress(target))
+                {
+                    _targetInstanceId = target.InstanceId ?? string.Empty;
+                    _targetInstanceName = target.Name ?? string.Empty;
+                    _targetLayerOrder = target.LayerOrder;
+                    _lastInputOwner = "world";
+                    _lastResultCode = "moveBlockedByPlacedProgress";
+                    _lastNotice = "该蓝图已有完成进度或自动放置进度；只能移动尚未放置过方块的蓝图实例。";
+                    return BuildInteractionResultLocked(false, false, true, true, false, _lastResultCode, _lastNotice);
+                }
+
                 _phase = BlueprintPlacedInstanceTransformPhases.PlaceTarget;
                 _targetInstanceId = target.InstanceId ?? string.Empty;
                 _targetInstanceName = target.Name ?? string.Empty;
@@ -390,7 +432,8 @@ namespace JueMingZ.Automation.Blueprint
                 _lastOriginTileY = target.OriginTileY;
                 _lastInputOwner = "world";
                 _lastResultCode = "moveTargetSelected";
-                _lastNotice = "已选择蓝图实例 " + GetInstanceName(target) + "；请点击新位置完成移动。";
+                SetFloatingPreviewLocked(target, target.OriginTileX, target.OriginTileY);
+                _lastNotice = "正在移动蓝图 " + GetInstanceName(target) + "；蓝图跟随鼠标，左键确认，取消移动回原位。";
                 return BuildInteractionResultLocked(true, true, true, true, false, _lastResultCode, _lastNotice);
             }
 
@@ -414,6 +457,7 @@ namespace JueMingZ.Automation.Blueprint
             if (index < 0 || instances[index].Hidden)
             {
                 ResetActiveTargetLocked();
+                ClearFloatingPreviewLocked();
                 _lastInputOwner = "world";
                 _lastResultCode = "targetUnavailable";
                 _lastNotice = "移动目标已不存在或已隐藏，请重新选择。";
@@ -421,6 +465,16 @@ namespace JueMingZ.Automation.Blueprint
             }
 
             var target = instances[index];
+            if (HasMoveBlockingProgress(target))
+            {
+                ResetActiveTargetLocked();
+                ClearFloatingPreviewLocked();
+                _lastInputOwner = "world";
+                _lastResultCode = "moveBlockedByPlacedProgress";
+                _lastNotice = "该蓝图已有完成进度或自动放置进度；只能移动尚未放置过方块的蓝图实例。";
+                return BuildInteractionResultLocked(false, true, true, _active, false, _lastResultCode, _lastNotice);
+            }
+
             var newOriginX = tileX - _grabOffsetX;
             var newOriginY = tileY - _grabOffsetY;
             var changed = target.OriginTileX != newOriginX || target.OriginTileY != newOriginY;
@@ -452,6 +506,7 @@ namespace JueMingZ.Automation.Blueprint
             _phase = string.Empty;
             _targetInstanceId = targetId;
             _targetInstanceName = targetName;
+            ClearFloatingPreviewLocked();
             RefreshAfterInstanceMutation();
             return BuildInteractionResultLocked(true, changed, true, false, true, _lastResultCode, _lastNotice);
         }
@@ -467,14 +522,17 @@ namespace JueMingZ.Automation.Blueprint
                 return BuildInteractionResultLocked(false, false, true, true, false, _lastResultCode, _lastNotice);
             }
 
-            if (HasAutoPlacementProgress(target))
+            if (HasMoveBlockingProgress(target))
             {
+                var autoProgress = HasAutoPlacementProgress(target);
                 _targetInstanceId = target.InstanceId ?? string.Empty;
                 _targetInstanceName = target.Name ?? string.Empty;
                 _targetLayerOrder = target.LayerOrder;
                 _lastInputOwner = "world";
-                _lastResultCode = "autoPlacementProgressActive";
-                _lastNotice = "该蓝图实例已有自动摆放进度标记，禁止镜像实例副本。";
+                _lastResultCode = autoProgress ? "autoPlacementProgressActive" : "mirrorBlockedByPlacedProgress";
+                _lastNotice = autoProgress
+                    ? "该蓝图实例已有自动摆放进度标记，禁止镜像实例副本。"
+                    : "该蓝图已有完成进度；禁止镜像已经放置过方块的实例副本。";
                 return BuildInteractionResultLocked(false, false, true, true, false, _lastResultCode, _lastNotice);
             }
 
@@ -538,6 +596,21 @@ namespace JueMingZ.Automation.Blueprint
             // Only empty / idle is mirrorable; any future non-idle progress must fail closed.
             var state = (instance.AutoPlacementProgressState ?? string.Empty).Trim();
             return state.Length > 0 && !string.Equals(state, "idle", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool HasMoveBlockingProgress(BlueprintWorldInstanceRecord instance)
+        {
+            if (HasAutoPlacementProgress(instance))
+            {
+                return true;
+            }
+
+            // Stage 05 persists fulfilled layers into CompletedLayers. Move and
+            // mirror both use that instance-owned fact, not a fresh world scan,
+            // so cancel and selection stay deterministic across dug-out tiles.
+            return instance != null &&
+                   instance.CompletedLayers != null &&
+                   instance.CompletedLayers.Count > 0;
         }
 
         private static bool TryFindTopmostInstanceAtWorldTile(
@@ -643,6 +716,183 @@ namespace JueMingZ.Automation.Blueprint
             }
 
             return false;
+        }
+
+        private static void UpdateMoveFloatingPreviewLocked(int tileX, int tileY)
+        {
+            if (_floatingProjection == null)
+            {
+                return;
+            }
+
+            var originX = tileX - _grabOffsetX;
+            var originY = tileY - _grabOffsetY;
+            if (originX == _floatingOriginTileX && originY == _floatingOriginTileY)
+            {
+                return;
+            }
+
+            var dx = originX - _floatingOriginTileX;
+            var dy = originY - _floatingOriginTileY;
+            _floatingOriginTileX = originX;
+            _floatingOriginTileY = originY;
+            var layers = _floatingProjection.ProjectedLayers;
+            for (var index = 0; layers != null && index < layers.Count; index++)
+            {
+                var layer = layers[index];
+                if (layer == null)
+                {
+                    continue;
+                }
+
+                layer.WorldTileX += dx;
+                layer.WorldTileY += dy;
+            }
+
+            _floatingProjection.Signature = BuildFloatingProjectionSignature(_targetInstanceId, originX, originY, layers == null ? 0 : layers.Count);
+        }
+
+        private static void SetFloatingPreviewLocked(BlueprintWorldInstanceRecord instance, int originX, int originY)
+        {
+            _floatingOriginTileX = originX;
+            _floatingOriginTileY = originY;
+            _floatingProjection = BuildFloatingProjection(instance, originX, originY);
+        }
+
+        private static void ClearFloatingPreviewLocked()
+        {
+            _floatingOriginTileX = 0;
+            _floatingOriginTileY = 0;
+            _floatingProjection = null;
+        }
+
+        private static BlueprintProjectionSnapshot BuildFloatingProjection(BlueprintWorldInstanceRecord instance, int originX, int originY)
+        {
+            var layers = new List<BlueprintProjectionCellSnapshot>();
+            var template = instance == null ? null : instance.TemplateSnapshot;
+            var cells = template == null ? null : template.Cells;
+            for (var cellIndex = 0; cells != null && cellIndex < cells.Count && layers.Count < MaxFloatingPreviewLayers; cellIndex++)
+            {
+                var cell = cells[cellIndex];
+                if (cell == null || IsCellErased(instance == null ? null : instance.EraseMask, cell.X, cell.Y))
+                {
+                    continue;
+                }
+
+                for (var layerIndex = 0; cell.Layers != null && layerIndex < cell.Layers.Count && layers.Count < MaxFloatingPreviewLayers; layerIndex++)
+                {
+                    var layer = cell.Layers[layerIndex];
+                    if (layer == null || string.IsNullOrWhiteSpace(layer.LayerKind))
+                    {
+                        continue;
+                    }
+
+                    layers.Add(new BlueprintProjectionCellSnapshot
+                    {
+                        InstanceId = instance == null ? string.Empty : instance.InstanceId ?? string.Empty,
+                        InstanceName = instance == null ? string.Empty : instance.Name ?? string.Empty,
+                        LayerOrder = instance == null ? 0 : instance.LayerOrder,
+                        WorldTileX = originX + cell.X,
+                        WorldTileY = originY + cell.Y,
+                        RelativeX = cell.X,
+                        RelativeY = cell.Y,
+                        LayerKind = layer.LayerKind ?? string.Empty,
+                        CoverageGroup = ResolveCoverageGroup(layer.LayerKind),
+                        ContentId = layer.ContentId,
+                        Style = layer.Style,
+                        FrameX = layer.FrameX,
+                        FrameY = layer.FrameY,
+                        PaintId = layer.PaintId,
+                        CoatingFlags = layer.CoatingFlags,
+                        Slope = layer.Slope,
+                        HalfBrick = layer.HalfBrick,
+                        Inactive = layer.Inactive,
+                        MaterialItemId = layer.MaterialItemId,
+                        MaterialStack = layer.MaterialStack,
+                        MaterialDisplayName = ResolveMaterialDisplayName(instance, layer.MaterialItemId),
+                        Status = BlueprintProjectionLayerStatuses.Missing
+                    });
+                }
+            }
+
+            return new BlueprintProjectionSnapshot
+            {
+                LoadSucceeded = true,
+                ResultCode = "moveFloatingPreview",
+                Message = "移动蓝图浮动预览。",
+                WorldPairKey = _worldPairKey,
+                WorldKey = _worldKey,
+                Signature = BuildFloatingProjectionSignature(instance == null ? string.Empty : instance.InstanceId, originX, originY, layers.Count),
+                InstanceCount = instance == null ? 0 : 1,
+                VisibleInstanceCount = instance == null ? 0 : 1,
+                EffectiveLayerCount = layers.Count,
+                MissingLayerCount = layers.Count,
+                ProjectedLayers = layers,
+                AllProjectedLayers = layers,
+                LastResolvedUtc = DateTime.UtcNow
+            };
+        }
+
+        private static string BuildFloatingProjectionSignature(string instanceId, int originX, int originY, int layerCount)
+        {
+            return "move-floating:" +
+                   (instanceId ?? string.Empty) + ":" +
+                   originX.ToString(CultureInfo.InvariantCulture) + "," +
+                   originY.ToString(CultureInfo.InvariantCulture) + ":" +
+                   layerCount.ToString(CultureInfo.InvariantCulture);
+        }
+
+        private static string ResolveCoverageGroup(string layerKind)
+        {
+            var kind = string.IsNullOrWhiteSpace(layerKind) ? string.Empty : layerKind.Trim();
+            if (string.Equals(kind, BlueprintLayerKinds.Object, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(kind, BlueprintLayerKinds.Tile, StringComparison.OrdinalIgnoreCase))
+            {
+                return BlueprintLayerKinds.Tile;
+            }
+
+            if (string.Equals(kind, BlueprintLayerKinds.Wall, StringComparison.OrdinalIgnoreCase))
+            {
+                return BlueprintLayerKinds.Wall;
+            }
+
+            if (string.Equals(kind, BlueprintLayerKinds.Wire, StringComparison.OrdinalIgnoreCase))
+            {
+                return BlueprintLayerKinds.Wire;
+            }
+
+            if (string.Equals(kind, BlueprintLayerKinds.Actuator, StringComparison.OrdinalIgnoreCase))
+            {
+                return BlueprintLayerKinds.Actuator;
+            }
+
+            return kind;
+        }
+
+        private static string ResolveMaterialDisplayName(BlueprintWorldInstanceRecord instance, int itemId)
+        {
+            if (itemId <= 0)
+            {
+                return string.Empty;
+            }
+
+            var template = instance == null ? null : instance.TemplateSnapshot;
+            var materials = template == null ? null : template.Materials;
+            for (var index = 0; materials != null && index < materials.Count; index++)
+            {
+                var material = materials[index];
+                if (material == null || material.ItemId != itemId)
+                {
+                    continue;
+                }
+
+                if (!string.IsNullOrWhiteSpace(material.DisplayNameSnapshot))
+                {
+                    return material.DisplayNameSnapshot.Trim();
+                }
+            }
+
+            return "#" + itemId.ToString(CultureInfo.InvariantCulture);
         }
 
         private static List<BlueprintWorldInstanceRecord> CloneInstances(IReadOnlyList<BlueprintWorldInstanceRecord> source)
@@ -812,6 +1062,7 @@ namespace JueMingZ.Automation.Blueprint
             _grabOffsetY = 0;
             _lastOriginTileX = 0;
             _lastOriginTileY = 0;
+            ClearFloatingPreviewLocked();
             _lastNotice = "蓝图移动 / 镜像待命。";
             _lastInputOwner = string.Empty;
             _lastResultCode = "idle";

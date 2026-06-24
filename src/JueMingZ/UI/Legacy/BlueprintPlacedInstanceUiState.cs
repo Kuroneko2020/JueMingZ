@@ -17,6 +17,7 @@ namespace JueMingZ.UI.Legacy
         public string WorldKey { get; set; }
         public string SelectedInstanceId { get; set; }
         public string RemoveConfirmInstanceId { get; set; }
+        public string ExpandedMaterialInstanceId { get; set; }
         public string LastNotice { get; set; }
         public string LastResultCode { get; set; }
         public int PageIndex { get; set; }
@@ -35,6 +36,7 @@ namespace JueMingZ.UI.Legacy
             WorldKey = string.Empty;
             SelectedInstanceId = string.Empty;
             RemoveConfirmInstanceId = string.Empty;
+            ExpandedMaterialInstanceId = string.Empty;
             LastNotice = string.Empty;
             LastResultCode = string.Empty;
             PageSize = BlueprintPlacedInstanceUiState.PageSize;
@@ -115,6 +117,7 @@ namespace JueMingZ.UI.Legacy
         private static string _worldKey = string.Empty;
         private static string _selectedInstanceId = string.Empty;
         private static string _removeConfirmInstanceId = string.Empty;
+        private static string _expandedMaterialInstanceId = string.Empty;
         private static string _lastNotice = "已放置实例待命。";
         private static string _lastResultCode = string.Empty;
         private static int _pageIndex;
@@ -286,6 +289,10 @@ namespace JueMingZ.UI.Legacy
                 }
 
                 _removeConfirmInstanceId = string.Empty;
+                if (string.Equals(_expandedMaterialInstanceId, normalizedId, StringComparison.OrdinalIgnoreCase))
+                {
+                    _expandedMaterialInstanceId = string.Empty;
+                }
                 RecordNoticeLocked("removed", "蓝图实例已移除；模板和世界内容未修改。", _selectedInstanceId, true);
                 result = CreateResultLocked(true, true, "Succeeded", _lastResultCode, _lastNotice, normalizedId, instance.Name);
             }
@@ -360,6 +367,7 @@ namespace JueMingZ.UI.Legacy
                 {
                     _selectedInstanceId = string.Empty;
                     _removeConfirmInstanceId = string.Empty;
+                    _expandedMaterialInstanceId = string.Empty;
                     RecordNoticeLocked("clearPlacedEmpty", "当前世界没有已放置蓝图。", string.Empty, false);
                     return CreateResultLocked(true, false, "NotApplicable", _lastResultCode, _lastNotice, string.Empty, string.Empty);
                 }
@@ -376,6 +384,7 @@ namespace JueMingZ.UI.Legacy
 
                 _selectedInstanceId = string.Empty;
                 _removeConfirmInstanceId = string.Empty;
+                _expandedMaterialInstanceId = string.Empty;
                 RecordNoticeLocked(
                     "clearPlaced",
                     "已清空当前世界 " + removedCount.ToString(CultureInfo.InvariantCulture) + " 个已放置蓝图；模板和世界内容未修改。",
@@ -420,6 +429,10 @@ namespace JueMingZ.UI.Legacy
                 }
 
                 _removeConfirmInstanceId = string.Empty;
+                if (!InstanceExistsLocked(_expandedMaterialInstanceId))
+                {
+                    _expandedMaterialInstanceId = string.Empty;
+                }
                 RecordNoticeLocked("instancesChanged", "当前世界蓝图实例数据已刷新。", _selectedInstanceId, true);
             }
 
@@ -441,6 +454,72 @@ namespace JueMingZ.UI.Legacy
                    " / " + BuildTemplateSize(instance.TemplateSnapshot);
         }
 
+        public static BlueprintPlacedInstanceCommandResult ToggleMaterialList(string instanceId)
+        {
+            var normalizedId = BlueprintTemplateLibraryStore.NormalizeId(instanceId);
+            lock (SyncRoot)
+            {
+                EnsureLoadedLocked();
+                BlueprintWorldInstanceRecord instance;
+                if (!TryFindInstanceLocked(normalizedId, out instance))
+                {
+                    RecordNoticeLocked("missingInstance", "蓝图实例不存在。", normalizedId, false);
+                    return CreateResultLocked(false, false, "Failed", _lastResultCode, _lastNotice, normalizedId, string.Empty);
+                }
+
+                var closing = string.Equals(_expandedMaterialInstanceId, normalizedId, StringComparison.OrdinalIgnoreCase);
+                _expandedMaterialInstanceId = closing ? string.Empty : normalizedId;
+                _removeConfirmInstanceId = string.Empty;
+                RecordNoticeLocked(
+                    closing ? "materialsClosed" : "materialsOpened",
+                    closing ? "已关闭蓝图材料清单。" : "已打开蓝图材料清单。",
+                    normalizedId,
+                    true);
+                return CreateResultLocked(true, true, "Succeeded", _lastResultCode, _lastNotice, normalizedId, instance.Name);
+            }
+        }
+
+        public static BlueprintPlacedInstanceCommandResult CloseMaterialList(string instanceId)
+        {
+            var normalizedId = BlueprintTemplateLibraryStore.NormalizeId(instanceId);
+            lock (SyncRoot)
+            {
+                EnsureLoadedLocked();
+                var changed = string.IsNullOrEmpty(normalizedId)
+                    ? !string.IsNullOrEmpty(_expandedMaterialInstanceId)
+                    : string.Equals(_expandedMaterialInstanceId, normalizedId, StringComparison.OrdinalIgnoreCase);
+                if (changed)
+                {
+                    _expandedMaterialInstanceId = string.Empty;
+                }
+
+                BlueprintWorldInstanceRecord instance;
+                TryFindInstanceLocked(normalizedId, out instance);
+                RecordNoticeLocked("materialsClosed", "已关闭蓝图材料清单。", normalizedId, changed);
+                return CreateResultLocked(true, changed, changed ? "Succeeded" : "NotApplicable", _lastResultCode, _lastNotice, normalizedId, instance == null ? string.Empty : instance.Name);
+            }
+        }
+
+        public static BlueprintWorldInstanceRecord GetExpandedMaterialInstance(BlueprintPlacedInstanceUiSnapshot snapshot)
+        {
+            if (snapshot == null || snapshot.Instances == null || string.IsNullOrWhiteSpace(snapshot.ExpandedMaterialInstanceId))
+            {
+                return null;
+            }
+
+            var expandedId = BlueprintTemplateLibraryStore.NormalizeId(snapshot.ExpandedMaterialInstanceId);
+            for (var index = 0; index < snapshot.Instances.Count; index++)
+            {
+                var instance = snapshot.Instances[index];
+                if (instance != null && string.Equals(instance.InstanceId, expandedId, StringComparison.OrdinalIgnoreCase))
+                {
+                    return instance;
+                }
+            }
+
+            return null;
+        }
+
         public static string BuildUiStateJson()
         {
             lock (SyncRoot)
@@ -456,6 +535,7 @@ namespace JueMingZ.UI.Legacy
                        "\"pageCount\":" + CalculatePageCount(GetInstanceCountLocked()).ToString(CultureInfo.InvariantCulture) + "," +
                        "\"selectedInstanceId\":\"" + EscapeJson(_selectedInstanceId) + "\"," +
                        "\"removeConfirmInstanceId\":\"" + EscapeJson(_removeConfirmInstanceId) + "\"," +
+                       "\"expandedMaterialInstanceId\":\"" + EscapeJson(_expandedMaterialInstanceId) + "\"," +
                        "\"lastResultCode\":\"" + EscapeJson(_lastResultCode) + "\"" +
                        "}";
             }
@@ -476,6 +556,7 @@ namespace JueMingZ.UI.Legacy
                     hash = hash * 31 + StringComparer.Ordinal.GetHashCode(_worldKey ?? string.Empty);
                     hash = hash * 31 + StringComparer.Ordinal.GetHashCode(_selectedInstanceId ?? string.Empty);
                     hash = hash * 31 + StringComparer.Ordinal.GetHashCode(_removeConfirmInstanceId ?? string.Empty);
+                    hash = hash * 31 + StringComparer.Ordinal.GetHashCode(_expandedMaterialInstanceId ?? string.Empty);
                     hash = hash * 31 + StringComparer.Ordinal.GetHashCode(_lastNotice ?? string.Empty);
                     hash = hash * 31 + StringComparer.Ordinal.GetHashCode(_lastResultCode ?? string.Empty);
                     return hash;
@@ -545,6 +626,7 @@ namespace JueMingZ.UI.Legacy
                 WorldKey = _worldKey,
                 SelectedInstanceId = _selectedInstanceId,
                 RemoveConfirmInstanceId = _removeConfirmInstanceId,
+                ExpandedMaterialInstanceId = _expandedMaterialInstanceId,
                 LastNotice = _lastNotice,
                 LastResultCode = _lastResultCode,
                 PageIndex = _pageIndex,
@@ -596,6 +678,7 @@ namespace JueMingZ.UI.Legacy
                 unchecked { _revision++; }
                 _selectedInstanceId = string.Empty;
                 _removeConfirmInstanceId = string.Empty;
+                _expandedMaterialInstanceId = string.Empty;
                 return;
             }
 
@@ -620,6 +703,11 @@ namespace JueMingZ.UI.Legacy
             if (!InstanceExistsLocked(_removeConfirmInstanceId))
             {
                 _removeConfirmInstanceId = string.Empty;
+            }
+
+            if (!InstanceExistsLocked(_expandedMaterialInstanceId))
+            {
+                _expandedMaterialInstanceId = string.Empty;
             }
         }
 
@@ -722,6 +810,7 @@ namespace JueMingZ.UI.Legacy
             _worldKey = string.Empty;
             _selectedInstanceId = string.Empty;
             _removeConfirmInstanceId = string.Empty;
+            _expandedMaterialInstanceId = string.Empty;
             _lastNotice = "已放置实例待命。";
             _lastResultCode = string.Empty;
             _pageIndex = 0;

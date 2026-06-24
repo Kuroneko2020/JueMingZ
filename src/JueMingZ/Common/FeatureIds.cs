@@ -54,6 +54,9 @@ namespace JueMingZ.Common
         public const string BlueprintCreateAction = "blueprint.create";
         public const string BlueprintSaveAction = "blueprint.save";
         public const string BlueprintLibraryAction = "blueprint.library";
+        public const string BlueprintMoveAction = "blueprint.move";
+        public const string BlueprintRegionAction = "blueprint.region";
+        public const string BlueprintMirrorAction = "blueprint.mirror";
         public const string MovementSimulatedMultiJump = "movement.simulated_multi_jump";
         public const string MovementContinuousDash = "movement.continuous_dash";
         public const string MovementTeleportCorrection = "movement.teleport_correction";

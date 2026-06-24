@@ -196,6 +196,7 @@ namespace JueMingZ.Automation.Blueprint
                 clone.WorldKey = worldKey ?? string.Empty;
                 clone.LayerOrder = Math.Max(0, clone.LayerOrder);
                 clone.EraseMask = NormalizeEraseMask(clone.EraseMask);
+                clone.CompletedLayers = NormalizeCompletedLayers(clone.CompletedLayers);
                 clone.TemplateSnapshot = clone.TemplateSnapshot == null ? new BlueprintTemplateRecord() : clone.TemplateSnapshot.Clone();
                 if (string.IsNullOrWhiteSpace(clone.TemplateSnapshot.Name))
                 {
@@ -241,6 +242,66 @@ namespace JueMingZ.Automation.Blueprint
                 }
             }
 
+            return normalized;
+        }
+
+        private static List<BlueprintCompletedLayerRecord> NormalizeCompletedLayers(IList<BlueprintCompletedLayerRecord> source)
+        {
+            var normalized = new List<BlueprintCompletedLayerRecord>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            if (source == null)
+            {
+                return normalized;
+            }
+
+            for (var index = 0; index < source.Count; index++)
+            {
+                var layer = source[index];
+                if (layer == null)
+                {
+                    continue;
+                }
+
+                var kind = string.IsNullOrWhiteSpace(layer.LayerKind) ? string.Empty : layer.LayerKind.Trim();
+                var group = string.IsNullOrWhiteSpace(layer.CoverageGroup) ? string.Empty : layer.CoverageGroup.Trim();
+                if (kind.Length <= 0 || group.Length <= 0)
+                {
+                    continue;
+                }
+
+                var key = layer.X.ToString(System.Globalization.CultureInfo.InvariantCulture) + ":" +
+                          layer.Y.ToString(System.Globalization.CultureInfo.InvariantCulture) + ":" +
+                          kind + ":" +
+                          group + ":" +
+                          layer.ContentId.ToString(System.Globalization.CultureInfo.InvariantCulture) + ":" +
+                          layer.Style.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                if (seen.Add(key))
+                {
+                    normalized.Add(new BlueprintCompletedLayerRecord
+                    {
+                        X = layer.X,
+                        Y = layer.Y,
+                        LayerKind = kind,
+                        CoverageGroup = group,
+                        ContentId = layer.ContentId,
+                        Style = layer.Style
+                    });
+                }
+            }
+
+            normalized.Sort((left, right) =>
+            {
+                var y = left.Y.CompareTo(right.Y);
+                if (y != 0) return y;
+                var x = left.X.CompareTo(right.X);
+                if (x != 0) return x;
+                var kind = string.Compare(left.LayerKind, right.LayerKind, StringComparison.Ordinal);
+                if (kind != 0) return kind;
+                var group = string.Compare(left.CoverageGroup, right.CoverageGroup, StringComparison.Ordinal);
+                if (group != 0) return group;
+                var content = left.ContentId.CompareTo(right.ContentId);
+                return content != 0 ? content : left.Style.CompareTo(right.Style);
+            });
             return normalized;
         }
 

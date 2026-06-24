@@ -919,6 +919,7 @@ namespace JueMingZ.Diagnostics
         public int BlueprintProjectionHiddenInstanceCount { get; set; }
         public int BlueprintProjectionEffectiveLayerCount { get; set; }
         public int BlueprintProjectionFulfilledLayerCount { get; set; }
+        public int BlueprintProjectionCompletedLayerCount { get; set; }
         public int BlueprintProjectionMissingLayerCount { get; set; }
         public int BlueprintProjectionConflictLayerCount { get; set; }
         public int BlueprintProjectionCoveredLayerCount { get; set; }
@@ -985,6 +986,7 @@ namespace JueMingZ.Diagnostics
         public int BlueprintAutoPlacementSkippedUnsupportedLayerCount { get; set; }
         public int BlueprintAutoPlacementSkippedNoMaterialLayerCount { get; set; }
         public int BlueprintAutoPlacementSkippedInsufficientMaterialLayerCount { get; set; }
+        public int BlueprintAutoPlacementSkippedVoidBagOnlyLayerCount { get; set; }
         public string BlueprintAutoPlacementSelectedInstanceId { get; set; }
         public string BlueprintAutoPlacementSelectedInstanceName { get; set; }
         public int BlueprintAutoPlacementSelectedLayerOrder { get; set; }
