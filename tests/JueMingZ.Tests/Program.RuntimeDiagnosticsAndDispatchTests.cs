@@ -1320,6 +1320,7 @@ namespace JueMingZ.Tests
                     "auto-capture-critter|dispatch.auto-capture-critter|4",
                     "auto-harvest|dispatch.auto-harvest|1",
                     "auto-mining|dispatch.auto-mining|1",
+                    "blueprint-world-instance-lifecycle|dispatch.blueprint-world-instance-lifecycle|10",
                     "blueprint-auto-placement|dispatch.blueprint-auto-placement|10",
                     "auto-stack|dispatch.auto-stack|5",
                     "auto-sell|dispatch.auto-sell|15",
@@ -1357,6 +1358,7 @@ namespace JueMingZ.Tests
                     "auto-capture-critter|ActionSubmitting",
                     "auto-harvest|ActionSubmitting",
                     "auto-mining|ActionSubmitting",
+                    "blueprint-world-instance-lifecycle|ReadOnlyDisplay",
                     "blueprint-auto-placement|ActionSubmitting",
                     "auto-stack|ActionSubmitting",
                     "auto-sell|ActionSubmitting",
@@ -1476,6 +1478,11 @@ namespace JueMingZ.Tests
                     throw new InvalidOperationException("Auto boss damage report must stay on the read-only display lane.");
                 }
 
+                if (!JueMingZRuntime.ShouldRunAutomationDispatchStepForTesting("blueprint-world-instance-lifecycle", true, unfocused, 1))
+                {
+                    throw new InvalidOperationException("Blueprint world instance lifecycle must stay on the read-only display lane.");
+                }
+
                 if (JueMingZRuntime.ShouldRunAutomationDispatchStepForTesting("auto-recovery", true, unfocused, 1))
                 {
                     throw new InvalidOperationException("ActionSubmitting lane must not dispatch when game input is unavailable.");
@@ -1548,6 +1555,11 @@ namespace JueMingZ.Tests
                 if (JueMingZRuntime.ShouldRunAutomationDispatchStepForTesting("combat-auto-boss-damage-report", true, mainMenu, 15))
                 {
                     throw new InvalidOperationException("Auto boss damage report must not scan while outside the world.");
+                }
+
+                if (JueMingZRuntime.ShouldRunAutomationDispatchStepForTesting("blueprint-world-instance-lifecycle", true, mainMenu, 15))
+                {
+                    throw new InvalidOperationException("Blueprint world instance lifecycle must not refresh while outside the world.");
                 }
             }
             finally

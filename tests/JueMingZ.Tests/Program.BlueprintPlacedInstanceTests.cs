@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using JueMingZ.Automation.Blueprint;
 using JueMingZ.Config;
+using JueMingZ.GameState;
 using JueMingZ.Input;
 using JueMingZ.UI.Legacy;
 
@@ -76,6 +77,102 @@ namespace JueMingZ.Tests
             {
                 BlueprintPlacedInstanceUiState.ResetForTesting();
                 BlueprintLibraryUiState.ResetForTesting();
+                BlueprintTemplateLibraryStore.ResetTestingHooks();
+                restore();
+            }
+        }
+
+        private static void BlueprintWorldInstanceLifecycleRefreshesCacheAfterWorldEntry()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-world-lifecycle-entry-refresh");
+            try
+            {
+                BlueprintWorldInstanceLifecycleService.ResetForTesting();
+                BlueprintPlacedInstanceUiState.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintHandheldActionBarState.ResetInteractionForTesting();
+
+                var store = new BlueprintWorldInstanceStore();
+                var reader = new FakeBlueprintWorldTileReader();
+                var template = CreateProjectionTileOnlyTemplate("进世界刷新", 66);
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(
+                    store.CreateInstanceFromTemplate("pair-lifecycle", "world-lifecycle", template, 30, 40, 0, out instance),
+                    "create lifecycle placed instance");
+                reader.Set(30, 40, new BlueprintWorldTileSnapshot());
+
+                var context = BlueprintPlacementWorldContext.Success("pair-lifecycle", "world-lifecycle");
+                BlueprintPlacedInstanceUiState.SetDependenciesForTesting(store, context, false);
+                BlueprintProjectionService.SetDependenciesForTesting(store, context, reader, false);
+
+                var beforePlaced = BlueprintPlacedInstanceUiState.GetCachedSummary();
+                var beforeProjection = BlueprintProjectionService.GetDiagnostics();
+                if (beforePlaced.Loaded ||
+                    beforePlaced.InstanceCount != 0 ||
+                    beforeProjection.InstanceCount != 0 ||
+                    !string.Equals(beforeProjection.ResultCode, "notResolved", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected placed/projection caches to start cold before world lifecycle refresh.");
+                }
+
+                var first = BlueprintWorldInstanceLifecycleService.TickForTesting(CreateBlueprintInWorldSnapshot(), context);
+                if (!first.Refreshed ||
+                    !string.Equals(first.ResultCode, "refreshed", StringComparison.Ordinal) ||
+                    first.PlacedInstanceCount != 1 ||
+                    first.ProjectionInstanceCount != 1)
+                {
+                    throw new InvalidOperationException("Expected world lifecycle to refresh placed list and projection caches after entering the world.");
+                }
+
+                var afterPlaced = BlueprintPlacedInstanceUiState.GetCachedSummary();
+                var afterProjection = BlueprintProjectionService.GetDiagnostics();
+                if (!afterPlaced.Loaded ||
+                    afterPlaced.InstanceCount != 1 ||
+                    afterProjection.InstanceCount != 1 ||
+                    afterProjection.EffectiveLayerCount != 1)
+                {
+                    throw new InvalidOperationException("Expected refreshed caches to expose the pre-existing placed blueprint instance.");
+                }
+
+                var handheld = BuildBlueprintHandheldFrame(
+                    true,
+                    BlueprintSettings.DefaultToolItemId,
+                    BlueprintHandheldEnvironment(
+                        1280,
+                        720,
+                        blueprintHasPlacedInstances: true,
+                        blueprintPlacedInstanceCount: Math.Max(afterPlaced.InstanceCount, afterProjection.InstanceCount)));
+                AssertBlueprintHandheldButtons(
+                    handheld,
+                    BlueprintHandheldActionBarState.ButtonIdCreate,
+                    BlueprintHandheldActionBarState.ButtonIdOpenLibrary,
+                    BlueprintHandheldActionBarState.ButtonIdOpenPlacedList,
+                    BlueprintHandheldActionBarState.ButtonIdClearPlaced,
+                    BlueprintHandheldActionBarState.ButtonIdMove,
+                    BlueprintHandheldActionBarState.ButtonIdRegionModify,
+                    BlueprintHandheldActionBarState.ButtonIdMirror);
+
+                var unchanged = BlueprintWorldInstanceLifecycleService.TickForTesting(CreateBlueprintInWorldSnapshot(), context);
+                if (unchanged.Refreshed || !string.Equals(unchanged.ResultCode, "unchanged", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected lifecycle service to skip repeated refreshes for the same world identity.");
+                }
+
+                BlueprintWorldInstanceLifecycleService.TickForTesting(
+                    new GameStateSnapshot { IsInWorld = false, IsInMainMenu = true },
+                    context);
+                var reenter = BlueprintWorldInstanceLifecycleService.TickForTesting(CreateBlueprintInWorldSnapshot(), context);
+                if (!reenter.Refreshed || reenter.RefreshCount <= first.RefreshCount)
+                {
+                    throw new InvalidOperationException("Expected leaving the world to reset lifecycle identity so the same world refreshes on re-entry.");
+                }
+            }
+            finally
+            {
+                BlueprintWorldInstanceLifecycleService.ResetForTesting();
+                BlueprintPlacedInstanceUiState.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintHandheldActionBarState.ResetInteractionForTesting();
                 BlueprintTemplateLibraryStore.ResetTestingHooks();
                 restore();
             }

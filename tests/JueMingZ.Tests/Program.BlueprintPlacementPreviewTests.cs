@@ -81,11 +81,13 @@ namespace JueMingZ.Tests
                     throw new InvalidOperationException("Expected template selection to enter placement preview.");
                 }
 
+                ReleasePlacementPreviewInitialLeftGate(40, 50);
                 var result = BlueprintPlacementPreviewState.HandlePointer(new BlueprintPlacementPointerInput
                 {
                     WorldTileHit = true,
                     TileX = 40,
                     TileY = 50,
+                    PhysicalLeftDown = true,
                     LeftDown = true,
                     LeftPressed = true
                 });
@@ -154,11 +156,13 @@ namespace JueMingZ.Tests
                     throw new InvalidOperationException("Expected stage04 template selection to enter placement preview.");
                 }
 
+                ReleasePlacementPreviewInitialLeftGate(25, 35);
                 var result = BlueprintPlacementPreviewState.HandlePointer(new BlueprintPlacementPointerInput
                 {
                     WorldTileHit = true,
                     TileX = 25,
                     TileY = 35,
+                    PhysicalLeftDown = true,
                     LeftDown = true,
                     LeftPressed = true
                 });
@@ -230,6 +234,153 @@ namespace JueMingZ.Tests
             BlueprintEntryState.ResetForTesting();
         }
 
+        private static void BlueprintPlacementPreviewWaitsForPhysicalLeftReleaseBeforeConfirm()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-placement-initial-release-gate");
+            try
+            {
+                var templateStore = new BlueprintTemplateLibraryStore();
+                var instanceStore = new BlueprintWorldInstanceStore();
+                BlueprintTemplateRecord template;
+                RequireBlueprintSuccess(templateStore.CreateTemplate(CreateEvenBlueprintTemplate("松手门闩"), out template), "create placement release-gate template");
+                BlueprintEntryState.ResetForTesting();
+                BlueprintPlacementPreviewState.SetPlacementDependenciesForTesting(
+                    templateStore,
+                    instanceStore,
+                    BlueprintPlacementWorldContext.Success("pair-release-gate", "world-release-gate"));
+
+                var begin = BlueprintEntryState.SelectTemplateForPlacement(template);
+                if (!begin.Succeeded)
+                {
+                    throw new InvalidOperationException("Expected template selection to enter placement preview before release-gate regression.");
+                }
+
+                var leakedPressInput = BlueprintPlacementPreviewOverlay.BuildPointerInputFromPhysicalEdgesForTesting(
+                    true,
+                    false,
+                    false,
+                    false,
+                    true,
+                    true,
+                    false,
+                    false,
+                    true,
+                    40,
+                    50);
+                if (!leakedPressInput.PhysicalLeftDown || !leakedPressInput.LeftPressed)
+                {
+                    throw new InvalidOperationException("Expected the simulated leaked UI click to look like a world press before the preview release gate.");
+                }
+
+                var leakedPress = BlueprintPlacementPreviewState.HandlePointer(leakedPressInput);
+                if (!leakedPress.ShouldConsumeLeftInput ||
+                    leakedPress.PlacedInstance ||
+                    !BlueprintPlacementPreviewState.GetSnapshot().Active ||
+                    !string.Equals(leakedPress.ResultCode, "awaitingInitialLeftRelease", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Placement preview must consume the activating held left button without creating an instance.");
+                }
+
+                BlueprintWorldInstanceSnapshot beforeRelease;
+                RequireBlueprintSuccess(instanceStore.TryLoadWorld("pair-release-gate", out beforeRelease), "load release-gate world before release");
+                if (beforeRelease.Instances.Count != 0)
+                {
+                    throw new InvalidOperationException("A held activating click must not create a blueprint instance before physical release.");
+                }
+
+                var consumedHeldInput = BlueprintPlacementPreviewOverlay.BuildPointerInputFromPhysicalEdgesForTesting(
+                    true,
+                    false,
+                    false,
+                    false,
+                    false,
+                    true,
+                    true,
+                    false,
+                    true,
+                    41,
+                    50);
+                if (!consumedHeldInput.PhysicalLeftDown ||
+                    consumedHeldInput.LeftDown ||
+                    consumedHeldInput.LeftPressed ||
+                    consumedHeldInput.LeftReleased)
+                {
+                    throw new InvalidOperationException("Consumed world-left while physical left is held must keep the initial release gate closed.");
+                }
+
+                var consumedHeld = BlueprintPlacementPreviewState.HandlePointer(consumedHeldInput);
+                if (!consumedHeld.ShouldConsumeLeftInput ||
+                    consumedHeld.PlacedInstance ||
+                    !BlueprintPlacementPreviewState.GetSnapshot().Active)
+                {
+                    throw new InvalidOperationException("Consumed-held placement frame should stay active and wait for physical release.");
+                }
+
+                var releaseInput = BlueprintPlacementPreviewOverlay.BuildPointerInputFromPhysicalEdgesForTesting(
+                    true,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    true,
+                    false,
+                    true,
+                    42,
+                    50);
+                if (releaseInput.PhysicalLeftDown || !releaseInput.LeftReleased)
+                {
+                    throw new InvalidOperationException("Expected release frame to clear the placement preview initial gate.");
+                }
+
+                var release = BlueprintPlacementPreviewState.HandlePointer(releaseInput);
+                if (!release.ShouldConsumeLeftInput ||
+                    release.PlacedInstance ||
+                    !BlueprintPlacementPreviewState.GetSnapshot().Active ||
+                    !string.Equals(release.ResultCode, "initialLeftReleased", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Releasing the activating left button should unlock but not confirm placement.");
+                }
+
+                var freshClickInput = BlueprintPlacementPreviewOverlay.BuildPointerInputFromPhysicalEdgesForTesting(
+                    true,
+                    false,
+                    false,
+                    false,
+                    true,
+                    true,
+                    false,
+                    false,
+                    true,
+                    43,
+                    50);
+                var confirmed = BlueprintPlacementPreviewState.HandlePointer(freshClickInput);
+                BlueprintEntryState.MarkPlacementConfirmed(confirmed);
+                if (!confirmed.Succeeded || !confirmed.PlacedInstance || confirmed.Instance == null)
+                {
+                    throw new InvalidOperationException("A fresh click after physical release should confirm placement.");
+                }
+
+                BlueprintWorldInstanceSnapshot afterConfirm;
+                RequireBlueprintSuccess(instanceStore.TryLoadWorld("pair-release-gate", out afterConfirm), "load release-gate world after confirm");
+                if (afterConfirm.Instances.Count != 1 ||
+                    afterConfirm.Instances[0].OriginTileX != 42 ||
+                    afterConfirm.Instances[0].OriginTileY != 50)
+                {
+                    throw new InvalidOperationException("Expected only the fresh post-release click to create the blueprint instance.");
+                }
+            }
+            finally
+            {
+                BlueprintPlacementPreviewState.ResetForTesting();
+                BlueprintPlacementPreviewOverlay.ResetInputForTesting();
+                BlueprintLibraryUiState.ResetForTesting();
+                BlueprintTemplateLibraryStore.ResetTestingHooks();
+                BlueprintEntryState.ResetForTesting();
+                restore();
+            }
+        }
+
         private static void BlueprintPlacementOverlayRoutesAndPointerContract()
         {
             if (!BlueprintPlacementPreviewOverlay.ShouldRegisterWorldOverlayForTesting())
@@ -252,10 +403,42 @@ namespace JueMingZ.Tests
                 throw new InvalidOperationException("Expected blueprint placement pointer contract to preserve UI ownership and world hit metadata.");
             }
 
+            var physicalEdge = BlueprintPlacementPreviewOverlay.BuildPointerInputFromPhysicalEdgesForTesting(
+                true,
+                false,
+                false,
+                false,
+                false,
+                true,
+                true,
+                false,
+                true,
+                6,
+                7);
+            if (!physicalEdge.PhysicalLeftDown || physicalEdge.LeftDown || physicalEdge.LeftPressed || physicalEdge.LeftReleased)
+            {
+                throw new InvalidOperationException("Expected placement physical-left helper to keep consumed world-left from becoming a fake press or release.");
+            }
+
             if (BlueprintPlacementPreviewOverlay.ShouldConsumeAfterPlayerInputForTesting(true, true, true) ||
                 !BlueprintPlacementPreviewOverlay.ShouldConsumeAfterPlayerInputForTesting(true, false, true))
             {
                 throw new InvalidOperationException("Expected placement after-PlayerInput consumption to preserve Legacy UI ownership while guarding world input.");
+            }
+        }
+
+        private static void ReleasePlacementPreviewInitialLeftGate(int tileX, int tileY)
+        {
+            var result = BlueprintPlacementPreviewState.HandlePointer(new BlueprintPlacementPointerInput
+            {
+                WorldTileHit = true,
+                TileX = tileX,
+                TileY = tileY,
+                LeftReleased = true
+            });
+            if (!result.Succeeded || result.PlacedInstance || !BlueprintPlacementPreviewState.GetSnapshot().Active)
+            {
+                throw new InvalidOperationException("Expected placement preview release-gate helper to keep preview active without creating an instance.");
             }
         }
 

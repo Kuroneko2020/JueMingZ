@@ -142,11 +142,13 @@ namespace JueMingZ.Tests
                 RequireBlueprintEntrySuccess(BlueprintEntryState.SelectTemplateForPlacement(template), "start mirror chain preview");
                 RequireBlueprintEntrySuccess(BlueprintEntryState.ApplyCommand(BlueprintEntryCommands.MirrorPreviewHorizontal, AppSettings.CreateDefault()), "mirror chain preview");
 
+                ReleasePlacementPreviewInitialLeftGate(100, 50);
                 var placed = BlueprintPlacementPreviewState.HandlePointer(new BlueprintPlacementPointerInput
                 {
                     WorldTileHit = true,
                     TileX = 100,
                     TileY = 50,
+                    PhysicalLeftDown = true,
                     LeftDown = true,
                     LeftPressed = true
                 });

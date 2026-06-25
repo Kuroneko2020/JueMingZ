@@ -176,7 +176,6 @@ namespace JueMingZ.Tests
                 {
                     "LegacyMainWindow.DrawInterfaceLayer",
                     "BlueprintMaterialWindowOverlay.DrawInterfaceLayer",
-                    "BlueprintHandheldActionBarOverlay.DrawInterfaceLayer",
                     "MapCustomMarkerStylePickerOverlay.DrawInterfaceLayer"
                 },
                 "UI overlay dispatcher routes when low status panel layer is active");
@@ -188,10 +187,22 @@ namespace JueMingZ.Tests
                     "InformationStatusPanelOverlay.DrawInterfaceLayer",
                     "LegacyMainWindow.DrawInterfaceLayer",
                     "BlueprintMaterialWindowOverlay.DrawInterfaceLayer",
-                    "BlueprintHandheldActionBarOverlay.DrawInterfaceLayer",
                     "MapCustomMarkerStylePickerOverlay.DrawInterfaceLayer"
                 },
                 "UI overlay fallback dispatcher routes when low status panel layer is missing");
+
+            AssertStringArrayEquals(
+                InterfaceLayerHookCallbacks.GetBlueprintHandheldActionBarDispatcherRouteNamesForTesting(),
+                new[]
+                {
+                    "BlueprintHandheldActionBarOverlay.DrawInterfaceLayer"
+                },
+                "blueprint handheld action bar unscaled dispatcher routes");
+
+            if (!string.Equals(InterfaceLayerHookCallbacks.GetBlueprintHandheldActionBarScaleTypeNameForTesting(), "None", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected blueprint handheld action bar dispatcher to use unscaled screen coordinates.");
+            }
 
             AssertStringArrayEquals(
                 InterfaceLayerHookCallbacks.GetUserNotesPinnedOverlayDispatcherRouteNamesForTesting(),

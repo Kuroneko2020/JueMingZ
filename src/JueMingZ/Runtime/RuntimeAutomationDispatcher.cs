@@ -67,6 +67,12 @@ namespace JueMingZ.Runtime
             new RuntimeDispatchStep("auto-harvest", "dispatch.auto-harvest", 1);
         private static readonly RuntimeDispatchStep DispatchAutoMining =
             new RuntimeDispatchStep("auto-mining", "dispatch.auto-mining", 1);
+        private static readonly RuntimeDispatchStep DispatchBlueprintWorldInstanceLifecycle =
+            new RuntimeDispatchStep(
+                "blueprint-world-instance-lifecycle",
+                "dispatch.blueprint-world-instance-lifecycle",
+                10,
+                RuntimeDispatchLane.ReadOnlyDisplay);
         private static readonly RuntimeDispatchStep DispatchBlueprintAutoPlacement =
             new RuntimeDispatchStep("blueprint-auto-placement", "dispatch.blueprint-auto-placement", 10);
         private static readonly RuntimeDispatchStep DispatchAutoStack =
@@ -144,6 +150,7 @@ namespace JueMingZ.Runtime
             DispatchAutoCaptureCritter,
             DispatchAutoHarvest,
             DispatchAutoMining,
+            DispatchBlueprintWorldInstanceLifecycle,
             DispatchBlueprintAutoPlacement,
             DispatchAutoStack,
             DispatchAutoSell,
@@ -332,6 +339,13 @@ namespace JueMingZ.Runtime
             {
                 AutoMiningService.Tick(actionQueue, gameState, state, settings);
                 RecordOperationTiming(context, DispatchAutoMining, operationStart);
+                operationStart = Stopwatch.GetTimestamp();
+            }
+
+            if (ShouldRun(DispatchBlueprintWorldInstanceLifecycle, true, gameState, tick))
+            {
+                BlueprintWorldInstanceLifecycleService.Tick(gameState);
+                RecordOperationTiming(context, DispatchBlueprintWorldInstanceLifecycle, operationStart);
                 operationStart = Stopwatch.GetTimestamp();
             }
 

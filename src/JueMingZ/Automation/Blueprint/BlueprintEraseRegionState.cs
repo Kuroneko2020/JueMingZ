@@ -177,6 +177,7 @@ namespace JueMingZ.Automation.Blueprint
                 }
 
                 BlueprintWorldInstanceRecord target = null;
+                var fixedSingleTarget = false;
                 if (!string.IsNullOrEmpty(normalizedId))
                 {
                     target = FindVisibleInstance(world == null ? null : world.Instances, normalizedId);
@@ -188,12 +189,26 @@ namespace JueMingZ.Automation.Blueprint
                         return BlueprintEraseCommandResult.Create(false, false, _lastResultCode, _lastNotice, normalizedId, string.Empty);
                     }
                 }
-                else if (!HasVisibleInstances(world == null ? null : world.Instances))
+                else
                 {
-                    ResetActiveLocked();
-                    _lastResultCode = "noVisibleInstances";
-                    _lastNotice = "当前世界没有可修改的可见蓝图实例。";
-                    return BlueprintEraseCommandResult.Create(false, false, _lastResultCode, _lastNotice, string.Empty, string.Empty);
+                    BlueprintWorldInstanceRecord singleVisibleTarget;
+                    var visibleInstanceCount = CountVisibleInstancesWithContent(world == null ? null : world.Instances, out singleVisibleTarget);
+                    if (visibleInstanceCount <= 0)
+                    {
+                        ResetActiveLocked();
+                        _lastResultCode = "noVisibleInstances";
+                        _lastNotice = "当前世界没有可修改的可见蓝图实例。";
+                        return BlueprintEraseCommandResult.Create(false, false, _lastResultCode, _lastNotice, string.Empty, string.Empty);
+                    }
+
+                    if (visibleInstanceCount == 1)
+                    {
+                        // With a single modifiable instance, region editing can
+                        // safely start from surrounding air and still resolve the
+                        // target; multi-instance worlds keep hover-hit selection.
+                        target = singleVisibleTarget;
+                        fixedSingleTarget = true;
+                    }
                 }
 
                 var changed = !_active ||
@@ -206,7 +221,9 @@ namespace JueMingZ.Automation.Blueprint
                 ApplyTargetLocked(target, target != null);
                 _lastErasedCellCount = 0;
                 _lastInputOwner = "ui";
-                _lastResultCode = target == null ? "eraseStartedHoverTarget" : "eraseStartedSelectedTarget";
+                _lastResultCode = target == null
+                    ? "eraseStartedHoverTarget"
+                    : fixedSingleTarget ? "eraseStartedSingleTarget" : "eraseStartedSelectedTarget";
                 _lastNotice = target == null
                     ? "正在修改已放置蓝图区域。按住左键拖选修剪，点击取消修改结束。"
                     : "正在修改已放置蓝图区域。目标实例 " + _targetInstanceName + "，点击取消修改结束。";
@@ -686,11 +703,48 @@ namespace JueMingZ.Automation.Blueprint
             return false;
         }
 
-        private static bool HasVisibleInstances(IReadOnlyList<BlueprintWorldInstanceRecord> instances)
+        private static int CountVisibleInstancesWithContent(
+            IReadOnlyList<BlueprintWorldInstanceRecord> instances,
+            out BlueprintWorldInstanceRecord singleVisibleTarget)
         {
+            singleVisibleTarget = null;
+            var count = 0;
             for (var index = 0; instances != null && index < instances.Count; index++)
             {
-                if (instances[index] != null && !instances[index].Hidden)
+                var instance = instances[index];
+                if (InstanceHasVisibleContent(instance))
+                {
+                    count++;
+                    if (count == 1)
+                    {
+                        singleVisibleTarget = instance.Clone();
+                    }
+                }
+            }
+
+            if (count != 1)
+            {
+                singleVisibleTarget = null;
+            }
+
+            return count;
+        }
+
+        private static bool InstanceHasVisibleContent(BlueprintWorldInstanceRecord instance)
+        {
+            if (instance == null || instance.Hidden)
+            {
+                return false;
+            }
+
+            var eraseMask = BuildEraseMaskSet(instance.EraseMask);
+            var cells = instance.TemplateSnapshot == null ? null : instance.TemplateSnapshot.Cells;
+            for (var index = 0; cells != null && index < cells.Count; index++)
+            {
+                var cell = cells[index];
+                if (cell != null &&
+                    HasContentLayer(cell) &&
+                    !eraseMask.Contains(BuildKey(cell.X, cell.Y)))
                 {
                     return true;
                 }

@@ -839,11 +839,13 @@ namespace JueMingZ.Tests
                     throw new InvalidOperationException("Using a library template must not refresh projection or material caches.");
                 }
 
+                ReleasePlacementPreviewInitialLeftGate(50, 60);
                 var placement = BlueprintPlacementPreviewState.HandlePointer(new BlueprintPlacementPointerInput
                 {
                     WorldTileHit = true,
                     TileX = 50,
                     TileY = 60,
+                    PhysicalLeftDown = true,
                     LeftDown = true,
                     LeftPressed = true
                 });

@@ -364,6 +364,11 @@ namespace JueMingZ.UI
                 hasSelectableContent,
                 isSelectableTile);
             var result = BlueprintCreationMaskState.HandlePointer(input);
+            if (result != null && result.Changed)
+            {
+                BlueprintCreationPromptService.NotifyMaskChanged(result.Snapshot != null ? result.Snapshot.SelectedCount : 0);
+            }
+
             BlueprintUiClickDiagnostics.RecordCreationStateTransition(
                 "prefix",
                 raw,

@@ -98,7 +98,7 @@ namespace JueMingZ.Tests
             AssertBlueprintHandheldButton(placed, BlueprintHandheldActionBarState.ButtonIdOpenPlacedList, "已放置蓝图列表", "打开当前世界已放置蓝图列表");
             AssertBlueprintHandheldButton(placed, BlueprintHandheldActionBarState.ButtonIdClearPlaced, "清空放置", "清空当前世界已放置蓝图");
             AssertBlueprintHandheldButton(placed, BlueprintHandheldActionBarState.ButtonIdMove, "移动蓝图", "点击蓝图使其进入浮动状态重新放置");
-            AssertBlueprintHandheldButton(placed, BlueprintHandheldActionBarState.ButtonIdRegionModify, "区域修改", "进入区域修改，拖选修剪已放置蓝图");
+            AssertBlueprintHandheldButton(placed, BlueprintHandheldActionBarState.ButtonIdRegionModify, "区域修改", "修改已放置的蓝图");
             AssertBlueprintHandheldButton(placed, BlueprintHandheldActionBarState.ButtonIdMirror, "镜像", "镜像已放置蓝图");
 
             AssertBlueprintHandheldButtons(
@@ -161,6 +161,97 @@ namespace JueMingZ.Tests
                 BlueprintHandheldActionBarState.ButtonIdSave,
                 BlueprintHandheldActionBarState.ButtonIdExitCreate,
                 BlueprintHandheldActionBarState.ButtonIdClearSelection);
+        }
+
+        private static void BlueprintHandheldActionBarUsesEffectiveProjectionForPlacedState()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-handheld-effective-projection");
+            try
+            {
+                BlueprintEraseRegionState.ResetForTesting();
+                BlueprintPlacedInstanceUiState.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+
+                var store = new BlueprintWorldInstanceStore();
+                var context = BlueprintPlacementWorldContext.Success("pair-handheld-effective", "world-handheld-effective");
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(
+                    store.CreateInstanceFromTemplate(
+                        "pair-handheld-effective",
+                        "world-handheld-effective",
+                        CreateProjectionTileOnlyTemplate("全擦空状态", 77),
+                        10,
+                        20,
+                        0,
+                        out instance),
+                    "create effective-projection handheld instance");
+
+                BlueprintPlacedInstanceUiState.SetDependenciesForTesting(store, context, true);
+                BlueprintEraseRegionState.SetDependenciesForTesting(store, context);
+                BlueprintProjectionService.SetDependenciesForTesting(store, context, new FakeBlueprintWorldTileReader(), true);
+                BlueprintMaterialService.SetInventoryReaderForTesting(new FakeBlueprintMaterialInventoryReader(), true);
+                BlueprintProjectionService.GetSnapshot();
+
+                var beforeEnvironment = BlueprintHandheldEnvironment(1280, 720);
+                BlueprintHandheldActionBarOverlay.PopulateDynamicBlueprintStateForTesting(beforeEnvironment);
+                if (!beforeEnvironment.BlueprintHasPlacedInstances)
+                {
+                    throw new InvalidOperationException("Expected visible projection layers to expose placed blueprint handheld commands.");
+                }
+
+                var erase = EraseOneCell(instance.InstanceId, 10, 20);
+                if (!erase.ErasedRegion || erase.ErasedCellCount != 1)
+                {
+                    throw new InvalidOperationException("Expected the single visible projection cell to be fully erased.");
+                }
+
+                BlueprintPlacedInstanceUiState.NotifyInstancesChanged(instance.InstanceId);
+                var projection = BlueprintProjectionService.GetDiagnostics();
+                if (!projection.LoadSucceeded ||
+                    projection.InstanceCount != 1 ||
+                    projection.EffectiveLayerCount != 0)
+                {
+                    throw new InvalidOperationException("Expected erased instance record to remain while effective projection layers drop to zero.");
+                }
+
+                var afterEnvironment = BlueprintHandheldEnvironment(1280, 720);
+                BlueprintHandheldActionBarOverlay.PopulateDynamicBlueprintStateForTesting(afterEnvironment);
+                if (afterEnvironment.BlueprintHasPlacedInstances)
+                {
+                    throw new InvalidOperationException("Expected fully erased placed instance to stop exposing placed-management handheld state.");
+                }
+
+                var activeFrame = BlueprintHandheldActionBarOverlay.BuildFrameForTesting(
+                    BlueprintHandheldSettings(true),
+                    BlueprintHandheldSnapshot(BlueprintSettings.DefaultToolItemId),
+                    afterEnvironment);
+                AssertBlueprintHandheldButtons(
+                    activeFrame,
+                    BlueprintHandheldActionBarState.ButtonIdCreate,
+                    BlueprintHandheldActionBarState.ButtonIdOpenLibrary,
+                    BlueprintHandheldActionBarState.ButtonIdRegionModify);
+                AssertBlueprintHandheldButton(activeFrame, BlueprintHandheldActionBarState.ButtonIdRegionModify, "取消修改", "取消蓝图修改");
+
+                BlueprintEraseRegionState.Cancel();
+                var idleFrame = BlueprintHandheldActionBarOverlay.BuildFrameForTesting(
+                    BlueprintHandheldSettings(true),
+                    BlueprintHandheldSnapshot(BlueprintSettings.DefaultToolItemId),
+                    afterEnvironment);
+                AssertBlueprintHandheldButtons(
+                    idleFrame,
+                    BlueprintHandheldActionBarState.ButtonIdCreate,
+                    BlueprintHandheldActionBarState.ButtonIdOpenLibrary);
+            }
+            finally
+            {
+                BlueprintEraseRegionState.ResetForTesting();
+                BlueprintPlacedInstanceUiState.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintTemplateLibraryStore.ResetTestingHooks();
+                restore();
+            }
         }
 
         private static void BlueprintHandheldActionBarLayoutKeepsButtonsStable()
@@ -1070,19 +1161,21 @@ namespace JueMingZ.Tests
                 LegacyUiActionService.HandleBlueprintHandheldActionBarCommandForTesting(BuildBlueprintHandheldCommand(BlueprintHandheldActionBarState.ButtonIdRegionModify, "区域修改"));
                 var regionModify = BlueprintHandheldActionBarState.GetInteractionSnapshotForTesting();
                 AssertStringEquals(regionModify.LastClickedButtonId, BlueprintHandheldActionBarState.ButtonIdRegionModify, "handheld region-modify clicked id");
-                AssertStringEquals(regionModify.LastResultCode, "eraseStartedHoverTarget", "handheld region-modify starts erase mode");
+                AssertStringEquals(regionModify.LastResultCode, "eraseStartedSingleTarget", "handheld region-modify starts erase mode");
                 AssertStringEquals(BlueprintEntryState.GetSnapshot(settings).Mode, BlueprintEntryModes.EraseRegion, "handheld region-modify entry mode");
                 var eraseSnapshot = BlueprintEraseRegionState.GetSnapshot();
-                if (!eraseSnapshot.Active || eraseSnapshot.HasFixedTarget)
+                if (!eraseSnapshot.Active ||
+                    !eraseSnapshot.HasFixedTarget ||
+                    !string.Equals(eraseSnapshot.TargetInstanceId, placedInstance.InstanceId, StringComparison.Ordinal))
                 {
-                    throw new InvalidOperationException("Expected handheld region-modify to enter hover-target erase mode for placed instance trimming.");
+                    throw new InvalidOperationException("Expected handheld region-modify to preselect the single visible placed instance for trimming.");
                 }
 
                 var regionFrame = BlueprintHandheldActionBarOverlay.BuildFrameForTesting(
                     BlueprintHandheldSettings(true),
                     BlueprintHandheldSnapshot(BlueprintSettings.DefaultToolItemId),
                     BlueprintHandheldEnvironment(1280, 720, blueprintHasPlacedInstances: true, blueprintPlacedInstanceCount: 1));
-                AssertBlueprintHandheldButton(regionFrame, BlueprintHandheldActionBarState.ButtonIdRegionModify, "取消修改", "取消修改并停止红色遮罩");
+                AssertBlueprintHandheldButton(regionFrame, BlueprintHandheldActionBarState.ButtonIdRegionModify, "取消修改", "取消蓝图修改");
                 LegacyUiActionService.HandleBlueprintHandheldActionBarCommandForTesting(BuildBlueprintHandheldCommand(BlueprintHandheldActionBarState.ButtonIdRegionModify, "取消修改"));
                 var regionCancel = BlueprintHandheldActionBarState.GetInteractionSnapshotForTesting();
                 AssertStringEquals(regionCancel.LastClickedButtonId, BlueprintHandheldActionBarState.ButtonIdRegionModify, "handheld region-modify cancel clicked id");

@@ -196,7 +196,7 @@ namespace JueMingZ.Automation.Blueprint
                         "entryStateChanged",
                         "创建入口已进入 mask 选择状态。",
                         false);
-                    BlueprintCreationPromptService.NotifyCreateStarted(started);
+                    BlueprintCreationPromptService.NotifyMaskChanged(BlueprintCreationMaskState.GetSnapshot().SelectedCount);
                     return started;
                 case BlueprintEntryCommands.OpenLibrary:
                     if (IsCurrentMode(BlueprintEntryModes.PlacedManagement))
@@ -252,7 +252,15 @@ namespace JueMingZ.Automation.Blueprint
                     BlueprintPlacedInstanceTransformState.Cancel();
                     return MarkEraseStarted(BlueprintEraseRegionState.BeginErase(string.Empty));
                 case BlueprintEntryCommands.ClearSelection:
-                    return ApplyCreationSelectionResult(BlueprintCreationMaskState.ClearSelection(), BlueprintEntryModes.Creating, false);
+                    {
+                        var clearResult = BlueprintCreationMaskState.ClearSelection();
+                        if (clearResult.Changed)
+                        {
+                            BlueprintCreationPromptService.NotifyMaskChanged(0);
+                        }
+
+                        return ApplyCreationSelectionResult(clearResult, BlueprintEntryModes.Creating, false);
+                    }
                 case BlueprintEntryCommands.ExitCreate:
                     return ExitCreatePreservingSelection();
                 case BlueprintEntryCommands.FinishCreateSave:
@@ -504,7 +512,7 @@ namespace JueMingZ.Automation.Blueprint
         public static string BuildSettingsSummary(AppSettings settings)
         {
             var snapshot = GetSnapshot(settings);
-            return "手持快捷入口 " + (snapshot.HandheldEntryEnabled ? "开" : "关") +
+            return "快捷入口 " + (snapshot.HandheldEntryEnabled ? "开" : "关") +
                    " / 自动放置 " + (snapshot.AutoPlacementEnabled ? "开" : "关") +
                    " / 同类替换 " + (snapshot.ReplacementEnabled ? "开" : "关") +
                    " / 分类 " + CountEnabledReplacementCategories(settings).ToString(CultureInfo.InvariantCulture);

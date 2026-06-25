@@ -174,9 +174,10 @@ namespace JueMingZ.Tests
 
                 var begin = BlueprintEraseRegionState.BeginErase(string.Empty);
                 if (!begin.Succeeded ||
-                    !string.Equals(begin.ResultCode, "eraseStartedHoverTarget", StringComparison.Ordinal))
+                    !string.Equals(begin.ResultCode, "eraseStartedSingleTarget", StringComparison.Ordinal) ||
+                    !string.Equals(begin.TargetInstanceId, instance.InstanceId, StringComparison.Ordinal))
                 {
-                    throw new InvalidOperationException("Expected stage07 region modify to start in hover-target mode.");
+                    throw new InvalidOperationException("Expected stage07 region modify to preselect the single visible instance.");
                 }
 
                 var hover = BlueprintEraseRegionState.HandlePointer(new BlueprintErasePointerInput
@@ -240,6 +241,264 @@ namespace JueMingZ.Tests
                 BlueprintEraseRegionState.ResetForTesting();
                 BlueprintProjectionService.ResetForTesting();
                 BlueprintMaterialService.ResetForTesting();
+                restore();
+            }
+        }
+
+        private static void BlueprintEraseRegionSingleVisibleInstanceAllowsAirStartDrag()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-region-single-air-drag");
+            try
+            {
+                BlueprintEraseRegionState.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+
+                var store = new BlueprintWorldInstanceStore();
+                var reader = new FakeBlueprintWorldTileReader();
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(
+                    store.CreateInstanceFromTemplate(
+                        "pair-region-air",
+                        "world-region-air",
+                        CreateProjectionTileOnlyTemplate("空气起拖", 90),
+                        30,
+                        40,
+                        0,
+                        out instance),
+                    "create single-instance air-drag target");
+
+                var context = BlueprintPlacementWorldContext.Success("pair-region-air", "world-region-air");
+                BlueprintEraseRegionState.SetDependenciesForTesting(store, context);
+                BlueprintProjectionService.SetDependenciesForTesting(store, context, reader, true);
+
+                var begin = BlueprintEraseRegionState.BeginErase(string.Empty);
+                if (!begin.Succeeded ||
+                    !string.Equals(begin.ResultCode, "eraseStartedSingleTarget", StringComparison.Ordinal) ||
+                    !string.Equals(begin.TargetInstanceId, instance.InstanceId, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected a single visible placed instance to be fixed when region modify starts.");
+                }
+
+                var start = BlueprintEraseRegionState.HandlePointer(new BlueprintErasePointerInput
+                {
+                    WorldTileHit = true,
+                    TileX = 28,
+                    TileY = 40,
+                    LeftDown = true,
+                    LeftPressed = true
+                });
+                var afterStart = BlueprintEraseRegionState.GetSnapshot();
+                if (!start.Succeeded ||
+                    !start.ShouldConsumeLeftInput ||
+                    !afterStart.Dragging ||
+                    afterStart.DragStartX != 28 ||
+                    !string.Equals(afterStart.TargetInstanceId, instance.InstanceId, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected air-origin press to start dragging against the fixed single target.");
+                }
+
+                var release = BlueprintEraseRegionState.HandlePointer(new BlueprintErasePointerInput
+                {
+                    WorldTileHit = true,
+                    TileX = 30,
+                    TileY = 40,
+                    LeftReleased = true
+                });
+                if (!release.ErasedRegion || release.ErasedCellCount != 1)
+                {
+                    throw new InvalidOperationException("Expected air-origin drag rectangle to erase the single target when it reaches blueprint content.");
+                }
+
+                BlueprintProjectionService.RefreshAfterWorldInstancesChanged();
+                var projection = BlueprintProjectionService.GetDiagnostics();
+                if (!projection.LoadSucceeded ||
+                    projection.InstanceCount != 1 ||
+                    projection.EffectiveLayerCount != 0)
+                {
+                    throw new InvalidOperationException("Expected air-origin region erase to leave the instance record but remove all effective projection layers.");
+                }
+            }
+            finally
+            {
+                BlueprintEraseRegionState.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                restore();
+            }
+        }
+
+        private static void BlueprintEraseRegionPhysicalLeftEdgesIgnoreConsumedWorldLeft()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-region-physical-left-consumed");
+            try
+            {
+                ResetUiInputFrameTestState();
+                BlueprintUiClickDiagnostics.ResetForTesting();
+                BlueprintEraseRegionOverlay.ResetInputForTesting();
+                BlueprintEraseRegionState.ResetForTesting();
+
+                var store = new BlueprintWorldInstanceStore();
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(
+                    store.CreateInstanceFromTemplate(
+                        "pair-region-physical-left",
+                        "world-region-physical-left",
+                        CreateEraseMaterialTemplate(),
+                        30,
+                        40,
+                        0,
+                        out instance),
+                    "create physical-left erase instance");
+
+                BlueprintEraseRegionState.SetDependenciesForTesting(
+                    store,
+                    BlueprintPlacementWorldContext.Success("pair-region-physical-left", "world-region-physical-left"));
+
+                var begin = BlueprintEraseRegionState.BeginErase(instance.InstanceId);
+                if (!begin.Succeeded)
+                {
+                    throw new InvalidOperationException("Expected erase mode to start before physical-left consumed frame test.");
+                }
+
+                var startInput = BlueprintEraseRegionOverlay.BuildPointerInputFromPhysicalEdgesForTesting(
+                    true,
+                    false,
+                    false,
+                    false,
+                    true,
+                    true,
+                    false,
+                    false,
+                    true,
+                    30,
+                    40);
+                if (!startInput.LeftDown || !startInput.LeftPressed || startInput.LeftReleased)
+                {
+                    throw new InvalidOperationException("Expected physical/world left edge to start region erase drag.");
+                }
+
+                var start = BlueprintEraseRegionState.HandlePointer(startInput);
+                if (!start.ShouldConsumeLeftInput || !BlueprintEraseRegionState.GetSnapshot().Dragging)
+                {
+                    throw new InvalidOperationException("Expected region erase drag to start before the consumed-left frame.");
+                }
+
+                UiInputFrameClock.BeginUpdateFrame("test.blueprint-region-physical-left-consumed-held");
+                UiPointerOwnershipService.RegisterPointerOwnerForCurrentFrame(
+                    "blueprint-left-consumed",
+                    "BlueprintHandheldActionBar",
+                    new LegacyUiRect(500, 500, 80, 48),
+                    true,
+                    true,
+                    false,
+                    "left");
+                var rawConsumedHeld = new DiagnosticMouseState
+                {
+                    GameInputAvailable = true,
+                    TerrariaReadAvailable = true,
+                    TerrariaMouseX = 32,
+                    TerrariaMouseY = 32,
+                    TerrariaLeftDown = false,
+                    OsReadAvailable = true,
+                    OsClientMouseX = 32,
+                    OsClientMouseY = 32,
+                    OsLeftDown = true,
+                    ReadMode = "TestErasePhysicalConsumedHeld"
+                };
+                var consumedOwnership = UiPointerOwnershipService.ResolveWorldPointerOwnership(rawConsumedHeld);
+                var consumedWorldLeft = UiPointerOwnershipService.ResolveWorldLeftDown(rawConsumedHeld);
+                var consumedPhysicalLeft = BlueprintEraseRegionOverlay.ResolvePhysicalLeftDownForTesting(rawConsumedHeld);
+                var consumedPointerBlock = BlueprintEraseRegionOverlay.ShouldBlockEraseForPointerOwnershipForTesting(consumedOwnership);
+                if (!consumedOwnership.PointerBlocksWorldLeft ||
+                    consumedOwnership.PointerBlocksHoverOrDrag ||
+                    consumedPointerBlock ||
+                    consumedWorldLeft ||
+                    !consumedPhysicalLeft)
+                {
+                    throw new InvalidOperationException("Expected consumed-left outside owner bounds to block only world-left while region erase physical left remains held.");
+                }
+
+                var consumedInput = BlueprintEraseRegionOverlay.BuildPointerInputFromPhysicalEdgesForTesting(
+                    true,
+                    false,
+                    false,
+                    consumedPointerBlock,
+                    consumedWorldLeft,
+                    consumedPhysicalLeft,
+                    true,
+                    false,
+                    true,
+                    31,
+                    40);
+                if (consumedInput.UiOwned ||
+                    consumedInput.LeftDown ||
+                    consumedInput.LeftPressed ||
+                    consumedInput.LeftReleased)
+                {
+                    throw new InvalidOperationException("Consumed world-left must not become UI-owned or fake a release while physical left is still held.");
+                }
+
+                var consumed = BlueprintEraseRegionState.HandlePointer(consumedInput);
+                var afterConsumed = BlueprintEraseRegionState.GetSnapshot();
+                if (consumed.ShouldConsumeLeftInput ||
+                    consumed.ErasedRegion ||
+                    !afterConsumed.Active ||
+                    !afterConsumed.Dragging ||
+                    !afterConsumed.HasHoverTile ||
+                    afterConsumed.HoverTileX != 31 ||
+                    afterConsumed.HoverTileY != 40 ||
+                    afterConsumed.DragCurrentX != 30 ||
+                    afterConsumed.DragCurrentY != 40)
+                {
+                    throw new InvalidOperationException("Consumed-held region frame should keep drag and hover alive without applying erase cells.");
+                }
+
+                UiInputFrameClock.BeginUpdateFrame("test.blueprint-region-physical-left-release");
+                var rawRelease = new DiagnosticMouseState
+                {
+                    GameInputAvailable = true,
+                    TerrariaReadAvailable = true,
+                    TerrariaMouseX = 31 * 16,
+                    TerrariaMouseY = 40 * 16,
+                    TerrariaLeftDown = false,
+                    OsReadAvailable = true,
+                    OsClientMouseX = 31 * 16,
+                    OsClientMouseY = 40 * 16,
+                    OsLeftDown = false,
+                    ReadMode = "TestErasePhysicalRelease"
+                };
+                var releaseInput = BlueprintEraseRegionOverlay.BuildPointerInputFromPhysicalEdgesForTesting(
+                    true,
+                    false,
+                    false,
+                    false,
+                    UiPointerOwnershipService.ResolveWorldLeftDown(rawRelease),
+                    BlueprintEraseRegionOverlay.ResolvePhysicalLeftDownForTesting(rawRelease),
+                    true,
+                    false,
+                    true,
+                    31,
+                    40);
+                if (!releaseInput.LeftReleased || releaseInput.LeftPressed || releaseInput.LeftDown)
+                {
+                    throw new InvalidOperationException("Expected true physical release to complete region erase after consumed-held frame.");
+                }
+
+                var released = BlueprintEraseRegionState.HandlePointer(releaseInput);
+                var afterRelease = BlueprintEraseRegionState.GetSnapshot();
+                if (!released.ErasedRegion ||
+                    released.ErasedCellCount != 2 ||
+                    afterRelease.Dragging ||
+                    afterRelease.LastErasedCellCount != 2)
+                {
+                    throw new InvalidOperationException("Expected true physical release to apply the final erase rectangle exactly once.");
+                }
+            }
+            finally
+            {
+                ResetUiInputFrameTestState();
+                BlueprintUiClickDiagnostics.ResetForTesting();
+                BlueprintEraseRegionOverlay.ResetInputForTesting();
+                BlueprintEraseRegionState.ResetForTesting();
                 restore();
             }
         }

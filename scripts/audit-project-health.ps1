@@ -5052,11 +5052,13 @@ function Test-BlueprintHandheldActionBarGovernance {
     $legacyUiInputCommandsPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyUiInput.Commands.cs"
     $legacyUiActionServicePath = Join-Path $RepoRoot "src\JueMingZ\Input\LegacyUiActionService.cs"
     $runtimeDispatcherPath = Join-Path $RepoRoot "src\JueMingZ\Runtime\RuntimeAutomationDispatcher.cs"
+    $interfaceLayerCallbacksPath = Join-Path $RepoRoot "src\JueMingZ\Hooks\InterfaceLayerHookCallbacks.cs"
     $uiActionPath = Join-Path $RepoRoot "src\JueMingZ\Input\LegacyUiActionService.Blueprint.cs"
     $snapshotPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\DiagnosticSnapshot.cs"
     $writerPath = Join-Path $RepoRoot "src\JueMingZ\Diagnostics\DiagnosticSnapshotWriter.Json.cs"
     $builderPath = Join-Path $RepoRoot "src\JueMingZ\Runtime\Diagnostics\RuntimeDiagnosticSnapshotBuilder.Blueprint.cs"
     $testPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintHandheldActionBarTests.cs"
+    $interfaceLayerTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.InterfaceLayerHookTests.cs"
     $runtimeTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.RuntimeDiagnosticsAndDispatchTests.cs"
     $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
     $functionDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
@@ -5077,11 +5079,13 @@ function Test-BlueprintHandheldActionBarGovernance {
     $legacyUiInputCommandsText = Read-TextIfExists -Path $legacyUiInputCommandsPath
     $legacyUiActionServiceText = Read-TextIfExists -Path $legacyUiActionServicePath
     $runtimeDispatcherText = Read-TextIfExists -Path $runtimeDispatcherPath
+    $interfaceLayerCallbacksText = Read-TextIfExists -Path $interfaceLayerCallbacksPath
     $uiActionText = Read-TextIfExists -Path $uiActionPath
     $snapshotText = Read-TextIfExists -Path $snapshotPath
     $writerText = Read-TextIfExists -Path $writerPath
     $builderText = Read-TextIfExists -Path $builderPath
     $testText = Read-TextIfExists -Path $testPath
+    $interfaceLayerTestText = Read-TextIfExists -Path $interfaceLayerTestPath
     $runtimeTestText = Read-TextIfExists -Path $runtimeTestPath
     $programText = Read-TextIfExists -Path $programPath
     $functionDocText = Read-TextIfExists -Path $functionDocPath
@@ -5185,6 +5189,21 @@ function Test-BlueprintHandheldActionBarGovernance {
     }
     else {
         Write-FailHealth "Blueprint handheld action bar must use a dedicated gate-closed mouse reader that preserves only Terraria in-process input, does not restore OS fallback, and prefers fresh OS client coordinates while the input gate is open."
+    }
+
+    if ($interfaceLayerCallbacksText -and $interfaceLayerTestText -and
+        $interfaceLayerCallbacksText.Contains("BlueprintHandheldActionBarDispatcherLayerName") -and
+        $interfaceLayerCallbacksText.Contains("BlueprintHandheldActionBarDispatcherDrawers") -and
+        $interfaceLayerCallbacksText.Contains("DrawBlueprintHandheldActionBarDispatcherLayer") -and
+        $interfaceLayerCallbacksText.Contains("GetBlueprintHandheldActionBarScaleTypeNameForTesting") -and
+        $interfaceLayerCallbacksText.Contains('ParseScaleValue(_scaleType, "None")') -and
+        $interfaceLayerTestText.Contains("GetBlueprintHandheldActionBarDispatcherRouteNamesForTesting") -and
+        $interfaceLayerTestText.Contains("GetBlueprintHandheldActionBarScaleTypeNameForTesting") -and
+        $interfaceLayerTestText.Contains("blueprint handheld action bar unscaled dispatcher routes")) {
+        Write-Pass "Blueprint handheld action bar uses a dedicated None-scale interface dispatcher so physical mouse hit-test coordinates match the visual layer."
+    }
+    else {
+        Write-FailHealth "Blueprint handheld action bar must stay on its dedicated InterfaceScaleType.None dispatcher, with interface-layer tests covering route names and scale type."
     }
 
     if ($legacyUiInputCommandsText -and $legacyUiActionServiceText -and $runtimeDispatcherText -and
@@ -5471,13 +5490,13 @@ function Test-BlueprintUiClickStage02Governance {
         $eraseText.Contains("pointerBlocksErase") -and
         $eraseText.Contains("legacyUiOwned || vanillaUiOwned || pointerBlocksErase") -and
         $eraseText.Contains("ShouldBlockEraseForPointerOwnership") -and
-        $eraseText.Contains("ownership.PointerBlocksWorldLeft || ownership.PointerBlocksHoverOrDrag")
+        $eraseText.Contains("return ownership.PointerBlocksHoverOrDrag")
     $worldOverlayOk =
         $creationPointerGateOk -and
         $placementPointerGateOk -and
         $erasePointerGateOk
     if ($worldOverlayOk) {
-        Write-Pass "Blueprint creation, placement, and erase world overlays query shared pointer ownership and consumed-left before world input."
+        Write-Pass "Blueprint creation, placement, and erase world overlays query shared pointer ownership and split consumed-left from hover/drag ownership."
     }
     else {
         Write-FailHealth "Blueprint creation, placement, and erase overlays must all use shared pointer ownership and consumed-left gating."
@@ -6176,7 +6195,7 @@ function Test-BlueprintUiClickStage04Governance {
         $eraseText.Contains("legacyUiOwned || vanillaUiOwned || pointerBlocksErase") -and
         $creationText.Contains("ownership.PointerBlocksHoverOrDrag") -and
         $placementText.Contains("ownership.PointerBlocksWorldLeft || ownership.PointerBlocksHoverOrDrag") -and
-        $eraseText.Contains("ownership.PointerBlocksWorldLeft || ownership.PointerBlocksHoverOrDrag")
+        $eraseText.Contains("return ownership.PointerBlocksHoverOrDrag")
     if ($worldOverlayOk) {
         Write-Pass "Blueprint UI click stage 04 keeps the shared ownership primitive and all world overlay ownership queries wired with split world-left and hover blockers."
     }
@@ -6305,9 +6324,9 @@ function Test-BlueprintWorldOverlayPointerOwnershipStage05Governance {
         $eraseText.Contains("ShouldBlockEraseForPointerOwnership") -and
         $creationText.Contains("ownership.PointerBlocksHoverOrDrag") -and
         $placementText.Contains("ownership.PointerBlocksWorldLeft || ownership.PointerBlocksHoverOrDrag") -and
-        $eraseText.Contains("ownership.PointerBlocksWorldLeft || ownership.PointerBlocksHoverOrDrag")
+        $eraseText.Contains("return ownership.PointerBlocksHoverOrDrag")
     if ($worldOverlayNarrowGateOk) {
-        Write-Pass "Blueprint world overlays keep split pointer ownership gates: creation hover uses bounds hit, adjacent click gates also include consumed-left."
+        Write-Pass "Blueprint world overlays keep split pointer ownership gates: creation/erase hover uses bounds hit, placement click gate still includes consumed-left."
     }
     else {
         Write-FailHealth "Blueprint creation, placement, and erase overlays must keep ResolveWorldPointerOwnership(raw) and split consumed-left from owner bounds hit."
@@ -6439,7 +6458,7 @@ function Test-BlueprintCreationFlickerPointerOwnershipStage02Governance {
         $creationText.Contains("ownership.PointerBlocksHoverOrDrag") -and
         -not $creationText.Contains("return ownership.LeftConsumed || ownership.BoundsHit") -and
         $placementText.Contains("ownership.PointerBlocksWorldLeft || ownership.PointerBlocksHoverOrDrag") -and
-        $eraseText.Contains("ownership.PointerBlocksWorldLeft || ownership.PointerBlocksHoverOrDrag") -and
+        $eraseText.Contains("return ownership.PointerBlocksHoverOrDrag") -and
         $diagnosticsText.Contains("pointerBlocksWorldLeft") -and
         $diagnosticsText.Contains("pointerBlocksHoverOrDrag")) {
         Write-Pass "Blueprint creation flicker stage 02 splits pointer-owned diagnostics, world-left blocking, and hover/drag blocking."
@@ -6641,11 +6660,11 @@ function Test-BlueprintCreationFlickerCoordinateDomainStage04Governance {
         $ownershipText.Contains("Handheld owner bounds are registered in draw/client-screen") -and
         $ownershipText.Contains('source = "OsClient"') -and
         $placementText.Contains("ownership.PointerBlocksWorldLeft || ownership.PointerBlocksHoverOrDrag") -and
-        $eraseText.Contains("ownership.PointerBlocksWorldLeft || ownership.PointerBlocksHoverOrDrag")) {
-        Write-Pass "Blueprint creation flicker stage 04 keeps handheld owner-bounds hit testing in the OS client coordinate domain while preserving placement/erase click blocking."
+        $eraseText.Contains("return ownership.PointerBlocksHoverOrDrag")) {
+        Write-Pass "Blueprint creation flicker stage 04 keeps handheld owner-bounds hit testing in the OS client coordinate domain while preserving placement consumed-left blocking and erase hover/drag bounds blocking."
     }
     else {
-        Write-FailHealth "Blueprint creation flicker stage 04 must prefer OS client mouse for handheld owner bounds and keep placement/erase strict pointer blocking."
+        Write-FailHealth "Blueprint creation flicker stage 04 must prefer OS client mouse for handheld owner bounds and keep placement/erase pointer ownership split."
     }
 
     if ($testText -and $programText -and
@@ -6746,7 +6765,7 @@ function Test-BlueprintCreationFlickerStage05Governance {
         $creationText.Contains("deriving LeftReleased from it would turn a consume into a fake") -and
         $creationText.Contains("ownership.PointerBlocksHoverOrDrag") -and
         $placementText.Contains("ownership.PointerBlocksWorldLeft || ownership.PointerBlocksHoverOrDrag") -and
-        $eraseText.Contains("ownership.PointerBlocksWorldLeft || ownership.PointerBlocksHoverOrDrag") -and
+        $eraseText.Contains("return ownership.PointerBlocksHoverOrDrag") -and
         $diagnosticsText.Contains("pointerBlocksWorldLeft") -and
         $diagnosticsText.Contains("pointerBlocksHoverOrDrag") -and
         $diagnosticsText.Contains("physicalLeft")) {
@@ -7989,7 +8008,13 @@ function Test-BlueprintPlacementVersionMetadata {
                 "0.964-blueprint-autoplace-entry-governance",
                 "0.965-blueprint-autoplace-execution-chain",
                 "0.966-blueprint-regression-diagnostics-audit",
-                "0.967-blueprint-feedback-autoplace-closeout")) {
+                "0.967-blueprint-feedback-autoplace-closeout",
+                "0.968-blueprint-world-lifecycle-refresh",
+                "0.969-blueprint-region-physical-left",
+                "0.970-blueprint-handheld-unscaled-layer",
+                "0.971-blueprint-placement-release-gate",
+                "0.972-blueprint-erase-empty-region",
+                "0.973-blueprint-action-hotkey-layout")) {
             if ($effectiveAllowedRuntimeVersions -notcontains $forwardVersion) {
                 $effectiveAllowedRuntimeVersions += $forwardVersion
             }
@@ -8039,6 +8064,36 @@ function Test-BlueprintPlacementVersionMetadata {
     if (($effectiveAllowedRuntimeVersions -contains "0.966-blueprint-regression-diagnostics-audit") -and
         ($effectiveAllowedRuntimeVersions -notcontains "0.967-blueprint-feedback-autoplace-closeout")) {
         $effectiveAllowedRuntimeVersions += "0.967-blueprint-feedback-autoplace-closeout"
+    }
+
+    if (($effectiveAllowedRuntimeVersions -contains "0.967-blueprint-feedback-autoplace-closeout") -and
+        ($effectiveAllowedRuntimeVersions -notcontains "0.968-blueprint-world-lifecycle-refresh")) {
+        $effectiveAllowedRuntimeVersions += "0.968-blueprint-world-lifecycle-refresh"
+    }
+
+    if (($effectiveAllowedRuntimeVersions -contains "0.968-blueprint-world-lifecycle-refresh") -and
+        ($effectiveAllowedRuntimeVersions -notcontains "0.969-blueprint-region-physical-left")) {
+        $effectiveAllowedRuntimeVersions += "0.969-blueprint-region-physical-left"
+    }
+
+    if (($effectiveAllowedRuntimeVersions -contains "0.969-blueprint-region-physical-left") -and
+        ($effectiveAllowedRuntimeVersions -notcontains "0.970-blueprint-handheld-unscaled-layer")) {
+        $effectiveAllowedRuntimeVersions += "0.970-blueprint-handheld-unscaled-layer"
+    }
+
+    if (($effectiveAllowedRuntimeVersions -contains "0.970-blueprint-handheld-unscaled-layer") -and
+        ($effectiveAllowedRuntimeVersions -notcontains "0.971-blueprint-placement-release-gate")) {
+        $effectiveAllowedRuntimeVersions += "0.971-blueprint-placement-release-gate"
+    }
+
+    if (($effectiveAllowedRuntimeVersions -contains "0.971-blueprint-placement-release-gate") -and
+        ($effectiveAllowedRuntimeVersions -notcontains "0.972-blueprint-erase-empty-region")) {
+        $effectiveAllowedRuntimeVersions += "0.972-blueprint-erase-empty-region"
+    }
+
+    if (($effectiveAllowedRuntimeVersions -contains "0.972-blueprint-erase-empty-region") -and
+        ($effectiveAllowedRuntimeVersions -notcontains "0.973-blueprint-action-hotkey-layout")) {
+        $effectiveAllowedRuntimeVersions += "0.973-blueprint-action-hotkey-layout"
     }
 
     foreach ($runtimeVersion in $effectiveAllowedRuntimeVersions) {
@@ -9524,6 +9579,91 @@ function Test-BlueprintPlacementStage09CloseoutGovernance {
     }
 }
 
+function Test-BlueprintPlacementReleaseGateGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $statePath = Join-Path $RepoRoot "src\JueMingZ\Automation\Blueprint\BlueprintPlacementPreviewState.cs"
+    $overlayPath = Join-Path $RepoRoot "src\JueMingZ\UI\BlueprintPlacementPreviewOverlay.cs"
+    $testPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintPlacementPreviewTests.cs"
+    $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
+    $auditPath = Join-Path $RepoRoot "scripts\audit-project-health.ps1"
+    $csprojPath = Join-Path $RepoRoot "src\JueMingZ\JueMingZ.csproj"
+    $runtimePath = Join-Path $RepoRoot "src\JueMingZ\Runtime\JueMingZRuntime.cs"
+    $functionDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+
+    $stateText = Read-TextIfExists -Path $statePath
+    $overlayText = Read-TextIfExists -Path $overlayPath
+    $testText = Read-TextIfExists -Path $testPath
+    $programText = Read-TextIfExists -Path $programPath
+    $auditText = Read-TextIfExists -Path $auditPath
+    $csprojText = Read-TextIfExists -Path $csprojPath
+    $runtimeText = Read-TextIfExists -Path $runtimePath
+    $functionDocText = Read-TextIfExists -Path $functionDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+
+    if (Test-BlueprintPlacementVersionMetadata -RuntimeText $runtimeText -CsprojText $csprojText -AllowedRuntimeVersions @("0.971-blueprint-placement-release-gate")) {
+        Write-Pass "Blueprint placement release-gate version metadata is synchronized."
+    }
+    else {
+        Write-FailHealth "Blueprint placement release-gate must synchronize RuntimeVersion and project metadata to 0.971-blueprint-placement-release-gate."
+    }
+
+    if ($stateText -and
+        $stateText.Contains("_awaitInitialLeftRelease") -and
+        $stateText.Contains("awaitingInitialLeftRelease") -and
+        $stateText.Contains("initialLeftReleased") -and
+        $stateText.Contains("held physical button")) {
+        Write-Pass "Blueprint placement preview state keeps the initial physical-left release gate."
+    }
+    else {
+        Write-FailHealth "Blueprint placement preview state must require a physical-left release before the first placement confirmation."
+    }
+
+    if ($overlayText -and
+        $overlayText.Contains("_wasPhysicalLeftDown") -and
+        $overlayText.Contains("BuildPointerInputFromPhysicalEdgesForTesting") -and
+        $overlayText.Contains("ResolvePhysicalLeftDown") -and
+        $overlayText.Contains("resolved world-left only decides")) {
+        Write-Pass "Blueprint placement overlay derives press edges from physical-left while preserving strict world-left gating."
+    }
+    else {
+        Write-FailHealth "Blueprint placement overlay must keep physical-left edge derivation and strict world-left placement gating."
+    }
+
+    if ($testText -and
+        $testText.Contains("BlueprintPlacementPreviewWaitsForPhysicalLeftReleaseBeforeConfirm") -and
+        $testText.Contains("awaitingInitialLeftRelease") -and
+        $testText.Contains("initialLeftReleased") -and
+        $programText -and
+        $programText.Contains("blueprint placement preview waits for physical left release before confirm")) {
+        Write-Pass "Blueprint placement release-gate console regression is registered."
+    }
+    else {
+        Write-FailHealth "Blueprint placement release-gate console regression must remain registered."
+    }
+
+    if ($auditText -and
+        $auditText.Contains("Test-BlueprintPlacementReleaseGateGovernance") -and
+        $functionDocText -and
+        $functionDocText.Contains("0.971-blueprint-placement-release-gate") -and
+        $diagnosticsDocText -and
+        $diagnosticsDocText.Contains("0.971-blueprint-placement-release-gate") -and
+        $updateIndexText -and
+        $updateIndexText.Contains("0.971-蓝图放置预览松手门闩") -and
+        $docHistoryIndexText -and
+        $docHistoryIndexText.Contains("蓝图放置预览松手门闩")) {
+        Write-Pass "Blueprint placement release-gate docs and health audit anchors are synchronized."
+    }
+    else {
+        Write-FailHealth "Blueprint placement release-gate must update function docs, diagnostics docs, update index, document-change history, and health audit anchors."
+    }
+}
+
 function Test-BlueprintFeedbackAutoplacePlanGovernance {
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
 
@@ -10815,14 +10955,16 @@ function Test-BlueprintFeedbackStage07RegionGovernance {
         $entryTestText.Contains("BlueprintRegionActionShortcutAndHotkeyShareEraseState") -and
         $entryTestText.Contains("FeatureIds.BlueprintRegionAction") -and
         $eraseTestText.Contains("BlueprintEraseRegionStage07ContinuousHoverAndCancelOnly") -and
+        $eraseTestText.Contains("BlueprintEraseRegionPhysicalLeftEdgesIgnoreConsumedWorldLeft") -and
         $eraseTestText.Contains("cursor-red-follow-mask") -and
         $handheldTestText.Contains("取消修改") -and
         $programText.Contains("blueprint region action shortcut and hotkey share erase state") -and
-        $programText.Contains("blueprint erase region stage 07 continuous hover and cancel only")) {
-        Write-Pass "Blueprint stage 07 console tests cover F5/hotkey shared state, handheld cancel label, hover mask, and cancel-only exit."
+        $programText.Contains("blueprint erase region stage 07 continuous hover and cancel only") -and
+        $programText.Contains("blueprint erase region physical left edges ignore consumed world left")) {
+        Write-Pass "Blueprint stage 07 console tests cover F5/hotkey shared state, handheld cancel label, hover mask, physical-left consumed frames, and cancel-only exit."
     }
     else {
-        Write-FailHealth "Blueprint stage 07 must register console tests for region F5/hotkey/handheld linkage, hover mask, and cancel-only exit."
+        Write-FailHealth "Blueprint stage 07 must register console tests for region F5/hotkey/handheld linkage, hover mask, physical-left consumed frames, and cancel-only exit."
     }
 
     if ($plan07Text -and
@@ -12851,6 +12993,7 @@ function Invoke-GovernanceAudit {
         Test-BlueprintPlacementStage07MoveMirrorGovernance -RepoRoot $RepoRoot
         Test-BlueprintPlacementStage08RegressionDiagnosticsGovernance -RepoRoot $RepoRoot
         Test-BlueprintPlacementStage09CloseoutGovernance -RepoRoot $RepoRoot
+        Test-BlueprintPlacementReleaseGateGovernance -RepoRoot $RepoRoot
         Test-BlueprintFeedbackAutoplacePlanGovernance -RepoRoot $RepoRoot
         Test-BlueprintFeedbackStage02Governance -RepoRoot $RepoRoot
         Test-BlueprintFeedbackStage03Governance -RepoRoot $RepoRoot

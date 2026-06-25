@@ -106,6 +106,11 @@ namespace JueMingZ.UI
             return BlueprintHandheldActionBarState.HandlePointer(frame, input);
         }
 
+        internal static void PopulateDynamicBlueprintStateForTesting(BlueprintHandheldActionBarEnvironment environment)
+        {
+            PopulateDynamicBlueprintState(environment);
+        }
+
         internal static UiPointerOwnershipSnapshot RegisterPointerOwnershipForTesting(
             BlueprintHandheldActionBarFrame frame,
             BlueprintHandheldActionBarInteraction interaction,
@@ -211,8 +216,11 @@ namespace JueMingZ.UI
             var placedCount = Math.Max(
                 placed == null ? 0 : placed.InstanceCount,
                 projection == null ? 0 : projection.InstanceCount);
+            // Placed instance records can remain after a full erase mask; the
+            // handheld management state follows still-visible projection layers.
             environment.BlueprintPlacedInstanceCount = placedCount;
-            environment.BlueprintHasPlacedInstances = placedCount > 0;
+            environment.BlueprintHasPlacedInstances =
+                BlueprintPlacedInstanceActivity.HasActionablePlacedBlueprint(placed == null ? 0 : placed.InstanceCount, projection);
         }
 
         private static void UpdateInputGuard(string source, bool allowCommand, bool afterPlayerInput)

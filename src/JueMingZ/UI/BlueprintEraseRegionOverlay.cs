@@ -11,7 +11,7 @@ namespace JueMingZ.UI
     {
         private const int TileSize = 16;
         private const string VisualContract = "instance-erase-region+selected-priority+top-layer-fallback+store-mask-only+stage07-continuous-region-edit+cursor-red-follow-mask+cancel-only-exit";
-        private static bool _wasLeftDown;
+        private static bool _wasPhysicalLeftDown;
         private static bool _wasActive;
 
         public static bool DrawInterfaceLayer()
@@ -125,6 +125,35 @@ namespace JueMingZ.UI
             };
         }
 
+        internal static BlueprintErasePointerInput BuildPointerInputFromPhysicalEdgesForTesting(
+            bool active,
+            bool legacyUiOwned,
+            bool vanillaUiOwned,
+            bool pointerUiOwned,
+            bool worldLeftDown,
+            bool physicalLeftDown,
+            bool wasPhysicalLeftDown,
+            bool justActivated,
+            bool worldTileHit,
+            int tileX,
+            int tileY)
+        {
+            var uiOwned = legacyUiOwned || vanillaUiOwned || pointerUiOwned;
+            var leftPressed = !justActivated && physicalLeftDown && !wasPhysicalLeftDown && worldLeftDown && !uiOwned;
+            var leftReleased = !physicalLeftDown && wasPhysicalLeftDown && !uiOwned;
+            return BuildPointerInputForTesting(
+                active,
+                legacyUiOwned,
+                vanillaUiOwned,
+                pointerUiOwned,
+                worldLeftDown,
+                leftPressed,
+                leftReleased,
+                worldTileHit,
+                tileX,
+                tileY);
+        }
+
         internal static bool ShouldRegisterWorldOverlayForTesting()
         {
             return true;
@@ -157,7 +186,7 @@ namespace JueMingZ.UI
 
         internal static void ResetInputForTesting()
         {
-            _wasLeftDown = false;
+            _wasPhysicalLeftDown = false;
             _wasActive = false;
         }
 
@@ -167,12 +196,13 @@ namespace JueMingZ.UI
             if (!snapshot.Active)
             {
                 _wasActive = false;
-                _wasLeftDown = false;
+                _wasPhysicalLeftDown = false;
                 return;
             }
 
             var raw = DiagnosticMouseStateReader.Read();
-            var leftDown = UiPointerOwnershipService.ResolveWorldLeftDown(raw);
+            var worldLeftDown = UiPointerOwnershipService.ResolveWorldLeftDown(raw);
+            var physicalLeftDown = ResolvePhysicalLeftDown(raw);
             var justActivated = !_wasActive;
             _wasActive = true;
             var legacyUiOwned = IsLegacyWindowHit(raw);
@@ -184,7 +214,7 @@ namespace JueMingZ.UI
 
             if (afterPlayerInput)
             {
-                var shouldConsumeAfter = ShouldConsumeAfterPlayerInputForTesting(snapshot.Active, legacyUiOwned, vanillaUiOwned, pointerBlocksErase, leftDown);
+                var shouldConsumeAfter = ShouldConsumeAfterPlayerInputForTesting(snapshot.Active, legacyUiOwned, vanillaUiOwned, pointerBlocksErase, worldLeftDown);
                 BlueprintUiClickDiagnostics.RecordWorldOverlayInput(
                     "erase",
                     "after-player-input",
@@ -193,7 +223,7 @@ namespace JueMingZ.UI
                     legacyUiOwned,
                     vanillaUiOwned,
                     pointerUiOwned,
-                    leftDown,
+                    worldLeftDown,
                     shouldConsumeAfter,
                     false,
                     0,
@@ -219,21 +249,25 @@ namespace JueMingZ.UI
                 legacyUiOwned,
                 vanillaUiOwned,
                 pointerUiOwned,
-                leftDown,
+                worldLeftDown,
                 false,
                 worldTileHit,
                 tileX,
                 tileY,
                 uiOwned);
 
-            var input = BuildPointerInputForTesting(
+            // Resolved world-left can go false when a UI owner consumes the click.
+            // Press/release edges must follow the physical button so a consumed
+            // frame cannot fake a release and interrupt region-modify dragging.
+            var input = BuildPointerInputFromPhysicalEdgesForTesting(
                 snapshot.Active,
                 legacyUiOwned,
                 vanillaUiOwned,
                 pointerBlocksErase,
-                leftDown,
-                !justActivated && leftDown && !_wasLeftDown,
-                !leftDown && _wasLeftDown,
+                worldLeftDown,
+                physicalLeftDown,
+                _wasPhysicalLeftDown,
+                justActivated,
                 worldTileHit,
                 tileX,
                 tileY);
@@ -250,7 +284,22 @@ namespace JueMingZ.UI
                 UiMouseCaptureService.ConsumeMouseTriggerForOperationWindow("MouseLeft", out _);
             }
 
-            _wasLeftDown = leftDown;
+            _wasPhysicalLeftDown = physicalLeftDown;
+        }
+
+        internal static bool ResolvePhysicalLeftDownForTesting(DiagnosticMouseState raw)
+        {
+            return ResolvePhysicalLeftDown(raw);
+        }
+
+        private static bool ResolvePhysicalLeftDown(DiagnosticMouseState raw)
+        {
+            if (raw == null || !raw.GameInputAvailable)
+            {
+                return false;
+            }
+
+            return raw.TerrariaLeftDown || raw.OsLeftDown;
         }
 
         private static bool ShouldBlockEraseForPointerOwnership(UiPointerOwnershipDetails ownership)
@@ -260,10 +309,10 @@ namespace JueMingZ.UI
                 return false;
             }
 
-            // Erase keeps the stricter click-blocking contract in this phase:
-            // UI-consumed left blocks world erase, and bounds hit blocks
-            // hover/drag in the same coordinate domain.
-            return ownership.PointerBlocksWorldLeft || ownership.PointerBlocksHoverOrDrag;
+            // LeftConsumed is already reflected in ResolveWorldLeftDown. Erase
+            // hover/drag only becomes UI-owned when the pointer still hits the
+            // owner bounds, otherwise a consumed frame can stop region dragging.
+            return ownership.PointerBlocksHoverOrDrag;
         }
 
         private static bool IsLegacyWindowHit(DiagnosticMouseState raw)

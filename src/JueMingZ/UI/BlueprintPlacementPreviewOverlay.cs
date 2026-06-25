@@ -10,7 +10,7 @@ namespace JueMingZ.UI
     public static class BlueprintPlacementPreviewOverlay
     {
         private const int TileSize = 16;
-        private static bool _wasLeftDown;
+        private static bool _wasPhysicalLeftDown;
         private static bool _wasActive;
 
         public static bool DrawInterfaceLayer()
@@ -115,7 +115,37 @@ namespace JueMingZ.UI
             return new BlueprintPlacementPointerInput
             {
                 UiOwned = legacyUiOwned || vanillaUiOwned || pointerUiOwned,
+                PhysicalLeftDown = active && leftDown,
                 LeftDown = active && leftDown,
+                LeftPressed = active && leftPressed,
+                LeftReleased = active && leftReleased,
+                WorldTileHit = worldTileHit,
+                TileX = tileX,
+                TileY = tileY
+            };
+        }
+
+        internal static BlueprintPlacementPointerInput BuildPointerInputFromPhysicalEdgesForTesting(
+            bool active,
+            bool legacyUiOwned,
+            bool vanillaUiOwned,
+            bool pointerUiOwned,
+            bool worldLeftDown,
+            bool physicalLeftDown,
+            bool wasPhysicalLeftDown,
+            bool justActivated,
+            bool worldTileHit,
+            int tileX,
+            int tileY)
+        {
+            var uiOwned = legacyUiOwned || vanillaUiOwned || pointerUiOwned;
+            var leftPressed = !justActivated && physicalLeftDown && !wasPhysicalLeftDown && worldLeftDown && !uiOwned;
+            var leftReleased = !physicalLeftDown && wasPhysicalLeftDown && !uiOwned;
+            return new BlueprintPlacementPointerInput
+            {
+                UiOwned = uiOwned,
+                PhysicalLeftDown = active && physicalLeftDown,
+                LeftDown = active && worldLeftDown,
                 LeftPressed = active && leftPressed,
                 LeftReleased = active && leftReleased,
                 WorldTileHit = worldTileHit,
@@ -151,7 +181,7 @@ namespace JueMingZ.UI
 
         internal static void ResetInputForTesting()
         {
-            _wasLeftDown = false;
+            _wasPhysicalLeftDown = false;
             _wasActive = false;
         }
 
@@ -161,12 +191,13 @@ namespace JueMingZ.UI
             if (!snapshot.Active)
             {
                 _wasActive = false;
-                _wasLeftDown = false;
+                _wasPhysicalLeftDown = false;
                 return;
             }
 
             var raw = DiagnosticMouseStateReader.Read();
-            var leftDown = UiPointerOwnershipService.ResolveWorldLeftDown(raw);
+            var worldLeftDown = UiPointerOwnershipService.ResolveWorldLeftDown(raw);
+            var physicalLeftDown = ResolvePhysicalLeftDown(raw);
             var justActivated = !_wasActive;
             _wasActive = true;
             var legacyUiOwned = IsLegacyWindowHit(raw);
@@ -178,7 +209,7 @@ namespace JueMingZ.UI
 
             if (afterPlayerInput)
             {
-                var shouldConsumeAfter = ShouldConsumeAfterPlayerInputForTesting(snapshot.Active, legacyUiOwned, vanillaUiOwned, pointerBlocksPlacement, leftDown);
+                var shouldConsumeAfter = ShouldConsumeAfterPlayerInputForTesting(snapshot.Active, legacyUiOwned, vanillaUiOwned, pointerBlocksPlacement, worldLeftDown);
                 BlueprintUiClickDiagnostics.RecordWorldOverlayInput(
                     "placement",
                     "after-player-input",
@@ -187,7 +218,7 @@ namespace JueMingZ.UI
                     legacyUiOwned,
                     vanillaUiOwned,
                     pointerUiOwned,
-                    leftDown,
+                    worldLeftDown,
                     shouldConsumeAfter,
                     false,
                     0,
@@ -213,21 +244,25 @@ namespace JueMingZ.UI
                 legacyUiOwned,
                 vanillaUiOwned,
                 pointerUiOwned,
-                leftDown,
+                worldLeftDown,
                 false,
                 worldTileHit,
                 tileX,
                 tileY,
                 uiOwned);
 
-            var input = BuildPointerInputForTesting(
+            // Activation may be caused by a UI click that is still physically held.
+            // Edges follow the physical button; resolved world-left only decides
+            // whether that edge is allowed to reach placement confirmation.
+            var input = BuildPointerInputFromPhysicalEdgesForTesting(
                 snapshot.Active,
                 legacyUiOwned,
                 vanillaUiOwned,
                 pointerBlocksPlacement,
-                leftDown,
-                !justActivated && leftDown && !_wasLeftDown,
-                !leftDown && _wasLeftDown,
+                worldLeftDown,
+                physicalLeftDown,
+                _wasPhysicalLeftDown,
+                justActivated,
                 worldTileHit,
                 tileX,
                 tileY);
@@ -244,7 +279,22 @@ namespace JueMingZ.UI
                 UiMouseCaptureService.ConsumeMouseTriggerForOperationWindow("MouseLeft", out _);
             }
 
-            _wasLeftDown = leftDown;
+            _wasPhysicalLeftDown = physicalLeftDown;
+        }
+
+        internal static bool ResolvePhysicalLeftDownForTesting(DiagnosticMouseState raw)
+        {
+            return ResolvePhysicalLeftDown(raw);
+        }
+
+        private static bool ResolvePhysicalLeftDown(DiagnosticMouseState raw)
+        {
+            if (raw == null || !raw.GameInputAvailable)
+            {
+                return false;
+            }
+
+            return raw.TerrariaLeftDown || raw.OsLeftDown;
         }
 
         private static bool ShouldBlockPlacementForPointerOwnership(UiPointerOwnershipDetails ownership)

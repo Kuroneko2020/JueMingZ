@@ -229,6 +229,17 @@ namespace JueMingZ.Automation.Blueprint
             }
         }
 
+        internal static BlueprintProjectionSnapshot RefreshAfterWorldIdentityChanged()
+        {
+            lock (SyncRoot)
+            {
+                // Entering or switching worlds is the explicit lifecycle boundary
+                // that wakes cached projection data after disk-backed instances
+                // already existed before this session.
+                return ResolveSnapshotLocked(true).CloneSummary();
+            }
+        }
+
         internal static BlueprintProjectionSnapshot GetCachedSnapshotForDraw()
         {
             lock (SyncRoot)

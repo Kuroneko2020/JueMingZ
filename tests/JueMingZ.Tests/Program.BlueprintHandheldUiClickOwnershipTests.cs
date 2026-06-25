@@ -1198,6 +1198,7 @@ namespace JueMingZ.Tests
                     throw new InvalidOperationException("Expected placement preview to begin for adjacent ownership narrowing test.");
                 }
 
+                ReleasePlacementPreviewInitialLeftGate(44, 55);
                 var placement = BlueprintPlacementPreviewState.HandlePointer(
                     BlueprintPlacementPreviewOverlay.BuildPointerInputForTesting(
                         true,
@@ -1377,10 +1378,10 @@ namespace JueMingZ.Tests
                     consumed.PointerBlocksHoverOrDrag ||
                     BlueprintCreationOverlay.ShouldBlockCreationForPointerOwnershipForTesting(consumed) ||
                     !BlueprintPlacementPreviewOverlay.ShouldBlockPlacementForPointerOwnershipForTesting(consumed) ||
-                    !BlueprintEraseRegionOverlay.ShouldBlockEraseForPointerOwnershipForTesting(consumed) ||
+                    BlueprintEraseRegionOverlay.ShouldBlockEraseForPointerOwnershipForTesting(consumed) ||
                     UiPointerOwnershipService.ResolveWorldLeftDown(rawConsumed))
                 {
-                    throw new InvalidOperationException("Expected left-consumed ownership to block world-left revival while only placement and erase keep the strict click-blocking gate.");
+                    throw new InvalidOperationException("Expected left-consumed ownership to block world-left revival while only placement keeps the strict click-blocking gate.");
                 }
             }
             finally

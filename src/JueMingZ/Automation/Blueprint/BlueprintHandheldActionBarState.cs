@@ -47,9 +47,9 @@ namespace JueMingZ.Automation.Blueprint
         public const string MoveButtonTooltip = "点击蓝图使其进入浮动状态重新放置";
         public const string MoveCancelButtonLabel = "取消移动";
         public const string MoveCancelButtonTooltip = "取消移动并回到原位置";
-        public const string RegionModifyButtonTooltip = "进入区域修改，拖选修剪已放置蓝图";
+        public const string RegionModifyButtonTooltip = "修改已放置的蓝图";
         public const string RegionModifyCancelButtonLabel = "取消修改";
-        public const string RegionModifyCancelButtonTooltip = "取消修改并停止红色遮罩";
+        public const string RegionModifyCancelButtonTooltip = "取消蓝图修改";
         public const string MirrorCancelButtonLabel = "取消镜像";
         public const string MirrorCancelButtonTooltip = "取消镜像选择";
         public const string PointerOwnershipReasonLeft = "left";
@@ -71,7 +71,7 @@ namespace JueMingZ.Automation.Blueprint
         {
             new BlueprintHandheldActionBarButtonDefinition(ButtonIdCreate, "创建蓝图", 0, "创建新的蓝图选区"),
             new BlueprintHandheldActionBarButtonDefinition(ButtonIdSave, "保存蓝图", 0, "保存当前蓝图选区"),
-            new BlueprintHandheldActionBarButtonDefinition(ButtonIdExitCreate, "退出创建", 1, "退出创建并保留当前选区"),
+            new BlueprintHandheldActionBarButtonDefinition(ButtonIdExitCreate, "退出创建", 1, "退出创建，保留选区但不保存"),
             new BlueprintHandheldActionBarButtonDefinition(ButtonIdClearSelection, "清除选区", 2, "清除所有选区"),
             new BlueprintHandheldActionBarButtonDefinition(ButtonIdOpenLibrary, "打开蓝图库", 1, "打开蓝图库"),
             new BlueprintHandheldActionBarButtonDefinition(ButtonIdOpenPlacedList, "已放置蓝图列表", 2, "打开当前世界已放置蓝图列表"),
@@ -568,6 +568,23 @@ namespace JueMingZ.Automation.Blueprint
                         true,
                         mirroring ? MirrorCancelButtonTooltip : string.Empty,
                         mirroring ? MirrorCancelButtonLabel : string.Empty));
+                }
+                else
+                {
+                    if (moving)
+                    {
+                        definitions.Add(BuildButtonSpec(ButtonIdMove, true, MoveCancelButtonTooltip, MoveCancelButtonLabel));
+                    }
+
+                    if (regionModifying)
+                    {
+                        definitions.Add(BuildButtonSpec(ButtonIdRegionModify, true, RegionModifyCancelButtonTooltip, RegionModifyCancelButtonLabel));
+                    }
+
+                    if (mirroring)
+                    {
+                        definitions.Add(BuildButtonSpec(ButtonIdMirror, true, MirrorCancelButtonTooltip, MirrorCancelButtonLabel));
+                    }
                 }
             }
 

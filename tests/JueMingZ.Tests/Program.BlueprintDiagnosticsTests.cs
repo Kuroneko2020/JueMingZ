@@ -174,8 +174,10 @@ namespace JueMingZ.Tests
             BlueprintPlacedListRefreshesMaterialComparisonWithoutDrawScan();
             BlueprintPlacedListStage03LayoutMaterialAndCards();
             BlueprintPlacedInstanceClearAllCurrentWorldKeepsTemplatesAndRefreshesCaches();
+            BlueprintWorldInstanceLifecycleRefreshesCacheAfterWorldEntry();
             BlueprintEraseSingleInstanceClipsProjectionAndMaterials();
             BlueprintEraseRegionStage07ContinuousHoverAndCancelOnly();
+            BlueprintEraseRegionPhysicalLeftEdgesIgnoreConsumedWorldLeft();
             BlueprintPlacedInstanceMoveKeepsSnapshotStateAndRefreshesCaches();
             BlueprintPlacedInstanceMoveBlocksCompletedProgressAndKeepsOriginalPosition();
             BlueprintPlacedInstanceMirrorUsesServiceAndFailsClosed();
@@ -189,6 +191,8 @@ namespace JueMingZ.Tests
             BlueprintHandheldActionBarStage04ButtonHitBoundsMatchVisibleRects();
             BlueprintHandheldActionBarStage04NoticeTimingAndScale();
             BlueprintHandheldActionBarStage04MouseReaderCachesPrefixAndPostfixSeparately();
+            BlueprintWorldInstanceLifecycleRefreshesCacheAfterWorldEntry();
+            BlueprintEraseRegionPhysicalLeftEdgesIgnoreConsumedWorldLeft();
             BlueprintProjectionStage05CompletedProgressPersistsAndSkipsDugCells();
             BlueprintMaterialsStage05SubtractCompletedProgressFromDemand();
             BlueprintAutoPlacementSubmitsActionQueueAndVerifiesPlacement();

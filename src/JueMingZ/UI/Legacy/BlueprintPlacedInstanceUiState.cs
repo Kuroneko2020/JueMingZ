@@ -136,15 +136,20 @@ namespace JueMingZ.UI.Legacy
         {
             lock (SyncRoot)
             {
-                return new BlueprintPlacedInstanceCachedSummary
-                {
-                    Loaded = _loaded,
-                    LoadSucceeded = _lastLoadResult == null || _lastLoadResult.Succeeded,
-                    LoadResultCode = _lastLoadResult == null ? string.Empty : _lastLoadResult.ResultCode,
-                    WorldPairKey = _worldPairKey,
-                    WorldKey = _worldKey,
-                    InstanceCount = _loaded ? GetInstanceCountLocked() : 0
-                };
+                return BuildCachedSummaryLocked();
+            }
+        }
+
+        internal static BlueprintPlacedInstanceCachedSummary RefreshForWorldLifecycle()
+        {
+            lock (SyncRoot)
+            {
+                // Runtime world-entry lifecycle is the allowed low-frequency
+                // refresh boundary. Draw and hit-test callers must keep using
+                // GetCachedSummary() so they never load blueprint files.
+                _loaded = false;
+                RefreshLocked();
+                return BuildCachedSummaryLocked();
             }
         }
 
@@ -635,6 +640,19 @@ namespace JueMingZ.UI.Legacy
                 VisibleStartIndex = start,
                 VisibleCount = visible,
                 Revision = _revision
+            };
+        }
+
+        private static BlueprintPlacedInstanceCachedSummary BuildCachedSummaryLocked()
+        {
+            return new BlueprintPlacedInstanceCachedSummary
+            {
+                Loaded = _loaded,
+                LoadSucceeded = _lastLoadResult == null || _lastLoadResult.Succeeded,
+                LoadResultCode = _lastLoadResult == null ? string.Empty : _lastLoadResult.ResultCode,
+                WorldPairKey = _worldPairKey,
+                WorldKey = _worldKey,
+                InstanceCount = _loaded ? GetInstanceCountLocked() : 0
             };
         }
 

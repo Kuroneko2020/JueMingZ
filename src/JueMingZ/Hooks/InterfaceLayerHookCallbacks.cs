@@ -20,6 +20,7 @@ namespace JueMingZ.Hooks
         private const string InformationStatusPanelUnderVanillaUiDispatcherLayerName = "JueMing-Z: Information Status Panel Under Vanilla UI Dispatcher";
         private const string GameOverlayDispatcherLayerName = "JueMing-Z: Game Overlay Dispatcher";
         private const string UiOverlayDispatcherLayerName = "JueMing-Z: UI Overlay Dispatcher";
+        private const string BlueprintHandheldActionBarDispatcherLayerName = "JueMing-Z: Blueprint Handheld Action Bar Dispatcher";
         private const string UserNotesPinnedOverlayDispatcherLayerName = "JueMing-Z: User Notes Pinned Overlay Dispatcher";
         private const string LegacyFinalMouseTextGuardLayerName = "JueMing-Z: Legacy Final MouseText Guard";
 
@@ -70,7 +71,6 @@ namespace JueMingZ.Hooks
         {
             LegacyMainWindow.DrawInterfaceLayer,
             BlueprintMaterialWindowOverlay.DrawInterfaceLayer,
-            BlueprintHandheldActionBarOverlay.DrawInterfaceLayer,
             // The map marker style picker uses screen/UI coordinates; keeping it
             // in the UI-scale dispatcher prevents fullscreen map clicks from
             // being transformed by the Game/world matrix.
@@ -82,8 +82,14 @@ namespace JueMingZ.Hooks
             InformationStatusPanelOverlay.DrawInterfaceLayer,
             LegacyMainWindow.DrawInterfaceLayer,
             BlueprintMaterialWindowOverlay.DrawInterfaceLayer,
-            BlueprintHandheldActionBarOverlay.DrawInterfaceLayer,
             MapCustomMarkerStylePickerOverlay.DrawInterfaceLayer
+        };
+
+        // The handheld bar hit-tests OS client physical coordinates, so its
+        // visual layer must not inherit Terraria's UI scale matrix.
+        private static readonly Func<bool>[] BlueprintHandheldActionBarDispatcherDrawers =
+        {
+            BlueprintHandheldActionBarOverlay.DrawInterfaceLayer
         };
 
         private static readonly Func<bool>[] UserNotesPinnedOverlayDispatcherDrawers =
@@ -96,6 +102,7 @@ namespace JueMingZ.Hooks
         private static int _firstInformationStatusPanelUnderVanillaUiDispatcherInsertLogged;
         private static int _firstGameOverlayDispatcherInsertLogged;
         private static int _firstUiOverlayDispatcherInsertLogged;
+        private static int _firstBlueprintHandheldActionBarDispatcherInsertLogged;
         private static int _firstUserNotesPinnedOverlayDispatcherInsertLogged;
         private static int _firstLegacyFinalMouseTextGuardInsertLogged;
         private static int _informationWorldUnderVanillaUiDispatcherActive;
@@ -233,6 +240,16 @@ namespace JueMingZ.Hooks
             InsertLayerIfMissing(
                 layers,
                 layerState,
+                BlueprintHandheldActionBarDispatcherLayerName,
+                typeof(InterfaceLayerHookCallbacks).GetMethod("DrawBlueprintHandheldActionBarDispatcherLayer", BindingFlags.Public | BindingFlags.Static),
+                _noneScaleValue,
+                ref _firstBlueprintHandheldActionBarDispatcherInsertLogged,
+                "Blueprint handheld action bar dispatcher interface layer inserted.",
+                -1);
+
+            InsertLayerIfMissing(
+                layers,
+                layerState,
                 UserNotesPinnedOverlayDispatcherLayerName,
                 typeof(InterfaceLayerHookCallbacks).GetMethod("DrawUserNotesPinnedOverlayDispatcherLayer", BindingFlags.Public | BindingFlags.Static),
                 _noneScaleValue,
@@ -275,6 +292,12 @@ namespace JueMingZ.Hooks
         {
             UiInputFrameClock.BeginDrawFrame("UiOverlayDispatcher");
             return DrawDispatcher(SelectUiOverlayDispatcherDrawers());
+        }
+
+        public static bool DrawBlueprintHandheldActionBarDispatcherLayer()
+        {
+            UiInputFrameClock.BeginDrawFrame("BlueprintHandheldActionBarDispatcher");
+            return DrawDispatcher(BlueprintHandheldActionBarDispatcherDrawers);
         }
 
         public static bool DrawUserNotesPinnedOverlayDispatcherLayer()
@@ -681,6 +704,16 @@ namespace JueMingZ.Hooks
                 informationStatusPanelUnderVanillaUiDispatcherActive
                     ? UiOverlayDispatcherDrawers
                     : UiOverlayFallbackDispatcherDrawers);
+        }
+
+        internal static string[] GetBlueprintHandheldActionBarDispatcherRouteNamesForTesting()
+        {
+            return GetDispatcherRouteNamesForTesting(BlueprintHandheldActionBarDispatcherDrawers);
+        }
+
+        internal static string GetBlueprintHandheldActionBarScaleTypeNameForTesting()
+        {
+            return "None";
         }
 
         internal static string[] GetUserNotesPinnedOverlayDispatcherRouteNamesForTesting()

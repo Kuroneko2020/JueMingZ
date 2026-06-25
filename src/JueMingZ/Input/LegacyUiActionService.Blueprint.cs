@@ -1275,7 +1275,7 @@ namespace JueMingZ.Input
 
             if (string.Equals(targetId, FeatureIds.BlueprintRegionAction, StringComparison.Ordinal))
             {
-                return "区域修改已放置蓝图";
+                return "修改已放置蓝图区域";
             }
 
             if (string.Equals(targetId, FeatureIds.BlueprintMirrorAction, StringComparison.Ordinal))

@@ -310,12 +310,34 @@ namespace JueMingZ.Tests
             AssertContains(LegacyMainWindow.GetBlueprintActionShortcutVisualContractForTesting(), "stage08-mirror-row");
             AssertContains(LegacyMainWindow.GetBlueprintActionShortcutVisualContractForTesting(), "real-mirror-entry");
             AssertContains(LegacyMainWindow.GetBlueprintActionShortcutVisualContractForTesting(), "short-hotkey-fields");
+            AssertContains(LegacyMainWindow.GetBlueprintActionShortcutVisualContractForTesting(), "right-adjacent-hotkey-fields");
+            AssertContains(LegacyMainWindow.GetBlueprintActionShortcutVisualContractForTesting(), "full-label-space");
 
             if (LegacyMainWindow.GetBlueprintActionHotkeyInputMaxWidthForTesting() >= 160 ||
                 LegacyMainWindow.ResolveBlueprintActionHotkeyInputWidthForTesting(400) != LegacyMainWindow.GetBlueprintActionHotkeyInputMaxWidthForTesting() ||
                 LegacyMainWindow.ResolveBlueprintActionHotkeyInputWidthForTesting(96) != 96)
             {
                 throw new InvalidOperationException("Expected blueprint create/save/library action hotkey fields to share the shortened width cap without breaking narrow rows.");
+            }
+
+            var shortcutRow = new LegacyUiRect(30, 40, 650, LegacyUiMetrics.RowHeight);
+            LegacyUiRect shortcutLabelRect;
+            LegacyUiRect shortcutInputRect;
+            LegacyUiRect shortcutButtonRect;
+            LegacyMainWindow.CalculateBlueprintActionShortcutRowRectsForTesting(
+                shortcutRow,
+                "开始",
+                out shortcutLabelRect,
+                out shortcutInputRect,
+                out shortcutButtonRect);
+            var longLabelWidth = UiTextRenderer.EstimateTextWidth("修改已放置蓝图区域", LegacyUiMetrics.RowLabelTextScale);
+            if (shortcutLabelRect.Width < longLabelWidth ||
+                shortcutInputRect.X <= shortcutLabelRect.Right ||
+                shortcutButtonRect.X <= shortcutInputRect.Right ||
+                shortcutInputRect.X - shortcutLabelRect.Right != 6 ||
+                shortcutButtonRect.X - shortcutInputRect.Right != 6)
+            {
+                throw new InvalidOperationException("Expected blueprint action shortcut rows to keep long labels visible and place the hotkey field next to the right action button.");
             }
 
             var hotkeyTooltips = LegacyMainWindow.GetBlueprintActionHotkeyTooltipLinesForTesting();
@@ -634,29 +656,30 @@ namespace JueMingZ.Tests
                 BlueprintProjectionService.GetSnapshot();
 
                 AssertStringEquals(LegacyMainWindow.GetBlueprintRegionActionButtonTextForTesting(), "开始", "blueprint region action idle button text");
-                AssertStringEquals(LegacyMainWindow.GetBlueprintRegionActionButtonTooltipForTesting(), "进入区域修改，拖选修剪已放置蓝图", "blueprint region action idle tooltip");
+                AssertStringEquals(LegacyMainWindow.GetBlueprintRegionActionButtonTooltipForTesting(), "修改已放置的蓝图", "blueprint region action idle tooltip");
 
                 LegacyMainUiState.SetVisible(true);
                 LegacyMainUiState.SelectPage("blueprint");
                 LegacyUiActionService.HandleBlueprintActionEntryCommandForTesting(new LegacyUiCommand
                 {
                     ElementId = LegacyMainWindow.GetBlueprintRegionActionElementIdForTesting(),
-                    Label = "蓝图:区域修改已放置蓝图:开始",
+                    Label = "蓝图:修改已放置蓝图区域:开始",
                     Kind = "button",
                     MouseCaptured = true
                 });
 
                 var started = BlueprintEraseRegionState.GetSnapshot();
                 if (!started.Active ||
-                    started.HasFixedTarget ||
+                    !started.HasFixedTarget ||
+                    !string.Equals(started.TargetInstanceId, instance.InstanceId, StringComparison.Ordinal) ||
                     !string.Equals(BlueprintEntryState.GetSnapshot(AppSettings.CreateDefault()).Mode, BlueprintEntryModes.EraseRegion, StringComparison.Ordinal) ||
                     LegacyMainUiState.Visible)
                 {
-                    throw new InvalidOperationException("Expected F5 region action row to enter shared hover-target region modify state and close F5.");
+                    throw new InvalidOperationException("Expected F5 region action row to preselect the single visible instance and close F5.");
                 }
 
                 AssertStringEquals(LegacyMainWindow.GetBlueprintRegionActionButtonTextForTesting(), "取消", "blueprint region action cancel button text");
-                AssertStringEquals(LegacyMainWindow.GetBlueprintRegionActionButtonTooltipForTesting(), "取消修改并停止红色遮罩", "blueprint region action cancel tooltip");
+                AssertStringEquals(LegacyMainWindow.GetBlueprintRegionActionButtonTooltipForTesting(), "取消蓝图修改", "blueprint region action cancel tooltip");
 
                 var hotkeys = HotkeySettings.CreateDefault();
                 hotkeys.HotkeysByFeatureId[FeatureIds.BlueprintRegionAction] = "Alt+R";

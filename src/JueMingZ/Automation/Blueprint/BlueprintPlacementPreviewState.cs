@@ -121,6 +121,7 @@ namespace JueMingZ.Automation.Blueprint
         public bool WorldTileHit { get; set; }
         public int TileX { get; set; }
         public int TileY { get; set; }
+        public bool PhysicalLeftDown { get; set; }
         public bool LeftDown { get; set; }
         public bool LeftPressed { get; set; }
         public bool LeftReleased { get; set; }
@@ -159,6 +160,7 @@ namespace JueMingZ.Automation.Blueprint
         private static string _lastResultCode = "idle";
         private static string _lastPlacedInstanceId = string.Empty;
         private static string _lastPlacedInstanceName = string.Empty;
+        private static bool _awaitInitialLeftRelease;
 
         public static BlueprintPlacementPreviewSnapshot GetSnapshot()
         {
@@ -195,6 +197,7 @@ namespace JueMingZ.Automation.Blueprint
                 _hoverTileY = 0;
                 _originTileX = 0;
                 _originTileY = 0;
+                _awaitInitialLeftRelease = true;
                 _lastInputOwner = source ?? string.Empty;
                 _lastResultCode = "previewStarted";
                 _lastPlacedInstanceId = string.Empty;
@@ -247,6 +250,7 @@ namespace JueMingZ.Automation.Blueprint
                 _hoverTileY = 0;
                 _originTileX = 0;
                 _originTileY = 0;
+                _awaitInitialLeftRelease = false;
                 _lastInputOwner = "ui";
                 _lastResultCode = "previewCancelled";
                 _lastNotice = "已取消蓝图摆放预览。";
@@ -297,11 +301,18 @@ namespace JueMingZ.Automation.Blueprint
             {
                 if (!_active)
                 {
+                    _awaitInitialLeftRelease = false;
                     return BuildInteractionResultLocked(true, false, false, false, false, "inactive", _lastNotice, null);
                 }
 
+                var physicalLeftDown = input.PhysicalLeftDown || input.LeftDown || input.LeftPressed;
                 if (input.UiOwned)
                 {
+                    if (!physicalLeftDown)
+                    {
+                        _awaitInitialLeftRelease = false;
+                    }
+
                     _lastInputOwner = "ui";
                     _lastResultCode = "uiOwned";
                     _lastNotice = "鼠标命中 UI；摆放预览未确认。";
@@ -318,6 +329,28 @@ namespace JueMingZ.Automation.Blueprint
                     _lastResultCode = "worldMiss";
                     _lastNotice = "鼠标未命中有效世界格；摆放预览未确认。";
                     return BuildInteractionResultLocked(true, false, true, true, false, _lastResultCode, _lastNotice, null);
+                }
+
+                // A template-use UI click can survive into the world overlay as a
+                // held physical button; require a real release before placement.
+                if (_awaitInitialLeftRelease)
+                {
+                    if (physicalLeftDown)
+                    {
+                        _lastInputOwner = input.WorldTileHit ? "world-initial-left-held" : "world-outside-initial-left-held";
+                        _lastResultCode = "awaitingInitialLeftRelease";
+                        _lastNotice = "等待松开进入预览时的左键；松开后再次点击才确认摆放。";
+                        return BuildInteractionResultLocked(true, false, true, true, false, _lastResultCode, _lastNotice, null);
+                    }
+
+                    _awaitInitialLeftRelease = false;
+                    if (input.LeftReleased)
+                    {
+                        _lastInputOwner = input.WorldTileHit ? "world" : "world-outside";
+                        _lastResultCode = "initialLeftReleased";
+                        _lastNotice = "左键已松开；下一次新的左键按下才确认蓝图实例。";
+                        return BuildInteractionResultLocked(true, false, true, true, false, _lastResultCode, _lastNotice, null);
+                    }
                 }
 
                 if (input.LeftPressed)
@@ -422,6 +455,7 @@ namespace JueMingZ.Automation.Blueprint
                 _lastResultCode = "idle";
                 _lastPlacedInstanceId = string.Empty;
                 _lastPlacedInstanceName = string.Empty;
+                _awaitInitialLeftRelease = false;
             }
 
             BlueprintMirrorService.ResetForTesting();
@@ -482,6 +516,7 @@ namespace JueMingZ.Automation.Blueprint
             }
 
             _active = false;
+            _awaitInitialLeftRelease = false;
             _lastInputOwner = "world";
             _lastResultCode = "instanceCreated";
             _lastPlacedInstanceId = instance == null ? string.Empty : instance.InstanceId;

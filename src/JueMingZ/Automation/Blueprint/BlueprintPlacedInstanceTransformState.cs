@@ -238,7 +238,7 @@ namespace JueMingZ.Automation.Blueprint
                 {
                     _lastInputOwner = "world";
                     _lastResultCode = "worldMiss";
-                    _lastNotice = "鼠标未命中世界格，蓝图移动 / 镜像等待有效世界位置。";
+                    _lastNotice = "点击需要移动位置的蓝图";
                     return BuildInteractionResultLocked(true, false, input.LeftDown || input.LeftPressed, true, false, _lastResultCode, _lastNotice);
                 }
 
@@ -433,7 +433,7 @@ namespace JueMingZ.Automation.Blueprint
                 _lastInputOwner = "world";
                 _lastResultCode = "moveTargetSelected";
                 SetFloatingPreviewLocked(target, target.OriginTileX, target.OriginTileY);
-                _lastNotice = "正在移动蓝图 " + GetInstanceName(target) + "；蓝图跟随鼠标，左键确认，取消移动回原位。";
+                _lastNotice = "左键放置，取消移动回原位";
                 return BuildInteractionResultLocked(true, true, true, true, false, _lastResultCode, _lastNotice);
             }
 

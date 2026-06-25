@@ -1093,6 +1093,7 @@ namespace JueMingZ.Tests
             Run("blueprint replacement config menu contracts", ref failed, BlueprintReplacementConfigMenuContracts);
             Run("blueprint handheld action bar visibility matrix", ref failed, BlueprintHandheldActionBarVisibilityMatrix);
             Run("blueprint handheld action bar dynamic button matrix", ref failed, BlueprintHandheldActionBarDynamicButtonMatrix);
+            Run("blueprint handheld action bar uses effective projection for placed state", ref failed, BlueprintHandheldActionBarUsesEffectiveProjectionForPlacedState);
             Run("blueprint handheld action bar layout keeps buttons stable", ref failed, BlueprintHandheldActionBarLayoutKeepsButtonsStable);
             Run("blueprint handheld action bar visual style uses legacy theme and stable text scale", ref failed, BlueprintHandheldActionBarVisualStyleUsesLegacyThemeAndStableTextScale);
             Run("blueprint handheld action bar overlay stays UI-only and no-scan", ref failed, BlueprintHandheldActionBarOverlayStaysUiOnlyAndNoScan);
@@ -1144,6 +1145,7 @@ namespace JueMingZ.Tests
             Run("blueprint placement confirm creates world instance only", ref failed, BlueprintPlacementConfirmCreatesWorldInstanceOnly);
             Run("blueprint placement confirm refreshes projection and placed list", ref failed, BlueprintPlacementConfirmRefreshesProjectionAndPlacedList);
             Run("blueprint placement UI hit consumes without creating instance", ref failed, BlueprintPlacementUiHitConsumesWithoutCreatingInstance);
+            Run("blueprint placement preview waits for physical left release before confirm", ref failed, BlueprintPlacementPreviewWaitsForPhysicalLeftReleaseBeforeConfirm);
             Run("blueprint placement overlay routes and pointer contract", ref failed, BlueprintPlacementOverlayRoutesAndPointerContract);
             Run("blueprint mirror horizontal mirrors preview coordinates anchor and slope", ref failed, BlueprintMirrorHorizontalMirrorsPreviewCoordinatesAnchorAndSlope);
             Run("blueprint mirror rejects directional furniture frames fail closed", ref failed, BlueprintMirrorRejectsDirectionalFurnitureFramesFailClosed);
@@ -1151,6 +1153,7 @@ namespace JueMingZ.Tests
             Run("blueprint mirror projection materials and auto placement use mirrored snapshot", ref failed, BlueprintMirrorProjectionMaterialsAndAutoPlacementUseMirroredSnapshot);
             Run("blueprint mirror diagnostics write runtime snapshot json", ref failed, BlueprintMirrorDiagnosticsWriteRuntimeSnapshotJson);
             Run("blueprint placed instances UI state loads current world and keeps snapshots", ref failed, BlueprintPlacedInstancesUiStateLoadsCurrentWorldAndKeepsSnapshots);
+            Run("blueprint world instance lifecycle refreshes cache after world entry", ref failed, BlueprintWorldInstanceLifecycleRefreshesCacheAfterWorldEntry);
             Run("blueprint placed instance commands toggle remove select and layer", ref failed, BlueprintPlacedInstanceCommandsToggleRemoveSelectAndLayer);
             Run("blueprint placed instance clear all current world keeps templates and refreshes caches", ref failed, BlueprintPlacedInstanceClearAllCurrentWorldKeepsTemplatesAndRefreshesCaches);
             Run("blueprint placed instance move keeps snapshot state and refreshes caches", ref failed, BlueprintPlacedInstanceMoveKeepsSnapshotStateAndRefreshesCaches);
@@ -1177,6 +1180,8 @@ namespace JueMingZ.Tests
             Run("blueprint erase single instance clips projection and materials", ref failed, BlueprintEraseSingleInstanceClipsProjectionAndMaterials);
             Run("blueprint erase selection prefers selected and top layer fallback", ref failed, BlueprintEraseSelectionPrefersSelectedAndTopLayerFallback);
             Run("blueprint erase region stage 07 continuous hover and cancel only", ref failed, BlueprintEraseRegionStage07ContinuousHoverAndCancelOnly);
+            Run("blueprint erase region single visible instance allows air start drag", ref failed, BlueprintEraseRegionSingleVisibleInstanceAllowsAirStartDrag);
+            Run("blueprint erase region physical left edges ignore consumed world left", ref failed, BlueprintEraseRegionPhysicalLeftEdgesIgnoreConsumedWorldLeft);
             Run("blueprint erase UI overlay and diagnostics contracts", ref failed, BlueprintEraseUiOverlayAndDiagnosticsContracts);
             Run("blueprint auto placement disabled does not enqueue", ref failed, BlueprintAutoPlacementDisabledDoesNotEnqueue);
             Run("blueprint auto placement ignores air-only template bounds", ref failed, BlueprintAutoPlacementIgnoresAirOnlyTemplateBounds);
