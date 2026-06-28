@@ -61,6 +61,14 @@ namespace JueMingZ.Runtime
             snapshot.BlueprintProjectionCoveredLayerCount = projection.CoveredLayerCount;
             snapshot.BlueprintProjectionErasedLayerCount = projection.ErasedLayerCount;
             snapshot.BlueprintProjectionUnavailableLayerCount = projection.UnavailableLayerCount;
+            snapshot.BlueprintProjectionWallTargetLayerCount = projection.WallTargetLayerCount;
+            snapshot.BlueprintProjectionWallTypePresentLayerCount = projection.WallTypePresentLayerCount;
+            snapshot.BlueprintProjectionWallTypeMissingLayerCount = projection.WallTypeMissingLayerCount;
+            snapshot.BlueprintProjectionWallTypeConflictLayerCount = projection.WallTypeConflictLayerCount;
+            snapshot.BlueprintProjectionWallTypeUnavailableLayerCount = projection.WallTypeUnavailableLayerCount;
+            snapshot.BlueprintProjectionWallCompletedLayerCount = projection.WallCompletedLayerCount;
+            snapshot.BlueprintProjectionWallCompletedCurrentMismatchCount = projection.WallCompletedCurrentMismatchCount;
+            snapshot.BlueprintProjectionWallFrameMismatchLayerCount = projection.WallFrameMismatchLayerCount;
             snapshot.BlueprintProjectionCacheHitCount = projection.CacheHitCount;
             snapshot.BlueprintProjectionCacheMissCount = projection.CacheMissCount;
             snapshot.BlueprintProjectionLastResolveElapsedMs = projection.LastResolveElapsedMs;

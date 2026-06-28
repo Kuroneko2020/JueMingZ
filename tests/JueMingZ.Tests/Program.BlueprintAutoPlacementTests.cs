@@ -320,6 +320,207 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void BlueprintAutoPlacementRefreshesWallFramesAfterVerifiedWallUse()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-auto-placement-wall-frame-refresh");
+            try
+            {
+                BlueprintAutoPlacementService.ResetForTesting();
+                var store = new BlueprintWorldInstanceStore();
+                var reader = new FakeBlueprintWorldTileReader();
+                var driver = new FakeBlueprintAutoPlaceExecutionDriver(ItemUseBridgeStatus.AttemptedButUnverified);
+                driver.OnRefreshWallFramesAround = candidate =>
+                {
+                    var expected = BlueprintWallProjectionFrameResolver.ResolveFrameForTesting(
+                        candidate.WorldTileX,
+                        candidate.WorldTileY,
+                        false,
+                        false,
+                        false,
+                        false);
+                    reader.Set(
+                        candidate.WorldTileX,
+                        candidate.WorldTileY,
+                        new BlueprintWorldTileSnapshot
+                        {
+                            WallType = candidate.ContentId,
+                            WallFrameX = expected[0],
+                            WallFrameY = expected[1]
+                        });
+                };
+                BlueprintAutoPlaceActionExecutor.SetExecutionDriverForTesting(driver);
+
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(store.CreateInstanceFromTemplate("pair-auto-wall-refresh", "world-auto-wall-refresh", CreateAutoPlacementLayerTemplate("wall refresh", BlueprintLayerKinds.Wall, 7, 802, 1), 12, 13, 0, out instance), "create wall frame refresh instance");
+                BlueprintProjectionService.SetDependenciesForTesting(store, BlueprintPlacementWorldContext.Success("pair-auto-wall-refresh", "world-auto-wall-refresh"), reader, true);
+                BlueprintMaterialService.SetInventoryReaderForTesting(new FakeBlueprintMaterialInventoryReader(
+                    new Dictionary<int, int> { { 802, 1 } },
+                    new Dictionary<int, int>()), true);
+
+                var settings = AppSettings.CreateDefault();
+                settings.BlueprintAutoPlacementEnabled = true;
+                var queue = new InputActionQueue();
+                var tick = BlueprintAutoPlacementService.TickForTesting(queue, CreateBlueprintInWorldSnapshot(), RuntimeSettingsSnapshot.FromSettings(settings));
+                if (!tick.Submitted || tick.Request == null || tick.Request.Kind != InputActionKind.BlueprintAutoPlace)
+                {
+                    throw new InvalidOperationException("Expected blueprint wall auto placement to submit an action request.");
+                }
+
+                queue.Update(CreateBlueprintInWorldSnapshot());
+                reader.Set(12, 13, new BlueprintWorldTileSnapshot { WallType = 7, WallFrameX = 0, WallFrameY = 0 });
+                queue.Update(CreateBlueprintInWorldSnapshot());
+
+                var queueSnapshot = queue.GetSnapshot();
+                if (queueSnapshot.LastResult == null ||
+                    queueSnapshot.LastResult.Status != InputActionStatus.Succeeded ||
+                    driver.WallFrameRefreshAttemptCount != 1 ||
+                    driver.LastWallFrameRefreshTileX != 12 ||
+                    driver.LastWallFrameRefreshTileY != 13)
+                {
+                    throw new InvalidOperationException("Expected verified wall placement to refresh only the target wall frame neighborhood before success.");
+                }
+
+                var projection = BlueprintProjectionService.GetSnapshot();
+                if (projection.WallTargetLayerCount != 1 ||
+                    projection.WallTypePresentLayerCount != 1 ||
+                    projection.WallFrameMismatchLayerCount != 0)
+                {
+                    throw new InvalidOperationException("Expected wall frame refresh to clear the target frame mismatch after final projection refresh.");
+                }
+            }
+            finally
+            {
+                BlueprintAutoPlaceActionExecutor.SetExecutionDriverForTesting(null);
+                BlueprintAutoPlacementService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialWindowOverlay.ResetForTesting();
+                restore();
+            }
+        }
+
+        private static void BlueprintAutoPlacementDoesNotRefreshWallFramesWhenWallTypeMissing()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-auto-placement-wall-missing-no-refresh");
+            try
+            {
+                BlueprintAutoPlacementService.ResetForTesting();
+                var store = new BlueprintWorldInstanceStore();
+                var reader = new FakeBlueprintWorldTileReader();
+                var driver = new FakeBlueprintAutoPlaceExecutionDriver(ItemUseBridgeStatus.AttemptedButUnverified);
+                BlueprintAutoPlaceActionExecutor.SetExecutionDriverForTesting(driver);
+
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(store.CreateInstanceFromTemplate("pair-auto-wall-missing", "world-auto-wall-missing", CreateAutoPlacementLayerTemplate("wall missing", BlueprintLayerKinds.Wall, 7, 803, 1), 14, 15, 0, out instance), "create missing wall frame refresh instance");
+                BlueprintProjectionService.SetDependenciesForTesting(store, BlueprintPlacementWorldContext.Success("pair-auto-wall-missing", "world-auto-wall-missing"), reader, true);
+                BlueprintMaterialService.SetInventoryReaderForTesting(new FakeBlueprintMaterialInventoryReader(
+                    new Dictionary<int, int> { { 803, 1 } },
+                    new Dictionary<int, int>()), true);
+
+                var settings = AppSettings.CreateDefault();
+                settings.BlueprintAutoPlacementEnabled = true;
+                var queue = new InputActionQueue();
+                var tick = BlueprintAutoPlacementService.TickForTesting(queue, CreateBlueprintInWorldSnapshot(), RuntimeSettingsSnapshot.FromSettings(settings));
+                if (!tick.Submitted)
+                {
+                    throw new InvalidOperationException("Expected missing wall to submit a blueprint auto placement action.");
+                }
+
+                queue.Update(CreateBlueprintInWorldSnapshot());
+                queue.Update(CreateBlueprintInWorldSnapshot());
+
+                var queueSnapshot = queue.GetSnapshot();
+                if (queueSnapshot.LastResult == null ||
+                    queueSnapshot.LastResult.Status != InputActionStatus.AttemptedButUnverified ||
+                    driver.WallFrameRefreshAttemptCount != 0)
+                {
+                    throw new InvalidOperationException("Expected missing WallType to stay unverified and skip wall frame refresh.");
+                }
+            }
+            finally
+            {
+                BlueprintAutoPlaceActionExecutor.SetExecutionDriverForTesting(null);
+                BlueprintAutoPlacementService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialWindowOverlay.ResetForTesting();
+                restore();
+            }
+        }
+
+        private static void BlueprintAutoPlacementRetriesWallMissingOnceAfterUnverifiedUse()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-auto-placement-wall-unverified-retry");
+            try
+            {
+                BlueprintAutoPlacementService.ResetForTesting();
+                var driver = new FakeBlueprintAutoPlaceExecutionDriver(ItemUseBridgeStatus.AttemptedButUnverified);
+                BlueprintAutoPlaceActionExecutor.SetExecutionDriverForTesting(driver);
+                var store = new BlueprintWorldInstanceStore();
+                var reader = new FakeBlueprintWorldTileReader();
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(store.CreateInstanceFromTemplate("pair-auto-wall-retry", "world-auto-wall-retry", CreateAutoPlacementLayerTemplate("wall retry", BlueprintLayerKinds.Wall, 9, 804, 1), 16, 17, 0, out instance), "create wall retry instance");
+                BlueprintProjectionService.SetDependenciesForTesting(store, BlueprintPlacementWorldContext.Success("pair-auto-wall-retry", "world-auto-wall-retry"), reader, true);
+                BlueprintMaterialService.SetInventoryReaderForTesting(new FakeBlueprintMaterialInventoryReader(
+                    new Dictionary<int, int> { { 804, 3 } },
+                    new Dictionary<int, int>()), true);
+
+                var settings = AppSettings.CreateDefault();
+                settings.BlueprintAutoPlacementEnabled = true;
+                var firstQueue = new InputActionQueue();
+                var first = BlueprintAutoPlacementService.TickForTesting(firstQueue, CreateBlueprintInWorldSnapshot(), RuntimeSettingsSnapshot.FromSettings(settings));
+                if (!first.Submitted || first.Request == null)
+                {
+                    throw new InvalidOperationException("Expected first missing-wall auto placement attempt to submit.");
+                }
+
+                firstQueue.Update(CreateBlueprintInWorldSnapshot());
+                firstQueue.Update(CreateBlueprintInWorldSnapshot());
+                var firstSnapshot = firstQueue.GetSnapshot();
+                if (firstSnapshot.LastResult == null ||
+                    firstSnapshot.LastResult.Status != InputActionStatus.AttemptedButUnverified)
+                {
+                    throw new InvalidOperationException("Expected first missing-wall attempt to finish as attempted-but-unverified.");
+                }
+
+                var retryQueue = new InputActionQueue();
+                var retry = BlueprintAutoPlacementService.TickForTesting(retryQueue, CreateBlueprintInWorldSnapshot(), RuntimeSettingsSnapshot.FromSettings(settings));
+                if (!retry.Submitted || retry.Request == null)
+                {
+                    throw new InvalidOperationException("Expected one bounded retry for the same missing wall candidate after unverified ItemUseBridge completion.");
+                }
+
+                retryQueue.Update(CreateBlueprintInWorldSnapshot());
+                retryQueue.Update(CreateBlueprintInWorldSnapshot());
+                var retrySnapshot = retryQueue.GetSnapshot();
+                if (retrySnapshot.LastResult == null ||
+                    retrySnapshot.LastResult.Status != InputActionStatus.AttemptedButUnverified)
+                {
+                    throw new InvalidOperationException("Expected wall retry to stay attempted-but-unverified when WallType is still missing.");
+                }
+
+                var thirdQueue = new InputActionQueue();
+                var third = BlueprintAutoPlacementService.TickForTesting(thirdQueue, CreateBlueprintInWorldSnapshot(), RuntimeSettingsSnapshot.FromSettings(settings));
+                var diagnostics = BlueprintAutoPlacementService.GetDiagnostics();
+                if (third.Submitted ||
+                    !string.Equals(diagnostics.ResultCode, "waitingForProjectionChange", StringComparison.Ordinal) ||
+                    diagnostics.SubmittedCount != 2 ||
+                    diagnostics.AttemptedButUnverifiedCount != 2)
+                {
+                    throw new InvalidOperationException("Expected wall auto placement to stop after one unverified retry until projection changes.");
+                }
+            }
+            finally
+            {
+                BlueprintAutoPlaceActionExecutor.SetExecutionDriverForTesting(null);
+                BlueprintAutoPlacementService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialWindowOverlay.ResetForTesting();
+                restore();
+            }
+        }
+
         private static void BlueprintAutoPlacementUsesConfiguredReplacementMaterial()
         {
             var restore = PushTemporaryConfigDirectory("blueprint-auto-placement-replacement");
@@ -697,9 +898,16 @@ namespace JueMingZ.Tests
             private readonly ItemUseBridgeStatus _terminalStatus;
             private int _resultCalls;
 
+            public Action<BlueprintAutoPlacementCandidate> OnRefreshWallFramesAround { get; set; }
+            public int WallFrameRefreshAttemptCount { get; private set; }
+            public int LastWallFrameRefreshTileX { get; private set; }
+            public int LastWallFrameRefreshTileY { get; private set; }
+
             public FakeBlueprintAutoPlaceExecutionDriver(ItemUseBridgeStatus terminalStatus)
             {
                 _terminalStatus = terminalStatus;
+                LastWallFrameRefreshTileX = int.MinValue;
+                LastWallFrameRefreshTileY = int.MinValue;
             }
 
             public bool TryBeginUse(
@@ -766,6 +974,24 @@ namespace JueMingZ.Tests
             public BlueprintProjectionSnapshot ForceRefreshProjection()
             {
                 return BlueprintProjectionService.ForceRefreshForAutoPlacement();
+            }
+
+            public bool TryRefreshWallFramesAround(
+                BlueprintAutoPlacementCandidate candidate,
+                out int refreshedCoordinateCount,
+                out string message)
+            {
+                refreshedCoordinateCount = 9;
+                message = "fake wall frame refresh";
+                WallFrameRefreshAttemptCount++;
+                LastWallFrameRefreshTileX = candidate == null ? int.MinValue : candidate.WorldTileX;
+                LastWallFrameRefreshTileY = candidate == null ? int.MinValue : candidate.WorldTileY;
+                if (OnRefreshWallFramesAround != null)
+                {
+                    OnRefreshWallFramesAround(candidate);
+                }
+
+                return true;
             }
         }
     }

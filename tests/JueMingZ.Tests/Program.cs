@@ -1168,6 +1168,8 @@ namespace JueMingZ.Tests
             Run("blueprint projection stage 04 later instance covers earlier without mutating snapshots", ref failed, BlueprintProjectionStage04LaterInstanceCoversEarlierWithoutMutatingSnapshots);
             Run("blueprint projection stage 05 completed progress persists and skips dug cells", ref failed, BlueprintProjectionStage05CompletedProgressPersistsAndSkipsDugCells);
             Run("blueprint projection wall frames use neighbor continuity", ref failed, BlueprintProjectionWallFramesUseNeighborContinuity);
+            Run("blueprint projection wall diagnostics separate type presence and frame mismatch", ref failed, BlueprintProjectionWallDiagnosticsSeparateTypePresenceAndFrameMismatch);
+            Run("blueprint projection wall diagnostics expose completed current mismatch", ref failed, BlueprintProjectionWallDiagnosticsExposeCompletedCurrentMismatch);
             Run("blueprint projection cache avoids immediate recompute", ref failed, BlueprintProjectionCacheAvoidsImmediateRecompute);
             Run("blueprint projection replacement rules fulfill configured same category", ref failed, BlueprintProjectionReplacementRulesFulfillConfiguredSameCategory);
             Run("blueprint projection UI overlay and diagnostics contracts", ref failed, BlueprintProjectionUiOverlayAndDiagnosticsContracts);
@@ -1191,6 +1193,9 @@ namespace JueMingZ.Tests
             Run("blueprint auto placement candidates sort and skip unsafe layers", ref failed, BlueprintAutoPlacementCandidatesSortAndSkipUnsafeLayers);
             Run("blueprint auto placement stage 14 supports furniture track actuator and skips wire", ref failed, BlueprintAutoPlacementStage14SupportsFurnitureTrackActuatorAndSkipsWire);
             Run("blueprint auto placement submits ActionQueue and verifies placement", ref failed, BlueprintAutoPlacementSubmitsActionQueueAndVerifiesPlacement);
+            Run("blueprint auto placement refreshes wall frames after verified wall use", ref failed, BlueprintAutoPlacementRefreshesWallFramesAfterVerifiedWallUse);
+            Run("blueprint auto placement skips wall frame refresh when WallType is missing", ref failed, BlueprintAutoPlacementDoesNotRefreshWallFramesWhenWallTypeMissing);
+            Run("blueprint auto placement retries missing wall once after unverified use", ref failed, BlueprintAutoPlacementRetriesWallMissingOnceAfterUnverifiedUse);
             Run("blueprint auto placement uses configured replacement material", ref failed, BlueprintAutoPlacementUsesConfiguredReplacementMaterial);
             Run("blueprint auto placement void bag only materials fail closed with reason", ref failed, BlueprintAutoPlacementVoidBagOnlyMaterialsFailClosedWithReason);
             Run("blueprint auto placement replacement fail closed when disabled or wrong category", ref failed, BlueprintAutoPlacementReplacementFailClosedWhenDisabledOrWrongCategory);
@@ -1200,6 +1205,7 @@ namespace JueMingZ.Tests
             Run("blueprint placement stage 08 regression diagnostics contracts stay wired", ref failed, BlueprintPlacementStage08RegressionDiagnosticsContractsStayWired);
             Run("blueprint feedback stage 11 regression diagnostics contracts stay wired", ref failed, BlueprintFeedbackStage11RegressionDiagnosticsContractsStayWired);
             Run("blueprint wall object stage 06 regression diagnostics contracts stay wired", ref failed, BlueprintWallObjectStage06RegressionDiagnosticsContractsStayWired);
+            Run("blueprint wall continuity stage 05 regression diagnostics contracts stay wired", ref failed, BlueprintWallContinuityStage05RegressionDiagnosticsContractsStayWired);
             Run("user notes tab keeps hotkeys page id and note icon", ref failed, UserNotesTabKeepsHotkeysPageIdAndUsesNoteIcon);
             Run("user notes layout uses two columns and caps card height", ref failed, UserNotesLayoutUsesTwoColumnsAndCapsCardHeight);
             Run("user notes card body viewport matches layout and scroll", ref failed, UserNotesCardBodyViewportMatchesLayoutAndScroll);

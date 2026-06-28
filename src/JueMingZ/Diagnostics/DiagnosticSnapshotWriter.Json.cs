@@ -942,6 +942,14 @@ namespace JueMingZ.Diagnostics
             Append(builder, "BlueprintProjectionCoveredLayerCount", snapshot.BlueprintProjectionCoveredLayerCount, true);
             Append(builder, "BlueprintProjectionErasedLayerCount", snapshot.BlueprintProjectionErasedLayerCount, true);
             Append(builder, "BlueprintProjectionUnavailableLayerCount", snapshot.BlueprintProjectionUnavailableLayerCount, true);
+            Append(builder, "BlueprintProjectionWallTargetLayerCount", snapshot.BlueprintProjectionWallTargetLayerCount, true);
+            Append(builder, "BlueprintProjectionWallTypePresentLayerCount", snapshot.BlueprintProjectionWallTypePresentLayerCount, true);
+            Append(builder, "BlueprintProjectionWallTypeMissingLayerCount", snapshot.BlueprintProjectionWallTypeMissingLayerCount, true);
+            Append(builder, "BlueprintProjectionWallTypeConflictLayerCount", snapshot.BlueprintProjectionWallTypeConflictLayerCount, true);
+            Append(builder, "BlueprintProjectionWallTypeUnavailableLayerCount", snapshot.BlueprintProjectionWallTypeUnavailableLayerCount, true);
+            Append(builder, "BlueprintProjectionWallCompletedLayerCount", snapshot.BlueprintProjectionWallCompletedLayerCount, true);
+            Append(builder, "BlueprintProjectionWallCompletedCurrentMismatchCount", snapshot.BlueprintProjectionWallCompletedCurrentMismatchCount, true);
+            Append(builder, "BlueprintProjectionWallFrameMismatchLayerCount", snapshot.BlueprintProjectionWallFrameMismatchLayerCount, true);
             Append(builder, "BlueprintProjectionCacheHitCount", snapshot.BlueprintProjectionCacheHitCount, true);
             Append(builder, "BlueprintProjectionCacheMissCount", snapshot.BlueprintProjectionCacheMissCount, true);
             Append(builder, "BlueprintProjectionLastResolveElapsedMs", snapshot.BlueprintProjectionLastResolveElapsedMs, true);

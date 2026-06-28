@@ -38,6 +38,16 @@ namespace JueMingZ.Compat
             return tile == null ? -1 : tile.wall;
         }
 
+        public static int WallFrameX(Tile tile)
+        {
+            return tile == null ? 0 : tile.wallFrameX();
+        }
+
+        public static int WallFrameY(Tile tile)
+        {
+            return tile == null ? 0 : tile.wallFrameY();
+        }
+
         public static int LiquidAmount(Tile tile)
         {
             return tile == null ? 0 : tile.liquid;

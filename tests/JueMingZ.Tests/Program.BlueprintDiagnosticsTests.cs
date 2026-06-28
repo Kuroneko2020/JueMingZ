@@ -70,6 +70,8 @@ namespace JueMingZ.Tests
                 AssertContains(json, "\"BlueprintDiagnosticsAutoPlacementEnabled\": true");
                 AssertContains(json, "\"BlueprintDiagnosticsAutoPlacementCandidateCount\": 0");
                 AssertContains(json, "\"BlueprintProjectionResolveCount\": 1");
+                AssertContains(json, "\"BlueprintProjectionWallTargetLayerCount\": 0");
+                AssertContains(json, "\"BlueprintProjectionWallFrameMismatchLayerCount\": 0");
                 AssertContains(json, "\"BlueprintMaterialsResolveCount\": 1");
                 AssertContains(json, "\"BlueprintAutoPlacementCandidateScanCount\": 1");
                 AssertContains(json, "\"BlueprintAutoPlacementLastFailureReason\": \"noCandidate:");
@@ -213,6 +215,22 @@ namespace JueMingZ.Tests
             BlueprintAutoPlacementDiagnosticsWriteRuntimeSnapshotJson();
             BlueprintAutoPlacementSubmitsActionQueueAndVerifiesPlacement();
             BlueprintAutoPlacementVoidBagOnlyMaterialsFailClosedWithReason();
+        }
+
+        private static void BlueprintWallContinuityStage05RegressionDiagnosticsContractsStayWired()
+        {
+            BlueprintProjectionWallFramesUseNeighborContinuity();
+            BlueprintProjectionWallDiagnosticsSeparateTypePresenceAndFrameMismatch();
+            BlueprintProjectionWallDiagnosticsExposeCompletedCurrentMismatch();
+            BlueprintProjectionStage05CompletedProgressPersistsAndSkipsDugCells();
+            BlueprintAutoPlacementRefreshesWallFramesAfterVerifiedWallUse();
+            BlueprintAutoPlacementDoesNotRefreshWallFramesWhenWallTypeMissing();
+            BlueprintAutoPlacementRetriesWallMissingOnceAfterUnverifiedUse();
+            BlueprintAutoPlacementSubmitsActionQueueAndVerifiesPlacement();
+            BlueprintAutoPlacementDiagnosticsWriteRuntimeSnapshotJson();
+            BlueprintAutoPlacementVoidBagOnlyMaterialsFailClosedWithReason();
+            BlueprintPlacedInstanceMoveBlocksCompletedProgressAndKeepsOriginalPosition();
+            BlueprintPlacedInstanceMirrorUsesServiceAndFailsClosed();
         }
     }
 }

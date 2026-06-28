@@ -1000,6 +1000,8 @@ namespace JueMingZ.Automation.Blueprint
                     WallType = wallType,
                     FrameX = TerrariaTileReadCompat.FrameX(tile),
                     FrameY = TerrariaTileReadCompat.FrameY(tile),
+                    WallFrameX = TerrariaTileReadCompat.WallFrameX(tile),
+                    WallFrameY = TerrariaTileReadCompat.WallFrameY(tile),
                     TilePaintId = TerrariaTileReadCompat.TilePaint(tile),
                     WallPaintId = TerrariaTileReadCompat.WallPaint(tile),
                     TileFullbright = TerrariaTileReadCompat.IsTileFullbright(tile),

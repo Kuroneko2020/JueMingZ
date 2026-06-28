@@ -927,6 +927,14 @@ namespace JueMingZ.Diagnostics
         public int BlueprintProjectionCoveredLayerCount { get; set; }
         public int BlueprintProjectionErasedLayerCount { get; set; }
         public int BlueprintProjectionUnavailableLayerCount { get; set; }
+        public int BlueprintProjectionWallTargetLayerCount { get; set; }
+        public int BlueprintProjectionWallTypePresentLayerCount { get; set; }
+        public int BlueprintProjectionWallTypeMissingLayerCount { get; set; }
+        public int BlueprintProjectionWallTypeConflictLayerCount { get; set; }
+        public int BlueprintProjectionWallTypeUnavailableLayerCount { get; set; }
+        public int BlueprintProjectionWallCompletedLayerCount { get; set; }
+        public int BlueprintProjectionWallCompletedCurrentMismatchCount { get; set; }
+        public int BlueprintProjectionWallFrameMismatchLayerCount { get; set; }
         public int BlueprintProjectionCacheHitCount { get; set; }
         public int BlueprintProjectionCacheMissCount { get; set; }
         public double BlueprintProjectionLastResolveElapsedMs { get; set; }

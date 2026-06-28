@@ -13272,13 +13272,15 @@ function Test-BlueprintCurrentDiagnosticsGovernance {
 
     Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.BlueprintDiagnosticsTests.cs" -RequiredAnchors @(
         "BlueprintDiagnosticsAggregateRuntimeSnapshotJson",
-        "BlueprintDiagnosticsPerformanceCountersAverageCosts"
+        "BlueprintDiagnosticsPerformanceCountersAverageCosts",
+        "BlueprintWallContinuityStage05RegressionDiagnosticsContractsStayWired"
     ) -PassMessage "Blueprint diagnostics tests still cover the aggregate runtime snapshot and averages." -FailMessage "Blueprint diagnostics tests drifted."
 
     Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.cs" -RequiredAnchors @(
         "blueprint diagnostics aggregate runtime snapshot json",
         "blueprint diagnostics performance counters average costs",
-        "blueprint wall object stage 06 regression diagnostics contracts stay wired"
+        "blueprint wall object stage 06 regression diagnostics contracts stay wired",
+        "blueprint wall continuity stage 05 regression diagnostics contracts stay wired"
     ) -PassMessage "Blueprint diagnostics tests remain registered." -FailMessage "Blueprint diagnostics test registration drifted."
 }
 
@@ -13371,11 +13373,14 @@ function Test-BlueprintWallObjectStage07CloseoutGovernance {
     $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
     $docHistoryRecordText = Read-TextIfExists -Path $docHistoryRecordPath
 
-    if (Test-BlueprintPlacementVersionMetadata -RuntimeText $runtimeText -CsprojText $csprojText -AllowedRuntimeVersions @("0.982-blueprint-wall-object-closeout")) {
-        Write-Pass "Blueprint wall/object stage 07 closeout version metadata is synchronized to 0.982-blueprint-wall-object-closeout."
+    if ($plan07Text -and
+        $plan07Text.Contains("0.982-blueprint-wall-object-closeout") -and
+        $updateRecordText -and
+        $updateRecordText.Contains('RuntimeVersion：`0.982-blueprint-wall-object-closeout`')) {
+        Write-Pass "Blueprint wall/object stage 07 closeout still records the 0.982 package version without pinning the current RuntimeVersion."
     }
     else {
-        Write-FailHealth "Blueprint wall/object stage 07 must synchronize RuntimeVersion and project metadata to 0.982-blueprint-wall-object-closeout."
+        Write-FailHealth "Blueprint wall/object stage 07 must keep the archived 0.982 RuntimeVersion record while allowing newer current versions."
     }
 
     if ((Test-Path -LiteralPath $archivePlanDirectory) -and
@@ -13441,6 +13446,288 @@ function Test-BlueprintWallObjectStage07CloseoutGovernance {
     }
     else {
         Write-FailHealth "Blueprint wall/object stage 07 must synchronize update index/record and document-change history for the 0.982 closeout."
+    }
+}
+
+function Test-BlueprintWallFrameRefreshStage03Governance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Compat\TerrariaWallFrameCompat.cs" -RequiredAnchors @(
+        "WorldGen.SquareWallFrame",
+        "must never be used as a substitute for placing WallType",
+        "refreshedCoordinateCount = 9"
+    ) -PassMessage "Blueprint wall frame refresh stays in a narrow Compat wrapper." -FailMessage "Blueprint wall frame refresh Compat wrapper drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Actions\Executors\BlueprintAutoPlaceActionExecutor.cs" -RequiredAnchors @(
+        "TryRefreshWallFramesAround",
+        "wallFrameRefreshFailed",
+        "IsProjectionVerified"
+    ) -PassMessage "Blueprint auto-place executor refreshes wall frames only in the post-use verification boundary." -FailMessage "Blueprint auto-place wall frame refresh boundary drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.BlueprintAutoPlacementTests.cs" -RequiredAnchors @(
+        "BlueprintAutoPlacementRefreshesWallFramesAfterVerifiedWallUse",
+        "BlueprintAutoPlacementDoesNotRefreshWallFramesWhenWallTypeMissing",
+        "WallFrameRefreshAttemptCount"
+    ) -PassMessage "Blueprint wall frame refresh regressions cover verified wall use and missing-wall fail-closed behavior." -FailMessage "Blueprint wall frame refresh regression tests drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.cs" -RequiredAnchors @(
+        "blueprint auto placement refreshes wall frames after verified wall use",
+        "blueprint auto placement skips wall frame refresh when WallType is missing"
+    ) -PassMessage "Blueprint wall frame refresh regression tests are registered." -FailMessage "Blueprint wall frame refresh test registration drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "文档\归档历史计划\蓝图墙不连续实机修复-2606281210\03-墙帧刷新边界修复.md" -RequiredAnchors @(
+        "状态：已完成",
+        "0.984-blueprint-wall-frame-refresh",
+        "Test-BlueprintWallFrameRefreshStage03Governance",
+        '下一唯一入口为 `04-自动放置节奏与复验修复.md`'
+    ) -PassMessage "Blueprint wall continuity stage 03 plan records the frame refresh implementation and next handoff." -FailMessage "Blueprint wall continuity stage 03 plan must record completion, audit anchor, and next handoff."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "文档\功能介绍\蓝图页\蓝图.md" -RequiredAnchors @(
+        "0.984-blueprint-wall-frame-refresh",
+        "WorldGen.SquareWallFrame",
+        '不改变 `Blueprint.AutoPlace` action event schema'
+    ) -PassMessage "Blueprint feature doc describes the wall frame refresh boundary." -FailMessage "Blueprint feature doc must describe the 0.984 wall frame refresh boundary."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "文档\项目规则\AI诊断日志说明.md" -RequiredAnchors @(
+        "0.984-blueprint-wall-frame-refresh",
+        "wallFrameRefreshFailed",
+        "BlueprintAutoPlacementRefreshesWallFramesAfterVerifiedWallUse"
+    ) -PassMessage "Blueprint diagnostics doc describes wall frame refresh diagnostics and tests." -FailMessage "Blueprint diagnostics doc must describe the 0.984 wall frame refresh diagnostics boundary."
+}
+
+function Test-BlueprintWallUnverifiedRetryStage04Governance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Automation\Blueprint\BlueprintAutoPlacementService.cs" -RequiredAnchors @(
+        "MaxWallUnverifiedRetrySubmissions = 1",
+        "CanSubmitWallUnverifiedRetryLocked",
+        "ArmWallUnverifiedRetryIfNeededLocked",
+        "waitingForProjectionChange"
+    ) -PassMessage "Blueprint wall auto-placement keeps the unverified retry bounded." -FailMessage "Blueprint wall unverified retry guard drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.BlueprintAutoPlacementTests.cs" -RequiredAnchors @(
+        "BlueprintAutoPlacementRetriesWallMissingOnceAfterUnverifiedUse",
+        "Expected one bounded retry",
+        "Expected wall auto placement to stop after one unverified retry"
+    ) -PassMessage "Blueprint wall unverified retry regression covers one retry and stop condition." -FailMessage "Blueprint wall unverified retry regression test drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.cs" -RequiredAnchors @(
+        "blueprint auto placement retries missing wall once after unverified use"
+    ) -PassMessage "Blueprint wall unverified retry regression is registered." -FailMessage "Blueprint wall unverified retry test registration drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "文档\归档历史计划\蓝图墙不连续实机修复-2606281210\04-自动放置节奏与复验修复.md" -RequiredAnchors @(
+        "状态：已完成",
+        "0.985-blueprint-wall-unverified-retry",
+        "Test-BlueprintWallUnverifiedRetryStage04Governance",
+        '下一唯一入口为 `05-回归诊断与审计防线.md`'
+    ) -PassMessage "Blueprint wall continuity stage 04 plan records the bounded retry and next handoff." -FailMessage "Blueprint wall continuity stage 04 plan must record completion, audit anchor, and next handoff."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "文档\功能介绍\蓝图页\蓝图.md" -RequiredAnchors @(
+        "0.985-blueprint-wall-unverified-retry",
+        "有界重试",
+        '不改变 `Blueprint.AutoPlace` action event schema'
+    ) -PassMessage "Blueprint feature doc describes the 0.985 bounded wall retry boundary." -FailMessage "Blueprint feature doc must describe the 0.985 bounded wall retry boundary."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "文档\项目规则\AI诊断日志说明.md" -RequiredAnchors @(
+        "0.985-blueprint-wall-unverified-retry",
+        "BlueprintAutoPlacementRetriesWallMissingOnceAfterUnverifiedUse",
+        "waitingForProjectionChange"
+    ) -PassMessage "Blueprint diagnostics doc describes the 0.985 bounded wall retry diagnostics." -FailMessage "Blueprint diagnostics doc must describe the 0.985 bounded wall retry diagnostics."
+}
+
+function Test-BlueprintWallContinuityStage05RegressionDiagnosticsGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.BlueprintDiagnosticsTests.cs" -RequiredAnchors @(
+        "BlueprintWallContinuityStage05RegressionDiagnosticsContractsStayWired",
+        "BlueprintProjectionWallDiagnosticsSeparateTypePresenceAndFrameMismatch",
+        "BlueprintProjectionWallDiagnosticsExposeCompletedCurrentMismatch",
+        "BlueprintAutoPlacementRefreshesWallFramesAfterVerifiedWallUse",
+        "BlueprintAutoPlacementRetriesWallMissingOnceAfterUnverifiedUse",
+        "BlueprintAutoPlacementVoidBagOnlyMaterialsFailClosedWithReason"
+    ) -PassMessage "Blueprint wall continuity stage 05 aggregate regression reuses wall diagnostics, frame refresh, retry, and material-boundary contracts." -FailMessage "Blueprint wall continuity stage 05 aggregate regression drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.cs" -RequiredAnchors @(
+        "blueprint wall continuity stage 05 regression diagnostics contracts stay wired"
+    ) -PassMessage "Blueprint wall continuity stage 05 aggregate regression is registered." -FailMessage "Blueprint wall continuity stage 05 aggregate regression registration drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Automation\Blueprint\BlueprintProjectionService.cs" -RequiredAnchors @(
+        "WallTypeMissingLayerCount",
+        "WallFrameMismatchLayerCount",
+        "WallCompletedCurrentMismatchCount"
+    ) -PassMessage "Blueprint projection still distinguishes missing wall, wall frame mismatch, and completed-current mismatch." -FailMessage "Blueprint wall completion diagnostics drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Actions\Executors\BlueprintAutoPlaceActionExecutor.cs" -RequiredAnchors @(
+        "TryRefreshWallFramesAround",
+        "wallFrameRefreshFailed",
+        "directWorldMutationAttempted"
+    ) -PassMessage "Blueprint auto-place executor keeps wall frame refresh in the action verification boundary and mutation guards visible." -FailMessage "Blueprint auto-place wall continuity executor boundary drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Automation\Blueprint\BlueprintAutoPlacementService.cs" -RequiredAnchors @(
+        "MaxWallUnverifiedRetrySubmissions = 1",
+        "CanSubmitWallUnverifiedRetryLocked",
+        "waitingForProjectionChange"
+    ) -PassMessage "Blueprint wall unverified retry remains bounded and stops at projection-change wait." -FailMessage "Blueprint wall retry stop condition drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "文档\归档历史计划\蓝图墙不连续实机修复-2606281210\05-回归诊断与审计防线.md" -RequiredAnchors @(
+        "状态：已完成",
+        "0.986-blueprint-wall-regression-audit",
+        "BlueprintWallContinuityStage05RegressionDiagnosticsContractsStayWired",
+        "Test-BlueprintWallContinuityStage05RegressionDiagnosticsGovernance",
+        '下一唯一入口为 `06-验证打包与归档收口.md`'
+    ) -PassMessage "Blueprint wall continuity stage 05 plan records aggregate regression, audit, and next handoff." -FailMessage "Blueprint wall continuity stage 05 plan must record completion, aggregate audit, and next handoff."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "文档\归档历史计划\蓝图墙不连续实机修复-2606281210\00-基准.md" -RequiredAnchors @(
+        "05-回归诊断与审计防线",
+        '已完成：`0.986-blueprint-wall-regression-audit`',
+        "06-验证打包与归档收口"
+    ) -PassMessage "Blueprint wall continuity baseline advances from stage 05 to stage 06." -FailMessage "Blueprint wall continuity baseline must mark stage 05 complete and stage 06 next."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "文档\当前在做计划\索引.md" -RequiredAnchors @(
+        "0.986-blueprint-wall-regression-audit",
+        "文档/归档历史计划/蓝图墙不连续实机修复-2606281210/",
+        "0.986-blueprint-wall-regression-audit"
+    ) -PassMessage "Current plan index keeps the archived wall continuity stage 05 context visible." -FailMessage "Current plan index must keep the archived wall continuity stage 05 context visible."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "文档\功能介绍\蓝图页\蓝图.md" -RequiredAnchors @(
+        "0.986-blueprint-wall-regression-audit",
+        "BlueprintWallContinuityStage05RegressionDiagnosticsContractsStayWired",
+        "Test-BlueprintWallContinuityStage05RegressionDiagnosticsGovernance"
+    ) -PassMessage "Blueprint feature doc describes the stage 05 wall continuity audit boundary." -FailMessage "Blueprint feature doc must describe the stage 05 wall continuity audit boundary."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "文档\项目规则\AI诊断日志说明.md" -RequiredAnchors @(
+        "0.986-blueprint-wall-regression-audit",
+        "BlueprintWallContinuityStage05RegressionDiagnosticsContractsStayWired",
+        "DiagnosticLifecycle=ActiveInvestigation"
+    ) -PassMessage "Blueprint diagnostics doc describes the stage 05 wall continuity diagnostics lifecycle." -FailMessage "Blueprint diagnostics doc must describe the stage 05 wall continuity diagnostics lifecycle."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "文档\更新记录\索引.md" -RequiredAnchors @(
+        "0.986-蓝图墙回归审计-2606281352.md",
+        "0.986-blueprint-wall-regression-audit"
+    ) -PassMessage "Update record index includes the 0.986 wall continuity audit." -FailMessage "Update record index must include the 0.986 wall continuity audit."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "文档\更新记录\0.986-蓝图墙回归审计-2606281352.md" -RequiredAnchors @(
+        "0.986-blueprint-wall-regression-audit",
+        "BlueprintWallContinuityStage05RegressionDiagnosticsContractsStayWired",
+        "Test-BlueprintWallContinuityStage05RegressionDiagnosticsGovernance",
+        "不生成测试包"
+    ) -PassMessage "Update record describes the stage 05 wall continuity regression audit and no-package boundary." -FailMessage "Update record must describe the stage 05 wall continuity regression audit and no-package boundary."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "文档\文档更改历史\索引.md" -RequiredAnchors @(
+        "蓝图墙回归审计-2606281352.md",
+        "0.986-blueprint-wall-regression-audit"
+    ) -PassMessage "Document-change history index includes the stage 05 wall continuity audit." -FailMessage "Document-change history index must include the stage 05 wall continuity audit."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "文档\文档更改历史\蓝图墙回归审计-2606281352.md" -RequiredAnchors @(
+        "05-回归诊断与审计防线",
+        "BlueprintWallContinuityStage05RegressionDiagnosticsContractsStayWired",
+        "Test-BlueprintWallContinuityStage05RegressionDiagnosticsGovernance"
+    ) -PassMessage "Document-change record describes the stage 05 wall continuity audit synchronization." -FailMessage "Document-change record must describe the stage 05 wall continuity audit synchronization."
+}
+
+function Test-BlueprintWallContinuityStage06CloseoutGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $csprojPath = Join-Path $RepoRoot "src\JueMingZ\JueMingZ.csproj"
+    $runtimePath = Join-Path $RepoRoot "src\JueMingZ\Runtime\JueMingZRuntime.cs"
+    $currentPlanDirectory = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图墙不连续实机修复-2606281210")
+    $archivePlanDirectory = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图墙不连续实机修复-2606281210")
+    $plan00Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图墙不连续实机修复-2606281210", "00-基准.md")
+    $plan06Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图墙不连续实机修复-2606281210", "06-验证打包与归档收口.md")
+    $currentPlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "索引.md")
+    $archivePlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "索引.md")
+    $functionDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $updateRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "0.987-蓝图墙连续性验证收口-2606281405.md")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+    $docHistoryRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "蓝图墙连续性验证收口-2606281405.md")
+
+    $csprojText = Read-TextIfExists -Path $csprojPath
+    $runtimeText = Read-TextIfExists -Path $runtimePath
+    $plan00Text = Read-TextIfExists -Path $plan00Path
+    $plan06Text = Read-TextIfExists -Path $plan06Path
+    $currentPlanIndexText = Read-TextIfExists -Path $currentPlanIndexPath
+    $archivePlanIndexText = Read-TextIfExists -Path $archivePlanIndexPath
+    $functionDocText = Read-TextIfExists -Path $functionDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $updateRecordText = Read-TextIfExists -Path $updateRecordPath
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+    $docHistoryRecordText = Read-TextIfExists -Path $docHistoryRecordPath
+
+    if ($plan06Text -and
+        $plan06Text.Contains("0.987-blueprint-wall-continuity-closeout") -and
+        $updateRecordText -and
+        $updateRecordText.Contains('RuntimeVersion：`0.987-blueprint-wall-continuity-closeout`')) {
+        Write-Pass "Blueprint wall continuity stage 06 still records the 0.987 package version without pinning the current RuntimeVersion."
+    }
+    else {
+        Write-FailHealth "Blueprint wall continuity stage 06 must keep the archived 0.987 RuntimeVersion record while allowing newer current versions."
+    }
+
+    if ((Test-Path -LiteralPath $archivePlanDirectory) -and
+        -not (Test-Path -LiteralPath $currentPlanDirectory) -and
+        $plan00Text -and
+        $plan00Text.Contains("06-验证打包与归档收口") -and
+        $plan00Text.Contains('已完成：`0.987-blueprint-wall-continuity-closeout`') -and
+        $plan06Text -and
+        $plan06Text.Contains("状态：已完成") -and
+        $plan06Text.Contains("0.987-blueprint-wall-continuity-closeout") -and
+        $plan06Text.Contains("JueMingZ-TestPackage") -and
+        $plan06Text.Contains("-RequireFreshTestPackage") -and
+        $plan06Text.Contains("不生成源码包") -and
+        $plan06Text.Contains("不新增运行时功能")) {
+        Write-Pass "Blueprint wall continuity plan is archived with stage 06 package delivery and strict freshness audit recorded."
+    }
+    else {
+        Write-FailHealth "Blueprint wall continuity stage 06 must archive the plan and record package, strict freshness audit, no source package, and no-new-runtime-feature scope."
+    }
+
+    if ($currentPlanIndexText -and
+        $currentPlanIndexText.Contains("当前没有正在推进的计划") -and
+        $currentPlanIndexText.Contains("文档/归档历史计划/蓝图墙不连续实机修复-2606281210/") -and
+        $currentPlanIndexText.Contains("0.987-blueprint-wall-continuity-closeout") -and
+        $archivePlanIndexText -and
+        $archivePlanIndexText.Contains("文档/归档历史计划/蓝图墙不连续实机修复-2606281210/") -and
+        $archivePlanIndexText.Contains("0.987-blueprint-wall-continuity-closeout") -and
+        $archivePlanIndexText.Contains("JueMingZ-TestPackage")) {
+        Write-Pass "Blueprint wall continuity current and archive plan indexes record the stage 06 closeout."
+    }
+    else {
+        Write-FailHealth "Blueprint wall continuity stage 06 must remove the plan from current work and add the archived closeout summary."
+    }
+
+    if ($functionDocText -and
+        $functionDocText.Contains("0.987-blueprint-wall-continuity-closeout") -and
+        $functionDocText.Contains("JueMingZ-TestPackage") -and
+        $functionDocText.Contains("Test-BlueprintWallContinuityStage06CloseoutGovernance") -and
+        $diagnosticsDocText -and
+        $diagnosticsDocText.Contains("0.987-blueprint-wall-continuity-closeout") -and
+        $diagnosticsDocText.Contains("不新增 runtime snapshot 字段") -and
+        $diagnosticsDocText.Contains("不新增 trace JSONL")) {
+        Write-Pass "Blueprint feature and diagnostics docs record the wall continuity closeout without expanding runtime or diagnostics scope."
+    }
+    else {
+        Write-FailHealth "Blueprint wall continuity stage 06 must update feature and diagnostics docs with package closeout and no-new-diagnostics scope."
+    }
+
+    if ($updateIndexText -and
+        $updateIndexText.Contains("0.987-蓝图墙连续性验证收口-2606281405.md") -and
+        $updateRecordText -and
+        $updateRecordText.Contains('RuntimeVersion：`0.987-blueprint-wall-continuity-closeout`') -and
+        $updateRecordText.Contains("JueMingZ-TestPackage") -and
+        $updateRecordText.Contains("-RequireFreshTestPackage") -and
+        $updateRecordText.Contains("不生成源码包") -and
+        $docHistoryIndexText -and
+        $docHistoryIndexText.Contains("蓝图墙连续性验证收口-2606281405.md") -and
+        $docHistoryRecordText -and
+        $docHistoryRecordText.Contains("0.987-blueprint-wall-continuity-closeout") -and
+        $docHistoryRecordText.Contains("06-验证打包与归档收口")) {
+        Write-Pass "Blueprint wall continuity closeout update record and document-change history are synchronized."
+    }
+    else {
+        Write-FailHealth "Blueprint wall continuity stage 06 must synchronize update index/record and document-change history for the 0.987 closeout."
     }
 }
 
@@ -13537,6 +13824,10 @@ function Invoke-GovernanceAudit {
         Test-BlueprintCurrentDiagnosticsGovernance -RepoRoot $RepoRoot
         Test-BlueprintWallObjectStage06RegressionDiagnosticsGovernance -RepoRoot $RepoRoot
         Test-BlueprintWallObjectStage07CloseoutGovernance -RepoRoot $RepoRoot
+        Test-BlueprintWallFrameRefreshStage03Governance -RepoRoot $RepoRoot
+        Test-BlueprintWallUnverifiedRetryStage04Governance -RepoRoot $RepoRoot
+        Test-BlueprintWallContinuityStage05RegressionDiagnosticsGovernance -RepoRoot $RepoRoot
+        Test-BlueprintWallContinuityStage06CloseoutGovernance -RepoRoot $RepoRoot
     }
 
     if (Test-AuditScopeSelected -Scopes $Scopes -Candidates @("Notes")) {

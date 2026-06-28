@@ -345,9 +345,127 @@ namespace JueMingZ.Tests
                     throw new InvalidOperationException("Expected wall ghost renderer to consume cached wall frame source rectangles instead of always drawing from 0,0.");
                 }
 
+                var destination = BlueprintProjectionGhostRenderer.ResolveWallGhostDestinationForTesting(160, 96);
+                if (destination[0] != 152 ||
+                    destination[1] != 88 ||
+                    destination[2] != 32 ||
+                    destination[3] != 32)
+                {
+                    throw new InvalidOperationException("Expected wall ghost renderer to draw a 32x32 wall texture centered on the 16x16 tile cell.");
+                }
+
                 if (reader.ReadCount != 4)
                 {
                     throw new InvalidOperationException("Expected wall frame projection to avoid extra world tile reads beyond normal layer classification.");
+                }
+            }
+            finally
+            {
+                BlueprintProjectionService.ResetForTesting();
+                restore();
+            }
+        }
+
+        private static void BlueprintProjectionWallDiagnosticsSeparateTypePresenceAndFrameMismatch()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-projection-wall-diagnostics");
+            try
+            {
+                var store = new BlueprintWorldInstanceStore();
+                var reader = new FakeBlueprintWorldTileReader();
+                var template = CreateProjectionWallBlockTemplate("02 墙诊断", 7);
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(store.CreateInstanceFromTemplate("pair-wall-diag", "world-wall-diag", template, 20, 30, 0, out instance), "create wall diagnostics instance");
+                reader.Set(20, 30, new BlueprintWorldTileSnapshot { WallType = 7, WallFrameX = 0, WallFrameY = 0 });
+                reader.Set(21, 30, new BlueprintWorldTileSnapshot { WallType = 7, WallFrameX = 0, WallFrameY = 0 });
+                reader.Set(20, 31, new BlueprintWorldTileSnapshot { WallType = 7, WallFrameX = 0, WallFrameY = 0 });
+                reader.Set(21, 31, new BlueprintWorldTileSnapshot { WallType = 7, WallFrameX = 0, WallFrameY = 0 });
+
+                BlueprintProjectionService.SetDependenciesForTesting(
+                    store,
+                    BlueprintPlacementWorldContext.Success("pair-wall-diag", "world-wall-diag"),
+                    reader,
+                    true);
+
+                var snapshot = BlueprintProjectionService.GetSnapshot();
+                if (!snapshot.LoadSucceeded ||
+                    snapshot.EffectiveLayerCount != 4 ||
+                    snapshot.FulfilledLayerCount != 4 ||
+                    snapshot.MissingLayerCount != 0 ||
+                    snapshot.WallTargetLayerCount != 4 ||
+                    snapshot.WallTypePresentLayerCount != 4 ||
+                    snapshot.WallTypeMissingLayerCount != 0 ||
+                    snapshot.WallTypeConflictLayerCount != 0 ||
+                    snapshot.WallCompletedLayerCount != 0 ||
+                    snapshot.WallCompletedCurrentMismatchCount != 0 ||
+                    snapshot.WallFrameMismatchLayerCount <= 0)
+                {
+                    throw new InvalidOperationException("Expected wall diagnostics to prove all wall types are present while wall frames still mismatch target continuity.");
+                }
+
+                AssertContains(BlueprintProjectionService.BuildUiStateJson(), "\"wallTypePresentLayerCount\":4");
+                AssertContains(BlueprintProjectionService.BuildUiStateJson(), "\"wallFrameMismatchLayerCount\":");
+                var runtimeSnapshot = RuntimeDiagnosticSnapshotBuilder.Build(new RuntimeDiagnosticSnapshotContext
+                {
+                    Initialized = true,
+                    Version = "test-blueprint-wall-diagnostics"
+                });
+                var json = InvokeDiagnosticSnapshotJson(runtimeSnapshot);
+                AssertContains(json, "\"BlueprintProjectionWallTargetLayerCount\": 4");
+                AssertContains(json, "\"BlueprintProjectionWallTypePresentLayerCount\": 4");
+                AssertContains(json, "\"BlueprintProjectionWallFrameMismatchLayerCount\": ");
+            }
+            finally
+            {
+                BlueprintProjectionService.ResetForTesting();
+                restore();
+            }
+        }
+
+        private static void BlueprintProjectionWallDiagnosticsExposeCompletedCurrentMismatch()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-projection-wall-completed-diag");
+            try
+            {
+                var store = new BlueprintWorldInstanceStore();
+                var reader = new FakeBlueprintWorldTileReader();
+                var template = CreateProjectionSingleWallTemplate("02 墙完成遮蔽诊断", 7);
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(store.CreateInstanceFromTemplate("pair-wall-completed", "world-wall-completed", template, 40, 50, 0, out instance), "create completed wall diagnostics instance");
+                reader.Set(40, 50, new BlueprintWorldTileSnapshot { WallType = 7 });
+
+                BlueprintProjectionService.SetDependenciesForTesting(
+                    store,
+                    BlueprintPlacementWorldContext.Success("pair-wall-completed", "world-wall-completed"),
+                    reader,
+                    true);
+
+                var first = BlueprintProjectionService.GetSnapshot();
+                if (first.FulfilledLayerCount != 1 ||
+                    first.WallTypePresentLayerCount != 1 ||
+                    first.WallCompletedCurrentMismatchCount != 0)
+                {
+                    throw new InvalidOperationException("Expected first wall projection pass to fulfill and persist completed progress.");
+                }
+
+                var missingReader = new FakeBlueprintWorldTileReader();
+                BlueprintProjectionService.SetDependenciesForTesting(
+                    store,
+                    BlueprintPlacementWorldContext.Success("pair-wall-completed", "world-wall-completed"),
+                    missingReader,
+                    true);
+
+                var second = BlueprintProjectionService.GetSnapshot();
+                if (second.CompletedLayerCount != 1 ||
+                    second.MissingLayerCount != 0 ||
+                    second.WallTargetLayerCount != 1 ||
+                    second.WallCompletedLayerCount != 1 ||
+                    second.WallTypePresentLayerCount != 0 ||
+                    second.WallTypeMissingLayerCount != 1 ||
+                    second.WallCompletedCurrentMismatchCount != 1 ||
+                    second.WallFrameMismatchLayerCount != 0)
+                {
+                    throw new InvalidOperationException("Expected wall diagnostics to expose current world mismatch behind CompletedLayers masking.");
                 }
             }
             finally
@@ -627,6 +745,20 @@ namespace JueMingZ.Tests
             template.Cells.Add(CreateWallCell(1, 0, wallType));
             template.Cells.Add(CreateWallCell(0, 1, wallType));
             template.Cells.Add(CreateWallCell(1, 1, wallType));
+            return template;
+        }
+
+        private static BlueprintTemplateRecord CreateProjectionSingleWallTemplate(string name, int wallType)
+        {
+            var template = new BlueprintTemplateRecord
+            {
+                Name = name,
+                Width = 1,
+                Height = 1,
+                AnchorX = 0,
+                AnchorY = 0
+            };
+            template.Cells.Add(CreateWallCell(0, 0, wallType));
             return template;
         }
 

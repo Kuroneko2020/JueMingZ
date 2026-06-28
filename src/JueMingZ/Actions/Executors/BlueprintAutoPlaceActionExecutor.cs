@@ -111,7 +111,30 @@ namespace JueMingZ.Actions.Executors
             BlueprintProjectionCellSnapshot currentLayer;
             string currentMessage;
             var hasLayer = TryResolveCurrentLayer(driver.ForceRefreshProjection(), candidate, out currentLayer, out currentMessage);
-            var fulfilled = hasLayer && string.Equals(currentLayer.Status, BlueprintProjectionLayerStatuses.Fulfilled, StringComparison.Ordinal);
+            if (hasLayer &&
+                IsWallCandidate(candidate) &&
+                IsProjectionVerified(currentLayer))
+            {
+                int refreshedCoordinateCount;
+                string refreshMessage;
+                if (!driver.TryRefreshWallFramesAround(candidate, out refreshedCoordinateCount, out refreshMessage))
+                {
+                    return Finish(
+                        execution,
+                        candidate,
+                        plan,
+                        result,
+                        currentLayer,
+                        InputActionStatus.AttemptedButUnverified,
+                        DiagnosticResultCode.AttemptedButUnverified,
+                        "attemptedButUnverified",
+                        "wallFrameRefreshFailed:" + (refreshMessage ?? string.Empty));
+                }
+
+                hasLayer = TryResolveCurrentLayer(driver.ForceRefreshProjection(), candidate, out currentLayer, out currentMessage);
+            }
+
+            var fulfilled = hasLayer && IsProjectionVerified(currentLayer);
 
             if (fulfilled)
             {
@@ -275,6 +298,20 @@ namespace JueMingZ.Actions.Executors
                    layer.Style == candidate.Style;
         }
 
+        private static bool IsWallCandidate(BlueprintAutoPlacementCandidate candidate)
+        {
+            return candidate != null &&
+                   string.Equals(candidate.LayerKind, BlueprintLayerKinds.Wall, StringComparison.OrdinalIgnoreCase) &&
+                   candidate.ContentId > 0;
+        }
+
+        private static bool IsProjectionVerified(BlueprintProjectionCellSnapshot layer)
+        {
+            return layer != null &&
+                   (string.Equals(layer.Status, BlueprintProjectionLayerStatuses.Fulfilled, StringComparison.Ordinal) ||
+                    string.Equals(layer.Status, BlueprintProjectionLayerStatuses.Completed, StringComparison.Ordinal));
+        }
+
         private static BlueprintAutoPlacementCandidate BuildCandidateFromMetadata(InputActionExecution execution)
         {
             return new BlueprintAutoPlacementCandidate
@@ -421,7 +458,7 @@ namespace JueMingZ.Actions.Executors
             AppendRaw(builder, "inventoryMutationAttempted", "false", true);
             AppendRaw(builder, "networkPacketAttempted", "false", true);
             AppendRaw(builder, "vanillaItemUseAttempted", BoolRaw(bridgeResult != null && bridgeResult.Status != ItemUseBridgeStatus.None), true);
-            AppendRaw(builder, "projectionVerified", BoolRaw(currentLayer != null && string.Equals(currentLayer.Status, BlueprintProjectionLayerStatuses.Fulfilled, StringComparison.Ordinal)), true);
+            AppendRaw(builder, "projectionVerified", BoolRaw(IsProjectionVerified(currentLayer)), true);
             AppendRaw(builder, "targetSlot", SlotRaw(plan == null ? -1 : plan.MaterialSlot), true);
             AppendRaw(builder, "originalSelectedSlot", SlotRaw(plan == null ? -1 : plan.OriginalSelectedSlot), true);
             AppendRaw(builder, "mouseWorldX", FloatRaw(plan == null ? (candidate == null ? 0f : candidate.WorldTileX * 16f + 8f) : plan.MouseWorldX), true);
@@ -508,6 +545,11 @@ namespace JueMingZ.Actions.Executors
         void ReleaseUseItem();
 
         BlueprintProjectionSnapshot ForceRefreshProjection();
+
+        bool TryRefreshWallFramesAround(
+            BlueprintAutoPlacementCandidate candidate,
+            out int refreshedCoordinateCount,
+            out string message);
     }
 
     internal sealed class BlueprintAutoPlaceUsePlan
@@ -653,6 +695,26 @@ namespace JueMingZ.Actions.Executors
         public BlueprintProjectionSnapshot ForceRefreshProjection()
         {
             return BlueprintProjectionService.ForceRefreshForAutoPlacement();
+        }
+
+        public bool TryRefreshWallFramesAround(
+            BlueprintAutoPlacementCandidate candidate,
+            out int refreshedCoordinateCount,
+            out string message)
+        {
+            refreshedCoordinateCount = 0;
+            message = string.Empty;
+            if (candidate == null)
+            {
+                message = "candidateMissing";
+                return false;
+            }
+
+            return TerrariaWallFrameCompat.TryRefreshWallFrameNeighborhood(
+                candidate.WorldTileX,
+                candidate.WorldTileY,
+                out refreshedCoordinateCount,
+                out message);
         }
 
         private static bool TryFindMainInventoryMaterial(

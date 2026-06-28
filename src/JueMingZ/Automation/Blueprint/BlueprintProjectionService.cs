@@ -85,6 +85,14 @@ namespace JueMingZ.Automation.Blueprint
         public int CoveredLayerCount { get; set; }
         public int ErasedLayerCount { get; set; }
         public int UnavailableLayerCount { get; set; }
+        public int WallTargetLayerCount { get; set; }
+        public int WallTypePresentLayerCount { get; set; }
+        public int WallTypeMissingLayerCount { get; set; }
+        public int WallTypeConflictLayerCount { get; set; }
+        public int WallTypeUnavailableLayerCount { get; set; }
+        public int WallCompletedLayerCount { get; set; }
+        public int WallCompletedCurrentMismatchCount { get; set; }
+        public int WallFrameMismatchLayerCount { get; set; }
         public int CacheHitCount { get; set; }
         public int CacheMissCount { get; set; }
         public double LastResolveElapsedMs { get; set; }
@@ -124,6 +132,14 @@ namespace JueMingZ.Automation.Blueprint
                 CoveredLayerCount = CoveredLayerCount,
                 ErasedLayerCount = ErasedLayerCount,
                 UnavailableLayerCount = UnavailableLayerCount,
+                WallTargetLayerCount = WallTargetLayerCount,
+                WallTypePresentLayerCount = WallTypePresentLayerCount,
+                WallTypeMissingLayerCount = WallTypeMissingLayerCount,
+                WallTypeConflictLayerCount = WallTypeConflictLayerCount,
+                WallTypeUnavailableLayerCount = WallTypeUnavailableLayerCount,
+                WallCompletedLayerCount = WallCompletedLayerCount,
+                WallCompletedCurrentMismatchCount = WallCompletedCurrentMismatchCount,
+                WallFrameMismatchLayerCount = WallFrameMismatchLayerCount,
                 CacheHitCount = CacheHitCount,
                 CacheMissCount = CacheMissCount,
                 LastResolveElapsedMs = LastResolveElapsedMs,
@@ -269,6 +285,14 @@ namespace JueMingZ.Automation.Blueprint
                    "\"coveredLayerCount\":" + snapshot.CoveredLayerCount.ToString(CultureInfo.InvariantCulture) + "," +
                    "\"erasedLayerCount\":" + snapshot.ErasedLayerCount.ToString(CultureInfo.InvariantCulture) + "," +
                    "\"unavailableLayerCount\":" + snapshot.UnavailableLayerCount.ToString(CultureInfo.InvariantCulture) + "," +
+                   "\"wallTargetLayerCount\":" + snapshot.WallTargetLayerCount.ToString(CultureInfo.InvariantCulture) + "," +
+                   "\"wallTypePresentLayerCount\":" + snapshot.WallTypePresentLayerCount.ToString(CultureInfo.InvariantCulture) + "," +
+                   "\"wallTypeMissingLayerCount\":" + snapshot.WallTypeMissingLayerCount.ToString(CultureInfo.InvariantCulture) + "," +
+                   "\"wallTypeConflictLayerCount\":" + snapshot.WallTypeConflictLayerCount.ToString(CultureInfo.InvariantCulture) + "," +
+                   "\"wallTypeUnavailableLayerCount\":" + snapshot.WallTypeUnavailableLayerCount.ToString(CultureInfo.InvariantCulture) + "," +
+                   "\"wallCompletedLayerCount\":" + snapshot.WallCompletedLayerCount.ToString(CultureInfo.InvariantCulture) + "," +
+                   "\"wallCompletedCurrentMismatchCount\":" + snapshot.WallCompletedCurrentMismatchCount.ToString(CultureInfo.InvariantCulture) + "," +
+                   "\"wallFrameMismatchLayerCount\":" + snapshot.WallFrameMismatchLayerCount.ToString(CultureInfo.InvariantCulture) + "," +
                    "\"cacheHitCount\":" + snapshot.CacheHitCount.ToString(CultureInfo.InvariantCulture) + "," +
                    "\"cacheMissCount\":" + snapshot.CacheMissCount.ToString(CultureInfo.InvariantCulture) +
                    "}";
@@ -292,6 +316,14 @@ namespace JueMingZ.Automation.Blueprint
                 hash = hash * 31 + snapshot.CoveredLayerCount;
                 hash = hash * 31 + snapshot.ErasedLayerCount;
                 hash = hash * 31 + snapshot.UnavailableLayerCount;
+                hash = hash * 31 + snapshot.WallTargetLayerCount;
+                hash = hash * 31 + snapshot.WallTypePresentLayerCount;
+                hash = hash * 31 + snapshot.WallTypeMissingLayerCount;
+                hash = hash * 31 + snapshot.WallTypeConflictLayerCount;
+                hash = hash * 31 + snapshot.WallTypeUnavailableLayerCount;
+                hash = hash * 31 + snapshot.WallCompletedLayerCount;
+                hash = hash * 31 + snapshot.WallCompletedCurrentMismatchCount;
+                hash = hash * 31 + snapshot.WallFrameMismatchLayerCount;
                 hash = hash * 31 + StringComparer.Ordinal.GetHashCode(snapshot.ResultCode ?? string.Empty);
                 hash = hash * 31 + StringComparer.Ordinal.GetHashCode(snapshot.Signature ?? string.Empty);
                 return hash;
@@ -473,6 +505,7 @@ namespace JueMingZ.Automation.Blueprint
 
             var projected = new List<BlueprintProjectionCellSnapshot>();
             var allProjected = new List<BlueprintProjectionCellSnapshot>();
+            var wallDiagnostics = new List<BlueprintWallCompletionDiagnostic>();
             var replacementSettings = BlueprintReplacementRuleService.GetSettingsFromCurrentConfig();
             var completedKeysByInstance = BuildCompletedKeySets(instances);
             for (var index = 0; index < order.Count; index++)
@@ -485,11 +518,19 @@ namespace JueMingZ.Automation.Blueprint
                 }
 
                 var projectedLayer = candidate.ToSnapshot();
-                projectedLayer.Status = IsCandidateCompleted(candidate, completedKeysByInstance)
+                BlueprintWorldTileSnapshot world = null;
+                var completed = IsCandidateCompleted(candidate, completedKeysByInstance);
+                projectedLayer.Status = completed
                     ? BlueprintProjectionLayerStatuses.Completed
-                    : ClassifyLayer(candidate, reader, replacementSettings);
+                    : ClassifyLayer(candidate, reader, replacementSettings, out world);
                 CountStatus(snapshot, projectedLayer.Status);
+                if (completed)
+                {
+                    world = null;
+                }
+
                 allProjected.Add(projectedLayer);
+                RecordWallCompletionDiagnostic(snapshot, candidate, projectedLayer, reader, world, wallDiagnostics);
                 if (projected.Count < MaxProjectedLayersForOverlay)
                 {
                     projected.Add(projectedLayer);
@@ -500,6 +541,7 @@ namespace JueMingZ.Automation.Blueprint
             // derived at cache-build time so draw paths consume cached source
             // rectangles without refreshing world tiles or mutating templates.
             BlueprintWallProjectionFrameResolver.Apply(allProjected);
+            FinalizeWallCompletionDiagnostics(snapshot, wallDiagnostics);
             snapshot.EffectiveLayerCount = order.Count;
             snapshot.ProjectedLayers = projected;
             snapshot.AllProjectedLayers = allProjected;
@@ -706,12 +748,107 @@ namespace JueMingZ.Automation.Blueprint
                    style.ToString(CultureInfo.InvariantCulture);
         }
 
+        private static void RecordWallCompletionDiagnostic(
+            BlueprintProjectionSnapshot snapshot,
+            BlueprintProjectionCandidate candidate,
+            BlueprintProjectionCellSnapshot layer,
+            IBlueprintWorldTileReader reader,
+            BlueprintWorldTileSnapshot world,
+            IList<BlueprintWallCompletionDiagnostic> diagnostics)
+        {
+            if (snapshot == null || candidate == null || layer == null || !IsWallCandidate(candidate))
+            {
+                return;
+            }
+
+            snapshot.WallTargetLayerCount++;
+            if (string.Equals(layer.Status, BlueprintProjectionLayerStatuses.Completed, StringComparison.Ordinal))
+            {
+                snapshot.WallCompletedLayerCount++;
+            }
+
+            if (world == null && reader != null)
+            {
+                reader.TryReadTile(candidate.WorldTileX, candidate.WorldTileY, out world);
+            }
+
+            if (world == null)
+            {
+                snapshot.WallTypeUnavailableLayerCount++;
+                if (string.Equals(layer.Status, BlueprintProjectionLayerStatuses.Completed, StringComparison.Ordinal))
+                {
+                    snapshot.WallCompletedCurrentMismatchCount++;
+                }
+
+                return;
+            }
+
+            var wallStatus = ClassifyWall(candidate.Layer, world);
+            if (string.Equals(wallStatus, BlueprintProjectionLayerStatuses.Fulfilled, StringComparison.Ordinal))
+            {
+                snapshot.WallTypePresentLayerCount++;
+                if (diagnostics != null)
+                {
+                    diagnostics.Add(new BlueprintWallCompletionDiagnostic(layer, world.WallFrameX, world.WallFrameY));
+                }
+
+                return;
+            }
+
+            if (string.Equals(wallStatus, BlueprintProjectionLayerStatuses.Missing, StringComparison.Ordinal))
+            {
+                snapshot.WallTypeMissingLayerCount++;
+            }
+            else
+            {
+                snapshot.WallTypeConflictLayerCount++;
+            }
+
+            if (string.Equals(layer.Status, BlueprintProjectionLayerStatuses.Completed, StringComparison.Ordinal))
+            {
+                snapshot.WallCompletedCurrentMismatchCount++;
+            }
+        }
+
+        private static void FinalizeWallCompletionDiagnostics(
+            BlueprintProjectionSnapshot snapshot,
+            IList<BlueprintWallCompletionDiagnostic> diagnostics)
+        {
+            if (snapshot == null || diagnostics == null || diagnostics.Count <= 0)
+            {
+                return;
+            }
+
+            for (var index = 0; index < diagnostics.Count; index++)
+            {
+                var diagnostic = diagnostics[index];
+                if (diagnostic == null ||
+                    diagnostic.Layer == null ||
+                    (diagnostic.Layer.FrameX == diagnostic.WorldWallFrameX &&
+                     diagnostic.Layer.FrameY == diagnostic.WorldWallFrameY))
+                {
+                    continue;
+                }
+
+                snapshot.WallFrameMismatchLayerCount++;
+            }
+        }
+
+        private static bool IsWallCandidate(BlueprintProjectionCandidate candidate)
+        {
+            return candidate != null &&
+                   candidate.Layer != null &&
+                   string.Equals(candidate.Layer.LayerKind, BlueprintLayerKinds.Wall, StringComparison.OrdinalIgnoreCase) &&
+                   candidate.Layer.ContentId > 0;
+        }
+
         private static string ClassifyLayer(
             BlueprintProjectionCandidate candidate,
             IBlueprintWorldTileReader reader,
-            BlueprintReplacementSettings replacementSettings)
+            BlueprintReplacementSettings replacementSettings,
+            out BlueprintWorldTileSnapshot world)
         {
-            BlueprintWorldTileSnapshot world;
+            world = null;
             if (!reader.TryReadTile(candidate.WorldTileX, candidate.WorldTileY, out world) || world == null)
             {
                 return BlueprintProjectionLayerStatuses.Unavailable;
@@ -1119,6 +1256,20 @@ namespace JueMingZ.Automation.Blueprint
             }
 
             return kind;
+        }
+
+        private sealed class BlueprintWallCompletionDiagnostic
+        {
+            public BlueprintWallCompletionDiagnostic(BlueprintProjectionCellSnapshot layer, int worldWallFrameX, int worldWallFrameY)
+            {
+                Layer = layer;
+                WorldWallFrameX = worldWallFrameX;
+                WorldWallFrameY = worldWallFrameY;
+            }
+
+            public BlueprintProjectionCellSnapshot Layer { get; private set; }
+            public int WorldWallFrameX { get; private set; }
+            public int WorldWallFrameY { get; private set; }
         }
 
         private sealed class BlueprintProjectionCandidate

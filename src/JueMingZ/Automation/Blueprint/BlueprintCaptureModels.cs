@@ -47,6 +47,8 @@ namespace JueMingZ.Automation.Blueprint
         public int WallType { get; set; }
         public int FrameX { get; set; }
         public int FrameY { get; set; }
+        public int WallFrameX { get; set; }
+        public int WallFrameY { get; set; }
         public int TilePaintId { get; set; }
         public int WallPaintId { get; set; }
         public bool TileFullbright { get; set; }

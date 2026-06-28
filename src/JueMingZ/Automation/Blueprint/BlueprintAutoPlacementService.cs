@@ -215,6 +215,10 @@ namespace JueMingZ.Automation.Blueprint
         private static BlueprintAutoPlacementSnapshot _lastSnapshot = CreateIdleSnapshot();
         private static string _lastSubmittedAdmissionKey = string.Empty;
         private static string _lastSubmittedProjectionSignature = string.Empty;
+        private const int MaxWallUnverifiedRetrySubmissions = 1;
+        private static string _wallUnverifiedRetryAdmissionKey = string.Empty;
+        private static string _wallUnverifiedRetryProjectionSignature = string.Empty;
+        private static int _wallUnverifiedRetrySubmissionCount;
         private static int _submittedCount;
         private static int _deniedCount;
         private static int _failClosedCount;
@@ -277,10 +281,17 @@ namespace JueMingZ.Automation.Blueprint
                 else if (string.Equals(normalized, "attemptedButUnverified", StringComparison.Ordinal))
                 {
                     _attemptedButUnverifiedCount++;
+                    ArmWallUnverifiedRetryIfNeededLocked(execution, message);
                 }
                 else
                 {
                     _failClosedCount++;
+                    ClearWallUnverifiedRetryIfSameRequestLocked(execution);
+                }
+
+                if (string.Equals(normalized, "succeeded", StringComparison.Ordinal))
+                {
+                    ClearWallUnverifiedRetryIfSameRequestLocked(execution);
                 }
 
                 var snapshot = _lastSnapshot == null ? CreateIdleSnapshot() : _lastSnapshot.Clone();
@@ -330,6 +341,9 @@ namespace JueMingZ.Automation.Blueprint
                 _lastSnapshot = CreateIdleSnapshot();
                 _lastSubmittedAdmissionKey = string.Empty;
                 _lastSubmittedProjectionSignature = string.Empty;
+                _wallUnverifiedRetryAdmissionKey = string.Empty;
+                _wallUnverifiedRetryProjectionSignature = string.Empty;
+                _wallUnverifiedRetrySubmissionCount = 0;
                 _submittedCount = 0;
                 _deniedCount = 0;
                 _failClosedCount = 0;
@@ -377,16 +391,24 @@ namespace JueMingZ.Automation.Blueprint
                 return result;
             }
 
+            var wallUnverifiedRetry = false;
             lock (SyncRoot)
             {
                 if (string.Equals(_lastSubmittedAdmissionKey, result.Candidate.AdmissionKey, StringComparison.Ordinal) &&
                     string.Equals(_lastSubmittedProjectionSignature, result.ProjectionSignature ?? string.Empty, StringComparison.Ordinal))
                 {
-                    snapshot.ResultCode = "waitingForProjectionChange";
-                    snapshot.Message = "蓝图自动摆放已提交同一候选，等待投影变化后再提交。";
-                    ApplyCounters(snapshot);
-                    _lastSnapshot = snapshot.Clone();
-                    return result;
+                    if (CanSubmitWallUnverifiedRetryLocked(result.Candidate, result.ProjectionSignature))
+                    {
+                        wallUnverifiedRetry = true;
+                    }
+                    else
+                    {
+                        snapshot.ResultCode = "waitingForProjectionChange";
+                        snapshot.Message = "蓝图自动摆放已提交同一候选，等待投影变化后再提交。";
+                        ApplyCounters(snapshot);
+                        _lastSnapshot = snapshot.Clone();
+                        return result;
+                    }
                 }
             }
 
@@ -407,10 +429,21 @@ namespace JueMingZ.Automation.Blueprint
                 if (accepted)
                 {
                     _submittedCount++;
+                    if (wallUnverifiedRetry)
+                    {
+                        _wallUnverifiedRetrySubmissionCount++;
+                    }
+                    else
+                    {
+                        ClearWallUnverifiedRetryIfDifferentLocked(request.AdmissionKey, result.ProjectionSignature);
+                    }
+
                     _lastSubmittedAdmissionKey = request.AdmissionKey ?? string.Empty;
                     _lastSubmittedProjectionSignature = result.ProjectionSignature ?? string.Empty;
                     snapshot.ResultCode = "submitted";
-                    snapshot.Message = "蓝图自动摆放候选已提交 ActionQueue，等待受控 ItemCheck 摆放与投影复验。";
+                    snapshot.Message = wallUnverifiedRetry
+                        ? "蓝图墙自动摆放候选在未验证后进行一次有界重试，仍等待受控 ItemCheck 摆放与投影复验。"
+                        : "蓝图自动摆放候选已提交 ActionQueue，等待受控 ItemCheck 摆放与投影复验。";
                 }
                 else
                 {
@@ -424,6 +457,111 @@ namespace JueMingZ.Automation.Blueprint
             }
 
             return result;
+        }
+
+        private static bool CanSubmitWallUnverifiedRetryLocked(BlueprintAutoPlacementCandidate candidate, string projectionSignature)
+        {
+            if (!IsWallCandidate(candidate) ||
+                candidate == null ||
+                string.IsNullOrWhiteSpace(candidate.AdmissionKey) ||
+                _wallUnverifiedRetrySubmissionCount >= MaxWallUnverifiedRetrySubmissions)
+            {
+                return false;
+            }
+
+            return string.Equals(_wallUnverifiedRetryAdmissionKey, candidate.AdmissionKey, StringComparison.Ordinal) &&
+                   string.Equals(_wallUnverifiedRetryProjectionSignature, projectionSignature ?? string.Empty, StringComparison.Ordinal);
+        }
+
+        private static void ArmWallUnverifiedRetryIfNeededLocked(InputActionExecution execution, string message)
+        {
+            if (!IsWallAutoPlacementRequest(execution) ||
+                (message ?? string.Empty).StartsWith("wallFrameRefreshFailed:", StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            var admissionKey = GetRequestAdmissionKey(execution);
+            if (string.IsNullOrWhiteSpace(admissionKey) ||
+                !string.Equals(admissionKey, _lastSubmittedAdmissionKey, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            if (!string.Equals(_wallUnverifiedRetryAdmissionKey, admissionKey, StringComparison.Ordinal) ||
+                !string.Equals(_wallUnverifiedRetryProjectionSignature, _lastSubmittedProjectionSignature, StringComparison.Ordinal))
+            {
+                _wallUnverifiedRetryAdmissionKey = admissionKey;
+                _wallUnverifiedRetryProjectionSignature = _lastSubmittedProjectionSignature ?? string.Empty;
+                _wallUnverifiedRetrySubmissionCount = 0;
+            }
+        }
+
+        private static void ClearWallUnverifiedRetryIfSameRequestLocked(InputActionExecution execution)
+        {
+            var admissionKey = GetRequestAdmissionKey(execution);
+            if (!string.IsNullOrWhiteSpace(admissionKey) &&
+                string.Equals(_wallUnverifiedRetryAdmissionKey, admissionKey, StringComparison.Ordinal))
+            {
+                ClearWallUnverifiedRetryLocked();
+            }
+        }
+
+        private static void ClearWallUnverifiedRetryIfDifferentLocked(string admissionKey, string projectionSignature)
+        {
+            if (string.IsNullOrWhiteSpace(_wallUnverifiedRetryAdmissionKey))
+            {
+                return;
+            }
+
+            if (!string.Equals(_wallUnverifiedRetryAdmissionKey, admissionKey ?? string.Empty, StringComparison.Ordinal) ||
+                !string.Equals(_wallUnverifiedRetryProjectionSignature, projectionSignature ?? string.Empty, StringComparison.Ordinal))
+            {
+                ClearWallUnverifiedRetryLocked();
+            }
+        }
+
+        private static void ClearWallUnverifiedRetryLocked()
+        {
+            _wallUnverifiedRetryAdmissionKey = string.Empty;
+            _wallUnverifiedRetryProjectionSignature = string.Empty;
+            _wallUnverifiedRetrySubmissionCount = 0;
+        }
+
+        private static bool IsWallCandidate(BlueprintAutoPlacementCandidate candidate)
+        {
+            return candidate != null &&
+                   string.Equals(candidate.LayerKind, BlueprintLayerKinds.Wall, StringComparison.OrdinalIgnoreCase) &&
+                   candidate.ContentId > 0;
+        }
+
+        private static bool IsWallAutoPlacementRequest(InputActionExecution execution)
+        {
+            return string.Equals(
+                GetRequestMetadata(execution, ActionMetadataKeys.BlueprintLayerKind),
+                BlueprintLayerKinds.Wall,
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string GetRequestAdmissionKey(InputActionExecution execution)
+        {
+            return execution == null || execution.Request == null
+                ? string.Empty
+                : execution.Request.AdmissionKey ?? string.Empty;
+        }
+
+        private static string GetRequestMetadata(InputActionExecution execution, string key)
+        {
+            if (execution == null ||
+                execution.Request == null ||
+                execution.Request.Metadata == null ||
+                string.IsNullOrWhiteSpace(key))
+            {
+                return string.Empty;
+            }
+
+            string value;
+            return execution.Request.Metadata.TryGetValue(key, out value) ? value ?? string.Empty : string.Empty;
         }
 
         private static BlueprintAutoPlacementTickResult ResolveCandidate(RuntimeSettingsSnapshot settings)

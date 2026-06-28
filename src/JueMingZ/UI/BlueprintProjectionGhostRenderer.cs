@@ -81,6 +81,16 @@ namespace JueMingZ.UI
             return new[] { sourceX, sourceY, sourceWidth, sourceHeight };
         }
 
+        internal static int[] ResolveWallGhostDestinationForTesting(int x, int y)
+        {
+            int destX;
+            int destY;
+            int destWidth;
+            int destHeight;
+            ResolveWallGhostDestination(x, y, out destX, out destY, out destWidth, out destHeight);
+            return new[] { destX, destY, destWidth, destHeight };
+        }
+
         internal static bool ShouldDrawLayer(string status)
         {
             return !string.Equals(status, BlueprintProjectionLayerStatuses.Fulfilled, StringComparison.Ordinal) &&
@@ -192,14 +202,19 @@ namespace JueMingZ.UI
             int sourceWidth;
             int sourceHeight;
             ResolveWallSourceRect(layer.FrameX, layer.FrameY, textureWidth, textureHeight, out sourceX, out sourceY, out sourceWidth, out sourceHeight);
+            int destX;
+            int destY;
+            int destWidth;
+            int destHeight;
+            ResolveWallGhostDestination(x, y, out destX, out destY, out destWidth, out destHeight);
             var effectiveAlpha = ResolveCoatingAlpha(layer, Math.Max(48, alpha - 22));
             var ok = UiPrimitiveRenderer.DrawTextureSourceRectClipped(
                 spriteBatch,
                 texture,
-                x,
-                y,
-                TileSize,
-                TileSize,
+                destX,
+                destY,
+                destWidth,
+                destHeight,
                 sourceX,
                 sourceY,
                 sourceWidth,
@@ -387,6 +402,21 @@ namespace JueMingZ.UI
             ok |= UiPrimitiveRenderer.DrawFilledRectClipped(spriteBatch, x + TileSize - 5, y + 2, 3, 1, 0, 0, clipWidth, clipHeight, r, g, b, alpha);
             ok |= UiPrimitiveRenderer.DrawFilledRectClipped(spriteBatch, x + TileSize - 3, y + 2, 1, 3, 0, 0, clipWidth, clipHeight, r, g, b, alpha);
             return ok;
+        }
+
+        private static void ResolveWallGhostDestination(
+            int x,
+            int y,
+            out int destX,
+            out int destY,
+            out int destWidth,
+            out int destHeight)
+        {
+            // Terraria draws 32x32 wall textures centered on the 16x16 tile cell.
+            destX = x - TileSize / 2;
+            destY = y - TileSize / 2;
+            destWidth = TileSize * 2;
+            destHeight = TileSize * 2;
         }
 
         private static void ResolveWallSourceRect(

@@ -7,10 +7,10 @@
     <Platforms>AnyCPU;x86</Platforms>
     <PlatformTarget>x86</PlatformTarget>
     <LangVersion>7.3</LangVersion>
-    <Version>0.982</Version>
-    <AssemblyVersion>0.982.0</AssemblyVersion>
-    <FileVersion>0.982.0</FileVersion>
-    <InformationalVersion>0.982-blueprint-wall-object-closeout</InformationalVersion>
+    <Version>0.988</Version>
+    <AssemblyVersion>0.988.0</AssemblyVersion>
+    <FileVersion>0.988.0</FileVersion>
+    <InformationalVersion>0.988-blueprint-wall-ghost-geometry</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Deterministic>true</Deterministic>
     <RestoreConfigFile>$(MSBuildThisFileDirectory)..\..\NuGet.Config</RestoreConfigFile>
