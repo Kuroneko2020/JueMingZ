@@ -54,6 +54,11 @@ namespace JueMingZ.UI
             return ShouldDrawLayer(status);
         }
 
+        internal static bool ShouldSkipWallGhostForTesting(BlueprintProjectionCellSnapshot layer)
+        {
+            return ShouldSkipWallGhost(layer);
+        }
+
         internal static int ResolveLayerDrawPassForTesting(string layerKind)
         {
             return ResolveLayerDrawPass(layerKind);
@@ -184,6 +189,11 @@ namespace JueMingZ.UI
 
         private static bool DrawWall(object spriteBatch, BlueprintProjectionCellSnapshot layer, int x, int y, int clipWidth, int clipHeight, int r, int g, int b, int alpha, int borderAlpha)
         {
+            if (ShouldSkipWallGhost(layer))
+            {
+                return true;
+            }
+
             var texture = ResolveWallTexture(layer);
             if (texture == null)
             {
@@ -238,6 +248,15 @@ namespace JueMingZ.UI
             }
 
             return ok;
+        }
+
+        private static bool ShouldSkipWallGhost(BlueprintProjectionCellSnapshot layer)
+        {
+            // This overlay is drawn after Terraria's world passes. If a real
+            // full tile would hide the wall in vanilla WallDrawing, treat the
+            // cached wall ghost as visually handled so the fallback cell fill
+            // does not float over the foreground tile.
+            return layer != null && layer.WallGhostBlockedByFullTile;
         }
 
         private static bool DrawWire(object spriteBatch, BlueprintProjectionCellSnapshot layer, int x, int y, int clipWidth, int clipHeight, int r, int g, int b, int alpha, int borderAlpha)

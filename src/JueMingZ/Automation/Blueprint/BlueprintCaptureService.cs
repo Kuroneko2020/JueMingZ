@@ -1008,6 +1008,7 @@ namespace JueMingZ.Automation.Blueprint
                     WallFullbright = TerrariaTileReadCompat.IsWallFullbright(tile),
                     TileInvisible = TerrariaTileReadCompat.IsTileInvisible(tile),
                     WallInvisible = TerrariaTileReadCompat.IsWallInvisible(tile),
+                    WallBlockedByFullTile = TerrariaTileVisibilityCompat.IsWallBlockedByFullTileForProjection(tile),
                     Slope = TerrariaTileReadCompat.Slope(tile),
                     HalfBrick = TerrariaTileReadCompat.IsHalfBlock(tile),
                     Inactive = TerrariaTileReadCompat.IsActuated(tile),

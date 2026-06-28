@@ -47,6 +47,7 @@ namespace JueMingZ.Automation.Blueprint
         public int Slope { get; set; }
         public bool HalfBrick { get; set; }
         public bool Inactive { get; set; }
+        public bool WallGhostBlockedByFullTile { get; set; }
         public int MaterialItemId { get; set; }
         public int MaterialStack { get; set; }
         public string MaterialDisplayName { get; set; }
@@ -186,6 +187,7 @@ namespace JueMingZ.Automation.Blueprint
                     Slope = layer.Slope,
                     HalfBrick = layer.HalfBrick,
                     Inactive = layer.Inactive,
+                    WallGhostBlockedByFullTile = layer.WallGhostBlockedByFullTile,
                     MaterialItemId = layer.MaterialItemId,
                     MaterialStack = layer.MaterialStack,
                     MaterialDisplayName = layer.MaterialDisplayName ?? string.Empty,
@@ -523,6 +525,11 @@ namespace JueMingZ.Automation.Blueprint
                 projectedLayer.Status = completed
                     ? BlueprintProjectionLayerStatuses.Completed
                     : ClassifyLayer(candidate, reader, replacementSettings, out world);
+                if (!completed)
+                {
+                    ApplyWallGhostVisibility(projectedLayer, world);
+                }
+
                 CountStatus(snapshot, projectedLayer.Status);
                 if (completed)
                 {
@@ -840,6 +847,18 @@ namespace JueMingZ.Automation.Blueprint
                    candidate.Layer != null &&
                    string.Equals(candidate.Layer.LayerKind, BlueprintLayerKinds.Wall, StringComparison.OrdinalIgnoreCase) &&
                    candidate.Layer.ContentId > 0;
+        }
+
+        private static void ApplyWallGhostVisibility(BlueprintProjectionCellSnapshot layer, BlueprintWorldTileSnapshot world)
+        {
+            if (layer == null ||
+                world == null ||
+                !string.Equals(layer.LayerKind, BlueprintLayerKinds.Wall, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            layer.WallGhostBlockedByFullTile = world.WallBlockedByFullTile;
         }
 
         private static string ClassifyLayer(

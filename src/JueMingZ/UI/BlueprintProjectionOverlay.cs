@@ -10,7 +10,7 @@ namespace JueMingZ.UI
     {
         private const int TileSize = 16;
         private const int MaxDrawLayersPerFrame = 1536;
-        private const string VisualContract = "placed-instance-projection+appearance-ghost+yellow-missing+red-conflict+fulfilled-no-mask+completed-progress+no-cell-border+move-floating-follow-preview+hidden-skip+layer-order-cover+draw-cache-only";
+        private const string VisualContract = "placed-instance-projection+appearance-ghost+yellow-missing+red-conflict+fulfilled-no-mask+completed-progress+no-cell-border+move-floating-follow-preview+hidden-skip+layer-order-cover+wall-full-tile-occlusion+draw-cache-only";
 
         public static bool DrawInterfaceLayer()
         {

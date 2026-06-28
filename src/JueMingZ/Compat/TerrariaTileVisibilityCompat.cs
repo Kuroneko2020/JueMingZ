@@ -170,6 +170,13 @@ namespace JueMingZ.Compat
             return IsEchoNativeWall(wallType);
         }
 
+        internal static bool IsWallBlockedByFullTileForProjection(Tile tile)
+        {
+            bool showInvisible;
+            return TryReadShowInvisible(out showInvisible) &&
+                   IsWallBlockedByFullTile(tile, showInvisible);
+        }
+
         internal static void ResetDangerousPredicateCacheForTesting()
         {
             lock (DangerousMethodSyncRoot)

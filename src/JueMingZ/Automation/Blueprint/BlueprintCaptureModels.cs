@@ -55,6 +55,7 @@ namespace JueMingZ.Automation.Blueprint
         public bool WallFullbright { get; set; }
         public bool TileInvisible { get; set; }
         public bool WallInvisible { get; set; }
+        public bool WallBlockedByFullTile { get; set; }
         public int Slope { get; set; }
         public bool HalfBrick { get; set; }
         public bool Inactive { get; set; }

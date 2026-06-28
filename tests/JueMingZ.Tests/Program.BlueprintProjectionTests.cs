@@ -366,6 +366,46 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void BlueprintProjectionWallGhostSkipsFullTileOcclusion()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-projection-wall-occlusion");
+            try
+            {
+                var store = new BlueprintWorldInstanceStore();
+                var reader = new FakeBlueprintWorldTileReader();
+                var template = CreateProjectionSingleWallTemplate("墙遮挡", 7);
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(store.CreateInstanceFromTemplate("pair-wall-occlusion", "world-wall-occlusion", template, 12, 13, 0, out instance), "create wall occlusion projection instance");
+                reader.Set(12, 13, new BlueprintWorldTileSnapshot { WallBlockedByFullTile = true });
+
+                BlueprintProjectionService.SetDependenciesForTesting(
+                    store,
+                    BlueprintPlacementWorldContext.Success("pair-wall-occlusion", "world-wall-occlusion"),
+                    reader,
+                    true);
+
+                var snapshot = BlueprintProjectionService.GetSnapshot();
+                var layer = FindProjectedLayerAt(snapshot.ProjectedLayers, instance.InstanceId, BlueprintLayerKinds.Wall, 12, 13);
+                if (!snapshot.LoadSucceeded ||
+                    snapshot.EffectiveLayerCount != 1 ||
+                    snapshot.MissingLayerCount != 1 ||
+                    snapshot.WallTargetLayerCount != 1 ||
+                    snapshot.WallTypeMissingLayerCount != 1 ||
+                    layer == null ||
+                    !layer.WallGhostBlockedByFullTile ||
+                    !BlueprintProjectionGhostRenderer.ShouldSkipWallGhostForTesting(layer) ||
+                    !BlueprintProjectionOverlay.GetVisualContractForTesting().Contains("wall-full-tile-occlusion"))
+                {
+                    throw new InvalidOperationException("Expected wall projection to keep missing/material semantics while skipping the ghost hidden by a real full tile.");
+                }
+            }
+            finally
+            {
+                BlueprintProjectionService.ResetForTesting();
+                restore();
+            }
+        }
+
         private static void BlueprintProjectionWallDiagnosticsSeparateTypePresenceAndFrameMismatch()
         {
             var restore = PushTemporaryConfigDirectory("blueprint-projection-wall-diagnostics");

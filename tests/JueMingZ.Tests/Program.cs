@@ -1168,6 +1168,7 @@ namespace JueMingZ.Tests
             Run("blueprint projection stage 04 later instance covers earlier without mutating snapshots", ref failed, BlueprintProjectionStage04LaterInstanceCoversEarlierWithoutMutatingSnapshots);
             Run("blueprint projection stage 05 completed progress persists and skips dug cells", ref failed, BlueprintProjectionStage05CompletedProgressPersistsAndSkipsDugCells);
             Run("blueprint projection wall frames use neighbor continuity", ref failed, BlueprintProjectionWallFramesUseNeighborContinuity);
+            Run("blueprint projection wall ghost skips full tile occlusion", ref failed, BlueprintProjectionWallGhostSkipsFullTileOcclusion);
             Run("blueprint projection wall diagnostics separate type presence and frame mismatch", ref failed, BlueprintProjectionWallDiagnosticsSeparateTypePresenceAndFrameMismatch);
             Run("blueprint projection wall diagnostics expose completed current mismatch", ref failed, BlueprintProjectionWallDiagnosticsExposeCompletedCurrentMismatch);
             Run("blueprint projection cache avoids immediate recompute", ref failed, BlueprintProjectionCacheAvoidsImmediateRecompute);
