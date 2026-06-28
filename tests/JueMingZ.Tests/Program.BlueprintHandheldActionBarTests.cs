@@ -413,7 +413,7 @@ namespace JueMingZ.Tests
                 true,
                 BlueprintSettings.DefaultToolItemId,
                 BlueprintHandheldEnvironment(1280, 720, blueprintCreationActive: true));
-            AssertContains(BlueprintHandheldActionBarOverlay.ResolveNoticeForTesting(creatingFrame), "创建中");
+            AssertContains(BlueprintHandheldActionBarOverlay.ResolveNoticeForTesting(creatingFrame), "长按拖动选区");
 
             var restore = PushTemporaryConfigDirectory("blueprint-handheld-stage04-status");
             try
@@ -447,7 +447,7 @@ namespace JueMingZ.Tests
                     true,
                     BlueprintSettings.DefaultToolItemId,
                     BlueprintHandheldEnvironment(1280, 720, blueprintHasPlacedInstances: true, blueprintPlacedInstanceCount: 1));
-                AssertContains(BlueprintHandheldActionBarOverlay.ResolveNoticeForTesting(moveFrame), "请点击一个已放置蓝图作为移动目标");
+                AssertContains(BlueprintHandheldActionBarOverlay.ResolveNoticeForTesting(moveFrame), "点击需要移动位置的蓝图");
 
                 var mirrorStatus = BlueprintPlacedInstanceTransformState.BeginMirror();
                 if (!mirrorStatus.Succeeded)

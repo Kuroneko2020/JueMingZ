@@ -91,7 +91,8 @@ namespace JueMingZ.UI.Legacy
         private const string BlueprintReplacementConfigPopupElementId = "blueprint-replacement-config-popup";
         private const string BlueprintReplacementVisualContract = "same-kind-replacement+config-popup+8-disabled-default-categories";
         private const string BlueprintAutoPlacementVisualContract = "auto-placement-stage15-replacement-rules+dependency-order+item-use-bridge+projection-verification+main-inventory-execution+void-bag-fail-closed";
-        private const string BlueprintMirrorVisualContract = "preview-horizontal-mirror+anchor-flip+slope-map+fail-closed-frame-matrix";
+        // 镜像已从 fail-closed 改为尝试翻转 frame（TileObjectData 方向查表），不可翻转时清零回退。 
+        private const string BlueprintMirrorVisualContract = "preview-horizontal-mirror+anchor-flip+slope-map+tileObjectData-direction-flip+frame-reset-fallback";
         private static readonly BlueprintReplacementOptionDefinition[] BlueprintReplacementOptions =
         {
             new BlueprintReplacementOptionDefinition(BlueprintReplacementCategories.Torch, "火把", "缺少原火把时允许使用同类火把。"),

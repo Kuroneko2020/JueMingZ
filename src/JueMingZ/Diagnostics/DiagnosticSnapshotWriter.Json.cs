@@ -906,9 +906,11 @@ namespace JueMingZ.Diagnostics
             Append(builder, "BlueprintMirrorTemplateId", snapshot.BlueprintMirrorTemplateId, true);
             Append(builder, "BlueprintMirrorTemplateName", snapshot.BlueprintMirrorTemplateName, true);
             Append(builder, "BlueprintMirrorBlockedReason", snapshot.BlueprintMirrorBlockedReason, true);
+            Append(builder, "BlueprintMirrorWarningReason", snapshot.BlueprintMirrorWarningReason, true);
             Append(builder, "BlueprintMirrorMirroredCellCount", snapshot.BlueprintMirrorMirroredCellCount, true);
             Append(builder, "BlueprintMirrorMirroredLayerCount", snapshot.BlueprintMirrorMirroredLayerCount, true);
             Append(builder, "BlueprintMirrorRejectedLayerCount", snapshot.BlueprintMirrorRejectedLayerCount, true);
+            Append(builder, "BlueprintMirrorWarningLayerCount", snapshot.BlueprintMirrorWarningLayerCount, true);
             Append(builder, "BlueprintMirrorLastAttemptedUtc", FormatDate(snapshot.BlueprintMirrorLastAttemptedUtc), true);
             Append(builder, "BlueprintDiagnosticsTemplateReadStatus", snapshot.BlueprintDiagnosticsTemplateReadStatus, true);
             Append(builder, "BlueprintDiagnosticsTemplateReadMessage", snapshot.BlueprintDiagnosticsTemplateReadMessage, true);

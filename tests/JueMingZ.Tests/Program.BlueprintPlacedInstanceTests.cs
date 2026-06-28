@@ -601,7 +601,7 @@ namespace JueMingZ.Tests
                 BlueprintTemplateRecord progressTemplate;
                 BlueprintTemplateRecord completedTemplate;
                 RequireBlueprintSuccess(templateStore.CreateTemplate(CreateMirrorableBlueprintTemplate("实例镜像"), out mirrorable), "create mirrorable template");
-                RequireBlueprintSuccess(templateStore.CreateTemplate(CreateDirectionalFurnitureBlueprintTemplate(), out unsupported), "create unsupported mirror template");
+                RequireBlueprintSuccess(templateStore.CreateTemplate(CreatePartialTableBlueprintTemplate("半件实例镜像"), out unsupported), "create unsupported mirror template");
                 RequireBlueprintSuccess(templateStore.CreateTemplate(CreateMirrorableBlueprintTemplate("进度镜像"), out progressTemplate), "create progress mirror template");
                 RequireBlueprintSuccess(templateStore.CreateTemplate(CreateMirrorableBlueprintTemplate("已完成进度镜像"), out completedTemplate), "create completed-progress mirror template");
 
@@ -693,7 +693,7 @@ namespace JueMingZ.Tests
                 var completedBefore = FindPlacedInstance(saved, completedInstance.InstanceId).TemplateSnapshot.Clone();
 
                 BlueprintPlacedInstanceTransformState.BeginMirror();
-                var blocked = BlueprintPlacedInstanceTransformState.HandlePointer(new BlueprintPlacedInstanceTransformPointerInput
+                var unsupportedResult = BlueprintPlacedInstanceTransformState.HandlePointer(new BlueprintPlacedInstanceTransformPointerInput
                 {
                     WorldTileHit = true,
                     TileX = 50,
@@ -701,20 +701,20 @@ namespace JueMingZ.Tests
                     LeftDown = true,
                     LeftPressed = true
                 });
-                if (blocked.Succeeded ||
-                    blocked.Changed ||
-                    !string.Equals(blocked.ResultCode, "mirrorBlocked", StringComparison.Ordinal))
+                if (unsupportedResult.Succeeded ||
+                    unsupportedResult.Changed ||
+                    !string.Equals(unsupportedResult.ResultCode, "mirrorBlocked", StringComparison.Ordinal))
                 {
-                    throw new InvalidOperationException("Expected unsupported frame/direction content to fail closed when mirroring an instance.");
+                    throw new InvalidOperationException("Expected partial object instance mirror to fail closed; got " + unsupportedResult.ResultCode);
                 }
 
-                RequireBlueprintSuccess(instanceStore.TryLoadWorld("pair-mirror-instance", out saved), "load after blocked mirror");
+                RequireBlueprintSuccess(instanceStore.TryLoadWorld("pair-mirror-instance", out saved), "load after unsupported mirror");
                 var unsupportedAfter = FindPlacedInstance(saved, unsupportedInstance.InstanceId).TemplateSnapshot;
                 if (FindLayerAt(unsupportedAfter, 0, 0, BlueprintLayerKinds.Object) == null ||
-                    FindLayerAt(unsupportedAfter, 1, 0, BlueprintLayerKinds.Object) != null ||
+                    FindLayerAt(unsupportedAfter, 2, 0, BlueprintLayerKinds.Object) != null ||
                     unsupportedAfter.Cells.Count != unsupportedBefore.Cells.Count)
                 {
-                    throw new InvalidOperationException("Blocked placed-instance mirror must leave the unsupported instance snapshot unchanged.");
+                    throw new InvalidOperationException("Rejected partial-object mirror must leave the instance template snapshot unchanged.");
                 }
 
                 BlueprintPlacedInstanceTransformState.BeginMirror();

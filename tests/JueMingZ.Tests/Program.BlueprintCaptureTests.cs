@@ -166,6 +166,81 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void BlueprintCaptureExpandsPartialMultitileObjectWithoutWallsOrWires()
+        {
+            BlueprintCreationMaskState.ResetForTesting();
+            BlueprintCreationMaskState.BeginCreate();
+            ClickTileForBlueprintCreation(31, 40);
+            BlueprintCreationMaskState.FinishCreate(false);
+
+            var reader = new FakeBlueprintWorldTileReader();
+            var leftPart = CreateObjectPart(21, 30, 40, 3, 300, string.Empty);
+            leftPart.FrameX = 0;
+            leftPart.WallType = 7;
+            leftPart.WallMaterialItemId = 701;
+            leftPart.HasRedWire = true;
+            leftPart.WireMaterialItemId = 530;
+            leftPart.HasActuator = true;
+            leftPart.ActuatorMaterialItemId = 849;
+            var rightPart = CreateObjectPart(21, 30, 40, 3, 300, string.Empty);
+            rightPart.FrameX = 18;
+            reader.Set(30, 40, leftPart);
+            reader.Set(31, 40, rightPart);
+
+            var result = BlueprintCaptureService.CaptureSnapshotToTemplate(BlueprintCreationMaskState.GetSnapshot(), reader, false);
+            if (!result.Succeeded ||
+                result.MaskSelectedCount != 1 ||
+                result.Template.Width != 2 ||
+                result.Template.Height != 1 ||
+                result.Template.Cells.Count != 2)
+            {
+                throw new InvalidOperationException("Expected partial multi-tile object selection to expand template bounds to the whole object.");
+            }
+
+            var leftCell = result.Template.Cells.FirstOrDefault(cell => cell.X == 0 && cell.Y == 0);
+            var rightCell = result.Template.Cells.FirstOrDefault(cell => cell.X == 1 && cell.Y == 0);
+            var leftObject = RequireLayer(leftCell, BlueprintLayerKinds.Object);
+            var rightObject = RequireLayer(rightCell, BlueprintLayerKinds.Object);
+            if (leftObject.FrameX != 0 || rightObject.FrameX != 18)
+            {
+                throw new InvalidOperationException("Expected expanded object cells to keep each furniture part frame.");
+            }
+
+            if (HasLayer(leftCell, BlueprintLayerKinds.Wall) ||
+                HasLayer(leftCell, BlueprintLayerKinds.Wire) ||
+                HasLayer(leftCell, BlueprintLayerKinds.Actuator))
+            {
+                throw new InvalidOperationException("Expected object expansion cells to import only the object layer, not unselected wall, wire or actuator layers.");
+            }
+
+            var material = result.Template.Materials.FirstOrDefault(item => item.ItemId == 300);
+            if (material == null || material.RequiredStack != 1 ||
+                leftObject.MaterialStack + rightObject.MaterialStack != 1)
+            {
+                throw new InvalidOperationException("Expected expanded multi-tile object material to still count once.");
+            }
+        }
+
+        private static void BlueprintCaptureFailsClosedWhenExpandedObjectCellIsIncomplete()
+        {
+            BlueprintCreationMaskState.ResetForTesting();
+            BlueprintCreationMaskState.BeginCreate();
+            ClickTileForBlueprintCreation(31, 40);
+            BlueprintCreationMaskState.FinishCreate(false);
+
+            var reader = new FakeBlueprintWorldTileReader();
+            var rightPart = CreateObjectPart(21, 30, 40, 3, 300, string.Empty);
+            rightPart.FrameX = 18;
+            reader.Set(31, 40, rightPart);
+
+            var result = BlueprintCaptureService.CaptureSnapshotToTemplate(BlueprintCreationMaskState.GetSnapshot(), reader, false);
+            if (result.Succeeded ||
+                !string.Equals(result.ResultCode, "objectExpansionIncomplete", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected incomplete multi-tile object expansion to fail closed instead of saving a half object.");
+            }
+        }
+
         private static void BlueprintCaptureSaveWritesTemplateAndRefreshesLibrary()
         {
             var restore = PushTemporaryConfigDirectory("blueprint-capture-save");
@@ -323,6 +398,16 @@ namespace JueMingZ.Tests
             }
 
             throw new InvalidOperationException("Missing blueprint layer " + layerKind + ".");
+        }
+
+        private static bool HasLayer(BlueprintCellRecord cell, string layerKind)
+        {
+            if (cell == null || cell.Layers == null)
+            {
+                return false;
+            }
+
+            return cell.Layers.Any(layer => layer != null && string.Equals(layer.LayerKind, layerKind, StringComparison.Ordinal));
         }
 
         private sealed class FakeBlueprintWorldTileReader : IBlueprintWorldTileReader

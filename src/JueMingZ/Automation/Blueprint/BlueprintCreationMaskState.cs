@@ -56,9 +56,7 @@ namespace JueMingZ.Automation.Blueprint
                 ClearHoverLocked();
                 _lastInputOwner = "ui";
                 _lastResultCode = preservedCount > 0 ? "creationResumed" : "creationStarted";
-                _lastNotice = preservedCount > 0
-                    ? "创建中：已保留 " + preservedCount.ToString(CultureInfo.InvariantCulture) + " 格选区，可继续编辑蓝图 mask。"
-                    : "创建中：左键单选/拖选世界格；只记录蓝图 mask。";
+                _lastNotice = BuildCreationNoticeLocked();
                 return BuildResultLocked(true, changed, false, true, _lastResultCode, _lastNotice);
             }
         }
@@ -165,7 +163,7 @@ namespace JueMingZ.Automation.Blueprint
                     ClearHoverLocked();
                     _lastInputOwner = "ui";
                     _lastResultCode = "uiOwned";
-                    _lastNotice = "鼠标命中 UI；创建 mask 未变化。";
+                    _lastNotice = BuildCreationNoticeLocked();
                     return BuildResultLocked(true, changed, true, true, _lastResultCode, _lastNotice);
                 }
 
@@ -179,7 +177,7 @@ namespace JueMingZ.Automation.Blueprint
                         ClearHoverLocked();
                         _lastInputOwner = "world-outside";
                         _lastResultCode = "worldMiss";
-                        _lastNotice = "鼠标未命中有效世界格；创建 mask 未变化。";
+                        _lastNotice = BuildCreationNoticeLocked();
                         return BuildResultLocked(true, changed, true, true, _lastResultCode, _lastNotice);
                     }
 
@@ -189,7 +187,7 @@ namespace JueMingZ.Automation.Blueprint
                         _dragging = false;
                         _lastInputOwner = "world";
                         _lastResultCode = "tileUnavailable";
-                        _lastNotice = "鼠标命中的世界格暂不可读取；创建 mask 未变化。";
+                        _lastNotice = BuildCreationNoticeLocked();
                         return BuildResultLocked(true, changed, true, true, _lastResultCode, _lastNotice);
                     }
 
@@ -200,7 +198,7 @@ namespace JueMingZ.Automation.Blueprint
                     _dragCurrentY = input.TileY;
                     _lastInputOwner = "world";
                     _lastResultCode = "dragStarted";
-                    _lastNotice = "开始拖选蓝图创建 mask。";
+                    _lastNotice = BuildCreationNoticeLocked();
                     return BuildResultLocked(true, true, true, true, _lastResultCode, _lastNotice);
                 }
 
@@ -213,7 +211,7 @@ namespace JueMingZ.Automation.Blueprint
                         _dragCurrentY = input.TileY;
                         _lastInputOwner = "world";
                         _lastResultCode = "dragUpdated";
-                        _lastNotice = "正在拖选蓝图创建 mask。";
+                        _lastNotice = BuildCreationNoticeLocked();
                         return BuildResultLocked(true, true, true, true, _lastResultCode, _lastNotice);
                     }
 
@@ -227,7 +225,7 @@ namespace JueMingZ.Automation.Blueprint
                         _dragging = false;
                         _lastInputOwner = "world-outside";
                         _lastResultCode = "dragCancelled";
-                        _lastNotice = "拖选释放点无效；创建 mask 未变化。";
+                        _lastNotice = BuildCreationNoticeLocked();
                         return BuildResultLocked(true, true, true, true, _lastResultCode, _lastNotice);
                     }
 
@@ -237,7 +235,7 @@ namespace JueMingZ.Automation.Blueprint
                     _dragging = false;
                     _lastInputOwner = "world";
                     _lastResultCode = toggle.ResultCode;
-                    _lastNotice = toggle.Message;
+                    _lastNotice = BuildCreationNoticeLocked();
                     return BuildResultLocked(toggle.Succeeded, toggle.Changed, true, true, _lastResultCode, _lastNotice);
                 }
 
@@ -245,7 +243,7 @@ namespace JueMingZ.Automation.Blueprint
                 {
                     _lastInputOwner = input.WorldTileHit ? "world" : "world-outside";
                     _lastResultCode = "heldIgnored";
-                    _lastNotice = "等待新的左键按下后再修改创建 mask。";
+                    _lastNotice = BuildCreationNoticeLocked();
                     return BuildResultLocked(true, false, true, true, _lastResultCode, _lastNotice);
                 }
 
@@ -413,6 +411,11 @@ namespace JueMingZ.Automation.Blueprint
             _hoverTileHit = false;
             _hoverTileX = 0;
             _hoverTileY = 0;
+        }
+
+        private static string BuildCreationNoticeLocked()
+        {
+            return "长按拖动选区，复选取消选区，当前已选" + SelectedCells.Count.ToString(CultureInfo.InvariantCulture) + "格";
         }
 
         private static bool IsSelectableForInputLocked(BlueprintCreationPointerInput input, int tileX, int tileY)

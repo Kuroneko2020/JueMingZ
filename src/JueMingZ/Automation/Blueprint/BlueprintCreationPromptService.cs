@@ -1,5 +1,4 @@
 using System;
-using System.Globalization;
 using JueMingZ.Compat;
 using JueMingZ.Diagnostics;
 
@@ -87,18 +86,13 @@ namespace JueMingZ.Automation.Blueprint
     {
         private const string StartEventKind = "start";
         private const string ExitEventKind = "exit";
-        private const string MaskChangedEventKind = "mask-changed";
+        private const string StartText = "开始创建蓝图选区";
         private const string ExitText = "退出创建蓝图";
         private const int PromptDurationFrames = 90;
         private const int PromptColorR = 98;
         private const int PromptColorG = 185;
         private const int PromptColorB = 255;
         private const string LocalPromptContract = "local-popuptext-no-chat-no-network-no-player-state+head-position+duration-90-frames";
-
-        private static string BuildMaskChangedText(int selectedCount)
-        {
-            return "长按左键选区，复选为取消，当前已选" + selectedCount.ToString(CultureInfo.InvariantCulture) + "格";
-        }
 
         private static readonly object SyncRoot = new object();
         private static IBlueprintCreationPromptSink _sink = TerrariaBlueprintCreationPromptCompat.Instance;
@@ -114,8 +108,7 @@ namespace JueMingZ.Automation.Blueprint
                 return;
             }
 
-            var snapshot = BlueprintCreationMaskState.GetSnapshot();
-            Show(StartEventKind, BuildMaskChangedText(snapshot.SelectedCount));
+            Show(StartEventKind, StartText);
         }
 
         public static void NotifyCreateExited(BlueprintEntryCommandResult result, bool wasCreating)
@@ -150,16 +143,6 @@ namespace JueMingZ.Automation.Blueprint
         internal static int GetPromptColorGForTesting()
         {
             return PromptColorG;
-        }
-
-        public static void NotifyMaskChanged(int selectedCount)
-        {
-            if (selectedCount < 0)
-            {
-                selectedCount = 0;
-            }
-
-            Show(MaskChangedEventKind, BuildMaskChangedText(selectedCount));
         }
 
         internal static int GetPromptColorBForTesting()

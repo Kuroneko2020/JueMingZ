@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using JueMingZ.Automation.Blueprint;
 using JueMingZ.Config;
 using JueMingZ.Diagnostics;
@@ -284,6 +285,78 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void BlueprintProjectionWallFramesUseNeighborContinuity()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-projection-wall-frames");
+            try
+            {
+                var store = new BlueprintWorldInstanceStore();
+                var reader = new FakeBlueprintWorldTileReader();
+                var template = CreateProjectionWallBlockTemplate("02 墙帧连续", 7);
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(store.CreateInstanceFromTemplate("pair-wall-frame", "world-wall-frame", template, 20, 30, 0, out instance), "create wall frame projection instance");
+                BlueprintProjectionService.SetDependenciesForTesting(
+                    store,
+                    BlueprintPlacementWorldContext.Success("pair-wall-frame", "world-wall-frame"),
+                    reader,
+                    true);
+
+                var snapshot = BlueprintProjectionService.GetSnapshot();
+                if (!snapshot.LoadSucceeded ||
+                    snapshot.EffectiveLayerCount != 4 ||
+                    snapshot.MissingLayerCount != 4 ||
+                    snapshot.ProjectedLayers.Count != 4)
+                {
+                    throw new InvalidOperationException("Expected 2x2 blueprint wall projection to resolve four missing wall layers.");
+                }
+
+                var frames = new HashSet<string>(StringComparer.Ordinal);
+                for (var index = 0; index < snapshot.ProjectedLayers.Count; index++)
+                {
+                    var layer = snapshot.ProjectedLayers[index];
+                    if (layer == null || !string.Equals(layer.LayerKind, BlueprintLayerKinds.Wall, StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new InvalidOperationException("Expected wall frame projection test to contain only wall layers.");
+                    }
+
+                    frames.Add(layer.FrameX.ToString(System.Globalization.CultureInfo.InvariantCulture) + ":" + layer.FrameY.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                }
+
+                if (frames.Count < 4)
+                {
+                    throw new InvalidOperationException("Expected neighboring blueprint walls to resolve varied wall frames instead of a fixed top-left source rectangle.");
+                }
+
+                var topLeft = FindProjectedLayerAt(snapshot.ProjectedLayers, instance.InstanceId, BlueprintLayerKinds.Wall, 20, 30);
+                var expectedTopLeft = BlueprintWallProjectionFrameResolver.ResolveFrameForTesting(20, 30, false, false, true, true);
+                if (topLeft == null ||
+                    topLeft.FrameX != expectedTopLeft[0] ||
+                    topLeft.FrameY != expectedTopLeft[1])
+                {
+                    throw new InvalidOperationException("Expected projection cache to assign Terraria-style wall frame data from neighboring blueprint wall cells.");
+                }
+
+                var source = BlueprintProjectionGhostRenderer.ResolveWallSourceRectForTesting(topLeft.FrameX, topLeft.FrameY, 512, 288);
+                if (source[0] != topLeft.FrameX ||
+                    source[1] != topLeft.FrameY ||
+                    source[2] != 32 ||
+                    source[3] != 32)
+                {
+                    throw new InvalidOperationException("Expected wall ghost renderer to consume cached wall frame source rectangles instead of always drawing from 0,0.");
+                }
+
+                if (reader.ReadCount != 4)
+                {
+                    throw new InvalidOperationException("Expected wall frame projection to avoid extra world tile reads beyond normal layer classification.");
+                }
+            }
+            finally
+            {
+                BlueprintProjectionService.ResetForTesting();
+                restore();
+            }
+        }
+
         private static void BlueprintProjectionCacheAvoidsImmediateRecompute()
         {
             var restore = PushTemporaryConfigDirectory("blueprint-projection-cache");
@@ -538,6 +611,23 @@ namespace JueMingZ.Tests
                     }
                 }
             };
+        }
+
+        private static BlueprintTemplateRecord CreateProjectionWallBlockTemplate(string name, int wallType)
+        {
+            var template = new BlueprintTemplateRecord
+            {
+                Name = name,
+                Width = 2,
+                Height = 2,
+                AnchorX = 0,
+                AnchorY = 0
+            };
+            template.Cells.Add(CreateWallCell(0, 0, wallType));
+            template.Cells.Add(CreateWallCell(1, 0, wallType));
+            template.Cells.Add(CreateWallCell(0, 1, wallType));
+            template.Cells.Add(CreateWallCell(1, 1, wallType));
+            return template;
         }
 
         private static bool HasProjectedLayer(

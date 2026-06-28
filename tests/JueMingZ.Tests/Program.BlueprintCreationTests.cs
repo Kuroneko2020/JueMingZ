@@ -835,8 +835,8 @@ namespace JueMingZ.Tests
                 var started = BlueprintEntryState.ApplyCommand(BlueprintEntryCommands.StartCreate, settings);
                 if (!started.Succeeded ||
                     sink.CallCount != 1 ||
-                    !string.Equals(sink.LastEventKind, "mask-changed", StringComparison.Ordinal) ||
-                    !string.Equals(sink.LastText, "长按左键选区，复选为取消，当前已选0格", StringComparison.Ordinal))
+                    !string.Equals(sink.LastEventKind, "start", StringComparison.Ordinal) ||
+                    !string.Equals(sink.LastText, "开始创建蓝图选区", StringComparison.Ordinal))
                 {
                     throw new InvalidOperationException("Expected entering blueprint creation to show the local start prompt once.");
                 }

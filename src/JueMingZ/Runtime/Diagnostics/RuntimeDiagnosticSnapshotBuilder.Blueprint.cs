@@ -38,9 +38,11 @@ namespace JueMingZ.Runtime
             snapshot.BlueprintMirrorTemplateId = mirror.LastTemplateId;
             snapshot.BlueprintMirrorTemplateName = mirror.LastTemplateName;
             snapshot.BlueprintMirrorBlockedReason = mirror.LastBlockedReason;
+            snapshot.BlueprintMirrorWarningReason = mirror.LastWarningReason;
             snapshot.BlueprintMirrorMirroredCellCount = mirror.LastMirroredCellCount;
             snapshot.BlueprintMirrorMirroredLayerCount = mirror.LastMirroredLayerCount;
             snapshot.BlueprintMirrorRejectedLayerCount = mirror.LastRejectedLayerCount;
+            snapshot.BlueprintMirrorWarningLayerCount = mirror.LastWarningLayerCount;
             snapshot.BlueprintMirrorLastAttemptedUtc = mirror.LastAttemptedUtc;
 
             var projection = BlueprintProjectionService.GetDiagnostics();

@@ -891,9 +891,11 @@ namespace JueMingZ.Diagnostics
         public string BlueprintMirrorTemplateId { get; set; }
         public string BlueprintMirrorTemplateName { get; set; }
         public string BlueprintMirrorBlockedReason { get; set; }
+        public string BlueprintMirrorWarningReason { get; set; }
         public int BlueprintMirrorMirroredCellCount { get; set; }
         public int BlueprintMirrorMirroredLayerCount { get; set; }
         public int BlueprintMirrorRejectedLayerCount { get; set; }
+        public int BlueprintMirrorWarningLayerCount { get; set; }
         public DateTime? BlueprintMirrorLastAttemptedUtc { get; set; }
         public string BlueprintDiagnosticsTemplateReadStatus { get; set; }
         public string BlueprintDiagnosticsTemplateReadMessage { get; set; }
@@ -1782,6 +1784,7 @@ namespace JueMingZ.Diagnostics
             BlueprintMirrorTemplateId = string.Empty;
             BlueprintMirrorTemplateName = string.Empty;
             BlueprintMirrorBlockedReason = string.Empty;
+            BlueprintMirrorWarningReason = string.Empty;
             BlueprintDiagnosticsTemplateReadStatus = string.Empty;
             BlueprintDiagnosticsTemplateReadMessage = string.Empty;
             BlueprintPerformanceLastScenario = string.Empty;

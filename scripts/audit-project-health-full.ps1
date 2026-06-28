@@ -6,7 +6,12 @@
     [ValidateSet("Full", "Fast")]
     [string]$AuditProfile = "Full",
     [Alias("Scope")]
-    [ValidateSet("All", "Base", "Information", "UI", "Combat", "Diagnostics", "Map", "Hotkey", "Blueprint", "Notes", "Exploration", "ActionQueue", "Feature", "Structure", "Fishing", "Movement", "Items", "Buffs", "World", "Npc")]
+    [ValidateSet(
+        "All", "Base",
+        "Information", "UI", "Combat", "Diagnostics", "Map", "Hotkey", "Blueprint", "BlueprintCreation", "BlueprintPlacement", "BlueprintTransform", "BlueprintAutoPlacement", "BlueprintHandheld", "BlueprintDiagnostics",
+        "Notes", "Exploration", "ActionQueue", "Input", "Feature", "Structure", "Runtime", "Config", "GameState",
+        "Fishing", "Movement", "Items", "Buffs", "World", "Npc"
+    )]
     [string[]]$AuditScope = @("All")
 )
 
@@ -12888,6 +12893,557 @@ function Test-AuditScopeSelected {
     return $false
 }
 
+function Test-CurrentContractAnchors {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$RelativePath,
+        [Parameter(Mandatory = $true)][string[]]$RequiredAnchors,
+        [Parameter(Mandatory = $true)][string]$PassMessage,
+        [Parameter(Mandatory = $true)][string]$FailMessage
+    )
+
+    $path = Join-Path $RepoRoot $RelativePath
+    $text = Read-TextIfExists -Path $path
+    if ($null -eq $text) {
+        Write-FailHealth "$FailMessage missing file: $RelativePath"
+        return
+    }
+
+    $missing = @()
+    foreach ($anchor in $RequiredAnchors) {
+        if (-not [string]::IsNullOrWhiteSpace($anchor) -and -not $text.Contains($anchor)) {
+            $missing += $anchor
+        }
+    }
+
+    if ($missing.Count -gt 0) {
+        Write-FailHealth "$FailMessage missing anchor(s) in ${RelativePath}: $($missing -join ', ')"
+    }
+    else {
+        Write-Pass $PassMessage
+    }
+}
+
+function Test-CurrentContractForbiddenAnchors {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$RelativePath,
+        [Parameter(Mandatory = $true)][string[]]$ForbiddenAnchors,
+        [Parameter(Mandatory = $true)][string]$PassMessage,
+        [Parameter(Mandatory = $true)][string]$FailMessage
+    )
+
+    $path = Join-Path $RepoRoot $RelativePath
+    $text = Read-TextIfExists -Path $path
+    if ($null -eq $text) {
+        Write-FailHealth "$FailMessage missing file: $RelativePath"
+        return
+    }
+
+    $violations = @()
+    foreach ($anchor in $ForbiddenAnchors) {
+        if (-not [string]::IsNullOrWhiteSpace($anchor) -and $text.Contains($anchor)) {
+            $violations += $anchor
+        }
+    }
+
+    if ($violations.Count -gt 0) {
+        Write-FailHealth "$FailMessage contains forbidden anchor(s) in ${RelativePath}: $($violations -join ', ')"
+    }
+    else {
+        Write-Pass $PassMessage
+    }
+}
+
+function Test-BlueprintCurrentCreationGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Automation\Blueprint\BlueprintCreationMaskState.cs" -RequiredAnchors @(
+        "BeginCreate",
+        "ClearSelection",
+        "ExitCreatePreservingSelection",
+        "FinishCreate",
+        "HandlePointer"
+    ) -PassMessage "Blueprint creation mask still owns begin/clear/exit/finish/pointer state." -FailMessage "Blueprint creation mask contract drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Automation\Blueprint\BlueprintCreationPromptService.cs" -RequiredAnchors @(
+        "NotifyCreateStarted",
+        "NotifyCreateExited",
+        "GetLocalPromptContractForTesting",
+        "StartEventKind",
+        "ExitEventKind",
+        "LocalPromptContract"
+    ) -PassMessage "Blueprint creation prompt stays local-only and emits start/exit notifications." -FailMessage "Blueprint creation prompt contract drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Automation\Blueprint\BlueprintEntryState.cs" -RequiredAnchors @(
+        "BlueprintCreationMaskState.BeginCreate",
+        "BlueprintCreationMaskState.ClearSelection",
+        "BlueprintCreationMaskState.ExitCreatePreservingSelection",
+        "BlueprintCreationMaskState.FinishCreate",
+        "BlueprintCreationPromptService.NotifyCreateStarted",
+        "BlueprintCreationPromptService.NotifyCreateExited"
+    ) -PassMessage "Blueprint creation entry flow still routes through mask and prompt services." -FailMessage "Blueprint creation entry flow drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\UI\BlueprintCreationOverlay.cs" -RequiredAnchors @(
+        "DrawInterfaceLayer",
+        "BuildPointerInputForTesting",
+        "ShouldBlockCreationForPointerOwnershipForTesting",
+        "ShouldConsumeAfterPlayerInputForTesting",
+        "GetVisualContractForTesting"
+    ) -PassMessage "Blueprint creation overlay keeps the pointer contract and draw entrypoint." -FailMessage "Blueprint creation overlay contract drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.BlueprintCreationTests.cs" -RequiredAnchors @(
+        "BlueprintCreationOverlayRoutesAndPointerContract",
+        "BlueprintCreationLocalPromptEdgesAndVisualContract",
+        "BlueprintCreationClearFinishAndCancelContracts"
+    ) -PassMessage "Blueprint creation tests still cover overlay routing and prompt edges." -FailMessage "Blueprint creation test coverage drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.cs" -RequiredAnchors @(
+        "blueprint creation overlay routes and pointer contract",
+        "blueprint creation local prompt edges and visual contract",
+        "blueprint creation clear finish and cancel contracts"
+    ) -PassMessage "Blueprint creation test registration is still wired." -FailMessage "Blueprint creation test registration drifted."
+}
+
+function Test-BlueprintCurrentPlacementGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Automation\Blueprint\BlueprintPlacementPreviewState.cs" -RequiredAnchors @(
+        "BlueprintPlacementWorldContext",
+        "LeftReleased",
+        "ConfirmPlacementLocked",
+        "initialLeftReleased",
+        "GetSnapshot"
+    ) -PassMessage "Blueprint placement preview still gates confirm on release and world context." -FailMessage "Blueprint placement preview contract drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Automation\Blueprint\BlueprintProjectionService.cs" -RequiredAnchors @(
+        "EffectiveLayerCount",
+        "BlueprintPlacementWorldContext",
+        "RecordProjectionResolve",
+        "RefreshAfterWorldIdentityChanged"
+    ) -PassMessage "Blueprint projection still feeds effective layer counts and refresh flow." -FailMessage "Blueprint projection contract drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\UI\Legacy\BlueprintPlacedInstanceUiState.cs" -RequiredAnchors @(
+        "GetCachedSummary",
+        "RefreshForWorldLifecycle",
+        "ClearAllCurrentWorld",
+        "BlueprintPlacementWorldContext",
+        "BuildCommandId"
+    ) -PassMessage "Blueprint placed-instance UI still owns the current-world management surface." -FailMessage "Blueprint placed-instance UI contract drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Automation\Blueprint\BlueprintPlacedInstanceActivity.cs" -RequiredAnchors @(
+        "EffectiveLayerCount",
+        "HasActionablePlacedBlueprint",
+        "ResolveActionableCount"
+    ) -PassMessage "Blueprint placed-instance activity still keys off effective projection content." -FailMessage "Blueprint placed-instance activity contract drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Automation\Blueprint\BlueprintWorldInstanceLifecycleService.cs" -RequiredAnchors @(
+        "RefreshForWorldLifecycle",
+        "BlueprintPlacedInstanceUiState.RefreshForWorldLifecycle",
+        "BlueprintProjectionService.RefreshAfterWorldIdentityChanged"
+    ) -PassMessage "Blueprint world lifecycle still refreshes placed and projection state together." -FailMessage "Blueprint world lifecycle contract drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.BlueprintPlacementPreviewTests.cs" -RequiredAnchors @(
+        "BlueprintPlacementPreviewUsesUpperLeftCenterAnchorForEvenSize",
+        "BlueprintPlacementConfirmCreatesWorldInstanceOnly",
+        "BlueprintPlacementConfirmRefreshesProjectionAndPlacedList",
+        "BlueprintPlacementPreviewWaitsForPhysicalLeftReleaseBeforeConfirm",
+        "BlueprintPlacementOverlayRoutesAndPointerContract"
+    ) -PassMessage "Blueprint placement entry tests still cover preview and confirm gating." -FailMessage "Blueprint placement entry tests drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.BlueprintPlacedInstanceTests.cs" -RequiredAnchors @(
+        "BlueprintPlacedInstancesUiStateLoadsCurrentWorldAndKeepsSnapshots",
+        "BlueprintPlacedInstanceCommandsToggleRemoveSelectAndLayer",
+        "BlueprintPlacedInstanceClearAllCurrentWorldKeepsTemplatesAndRefreshesCaches",
+        "BlueprintPlacedInstanceMoveKeepsSnapshotStateAndRefreshesCaches",
+        "BlueprintPlacedInstanceMoveBlocksCompletedProgressAndKeepsOriginalPosition",
+        "BlueprintPlacedInstanceMirrorUsesServiceAndFailsClosed"
+    ) -PassMessage "Blueprint placed-instance tests still cover current-world management and transforms." -FailMessage "Blueprint placed-instance tests drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.cs" -RequiredAnchors @(
+        "blueprint placement confirm creates world instance only",
+        "blueprint placement confirm refreshes projection and placed list",
+        "blueprint placement preview waits for physical left release before confirm",
+        "blueprint placement overlay routes and pointer contract",
+        "blueprint placed instances UI state loads current world and keeps snapshots",
+        "blueprint placed instance mirror uses service and fails closed"
+    ) -PassMessage "Blueprint placement tests remain registered." -FailMessage "Blueprint placement test registration drifted."
+}
+
+function Test-BlueprintCurrentTransformGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Automation\Blueprint\BlueprintMirrorService.cs" -RequiredAnchors @(
+        "TryMirrorHorizontal",
+        "MirrorSlopeForTesting",
+        "CanMirrorLayerForTesting",
+        "ResolveTileObjectDataForDirection",
+        "TileObjectData"
+    ) -PassMessage "Blueprint mirror service still flips slopes and TileObjectData direction." -FailMessage "Blueprint mirror service contract drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Automation\Blueprint\BlueprintPlacedInstanceTransformState.cs" -RequiredAnchors @(
+        "BeginMove",
+        "BeginMirror",
+        "mirrorBlockedByPlacedProgress",
+        "GetFloatingProjectionForTesting",
+        "BlueprintMirrorService.TryMirrorHorizontal"
+    ) -PassMessage "Blueprint placed-instance transform state still gates move/mirror through the mirror service." -FailMessage "Blueprint placed-instance transform contract drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.BlueprintMirrorTests.cs" -RequiredAnchors @(
+        "BlueprintMirrorCompleteMultitileObjectMirrorsAndPartialFailsClosed",
+        "BlueprintMirrorSupportMatrixMapsSlopesAndFlipsObjectDirection",
+        "BlueprintMirrorProjectionMaterialsAndAutoPlacementUseMirroredSnapshot",
+        "BlueprintMirrorDiagnosticsWriteRuntimeSnapshotJson"
+    ) -PassMessage "Blueprint mirror tests still cover object support, fail-closed, projection reuse, and diagnostics." -FailMessage "Blueprint mirror test coverage drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.BlueprintPlacedInstanceTests.cs" -RequiredAnchors @(
+        "BlueprintPlacedInstanceMirrorUsesServiceAndFailsClosed",
+        "BlueprintPlacedInstanceMoveBlocksCompletedProgressAndKeepsOriginalPosition"
+    ) -PassMessage "Blueprint placed-instance tests still cover transform progress and mirror service reuse." -FailMessage "Blueprint placed-instance transform tests drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.cs" -RequiredAnchors @(
+        "blueprint mirror complete multitile object mirrors and partial fails closed",
+        "blueprint mirror support matrix maps slopes and flips object direction",
+        "blueprint mirror projection materials and auto placement use mirrored snapshot",
+        "blueprint mirror diagnostics write runtime snapshot json",
+        "blueprint placed instance mirror uses service and fails closed"
+    ) -PassMessage "Blueprint transform tests remain registered." -FailMessage "Blueprint transform test registration drifted."
+}
+
+function Test-BlueprintCurrentAutoPlacementGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Automation\Blueprint\BlueprintAutoPlacementService.cs" -RequiredAnchors @(
+        "voidBagMaterialNotExecutable",
+        "BuildMainInventoryAvailabilityMap",
+        "BuildCombinedInventoryAvailabilityMap",
+        "BlueprintMaterialExecutionScope",
+        "RecordAutoPlacementCandidateScan",
+        "BuildRequestForTesting"
+    ) -PassMessage "Blueprint auto-placement service still resolves main-inventory scope and void-bag fail-closed paths." -FailMessage "Blueprint auto-placement service contract drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Actions\Executors\BlueprintAutoPlaceActionExecutor.cs" -RequiredAnchors @(
+        "ScenarioNames.BlueprintAutoPlace",
+        "TryFindMainInventoryMaterial",
+        "ItemUseBridge.TryEnqueueUseSelectedItem",
+        "materialExecutionScope",
+        "directWorldMutationAttempted",
+        "inventoryMutationAttempted"
+    ) -PassMessage "Blueprint auto-place executor still routes through ItemUseBridge and fail-closed verification." -FailMessage "Blueprint auto-place executor contract drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Common\ActionMetadataKeys.cs" -RequiredAnchors @(
+        "BlueprintMaterialExecutionScope"
+    ) -PassMessage "Blueprint material execution metadata key stays centralized." -FailMessage "Blueprint material execution metadata drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Runtime\RuntimeAutomationDispatcher.cs" -RequiredAnchors @(
+        "DispatchBlueprintAutoPlacement",
+        "BlueprintAutoPlacementEnabled",
+        "BlueprintAutoPlacementService.Tick"
+    ) -PassMessage "Blueprint auto-placement stays wired into the runtime dispatcher." -FailMessage "Blueprint auto-placement runtime dispatch drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Runtime\Diagnostics\RuntimeDiagnosticSnapshotBuilder.Blueprint.cs" -RequiredAnchors @(
+        "BlueprintAutoPlacementSkippedVoidBagOnlyLayerCount",
+        "BlueprintAutoPlacementLastFailureReason",
+        "BlueprintAutoPlacementAverageCandidateScanElapsedMs"
+    ) -PassMessage "Blueprint auto-placement diagnostics still feed runtime snapshot fields." -FailMessage "Blueprint auto-placement diagnostics snapshot drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Diagnostics\DiagnosticSnapshotWriter.Json.cs" -RequiredAnchors @(
+        "BlueprintAutoPlacementSkippedVoidBagOnlyLayerCount",
+        "BlueprintAutoPlacementLastFailureReason"
+    ) -PassMessage "Blueprint auto-placement diagnostics still serialize into runtime JSON." -FailMessage "Blueprint auto-placement JSON snapshot drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.BlueprintAutoPlacementTests.cs" -RequiredAnchors @(
+        "BlueprintAutoPlacementSubmitsActionQueueAndVerifiesPlacement",
+        "BlueprintAutoPlacementUsesConfiguredReplacementMaterial",
+        "BlueprintAutoPlacementVoidBagOnlyMaterialsFailClosedWithReason",
+        "BlueprintAutoPlacementDiagnosticsWriteRuntimeSnapshotJson"
+    ) -PassMessage "Blueprint auto-placement tests still cover execution, replacement, and fail-closed diagnostics." -FailMessage "Blueprint auto-placement tests drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.cs" -RequiredAnchors @(
+        "blueprint auto placement submits ActionQueue and verifies placement",
+        "blueprint auto placement uses configured replacement material",
+        "blueprint auto placement void bag only materials fail closed with reason",
+        "blueprint auto placement diagnostics write runtime snapshot json"
+    ) -PassMessage "Blueprint auto-placement tests remain registered." -FailMessage "Blueprint auto-placement test registration drifted."
+}
+
+function Test-BlueprintCurrentHandheldGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Automation\Blueprint\BlueprintHandheldActionBarState.cs" -RequiredAnchors @(
+        "ButtonIdCreate",
+        "ButtonIdSave",
+        "ButtonIdOpenPlacedList",
+        "ButtonIdClearPlaced",
+        "ButtonIdMove",
+        "ButtonIdRegionModify",
+        "ButtonIdMirror",
+        "RecordDeferredBusinessClick",
+        "BuildPointerOwnerId",
+        "BuildDiagnostics"
+    ) -PassMessage "Blueprint handheld action bar state still owns the command matrix and pointer diagnostics." -FailMessage "Blueprint handheld action bar state drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\UI\BlueprintHandheldActionBarOverlay.cs" -RequiredAnchors @(
+        "PopulateDynamicBlueprintState",
+        "ReadForBlueprintHandheldActionBarOverlay",
+        "ReadMouseForBlueprintHandheldOverlay",
+        "RegisterPointerOwnerForCurrentFrame",
+        "UpdateAfterPlayerInputGuard",
+        "LegacyUiTheme.DrawButtonClipped"
+    ) -PassMessage "Blueprint handheld overlay still stays on the UI/input-only surface." -FailMessage "Blueprint handheld overlay contract drifted."
+
+    Test-CurrentContractForbiddenAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\UI\BlueprintHandheldActionBarOverlay.cs" -ForbiddenAnchors @(
+        "InputActionQueue",
+        "ForceRefreshForMaterialWindow",
+        "ForceRefreshForAutoPlacement"
+    ) -PassMessage "Blueprint handheld overlay avoids ActionQueue and blueprint refresh backflow." -FailMessage "Blueprint handheld overlay backflow guard drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\UI\DiagnosticMouseStateReader.cs" -RequiredAnchors @(
+        "ReadForBlueprintHandheldActionBarOverlay",
+        "BlueprintHandheldActionBarOverlayAfterPlayerInput",
+        "BlueprintHandheldOverlayGateBypass"
+    ) -PassMessage "Blueprint handheld mouse reader keeps the dedicated gate-bypass cache paths." -FailMessage "Blueprint handheld mouse reader drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Hooks\InterfaceLayerHookCallbacks.cs" -RequiredAnchors @(
+        "BlueprintHandheldActionBarDispatcherLayerName",
+        "DrawBlueprintHandheldActionBarDispatcherLayer",
+        'ParseScaleValue(_scaleType, "None")'
+    ) -PassMessage "Blueprint handheld interface layer stays on the unscaled dispatcher." -FailMessage "Blueprint handheld interface-layer contract drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Automation\Blueprint\BlueprintPlacedInstanceActivity.cs" -RequiredAnchors @(
+        "EffectiveLayerCount",
+        "HasActionablePlacedBlueprint"
+    ) -PassMessage "Blueprint handheld action bar still keys off effective placed content." -FailMessage "Blueprint handheld activity contract drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.BlueprintHandheldActionBarTests.cs" -RequiredAnchors @(
+        "BlueprintHandheldActionBarUsesEffectiveProjectionForPlacedState",
+        "BlueprintHandheldActionBarOverlayStaysUiOnlyAndNoScan",
+        "BlueprintHandheldActionBarGateClosedMouseKeepsTerrariaClick",
+        "BlueprintHandheldActionBarDiagnosticsSnapshotJson"
+    ) -PassMessage "Blueprint handheld tests still cover effective projection and UI-only boundaries." -FailMessage "Blueprint handheld tests drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.InterfaceLayerHookTests.cs" -RequiredAnchors @(
+        "GetBlueprintHandheldActionBarDispatcherRouteNamesForTesting",
+        "GetBlueprintHandheldActionBarScaleTypeNameForTesting",
+        "blueprint handheld action bar unscaled dispatcher routes"
+    ) -PassMessage "Blueprint handheld interface-layer tests still pin the scale domain." -FailMessage "Blueprint handheld interface-layer test coverage drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.cs" -RequiredAnchors @(
+        "blueprint handheld action bar uses effective projection for placed state",
+        "blueprint handheld action bar overlay stays UI-only and no-scan",
+        "blueprint handheld action bar gate-closed mouse keeps Terraria click",
+        "blueprint handheld action bar diagnostics snapshot json"
+    ) -PassMessage "Blueprint handheld tests remain registered." -FailMessage "Blueprint handheld test registration drifted."
+}
+
+function Test-BlueprintCurrentDiagnosticsGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Automation\Blueprint\BlueprintDiagnostics.cs" -RequiredAnchors @(
+        "RecordProjectionResolve",
+        "RecordMaterialResolve",
+        "RecordAutoPlacementCandidateScan",
+        "RecordOperationIfNeeded"
+    ) -PassMessage "Blueprint diagnostics helper still owns projection/material/auto-placement counters." -FailMessage "Blueprint diagnostics helper drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Runtime\Diagnostics\RuntimeDiagnosticSnapshotBuilder.Blueprint.cs" -RequiredAnchors @(
+        "BlueprintMirrorLastStatus",
+        "BlueprintAutoPlacementSkippedVoidBagOnlyLayerCount",
+        "BlueprintDiagnosticsTemplateCount",
+        "BlueprintCreationSelectedCount",
+        "BlueprintPerformanceLastScenario"
+    ) -PassMessage "Blueprint runtime snapshot still carries the current blueprint diagnostics fields." -FailMessage "Blueprint runtime snapshot blueprint fields drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Diagnostics\DiagnosticSnapshot.cs" -RequiredAnchors @(
+        "BlueprintMirrorLastStatus",
+        "BlueprintDiagnosticsTemplateCount",
+        "BlueprintPerformanceLastScenario",
+        "BlueprintAutoPlacementSkippedVoidBagOnlyLayerCount",
+        "BlueprintAutoPlacementLastFailureReason"
+    ) -PassMessage "Blueprint diagnostic snapshot DTO still exposes the current fields." -FailMessage "Blueprint diagnostic snapshot DTO drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Diagnostics\DiagnosticSnapshotWriter.Json.cs" -RequiredAnchors @(
+        "BlueprintMirrorLastStatus",
+        "BlueprintDiagnosticsTemplateCount",
+        "BlueprintPerformanceLastScenario",
+        "BlueprintAutoPlacementSkippedVoidBagOnlyLayerCount",
+        "BlueprintAutoPlacementLastFailureReason"
+    ) -PassMessage "Blueprint diagnostic JSON writer still serializes the current fields." -FailMessage "Blueprint diagnostic JSON writer drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.BlueprintDiagnosticsTests.cs" -RequiredAnchors @(
+        "BlueprintDiagnosticsAggregateRuntimeSnapshotJson",
+        "BlueprintDiagnosticsPerformanceCountersAverageCosts"
+    ) -PassMessage "Blueprint diagnostics tests still cover the aggregate runtime snapshot and averages." -FailMessage "Blueprint diagnostics tests drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.cs" -RequiredAnchors @(
+        "blueprint diagnostics aggregate runtime snapshot json",
+        "blueprint diagnostics performance counters average costs",
+        "blueprint wall object stage 06 regression diagnostics contracts stay wired"
+    ) -PassMessage "Blueprint diagnostics tests remain registered." -FailMessage "Blueprint diagnostics test registration drifted."
+}
+
+function Test-BlueprintWallObjectStage06RegressionDiagnosticsGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Automation\Blueprint\BlueprintWallProjectionFrameResolver.cs" -RequiredAnchors @(
+        "ResolveFrameForTesting",
+        "FrameSize = 36",
+        "layer.FrameX = frameX",
+        "layer.FrameY = frameY"
+    ) -PassMessage "Blueprint wall projection frame resolver still derives transient wall frame coordinates." -FailMessage "Blueprint wall projection frame resolver contract drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Automation\Blueprint\BlueprintCaptureService.cs" -RequiredAnchors @(
+        "TryBuildCaptureCellRequests",
+        "TryAddObjectExpansionRequest",
+        "BuildObjectExpansionCell",
+        "objectExpansionIncomplete"
+    ) -PassMessage "Blueprint capture still expands partial multi-tile objects and fails closed on incomplete expansion." -FailMessage "Blueprint object capture expansion contract drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Automation\Blueprint\BlueprintMirrorService.cs" -RequiredAnchors @(
+        "TryValidateObjectIntegrity",
+        "objectIncomplete",
+        "objectTileDataUnresolvable",
+        "不能保留旧 FrameX/Y 伪装成功"
+    ) -PassMessage "Blueprint mirror service still fails closed when object frame or integrity cannot be proven." -FailMessage "Blueprint mirror fail-closed contract drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.BlueprintDiagnosticsTests.cs" -RequiredAnchors @(
+        "BlueprintWallObjectStage06RegressionDiagnosticsContractsStayWired",
+        "BlueprintProjectionWallFramesUseNeighborContinuity",
+        "BlueprintCaptureExpandsPartialMultitileObjectWithoutWallsOrWires",
+        "BlueprintCaptureFailsClosedWhenExpandedObjectCellIsIncomplete",
+        "BlueprintMirrorCompleteMultitileObjectMirrorsAndPartialFailsClosed",
+        "BlueprintAutoPlacementDiagnosticsWriteRuntimeSnapshotJson",
+        "BlueprintAutoPlacementVoidBagOnlyMaterialsFailClosedWithReason"
+    ) -PassMessage "Blueprint stage 06 aggregate regression reuses wall, capture, mirror, and auto-placement evidence contracts." -FailMessage "Blueprint stage 06 aggregate regression drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.cs" -RequiredAnchors @(
+        "blueprint wall object stage 06 regression diagnostics contracts stay wired"
+    ) -PassMessage "Blueprint stage 06 aggregate regression is registered." -FailMessage "Blueprint stage 06 aggregate regression registration drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "文档\功能介绍\蓝图页\蓝图.md" -RequiredAnchors @(
+        "0.981-blueprint-wall-object-regression-audit",
+        "BlueprintWallObjectStage06RegressionDiagnosticsContractsStayWired",
+        "Test-BlueprintWallObjectStage06RegressionDiagnosticsGovernance"
+    ) -PassMessage "Blueprint feature doc describes the stage 06 aggregate audit boundary." -FailMessage "Blueprint feature doc must describe the stage 06 aggregate audit boundary."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "文档\项目规则\AI诊断日志说明.md" -RequiredAnchors @(
+        "0.981-blueprint-wall-object-regression-audit",
+        "BlueprintWallObjectStage06RegressionDiagnosticsContractsStayWired",
+        "证据不足"
+    ) -PassMessage "Blueprint diagnostics doc keeps the stage 06 evidence boundary visible." -FailMessage "Blueprint diagnostics doc must keep the stage 06 evidence boundary visible."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "文档\归档历史计划\蓝图墙层与多格家具镜像治理作业方法-2606260717\06-回归诊断与审计防线.md" -RequiredAnchors @(
+        "状态：已完成",
+        "BlueprintWallObjectStage06RegressionDiagnosticsContractsStayWired",
+        "Test-BlueprintWallObjectStage06RegressionDiagnosticsGovernance",
+        "未新增诊断字段"
+    ) -PassMessage "Blueprint stage 06 plan records the aggregate regression and no-new-diagnostics boundary." -FailMessage "Blueprint stage 06 plan must record completion, aggregate audit, and diagnostics boundary."
+}
+
+function Test-BlueprintWallObjectStage07CloseoutGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $csprojPath = Join-Path $RepoRoot "src\JueMingZ\JueMingZ.csproj"
+    $runtimePath = Join-Path $RepoRoot "src\JueMingZ\Runtime\JueMingZRuntime.cs"
+    $currentPlanDirectory = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图墙层与多格家具镜像治理作业方法-2606260717")
+    $archivePlanDirectory = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图墙层与多格家具镜像治理作业方法-2606260717")
+    $plan00Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图墙层与多格家具镜像治理作业方法-2606260717", "00-作业基准.md")
+    $plan07Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图墙层与多格家具镜像治理作业方法-2606260717", "07-验证打包与归档收口.md")
+    $currentPlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "索引.md")
+    $archivePlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "索引.md")
+    $functionDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $updateRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "0.982-蓝图墙家具验证收口-2606261634.md")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+    $docHistoryRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "蓝图墙家具验证收口-2606261634.md")
+
+    $csprojText = Read-TextIfExists -Path $csprojPath
+    $runtimeText = Read-TextIfExists -Path $runtimePath
+    $plan00Text = Read-TextIfExists -Path $plan00Path
+    $plan07Text = Read-TextIfExists -Path $plan07Path
+    $currentPlanIndexText = Read-TextIfExists -Path $currentPlanIndexPath
+    $archivePlanIndexText = Read-TextIfExists -Path $archivePlanIndexPath
+    $functionDocText = Read-TextIfExists -Path $functionDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $updateRecordText = Read-TextIfExists -Path $updateRecordPath
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+    $docHistoryRecordText = Read-TextIfExists -Path $docHistoryRecordPath
+
+    if (Test-BlueprintPlacementVersionMetadata -RuntimeText $runtimeText -CsprojText $csprojText -AllowedRuntimeVersions @("0.982-blueprint-wall-object-closeout")) {
+        Write-Pass "Blueprint wall/object stage 07 closeout version metadata is synchronized to 0.982-blueprint-wall-object-closeout."
+    }
+    else {
+        Write-FailHealth "Blueprint wall/object stage 07 must synchronize RuntimeVersion and project metadata to 0.982-blueprint-wall-object-closeout."
+    }
+
+    if ((Test-Path -LiteralPath $archivePlanDirectory) -and
+        -not (Test-Path -LiteralPath $currentPlanDirectory) -and
+        $plan00Text -and
+        $plan00Text.Contains("07-验证打包与归档收口") -and
+        $plan00Text.Contains("已完成：0.982-蓝图墙家具验证收口") -and
+        $plan07Text -and
+        $plan07Text.Contains("状态：已完成") -and
+        $plan07Text.Contains("0.982-blueprint-wall-object-closeout") -and
+        $plan07Text.Contains("JueMingZ-TestPackage") -and
+        $plan07Text.Contains("-RequireFreshTestPackage") -and
+        $plan07Text.Contains("不生成源码包") -and
+        $plan07Text.Contains("不新增功能")) {
+        Write-Pass "Blueprint wall/object plan is archived with stage 07 package delivery and strict freshness audit recorded."
+    }
+    else {
+        Write-FailHealth "Blueprint wall/object stage 07 must archive the plan and mark 00/07 complete with package, strict freshness audit, no source package, and no-new-feature scope."
+    }
+
+    if ($currentPlanIndexText -and
+        $currentPlanIndexText.Contains("当前没有正在推进的计划") -and
+        $currentPlanIndexText.Contains("文档/归档历史计划/蓝图墙层与多格家具镜像治理作业方法-2606260717/") -and
+        $currentPlanIndexText.Contains("0.982-blueprint-wall-object-closeout") -and
+        $archivePlanIndexText -and
+        $archivePlanIndexText.Contains("文档/归档历史计划/蓝图墙层与多格家具镜像治理作业方法-2606260717/") -and
+        $archivePlanIndexText.Contains("0.982-blueprint-wall-object-closeout") -and
+        $archivePlanIndexText.Contains("JueMingZ-TestPackage")) {
+        Write-Pass "Blueprint wall/object current and archive plan indexes record the stage 07 closeout."
+    }
+    else {
+        Write-FailHealth "Blueprint wall/object stage 07 must remove the plan from current work and add the 0.982 archived closeout summary."
+    }
+
+    if ($functionDocText -and
+        $functionDocText.Contains("0.982-blueprint-wall-object-closeout") -and
+        $functionDocText.Contains("文档/归档历史计划/蓝图墙层与多格家具镜像治理作业方法-2606260717/00-作业基准.md") -and
+        $functionDocText.Contains("JueMingZ-TestPackage") -and
+        $functionDocText.Contains("严格新鲜包健康审计") -and
+        $diagnosticsDocText -and
+        $diagnosticsDocText.Contains("0.982-blueprint-wall-object-closeout") -and
+        $diagnosticsDocText.Contains("不新增 runtime snapshot 字段") -and
+        $diagnosticsDocText.Contains("不新增 trace JSONL")) {
+        Write-Pass "Blueprint feature and diagnostics docs record the 0.982 closeout without expanding runtime or diagnostics scope."
+    }
+    else {
+        Write-FailHealth "Blueprint wall/object stage 07 must update blueprint feature and diagnostics docs with package closeout and no-new-diagnostics scope."
+    }
+
+    if ($updateIndexText -and
+        $updateIndexText.Contains("0.982-蓝图墙家具验证收口-2606261634.md") -and
+        $updateRecordText -and
+        $updateRecordText.Contains('RuntimeVersion：`0.982-blueprint-wall-object-closeout`') -and
+        $updateRecordText.Contains("JueMingZ-TestPackage") -and
+        $updateRecordText.Contains("-RequireFreshTestPackage") -and
+        $updateRecordText.Contains("不生成源码包") -and
+        $docHistoryIndexText -and
+        $docHistoryIndexText.Contains("蓝图墙家具验证收口-2606261634.md") -and
+        $docHistoryRecordText -and
+        $docHistoryRecordText.Contains("0.982-blueprint-wall-object-closeout") -and
+        $docHistoryRecordText.Contains("07-验证打包与归档收口")) {
+        Write-Pass "Blueprint wall/object stage 07 update record and document-change history are synchronized."
+    }
+    else {
+        Write-FailHealth "Blueprint wall/object stage 07 must synchronize update index/record and document-change history for the 0.982 closeout."
+    }
+}
+
 function Invoke-PackageBoundaryAudit {
     param(
         [Parameter(Mandatory = $true)][string]$RepoRoot,
@@ -12957,57 +13513,30 @@ function Invoke-GovernanceAudit {
         Test-HotkeyBackspaceClearGovernance -RepoRoot $RepoRoot
     }
 
-    if (Test-AuditScopeSelected -Scopes $Scopes -Candidates @("Blueprint")) {
-        Test-BlueprintSecondFeedbackStage07Governance -RepoRoot $RepoRoot
-        Test-BlueprintSecondFeedbackStage08CloseoutGovernance -RepoRoot $RepoRoot
-        Test-BlueprintDiagnosticsGovernance -RepoRoot $RepoRoot
-        Test-BlueprintActionShortcutGovernance -RepoRoot $RepoRoot
-        Test-BlueprintFeedbackStage04Governance -RepoRoot $RepoRoot
-        Test-BlueprintHandheldActionBarGovernance -RepoRoot $RepoRoot
-        Test-BlueprintUiClickStage02Governance -RepoRoot $RepoRoot
-        Test-BlueprintHotbarOwnershipStage03Governance -RepoRoot $RepoRoot
-        Test-BlueprintHotbarDeadClickStage04Governance -RepoRoot $RepoRoot
-        Test-BlueprintHotbarPhysicalCoordinateStage04Governance -RepoRoot $RepoRoot
-        Test-BlueprintHotbarPhysicalCoordinateStage05CloseoutGovernance -RepoRoot $RepoRoot
-        Test-BlueprintHotbarDeadClickStage05CloseoutGovernance -RepoRoot $RepoRoot
-        Test-BlueprintUiClickStage04Governance -RepoRoot $RepoRoot
-        Test-BlueprintUiClickStage05CloseoutGovernance -RepoRoot $RepoRoot
-        Test-BlueprintWorldOverlayPointerOwnershipStage05Governance -RepoRoot $RepoRoot
-        Test-BlueprintCreationFlickerPointerOwnershipStage02Governance -RepoRoot $RepoRoot
-        Test-BlueprintCreationFlickerPhysicalLeftStage03Governance -RepoRoot $RepoRoot
-        Test-BlueprintCreationFlickerCoordinateDomainStage04Governance -RepoRoot $RepoRoot
-        Test-BlueprintCreationFlickerStage05Governance -RepoRoot $RepoRoot
-        Test-BlueprintCreationFlickerStage06CloseoutGovernance -RepoRoot $RepoRoot
-        Test-BlueprintCreationInputPhaseTraceStage02Governance -RepoRoot $RepoRoot
-        Test-BlueprintCreationClearReasonTraceStage03Governance -RepoRoot $RepoRoot
-        Test-BlueprintCreationDiagnosticStage04Governance -RepoRoot $RepoRoot
-        Test-BlueprintCreationDiagnosticStage05CloseoutGovernance -RepoRoot $RepoRoot
-        Test-BlueprintWorldOverlayPointerOwnershipStage06CloseoutGovernance -RepoRoot $RepoRoot
-        Test-BlueprintFeedbackStage08Governance -RepoRoot $RepoRoot
-        Test-BlueprintFeedbackStage09CloseoutGovernance -RepoRoot $RepoRoot
-        Test-BlueprintPlacementStage02LibraryUiGovernance -RepoRoot $RepoRoot
-        Test-BlueprintPlacementStage03HandheldCommandMatrixGovernance -RepoRoot $RepoRoot
-        Test-BlueprintPlacementStage04InstancePersistenceGovernance -RepoRoot $RepoRoot
-        Test-BlueprintPlacementStage05VisualMaterialGovernance -RepoRoot $RepoRoot
-        Test-BlueprintPlacementStage06ClearRegionGovernance -RepoRoot $RepoRoot
-        Test-BlueprintPlacementStage07MoveMirrorGovernance -RepoRoot $RepoRoot
-        Test-BlueprintPlacementStage08RegressionDiagnosticsGovernance -RepoRoot $RepoRoot
-        Test-BlueprintPlacementStage09CloseoutGovernance -RepoRoot $RepoRoot
-        Test-BlueprintPlacementReleaseGateGovernance -RepoRoot $RepoRoot
-        Test-BlueprintFeedbackAutoplacePlanGovernance -RepoRoot $RepoRoot
-        Test-BlueprintFeedbackStage02Governance -RepoRoot $RepoRoot
-        Test-BlueprintFeedbackStage03Governance -RepoRoot $RepoRoot
-        Test-BlueprintFeedbackStage04HandheldStatusGovernance -RepoRoot $RepoRoot
-        Test-BlueprintFeedbackStage05ProgressMaterialGovernance -RepoRoot $RepoRoot
-        Test-BlueprintFeedbackStage06MoveInteractionGovernance -RepoRoot $RepoRoot
-        Test-BlueprintFeedbackStage07RegionGovernance -RepoRoot $RepoRoot
-        Test-BlueprintFeedbackStage08MirrorGovernance -RepoRoot $RepoRoot
-        Test-BlueprintFeedbackStage09AutoplaceEntryGovernance -RepoRoot $RepoRoot
-        Test-BlueprintFeedbackStage10AutoplaceExecutionGovernance -RepoRoot $RepoRoot
-        Test-BlueprintFeedbackStage11RegressionDiagnosticsGovernance -RepoRoot $RepoRoot
-        Test-BlueprintFeedbackAutoplaceStage12CloseoutGovernance -RepoRoot $RepoRoot
-        Test-BlueprintLibraryStage10Governance -RepoRoot $RepoRoot
-        Test-BlueprintLibraryStage11CloseoutGovernance -RepoRoot $RepoRoot
+    if (Test-AuditScopeSelected -Scopes $Scopes -Candidates @("Blueprint", "BlueprintCreation")) {
+        Test-BlueprintCurrentCreationGovernance -RepoRoot $RepoRoot
+    }
+
+    if (Test-AuditScopeSelected -Scopes $Scopes -Candidates @("Blueprint", "BlueprintPlacement")) {
+        Test-BlueprintCurrentPlacementGovernance -RepoRoot $RepoRoot
+    }
+
+    if (Test-AuditScopeSelected -Scopes $Scopes -Candidates @("Blueprint", "BlueprintTransform")) {
+        Test-BlueprintCurrentTransformGovernance -RepoRoot $RepoRoot
+    }
+
+    if (Test-AuditScopeSelected -Scopes $Scopes -Candidates @("Blueprint", "BlueprintAutoPlacement")) {
+        Test-BlueprintCurrentAutoPlacementGovernance -RepoRoot $RepoRoot
+    }
+
+    if (Test-AuditScopeSelected -Scopes $Scopes -Candidates @("Blueprint", "BlueprintHandheld")) {
+        Test-BlueprintCurrentHandheldGovernance -RepoRoot $RepoRoot
+    }
+
+    if (Test-AuditScopeSelected -Scopes $Scopes -Candidates @("Blueprint", "BlueprintDiagnostics")) {
+        Test-BlueprintCurrentDiagnosticsGovernance -RepoRoot $RepoRoot
+        Test-BlueprintWallObjectStage06RegressionDiagnosticsGovernance -RepoRoot $RepoRoot
+        Test-BlueprintWallObjectStage07CloseoutGovernance -RepoRoot $RepoRoot
     }
 
     if (Test-AuditScopeSelected -Scopes $Scopes -Candidates @("Notes")) {

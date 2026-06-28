@@ -71,6 +71,16 @@ namespace JueMingZ.UI
             return new[] { sourceX, sourceY, sourceWidth, sourceHeight, destYOffset, destHeight };
         }
 
+        internal static int[] ResolveWallSourceRectForTesting(int frameX, int frameY, int textureWidth, int textureHeight)
+        {
+            int sourceX;
+            int sourceY;
+            int sourceWidth;
+            int sourceHeight;
+            ResolveWallSourceRect(frameX, frameY, textureWidth, textureHeight, out sourceX, out sourceY, out sourceWidth, out sourceHeight);
+            return new[] { sourceX, sourceY, sourceWidth, sourceHeight };
+        }
+
         internal static bool ShouldDrawLayer(string status)
         {
             return !string.Equals(status, BlueprintProjectionLayerStatuses.Fulfilled, StringComparison.Ordinal) &&
@@ -177,8 +187,11 @@ namespace JueMingZ.UI
                 return false;
             }
 
-            var sourceWidth = Math.Max(1, Math.Min(32, textureWidth));
-            var sourceHeight = Math.Max(1, Math.Min(32, textureHeight));
+            int sourceX;
+            int sourceY;
+            int sourceWidth;
+            int sourceHeight;
+            ResolveWallSourceRect(layer.FrameX, layer.FrameY, textureWidth, textureHeight, out sourceX, out sourceY, out sourceWidth, out sourceHeight);
             var effectiveAlpha = ResolveCoatingAlpha(layer, Math.Max(48, alpha - 22));
             var ok = UiPrimitiveRenderer.DrawTextureSourceRectClipped(
                 spriteBatch,
@@ -187,8 +200,8 @@ namespace JueMingZ.UI
                 y,
                 TileSize,
                 TileSize,
-                0,
-                0,
+                sourceX,
+                sourceY,
                 sourceWidth,
                 sourceHeight,
                 0,
@@ -374,6 +387,24 @@ namespace JueMingZ.UI
             ok |= UiPrimitiveRenderer.DrawFilledRectClipped(spriteBatch, x + TileSize - 5, y + 2, 3, 1, 0, 0, clipWidth, clipHeight, r, g, b, alpha);
             ok |= UiPrimitiveRenderer.DrawFilledRectClipped(spriteBatch, x + TileSize - 3, y + 2, 1, 3, 0, 0, clipWidth, clipHeight, r, g, b, alpha);
             return ok;
+        }
+
+        private static void ResolveWallSourceRect(
+            int frameX,
+            int frameY,
+            int textureWidth,
+            int textureHeight,
+            out int sourceX,
+            out int sourceY,
+            out int sourceWidth,
+            out int sourceHeight)
+        {
+            textureWidth = Math.Max(0, textureWidth);
+            textureHeight = Math.Max(0, textureHeight);
+            sourceWidth = Math.Max(1, Math.Min(32, textureWidth));
+            sourceHeight = Math.Max(1, Math.Min(32, textureHeight));
+            sourceX = frameX >= 0 && frameX + sourceWidth <= textureWidth ? frameX : 0;
+            sourceY = frameY >= 0 && frameY + sourceHeight <= textureHeight ? frameY : 0;
         }
 
         private static void ResolveTileSourceRect(

@@ -201,5 +201,18 @@ namespace JueMingZ.Tests
             BlueprintAutoPlacementReplacementFailClosedWhenDisabledOrWrongCategory();
             BlueprintAutoPlacementDiagnosticsWriteRuntimeSnapshotJson();
         }
+
+        private static void BlueprintWallObjectStage06RegressionDiagnosticsContractsStayWired()
+        {
+            BlueprintProjectionWallFramesUseNeighborContinuity();
+            BlueprintCaptureExpandsPartialMultitileObjectWithoutWallsOrWires();
+            BlueprintCaptureFailsClosedWhenExpandedObjectCellIsIncomplete();
+            BlueprintMirrorCompleteMultitileObjectMirrorsAndPartialFailsClosed();
+            BlueprintMirrorSupportMatrixMapsSlopesAndFlipsObjectDirection();
+            BlueprintPlacedInstanceMirrorUsesServiceAndFailsClosed();
+            BlueprintAutoPlacementDiagnosticsWriteRuntimeSnapshotJson();
+            BlueprintAutoPlacementSubmitsActionQueueAndVerifiesPlacement();
+            BlueprintAutoPlacementVoidBagOnlyMaterialsFailClosedWithReason();
+        }
     }
 }

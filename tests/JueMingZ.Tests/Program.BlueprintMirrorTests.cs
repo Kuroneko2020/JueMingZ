@@ -47,7 +47,7 @@ namespace JueMingZ.Tests
 
                 AssertContains(BlueprintPlacementPreviewState.BuildUiStateJson(), "\"mirrorLastStatus\":\"mirrorHorizontalApplied\"");
                 AssertContains(LegacyMainWindow.BuildBlueprintPlacementSummaryForTesting(), "锚点 2,0");
-                AssertContains(LegacyMainWindow.GetBlueprintMirrorVisualContractForTesting(), "fail-closed-frame-matrix");
+                AssertContains(LegacyMainWindow.GetBlueprintMirrorVisualContractForTesting(), "tileObjectData-direction-flip");
             }
             finally
             {
@@ -55,31 +55,53 @@ namespace JueMingZ.Tests
             }
         }
 
-        private static void BlueprintMirrorRejectsDirectionalFurnitureFramesFailClosed()
+        private static void BlueprintMirrorCompleteMultitileObjectMirrorsAndPartialFailsClosed()
         {
             BlueprintEntryState.ResetForTesting();
             try
             {
-                var template = CreateDirectionalFurnitureBlueprintTemplate();
-                RequireBlueprintEntrySuccess(BlueprintEntryState.SelectTemplateForPlacement(template), "start directional mirror preview");
+                var template = CreateCompleteTableBlueprintTemplate("完整多格家具镜像");
+                RequireBlueprintEntrySuccess(BlueprintEntryState.SelectTemplateForPlacement(template), "start complete object mirror preview");
                 var result = BlueprintEntryState.ApplyCommand(BlueprintEntryCommands.MirrorPreviewHorizontal, AppSettings.CreateDefault());
-                if (result.Succeeded || result.Changed)
+                if (!result.Succeeded || !result.Changed)
                 {
-                    throw new InvalidOperationException("Expected directional furniture frames to block horizontal mirror.");
+                    throw new InvalidOperationException("Expected complete multitile object layer to mirror with precise TileObjectData frames.");
                 }
 
                 var snapshot = BlueprintPlacementPreviewState.GetSnapshot();
+                var mirroredLeftTop = FindLayerAt(snapshot.TemplateSnapshot, 0, 0, BlueprintLayerKinds.Object);
+                var mirroredRightTop = FindLayerAt(snapshot.TemplateSnapshot, 2, 0, BlueprintLayerKinds.Object);
+                var mirroredLeftBottom = FindLayerAt(snapshot.TemplateSnapshot, 0, 1, BlueprintLayerKinds.Object);
+                var mirroredRightBottom = FindLayerAt(snapshot.TemplateSnapshot, 2, 1, BlueprintLayerKinds.Object);
                 if (!snapshot.Active ||
-                    FindLayerAt(snapshot.TemplateSnapshot, 0, 0, BlueprintLayerKinds.Object) == null ||
-                    FindLayerAt(snapshot.TemplateSnapshot, 1, 0, BlueprintLayerKinds.Object) != null)
+                    mirroredLeftTop == null ||
+                    mirroredRightTop == null ||
+                    mirroredLeftBottom == null ||
+                    mirroredRightBottom == null ||
+                    mirroredLeftTop.FrameX != 0 ||
+                    mirroredRightTop.FrameX != 36 ||
+                    mirroredLeftBottom.FrameY != 18 ||
+                    mirroredRightBottom.FrameY != 18)
                 {
-                    throw new InvalidOperationException("Expected blocked mirror to leave the preview template snapshot unchanged.");
+                    throw new InvalidOperationException("Expected mirrored 3x2 object to keep all child cells and horizontally corrected frames.");
                 }
 
                 var diagnostics = BlueprintMirrorService.GetDiagnostics();
-                AssertStringEquals(diagnostics.LastStatus, "mirrorBlocked", "blueprint mirror blocked status");
-                AssertContains(diagnostics.LastBlockedReason, "objectDirectionFrameUnsupported");
-                AssertContains(LegacyMainWindow.BuildBlueprintPlacementSummaryForTesting(), "镜像阻止");
+                if (!string.Equals(diagnostics.LastStatus, "mirrorHorizontalApplied", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected complete multitile object mirror to succeed without object fallback warnings; got " + diagnostics.LastStatus);
+                }
+
+                var partial = CreatePartialTableBlueprintTemplate("半件多格家具镜像");
+                var blocked = BlueprintMirrorService.TryMirrorHorizontal(partial);
+                if (blocked.Succeeded ||
+                    blocked.Changed ||
+                    blocked.Template != null ||
+                    !string.Equals(blocked.ResultCode, "mirrorBlocked", StringComparison.Ordinal) ||
+                    blocked.BlockedReason.IndexOf("objectIncomplete", StringComparison.Ordinal) < 0)
+                {
+                    throw new InvalidOperationException("Expected partial multitile object mirror to fail closed without producing a mirrored template; got " + blocked.ResultCode + " / " + blocked.BlockedReason);
+                }
             }
             finally
             {
@@ -87,7 +109,7 @@ namespace JueMingZ.Tests
             }
         }
 
-        private static void BlueprintMirrorSupportMatrixMapsSlopesAndRejectsUnknownDirection()
+        private static void BlueprintMirrorSupportMatrixMapsSlopesAndFlipsObjectDirection()
         {
             if (BlueprintMirrorService.MirrorSlopeForTesting(1) != 2 ||
                 BlueprintMirrorService.MirrorSlopeForTesting(2) != 1 ||
@@ -99,27 +121,39 @@ namespace JueMingZ.Tests
             }
 
             string reason;
-            var chair = new BlueprintCellLayerRecord
+            // Table (ContentId=14): non-directional 3x2 object — frame must mirror by sub-tile, not fallback to old frame.
+            var tableLeftTop = new BlueprintCellLayerRecord
             {
                 LayerKind = BlueprintLayerKinds.Object,
-                ContentId = 15
+                ContentId = 14,
+                Style = 0,
+                FrameX = 0,
+                FrameY = 0
             };
-            if (BlueprintMirrorService.CanMirrorLayerForTesting(chair, out reason) ||
-                !string.Equals(reason, "objectDirectionUnsupported", StringComparison.Ordinal))
+            if (!BlueprintMirrorService.CanMirrorLayerForTesting(tableLeftTop, out reason))
             {
-                throw new InvalidOperationException("Expected direction-bearing chair object to stay outside the mirror matrix.");
+                throw new InvalidOperationException("Expected table object sub-tile to be mirrorable with TileObjectData frame math; got " + reason);
             }
 
-            var framedDoor = new BlueprintCellLayerRecord
+            int newFrameX;
+            int newFrameY;
+            if (!BlueprintMirrorService.TryMirrorObjectFrameForTesting(tableLeftTop, out newFrameX, out newFrameY, out reason) ||
+                newFrameX != 36 ||
+                newFrameY != 0)
+            {
+                throw new InvalidOperationException("Expected table left sub-tile frame to mirror to the right sub-tile; got " + newFrameX + "," + newFrameY + " / " + reason);
+            }
+
+            // Unknown object frames must not fall back to old FrameX/Y and report success.
+            var unknownObject = new BlueprintCellLayerRecord
             {
                 LayerKind = BlueprintLayerKinds.Object,
-                ContentId = 10,
-                FrameX = 18
+                ContentId = 999
             };
-            if (BlueprintMirrorService.CanMirrorLayerForTesting(framedDoor, out reason) ||
-                !string.Equals(reason, "objectDirectionFrameUnsupported", StringComparison.Ordinal))
+            if (BlueprintMirrorService.CanMirrorLayerForTesting(unknownObject, out reason) ||
+                !string.Equals(reason, "objectTileDataUnresolvable", StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("Expected framed door object to fail closed before guessing direction frame mapping.");
+                throw new InvalidOperationException("Expected unknown object to fail closed instead of fallback-success; got " + reason);
             }
         }
 
@@ -301,14 +335,55 @@ namespace JueMingZ.Tests
             }
         }
 
-        private static BlueprintTemplateRecord CreateDirectionalFurnitureBlueprintTemplate()
+        private static BlueprintTemplateRecord CreateCompleteTableBlueprintTemplate(string name)
         {
             var template = new BlueprintTemplateRecord
             {
                 TemplateId = "template-" + Guid.NewGuid().ToString("N"),
-                Name = "方向家具",
-                Width = 2,
-                Height = 1,
+                Name = name,
+                Width = 3,
+                Height = 2,
+                AnchorX = 1,
+                AnchorY = 0
+            };
+
+            for (var y = 0; y < 2; y++)
+            {
+                for (var x = 0; x < 3; x++)
+                {
+                    template.Cells.Add(new BlueprintCellRecord
+                    {
+                        X = x,
+                        Y = y,
+                        Layers =
+                        {
+                            new BlueprintCellLayerRecord
+                            {
+                                LayerKind = BlueprintLayerKinds.Object,
+                                ContentId = 14,
+                                Style = 0,
+                                FrameX = x * 18,
+                                FrameY = y * 18,
+                                MaterialItemId = x == 0 && y == 0 ? 1006 : 0,
+                                MaterialStack = x == 0 && y == 0 ? 1 : 0
+                            }
+                        }
+                    });
+                }
+            }
+
+            AddMaterialEntries(template);
+            return template;
+        }
+
+        private static BlueprintTemplateRecord CreatePartialTableBlueprintTemplate(string name)
+        {
+            var template = new BlueprintTemplateRecord
+            {
+                TemplateId = "template-" + Guid.NewGuid().ToString("N"),
+                Name = name,
+                Width = 3,
+                Height = 2,
                 AnchorX = 0,
                 AnchorY = 0
             };
@@ -321,9 +396,11 @@ namespace JueMingZ.Tests
                     new BlueprintCellLayerRecord
                     {
                         LayerKind = BlueprintLayerKinds.Object,
-                        ContentId = 15,
-                        FrameX = 18,
-                        MaterialItemId = 1007,
+                        ContentId = 14,
+                        Style = 0,
+                        FrameX = 0,
+                        FrameY = 0,
+                        MaterialItemId = 1006,
                         MaterialStack = 1
                     }
                 }

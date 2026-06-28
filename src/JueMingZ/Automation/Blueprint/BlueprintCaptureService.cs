@@ -126,34 +126,83 @@ namespace JueMingZ.Automation.Blueprint
                 return BlueprintCaptureResult.Failure("worldUnavailable", "世界尚未就绪，不能采集蓝图。", null, null, mask.SelectedCount, 0, 0, 0, 0, useAfterSave);
             }
 
-            var state = new BlueprintCaptureBuildState();
             var selected = CloneAndSortSelectedCells(mask.SelectedCells);
+            var state = new BlueprintCaptureBuildState();
+            List<BlueprintCaptureCellRequest> captureRequests;
+            BlueprintCaptureResult requestFailure;
+            if (!TryBuildCaptureCellRequests(selected, reader, mask.SelectedCount, useAfterSave, out captureRequests, out requestFailure))
+            {
+                return requestFailure;
+            }
+
             int minMaskX;
             int minMaskY;
             int maxMaskX;
             int maxMaskY;
-            if (!TryResolveSelectedBounds(selected, out minMaskX, out minMaskY, out maxMaskX, out maxMaskY))
+            if (!TryResolveCaptureBounds(captureRequests, out minMaskX, out minMaskY, out maxMaskX, out maxMaskY))
             {
                 return BlueprintCaptureResult.Failure("emptySelection", "没有可采集的蓝图选区。", null, null, mask.SelectedCount, 0, 0, 0, 0, useAfterSave);
             }
 
-            for (var index = 0; index < selected.Count; index++)
+            for (var index = 0; index < captureRequests.Count; index++)
             {
-                var selectedCell = selected[index];
+                var request = captureRequests[index];
                 BlueprintWorldTileSnapshot sample;
-                if (!reader.TryReadTile(selectedCell.X, selectedCell.Y, out sample) || sample == null)
+                if (!TryReadCaptureSample(reader, request, out sample))
                 {
                     state.UnavailableCount++;
                     state.MissingFlags.Add(BlueprintCaptureMissingCapabilities.TileReadUnavailable);
+                    if (request.ExpectedObject != null)
+                    {
+                        return BuildObjectExpansionFailureResult(
+                            "objectExpansionTileReadUnavailable",
+                            "多格家具采集补齐失败：无法读取整件家具的格子 " +
+                            request.X.ToString(CultureInfo.InvariantCulture) + "," +
+                            request.Y.ToString(CultureInfo.InvariantCulture) + "。",
+                            mask.SelectedCount,
+                            state,
+                            useAfterSave);
+                    }
+
                     continue;
                 }
 
-                sample.TileX = selectedCell.X;
-                sample.TileY = selectedCell.Y;
-                var cell = BuildCell(sample, state);
+                sample.TileX = request.X;
+                sample.TileY = request.Y;
+                if (request.ExpectedObject != null && !MatchesObjectSignature(sample, request.ExpectedObject))
+                {
+                    return BuildObjectExpansionFailureResult(
+                        "objectExpansionIncomplete",
+                        "多格家具采集补齐失败：整件家具的格子 " +
+                        request.X.ToString(CultureInfo.InvariantCulture) + "," +
+                        request.Y.ToString(CultureInfo.InvariantCulture) + " 与起始家具不一致。",
+                        mask.SelectedCount,
+                        state,
+                        useAfterSave);
+                }
+
+                var cell = request.CaptureAllLayers
+                    ? BuildCell(sample, state)
+                    : BuildObjectExpansionCell(sample, state);
                 if (cell == null || cell.Layers == null || cell.Layers.Count <= 0)
                 {
-                    state.SkippedAirCount++;
+                    if (request.ExpectedObject != null)
+                    {
+                        return BuildObjectExpansionFailureResult(
+                            "objectExpansionEmptyCell",
+                            "多格家具采集补齐失败：整件家具的格子 " +
+                            request.X.ToString(CultureInfo.InvariantCulture) + "," +
+                            request.Y.ToString(CultureInfo.InvariantCulture) + " 没有可采集的 object 层。",
+                            mask.SelectedCount,
+                            state,
+                            useAfterSave);
+                    }
+
+                    if (request.CaptureAllLayers)
+                    {
+                        state.SkippedAirCount++;
+                    }
+
                     continue;
                 }
 
@@ -259,31 +308,7 @@ namespace JueMingZ.Automation.Blueprint
                 state.MissingFlags.Add(BlueprintCaptureMissingCapabilities.LiquidNotSupported);
             }
 
-            if (sample.Active && sample.TileType >= 0)
-            {
-                var kind = sample.FrameImportant ? BlueprintLayerKinds.Object : BlueprintLayerKinds.Tile;
-                var materialStack = ResolveTileMaterialStack(sample, state);
-                var note = ResolveExternalDataNote(sample, state);
-                var layer = new BlueprintCellLayerRecord
-                {
-                    LayerKind = kind,
-                    ContentId = sample.TileType,
-                    Style = Math.Max(0, sample.ObjectStyle),
-                    FrameX = sample.FrameX,
-                    FrameY = sample.FrameY,
-                    PaintId = Math.Max(0, sample.TilePaintId),
-                    CoatingFlags = BuildCoatingFlags(sample.TileFullbright, sample.TileInvisible),
-                    Slope = Math.Max(0, sample.Slope),
-                    HalfBrick = sample.HalfBrick,
-                    Inactive = sample.Inactive,
-                    MaterialItemId = Math.Max(0, sample.TileMaterialItemId),
-                    MaterialStack = materialStack,
-                    Note = note
-                };
-                cell.Layers.Add(layer);
-                state.LayerCount++;
-                AddMaterial(state, layer.MaterialItemId, layer.MaterialStack, sample.TileDisplayName, kind, "tile");
-            }
+            TryAddActiveTileLayer(cell, sample, state, false);
 
             if (sample.WallType > 0)
             {
@@ -332,6 +357,62 @@ namespace JueMingZ.Automation.Blueprint
             }
 
             return cell.Layers.Count <= 0 ? null : cell;
+        }
+
+        private static BlueprintCellRecord BuildObjectExpansionCell(BlueprintWorldTileSnapshot sample, BlueprintCaptureBuildState state)
+        {
+            var cell = new BlueprintCellRecord
+            {
+                X = sample.TileX,
+                Y = sample.TileY
+            };
+
+            // Object capture expansion protects mirror integrity before the
+            // mirror service ever sees a template. Only the object layer is
+            // imported here; wall/wire/actuator layers still belong to the
+            // user's original selected cells.
+            return TryAddActiveTileLayer(cell, sample, state, true) ? cell : null;
+        }
+
+        private static bool TryAddActiveTileLayer(
+            BlueprintCellRecord cell,
+            BlueprintWorldTileSnapshot sample,
+            BlueprintCaptureBuildState state,
+            bool requireFrameImportant)
+        {
+            if (cell == null || sample == null || state == null || !sample.Active || sample.TileType < 0)
+            {
+                return false;
+            }
+
+            if (requireFrameImportant && !sample.FrameImportant)
+            {
+                return false;
+            }
+
+            var kind = sample.FrameImportant ? BlueprintLayerKinds.Object : BlueprintLayerKinds.Tile;
+            var materialStack = ResolveTileMaterialStack(sample, state);
+            var note = ResolveExternalDataNote(sample, state);
+            var layer = new BlueprintCellLayerRecord
+            {
+                LayerKind = kind,
+                ContentId = sample.TileType,
+                Style = Math.Max(0, sample.ObjectStyle),
+                FrameX = sample.FrameX,
+                FrameY = sample.FrameY,
+                PaintId = Math.Max(0, sample.TilePaintId),
+                CoatingFlags = BuildCoatingFlags(sample.TileFullbright, sample.TileInvisible),
+                Slope = Math.Max(0, sample.Slope),
+                HalfBrick = sample.HalfBrick,
+                Inactive = sample.Inactive,
+                MaterialItemId = Math.Max(0, sample.TileMaterialItemId),
+                MaterialStack = materialStack,
+                Note = note
+            };
+            cell.Layers.Add(layer);
+            state.LayerCount++;
+            AddMaterial(state, layer.MaterialItemId, layer.MaterialStack, sample.TileDisplayName, kind, "tile");
+            return true;
         }
 
         private static int ResolveTileMaterialStack(BlueprintWorldTileSnapshot sample, BlueprintCaptureBuildState state)
@@ -515,8 +596,279 @@ namespace JueMingZ.Automation.Blueprint
             return cells;
         }
 
-        private static bool TryResolveSelectedBounds(
+        private static bool TryBuildCaptureCellRequests(
             IList<BlueprintCreationMaskCell> selected,
+            IBlueprintWorldTileReader reader,
+            int maskSelectedCount,
+            bool useAfterSave,
+            out List<BlueprintCaptureCellRequest> requests,
+            out BlueprintCaptureResult failure)
+        {
+            requests = new List<BlueprintCaptureCellRequest>();
+            failure = null;
+            var requestsByKey = new Dictionary<string, BlueprintCaptureCellRequest>(StringComparer.Ordinal);
+            if (selected == null || selected.Count <= 0)
+            {
+                return true;
+            }
+
+            for (var index = 0; index < selected.Count; index++)
+            {
+                var cell = selected[index];
+                if (cell == null)
+                {
+                    continue;
+                }
+
+                GetOrCreateCaptureRequest(requestsByKey, cell.X, cell.Y).CaptureAllLayers = true;
+            }
+
+            for (var index = 0; index < selected.Count; index++)
+            {
+                var cell = selected[index];
+                if (cell == null)
+                {
+                    continue;
+                }
+
+                var request = GetOrCreateCaptureRequest(requestsByKey, cell.X, cell.Y);
+                BlueprintWorldTileSnapshot sample;
+                if (!TryReadCaptureSample(reader, request, out sample) || sample == null)
+                {
+                    continue;
+                }
+
+                sample.TileX = cell.X;
+                sample.TileY = cell.Y;
+                BlueprintCaptureObjectSignature signature;
+                BlueprintCaptureResult signatureFailure;
+                if (!TryCreateObjectExpansionSignature(sample, maskSelectedCount, useAfterSave, out signature, out signatureFailure))
+                {
+                    failure = signatureFailure;
+                    return false;
+                }
+
+                if (signature == null)
+                {
+                    continue;
+                }
+
+                for (var y = signature.OriginY; y < signature.OriginY + signature.Height; y++)
+                {
+                    for (var x = signature.OriginX; x < signature.OriginX + signature.Width; x++)
+                    {
+                        BlueprintCaptureResult addFailure;
+                        if (!TryAddObjectExpansionRequest(requestsByKey, x, y, signature, maskSelectedCount, useAfterSave, out addFailure))
+                        {
+                            failure = addFailure;
+                            return false;
+                        }
+                    }
+                }
+            }
+
+            foreach (var request in requestsByKey.Values)
+            {
+                requests.Add(request);
+            }
+
+            requests.Sort((left, right) =>
+            {
+                var y = left.Y.CompareTo(right.Y);
+                return y != 0 ? y : left.X.CompareTo(right.X);
+            });
+            return true;
+        }
+
+        private static bool TryCreateObjectExpansionSignature(
+            BlueprintWorldTileSnapshot sample,
+            int maskSelectedCount,
+            bool useAfterSave,
+            out BlueprintCaptureObjectSignature signature,
+            out BlueprintCaptureResult failure)
+        {
+            signature = null;
+            failure = null;
+            if (sample == null || !sample.Active || !sample.FrameImportant || sample.TileType < 0)
+            {
+                return true;
+            }
+
+            var width = Math.Max(1, sample.ObjectWidth);
+            var height = Math.Max(1, sample.ObjectHeight);
+            if (width <= 1 && height <= 1)
+            {
+                return true;
+            }
+
+            var rightExclusive = sample.ObjectOriginX + width;
+            var bottomExclusive = sample.ObjectOriginY + height;
+            if (sample.TileX < sample.ObjectOriginX ||
+                sample.TileX >= rightExclusive ||
+                sample.TileY < sample.ObjectOriginY ||
+                sample.TileY >= bottomExclusive)
+            {
+                failure = BlueprintCaptureResult.Failure(
+                    "objectExpansionInvalidBounds",
+                    "多格家具采集补齐失败：object 边界不包含起始格。",
+                    null,
+                    null,
+                    maskSelectedCount,
+                    0,
+                    0,
+                    0,
+                    0,
+                    useAfterSave);
+                return false;
+            }
+
+            var area = (long)width * height;
+            if (area > BlueprintCreationMaskState.MaxSelectedCells)
+            {
+                failure = BlueprintCaptureResult.Failure(
+                    "objectExpansionTooLarge",
+                    "多格家具采集补齐失败：object 范围超过蓝图选区上限。",
+                    null,
+                    null,
+                    maskSelectedCount,
+                    0,
+                    0,
+                    0,
+                    0,
+                    useAfterSave);
+                return false;
+            }
+
+            signature = new BlueprintCaptureObjectSignature
+            {
+                TileType = sample.TileType,
+                Style = Math.Max(0, sample.ObjectStyle),
+                OriginX = sample.ObjectOriginX,
+                OriginY = sample.ObjectOriginY,
+                Width = width,
+                Height = height
+            };
+            return true;
+        }
+
+        private static bool TryAddObjectExpansionRequest(
+            Dictionary<string, BlueprintCaptureCellRequest> requestsByKey,
+            int tileX,
+            int tileY,
+            BlueprintCaptureObjectSignature signature,
+            int maskSelectedCount,
+            bool useAfterSave,
+            out BlueprintCaptureResult failure)
+        {
+            failure = null;
+            var request = GetOrCreateCaptureRequest(requestsByKey, tileX, tileY);
+            if (request.ExpectedObject == null)
+            {
+                request.ExpectedObject = signature;
+                return true;
+            }
+
+            if (request.ExpectedObject.Matches(signature))
+            {
+                return true;
+            }
+
+            failure = BlueprintCaptureResult.Failure(
+                "objectExpansionOverlap",
+                "多格家具采集补齐失败：多个 object 边界重叠，已拒绝保存半件家具。",
+                null,
+                null,
+                maskSelectedCount,
+                0,
+                0,
+                0,
+                0,
+                useAfterSave);
+            return false;
+        }
+
+        private static BlueprintCaptureCellRequest GetOrCreateCaptureRequest(
+            Dictionary<string, BlueprintCaptureCellRequest> requestsByKey,
+            int tileX,
+            int tileY)
+        {
+            var key = BuildCoordinateKey(tileX, tileY);
+            BlueprintCaptureCellRequest request;
+            if (!requestsByKey.TryGetValue(key, out request))
+            {
+                request = new BlueprintCaptureCellRequest
+                {
+                    X = tileX,
+                    Y = tileY
+                };
+                requestsByKey[key] = request;
+            }
+
+            return request;
+        }
+
+        private static bool TryReadCaptureSample(
+            IBlueprintWorldTileReader reader,
+            BlueprintCaptureCellRequest request,
+            out BlueprintWorldTileSnapshot sample)
+        {
+            sample = null;
+            if (reader == null || request == null)
+            {
+                return false;
+            }
+
+            if (request.CachedReadAttempted)
+            {
+                sample = request.CachedSample;
+                return request.CachedReadSucceeded;
+            }
+
+            request.CachedReadAttempted = true;
+            request.CachedReadSucceeded = reader.TryReadTile(request.X, request.Y, out sample) && sample != null;
+            request.CachedSample = sample;
+            return request.CachedReadSucceeded;
+        }
+
+        private static bool MatchesObjectSignature(BlueprintWorldTileSnapshot sample, BlueprintCaptureObjectSignature signature)
+        {
+            if (sample == null || signature == null)
+            {
+                return false;
+            }
+
+            return sample.Active &&
+                   sample.FrameImportant &&
+                   sample.TileType == signature.TileType &&
+                   Math.Max(0, sample.ObjectStyle) == signature.Style &&
+                   sample.ObjectOriginX == signature.OriginX &&
+                   sample.ObjectOriginY == signature.OriginY &&
+                   Math.Max(1, sample.ObjectWidth) == signature.Width &&
+                   Math.Max(1, sample.ObjectHeight) == signature.Height;
+        }
+
+        private static BlueprintCaptureResult BuildObjectExpansionFailureResult(
+            string resultCode,
+            string message,
+            int maskSelectedCount,
+            BlueprintCaptureBuildState state,
+            bool useAfterSave)
+        {
+            return BlueprintCaptureResult.Failure(
+                resultCode,
+                message,
+                null,
+                null,
+                maskSelectedCount,
+                state == null ? 0 : state.Cells.Count,
+                state == null ? 0 : state.LayerCount,
+                state == null ? 0 : state.SkippedAirCount,
+                state == null ? 0 : state.UnavailableCount,
+                useAfterSave);
+        }
+
+        private static bool TryResolveCaptureBounds(
+            IList<BlueprintCaptureCellRequest> requests,
             out int minX,
             out int minY,
             out int maxX,
@@ -526,30 +878,68 @@ namespace JueMingZ.Automation.Blueprint
             minY = 0;
             maxX = 0;
             maxY = 0;
-            if (selected == null || selected.Count <= 0)
+            if (requests == null || requests.Count <= 0)
             {
                 return false;
             }
 
-            minX = selected[0].X;
-            maxX = selected[0].X;
-            minY = selected[0].Y;
-            maxY = selected[0].Y;
-            for (var index = 1; index < selected.Count; index++)
+            minX = requests[0].X;
+            maxX = requests[0].X;
+            minY = requests[0].Y;
+            maxY = requests[0].Y;
+            for (var index = 1; index < requests.Count; index++)
             {
-                var cell = selected[index];
-                if (cell == null)
+                var request = requests[index];
+                if (request == null)
                 {
                     continue;
                 }
 
-                if (cell.X < minX) minX = cell.X;
-                if (cell.X > maxX) maxX = cell.X;
-                if (cell.Y < minY) minY = cell.Y;
-                if (cell.Y > maxY) maxY = cell.Y;
+                if (request.X < minX) minX = request.X;
+                if (request.X > maxX) maxX = request.X;
+                if (request.Y < minY) minY = request.Y;
+                if (request.Y > maxY) maxY = request.Y;
             }
 
             return true;
+        }
+
+        private static string BuildCoordinateKey(int tileX, int tileY)
+        {
+            return tileX.ToString(CultureInfo.InvariantCulture) + "," +
+                   tileY.ToString(CultureInfo.InvariantCulture);
+        }
+
+        private sealed class BlueprintCaptureCellRequest
+        {
+            public int X { get; set; }
+            public int Y { get; set; }
+            public bool CaptureAllLayers { get; set; }
+            public BlueprintCaptureObjectSignature ExpectedObject { get; set; }
+            public bool CachedReadAttempted { get; set; }
+            public bool CachedReadSucceeded { get; set; }
+            public BlueprintWorldTileSnapshot CachedSample { get; set; }
+        }
+
+        private sealed class BlueprintCaptureObjectSignature
+        {
+            public int TileType { get; set; }
+            public int Style { get; set; }
+            public int OriginX { get; set; }
+            public int OriginY { get; set; }
+            public int Width { get; set; }
+            public int Height { get; set; }
+
+            public bool Matches(BlueprintCaptureObjectSignature other)
+            {
+                return other != null &&
+                       TileType == other.TileType &&
+                       Style == other.Style &&
+                       OriginX == other.OriginX &&
+                       OriginY == other.OriginY &&
+                       Width == other.Width &&
+                       Height == other.Height;
+            }
         }
 
         private static void NormalizeCellCoordinates(IList<BlueprintCellRecord> cells, int originX, int originY)

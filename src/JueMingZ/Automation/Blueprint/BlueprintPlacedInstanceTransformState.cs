@@ -230,7 +230,9 @@ namespace JueMingZ.Automation.Blueprint
                 {
                     _lastInputOwner = "ui";
                     _lastResultCode = "uiOwned";
-                    _lastNotice = "鼠标位于 UI 上，蓝图移动 / 镜像不会命中世界实例。";
+                    _lastNotice = string.Equals(_phase, BlueprintPlacedInstanceTransformPhases.PlaceTarget, StringComparison.Ordinal)
+                        ? "左键放置，取消移动回原位"
+                        : "点击需要移动位置的蓝图";
                     return BuildInteractionResultLocked(true, false, input.LeftDown || input.LeftPressed || input.LeftReleased, true, false, _lastResultCode, _lastNotice);
                 }
 
@@ -380,7 +382,7 @@ namespace JueMingZ.Automation.Blueprint
                     ? "moveTargetSelectStarted"
                     : "mirrorTargetSelectStarted";
                 _lastNotice = string.Equals(mode, BlueprintPlacedInstanceTransformModes.Move, StringComparison.Ordinal)
-                    ? "请点击一个已放置蓝图作为移动目标。"
+                    ? "点击需要移动位置的蓝图"
                     : "请点击一个已放置蓝图进行镜像；不安全 frame / 方向会自动拒绝。";
                 return BlueprintPlacedInstanceTransformCommandResult.Create(true, true, _mode, _phase, _lastResultCode, _lastNotice, string.Empty, string.Empty);
             }
@@ -405,7 +407,7 @@ namespace JueMingZ.Automation.Blueprint
             {
                 _lastInputOwner = "world";
                 _lastResultCode = "noInstanceAtPointer";
-                _lastNotice = "该位置没有可见已放置蓝图；请点击蓝图虚影覆盖的格子。";
+                _lastNotice = "点击需要移动位置的蓝图";
                 return BuildInteractionResultLocked(true, false, true, true, false, _lastResultCode, _lastNotice);
             }
 

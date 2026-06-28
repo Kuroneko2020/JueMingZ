@@ -496,6 +496,10 @@ namespace JueMingZ.Automation.Blueprint
                 }
             }
 
+            // Wall frames are transient projection appearance data. They are
+            // derived at cache-build time so draw paths consume cached source
+            // rectangles without refreshing world tiles or mutating templates.
+            BlueprintWallProjectionFrameResolver.Apply(allProjected);
             snapshot.EffectiveLayerCount = order.Count;
             snapshot.ProjectedLayers = projected;
             snapshot.AllProjectedLayers = allProjected;

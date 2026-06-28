@@ -196,7 +196,7 @@ namespace JueMingZ.Automation.Blueprint
                         "entryStateChanged",
                         "创建入口已进入 mask 选择状态。",
                         false);
-                    BlueprintCreationPromptService.NotifyMaskChanged(BlueprintCreationMaskState.GetSnapshot().SelectedCount);
+                    BlueprintCreationPromptService.NotifyCreateStarted(started);
                     return started;
                 case BlueprintEntryCommands.OpenLibrary:
                     if (IsCurrentMode(BlueprintEntryModes.PlacedManagement))
@@ -252,15 +252,7 @@ namespace JueMingZ.Automation.Blueprint
                     BlueprintPlacedInstanceTransformState.Cancel();
                     return MarkEraseStarted(BlueprintEraseRegionState.BeginErase(string.Empty));
                 case BlueprintEntryCommands.ClearSelection:
-                    {
-                        var clearResult = BlueprintCreationMaskState.ClearSelection();
-                        if (clearResult.Changed)
-                        {
-                            BlueprintCreationPromptService.NotifyMaskChanged(0);
-                        }
-
-                        return ApplyCreationSelectionResult(clearResult, BlueprintEntryModes.Creating, false);
-                    }
+                    return ApplyCreationSelectionResult(BlueprintCreationMaskState.ClearSelection(), BlueprintEntryModes.Creating, false);
                 case BlueprintEntryCommands.ExitCreate:
                     return ExitCreatePreservingSelection();
                 case BlueprintEntryCommands.FinishCreateSave:

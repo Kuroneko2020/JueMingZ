@@ -1138,6 +1138,8 @@ namespace JueMingZ.Tests
             Run("blueprint capture records layers and keeps air bounds", ref failed, BlueprintCaptureRecordsLayersAndKeepsAirBounds);
             Run("blueprint capture rejects pure air selection explicitly", ref failed, BlueprintCaptureRejectsPureAirSelectionExplicitly);
             Run("blueprint capture counts multitile material once and flags external content", ref failed, BlueprintCaptureCountsMultitileMaterialOnceAndFlagsExternalContent);
+            Run("blueprint capture expands partial multitile object without walls or wires", ref failed, BlueprintCaptureExpandsPartialMultitileObjectWithoutWallsOrWires);
+            Run("blueprint capture fails closed when expanded object cell is incomplete", ref failed, BlueprintCaptureFailsClosedWhenExpandedObjectCellIsIncomplete);
             Run("blueprint capture save writes template and refreshes library", ref failed, BlueprintCaptureSaveWritesTemplateAndRefreshesLibrary);
             Run("blueprint capture finish-use saves and enters placement preview", ref failed, BlueprintCaptureFinishUseSavesAndEntersPlacementPreview);
             Run("blueprint placement preview uses upper-left center anchor for even size", ref failed, BlueprintPlacementPreviewUsesUpperLeftCenterAnchorForEvenSize);
@@ -1148,8 +1150,8 @@ namespace JueMingZ.Tests
             Run("blueprint placement preview waits for physical left release before confirm", ref failed, BlueprintPlacementPreviewWaitsForPhysicalLeftReleaseBeforeConfirm);
             Run("blueprint placement overlay routes and pointer contract", ref failed, BlueprintPlacementOverlayRoutesAndPointerContract);
             Run("blueprint mirror horizontal mirrors preview coordinates anchor and slope", ref failed, BlueprintMirrorHorizontalMirrorsPreviewCoordinatesAnchorAndSlope);
-            Run("blueprint mirror rejects directional furniture frames fail closed", ref failed, BlueprintMirrorRejectsDirectionalFurnitureFramesFailClosed);
-            Run("blueprint mirror support matrix maps slopes and rejects unknown direction", ref failed, BlueprintMirrorSupportMatrixMapsSlopesAndRejectsUnknownDirection);
+            Run("blueprint mirror complete multitile object mirrors and partial fails closed", ref failed, BlueprintMirrorCompleteMultitileObjectMirrorsAndPartialFailsClosed);
+            Run("blueprint mirror support matrix maps slopes and flips object direction", ref failed, BlueprintMirrorSupportMatrixMapsSlopesAndFlipsObjectDirection);
             Run("blueprint mirror projection materials and auto placement use mirrored snapshot", ref failed, BlueprintMirrorProjectionMaterialsAndAutoPlacementUseMirroredSnapshot);
             Run("blueprint mirror diagnostics write runtime snapshot json", ref failed, BlueprintMirrorDiagnosticsWriteRuntimeSnapshotJson);
             Run("blueprint placed instances UI state loads current world and keeps snapshots", ref failed, BlueprintPlacedInstancesUiStateLoadsCurrentWorldAndKeepsSnapshots);
@@ -1165,6 +1167,7 @@ namespace JueMingZ.Tests
             Run("blueprint projection composes layer order and skips hidden", ref failed, BlueprintProjectionComposesLayerOrderAndSkipsHidden);
             Run("blueprint projection stage 04 later instance covers earlier without mutating snapshots", ref failed, BlueprintProjectionStage04LaterInstanceCoversEarlierWithoutMutatingSnapshots);
             Run("blueprint projection stage 05 completed progress persists and skips dug cells", ref failed, BlueprintProjectionStage05CompletedProgressPersistsAndSkipsDugCells);
+            Run("blueprint projection wall frames use neighbor continuity", ref failed, BlueprintProjectionWallFramesUseNeighborContinuity);
             Run("blueprint projection cache avoids immediate recompute", ref failed, BlueprintProjectionCacheAvoidsImmediateRecompute);
             Run("blueprint projection replacement rules fulfill configured same category", ref failed, BlueprintProjectionReplacementRulesFulfillConfiguredSameCategory);
             Run("blueprint projection UI overlay and diagnostics contracts", ref failed, BlueprintProjectionUiOverlayAndDiagnosticsContracts);
@@ -1196,6 +1199,7 @@ namespace JueMingZ.Tests
             Run("blueprint diagnostics performance counters average costs", ref failed, BlueprintDiagnosticsPerformanceCountersAverageCosts);
             Run("blueprint placement stage 08 regression diagnostics contracts stay wired", ref failed, BlueprintPlacementStage08RegressionDiagnosticsContractsStayWired);
             Run("blueprint feedback stage 11 regression diagnostics contracts stay wired", ref failed, BlueprintFeedbackStage11RegressionDiagnosticsContractsStayWired);
+            Run("blueprint wall object stage 06 regression diagnostics contracts stay wired", ref failed, BlueprintWallObjectStage06RegressionDiagnosticsContractsStayWired);
             Run("user notes tab keeps hotkeys page id and note icon", ref failed, UserNotesTabKeepsHotkeysPageIdAndUsesNoteIcon);
             Run("user notes layout uses two columns and caps card height", ref failed, UserNotesLayoutUsesTwoColumnsAndCapsCardHeight);
             Run("user notes card body viewport matches layout and scroll", ref failed, UserNotesCardBodyViewportMatchesLayoutAndScroll);
