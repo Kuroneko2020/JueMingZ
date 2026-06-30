@@ -13,6 +13,37 @@ namespace JueMingZ.UI
         private static PropertyInfo _beginStateProperty;
         private static bool _beginStateLookupDone;
 
+        public static bool TryEnterWorldDraw(string owner, out object spriteBatch)
+        {
+            var safeOwner = string.IsNullOrWhiteSpace(owner) ? "UnknownWorldLayer" : owner;
+            Microsoft.Xna.Framework.Graphics.SpriteBatch worldSpriteBatch;
+            if (!TerrariaDrawCompat.TryGetSpriteBatch(out worldSpriteBatch))
+            {
+                spriteBatch = null;
+                LogWorldSkip(safeOwner, "spriteBatchUnavailable", "Terraria.Main.spriteBatch is unavailable for world drawing.");
+                return false;
+            }
+
+            spriteBatch = worldSpriteBatch;
+            bool begun;
+            if (TryReadSpriteBatchBegun(spriteBatch, out begun) && !begun)
+            {
+                LogWorldSkip(safeOwner, "spriteBatchNotBegun", "Terraria world layer is not inside a SpriteBatch.Begin/End pair; JueMing-Z will not Begin here.");
+                return false;
+            }
+
+            // World-layer hooks run inside Terraria's own world SpriteBatch
+            // lifecycle. Keep this guard separate from interface overlays so a
+            // wall ghost cannot silently drift back into the late UI layer.
+            if (!UiPrimitiveRenderer.EnsureReady(spriteBatch))
+            {
+                LogWorldSkip(safeOwner, "primitiveRendererNotReady", "UI primitive renderer is not ready for world drawing: " + UiPrimitiveRenderer.LastError);
+                return false;
+            }
+
+            return true;
+        }
+
         public static bool TryEnterInterfaceDraw(string owner, bool requireVanillaResources, out object spriteBatch)
         {
             // Interface overlays must draw inside Terraria's active SpriteBatch; starting
@@ -45,6 +76,11 @@ namespace JueMingZ.UI
             }
 
             return true;
+        }
+
+        internal static string GetWorldDrawLifecycleContractForTesting()
+        {
+            return "world-spritebatch-active+no-begin-end+primitive-renderer-ready";
         }
 
         public static void RecordDrawException(string owner, Exception error)
@@ -200,6 +236,15 @@ namespace JueMingZ.UI
                 TimeSpan.FromSeconds(10),
                 owner,
                 "JueMing-Z UI draw skipped this frame. " + message);
+        }
+
+        private static void LogWorldSkip(string owner, string reasonKey, string message)
+        {
+            LogThrottle.WarnThrottled(
+                "world-draw-skip-" + owner + "-" + reasonKey,
+                TimeSpan.FromSeconds(10),
+                owner,
+                "JueMing-Z world draw skipped this frame. " + message);
         }
     }
 }

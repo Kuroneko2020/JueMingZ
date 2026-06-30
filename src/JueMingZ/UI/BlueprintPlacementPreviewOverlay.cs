@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using JueMingZ.Automation.Blueprint;
 using JueMingZ.Compat;
 using JueMingZ.Diagnostics;
@@ -10,6 +11,10 @@ namespace JueMingZ.UI
     public static class BlueprintPlacementPreviewOverlay
     {
         private const int TileSize = 16;
+        private const int RangeFillAlpha = 10;
+        private const int CellFillAlpha = 92;
+        private const int CellBorderAlpha = 155;
+        private const string VisualContract = "blueprint-placement-preview-late-overlay+ui-range-border-anchor-hints+foreground-cell-hints+skip-wall-content+mixed-cell-layer-aware+wall-content-owned-by-world-layer+wall-template-disables-late-range-fill";
         private static bool _wasPhysicalLeftDown;
         private static bool _wasActive;
 
@@ -157,6 +162,43 @@ namespace JueMingZ.UI
         internal static bool ShouldRegisterWorldOverlayForTesting()
         {
             return true;
+        }
+
+        internal static string GetVisualContractForTesting()
+        {
+            return VisualContract;
+        }
+
+        internal static int ResolveRangeFillAlphaForTesting()
+        {
+            return RangeFillAlpha;
+        }
+
+        internal static int ResolveCellFillAlphaForTesting()
+        {
+            return CellFillAlpha;
+        }
+
+        internal static bool ShouldDrawRangeFillForTesting(BlueprintPlacementPreviewSnapshot snapshot)
+        {
+            return ShouldDrawRangeFill(snapshot);
+        }
+
+        internal static bool ShouldDrawTemplateLayerInLateOverlayForTesting(string layerKind)
+        {
+            return ShouldDrawTemplateLayerInLateOverlay(layerKind);
+        }
+
+        internal static int ResolveTemplateLayerDrawPassForTesting(string layerKind)
+        {
+            return BlueprintProjectionGhostRenderer.ResolveLayerDrawPassForTesting(layerKind);
+        }
+
+        internal static IReadOnlyList<string> BuildLatePreviewDrawOrderForTesting(BlueprintPlacementPreviewSnapshot snapshot)
+        {
+            var order = new List<string>();
+            AppendLatePreviewDrawOrder(order, snapshot);
+            return order;
         }
 
         internal static bool ShouldConsumeAfterPlayerInputForTesting(bool active, bool legacyUiOwned, bool leftDown)
@@ -392,7 +434,11 @@ namespace JueMingZ.UI
             var y = (int)Math.Round(snapshot.OriginTileY * TileSize - screenPosition.Y);
             var width = Math.Max(TileSize, Math.Max(1, snapshot.Width) * TileSize);
             var height = Math.Max(TileSize, Math.Max(1, snapshot.Height) * TileSize);
-            UiPrimitiveRenderer.DrawFilledRectClipped(spriteBatch, x, y, width, height, 0, 0, clipWidth, clipHeight, 78, 180, 124, 34);
+            if (ShouldDrawRangeFill(snapshot))
+            {
+                UiPrimitiveRenderer.DrawFilledRectClipped(spriteBatch, x, y, width, height, 0, 0, clipWidth, clipHeight, 78, 180, 124, RangeFillAlpha);
+            }
+
             UiPrimitiveRenderer.DrawRectBorderClipped(spriteBatch, x, y, width, height, 2, 0, 0, clipWidth, clipHeight, 122, 238, 154, 210);
             DrawTemplateCells(spriteBatch, snapshot, screenPosition, clipWidth, clipHeight);
             DrawAnchor(spriteBatch, snapshot, screenPosition, clipWidth, clipHeight);
@@ -407,24 +453,38 @@ namespace JueMingZ.UI
             }
 
             var maxCells = Math.Min(template.Cells.Count, 512);
-            for (var index = 0; index < maxCells; index++)
+            for (var pass = 1; pass <= 2; pass++)
             {
-                var cell = template.Cells[index];
-                if (cell == null)
+                for (var index = 0; index < maxCells; index++)
                 {
-                    continue;
-                }
+                    var cell = template.Cells[index];
+                    if (cell == null || cell.Layers == null)
+                    {
+                        continue;
+                    }
 
-                var x = (int)Math.Round((snapshot.OriginTileX + cell.X) * TileSize - screenPosition.X);
-                var y = (int)Math.Round((snapshot.OriginTileY + cell.Y) * TileSize - screenPosition.Y);
-                if (x >= clipWidth || y >= clipHeight || x + TileSize <= 0 || y + TileSize <= 0)
-                {
-                    continue;
-                }
+                    var x = (int)Math.Round((snapshot.OriginTileX + cell.X) * TileSize - screenPosition.X);
+                    var y = (int)Math.Round((snapshot.OriginTileY + cell.Y) * TileSize - screenPosition.Y);
+                    if (x >= clipWidth || y >= clipHeight || x + TileSize <= 0 || y + TileSize <= 0)
+                    {
+                        continue;
+                    }
 
-                var color = ResolvePreviewColor(cell);
-                UiPrimitiveRenderer.DrawFilledRectClipped(spriteBatch, x, y, TileSize, TileSize, 0, 0, clipWidth, clipHeight, color[0], color[1], color[2], 92);
-                UiPrimitiveRenderer.DrawRectBorderClipped(spriteBatch, x, y, TileSize, TileSize, 1, 0, 0, clipWidth, clipHeight, color[0], color[1], color[2], 155);
+                    for (var layerIndex = 0; layerIndex < cell.Layers.Count; layerIndex++)
+                    {
+                        var layer = cell.Layers[layerIndex];
+                        if (layer == null ||
+                            !ShouldDrawTemplateLayerInLateOverlay(layer.LayerKind) ||
+                            BlueprintProjectionGhostRenderer.ResolveLayerDrawPass(layer.LayerKind) != pass)
+                        {
+                            continue;
+                        }
+
+                        var color = ResolvePreviewColor(layer);
+                        UiPrimitiveRenderer.DrawFilledRectClipped(spriteBatch, x, y, TileSize, TileSize, 0, 0, clipWidth, clipHeight, color[0], color[1], color[2], CellFillAlpha);
+                        UiPrimitiveRenderer.DrawRectBorderClipped(spriteBatch, x, y, TileSize, TileSize, 1, 0, 0, clipWidth, clipHeight, color[0], color[1], color[2], CellBorderAlpha);
+                    }
+                }
             }
         }
 
@@ -435,9 +495,98 @@ namespace JueMingZ.UI
             UiPrimitiveRenderer.DrawRectBorderClipped(spriteBatch, x + 2, y + 2, TileSize - 4, TileSize - 4, 2, 0, 0, clipWidth, clipHeight, 255, 242, 136, 225);
         }
 
-        private static int[] ResolvePreviewColor(BlueprintCellRecord cell)
+        private static void AppendLatePreviewDrawOrder(List<string> order, BlueprintPlacementPreviewSnapshot snapshot)
         {
-            var layer = cell == null || cell.Layers == null || cell.Layers.Count <= 0 ? null : cell.Layers[0];
+            if (order == null || !ShouldDraw(snapshot))
+            {
+                return;
+            }
+
+            if (ShouldDrawRangeFill(snapshot))
+            {
+                order.Add("late-preview:range-fill");
+            }
+
+            order.Add("late-preview:range-border");
+            var template = snapshot.TemplateSnapshot;
+            var maxCells = Math.Min(template.Cells.Count, 512);
+            for (var pass = 1; pass <= 2; pass++)
+            {
+                for (var cellIndex = 0; cellIndex < maxCells; cellIndex++)
+                {
+                    var cell = template.Cells[cellIndex];
+                    if (cell == null || cell.Layers == null)
+                    {
+                        continue;
+                    }
+
+                    for (var layerIndex = 0; layerIndex < cell.Layers.Count; layerIndex++)
+                    {
+                        var layer = cell.Layers[layerIndex];
+                        if (layer == null ||
+                            !ShouldDrawTemplateLayerInLateOverlay(layer.LayerKind) ||
+                            BlueprintProjectionGhostRenderer.ResolveLayerDrawPass(layer.LayerKind) != pass)
+                        {
+                            continue;
+                        }
+
+                        order.Add("late-preview:" + (layer.LayerKind ?? string.Empty) + ":" + (snapshot.OriginTileX + cell.X) + "," + (snapshot.OriginTileY + cell.Y));
+                    }
+                }
+            }
+
+            order.Add("late-preview:anchor");
+        }
+
+        private static bool ShouldDrawTemplateLayerInLateOverlay(string layerKind)
+        {
+            return !string.Equals(layerKind, BlueprintLayerKinds.Wall, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool ShouldDrawRangeFill(BlueprintPlacementPreviewSnapshot snapshot)
+        {
+            if (!ShouldDraw(snapshot))
+            {
+                return false;
+            }
+
+            // Wall content is owned by the world layer. A filled late UI surface
+            // over a wall template reads as topmost background wall in screenshots.
+            return !TemplateHasWallLayer(snapshot.TemplateSnapshot);
+        }
+
+        private static bool TemplateHasWallLayer(BlueprintTemplateRecord template)
+        {
+            if (template == null || template.Cells == null)
+            {
+                return false;
+            }
+
+            var maxCells = Math.Min(template.Cells.Count, 512);
+            for (var cellIndex = 0; cellIndex < maxCells; cellIndex++)
+            {
+                var cell = template.Cells[cellIndex];
+                if (cell == null || cell.Layers == null)
+                {
+                    continue;
+                }
+
+                for (var layerIndex = 0; layerIndex < cell.Layers.Count; layerIndex++)
+                {
+                    var layer = cell.Layers[layerIndex];
+                    if (layer != null &&
+                        string.Equals(layer.LayerKind, BlueprintLayerKinds.Wall, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static int[] ResolvePreviewColor(BlueprintCellLayerRecord layer)
+        {
             var kind = layer == null ? string.Empty : layer.LayerKind ?? string.Empty;
             if (string.Equals(kind, BlueprintLayerKinds.Wall, StringComparison.OrdinalIgnoreCase))
             {

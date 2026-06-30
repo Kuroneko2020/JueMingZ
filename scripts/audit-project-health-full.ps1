@@ -13342,6 +13342,244 @@ function Test-BlueprintWallObjectStage06RegressionDiagnosticsGovernance {
     ) -PassMessage "Blueprint stage 06 plan records the aggregate regression and no-new-diagnostics boundary." -FailMessage "Blueprint stage 06 plan must record completion, aggregate audit, and diagnostics boundary."
 }
 
+function Test-BlueprintProjectionRebuildStage06RegressionAuditGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $auditText = Read-TextIfExists -Path (Join-Path $RepoRoot "scripts\audit-project-health-full.ps1")
+    if ($null -ne $auditText -and
+        $auditText.Contains("Test-BlueprintProjectionRebuildStage06RegressionAuditGovernance -RepoRoot `$RepoRoot")) {
+        Write-Pass "Blueprint projection rebuild stage 06 audit is wired into the scoped health audit."
+    }
+    else {
+        Write-FailHealth "Blueprint projection rebuild stage 06 audit must be called by the Blueprint diagnostics scoped health audit."
+    }
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.BlueprintDiagnosticsTests.cs" -RequiredAnchors @(
+        "BlueprintProjectionRebuildStage06RegressionAuditContractsStayWired",
+        "BlueprintProjectionUiOverlayAndDiagnosticsContracts",
+        "BlueprintProjectionWallFramesUseNeighborContinuity",
+        "BlueprintProjectionWallGhostUsesWorldLayerBeforeLateProjectionOverlay",
+        "BlueprintProjectionMultitileObjectConflictMarksWholeGroup",
+        "BlueprintCaptureExpandsPartialMultitileObjectWithoutWallsOrWires",
+        "BlueprintCaptureFailsClosedWhenExpandedObjectCellIsIncomplete",
+        "BlueprintAutoPlacementSkipsWholeMultitileObjectWhenAnyCellConflicts",
+        "yellow-missing",
+        "topmost"
+    ) -PassMessage "Blueprint projection rebuild stage 06 aggregate regression covers visual, lifecycle, capture, object-group, and old-route blockers." -FailMessage "Blueprint projection rebuild stage 06 aggregate regression drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.cs" -RequiredAnchors @(
+        "blueprint projection rebuild stage 06 regression audit contracts stay wired"
+    ) -PassMessage "Blueprint projection rebuild stage 06 aggregate regression is registered." -FailMessage "Blueprint projection rebuild stage 06 aggregate regression registration drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\UI\BlueprintProjectionOverlay.cs" -RequiredAnchors @(
+        "original-missing",
+        "missing-no-state-block",
+        "wall-world-layer-before-foreground",
+        "terraria-foreground-between-wall-and-late-projection",
+        "late-overlay-skips-wall",
+        "multitile-object-group-conflict",
+        "BuildProjectionPixelStackForTesting"
+    ) -PassMessage "Blueprint projection overlay still exposes the rebuilt visual and pixel-stack contracts." -FailMessage "Blueprint projection overlay rebuilt contract drifted."
+
+    $overlayText = Read-TextIfExists -Path (Join-Path $RepoRoot "src\JueMingZ\UI\BlueprintProjectionOverlay.cs")
+    if ($null -ne $overlayText -and
+        -not $overlayText.Contains("yellow-missing") -and
+        -not $overlayText.Contains("topmost") -and
+        -not $overlayText.Contains("stage-05 yellow ghost semantics")) {
+        Write-Pass "Blueprint projection overlay no longer advertises old yellow or topmost wall contracts."
+    }
+    else {
+        Write-FailHealth "Blueprint projection overlay must not reintroduce yellow-missing, topmost, or stage-05 yellow ghost contracts."
+    }
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "src\JueMingZ\Automation\Blueprint\BlueprintProjectionService.cs" -RequiredAnchors @(
+        "ApplyMultitileObjectGroupPolicy",
+        "ObjectGroupKey",
+        "ObjectGroupStatus",
+        "ApplyBottomWallGhostVisualPolicy",
+        "layer.WallGhostOcclusionMask = 0",
+        "layer.WallGhostProjectionForegroundMask = 0"
+    ) -PassMessage "Blueprint projection service keeps object-group escalation and complete bottom-wall policy wired." -FailMessage "Blueprint projection service stage 06 contract drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.BlueprintProjectionTests.cs" -RequiredAnchors @(
+        "BlueprintProjectionUiOverlayAndDiagnosticsContracts",
+        "BlueprintProjectionWallGhostUsesWorldLayerBeforeLateProjectionOverlay",
+        "BlueprintProjectionMultitileObjectConflictMarksWholeGroup",
+        "BuildProjectionPixelStackForTesting",
+        "terraria-foreground:12,13",
+        "Expected projection overlay to draw original missing ghosts"
+    ) -PassMessage "Blueprint projection tests still cover current visual, lifecycle, and object-group contracts." -FailMessage "Blueprint projection tests stage 06 anchors drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.BlueprintCaptureTests.cs" -RequiredAnchors @(
+        "BlueprintCaptureExpandsPartialMultitileObjectWithoutWallsOrWires",
+        "BlueprintCaptureFailsClosedWhenExpandedObjectCellIsIncomplete",
+        "objectExpansionIncomplete"
+    ) -PassMessage "Blueprint capture tests still lock multi-tile object expansion and fail-closed behavior." -FailMessage "Blueprint capture tests stage 06 anchors drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.BlueprintAutoPlacementTests.cs" -RequiredAnchors @(
+        "BlueprintAutoPlacementSkipsWholeMultitileObjectWhenAnyCellConflicts",
+        "SkippedConflictLayerCount != 2"
+    ) -PassMessage "Blueprint auto placement tests still skip whole blocked multi-tile object groups." -FailMessage "Blueprint auto placement tests stage 06 anchors drifted."
+
+    $projectionRebuildStage06PlanRelativePath = "文档\当前在做计划\已放置蓝图投影绘制重制-2606291746\06-回归诊断与审计防线.md"
+    if (-not (Test-Path -LiteralPath (Join-Path $RepoRoot $projectionRebuildStage06PlanRelativePath))) {
+        $projectionRebuildStage06PlanRelativePath = "文档\归档历史计划\已放置蓝图投影绘制重制-2606291746\06-回归诊断与审计防线.md"
+    }
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath $projectionRebuildStage06PlanRelativePath -RequiredAnchors @(
+        "阶段状态：已完成",
+        "BlueprintProjectionRebuildStage06RegressionAuditContractsStayWired",
+        "Test-BlueprintProjectionRebuildStage06RegressionAuditGovernance",
+        "不生成测试包",
+        '下一唯一入口为 `07-验证打包与归档收口.md`'
+    ) -PassMessage "Blueprint projection rebuild stage 06 plan records completion and the next-stage boundary." -FailMessage "Blueprint projection rebuild stage 06 plan anchors drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "文档\功能介绍\蓝图页\蓝图.md" -RequiredAnchors @(
+        "0.1001-blueprint-regression-audit",
+        "BlueprintProjectionRebuildStage06RegressionAuditContractsStayWired",
+        "Test-BlueprintProjectionRebuildStage06RegressionAuditGovernance",
+        "不生成测试包"
+    ) -PassMessage "Blueprint feature doc describes the current projection rebuild regression audit boundary." -FailMessage "Blueprint feature doc must describe the projection rebuild stage 06 boundary."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "文档\项目规则\AI诊断日志说明.md" -RequiredAnchors @(
+        "0.1001-blueprint-regression-audit",
+        "BlueprintProjectionRebuildStage06RegressionAuditContractsStayWired",
+        "Test-BlueprintProjectionRebuildStage06RegressionAuditGovernance",
+        "本地等价栈验证不等于用户实机验收"
+    ) -PassMessage "Blueprint diagnostics doc keeps the current projection rebuild evidence boundary visible." -FailMessage "Blueprint diagnostics doc must keep the current projection rebuild evidence boundary visible."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "文档\更新记录\0.1001-蓝图投影回归审计-2606292009.md" -RequiredAnchors @(
+        "0.1001-blueprint-regression-audit",
+        "BlueprintProjectionRebuildStage06RegressionAuditContractsStayWired",
+        "Test-BlueprintProjectionRebuildStage06RegressionAuditGovernance",
+        "不生成测试包"
+    ) -PassMessage "Blueprint projection rebuild stage 06 update record exists." -FailMessage "Blueprint projection rebuild stage 06 update record anchors drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "文档\文档更改历史\蓝图投影回归审计-2606292009.md" -RequiredAnchors @(
+        "BlueprintProjectionRebuildStage06RegressionAuditContractsStayWired",
+        "Test-BlueprintProjectionRebuildStage06RegressionAuditGovernance",
+        "不生成测试包"
+    ) -PassMessage "Blueprint projection rebuild stage 06 document history exists." -FailMessage "Blueprint projection rebuild stage 06 document history anchors drifted."
+}
+
+function Test-BlueprintProjectionRebuildStage07CloseoutGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $csprojPath = Join-Path $RepoRoot "src\JueMingZ\JueMingZ.csproj"
+    $runtimePath = Join-Path $RepoRoot "src\JueMingZ\Runtime\JueMingZRuntime.cs"
+    $currentPlanDirectory = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "已放置蓝图投影绘制重制-2606291746")
+    $archivePlanDirectory = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "已放置蓝图投影绘制重制-2606291746")
+    $plan00Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "已放置蓝图投影绘制重制-2606291746", "00-基准.md")
+    $plan07Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "已放置蓝图投影绘制重制-2606291746", "07-验证打包与归档收口.md")
+    $currentPlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "索引.md")
+    $archivePlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "索引.md")
+    $functionDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $updateRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "0.1002-蓝图投影重制收口-2606292101.md")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+    $docHistoryRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "蓝图投影重制收口-2606292101.md")
+    $auditText = Read-TextIfExists -Path (Join-Path $RepoRoot "scripts\audit-project-health-full.ps1")
+
+    $csprojText = Read-TextIfExists -Path $csprojPath
+    $runtimeText = Read-TextIfExists -Path $runtimePath
+    $plan00Text = Read-TextIfExists -Path $plan00Path
+    $plan07Text = Read-TextIfExists -Path $plan07Path
+    $currentPlanIndexText = Read-TextIfExists -Path $currentPlanIndexPath
+    $archivePlanIndexText = Read-TextIfExists -Path $archivePlanIndexPath
+    $functionDocText = Read-TextIfExists -Path $functionDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $updateRecordText = Read-TextIfExists -Path $updateRecordPath
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+    $docHistoryRecordText = Read-TextIfExists -Path $docHistoryRecordPath
+
+    if ($csprojText -and
+        $runtimeText -and
+        $csprojText.Contains("<Version>0.1002</Version>") -and
+        $csprojText.Contains("<InformationalVersion>0.1002-blueprint-projection-rebuild-closeout</InformationalVersion>") -and
+        $runtimeText.Contains('public const string Version = "0.1002-blueprint-projection-rebuild-closeout";')) {
+        Write-Pass "Blueprint projection rebuild closeout version metadata is 0.1002."
+    }
+    else {
+        Write-FailHealth "Blueprint projection rebuild closeout must keep RuntimeVersion and project metadata at 0.1002-blueprint-projection-rebuild-closeout."
+    }
+
+    if ((Test-Path -LiteralPath $archivePlanDirectory) -and
+        -not (Test-Path -LiteralPath $currentPlanDirectory) -and
+        $plan00Text -and
+        $plan00Text.Contains("07-验证打包与归档收口") -and
+        $plan00Text.Contains("0.1002-blueprint-projection-rebuild-closeout") -and
+        $plan00Text.Contains("Test-BlueprintProjectionRebuildStage07CloseoutGovernance") -and
+        $plan07Text -and
+        $plan07Text.Contains("状态：已完成") -and
+        $plan07Text.Contains("0.1002-blueprint-projection-rebuild-closeout") -and
+        $plan07Text.Contains("JueMingZ-TestPackage") -and
+        $plan07Text.Contains("-RequireFreshTestPackage") -and
+        $plan07Text.Contains("未生成源码包") -and
+        $plan07Text.Contains("不新增玩家可见功能")) {
+        Write-Pass "Blueprint projection rebuild plan is archived with stage 07 package delivery and strict freshness audit recorded."
+    }
+    else {
+        Write-FailHealth "Blueprint projection rebuild stage 07 must archive the plan and mark 00/07 complete with package, strict freshness audit, no source package, and no-new-feature scope."
+    }
+
+    if ($currentPlanIndexText -and
+        $currentPlanIndexText.Contains("当前没有正在推进的计划") -and
+        $currentPlanIndexText.Contains("文档/归档历史计划/已放置蓝图投影绘制重制-2606291746/") -and
+        $currentPlanIndexText.Contains("0.1002-blueprint-projection-rebuild-closeout") -and
+        $archivePlanIndexText -and
+        $archivePlanIndexText.Contains("文档/归档历史计划/已放置蓝图投影绘制重制-2606291746/") -and
+        $archivePlanIndexText.Contains("0.1002-blueprint-projection-rebuild-closeout") -and
+        $archivePlanIndexText.Contains("JueMingZ-TestPackage")) {
+        Write-Pass "Blueprint projection rebuild current and archive plan indexes record the stage 07 closeout."
+    }
+    else {
+        Write-FailHealth "Blueprint projection rebuild stage 07 must remove the plan from current work and add the 0.1002 archived closeout summary."
+    }
+
+    if ($functionDocText -and
+        $functionDocText.Contains("0.1002-blueprint-projection-rebuild-closeout") -and
+        $functionDocText.Contains("文档/归档历史计划/已放置蓝图投影绘制重制-2606291746/00-基准.md") -and
+        $functionDocText.Contains("Test-BlueprintProjectionRebuildStage07CloseoutGovernance") -and
+        $functionDocText.Contains("JueMingZ-TestPackage") -and
+        $diagnosticsDocText -and
+        $diagnosticsDocText.Contains("0.1002-blueprint-projection-rebuild-closeout") -and
+        $diagnosticsDocText.Contains("不新增 runtime snapshot 字段") -and
+        $diagnosticsDocText.Contains("不新增 trace JSONL") -and
+        $diagnosticsDocText.Contains("Test-BlueprintProjectionRebuildStage07CloseoutGovernance")) {
+        Write-Pass "Blueprint feature and diagnostics docs record the 0.1002 closeout without expanding runtime or diagnostics scope."
+    }
+    else {
+        Write-FailHealth "Blueprint projection rebuild stage 07 must update blueprint feature and diagnostics docs with package closeout and no-new-diagnostics scope."
+    }
+
+    if ($updateIndexText -and
+        $updateIndexText.Contains("0.1002-蓝图投影重制收口-2606292101.md") -and
+        $updateRecordText -and
+        $updateRecordText.Contains('RuntimeVersion：`0.1002-blueprint-projection-rebuild-closeout`') -and
+        $updateRecordText.Contains("JueMingZ-TestPackage") -and
+        $updateRecordText.Contains("-RequireFreshTestPackage") -and
+        $updateRecordText.Contains("未生成源码包") -and
+        $docHistoryIndexText -and
+        $docHistoryIndexText.Contains("蓝图投影重制收口-2606292101.md") -and
+        $docHistoryRecordText -and
+        $docHistoryRecordText.Contains("0.1002-blueprint-projection-rebuild-closeout") -and
+        $docHistoryRecordText.Contains("07-验证打包与归档收口")) {
+        Write-Pass "Blueprint projection rebuild stage 07 update record and document-change history are synchronized."
+    }
+    else {
+        Write-FailHealth "Blueprint projection rebuild stage 07 must synchronize update index/record and document-change history for the 0.1002 closeout."
+    }
+
+    if ($auditText -and
+        $auditText.Contains("Test-BlueprintProjectionRebuildStage07CloseoutGovernance -RepoRoot `$RepoRoot")) {
+        Write-Pass "Blueprint projection rebuild stage 07 closeout audit is wired into the scoped health audit."
+    }
+    else {
+        Write-FailHealth "Blueprint scoped health audit must include Test-BlueprintProjectionRebuildStage07CloseoutGovernance and archived-plan path resolution."
+    }
+}
+
 function Test-BlueprintWallObjectStage07CloseoutGovernance {
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
 
@@ -13823,6 +14061,8 @@ function Invoke-GovernanceAudit {
     if (Test-AuditScopeSelected -Scopes $Scopes -Candidates @("Blueprint", "BlueprintDiagnostics")) {
         Test-BlueprintCurrentDiagnosticsGovernance -RepoRoot $RepoRoot
         Test-BlueprintWallObjectStage06RegressionDiagnosticsGovernance -RepoRoot $RepoRoot
+        Test-BlueprintProjectionRebuildStage06RegressionAuditGovernance -RepoRoot $RepoRoot
+        Test-BlueprintProjectionRebuildStage07CloseoutGovernance -RepoRoot $RepoRoot
         Test-BlueprintWallObjectStage07CloseoutGovernance -RepoRoot $RepoRoot
         Test-BlueprintWallFrameRefreshStage03Governance -RepoRoot $RepoRoot
         Test-BlueprintWallUnverifiedRetryStage04Governance -RepoRoot $RepoRoot

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using JueMingZ.Hooks;
+using JueMingZ.UI;
 
 namespace JueMingZ.Tests
 {
@@ -216,6 +217,48 @@ namespace JueMingZ.Tests
             {
                 throw new InvalidOperationException("Expected pinned overlay dispatcher to use unscaled screen coordinates.");
             }
+        }
+
+        private static void BlueprintWallGhostWorldLayerHookTargetsVanillaWallStage()
+        {
+            if (!string.Equals(BlueprintWallGhostWorldLayerHookInstaller.GetHookTargetNameForTesting(), "Terraria.Main.DoDraw_WallsAndBlacks", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected blueprint wall ghost world layer hook to target the vanilla walls-before-tiles stage.");
+            }
+
+            if (!string.Equals(BlueprintWallGhostWorldLayerHookCallbacks.GetRouteNameForTesting(), "BlueprintProjectionWallWorldOverlay.DrawWorldLayer+BlueprintPlacementPreviewWallWorldOverlay.DrawWorldLayer", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Expected blueprint wall ghost world layer hook to route projection and placement-preview wall content through world overlays.");
+            }
+        }
+
+        private static void InterfaceLayerHookDoesNotTreatPlacementPreviewRangeFillAsWallFix()
+        {
+            AssertStringArrayEquals(
+                InterfaceLayerHookCallbacks.GetGameOverlayDispatcherRouteNamesForTesting(true),
+                new[]
+                {
+                    "InformationWorldOverlay.DrawAutoMiningInterfaceLayer",
+                    "FishingStatusPromptOverlay.DrawInterfaceLayer",
+                    "FirstWorldLoadPromptOverlay.DrawInterfaceLayer",
+                    "CombatEquipmentWarningPromptOverlay.DrawInterfaceLayer",
+                    "CombatAimMarkerOverlay.DrawInterfaceLayer",
+                    "MapDirectionHintOverlay.DrawInterfaceLayer",
+                    "BlueprintProjectionOverlay.DrawInterfaceLayer",
+                    "BlueprintCreationOverlay.DrawInterfaceLayer",
+                    "BlueprintPlacementPreviewOverlay.DrawInterfaceLayer",
+                    "BlueprintEraseRegionOverlay.DrawInterfaceLayer"
+                },
+                "game overlay dispatcher routes with placement preview late UI hints");
+
+            var snapshot = CreateActivePlacementPreviewSnapshot(CreatePlacementPreviewMixedWallTemplate("hook不把范围面当墙修复"));
+            if (BlueprintPlacementPreviewOverlay.ShouldDrawRangeFillForTesting(snapshot))
+            {
+                throw new InvalidOperationException("Interface-layer placement preview must not treat the late filled range surface as part of the wall-layer fix.");
+            }
+
+            AssertContains(BlueprintPlacementPreviewWallWorldOverlay.GetVisualContractForTesting(), "complete-template-wall-target");
+            AssertContains(BlueprintPlacementPreviewOverlay.GetVisualContractForTesting(), "wall-template-disables-late-range-fill");
         }
 
         private static void AssertIntEquals(int actual, int expected, string label)

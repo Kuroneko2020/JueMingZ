@@ -242,6 +242,57 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void BlueprintAutoPlacementSkipsWholeMultitileObjectWhenAnyCellConflicts()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-auto-placement-multitile-object-group");
+            try
+            {
+                BlueprintAutoPlacementService.ResetForTesting();
+                var store = new BlueprintWorldInstanceStore();
+                var reader = new FakeBlueprintWorldTileReader();
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(
+                    store.CreateInstanceFromTemplate(
+                        "pair-auto-object-group",
+                        "world-auto-object-group",
+                        CreateAutoPlacementTwoCellObjectTemplate("整件家具", 14, 1010),
+                        20,
+                        30,
+                        0,
+                        out instance),
+                    "create auto placement multitile object instance");
+                reader.Set(20, 30, new BlueprintWorldTileSnapshot());
+                reader.Set(21, 30, new BlueprintWorldTileSnapshot { Active = true, TileType = 999 });
+                BlueprintProjectionService.SetDependenciesForTesting(
+                    store,
+                    BlueprintPlacementWorldContext.Success("pair-auto-object-group", "world-auto-object-group"),
+                    reader,
+                    true);
+                BlueprintMaterialService.SetInventoryReaderForTesting(new FakeBlueprintMaterialInventoryReader(
+                    new Dictionary<int, int> { { 1010, 1 } },
+                    new Dictionary<int, int>()), true);
+
+                var settings = AppSettings.CreateDefault();
+                settings.BlueprintAutoPlacementEnabled = true;
+                var result = BlueprintAutoPlacementService.ResolveCandidatesForTesting(RuntimeSettingsSnapshot.FromSettings(settings));
+                if (result.Candidate != null ||
+                    result.Snapshot.CandidateCount != 0 ||
+                    result.Snapshot.SkippedConflictLayerCount != 2 ||
+                    !string.Equals(result.Snapshot.ResultCode, "noCandidate", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected blueprint auto placement to skip every layer of a blocked multitile object group.");
+                }
+            }
+            finally
+            {
+                BlueprintAutoPlacementService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialWindowOverlay.ResetForTesting();
+                restore();
+            }
+        }
+
         private static void BlueprintAutoPlacementSubmitsActionQueueAndVerifiesPlacement()
         {
             var restore = PushTemporaryConfigDirectory("blueprint-auto-placement-action");

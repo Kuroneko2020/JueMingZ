@@ -354,9 +354,23 @@ namespace JueMingZ.Tests
                     throw new InvalidOperationException("Expected wall ghost renderer to draw a 32x32 wall texture centered on the 16x16 tile cell.");
                 }
 
-                if (reader.ReadCount != 4)
+                var outerMask = BlueprintWallGhostOcclusionMask.TopLeft |
+                                BlueprintWallGhostOcclusionMask.TopRight |
+                                BlueprintWallGhostOcclusionMask.BottomLeft;
+                var interiorAlpha = BlueprintProjectionGhostRenderer.ResolveWallGhostInteriorAlphaForTesting(142);
+                var outerAlpha = BlueprintProjectionGhostRenderer.ResolveWallGhostQuadrantAlphaForTesting(interiorAlpha, topLeft.WallGhostOuterEdgeMask, BlueprintWallGhostOcclusionMask.TopLeft);
+                var innerAlpha = BlueprintProjectionGhostRenderer.ResolveWallGhostQuadrantAlphaForTesting(interiorAlpha, topLeft.WallGhostOuterEdgeMask, BlueprintWallGhostOcclusionMask.BottomRight);
+                if (topLeft.WallGhostOuterEdgeMask != outerMask ||
+                    interiorAlpha < 80 ||
+                    outerAlpha >= innerAlpha ||
+                    outerAlpha > 60)
                 {
-                    throw new InvalidOperationException("Expected wall frame projection to avoid extra world tile reads beyond normal layer classification.");
+                    throw new InvalidOperationException("Expected bottom-layer wall ghost to keep cached wall frames while de-emphasizing only the outer perimeter spill.");
+                }
+
+                if (reader.ReadCount > 16)
+                {
+                    throw new InvalidOperationException("Expected wall frame projection to reuse cache-build tile reads while resolving bottom-layer wall visual policy.");
                 }
             }
             finally
@@ -366,7 +380,7 @@ namespace JueMingZ.Tests
             }
         }
 
-        private static void BlueprintProjectionWallGhostSkipsFullTileOcclusion()
+        private static void BlueprintProjectionWallGhostKeepsCompleteBehindFullTileForeground()
         {
             var restore = PushTemporaryConfigDirectory("blueprint-projection-wall-occlusion");
             try
@@ -392,17 +406,361 @@ namespace JueMingZ.Tests
                     snapshot.WallTargetLayerCount != 1 ||
                     snapshot.WallTypeMissingLayerCount != 1 ||
                     layer == null ||
-                    !layer.WallGhostBlockedByFullTile ||
-                    !BlueprintProjectionGhostRenderer.ShouldSkipWallGhostForTesting(layer) ||
-                    !BlueprintProjectionOverlay.GetVisualContractForTesting().Contains("wall-full-tile-occlusion"))
+                    layer.WallGhostBlockedByFullTile ||
+                    layer.WallGhostOcclusionMask != 0 ||
+                    layer.WallGhostProjectionForegroundMask != 0 ||
+                    layer.WallGhostOuterEdgeMask != BlueprintWallGhostOcclusionMask.All ||
+                    BlueprintProjectionGhostRenderer.ShouldSkipWallGhostForTesting(layer) ||
+                    !BlueprintProjectionGhostRenderer.DrawLayer(null, layer, 192, 208, 800, 600, 255, 255, 255, 142, 0) ||
+                    !BlueprintProjectionOverlay.GetVisualContractForTesting().Contains("wall-bottom-layer-complete"))
                 {
-                    throw new InvalidOperationException("Expected wall projection to keep missing/material semantics while skipping the ghost hidden by a real full tile.");
+                    throw new InvalidOperationException("Expected bottom-layer wall projection to stay complete behind a real full tile foreground without falling back to a whole-cell fill.");
                 }
             }
             finally
             {
                 BlueprintProjectionService.ResetForTesting();
                 restore();
+            }
+        }
+
+        private static void BlueprintProjectionWallGhostKeepsNeighborForegroundSpillComplete()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-projection-wall-neighbor-occlusion");
+            try
+            {
+                var store = new BlueprintWorldInstanceStore();
+                var reader = new FakeBlueprintWorldTileReader();
+                var template = CreateProjectionSingleWallTemplate("wall-neighbor-occlusion", 7);
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(store.CreateInstanceFromTemplate("pair-wall-neighbor-occlusion", "world-wall-neighbor-occlusion", template, 12, 13, 0, out instance), "create wall neighbor occlusion projection instance");
+                reader.Set(13, 13, new BlueprintWorldTileSnapshot { Active = true, WallBlockedByFullTile = true });
+
+                BlueprintProjectionService.SetDependenciesForTesting(
+                    store,
+                    BlueprintPlacementWorldContext.Success("pair-wall-neighbor-occlusion", "world-wall-neighbor-occlusion"),
+                    reader,
+                    true);
+
+                var snapshot = BlueprintProjectionService.GetSnapshot();
+                var layer = FindProjectedLayerAt(snapshot.ProjectedLayers, instance.InstanceId, BlueprintLayerKinds.Wall, 12, 13);
+                if (!snapshot.LoadSucceeded ||
+                    snapshot.MissingLayerCount != 1 ||
+                    layer == null ||
+                    layer.WallGhostBlockedByFullTile ||
+                    layer.WallGhostOcclusionMask != 0 ||
+                    layer.WallGhostProjectionForegroundMask != 0 ||
+                    layer.WallGhostOuterEdgeMask != BlueprintWallGhostOcclusionMask.All ||
+                    BlueprintProjectionGhostRenderer.ShouldSkipWallGhostForTesting(layer) ||
+                    !BlueprintProjectionGhostRenderer.DrawLayer(null, layer, 192, 208, 800, 600, 255, 255, 255, 142, 0) ||
+                    !BlueprintProjectionOverlay.GetVisualContractForTesting().Contains("wall-bottom-layer-complete"))
+                {
+                    throw new InvalidOperationException("Expected neighboring foreground touched by the 32x32 wall spill to no longer cut the bottom wall projection.");
+                }
+            }
+            finally
+            {
+                BlueprintProjectionService.ResetForTesting();
+                restore();
+            }
+        }
+
+        private static void BlueprintProjectionWallGhostKeepsFrameImportantForegroundComplete()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-projection-wall-object-occlusion");
+            try
+            {
+                var store = new BlueprintWorldInstanceStore();
+                var reader = new FakeBlueprintWorldTileReader();
+                var template = CreateProjectionSingleWallTemplate("wall-object-occlusion", 7);
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(store.CreateInstanceFromTemplate("pair-wall-object-occlusion", "world-wall-object-occlusion", template, 12, 13, 0, out instance), "create wall object occlusion projection instance");
+                reader.Set(12, 13, new BlueprintWorldTileSnapshot { Active = true, TileType = 19, FrameImportant = true });
+
+                BlueprintProjectionService.SetDependenciesForTesting(
+                    store,
+                    BlueprintPlacementWorldContext.Success("pair-wall-object-occlusion", "world-wall-object-occlusion"),
+                    reader,
+                    true);
+
+                var snapshot = BlueprintProjectionService.GetSnapshot();
+                var layer = FindProjectedLayerAt(snapshot.ProjectedLayers, instance.InstanceId, BlueprintLayerKinds.Wall, 12, 13);
+                if (!snapshot.LoadSucceeded ||
+                    snapshot.MissingLayerCount != 1 ||
+                    layer == null ||
+                    layer.WallGhostBlockedByFullTile ||
+                    layer.WallGhostOcclusionMask != 0 ||
+                    layer.WallGhostProjectionForegroundMask != 0 ||
+                    layer.WallGhostOuterEdgeMask != BlueprintWallGhostOcclusionMask.All ||
+                    BlueprintProjectionGhostRenderer.ShouldSkipWallGhostForTesting(layer) ||
+                    !BlueprintProjectionGhostRenderer.DrawLayer(null, layer, 192, 208, 800, 600, 255, 255, 255, 142, 0))
+                {
+                    throw new InvalidOperationException("Expected visible frame-important foreground objects to no longer hard-cut bottom wall ghost projection.");
+                }
+            }
+            finally
+            {
+                BlueprintProjectionService.ResetForTesting();
+                restore();
+            }
+        }
+
+        private static void BlueprintProjectionWallGhostKeepsCompleteBehindSameProjectionObjectGhost()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-projection-wall-same-object-softening");
+            try
+            {
+                var store = new BlueprintWorldInstanceStore();
+                var reader = new FakeBlueprintWorldTileReader();
+                var template = CreateProjectionWallWithObjectTemplate("wall-same-object-softening", 7, 10);
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(store.CreateInstanceFromTemplate("pair-wall-same-object-softening", "world-wall-same-object-softening", template, 12, 13, 0, out instance), "create wall same projection object softening instance");
+
+                BlueprintProjectionService.SetDependenciesForTesting(
+                    store,
+                    BlueprintPlacementWorldContext.Success("pair-wall-same-object-softening", "world-wall-same-object-softening"),
+                    reader,
+                    true);
+
+                var snapshot = BlueprintProjectionService.GetSnapshot();
+                var wall = FindProjectedLayerAt(snapshot.ProjectedLayers, instance.InstanceId, BlueprintLayerKinds.Wall, 12, 13);
+                var foreground = FindProjectedLayerAt(snapshot.ProjectedLayers, instance.InstanceId, BlueprintLayerKinds.Object, 12, 13);
+                if (!snapshot.LoadSucceeded ||
+                    snapshot.MissingLayerCount != 2 ||
+                    wall == null ||
+                    foreground == null ||
+                    wall.WallGhostBlockedByFullTile ||
+                    wall.WallGhostOcclusionMask != 0 ||
+                    wall.WallGhostProjectionForegroundMask != 0 ||
+                    wall.WallGhostOuterEdgeMask != BlueprintWallGhostOcclusionMask.All ||
+                    BlueprintProjectionGhostRenderer.ShouldSkipWallGhostForTesting(wall) ||
+                    !BlueprintProjectionGhostRenderer.DrawLayer(null, wall, 192, 208, 800, 600, 255, 255, 255, 142, 0))
+                {
+                    throw new InvalidOperationException("Expected a visible object ghost in the same projection cell to leave the bottom wall layer complete.");
+                }
+
+                var drawOrder = BlueprintProjectionOverlay.BuildProjectionDrawOrderForTesting(snapshot, null);
+                var objectIndex = IndexOfDrawOrder(drawOrder, "placed:object:12,13");
+                var wallIndex = IndexOfDrawOrder(drawOrder, "world-placed:wall:12,13");
+                if (objectIndex < 0 || wallIndex < 0 || wallIndex > objectIndex)
+                {
+                    throw new InvalidOperationException("Expected world-layer bottom wall projection to draw before the same-cell object projection foreground.");
+                }
+            }
+            finally
+            {
+                BlueprintProjectionService.ResetForTesting();
+                restore();
+            }
+        }
+
+        private static void BlueprintProjectionWallGhostKeepsCompleteBehindSameProjectionNeighborTileGhost()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-projection-wall-neighbor-tile-softening");
+            try
+            {
+                var store = new BlueprintWorldInstanceStore();
+                var reader = new FakeBlueprintWorldTileReader();
+                var template = CreateProjectionWallWithNeighborTileTemplate("wall-neighbor-tile-softening", 7, 19);
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(store.CreateInstanceFromTemplate("pair-wall-neighbor-tile-softening", "world-wall-neighbor-tile-softening", template, 12, 13, 0, out instance), "create wall neighbor projection tile softening instance");
+
+                BlueprintProjectionService.SetDependenciesForTesting(
+                    store,
+                    BlueprintPlacementWorldContext.Success("pair-wall-neighbor-tile-softening", "world-wall-neighbor-tile-softening"),
+                    reader,
+                    true);
+
+                var snapshot = BlueprintProjectionService.GetSnapshot();
+                var wall = FindProjectedLayerAt(snapshot.ProjectedLayers, instance.InstanceId, BlueprintLayerKinds.Wall, 12, 13);
+                var foreground = FindProjectedLayerAt(snapshot.ProjectedLayers, instance.InstanceId, BlueprintLayerKinds.Tile, 13, 13);
+                if (!snapshot.LoadSucceeded ||
+                    snapshot.MissingLayerCount != 2 ||
+                    wall == null ||
+                    foreground == null ||
+                    wall.WallGhostBlockedByFullTile ||
+                    wall.WallGhostOcclusionMask != 0 ||
+                    wall.WallGhostProjectionForegroundMask != 0 ||
+                    wall.WallGhostOuterEdgeMask != BlueprintWallGhostOcclusionMask.All ||
+                    BlueprintProjectionGhostRenderer.ShouldSkipWallGhostForTesting(wall) ||
+                    !BlueprintProjectionGhostRenderer.DrawLayer(null, wall, 192, 208, 800, 600, 255, 255, 255, 142, 0))
+                {
+                    throw new InvalidOperationException("Expected a visible neighboring tile ghost touched by wall spill to leave the bottom wall layer complete.");
+                }
+
+                var drawOrder = BlueprintProjectionOverlay.BuildProjectionDrawOrderForTesting(snapshot, null);
+                var tileIndex = IndexOfDrawOrder(drawOrder, "placed:tile:13,13");
+                var wallIndex = IndexOfDrawOrder(drawOrder, "world-placed:wall:12,13");
+                if (tileIndex < 0 || wallIndex < 0 || wallIndex > tileIndex)
+                {
+                    throw new InvalidOperationException("Expected world-layer bottom wall projection to draw before the neighboring tile projection foreground.");
+                }
+            }
+            finally
+            {
+                BlueprintProjectionService.ResetForTesting();
+                restore();
+            }
+        }
+
+        private static void BlueprintProjectionFloatingWallGhostKeepsCompleteBelowPlacedProjectionForeground()
+        {
+            var placedLayers = new List<BlueprintProjectionCellSnapshot>
+            {
+                new BlueprintProjectionCellSnapshot
+                {
+                    InstanceId = "placed",
+                    LayerKind = BlueprintLayerKinds.Tile,
+                    CoverageGroup = BlueprintLayerKinds.Tile,
+                    ContentId = 19,
+                    Status = BlueprintProjectionLayerStatuses.Missing,
+                    WorldTileX = 13,
+                    WorldTileY = 13
+                }
+            };
+            BlueprintProjectionService.ApplyBottomWallGhostVisualPolicy(placedLayers);
+            var placed = new BlueprintProjectionSnapshot
+            {
+                LoadSucceeded = true,
+                ProjectedLayers = placedLayers,
+                AllProjectedLayers = placedLayers
+            };
+            var floatingLayers = new List<BlueprintProjectionCellSnapshot>
+            {
+                new BlueprintProjectionCellSnapshot
+                {
+                    InstanceId = "floating",
+                    LayerKind = BlueprintLayerKinds.Wall,
+                    CoverageGroup = BlueprintLayerKinds.Wall,
+                    ContentId = 7,
+                    Status = BlueprintProjectionLayerStatuses.Missing,
+                    WorldTileX = 12,
+                    WorldTileY = 13
+                }
+            };
+
+            BlueprintProjectionService.ApplyBottomWallGhostVisualPolicy(floatingLayers);
+            var wall = floatingLayers[0];
+            if (wall.WallGhostBlockedByFullTile ||
+                wall.WallGhostOcclusionMask != 0 ||
+                wall.WallGhostProjectionForegroundMask != 0 ||
+                wall.WallGhostOuterEdgeMask != BlueprintWallGhostOcclusionMask.All ||
+                BlueprintProjectionGhostRenderer.ShouldSkipWallGhostForTesting(wall) ||
+                !BlueprintProjectionGhostRenderer.DrawLayer(null, wall, 192, 208, 800, 600, 255, 255, 255, 142, 0))
+            {
+                throw new InvalidOperationException("Expected floating wall ghost to ignore placed foreground occupancy as a cut/soften source and stay complete.");
+            }
+
+            var floating = new BlueprintProjectionSnapshot
+            {
+                LoadSucceeded = true,
+                ProjectedLayers = floatingLayers,
+                AllProjectedLayers = floatingLayers
+            };
+            var drawOrder = BlueprintProjectionOverlay.BuildProjectionDrawOrderForTesting(placed, floating);
+            var floatingWallIndex = IndexOfDrawOrder(drawOrder, "world-floating:wall:12,13");
+            var placedTileIndex = IndexOfDrawOrder(drawOrder, "placed:tile:13,13");
+            if (floatingWallIndex < 0 ||
+                placedTileIndex < 0 ||
+                floatingWallIndex > placedTileIndex ||
+                !BlueprintProjectionOverlay.GetVisualContractForTesting().Contains("wall-bottom-layer-complete"))
+            {
+                throw new InvalidOperationException("Expected cross-projection draw order to draw floating wall in the world wall layer below visible placed tile/object foreground.");
+            }
+        }
+
+        private static void BlueprintProjectionWallGhostUsesWorldLayerBeforeLateProjectionOverlay()
+        {
+            var layers = new List<BlueprintProjectionCellSnapshot>
+            {
+                new BlueprintProjectionCellSnapshot
+                {
+                    InstanceId = "placed",
+                    LayerKind = BlueprintLayerKinds.Wall,
+                    CoverageGroup = BlueprintLayerKinds.Wall,
+                    ContentId = 7,
+                    Status = BlueprintProjectionLayerStatuses.Missing,
+                    WorldTileX = 12,
+                    WorldTileY = 13
+                },
+                new BlueprintProjectionCellSnapshot
+                {
+                    InstanceId = "placed",
+                    LayerKind = BlueprintLayerKinds.Object,
+                    CoverageGroup = BlueprintLayerKinds.Object,
+                    ContentId = 10,
+                    Status = BlueprintProjectionLayerStatuses.Missing,
+                    WorldTileX = 12,
+                    WorldTileY = 13
+                },
+                new BlueprintProjectionCellSnapshot
+                {
+                    InstanceId = "placed",
+                    LayerKind = BlueprintLayerKinds.Wire,
+                    CoverageGroup = BlueprintLayerKinds.Wire,
+                    ContentId = BlueprintCaptureWireFlags.Red,
+                    Status = BlueprintProjectionLayerStatuses.Missing,
+                    WorldTileX = 12,
+                    WorldTileY = 13
+                }
+            };
+            BlueprintProjectionService.ApplyBottomWallGhostVisualPolicy(layers);
+            var snapshot = new BlueprintProjectionSnapshot
+            {
+                LoadSucceeded = true,
+                ProjectedLayers = layers,
+                AllProjectedLayers = layers
+            };
+
+            var worldOrder = BlueprintProjectionOverlay.BuildWorldWallDrawOrderForTesting(snapshot, null);
+            var lateOrder = BlueprintProjectionOverlay.BuildLateProjectionDrawOrderForTesting(snapshot, null);
+            var combinedOrder = BlueprintProjectionOverlay.BuildProjectionDrawOrderForTesting(snapshot, null);
+            var pixelStack = BlueprintProjectionOverlay.BuildProjectionPixelStackForTesting(snapshot, null, 12, 13, true);
+
+            if (IndexOfDrawOrder(worldOrder, "world-placed:wall:12,13") < 0 ||
+                IndexOfDrawOrder(worldOrder, "world-placed:object:12,13") >= 0 ||
+                IndexOfDrawOrder(worldOrder, "world-placed:wire:12,13") >= 0)
+            {
+                throw new InvalidOperationException("Expected the early world layer to draw only blueprint wall projection.");
+            }
+
+            if (IndexOfDrawOrder(lateOrder, "placed:wall:12,13") >= 0 ||
+                IndexOfDrawOrder(lateOrder, "placed:object:12,13") < 0 ||
+                IndexOfDrawOrder(lateOrder, "placed:wire:12,13") < 0)
+            {
+                throw new InvalidOperationException("Expected the late projection overlay to skip wall and keep foreground projection layers.");
+            }
+
+            var wallIndex = IndexOfDrawOrder(combinedOrder, "world-placed:wall:12,13");
+            var objectIndex = IndexOfDrawOrder(combinedOrder, "placed:object:12,13");
+            var wireIndex = IndexOfDrawOrder(combinedOrder, "placed:wire:12,13");
+            if (wallIndex < 0 ||
+                objectIndex < 0 ||
+                wireIndex < 0 ||
+                wallIndex > objectIndex ||
+                wallIndex > wireIndex ||
+                !BlueprintProjectionOverlay.GetVisualContractForTesting().Contains("late-overlay-skips-wall") ||
+                !BlueprintProjectionWallWorldOverlay.GetVisualContractForTesting().Contains("before-terraria-foreground"))
+            {
+                throw new InvalidOperationException("Expected wall ghost lifecycle to be world-layer first, then late projection foreground.");
+            }
+
+            var pixelWallIndex = IndexOfDrawOrder(pixelStack, "world-placed:wall:12,13");
+            var pixelTerrariaForegroundIndex = IndexOfDrawOrder(pixelStack, "terraria-foreground:12,13");
+            var pixelObjectIndex = IndexOfDrawOrder(pixelStack, "placed:object:12,13");
+            var pixelWireIndex = IndexOfDrawOrder(pixelStack, "placed:wire:12,13");
+            if (pixelWallIndex < 0 ||
+                pixelTerrariaForegroundIndex < 0 ||
+                pixelObjectIndex < 0 ||
+                pixelWireIndex < 0 ||
+                pixelWallIndex > pixelTerrariaForegroundIndex ||
+                pixelTerrariaForegroundIndex > pixelObjectIndex ||
+                pixelObjectIndex > pixelWireIndex ||
+                !BlueprintProjectionOverlay.GetVisualContractForTesting().Contains("terraria-foreground-between-wall-and-late-projection") ||
+                !BlueprintProjectionWallWorldOverlay.GetVisualContractForTesting().Contains("world-draw-guard") ||
+                !UiDrawLifecycleGuard.GetWorldDrawLifecycleContractForTesting().Contains("no-begin-end"))
+            {
+                throw new InvalidOperationException("Expected same-pixel stack validation to keep Terraria foreground above world wall and below late projection foreground.");
             }
         }
 
@@ -592,6 +950,56 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void BlueprintProjectionMultitileObjectConflictMarksWholeGroup()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-projection-multitile-object-group");
+            try
+            {
+                var store = new BlueprintWorldInstanceStore();
+                var reader = new FakeBlueprintWorldTileReader();
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(
+                    store.CreateInstanceFromTemplate(
+                        "pair-proj-object-group",
+                        "world-proj-object-group",
+                        CreateAutoPlacementTwoCellObjectTemplate("整件家具", 14, 1010),
+                        20,
+                        30,
+                        0,
+                        out instance),
+                    "create multitile object projection instance");
+                reader.Set(20, 30, new BlueprintWorldTileSnapshot());
+                reader.Set(21, 30, new BlueprintWorldTileSnapshot { Active = true, TileType = 999 });
+                BlueprintProjectionService.SetDependenciesForTesting(
+                    store,
+                    BlueprintPlacementWorldContext.Success("pair-proj-object-group", "world-proj-object-group"),
+                    reader,
+                    true);
+
+                var snapshot = BlueprintProjectionService.GetSnapshot();
+                var left = FindProjectedLayerAt(snapshot.AllProjectedLayers, instance.InstanceId, BlueprintLayerKinds.Object, 20, 30);
+                var right = FindProjectedLayerAt(snapshot.AllProjectedLayers, instance.InstanceId, BlueprintLayerKinds.Object, 21, 30);
+                if (snapshot.MissingLayerCount != 0 ||
+                    snapshot.ConflictLayerCount != 2 ||
+                    left == null ||
+                    right == null ||
+                    !string.Equals(left.Status, BlueprintProjectionLayerStatuses.Conflict, StringComparison.Ordinal) ||
+                    !string.Equals(right.Status, BlueprintProjectionLayerStatuses.Conflict, StringComparison.Ordinal) ||
+                    string.IsNullOrWhiteSpace(left.ObjectGroupKey) ||
+                    !string.Equals(left.ObjectGroupKey, right.ObjectGroupKey, StringComparison.Ordinal) ||
+                    !string.Equals(left.ObjectGroupStatus, BlueprintProjectionLayerStatuses.Conflict, StringComparison.Ordinal) ||
+                    !string.Equals(right.ObjectGroupStatus, BlueprintProjectionLayerStatuses.Conflict, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected one conflicted cell to mark the whole multitile object group as blocked for projection.");
+                }
+            }
+            finally
+            {
+                BlueprintProjectionService.ResetForTesting();
+                restore();
+            }
+        }
+
         private static void BlueprintProjectionUiOverlayAndDiagnosticsContracts()
         {
             var restore = PushTemporaryConfigDirectory("blueprint-projection-contracts");
@@ -614,20 +1022,29 @@ namespace JueMingZ.Tests
                 }
 
                 AssertContains(BlueprintProjectionOverlay.GetVisualContractForTesting(), "appearance-ghost");
-                AssertContains(BlueprintProjectionOverlay.GetVisualContractForTesting(), "yellow-missing");
+                AssertContains(BlueprintProjectionOverlay.GetVisualContractForTesting(), "original-missing");
                 AssertContains(BlueprintProjectionOverlay.GetVisualContractForTesting(), "red-conflict");
+                AssertContains(BlueprintProjectionOverlay.GetVisualContractForTesting(), "gray-unavailable");
                 AssertContains(BlueprintProjectionOverlay.GetVisualContractForTesting(), "fulfilled-no-mask");
                 AssertContains(BlueprintProjectionOverlay.GetVisualContractForTesting(), "completed-progress");
                 AssertContains(BlueprintProjectionOverlay.GetVisualContractForTesting(), "no-cell-border");
                 AssertContains(BlueprintProjectionOverlay.GetVisualContractForTesting(), "move-floating-follow-preview");
+                AssertContains(BlueprintProjectionOverlay.GetVisualContractForTesting(), "wire-actuator-original-color");
+                AssertContains(BlueprintProjectionOverlay.GetVisualContractForTesting(), "missing-no-state-block");
+                AssertContains(BlueprintProjectionOverlay.GetVisualContractForTesting(), "wall-bottom-layer-complete");
+                AssertContains(BlueprintProjectionOverlay.GetVisualContractForTesting(), "wall-outer-edge-deemphasis");
+                AssertContains(BlueprintProjectionOverlay.GetVisualContractForTesting(), "multitile-object-group-conflict");
                 AssertContains(LegacyMainWindow.GetBlueprintProjectionVisualContractForTesting(), "appearance-ghost");
+                AssertContains(LegacyMainWindow.GetBlueprintProjectionVisualContractForTesting(), "original-missing");
                 AssertContains(LegacyMainWindow.GetBlueprintProjectionVisualContractForTesting(), "move-floating-follow-preview");
+                AssertContains(LegacyMainWindow.GetBlueprintProjectionVisualContractForTesting(), "wire-actuator-original-color");
                 AssertContains(LegacyMainWindow.GetBlueprintProjectionVisualContractForTesting(), "layer-cover");
+                AssertContains(LegacyMainWindow.GetBlueprintProjectionVisualContractForTesting(), "multitile-object-group-conflict");
                 AssertContains(LegacyMainWindow.BuildBlueprintProjectionSummaryForTesting(), "投影：有效");
                 var missingColor = BlueprintProjectionOverlay.ResolveProjectionColorForTesting(BlueprintProjectionLayerStatuses.Missing);
-                if (missingColor == null || missingColor.Length != 3 || missingColor[0] < 240 || missingColor[1] < 200 || missingColor[2] > 120)
+                if (missingColor == null || missingColor.Length != 3 || missingColor[0] != 255 || missingColor[1] != 255 || missingColor[2] != 255)
                 {
-                    throw new InvalidOperationException("Expected blueprint projection missing color to use the stage-05 yellow ghost semantics.");
+                    throw new InvalidOperationException("Expected blueprint projection missing render input to keep original texture color instead of yellow state tint.");
                 }
 
                 var conflictColor = BlueprintProjectionOverlay.ResolveProjectionColorForTesting(BlueprintProjectionLayerStatuses.Conflict);
@@ -636,17 +1053,46 @@ namespace JueMingZ.Tests
                     throw new InvalidOperationException("Expected blueprint projection conflict color to emphasize red.");
                 }
 
+                var unavailableColor = BlueprintProjectionOverlay.ResolveProjectionColorForTesting(BlueprintProjectionLayerStatuses.Unavailable);
+                if (unavailableColor == null || unavailableColor.Length != 3 || unavailableColor[0] < 120 || unavailableColor[1] < 120 || unavailableColor[2] < 120 || unavailableColor[0] == missingColor[0])
+                {
+                    throw new InvalidOperationException("Expected blueprint projection unavailable render input to use a gray unknown state.");
+                }
+
+                var redWire = BlueprintProjectionGhostRenderer.ResolveWireChannelColorForTesting(BlueprintProjectionLayerStatuses.Missing, BlueprintCaptureWireFlags.Red, missingColor[0], missingColor[1], missingColor[2]);
+                var blueWire = BlueprintProjectionGhostRenderer.ResolveWireChannelColorForTesting(BlueprintProjectionLayerStatuses.Missing, BlueprintCaptureWireFlags.Blue, missingColor[0], missingColor[1], missingColor[2]);
+                var greenWire = BlueprintProjectionGhostRenderer.ResolveWireChannelColorForTesting(BlueprintProjectionLayerStatuses.Missing, BlueprintCaptureWireFlags.Green, missingColor[0], missingColor[1], missingColor[2]);
+                var yellowWire = BlueprintProjectionGhostRenderer.ResolveWireChannelColorForTesting(BlueprintProjectionLayerStatuses.Missing, BlueprintCaptureWireFlags.Yellow, missingColor[0], missingColor[1], missingColor[2]);
+                if (redWire[0] <= redWire[1] ||
+                    blueWire[2] <= blueWire[0] ||
+                    greenWire[1] <= greenWire[0] ||
+                    yellowWire[0] <= yellowWire[2] ||
+                    yellowWire[1] <= yellowWire[2])
+                {
+                    throw new InvalidOperationException("Expected missing blueprint wire details to keep red, blue, green and yellow channel colors.");
+                }
+
+                var conflictWire = BlueprintProjectionGhostRenderer.ResolveWireChannelColorForTesting(BlueprintProjectionLayerStatuses.Conflict, BlueprintCaptureWireFlags.Blue, conflictColor[0], conflictColor[1], conflictColor[2]);
+                if (conflictWire[0] != conflictColor[0] || conflictWire[1] != conflictColor[1] || conflictWire[2] != conflictColor[2])
+                {
+                    throw new InvalidOperationException("Expected conflicting blueprint wire details to turn red instead of keeping original channel color.");
+                }
+
                 if (BlueprintProjectionOverlay.ResolveProjectionFillAlphaForTesting(BlueprintProjectionLayerStatuses.Fulfilled) != 0 ||
                     BlueprintProjectionOverlay.ResolveProjectionFillAlphaForTesting(BlueprintProjectionLayerStatuses.Completed) != 0 ||
                     BlueprintProjectionOverlay.ResolveProjectionBorderAlphaForTesting(BlueprintProjectionLayerStatuses.Missing) != 0 ||
                     BlueprintProjectionOverlay.ResolveProjectionBorderAlphaForTesting(BlueprintProjectionLayerStatuses.Conflict) != 0 ||
+                    BlueprintProjectionOverlay.ShouldDrawFallbackBlockForTesting(BlueprintProjectionLayerStatuses.Missing) ||
+                    !BlueprintProjectionOverlay.ShouldDrawFallbackBlockForTesting(BlueprintProjectionLayerStatuses.Conflict) ||
+                    !BlueprintProjectionOverlay.ShouldDrawFallbackBlockForTesting(BlueprintProjectionLayerStatuses.Unavailable) ||
                     BlueprintProjectionOverlay.ShouldDrawProjectionLayerForTesting(BlueprintProjectionLayerStatuses.Fulfilled) ||
                     BlueprintProjectionOverlay.ShouldDrawProjectionLayerForTesting(BlueprintProjectionLayerStatuses.Completed) ||
                     !BlueprintProjectionOverlay.ShouldDrawProjectionLayerForTesting(BlueprintProjectionLayerStatuses.Missing) ||
+                    !BlueprintProjectionOverlay.ShouldDrawProjectionLayerForTesting(BlueprintProjectionLayerStatuses.Unavailable) ||
                     BlueprintProjectionOverlay.ResolveLayerDrawPassForTesting(BlueprintLayerKinds.Wall) >= BlueprintProjectionOverlay.ResolveLayerDrawPassForTesting(BlueprintLayerKinds.Tile) ||
-                    BlueprintProjectionOverlay.ResolveLayerDrawPassForTesting(BlueprintLayerKinds.Wire) <= BlueprintProjectionOverlay.ResolveLayerDrawPassForTesting(BlueprintLayerKinds.Tile))
+                    BlueprintProjectionOverlay.ResolveLayerDrawPassForTesting(BlueprintLayerKinds.Tile) >= BlueprintProjectionOverlay.ResolveLayerDrawPassForTesting(BlueprintLayerKinds.Wire))
                 {
-                    throw new InvalidOperationException("Expected stage-05 projection overlay to draw wall/tile/wire ghosts in order, hide completed cells and skip per-cell borders.");
+                    throw new InvalidOperationException("Expected projection overlay to draw original missing ghosts, red conflicts, gray unknowns, bottom-wall order, hidden completed cells and no missing fallback blocks.");
                 }
 
                 var runtimeSnapshot = RuntimeDiagnosticSnapshotBuilder.Build(new RuntimeDiagnosticSnapshotContext
@@ -800,6 +1246,45 @@ namespace JueMingZ.Tests
             };
             template.Cells.Add(CreateWallCell(0, 0, wallType));
             return template;
+        }
+
+        private static BlueprintTemplateRecord CreateProjectionWallWithObjectTemplate(string name, int wallType, int objectType)
+        {
+            var template = CreateProjectionSingleWallTemplate(name, wallType);
+            template.Cells[0].Layers.Add(new BlueprintCellLayerRecord
+            {
+                LayerKind = BlueprintLayerKinds.Object,
+                ContentId = objectType
+            });
+            return template;
+        }
+
+        private static BlueprintTemplateRecord CreateProjectionWallWithNeighborTileTemplate(string name, int wallType, int tileType)
+        {
+            var template = new BlueprintTemplateRecord
+            {
+                Name = name,
+                Width = 2,
+                Height = 1,
+                AnchorX = 0,
+                AnchorY = 0
+            };
+            template.Cells.Add(CreateWallCell(0, 0, wallType));
+            template.Cells.Add(CreateTileCell(1, 0, tileType));
+            return template;
+        }
+
+        private static int IndexOfDrawOrder(IReadOnlyList<string> drawOrder, string value)
+        {
+            for (var index = 0; drawOrder != null && index < drawOrder.Count; index++)
+            {
+                if (string.Equals(drawOrder[index], value, StringComparison.Ordinal))
+                {
+                    return index;
+                }
+            }
+
+            return -1;
         }
 
         private static bool HasProjectedLayer(

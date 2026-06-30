@@ -9,9 +9,24 @@ namespace JueMingZ.UI
     internal static class BlueprintProjectionGhostRenderer
     {
         private const int TileSize = 16;
-        private const int TilePass = 1;
         private const int WallPass = 0;
+        private const int TilePass = 1;
         private const int WirePass = 2;
+        private const int WallInteriorAlphaReduction = 48;
+        private const int WallInteriorMinAlpha = 40;
+        private const int WallOuterEdgeMinAlpha = 18;
+        private const int WireRedR = 226;
+        private const int WireRedG = 96;
+        private const int WireRedB = 92;
+        private const int WireBlueR = 92;
+        private const int WireBlueG = 144;
+        private const int WireBlueB = 214;
+        private const int WireGreenR = 96;
+        private const int WireGreenG = 196;
+        private const int WireGreenB = 116;
+        private const int WireYellowR = 218;
+        private const int WireYellowG = 178;
+        private const int WireYellowB = 84;
 
         public static bool DrawLayer(
             object spriteBatch,
@@ -94,6 +109,25 @@ namespace JueMingZ.UI
             int destHeight;
             ResolveWallGhostDestination(x, y, out destX, out destY, out destWidth, out destHeight);
             return new[] { destX, destY, destWidth, destHeight };
+        }
+
+        internal static int ResolveWallGhostInteriorAlphaForTesting(int alpha)
+        {
+            return ResolveWallGhostInteriorAlpha(alpha);
+        }
+
+        internal static int ResolveWallGhostQuadrantAlphaForTesting(int interiorAlpha, int outerEdgeMask, int quadrantMask)
+        {
+            return ResolveWallGhostQuadrantAlpha(interiorAlpha, outerEdgeMask, quadrantMask);
+        }
+
+        internal static int[] ResolveWireChannelColorForTesting(string status, int wireFlag, int r, int g, int b)
+        {
+            int wireR;
+            int wireG;
+            int wireB;
+            ResolveWireChannelColor(status, wireFlag, r, g, b, out wireR, out wireG, out wireB);
+            return new[] { wireR, wireG, wireB };
         }
 
         internal static bool ShouldDrawLayer(string status)
@@ -194,17 +228,18 @@ namespace JueMingZ.UI
                 return true;
             }
 
+            var outerEdgeMask = ResolveWallGhostOuterEdgeMask(layer);
             var texture = ResolveWallTexture(layer);
             if (texture == null)
             {
-                return false;
+                return true;
             }
 
             int textureWidth;
             int textureHeight;
             if (!UiPrimitiveRenderer.TryReadTextureDimensions(texture, out textureWidth, out textureHeight))
             {
-                return false;
+                return true;
             }
 
             int sourceX;
@@ -217,8 +252,152 @@ namespace JueMingZ.UI
             int destWidth;
             int destHeight;
             ResolveWallGhostDestination(x, y, out destX, out destY, out destWidth, out destHeight);
-            var effectiveAlpha = ResolveCoatingAlpha(layer, Math.Max(48, alpha - 22));
-            var ok = UiPrimitiveRenderer.DrawTextureSourceRectClipped(
+            var effectiveAlpha = ResolveCoatingAlpha(layer, ResolveWallGhostInteriorAlpha(alpha));
+            var ok = DrawWallGhostTexture(
+                spriteBatch,
+                texture,
+                destX,
+                destY,
+                destWidth,
+                destHeight,
+                sourceX,
+                sourceY,
+                sourceWidth,
+                sourceHeight,
+                clipWidth,
+                clipHeight,
+                r,
+                g,
+                b,
+                effectiveAlpha,
+                outerEdgeMask);
+            if (HasCoatingFlag(layer.CoatingFlags, BlueprintCaptureCoatingFlags.Invisible))
+            {
+                ok |= DrawInvisibleCoatingMarker(spriteBatch, x, y, clipWidth, clipHeight, r, g, b, borderAlpha);
+            }
+
+            if (borderAlpha > 0)
+            {
+                ok |= UiPrimitiveRenderer.DrawRectBorderClipped(spriteBatch, x, y, TileSize, TileSize, 1, 0, 0, clipWidth, clipHeight, r, g, b, Math.Max(1, borderAlpha - 42));
+            }
+
+            return true;
+        }
+
+        private static bool ShouldSkipWallGhost(BlueprintProjectionCellSnapshot layer)
+        {
+            return false;
+        }
+
+        private static int ResolveWallGhostOuterEdgeMask(BlueprintProjectionCellSnapshot layer)
+        {
+            if (layer == null)
+            {
+                return 0;
+            }
+
+            return layer.WallGhostOuterEdgeMask & BlueprintWallGhostOcclusionMask.All;
+        }
+
+        private static int ResolveWallGhostInteriorAlpha(int alpha)
+        {
+            return Math.Max(WallInteriorMinAlpha, Math.Min(255, alpha) - WallInteriorAlphaReduction);
+        }
+
+        private static int ResolveWallGhostQuadrantAlpha(int interiorAlpha, int outerEdgeMask, int quadrantMask)
+        {
+            interiorAlpha = Math.Max(0, Math.Min(255, interiorAlpha));
+            if ((outerEdgeMask & quadrantMask) == 0)
+            {
+                return interiorAlpha;
+            }
+
+            return Math.Max(WallOuterEdgeMinAlpha, interiorAlpha * 45 / 100);
+        }
+
+        private static bool DrawWallGhostTexture(
+            object spriteBatch,
+            Texture2D texture,
+            int destX,
+            int destY,
+            int destWidth,
+            int destHeight,
+            int sourceX,
+            int sourceY,
+            int sourceWidth,
+            int sourceHeight,
+            int clipWidth,
+            int clipHeight,
+            int r,
+            int g,
+            int b,
+            int alpha,
+            int outerEdgeMask)
+        {
+            if ((outerEdgeMask & BlueprintWallGhostOcclusionMask.All) == 0)
+            {
+                return UiPrimitiveRenderer.DrawTextureSourceRectClipped(
+                    spriteBatch,
+                    texture,
+                    destX,
+                    destY,
+                    destWidth,
+                    destHeight,
+                    sourceX,
+                    sourceY,
+                    sourceWidth,
+                    sourceHeight,
+                    0,
+                    0,
+                    clipWidth,
+                    clipHeight,
+                    r,
+                    g,
+                    b,
+                    alpha);
+            }
+
+            var leftSourceWidth = sourceWidth / 2;
+            var rightSourceWidth = sourceWidth - leftSourceWidth;
+            var topSourceHeight = sourceHeight / 2;
+            var bottomSourceHeight = sourceHeight - topSourceHeight;
+            if (leftSourceWidth <= 0 || rightSourceWidth <= 0 || topSourceHeight <= 0 || bottomSourceHeight <= 0)
+            {
+                return false;
+            }
+
+            var ok = false;
+            // The bottom wall layer must stay complete. Only the outer perimeter
+            // of the 32x32 spill is de-emphasized to avoid a UI-like rectangle.
+            ok |= DrawWallGhostQuadrant(spriteBatch, texture, outerEdgeMask, BlueprintWallGhostOcclusionMask.TopLeft, destX, destY, TileSize, TileSize, sourceX, sourceY, leftSourceWidth, topSourceHeight, clipWidth, clipHeight, r, g, b, alpha);
+            ok |= DrawWallGhostQuadrant(spriteBatch, texture, outerEdgeMask, BlueprintWallGhostOcclusionMask.TopRight, destX + TileSize, destY, TileSize, TileSize, sourceX + leftSourceWidth, sourceY, rightSourceWidth, topSourceHeight, clipWidth, clipHeight, r, g, b, alpha);
+            ok |= DrawWallGhostQuadrant(spriteBatch, texture, outerEdgeMask, BlueprintWallGhostOcclusionMask.BottomLeft, destX, destY + TileSize, TileSize, TileSize, sourceX, sourceY + topSourceHeight, leftSourceWidth, bottomSourceHeight, clipWidth, clipHeight, r, g, b, alpha);
+            ok |= DrawWallGhostQuadrant(spriteBatch, texture, outerEdgeMask, BlueprintWallGhostOcclusionMask.BottomRight, destX + TileSize, destY + TileSize, TileSize, TileSize, sourceX + leftSourceWidth, sourceY + topSourceHeight, rightSourceWidth, bottomSourceHeight, clipWidth, clipHeight, r, g, b, alpha);
+            return ok;
+        }
+
+        private static bool DrawWallGhostQuadrant(
+            object spriteBatch,
+            Texture2D texture,
+            int outerEdgeMask,
+            int quadrantMask,
+            int destX,
+            int destY,
+            int destWidth,
+            int destHeight,
+            int sourceX,
+            int sourceY,
+            int sourceWidth,
+            int sourceHeight,
+            int clipWidth,
+            int clipHeight,
+            int r,
+            int g,
+            int b,
+            int alpha)
+        {
+            var effectiveAlpha = ResolveWallGhostQuadrantAlpha(alpha, outerEdgeMask, quadrantMask);
+            return UiPrimitiveRenderer.DrawTextureSourceRectClipped(
                 spriteBatch,
                 texture,
                 destX,
@@ -237,26 +416,6 @@ namespace JueMingZ.UI
                 g,
                 b,
                 effectiveAlpha);
-            if (HasCoatingFlag(layer.CoatingFlags, BlueprintCaptureCoatingFlags.Invisible))
-            {
-                ok |= DrawInvisibleCoatingMarker(spriteBatch, x, y, clipWidth, clipHeight, r, g, b, borderAlpha);
-            }
-
-            if (borderAlpha > 0)
-            {
-                ok |= UiPrimitiveRenderer.DrawRectBorderClipped(spriteBatch, x, y, TileSize, TileSize, 1, 0, 0, clipWidth, clipHeight, r, g, b, Math.Max(1, borderAlpha - 42));
-            }
-
-            return ok;
-        }
-
-        private static bool ShouldSkipWallGhost(BlueprintProjectionCellSnapshot layer)
-        {
-            // This overlay is drawn after Terraria's world passes. If a real
-            // full tile would hide the wall in vanilla WallDrawing, treat the
-            // cached wall ghost as visually handled so the fallback cell fill
-            // does not float over the foreground tile.
-            return layer != null && layer.WallGhostBlockedByFullTile;
         }
 
         private static bool DrawWire(object spriteBatch, BlueprintProjectionCellSnapshot layer, int x, int y, int clipWidth, int clipHeight, int r, int g, int b, int alpha, int borderAlpha)
@@ -266,27 +425,90 @@ namespace JueMingZ.UI
             var ok = false;
             if ((flags & BlueprintCaptureWireFlags.Red) != 0)
             {
-                ok |= UiPrimitiveRenderer.DrawFilledRectClipped(spriteBatch, x + 2, y + 4, TileSize - 4, 2, 0, 0, clipWidth, clipHeight, r, g, b, lineAlpha);
+                int wireR;
+                int wireG;
+                int wireB;
+                ResolveWireChannelColor(layer.Status, BlueprintCaptureWireFlags.Red, r, g, b, out wireR, out wireG, out wireB);
+                ok |= UiPrimitiveRenderer.DrawFilledRectClipped(spriteBatch, x + 2, y + 4, TileSize - 4, 2, 0, 0, clipWidth, clipHeight, wireR, wireG, wireB, lineAlpha);
             }
 
             if ((flags & BlueprintCaptureWireFlags.Blue) != 0)
             {
-                ok |= UiPrimitiveRenderer.DrawFilledRectClipped(spriteBatch, x + 4, y + 2, 2, TileSize - 4, 0, 0, clipWidth, clipHeight, r, g, b, lineAlpha);
+                int wireR;
+                int wireG;
+                int wireB;
+                ResolveWireChannelColor(layer.Status, BlueprintCaptureWireFlags.Blue, r, g, b, out wireR, out wireG, out wireB);
+                ok |= UiPrimitiveRenderer.DrawFilledRectClipped(spriteBatch, x + 4, y + 2, 2, TileSize - 4, 0, 0, clipWidth, clipHeight, wireR, wireG, wireB, lineAlpha);
             }
 
             if ((flags & BlueprintCaptureWireFlags.Green) != 0)
             {
-                ok |= UiPrimitiveRenderer.DrawFilledRectClipped(spriteBatch, x + 2, y + 10, TileSize - 4, 2, 0, 0, clipWidth, clipHeight, r, g, b, lineAlpha);
+                int wireR;
+                int wireG;
+                int wireB;
+                ResolveWireChannelColor(layer.Status, BlueprintCaptureWireFlags.Green, r, g, b, out wireR, out wireG, out wireB);
+                ok |= UiPrimitiveRenderer.DrawFilledRectClipped(spriteBatch, x + 2, y + 10, TileSize - 4, 2, 0, 0, clipWidth, clipHeight, wireR, wireG, wireB, lineAlpha);
             }
 
             if ((flags & BlueprintCaptureWireFlags.Yellow) != 0)
             {
-                ok |= UiPrimitiveRenderer.DrawFilledRectClipped(spriteBatch, x + 10, y + 2, 2, TileSize - 4, 0, 0, clipWidth, clipHeight, r, g, b, lineAlpha);
+                int wireR;
+                int wireG;
+                int wireB;
+                ResolveWireChannelColor(layer.Status, BlueprintCaptureWireFlags.Yellow, r, g, b, out wireR, out wireG, out wireB);
+                ok |= UiPrimitiveRenderer.DrawFilledRectClipped(spriteBatch, x + 10, y + 2, 2, TileSize - 4, 0, 0, clipWidth, clipHeight, wireR, wireG, wireB, lineAlpha);
             }
 
             return borderAlpha > 0
                 ? ok || UiPrimitiveRenderer.DrawRectBorderClipped(spriteBatch, x + 3, y + 3, TileSize - 6, TileSize - 6, 1, 0, 0, clipWidth, clipHeight, r, g, b, borderAlpha)
                 : ok;
+        }
+
+        private static void ResolveWireChannelColor(string status, int wireFlag, int r, int g, int b, out int wireR, out int wireG, out int wireB)
+        {
+            if (!string.Equals(status, BlueprintProjectionLayerStatuses.Missing, StringComparison.Ordinal))
+            {
+                wireR = r;
+                wireG = g;
+                wireB = b;
+                return;
+            }
+
+            if (wireFlag == BlueprintCaptureWireFlags.Red)
+            {
+                wireR = WireRedR;
+                wireG = WireRedG;
+                wireB = WireRedB;
+                return;
+            }
+
+            if (wireFlag == BlueprintCaptureWireFlags.Blue)
+            {
+                wireR = WireBlueR;
+                wireG = WireBlueG;
+                wireB = WireBlueB;
+                return;
+            }
+
+            if (wireFlag == BlueprintCaptureWireFlags.Green)
+            {
+                wireR = WireGreenR;
+                wireG = WireGreenG;
+                wireB = WireGreenB;
+                return;
+            }
+
+            if (wireFlag == BlueprintCaptureWireFlags.Yellow)
+            {
+                wireR = WireYellowR;
+                wireG = WireYellowG;
+                wireB = WireYellowB;
+                return;
+            }
+
+            wireR = r;
+            wireG = g;
+            wireB = b;
         }
 
         private static bool DrawActuator(object spriteBatch, int x, int y, int clipWidth, int clipHeight, int r, int g, int b, int alpha, int borderAlpha)
@@ -542,7 +764,14 @@ namespace JueMingZ.UI
                 }
             }
 
-            return ResolveTexture(TextureAssets.Wall, layer.ContentId);
+            try
+            {
+                return ResolveTexture(TextureAssets.Wall, layer.ContentId);
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         private static Texture2D ResolveTexture(ReLogic.Content.Asset<Texture2D>[] assets, int contentId)

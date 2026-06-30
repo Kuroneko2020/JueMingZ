@@ -212,6 +212,14 @@ namespace JueMingZ.Bootstrap
                     Logger.Warn("LateBootstrap", "TileInteraction hooks did not install; TileInteract will keep using direct mouse target override as fallback.");
                 }
 
+                Logger.Info("LateBootstrap", "Installing blueprint wall ghost world layer hook...");
+                var blueprintWallGhostWorldLayerHookResult = BlueprintWallGhostWorldLayerHookInstaller.Install();
+                Logger.Info("LateBootstrap", "Blueprint wall ghost world layer hook handoff result: " + blueprintWallGhostWorldLayerHookResult.Message);
+                if (!blueprintWallGhostWorldLayerHookResult.Succeeded)
+                {
+                    Logger.Warn("LateBootstrap", "Blueprint wall ghost world layer hook did not install; wall projection cannot be drawn below Terraria foreground.");
+                }
+
                 Logger.Info("LateBootstrap", "Installing interface layer hook...");
                 var interfaceLayerHookResult = InterfaceLayerHookInstaller.Install();
                 Logger.Info("LateBootstrap", "Interface layer hook handoff result: " + interfaceLayerHookResult.Message);

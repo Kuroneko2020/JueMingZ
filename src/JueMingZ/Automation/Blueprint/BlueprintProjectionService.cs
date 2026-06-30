@@ -17,6 +17,15 @@ namespace JueMingZ.Automation.Blueprint
         public const string Unavailable = "unavailable";
     }
 
+    internal static class BlueprintWallGhostOcclusionMask
+    {
+        public const int TopLeft = 1;
+        public const int TopRight = 2;
+        public const int BottomLeft = 4;
+        public const int BottomRight = 8;
+        public const int All = TopLeft | TopRight | BottomLeft | BottomRight;
+    }
+
     internal sealed class BlueprintProjectionCellSnapshot
     {
         public BlueprintProjectionCellSnapshot()
@@ -25,6 +34,8 @@ namespace JueMingZ.Automation.Blueprint
             InstanceName = string.Empty;
             LayerKind = string.Empty;
             CoverageGroup = string.Empty;
+            ObjectGroupKey = string.Empty;
+            ObjectGroupStatus = string.Empty;
             Status = string.Empty;
             MaterialDisplayName = string.Empty;
         }
@@ -38,6 +49,8 @@ namespace JueMingZ.Automation.Blueprint
         public int RelativeY { get; set; }
         public string LayerKind { get; set; }
         public string CoverageGroup { get; set; }
+        public string ObjectGroupKey { get; set; }
+        public string ObjectGroupStatus { get; set; }
         public int ContentId { get; set; }
         public int Style { get; set; }
         public int FrameX { get; set; }
@@ -48,6 +61,9 @@ namespace JueMingZ.Automation.Blueprint
         public bool HalfBrick { get; set; }
         public bool Inactive { get; set; }
         public bool WallGhostBlockedByFullTile { get; set; }
+        public int WallGhostOcclusionMask { get; set; }
+        public int WallGhostProjectionForegroundMask { get; set; }
+        public int WallGhostOuterEdgeMask { get; set; }
         public int MaterialItemId { get; set; }
         public int MaterialStack { get; set; }
         public string MaterialDisplayName { get; set; }
@@ -178,6 +194,8 @@ namespace JueMingZ.Automation.Blueprint
                     RelativeY = layer.RelativeY,
                     LayerKind = layer.LayerKind ?? string.Empty,
                     CoverageGroup = layer.CoverageGroup ?? string.Empty,
+                    ObjectGroupKey = layer.ObjectGroupKey ?? string.Empty,
+                    ObjectGroupStatus = layer.ObjectGroupStatus ?? string.Empty,
                     ContentId = layer.ContentId,
                     Style = layer.Style,
                     FrameX = layer.FrameX,
@@ -188,6 +206,9 @@ namespace JueMingZ.Automation.Blueprint
                     HalfBrick = layer.HalfBrick,
                     Inactive = layer.Inactive,
                     WallGhostBlockedByFullTile = layer.WallGhostBlockedByFullTile,
+                    WallGhostOcclusionMask = layer.WallGhostOcclusionMask,
+                    WallGhostProjectionForegroundMask = layer.WallGhostProjectionForegroundMask,
+                    WallGhostOuterEdgeMask = layer.WallGhostOuterEdgeMask,
                     MaterialItemId = layer.MaterialItemId,
                     MaterialStack = layer.MaterialStack,
                     MaterialDisplayName = layer.MaterialDisplayName ?? string.Empty,
@@ -366,6 +387,47 @@ namespace JueMingZ.Automation.Blueprint
             return GetSnapshot().ProjectedLayers;
         }
 
+        internal static void ApplyBottomWallGhostVisualPolicy(IReadOnlyList<BlueprintProjectionCellSnapshot> layers)
+        {
+            if (layers == null || layers.Count <= 0)
+            {
+                return;
+            }
+
+            var mutableLayers = layers as IList<BlueprintProjectionCellSnapshot>;
+            if (mutableLayers != null)
+            {
+                BlueprintWallProjectionFrameResolver.Apply(mutableLayers);
+            }
+
+            var wallsByCoordinate = new HashSet<string>(StringComparer.Ordinal);
+            for (var index = 0; index < layers.Count; index++)
+            {
+                var layer = layers[index];
+                if (IsWallLayer(layer) && ShouldDrawProjectionLayer(layer.Status))
+                {
+                    wallsByCoordinate.Add(BuildWorldTileCacheKey(layer.WorldTileX, layer.WorldTileY));
+                }
+            }
+
+            for (var index = 0; index < layers.Count; index++)
+            {
+                var layer = layers[index];
+                if (!IsWallLayer(layer))
+                {
+                    continue;
+                }
+
+                // Bottom-layer wall projection is complete by contract. Historical
+                // foreground masks may still exist on old snapshots, but they must
+                // not cut the wall; later tile/object/wire passes provide foreground.
+                layer.WallGhostBlockedByFullTile = false;
+                layer.WallGhostOcclusionMask = 0;
+                layer.WallGhostProjectionForegroundMask = 0;
+                layer.WallGhostOuterEdgeMask = ResolveWallGhostOuterEdgeMask(layer, wallsByCoordinate);
+            }
+        }
+
         private static BlueprintProjectionSnapshot ResolveSnapshotLocked(bool forceRefresh)
         {
             var context = ResolveWorldContextLocked();
@@ -510,6 +572,7 @@ namespace JueMingZ.Automation.Blueprint
             var wallDiagnostics = new List<BlueprintWallCompletionDiagnostic>();
             var replacementSettings = BlueprintReplacementRuleService.GetSettingsFromCurrentConfig();
             var completedKeysByInstance = BuildCompletedKeySets(instances);
+            var worldTileCache = new Dictionary<string, BlueprintWorldTileSnapshot>(StringComparer.Ordinal);
             for (var index = 0; index < order.Count; index++)
             {
                 var key = order[index];
@@ -524,30 +587,24 @@ namespace JueMingZ.Automation.Blueprint
                 var completed = IsCandidateCompleted(candidate, completedKeysByInstance);
                 projectedLayer.Status = completed
                     ? BlueprintProjectionLayerStatuses.Completed
-                    : ClassifyLayer(candidate, reader, replacementSettings, out world);
-                if (!completed)
-                {
-                    ApplyWallGhostVisibility(projectedLayer, world);
-                }
+                    : ClassifyLayer(candidate, reader, replacementSettings, worldTileCache, out world);
 
-                CountStatus(snapshot, projectedLayer.Status);
                 if (completed)
                 {
                     world = null;
                 }
 
                 allProjected.Add(projectedLayer);
-                RecordWallCompletionDiagnostic(snapshot, candidate, projectedLayer, reader, world, wallDiagnostics);
+                RecordWallCompletionDiagnostic(snapshot, candidate, projectedLayer, reader, worldTileCache, world, wallDiagnostics);
                 if (projected.Count < MaxProjectedLayersForOverlay)
                 {
                     projected.Add(projectedLayer);
                 }
             }
 
-            // Wall frames are transient projection appearance data. They are
-            // derived at cache-build time so draw paths consume cached source
-            // rectangles without refreshing world tiles or mutating templates.
-            BlueprintWallProjectionFrameResolver.Apply(allProjected);
+            ApplyMultitileObjectGroupPolicy(allProjected);
+            ApplyBottomWallGhostVisualPolicy(allProjected);
+            CountProjectionStatuses(snapshot, allProjected);
             FinalizeWallCompletionDiagnostics(snapshot, wallDiagnostics);
             snapshot.EffectiveLayerCount = order.Count;
             snapshot.ProjectedLayers = projected;
@@ -760,6 +817,7 @@ namespace JueMingZ.Automation.Blueprint
             BlueprintProjectionCandidate candidate,
             BlueprintProjectionCellSnapshot layer,
             IBlueprintWorldTileReader reader,
+            IDictionary<string, BlueprintWorldTileSnapshot> worldTileCache,
             BlueprintWorldTileSnapshot world,
             IList<BlueprintWallCompletionDiagnostic> diagnostics)
         {
@@ -776,7 +834,7 @@ namespace JueMingZ.Automation.Blueprint
 
             if (world == null && reader != null)
             {
-                reader.TryReadTile(candidate.WorldTileX, candidate.WorldTileY, out world);
+                TryReadWorldTile(reader, worldTileCache, candidate.WorldTileX, candidate.WorldTileY, out world);
             }
 
             if (world == null)
@@ -849,26 +907,70 @@ namespace JueMingZ.Automation.Blueprint
                    candidate.Layer.ContentId > 0;
         }
 
-        private static void ApplyWallGhostVisibility(BlueprintProjectionCellSnapshot layer, BlueprintWorldTileSnapshot world)
+        private static int ResolveWallGhostOuterEdgeMask(
+            BlueprintProjectionCellSnapshot layer,
+            HashSet<string> wallsByCoordinate)
         {
-            if (layer == null ||
-                world == null ||
-                !string.Equals(layer.LayerKind, BlueprintLayerKinds.Wall, StringComparison.OrdinalIgnoreCase))
+            if (!IsWallLayer(layer) || wallsByCoordinate == null || wallsByCoordinate.Count <= 0)
             {
-                return;
+                return 0;
             }
 
-            layer.WallGhostBlockedByFullTile = world.WallBlockedByFullTile;
+            var up = wallsByCoordinate.Contains(BuildWorldTileCacheKey(layer.WorldTileX, layer.WorldTileY - 1));
+            var left = wallsByCoordinate.Contains(BuildWorldTileCacheKey(layer.WorldTileX - 1, layer.WorldTileY));
+            var right = wallsByCoordinate.Contains(BuildWorldTileCacheKey(layer.WorldTileX + 1, layer.WorldTileY));
+            var down = wallsByCoordinate.Contains(BuildWorldTileCacheKey(layer.WorldTileX, layer.WorldTileY + 1));
+            var mask = 0;
+            if (!up || !left)
+            {
+                mask |= BlueprintWallGhostOcclusionMask.TopLeft;
+            }
+
+            if (!up || !right)
+            {
+                mask |= BlueprintWallGhostOcclusionMask.TopRight;
+            }
+
+            if (!down || !left)
+            {
+                mask |= BlueprintWallGhostOcclusionMask.BottomLeft;
+            }
+
+            if (!down || !right)
+            {
+                mask |= BlueprintWallGhostOcclusionMask.BottomRight;
+            }
+
+            return mask;
+        }
+
+        private static bool IsWallLayer(BlueprintProjectionCellSnapshot layer)
+        {
+            return layer != null &&
+                   string.Equals(layer.LayerKind, BlueprintLayerKinds.Wall, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsObjectLayer(BlueprintProjectionCellSnapshot layer)
+        {
+            return layer != null &&
+                   string.Equals(layer.LayerKind, BlueprintLayerKinds.Object, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool ShouldDrawProjectionLayer(string status)
+        {
+            return !string.Equals(status, BlueprintProjectionLayerStatuses.Fulfilled, StringComparison.Ordinal) &&
+                   !string.Equals(status, BlueprintProjectionLayerStatuses.Completed, StringComparison.Ordinal);
         }
 
         private static string ClassifyLayer(
             BlueprintProjectionCandidate candidate,
             IBlueprintWorldTileReader reader,
             BlueprintReplacementSettings replacementSettings,
+            IDictionary<string, BlueprintWorldTileSnapshot> worldTileCache,
             out BlueprintWorldTileSnapshot world)
         {
             world = null;
-            if (!reader.TryReadTile(candidate.WorldTileX, candidate.WorldTileY, out world) || world == null)
+            if (!TryReadWorldTile(reader, worldTileCache, candidate.WorldTileX, candidate.WorldTileY, out world) || world == null)
             {
                 return BlueprintProjectionLayerStatuses.Unavailable;
             }
@@ -890,6 +992,48 @@ namespace JueMingZ.Automation.Blueprint
             }
 
             return ClassifyTile(candidate.Layer, world, replacementSettings);
+        }
+
+        private static bool TryReadWorldTile(
+            IBlueprintWorldTileReader reader,
+            IDictionary<string, BlueprintWorldTileSnapshot> worldTileCache,
+            int tileX,
+            int tileY,
+            out BlueprintWorldTileSnapshot world)
+        {
+            world = null;
+            if (reader == null)
+            {
+                return false;
+            }
+
+            var key = BuildWorldTileCacheKey(tileX, tileY);
+            if (worldTileCache != null && worldTileCache.TryGetValue(key, out world))
+            {
+                return world != null;
+            }
+
+            if (!reader.TryReadTile(tileX, tileY, out world) || world == null)
+            {
+                if (worldTileCache != null)
+                {
+                    worldTileCache[key] = null;
+                }
+
+                return false;
+            }
+
+            if (worldTileCache != null)
+            {
+                worldTileCache[key] = world;
+            }
+
+            return true;
+        }
+
+        private static string BuildWorldTileCacheKey(int tileX, int tileY)
+        {
+            return tileX.ToString(CultureInfo.InvariantCulture) + ":" + tileY.ToString(CultureInfo.InvariantCulture);
         }
 
         private static string ClassifyTile(
@@ -976,6 +1120,276 @@ namespace JueMingZ.Automation.Blueprint
             return layer.ContentId != 0
                 ? BlueprintProjectionLayerStatuses.Fulfilled
                 : BlueprintProjectionLayerStatuses.Conflict;
+        }
+
+        private static void ApplyMultitileObjectGroupPolicy(IReadOnlyList<BlueprintProjectionCellSnapshot> layers)
+        {
+            if (layers == null || layers.Count <= 0)
+            {
+                return;
+            }
+
+            // The template format has no explicit furniture id. Treat only connected
+            // object cells with one material-bearing representative as a whole object.
+            var groups = new Dictionary<string, List<BlueprintProjectionCellSnapshot>>(StringComparer.Ordinal);
+            for (var index = 0; index < layers.Count; index++)
+            {
+                var layer = layers[index];
+                if (!IsObjectLayer(layer))
+                {
+                    continue;
+                }
+
+                var key = BuildObjectGroupSeedKey(layer);
+                if (key.Length <= 0)
+                {
+                    continue;
+                }
+
+                List<BlueprintProjectionCellSnapshot> bucket;
+                if (!groups.TryGetValue(key, out bucket))
+                {
+                    bucket = new List<BlueprintProjectionCellSnapshot>();
+                    groups.Add(key, bucket);
+                }
+
+                bucket.Add(layer);
+            }
+
+            foreach (var group in groups)
+            {
+                ApplyMultitileObjectGroupPolicy(group.Key, group.Value);
+            }
+        }
+
+        private static void ApplyMultitileObjectGroupPolicy(string seedKey, List<BlueprintProjectionCellSnapshot> layers)
+        {
+            if (layers == null || layers.Count <= 1)
+            {
+                return;
+            }
+
+            var coordinateToIndexes = new Dictionary<string, List<int>>(StringComparer.Ordinal);
+            for (var index = 0; index < layers.Count; index++)
+            {
+                var layer = layers[index];
+                if (layer == null)
+                {
+                    continue;
+                }
+
+                var coordinateKey = BuildWorldTileCacheKey(layer.WorldTileX, layer.WorldTileY);
+                List<int> indexes;
+                if (!coordinateToIndexes.TryGetValue(coordinateKey, out indexes))
+                {
+                    indexes = new List<int>();
+                    coordinateToIndexes.Add(coordinateKey, indexes);
+                }
+
+                indexes.Add(index);
+            }
+
+            var visited = new bool[layers.Count];
+            for (var index = 0; index < layers.Count; index++)
+            {
+                if (visited[index] || layers[index] == null)
+                {
+                    continue;
+                }
+
+                var component = CollectObjectGroupComponent(index, layers, coordinateToIndexes, visited);
+                if (component.Count <= 1 || CountPositiveMaterialLayers(component) != 1)
+                {
+                    continue;
+                }
+
+                ApplyMultitileObjectComponentStatus(seedKey, component);
+            }
+        }
+
+        private static List<BlueprintProjectionCellSnapshot> CollectObjectGroupComponent(
+            int startIndex,
+            List<BlueprintProjectionCellSnapshot> layers,
+            IDictionary<string, List<int>> coordinateToIndexes,
+            bool[] visited)
+        {
+            var result = new List<BlueprintProjectionCellSnapshot>();
+            var queue = new Queue<int>();
+            queue.Enqueue(startIndex);
+            visited[startIndex] = true;
+            while (queue.Count > 0)
+            {
+                var index = queue.Dequeue();
+                var layer = layers[index];
+                if (layer == null)
+                {
+                    continue;
+                }
+
+                result.Add(layer);
+                EnqueueObjectGroupNeighbor(layer.WorldTileX + 1, layer.WorldTileY, coordinateToIndexes, visited, queue);
+                EnqueueObjectGroupNeighbor(layer.WorldTileX - 1, layer.WorldTileY, coordinateToIndexes, visited, queue);
+                EnqueueObjectGroupNeighbor(layer.WorldTileX, layer.WorldTileY + 1, coordinateToIndexes, visited, queue);
+                EnqueueObjectGroupNeighbor(layer.WorldTileX, layer.WorldTileY - 1, coordinateToIndexes, visited, queue);
+            }
+
+            return result;
+        }
+
+        private static void EnqueueObjectGroupNeighbor(
+            int worldTileX,
+            int worldTileY,
+            IDictionary<string, List<int>> coordinateToIndexes,
+            bool[] visited,
+            Queue<int> queue)
+        {
+            if (coordinateToIndexes == null || visited == null || queue == null)
+            {
+                return;
+            }
+
+            List<int> indexes;
+            if (!coordinateToIndexes.TryGetValue(BuildWorldTileCacheKey(worldTileX, worldTileY), out indexes))
+            {
+                return;
+            }
+
+            for (var index = 0; index < indexes.Count; index++)
+            {
+                var layerIndex = indexes[index];
+                if (layerIndex < 0 || layerIndex >= visited.Length || visited[layerIndex])
+                {
+                    continue;
+                }
+
+                visited[layerIndex] = true;
+                queue.Enqueue(layerIndex);
+            }
+        }
+
+        private static void ApplyMultitileObjectComponentStatus(string seedKey, List<BlueprintProjectionCellSnapshot> component)
+        {
+            var groupKey = BuildObjectGroupComponentKey(seedKey, component);
+            var hasConflict = false;
+            var hasUnavailable = false;
+            for (var index = 0; index < component.Count; index++)
+            {
+                var layer = component[index];
+                if (layer == null)
+                {
+                    continue;
+                }
+
+                layer.ObjectGroupKey = groupKey;
+                if (string.Equals(layer.Status, BlueprintProjectionLayerStatuses.Conflict, StringComparison.Ordinal))
+                {
+                    hasConflict = true;
+                }
+                else if (string.Equals(layer.Status, BlueprintProjectionLayerStatuses.Unavailable, StringComparison.Ordinal))
+                {
+                    hasUnavailable = true;
+                }
+            }
+
+            if (!hasConflict && !hasUnavailable)
+            {
+                return;
+            }
+
+            var groupStatus = hasConflict
+                ? BlueprintProjectionLayerStatuses.Conflict
+                : BlueprintProjectionLayerStatuses.Unavailable;
+            for (var index = 0; index < component.Count; index++)
+            {
+                var layer = component[index];
+                if (layer == null)
+                {
+                    continue;
+                }
+
+                layer.ObjectGroupStatus = groupStatus;
+                if (string.Equals(layer.Status, BlueprintProjectionLayerStatuses.Missing, StringComparison.Ordinal))
+                {
+                    layer.Status = groupStatus;
+                }
+            }
+        }
+
+        private static int CountPositiveMaterialLayers(List<BlueprintProjectionCellSnapshot> component)
+        {
+            var count = 0;
+            for (var index = 0; component != null && index < component.Count; index++)
+            {
+                var layer = component[index];
+                if (layer != null && layer.MaterialStack > 0)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private static string BuildObjectGroupSeedKey(BlueprintProjectionCellSnapshot layer)
+        {
+            if (layer == null || string.IsNullOrWhiteSpace(layer.InstanceId) || layer.ContentId <= 0)
+            {
+                return string.Empty;
+            }
+
+            return (layer.InstanceId ?? string.Empty) + "|" +
+                   layer.LayerOrder.ToString(CultureInfo.InvariantCulture) + "|" +
+                   layer.ContentId.ToString(CultureInfo.InvariantCulture) + "|" +
+                   layer.Style.ToString(CultureInfo.InvariantCulture);
+        }
+
+        private static string BuildObjectGroupComponentKey(string seedKey, List<BlueprintProjectionCellSnapshot> component)
+        {
+            var minX = int.MaxValue;
+            var minY = int.MaxValue;
+            var maxX = int.MinValue;
+            var maxY = int.MinValue;
+            for (var index = 0; component != null && index < component.Count; index++)
+            {
+                var layer = component[index];
+                if (layer == null)
+                {
+                    continue;
+                }
+
+                if (layer.WorldTileX < minX) minX = layer.WorldTileX;
+                if (layer.WorldTileY < minY) minY = layer.WorldTileY;
+                if (layer.WorldTileX > maxX) maxX = layer.WorldTileX;
+                if (layer.WorldTileY > maxY) maxY = layer.WorldTileY;
+            }
+
+            if (minX == int.MaxValue)
+            {
+                return seedKey ?? string.Empty;
+            }
+
+            return (seedKey ?? string.Empty) + "|" +
+                   minX.ToString(CultureInfo.InvariantCulture) + "," +
+                   minY.ToString(CultureInfo.InvariantCulture) + "-" +
+                   maxX.ToString(CultureInfo.InvariantCulture) + "," +
+                   maxY.ToString(CultureInfo.InvariantCulture);
+        }
+
+        private static void CountProjectionStatuses(BlueprintProjectionSnapshot snapshot, IReadOnlyList<BlueprintProjectionCellSnapshot> layers)
+        {
+            if (snapshot == null || layers == null)
+            {
+                return;
+            }
+
+            for (var index = 0; index < layers.Count; index++)
+            {
+                var layer = layers[index];
+                if (layer != null)
+                {
+                    CountStatus(snapshot, layer.Status);
+                }
+            }
         }
 
         private static void CountStatus(BlueprintProjectionSnapshot snapshot, string status)

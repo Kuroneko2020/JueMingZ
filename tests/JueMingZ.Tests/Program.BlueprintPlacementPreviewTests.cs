@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using JueMingZ.Automation.Blueprint;
 using JueMingZ.Config;
 using JueMingZ.Input;
@@ -381,6 +382,125 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void BlueprintPlacementPreviewWallContentUsesWorldLayerBeforeLatePreviewOverlay()
+        {
+            var snapshot = CreateActivePlacementPreviewSnapshot(CreatePlacementPreviewMixedWallTemplate("摆放墙层世界层"));
+            var worldOrder = BlueprintPlacementPreviewWallWorldOverlay.BuildWorldWallDrawOrderForTesting(snapshot);
+            var lateOrder = BlueprintPlacementPreviewOverlay.BuildLatePreviewDrawOrderForTesting(snapshot);
+
+            var wallIndex = IndexOfOrder(worldOrder, "world-preview:wall:30,40");
+            var objectIndex = IndexOfOrder(lateOrder, "late-preview:object:30,40");
+            var wireIndex = IndexOfOrder(lateOrder, "late-preview:wire:30,40");
+            if (wallIndex < 0)
+            {
+                throw new InvalidOperationException("Expected placement preview wall content to be drawn by the world-layer preview overlay.");
+            }
+
+            if (objectIndex < 0 || wireIndex < 0)
+            {
+                throw new InvalidOperationException("Expected late placement preview overlay to keep non-wall foreground hints for a mixed wall/object/wire cell.");
+            }
+
+            for (var index = 0; index < lateOrder.Count; index++)
+            {
+                if ((lateOrder[index] ?? string.Empty).IndexOf(":wall:", StringComparison.Ordinal) >= 0)
+                {
+                    throw new InvalidOperationException("Late placement preview overlay must not redraw wall content over the real foreground.");
+                }
+            }
+
+            var combined = new List<string>();
+            combined.AddRange(worldOrder);
+            combined.Add("terraria-foreground:door-platform-torch-frame");
+            combined.AddRange(lateOrder);
+            var combinedWallIndex = IndexOfOrder(combined, "world-preview:wall:30,40");
+            var terrariaForegroundIndex = IndexOfOrder(combined, "terraria-foreground:door-platform-torch-frame");
+            var combinedObjectIndex = IndexOfOrder(combined, "late-preview:object:30,40");
+            var combinedWireIndex = IndexOfOrder(combined, "late-preview:wire:30,40");
+            if (combinedWallIndex < 0 ||
+                terrariaForegroundIndex < 0 ||
+                combinedObjectIndex < 0 ||
+                combinedWireIndex < 0 ||
+                combinedWallIndex >= terrariaForegroundIndex ||
+                combinedWallIndex >= combinedObjectIndex ||
+                combinedWallIndex >= combinedWireIndex)
+            {
+                throw new InvalidOperationException("Placement preview wall content must be below Terraria foreground and late preview foreground hints.");
+            }
+
+            AssertContains(BlueprintPlacementPreviewWallWorldOverlay.GetVisualContractForTesting(), "before-terraria-foreground");
+            AssertContains(BlueprintPlacementPreviewOverlay.GetVisualContractForTesting(), "skip-wall-content");
+            AssertContains(BlueprintPlacementPreviewOverlay.GetVisualContractForTesting(), "wall-template-disables-late-range-fill");
+            if (IndexOfOrder(lateOrder, "late-preview:range-fill") >= 0 ||
+                BlueprintPlacementPreviewOverlay.ShouldDrawRangeFillForTesting(snapshot))
+            {
+                throw new InvalidOperationException("Placement preview wall templates must not draw a late filled range surface over Terraria foreground.");
+            }
+
+            if (IndexOfOrder(lateOrder, "late-preview:range-border") < 0 ||
+                IndexOfOrder(lateOrder, "late-preview:anchor") < 0)
+            {
+                throw new InvalidOperationException("Placement preview wall templates should keep non-filled UI border and anchor hints.");
+            }
+        }
+
+        private static void BlueprintPlacementPreviewLateOverlaySkipsWallContentWhenWorldLayerActive()
+        {
+            var snapshot = CreateActivePlacementPreviewSnapshot(CreatePlacementPreviewMixedWallTemplate("摆放晚层跳墙"));
+            var lateOrder = BlueprintPlacementPreviewOverlay.BuildLatePreviewDrawOrderForTesting(snapshot);
+            if (BlueprintPlacementPreviewOverlay.ShouldDrawTemplateLayerInLateOverlayForTesting(BlueprintLayerKinds.Wall))
+            {
+                throw new InvalidOperationException("Expected placement preview late overlay to skip wall layers.");
+            }
+
+            if (!BlueprintPlacementPreviewOverlay.ShouldDrawTemplateLayerInLateOverlayForTesting(BlueprintLayerKinds.Object) ||
+                !BlueprintPlacementPreviewOverlay.ShouldDrawTemplateLayerInLateOverlayForTesting(BlueprintLayerKinds.Wire) ||
+                !BlueprintPlacementPreviewOverlay.ShouldDrawTemplateLayerInLateOverlayForTesting(BlueprintLayerKinds.Actuator))
+            {
+                throw new InvalidOperationException("Expected placement preview late overlay to retain non-wall foreground and wiring hints.");
+            }
+
+            if (IndexOfOrder(lateOrder, "late-preview:object:30,40") < 0 ||
+                IndexOfOrder(lateOrder, "late-preview:tile:31,40") < 0 ||
+                IndexOfOrder(lateOrder, "late-preview:actuator:31,40") < 0)
+            {
+                throw new InvalidOperationException("Expected placement preview mixed cells to keep foreground layers even when wall is present in the same template.");
+            }
+
+            if (IndexOfOrder(lateOrder, "late-preview:range-fill") >= 0 ||
+                BlueprintPlacementPreviewOverlay.ShouldDrawRangeFillForTesting(snapshot))
+            {
+                throw new InvalidOperationException("Mixed wall placement preview must keep foreground hints without reintroducing a filled wall-like range surface.");
+            }
+        }
+
+        private static void BlueprintPlacementPreviewWallTemplateDoesNotDrawLateRangeFillOverForeground()
+        {
+            var wallSnapshot = CreateActivePlacementPreviewSnapshot(CreatePlacementPreviewMixedWallTemplate("含墙禁范围面"));
+            var wallOrder = BlueprintPlacementPreviewOverlay.BuildLatePreviewDrawOrderForTesting(wallSnapshot);
+            if (BlueprintPlacementPreviewOverlay.ShouldDrawRangeFillForTesting(wallSnapshot) ||
+                IndexOfOrder(wallOrder, "late-preview:range-fill") >= 0)
+            {
+                throw new InvalidOperationException("A placement preview containing wall content must not draw a late filled range rectangle over real foreground.");
+            }
+
+            if (IndexOfOrder(wallOrder, "late-preview:range-border") < 0 ||
+                IndexOfOrder(wallOrder, "late-preview:anchor") < 0 ||
+                IndexOfOrder(wallOrder, "late-preview:object:30,40") < 0)
+            {
+                throw new InvalidOperationException("Disabling the filled range surface must not remove border, anchor or non-wall foreground hints.");
+            }
+
+            var foregroundSnapshot = CreateActivePlacementPreviewSnapshot(CreatePlacementPreviewForegroundOnlyTemplate("纯前景保留极淡范围面"));
+            var foregroundOrder = BlueprintPlacementPreviewOverlay.BuildLatePreviewDrawOrderForTesting(foregroundSnapshot);
+            if (!BlueprintPlacementPreviewOverlay.ShouldDrawRangeFillForTesting(foregroundSnapshot) ||
+                IndexOfOrder(foregroundOrder, "late-preview:range-fill") < 0 ||
+                IndexOfOrder(foregroundOrder, "late-preview:tile:30,40") < 0)
+            {
+                throw new InvalidOperationException("A pure foreground placement preview may keep the weak range fill and tile hint.");
+            }
+        }
+
         private static void BlueprintPlacementOverlayRoutesAndPointerContract()
         {
             if (!BlueprintPlacementPreviewOverlay.ShouldRegisterWorldOverlayForTesting())
@@ -425,6 +545,145 @@ namespace JueMingZ.Tests
             {
                 throw new InvalidOperationException("Expected placement after-PlayerInput consumption to preserve Legacy UI ownership while guarding world input.");
             }
+        }
+
+        private static int IndexOfOrder(IReadOnlyList<string> order, string expected)
+        {
+            if (order == null)
+            {
+                return -1;
+            }
+
+            for (var index = 0; index < order.Count; index++)
+            {
+                if (string.Equals(order[index], expected, StringComparison.Ordinal))
+                {
+                    return index;
+                }
+            }
+
+            return -1;
+        }
+
+        private static BlueprintPlacementPreviewSnapshot CreateActivePlacementPreviewSnapshot(BlueprintTemplateRecord template)
+        {
+            return new BlueprintPlacementPreviewSnapshot
+            {
+                Active = true,
+                HoverTileHit = true,
+                HoverTileX = 31,
+                HoverTileY = 40,
+                OriginTileX = 30,
+                OriginTileY = 40,
+                Width = template.Width,
+                Height = template.Height,
+                AnchorX = template.AnchorX,
+                AnchorY = template.AnchorY,
+                TemplateId = template.TemplateId,
+                TemplateName = template.Name,
+                TemplateSnapshot = template
+            };
+        }
+
+        private static BlueprintTemplateRecord CreatePlacementPreviewMixedWallTemplate(string name)
+        {
+            var template = new BlueprintTemplateRecord
+            {
+                TemplateId = "template-" + Guid.NewGuid().ToString("N"),
+                Name = name,
+                Width = 2,
+                Height = 1,
+                AnchorX = 0,
+                AnchorY = 0
+            };
+            template.Cells.Add(new BlueprintCellRecord
+            {
+                X = 0,
+                Y = 0,
+                Layers =
+                {
+                    new BlueprintCellLayerRecord
+                    {
+                        LayerKind = BlueprintLayerKinds.Wall,
+                        ContentId = 2,
+                        MaterialItemId = 2,
+                        MaterialStack = 1
+                    },
+                    new BlueprintCellLayerRecord
+                    {
+                        LayerKind = BlueprintLayerKinds.Object,
+                        ContentId = 4,
+                        MaterialItemId = 4,
+                        MaterialStack = 1
+                    },
+                    new BlueprintCellLayerRecord
+                    {
+                        LayerKind = BlueprintLayerKinds.Wire,
+                        ContentId = BlueprintCaptureWireFlags.Red,
+                        MaterialItemId = 530,
+                        MaterialStack = 1
+                    }
+                }
+            });
+            template.Cells.Add(new BlueprintCellRecord
+            {
+                X = 1,
+                Y = 0,
+                Layers =
+                {
+                    new BlueprintCellLayerRecord
+                    {
+                        LayerKind = BlueprintLayerKinds.Wall,
+                        ContentId = 2,
+                        MaterialItemId = 2,
+                        MaterialStack = 1
+                    },
+                    new BlueprintCellLayerRecord
+                    {
+                        LayerKind = BlueprintLayerKinds.Tile,
+                        ContentId = 1,
+                        MaterialItemId = 1,
+                        MaterialStack = 1
+                    },
+                    new BlueprintCellLayerRecord
+                    {
+                        LayerKind = BlueprintLayerKinds.Actuator,
+                        ContentId = 849,
+                        MaterialItemId = 849,
+                        MaterialStack = 1
+                    }
+                }
+            });
+            return template;
+        }
+
+        private static BlueprintTemplateRecord CreatePlacementPreviewForegroundOnlyTemplate(string name)
+        {
+            var template = new BlueprintTemplateRecord
+            {
+                TemplateId = "template-" + Guid.NewGuid().ToString("N"),
+                Name = name,
+                Width = 1,
+                Height = 1,
+                AnchorX = 0,
+                AnchorY = 0
+            };
+            template.Cells.Add(new BlueprintCellRecord
+            {
+                X = 0,
+                Y = 0,
+                Layers =
+                {
+                    new BlueprintCellLayerRecord
+                    {
+                        LayerKind = BlueprintLayerKinds.Tile,
+                        ContentId = 1,
+                        MaterialItemId = 1,
+                        MaterialStack = 1
+                    }
+                }
+            });
+            return template;
         }
 
         private static void ReleasePlacementPreviewInitialLeftGate(int tileX, int tileY)

@@ -1148,6 +1148,9 @@ namespace JueMingZ.Tests
             Run("blueprint placement confirm refreshes projection and placed list", ref failed, BlueprintPlacementConfirmRefreshesProjectionAndPlacedList);
             Run("blueprint placement UI hit consumes without creating instance", ref failed, BlueprintPlacementUiHitConsumesWithoutCreatingInstance);
             Run("blueprint placement preview waits for physical left release before confirm", ref failed, BlueprintPlacementPreviewWaitsForPhysicalLeftReleaseBeforeConfirm);
+            Run("blueprint placement preview wall template does not draw late range fill over foreground", ref failed, BlueprintPlacementPreviewWallTemplateDoesNotDrawLateRangeFillOverForeground);
+            Run("blueprint placement preview wall content uses world layer before late preview overlay", ref failed, BlueprintPlacementPreviewWallContentUsesWorldLayerBeforeLatePreviewOverlay);
+            Run("blueprint placement preview late overlay skips wall content when world layer active", ref failed, BlueprintPlacementPreviewLateOverlaySkipsWallContentWhenWorldLayerActive);
             Run("blueprint placement overlay routes and pointer contract", ref failed, BlueprintPlacementOverlayRoutesAndPointerContract);
             Run("blueprint mirror horizontal mirrors preview coordinates anchor and slope", ref failed, BlueprintMirrorHorizontalMirrorsPreviewCoordinatesAnchorAndSlope);
             Run("blueprint mirror complete multitile object mirrors and partial fails closed", ref failed, BlueprintMirrorCompleteMultitileObjectMirrorsAndPartialFailsClosed);
@@ -1168,11 +1171,18 @@ namespace JueMingZ.Tests
             Run("blueprint projection stage 04 later instance covers earlier without mutating snapshots", ref failed, BlueprintProjectionStage04LaterInstanceCoversEarlierWithoutMutatingSnapshots);
             Run("blueprint projection stage 05 completed progress persists and skips dug cells", ref failed, BlueprintProjectionStage05CompletedProgressPersistsAndSkipsDugCells);
             Run("blueprint projection wall frames use neighbor continuity", ref failed, BlueprintProjectionWallFramesUseNeighborContinuity);
-            Run("blueprint projection wall ghost skips full tile occlusion", ref failed, BlueprintProjectionWallGhostSkipsFullTileOcclusion);
+            Run("blueprint projection wall ghost keeps complete behind full tile foreground", ref failed, BlueprintProjectionWallGhostKeepsCompleteBehindFullTileForeground);
+            Run("blueprint projection wall ghost keeps neighbor foreground spill complete", ref failed, BlueprintProjectionWallGhostKeepsNeighborForegroundSpillComplete);
+            Run("blueprint projection wall ghost keeps frame-important foreground complete", ref failed, BlueprintProjectionWallGhostKeepsFrameImportantForegroundComplete);
+            Run("blueprint projection wall ghost keeps complete behind same projection object ghost", ref failed, BlueprintProjectionWallGhostKeepsCompleteBehindSameProjectionObjectGhost);
+            Run("blueprint projection wall ghost keeps complete behind same projection neighbor tile ghost", ref failed, BlueprintProjectionWallGhostKeepsCompleteBehindSameProjectionNeighborTileGhost);
+            Run("blueprint projection floating wall ghost keeps complete below placed projection foreground", ref failed, BlueprintProjectionFloatingWallGhostKeepsCompleteBelowPlacedProjectionForeground);
+            Run("blueprint projection wall ghost uses world layer before late projection overlay", ref failed, BlueprintProjectionWallGhostUsesWorldLayerBeforeLateProjectionOverlay);
             Run("blueprint projection wall diagnostics separate type presence and frame mismatch", ref failed, BlueprintProjectionWallDiagnosticsSeparateTypePresenceAndFrameMismatch);
             Run("blueprint projection wall diagnostics expose completed current mismatch", ref failed, BlueprintProjectionWallDiagnosticsExposeCompletedCurrentMismatch);
             Run("blueprint projection cache avoids immediate recompute", ref failed, BlueprintProjectionCacheAvoidsImmediateRecompute);
             Run("blueprint projection replacement rules fulfill configured same category", ref failed, BlueprintProjectionReplacementRulesFulfillConfiguredSameCategory);
+            Run("blueprint projection multitile object conflict marks whole group", ref failed, BlueprintProjectionMultitileObjectConflictMarksWholeGroup);
             Run("blueprint projection UI overlay and diagnostics contracts", ref failed, BlueprintProjectionUiOverlayAndDiagnosticsContracts);
             Run("blueprint materials count only missing effective projection layers", ref failed, BlueprintMaterialsCountOnlyMissingEffectiveProjectionLayers);
             Run("blueprint materials ignore air-only template bounds", ref failed, BlueprintMaterialsIgnoreAirOnlyTemplateBounds);
@@ -1193,6 +1203,7 @@ namespace JueMingZ.Tests
             Run("blueprint auto placement ignores air-only template bounds", ref failed, BlueprintAutoPlacementIgnoresAirOnlyTemplateBounds);
             Run("blueprint auto placement candidates sort and skip unsafe layers", ref failed, BlueprintAutoPlacementCandidatesSortAndSkipUnsafeLayers);
             Run("blueprint auto placement stage 14 supports furniture track actuator and skips wire", ref failed, BlueprintAutoPlacementStage14SupportsFurnitureTrackActuatorAndSkipsWire);
+            Run("blueprint auto placement skips whole multitile object when any cell conflicts", ref failed, BlueprintAutoPlacementSkipsWholeMultitileObjectWhenAnyCellConflicts);
             Run("blueprint auto placement submits ActionQueue and verifies placement", ref failed, BlueprintAutoPlacementSubmitsActionQueueAndVerifiesPlacement);
             Run("blueprint auto placement refreshes wall frames after verified wall use", ref failed, BlueprintAutoPlacementRefreshesWallFramesAfterVerifiedWallUse);
             Run("blueprint auto placement skips wall frame refresh when WallType is missing", ref failed, BlueprintAutoPlacementDoesNotRefreshWallFramesWhenWallTypeMissing);
@@ -1206,6 +1217,7 @@ namespace JueMingZ.Tests
             Run("blueprint placement stage 08 regression diagnostics contracts stay wired", ref failed, BlueprintPlacementStage08RegressionDiagnosticsContractsStayWired);
             Run("blueprint feedback stage 11 regression diagnostics contracts stay wired", ref failed, BlueprintFeedbackStage11RegressionDiagnosticsContractsStayWired);
             Run("blueprint wall object stage 06 regression diagnostics contracts stay wired", ref failed, BlueprintWallObjectStage06RegressionDiagnosticsContractsStayWired);
+            Run("blueprint projection rebuild stage 06 regression audit contracts stay wired", ref failed, BlueprintProjectionRebuildStage06RegressionAuditContractsStayWired);
             Run("blueprint wall continuity stage 05 regression diagnostics contracts stay wired", ref failed, BlueprintWallContinuityStage05RegressionDiagnosticsContractsStayWired);
             Run("user notes tab keeps hotkeys page id and note icon", ref failed, UserNotesTabKeepsHotkeysPageIdAndUsesNoteIcon);
             Run("user notes layout uses two columns and caps card height", ref failed, UserNotesLayoutUsesTwoColumnsAndCapsCardHeight);
@@ -1778,6 +1790,8 @@ namespace JueMingZ.Tests
             Run("legacy final MouseText guard runs after Mouse Over", ref failed, LegacyFinalMouseTextGuardRunsAfterMouseOver);
             Run("information world overlay routes information under vanilla UI and automining above", ref failed, InformationWorldOverlayRoutesInformationUnderVanillaUiAndAutoMiningAbove);
             Run("information status panel routes under vanilla UI and pinned overlay stays above legacy main window", ref failed, InformationStatusPanelRoutesUnderVanillaUiAndPinnedOverlayStaysAboveLegacyMainWindow);
+            Run("blueprint wall ghost world layer hook targets vanilla wall stage", ref failed, BlueprintWallGhostWorldLayerHookTargetsVanillaWallStage);
+            Run("interface layer hook does not treat placement preview range fill as wall fix", ref failed, InterfaceLayerHookDoesNotTreatPlacementPreviewRangeFillAsWallFix);
             Run("UI text renderer fast path keeps safe fallbacks", ref failed, UiTextRendererFastPathKeepsSafeFallbacks);
             Run("UI text renderer font signature change clears caches", ref failed, UiTextRendererFontSignatureChangeClearsCaches);
             Run("information tombstone text defaults to red and splits tile type", ref failed, InformationTombstoneTextDefaultsToRedAndSplitsTileType);

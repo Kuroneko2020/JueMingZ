@@ -4,6 +4,7 @@ using JueMingZ.Actions;
 using JueMingZ.Automation.Blueprint;
 using JueMingZ.Config;
 using JueMingZ.Runtime;
+using JueMingZ.UI;
 
 namespace JueMingZ.Tests
 {
@@ -215,6 +216,26 @@ namespace JueMingZ.Tests
             BlueprintAutoPlacementDiagnosticsWriteRuntimeSnapshotJson();
             BlueprintAutoPlacementSubmitsActionQueueAndVerifiesPlacement();
             BlueprintAutoPlacementVoidBagOnlyMaterialsFailClosedWithReason();
+        }
+
+        private static void BlueprintProjectionRebuildStage06RegressionAuditContractsStayWired()
+        {
+            BlueprintProjectionUiOverlayAndDiagnosticsContracts();
+            BlueprintProjectionWallFramesUseNeighborContinuity();
+            BlueprintProjectionWallGhostUsesWorldLayerBeforeLateProjectionOverlay();
+            BlueprintProjectionMultitileObjectConflictMarksWholeGroup();
+            BlueprintCaptureExpandsPartialMultitileObjectWithoutWallsOrWires();
+            BlueprintCaptureFailsClosedWhenExpandedObjectCellIsIncomplete();
+            BlueprintAutoPlacementSkipsWholeMultitileObjectWhenAnyCellConflicts();
+
+            var projectionContract = BlueprintProjectionOverlay.GetVisualContractForTesting();
+            AssertContains(projectionContract, "original-missing");
+            AssertContains(projectionContract, "missing-no-state-block");
+            AssertContains(projectionContract, "wall-world-layer-before-foreground");
+            AssertContains(projectionContract, "terraria-foreground-between-wall-and-late-projection");
+            AssertContains(projectionContract, "multitile-object-group-conflict");
+            AssertDoesNotContain(projectionContract, "yellow-missing");
+            AssertDoesNotContain(projectionContract, "topmost");
         }
 
         private static void BlueprintWallContinuityStage05RegressionDiagnosticsContractsStayWired()

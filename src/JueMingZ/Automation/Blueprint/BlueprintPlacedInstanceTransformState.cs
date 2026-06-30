@@ -751,6 +751,7 @@ namespace JueMingZ.Automation.Blueprint
                 layer.WorldTileY += dy;
             }
 
+            BlueprintProjectionService.ApplyBottomWallGhostVisualPolicy(layers);
             _floatingProjection.Signature = BuildFloatingProjectionSignature(_targetInstanceId, originX, originY, layers == null ? 0 : layers.Count);
         }
 
@@ -817,6 +818,7 @@ namespace JueMingZ.Automation.Blueprint
                 }
             }
 
+            BlueprintProjectionService.ApplyBottomWallGhostVisualPolicy(layers);
             return new BlueprintProjectionSnapshot
             {
                 LoadSucceeded = true,
