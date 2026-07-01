@@ -13,6 +13,7 @@ using JueMingZ.Compat;
 using JueMingZ.Common;
 using JueMingZ.Config;
 using JueMingZ.Diagnostics;
+using JueMingZ.Input.Hotkeys;
 using JueMingZ.Runtime;
 using JueMingZ.UI.Legacy.Controls;
 using JueMingZ.UI.Legacy.Framework;
@@ -273,17 +274,17 @@ namespace JueMingZ.UI.Legacy
             _blueprintEntryHotkeyMessage = string.Empty;
             _mapQuickAnnouncementHotkeyCaptureSlot = string.Empty;
             CloseFeatureToggleHotkeyModal();
-            AutoMiningCaptureWasDown.Clear();
-            BlueprintEntryCaptureWasDown.Clear();
-            QuickItemCaptureWasDown.Clear();
-            MapQuickAnnouncementCaptureWasDown.Clear();
+            AutoMiningHotkeyCaptureSession.Clear();
+            BlueprintEntryHotkeyCaptureSession.Clear();
+            MapQuickAnnouncementHotkeyCaptureSession.Clear();
+            HotkeyCaptureService.Seed(QuickItemHotkeyCaptureSession, IsKeyDown);
         }
 
         public static void StopQuickItemHotkeyCapture()
         {
             _quickItemHotkeyCaptureActive = false;
             _quickItemHotkeyCaptureBindingIndex = -1;
-            QuickItemCaptureWasDown.Clear();
+            QuickItemHotkeyCaptureSession.Clear();
         }
 
         public static void StartAutoMiningHotkeyCapture()
@@ -296,13 +297,13 @@ namespace JueMingZ.UI.Legacy
             StopMapQuickAnnouncementHotkeyCapture();
             CloseFeatureToggleHotkeyModal();
             _autoMiningHotkeyCaptureActive = true;
-            AutoMiningCaptureWasDown.Clear();
+            HotkeyCaptureService.Seed(AutoMiningHotkeyCaptureSession, IsKeyDown);
         }
 
         public static void StopAutoMiningHotkeyCapture()
         {
             _autoMiningHotkeyCaptureActive = false;
-            AutoMiningCaptureWasDown.Clear();
+            AutoMiningHotkeyCaptureSession.Clear();
         }
 
         public static void StartBlueprintEntryHotkeyCapture()
@@ -335,8 +336,7 @@ namespace JueMingZ.UI.Legacy
             _blueprintEntryHotkeyCaptureActive = true;
             _blueprintHotkeyCaptureTargetId = normalizedTargetId;
             _blueprintEntryHotkeyMessage = string.Empty;
-            BlueprintEntryCaptureWasDown.Clear();
-            SeedBlueprintEntryHotkeyCaptureState();
+            HotkeyCaptureService.Seed(BlueprintEntryHotkeyCaptureSession, IsKeyDown);
         }
 
         public static void StopBlueprintEntryHotkeyCapture()
@@ -344,7 +344,7 @@ namespace JueMingZ.UI.Legacy
             _blueprintEntryHotkeyCaptureActive = false;
             _blueprintHotkeyCaptureTargetId = string.Empty;
             _blueprintEntryHotkeyMessage = string.Empty;
-            BlueprintEntryCaptureWasDown.Clear();
+            BlueprintEntryHotkeyCaptureSession.Clear();
         }
 
         public static void StartMapQuickAnnouncementHotkeyCapture(string slot)
@@ -365,13 +365,13 @@ namespace JueMingZ.UI.Legacy
             CloseFeatureToggleHotkeyModal();
             _mapQuickAnnouncementHotkeyCaptureSlot = slotId;
             // Seed held keys so the double-click that starts capture cannot become the captured trigger.
-            MapQuickAnnouncementHotkeyTokens.SeedCaptureState(MapQuickAnnouncementCaptureWasDown, IsKeyDown);
+            HotkeyCaptureService.Seed(MapQuickAnnouncementHotkeyCaptureSession, IsKeyDown);
         }
 
         public static void StopMapQuickAnnouncementHotkeyCapture()
         {
             _mapQuickAnnouncementHotkeyCaptureSlot = string.Empty;
-            MapQuickAnnouncementCaptureWasDown.Clear();
+            MapQuickAnnouncementHotkeyCaptureSession.Clear();
         }
 
         public static void ToggleMapDeathHistoryPopup()

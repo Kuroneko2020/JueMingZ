@@ -9,6 +9,8 @@ using JueMingZ.UI.Legacy;
 
 namespace JueMingZ.Automation.WorldAutomation
 {
+    // Legacy hotkey parser kept only for pre-unified regression tests; production auto-mining trigger
+    // switched to UnifiedHotkeyRuntimeService in stage 07 and must not call this path again.
     internal static class AutoMiningHotkeyInput
     {
         private const int VkShift = 0x10;

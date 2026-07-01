@@ -17,9 +17,10 @@ namespace JueMingZ.UI.Legacy
             // item use stays in hotkey/runtime services.
             LegacyUiTheme.DrawRowClipped(spriteBatch, card, clip);
             var captureSelected = _quickItemHotkeyCaptureActive && _quickItemHotkeyCaptureBindingIndex == index;
+            var unifiedHotkey = GetUnifiedHotkeyDisplay(UnifiedHotkeyBindingIds.ForQuickItemSlot(index));
             var hotkeyText = captureSelected
                 ? "按键中..."
-                : string.IsNullOrWhiteSpace(binding == null ? null : binding.Hotkey) ? "+" : binding.Hotkey.Trim();
+                : string.IsNullOrWhiteSpace(unifiedHotkey) ? "+" : unifiedHotkey;
             var hotkeyWidth = ResolveQuickItemHotkeyWidth(hotkeyText, captureSelected, card.Width);
             var buttonHeight = Math.Max(RowModeButtonHeight, card.Height - 6);
             var buttonY = card.Y + Math.Max(0, (card.Height - buttonHeight) / 2);
@@ -114,7 +115,7 @@ namespace JueMingZ.UI.Legacy
 
             if (!captureSelected &&
                 hotkeyHovered &&
-                !string.IsNullOrWhiteSpace(binding == null ? null : binding.Hotkey))
+                !string.IsNullOrWhiteSpace(unifiedHotkey))
             {
                 UiTextRenderer.DrawTextClipped(spriteBatch, "编辑", hotkeyRect.X + 4, hotkeyRect.Y + 2, hotkeyRect.Width - 8, 14, clip.X, clip.Y, clip.Width, clip.Height, 238, 196, 156, 248, 0.52f);
             }

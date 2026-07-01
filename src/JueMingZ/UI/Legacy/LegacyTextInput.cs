@@ -18,6 +18,11 @@ namespace JueMingZ.UI.Legacy
             get { lock (SyncRoot) { return !string.IsNullOrWhiteSpace(_activeId); } }
         }
 
+        public static string ActiveId
+        {
+            get { lock (SyncRoot) { return _activeId ?? string.Empty; } }
+        }
+
         public static int DraftLength
         {
             get { lock (SyncRoot) { return _draft == null ? 0 : _draft.Length; } }

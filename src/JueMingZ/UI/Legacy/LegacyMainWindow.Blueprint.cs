@@ -339,7 +339,7 @@ namespace JueMingZ.UI.Legacy
             UiTextRenderer.DrawAlignedTextClipped(spriteBatch, label, labelRect.X, labelRect.Y, labelRect.Width, labelRect.Height, UiTextHorizontalAlignment.Left, area.Viewport.X, area.Viewport.Y, area.Viewport.Width, area.Viewport.Height, 238, 238, 226, 255, LegacyUiMetrics.RowLabelTextScale);
             var capturing = _blueprintEntryHotkeyCaptureActive &&
                             string.Equals(NormalizeBlueprintHotkeyTargetId(_blueprintHotkeyCaptureTargetId), NormalizeBlueprintHotkeyTargetId(hotkeyTargetId), StringComparison.Ordinal);
-            var hotkey = GetBlueprintHotkeyDisplay(ConfigService.HotkeySettings, hotkeyTargetId);
+            var hotkey = GetUnifiedHotkeyDisplay(UnifiedHotkeyBindingIds.ForBlueprintAction(hotkeyTargetId));
             var inputText = capturing
                 ? capturingText
                 : string.IsNullOrWhiteSpace(hotkey) ? emptyText : hotkey;

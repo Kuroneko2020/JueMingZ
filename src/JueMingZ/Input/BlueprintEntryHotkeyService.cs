@@ -1,14 +1,12 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Globalization;
-using System.Runtime.InteropServices;
 using JueMingZ.Actions;
 using JueMingZ.Automation.Blueprint;
 using JueMingZ.Common;
 using JueMingZ.Config;
 using JueMingZ.Diagnostics;
 using JueMingZ.GameState;
+using JueMingZ.Input.Hotkeys;
 using JueMingZ.UI.Legacy;
 
 namespace JueMingZ.Input
@@ -19,22 +17,16 @@ namespace JueMingZ.Input
         private const int VkControl = 0x11;
         private const int VkShift = 0x10;
 
-        private static readonly object SyncRoot = new object();
-        private static readonly Dictionary<string, bool> WasDownByTargetId =
-            new Dictionary<string, bool>(StringComparer.Ordinal);
-
         public static bool HasActiveBinding
         {
             get
             {
-                var settings = ConfigService.HotkeySettings;
-                FeatureToggleHotkeyChord chord;
-                return TryGetActionChord(settings, FeatureIds.BlueprintCreateAction, out chord) ||
-                       TryGetActionChord(settings, FeatureIds.BlueprintSaveAction, out chord) ||
-                       TryGetActionChord(settings, FeatureIds.BlueprintMoveAction, out chord) ||
-                       TryGetActionChord(settings, FeatureIds.BlueprintRegionAction, out chord) ||
-                       TryGetActionChord(settings, FeatureIds.BlueprintMirrorAction, out chord) ||
-                       TryGetActionChord(settings, FeatureIds.BlueprintLibraryAction, out chord);
+                return HasActiveUnifiedBlueprintAction(FeatureIds.BlueprintCreateAction) ||
+                       HasActiveUnifiedBlueprintAction(FeatureIds.BlueprintSaveAction) ||
+                       HasActiveUnifiedBlueprintAction(FeatureIds.BlueprintMoveAction) ||
+                       HasActiveUnifiedBlueprintAction(FeatureIds.BlueprintRegionAction) ||
+                       HasActiveUnifiedBlueprintAction(FeatureIds.BlueprintMirrorAction) ||
+                       HasActiveUnifiedBlueprintAction(FeatureIds.BlueprintLibraryAction);
             }
         }
 
@@ -42,13 +34,7 @@ namespace JueMingZ.Input
         {
             var result = TickCore(
                 ConfigService.AppSettings ?? AppSettings.CreateDefault(),
-                ConfigService.HotkeySettings ?? HotkeySettings.CreateDefault(),
-                gameState,
-                IsRuntimeGateAvailable(gameState, out var gateReason),
-                gateReason,
-                IsCurrentProcessForeground(),
-                false,
-                IsKeyDown);
+                bindingId => UnifiedHotkeyRuntimeService.QueryBinding(bindingId));
             if (result != null && result.Triggered)
             {
                 RecordBlueprintActionHotkeyEvent(result);
@@ -63,46 +49,48 @@ namespace JueMingZ.Input
             string gateReason,
             bool textInputFocused)
         {
+            var unifiedHotkeys = CreateUnifiedSettingsFromLegacyBlueprintHotkeys(hotkeySettings);
+            var gate = CreateGateContextForTesting(gameInputAvailable, gateReason, textInputFocused);
+            var input = CreateUnifiedInputStateFromLegacyDownKeys(downKeys);
+            var signature = unifiedHotkeys.CreateCacheSignature();
             return TickCore(
                 appSettings ?? AppSettings.CreateDefault(),
-                hotkeySettings ?? HotkeySettings.CreateDefault(),
-                null,
-                gameInputAvailable,
-                gateReason,
-                true,
-                textInputFocused,
-                key => downKeys != null && downKeys.TryGetValue(key, out var down) && down);
+                bindingId => UnifiedHotkeyRuntimeService.QueryBinding(unifiedHotkeys, signature, bindingId, gate, input));
+        }
+
+        internal static BlueprintEntryHotkeyDispatchResult TickUnifiedForTesting(
+            AppSettings appSettings,
+            UnifiedHotkeySettings unifiedHotkeySettings,
+            IDictionary<int, bool> downKeys,
+            UnifiedHotkeyRuntimeGateContext gateContext)
+        {
+            unifiedHotkeySettings = unifiedHotkeySettings ?? UnifiedHotkeySettings.CreateDefault();
+            var signature = unifiedHotkeySettings.CreateCacheSignature();
+            var input = UnifiedHotkeyRuntimeInputState.FromDictionary(downKeys);
+            return TickCore(
+                appSettings ?? AppSettings.CreateDefault(),
+                bindingId => UnifiedHotkeyRuntimeService.QueryBinding(
+                    unifiedHotkeySettings,
+                    signature,
+                    bindingId,
+                    gateContext ?? new UnifiedHotkeyRuntimeGateContext(),
+                    input));
         }
 
         internal static void ResetForTesting()
         {
-            lock (SyncRoot)
-            {
-                WasDownByTargetId.Clear();
-            }
+            UnifiedHotkeyRuntimeService.ResetForTesting();
         }
 
         private static BlueprintEntryHotkeyDispatchResult TickCore(
             AppSettings appSettings,
-            HotkeySettings hotkeySettings,
-            GameStateSnapshot gameState,
-            bool gameInputAvailable,
-            string gateReason,
-            bool foreground,
-            bool textInputFocused,
-            Func<int, bool> isKeyDown)
+            Func<string, UnifiedHotkeyRuntimeTriggerResult> queryBinding)
         {
             var result = TryTickTarget(
                 appSettings,
-                hotkeySettings,
-                gameState,
                 FeatureIds.BlueprintCreateAction,
                 BlueprintEntryCommands.StartCreate,
-                gameInputAvailable,
-                gateReason,
-                foreground,
-                textInputFocused,
-                isKeyDown);
+                queryBinding);
             if (result.Triggered)
             {
                 return result;
@@ -110,15 +98,9 @@ namespace JueMingZ.Input
 
             result = TryTickTarget(
                 appSettings,
-                hotkeySettings,
-                gameState,
                 FeatureIds.BlueprintSaveAction,
                 BlueprintEntryCommands.FinishCreateSave,
-                gameInputAvailable,
-                gateReason,
-                foreground,
-                textInputFocused,
-                isKeyDown);
+                queryBinding);
             if (result.Triggered)
             {
                 return result;
@@ -126,15 +108,9 @@ namespace JueMingZ.Input
 
             result = TryTickTarget(
                 appSettings,
-                hotkeySettings,
-                gameState,
                 FeatureIds.BlueprintMoveAction,
                 BlueprintEntryCommands.StartMove,
-                gameInputAvailable,
-                gateReason,
-                foreground,
-                textInputFocused,
-                isKeyDown);
+                queryBinding);
             if (result.Triggered)
             {
                 return result;
@@ -142,15 +118,9 @@ namespace JueMingZ.Input
 
             result = TryTickTarget(
                 appSettings,
-                hotkeySettings,
-                gameState,
                 FeatureIds.BlueprintRegionAction,
                 BlueprintEntryCommands.StartRegionModify,
-                gameInputAvailable,
-                gateReason,
-                foreground,
-                textInputFocused,
-                isKeyDown);
+                queryBinding);
             if (result.Triggered)
             {
                 return result;
@@ -158,15 +128,9 @@ namespace JueMingZ.Input
 
             result = TryTickTarget(
                 appSettings,
-                hotkeySettings,
-                gameState,
                 FeatureIds.BlueprintMirrorAction,
                 BlueprintEntryCommands.StartMirror,
-                gameInputAvailable,
-                gateReason,
-                foreground,
-                textInputFocused,
-                isKeyDown);
+                queryBinding);
             if (result.Triggered)
             {
                 return result;
@@ -174,58 +138,43 @@ namespace JueMingZ.Input
 
             return TryTickTarget(
                 appSettings,
-                hotkeySettings,
-                gameState,
                 FeatureIds.BlueprintLibraryAction,
                 BlueprintEntryCommands.OpenLibrary,
-                gameInputAvailable,
-                gateReason,
-                foreground,
-                textInputFocused,
-                isKeyDown);
+                queryBinding);
         }
 
         private static BlueprintEntryHotkeyDispatchResult TryTickTarget(
             AppSettings appSettings,
-            HotkeySettings hotkeySettings,
-            GameStateSnapshot gameState,
             string targetId,
             string action,
-            bool gameInputAvailable,
-            string gateReason,
-            bool foreground,
-            bool textInputFocused,
-            Func<int, bool> isKeyDown)
+            Func<string, UnifiedHotkeyRuntimeTriggerResult> queryBinding)
         {
-            FeatureToggleHotkeyChord chord;
-            if (!TryGetActionChord(hotkeySettings, targetId, out chord))
-            {
-                SetWasDown(targetId, false);
-                return BlueprintEntryHotkeyDispatchResult.NoOp;
-            }
-
-            var down = IsChordDown(chord, isKeyDown);
-            var wasDown = GetWasDown(targetId);
-            SetWasDown(targetId, down);
-            if (!down || wasDown)
+            if (queryBinding == null)
             {
                 return BlueprintEntryHotkeyDispatchResult.NoOp;
             }
 
-            var effectiveGateReason = ResolveGateReason(gameState, gameInputAvailable, gateReason, foreground, textInputFocused);
-            if (!string.IsNullOrWhiteSpace(effectiveGateReason))
+            var trigger = queryBinding(UnifiedHotkeyBindingIds.ForBlueprintAction(targetId));
+            if (!trigger.PressedEdge)
+            {
+                return BlueprintEntryHotkeyDispatchResult.NoOp;
+            }
+
+            if (string.Equals(trigger.ResultCode, "blocked", StringComparison.Ordinal))
             {
                 return BlueprintEntryHotkeyDispatchResult.Blocked(
                     targetId,
                     action,
-                    chord.Display,
-                    effectiveGateReason,
-                    IsUiGateReason(effectiveGateReason)
+                    trigger.Display,
+                    trigger.Reason,
+                    UnifiedHotkeyReasonCatalog.IsUiGateReason(trigger.Reason)
                         ? DiagnosticResultCode.BlockedByUi
                         : DiagnosticResultCode.BlockedByEnvironment);
             }
 
-            return ApplyBlueprintAction(appSettings, targetId, action, chord.Display);
+            return string.Equals(trigger.ResultCode, "triggered", StringComparison.Ordinal)
+                ? ApplyBlueprintAction(appSettings, targetId, action, trigger.Display)
+                : BlueprintEntryHotkeyDispatchResult.NoOp;
         }
 
         private static BlueprintEntryHotkeyDispatchResult ApplyBlueprintAction(
@@ -371,234 +320,156 @@ namespace JueMingZ.Input
             return BlueprintEntryHotkeyDispatchResult.FromTransform(targetId, action, chord, mirror, entry, startedMirror);
         }
 
-        private static bool TryGetActionChord(HotkeySettings settings, string targetId, out FeatureToggleHotkeyChord chord)
+        private static bool HasActiveUnifiedBlueprintAction(string targetId)
         {
-            chord = null;
-            if (settings == null ||
-                settings.HotkeysByFeatureId == null ||
-                string.IsNullOrWhiteSpace(targetId))
+            UnifiedHotkeyRuntimeBinding binding;
+            return UnifiedHotkeyRuntimeService.TryGetBinding(
+                UnifiedHotkeyBindingIds.ForBlueprintAction(targetId),
+                out binding);
+        }
+
+        private static UnifiedHotkeySettings CreateUnifiedSettingsFromLegacyBlueprintHotkeys(HotkeySettings hotkeySettings)
+        {
+            // Test-only bridge for old blueprint regression fixtures. Runtime dispatch now consumes
+            // blueprint.action.* unified bindings directly and never promotes legacy hotkeys.json values.
+            var unified = new UnifiedHotkeySettings
+            {
+                ConfigVersion = UnifiedHotkeySettings.CurrentConfigVersion,
+                BindingsById = new Dictionary<string, string>(StringComparer.Ordinal)
+            };
+
+            AddLegacyBlueprintHotkey(unified, hotkeySettings, FeatureIds.BlueprintCreateAction);
+            AddLegacyBlueprintHotkey(unified, hotkeySettings, FeatureIds.BlueprintSaveAction);
+            AddLegacyBlueprintHotkey(unified, hotkeySettings, FeatureIds.BlueprintMoveAction);
+            AddLegacyBlueprintHotkey(unified, hotkeySettings, FeatureIds.BlueprintRegionAction);
+            AddLegacyBlueprintHotkey(unified, hotkeySettings, FeatureIds.BlueprintMirrorAction);
+            AddLegacyBlueprintHotkey(unified, hotkeySettings, FeatureIds.BlueprintLibraryAction);
+            return unified;
+        }
+
+        private static void AddLegacyBlueprintHotkey(
+            UnifiedHotkeySettings unified,
+            HotkeySettings hotkeySettings,
+            string targetId)
+        {
+            if (unified == null ||
+                hotkeySettings == null ||
+                hotkeySettings.HotkeysByFeatureId == null)
+            {
+                return;
+            }
+
+            string hotkey;
+            if (!hotkeySettings.HotkeysByFeatureId.TryGetValue(targetId, out hotkey))
+            {
+                return;
+            }
+
+            UnifiedHotkeyBindingUpdateResult update;
+            unified.TrySetBinding(
+                UnifiedHotkeyBindingIds.ForBlueprintAction(targetId),
+                NormalizeLegacyChordForUnified(hotkey),
+                out update);
+        }
+
+        private static string NormalizeLegacyChordForUnified(string chordText)
+        {
+            FeatureToggleHotkeyChord legacy;
+            if (!FeatureToggleHotkeyChord.TryParse(chordText, out legacy) || legacy == null)
+            {
+                return chordText ?? string.Empty;
+            }
+
+            var modifier = string.Empty;
+            if (string.Equals(legacy.Modifier, "Alt", StringComparison.Ordinal))
+            {
+                modifier = "LAlt+";
+            }
+            else if (string.Equals(legacy.Modifier, "Ctrl", StringComparison.Ordinal))
+            {
+                modifier = "LCtrl+";
+            }
+            else if (string.Equals(legacy.Modifier, "Shift", StringComparison.Ordinal))
+            {
+                modifier = "LShift+";
+            }
+
+            return modifier + (legacy.Key ?? string.Empty);
+        }
+
+        private static UnifiedHotkeyRuntimeInputState CreateUnifiedInputStateFromLegacyDownKeys(IDictionary<int, bool> downKeys)
+        {
+            return new UnifiedHotkeyRuntimeInputState(key => IsLegacyOrUnifiedKeyDown(downKeys, key));
+        }
+
+        private static bool IsLegacyOrUnifiedKeyDown(IDictionary<int, bool> downKeys, int key)
+        {
+            if (downKeys == null)
             {
                 return false;
             }
 
-            string value;
-            return settings.HotkeysByFeatureId.TryGetValue(targetId, out value) &&
-                   FeatureToggleHotkeyChord.TryParse(value, out chord);
-        }
-
-        private static bool IsRuntimeGateAvailable(GameStateSnapshot gameState, out string reason)
-        {
-            reason = ResolveGameStateGateReason(gameState);
-            if (!string.IsNullOrWhiteSpace(reason))
-            {
-                return false;
-            }
-
-            if (LegacyTextInput.IsAnyFocused || LegacyHexColorInput.IsAnyFocused)
-            {
-                reason = "textInputFocused";
-                return false;
-            }
-
-            if (LegacyUiInput.IsActiveInteraction())
-            {
-                reason = "legacyUiActive";
-                return false;
-            }
-
-            if (LegacyUiOverlayCoordinator.Current.HasAnyActiveModal())
-            {
-                reason = "legacyModalActive";
-                return false;
-            }
-
-            if (LegacyMainWindow.IsAnyHotkeyCaptureActive())
-            {
-                reason = "hotkeyCaptureActive";
-                return false;
-            }
-
-            return true;
-        }
-
-        private static string ResolveGateReason(
-            GameStateSnapshot gameState,
-            bool gameInputAvailable,
-            string gateReason,
-            bool foreground,
-            bool textInputFocused)
-        {
-            if (!foreground)
-            {
-                return "notForeground";
-            }
-
-            if (textInputFocused)
-            {
-                return "textInputFocused";
-            }
-
-            if (!gameInputAvailable)
-            {
-                return string.IsNullOrWhiteSpace(gateReason) ? "gameInputUnavailable" : gateReason;
-            }
-
-            return ResolveGameStateGateReason(gameState);
-        }
-
-        private static string ResolveGameStateGateReason(GameStateSnapshot gameState)
-        {
-            if (gameState == null)
-            {
-                return string.Empty;
-            }
-
-            if (!gameState.IsInWorld)
-            {
-                return "notInWorld";
-            }
-
-            if (gameState.IsInMainMenu)
-            {
-                return "mainMenu";
-            }
-
-            var ui = gameState.Ui;
-            if (ui == null)
-            {
-                return "uiUnavailable";
-            }
-
-            if (!ui.GameInputAvailable)
-            {
-                return "gameInputUnavailable";
-            }
-
-            if (ui.IsInMainMenu)
-            {
-                return "mainMenu";
-            }
-
-            if (ui.ChatOpen)
-            {
-                return "chatOpen";
-            }
-
-            return string.Empty;
-        }
-
-        private static bool IsUiGateReason(string reason)
-        {
-            return string.Equals(reason, "textInputFocused", StringComparison.Ordinal) ||
-                   string.Equals(reason, "legacyUiActive", StringComparison.Ordinal) ||
-                   string.Equals(reason, "legacyModalActive", StringComparison.Ordinal) ||
-                   string.Equals(reason, "hotkeyCaptureActive", StringComparison.Ordinal) ||
-                   string.Equals(reason, "chatOpen", StringComparison.Ordinal);
-        }
-
-        private static bool IsChordDown(FeatureToggleHotkeyChord chord, Func<int, bool> isKeyDown)
-        {
-            if (chord == null || isKeyDown == null)
-            {
-                return false;
-            }
-
-            if (!string.IsNullOrWhiteSpace(chord.Modifier) && !isKeyDown(ModifierToVirtualKey(chord.Modifier)))
-            {
-                return false;
-            }
-
-            var key = MainKeyToVirtualKey(chord.Key);
-            return key > 0 && isKeyDown(key);
-        }
-
-        private static int ModifierToVirtualKey(string modifier)
-        {
-            if (string.Equals(modifier, "Alt", StringComparison.Ordinal))
-            {
-                return VkAlt;
-            }
-
-            if (string.Equals(modifier, "Ctrl", StringComparison.Ordinal))
-            {
-                return VkControl;
-            }
-
-            return string.Equals(modifier, "Shift", StringComparison.Ordinal) ? VkShift : 0;
-        }
-
-        private static int MainKeyToVirtualKey(string key)
-        {
-            if (string.IsNullOrWhiteSpace(key))
-            {
-                return 0;
-            }
-
-            if (key.Length == 1)
-            {
-                var ch = char.ToUpperInvariant(key[0]);
-                if ((ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9'))
-                {
-                    return ch;
-                }
-            }
-
-            if (key.Length >= 2 &&
-                key[0] == 'F' &&
-                int.TryParse(key.Substring(1), NumberStyles.None, CultureInfo.InvariantCulture, out var functionKey) &&
-                functionKey >= 1 &&
-                functionKey <= 24)
-            {
-                return 0x70 + functionKey - 1;
-            }
-
-            return 0;
-        }
-
-        private static bool GetWasDown(string targetId)
-        {
-            lock (SyncRoot)
-            {
-                return WasDownByTargetId.TryGetValue(targetId, out var value) && value;
-            }
-        }
-
-        private static void SetWasDown(string targetId, bool down)
-        {
-            lock (SyncRoot)
-            {
-                if (string.IsNullOrWhiteSpace(targetId))
-                {
-                    return;
-                }
-
-                WasDownByTargetId[targetId] = down;
-            }
-        }
-
-        private static bool IsKeyDown(int virtualKey)
-        {
-            return virtualKey > 0 && (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
-        }
-
-        private static bool IsCurrentProcessForeground()
-        {
-            try
-            {
-                var foregroundWindow = GetForegroundWindow();
-                if (foregroundWindow == IntPtr.Zero)
-                {
-                    return true;
-                }
-
-                int processId;
-                GetWindowThreadProcessId(foregroundWindow, out processId);
-                return processId == Process.GetCurrentProcess().Id;
-            }
-            catch
+            bool down;
+            if (downKeys.TryGetValue(key, out down) && down)
             {
                 return true;
             }
+
+            switch (key)
+            {
+                case 0xA2:
+                case 0xA3:
+                    return downKeys.TryGetValue(VkControl, out down) && down;
+                case 0xA4:
+                case 0xA5:
+                    return downKeys.TryGetValue(VkAlt, out down) && down;
+                case 0xA0:
+                case 0xA1:
+                    return downKeys.TryGetValue(VkShift, out down) && down;
+                default:
+                    return false;
+            }
+        }
+
+        private static UnifiedHotkeyRuntimeGateContext CreateGateContextForTesting(
+            bool gameInputAvailable,
+            string gateReason,
+            bool textInputFocused)
+        {
+            var gate = new UnifiedHotkeyRuntimeGateContext
+            {
+                GameInputAvailable = gameInputAvailable,
+                F5TextInputFocused = textInputFocused
+            };
+            if (gameInputAvailable || string.IsNullOrWhiteSpace(gateReason))
+            {
+                return gate;
+            }
+
+            gate.GameInputAvailable = true;
+            if (string.Equals(gateReason, "textInputFocused", StringComparison.Ordinal))
+            {
+                gate.F5TextInputFocused = true;
+            }
+            else if (string.Equals(gateReason, "legacyUiActive", StringComparison.Ordinal))
+            {
+                gate.LegacyUiActiveInteraction = true;
+            }
+            else if (string.Equals(gateReason, "legacyModalActive", StringComparison.Ordinal) ||
+                     string.Equals(gateReason, UnifiedHotkeyRuntimeGate.LegacyModalOpen, StringComparison.Ordinal))
+            {
+                gate.LegacyModalOpen = true;
+            }
+            else if (string.Equals(gateReason, "hotkeyCaptureActive", StringComparison.Ordinal))
+            {
+                gate.HotkeyCaptureActive = true;
+            }
+            else
+            {
+                gate.GameInputAvailable = false;
+            }
+
+            return gate;
         }
 
         private static void RecordBlueprintActionHotkeyEvent(BlueprintEntryHotkeyDispatchResult result)
@@ -633,9 +504,13 @@ namespace JueMingZ.Input
             var trace = BlueprintUiClickDiagnostics.GetSnapshot();
             return
                 "{" +
+                "\"bindingId\":\"" + EscapeJson(string.IsNullOrWhiteSpace(result.TargetId) ? string.Empty : UnifiedHotkeyBindingIds.ForBlueprintAction(result.TargetId)) + "\"," +
                 "\"targetId\":\"" + EscapeJson(result.TargetId) + "\"," +
                 "\"action\":\"" + EscapeJson(result.Action) + "\"," +
                 "\"resultCode\":\"" + EscapeJson(result.ResultCode) + "\"," +
+                "\"reason\":\"" + EscapeJson(result.Reason) + "\"," +
+                "\"reasonCode\":\"" + EscapeJson(UnifiedHotkeyReasonCatalog.NormalizeRuntimeReasonCode(result.Reason)) + "\"," +
+                "\"blockedReason\":\"" + EscapeJson(IsBlockedDiagnostic(result.DiagnosticResultCode) ? result.Reason : string.Empty) + "\"," +
                 "\"applied\":" + BoolRaw(result.Applied) + "," +
                 "\"creationClearTrace\":\"" + EscapeJson(trace.CreationLastClearReasonTrace) + "\"" +
                 "}";
@@ -651,6 +526,12 @@ namespace JueMingZ.Input
             return value ? "true" : "false";
         }
 
+        private static bool IsBlockedDiagnostic(DiagnosticResultCode resultCode)
+        {
+            return resultCode == DiagnosticResultCode.BlockedByUi ||
+                   resultCode == DiagnosticResultCode.BlockedByEnvironment;
+        }
+
         private static string EscapeJson(string value)
         {
             if (string.IsNullOrEmpty(value))
@@ -661,14 +542,6 @@ namespace JueMingZ.Input
             return value.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", "\\r").Replace("\n", "\\n");
         }
 
-        [DllImport("user32.dll")]
-        private static extern short GetAsyncKeyState(int virtualKey);
-
-        [DllImport("user32.dll")]
-        private static extern IntPtr GetForegroundWindow();
-
-        [DllImport("user32.dll")]
-        private static extern int GetWindowThreadProcessId(IntPtr windowHandle, out int processId);
     }
 
     internal sealed class BlueprintEntryHotkeyDispatchResult
@@ -713,7 +586,7 @@ namespace JueMingZ.Input
                 Action = action ?? string.Empty,
                 ResultCode = reason ?? string.Empty,
                 Reason = reason ?? string.Empty,
-                Message = "蓝图动作快捷键被阻止：" + (reason ?? string.Empty) + "。",
+                Message = UnifiedHotkeyReasonCatalog.BuildRuntimeGateMessage("蓝图动作快捷键", reason),
                 DiagnosticResultCode = diagnosticResultCode
             };
         }

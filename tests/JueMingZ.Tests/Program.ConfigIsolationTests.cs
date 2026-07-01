@@ -27,6 +27,7 @@ namespace JueMingZ.Tests
             var previousAppSettingsPath = ConfigService.AppSettingsPath;
             var previousFeatureSettingsPath = ConfigService.FeatureSettingsPath;
             var previousHotkeySettingsPath = ConfigService.HotkeySettingsPath;
+            var previousUnifiedHotkeySettingsPath = ConfigService.UnifiedHotkeySettingsPath;
             try
             {
                 SetConfigDirectoryForTesting(RealUserConfigDirectory);
@@ -51,7 +52,8 @@ namespace JueMingZ.Tests
                     previousConfigDirectory,
                     previousAppSettingsPath,
                     previousFeatureSettingsPath,
-                    previousHotkeySettingsPath);
+                    previousHotkeySettingsPath,
+                    previousUnifiedHotkeySettingsPath);
             }
         }
 
@@ -166,6 +168,7 @@ namespace JueMingZ.Tests
             AssertConfigFileExists(ConfigService.AppSettingsPath, label + " appsettings");
             AssertConfigFileExists(ConfigService.FeatureSettingsPath, label + " features");
             AssertConfigFileExists(ConfigService.HotkeySettingsPath, label + " hotkeys");
+            AssertConfigFileExists(ConfigService.UnifiedHotkeySettingsPath, label + " unified hotkeys");
         }
 
         private static void AssertConfigFileExists(string path, string label)

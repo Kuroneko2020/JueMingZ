@@ -132,20 +132,6 @@ namespace JueMingZ.UI.Legacy
         private const string FishingQuickRenameTextInputId = "fishing-quick-rename:name";
         private const string MiscQuickReforgeTextInputId = "misc-quick-reforge:prefix";
         private const int RowLabelTextHeight = 22;
-        private static readonly int[] QuickItemCaptureAdditionalKeys =
-        {
-            0x14,
-            0x20,
-            0x09,
-            0x0D,
-            0x1B,
-            0x25,
-            0x26,
-            0x27,
-            0x28,
-            0x05,
-            0x06
-        };
         private static string _informationStylePopupFeatureId = string.Empty;
         private static LegacyUiRect _informationStylePopupAnchor;
         private static bool _informationStylePopupAnchorVisible;
@@ -184,10 +170,6 @@ namespace JueMingZ.UI.Legacy
         private static bool _mapRevealedAreaDetailsPopupOpen;
         private static LegacyUiRect _mapRevealedAreaDetailsAnchor;
         private static bool _mapRevealedAreaDetailsAnchorVisible;
-        private static readonly Dictionary<int, bool> QuickItemCaptureWasDown = new Dictionary<int, bool>();
-        private static readonly Dictionary<int, bool> AutoMiningCaptureWasDown = new Dictionary<int, bool>();
-        private static readonly Dictionary<int, bool> BlueprintEntryCaptureWasDown = new Dictionary<int, bool>();
-        private static readonly Dictionary<int, bool> MapQuickAnnouncementCaptureWasDown = new Dictionary<int, bool>();
         private static readonly TimeSpan PickerCandidateCacheWindow = TimeSpan.FromMilliseconds(120);
         private static DateTime _quickItemPickerCandidateCacheUtc = DateTime.MinValue;
         private static List<QuickItemInventoryCandidate> _quickItemPickerCandidateCache;

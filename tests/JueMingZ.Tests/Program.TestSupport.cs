@@ -88,6 +88,7 @@ namespace JueMingZ.Tests
             var previousAppSettingsPath = ConfigService.AppSettingsPath;
             var previousFeatureSettingsPath = ConfigService.FeatureSettingsPath;
             var previousHotkeySettingsPath = ConfigService.HotkeySettingsPath;
+            var previousUnifiedHotkeySettingsPath = ConfigService.UnifiedHotkeySettingsPath;
             var root = BuildTestConfigDirectory(prefix);
             Directory.CreateDirectory(root);
             SetConfigDirectoryForTesting(root);
@@ -98,7 +99,8 @@ namespace JueMingZ.Tests
                     previousConfigDirectory,
                     previousAppSettingsPath,
                     previousFeatureSettingsPath,
-                    previousHotkeySettingsPath);
+                    previousHotkeySettingsPath,
+                    previousUnifiedHotkeySettingsPath);
                 TryDeleteTemporaryConfigDirectory(root);
             };
         }
@@ -117,19 +119,22 @@ namespace JueMingZ.Tests
                 directory,
                 Path.Combine(directory, "appsettings.json"),
                 Path.Combine(directory, "features.json"),
-                Path.Combine(directory, "hotkeys.json"));
+                Path.Combine(directory, "hotkeys.json"),
+                Path.Combine(directory, "unified-hotkeys.json"));
         }
 
         private static void SetConfigDirectoryForTesting(
             string configDirectory,
             string appSettingsPath,
             string featureSettingsPath,
-            string hotkeySettingsPath)
+            string hotkeySettingsPath,
+            string unifiedHotkeySettingsPath)
         {
             SetConfigServicePathBackingField("<ConfigDirectory>k__BackingField", configDirectory);
             SetConfigServicePathBackingField("<AppSettingsPath>k__BackingField", appSettingsPath);
             SetConfigServicePathBackingField("<FeatureSettingsPath>k__BackingField", featureSettingsPath);
             SetConfigServicePathBackingField("<HotkeySettingsPath>k__BackingField", hotkeySettingsPath);
+            SetConfigServicePathBackingField("<UnifiedHotkeySettingsPath>k__BackingField", unifiedHotkeySettingsPath);
             ConfigService.ResetLoadStateForTesting();
         }
 
@@ -170,6 +175,7 @@ namespace JueMingZ.Tests
             AssertPathUnderConfigDirectory(ConfigService.AppSettingsPath, label + " appsettings path");
             AssertPathUnderConfigDirectory(ConfigService.FeatureSettingsPath, label + " features path");
             AssertPathUnderConfigDirectory(ConfigService.HotkeySettingsPath, label + " hotkeys path");
+            AssertPathUnderConfigDirectory(ConfigService.UnifiedHotkeySettingsPath, label + " unified hotkeys path");
         }
 
         private static void AssertPathUnderConfigDirectory(string path, string label)
@@ -190,6 +196,7 @@ namespace JueMingZ.Tests
             AssertSaveResultUsesTestDirectory(summary.AppSettings, label + " appsettings");
             AssertSaveResultUsesTestDirectory(summary.FeatureSettings, label + " features");
             AssertSaveResultUsesTestDirectory(summary.HotkeySettings, label + " hotkeys");
+            AssertSaveResultUsesTestDirectory(summary.UnifiedHotkeySettings, label + " unified hotkeys");
         }
 
         private static void AssertSaveResultUsesTestDirectory(ConfigFileSaveResult result, string label)

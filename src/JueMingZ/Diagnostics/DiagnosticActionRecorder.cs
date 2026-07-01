@@ -71,6 +71,16 @@ namespace JueMingZ.Diagnostics
 
         public static void RecordHotkeyEvent(string hotkey, string scenario, DiagnosticResultCode resultCode, string message)
         {
+            RecordHotkeyEvent(hotkey, scenario, resultCode, message, "{}");
+        }
+
+        public static void RecordHotkeyEvent(
+            string hotkey,
+            string scenario,
+            DiagnosticResultCode resultCode,
+            string message,
+            string verificationJson)
+        {
             RecordCustomEvent(
                 Guid.Empty,
                 scenario,
@@ -82,7 +92,7 @@ namespace JueMingZ.Diagnostics
                 0,
                 "{}",
                 "{}",
-                "{}",
+                string.IsNullOrWhiteSpace(verificationJson) ? "{}" : verificationJson,
                 "Hotkey",
                 string.Empty,
                 string.Empty,

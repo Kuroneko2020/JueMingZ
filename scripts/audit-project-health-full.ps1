@@ -1680,11 +1680,13 @@ function Test-FeatureToggleHotkeyGovernance {
     $chordPath = Join-Path $RepoRoot "src\JueMingZ\Config\FeatureToggleHotkeyChord.cs"
     $targetCatalogPath = Join-Path $RepoRoot "src\JueMingZ\Config\FeatureToggleHotkeyTargetCatalog.cs"
     $conflictRegistryPath = Join-Path $RepoRoot "src\JueMingZ\Config\FeatureToggleHotkeyConflictRegistry.cs"
+    $unifiedBindingIdsPath = Join-Path $RepoRoot "src\JueMingZ\Config\UnifiedHotkeyBindingIds.cs"
     $runtimeServicePath = Join-Path $RepoRoot "src\JueMingZ\Input\FeatureToggleHotkeyService.cs"
     $dispatcherPath = Join-Path $RepoRoot "src\JueMingZ\Runtime\RuntimeAutomationDispatcher.cs"
     $uiPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.FeatureToggleHotkeys.cs"
     $vectorIconPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\Controls\LegacyVectorIconRenderer.cs"
     $testPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.FeatureToggleHotkeyTests.cs"
+    $runtimeSwitchTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.UnifiedHotkeyRuntimeSwitchTests.cs"
     $dispatchTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.RuntimeDiagnosticsAndDispatchTests.cs"
     $featureDocPath = Join-Path $RepoRoot "文档\功能介绍\F5通用\功能主开关快捷键.md"
     $featureIndexPath = Join-Path $RepoRoot "文档\功能介绍\功能索引.md"
@@ -1699,11 +1701,13 @@ function Test-FeatureToggleHotkeyGovernance {
     $chordText = Read-TextIfExists -Path $chordPath
     $targetCatalogText = Read-TextIfExists -Path $targetCatalogPath
     $conflictRegistryText = Read-TextIfExists -Path $conflictRegistryPath
+    $unifiedBindingIdsText = Read-TextIfExists -Path $unifiedBindingIdsPath
     $runtimeServiceText = Read-TextIfExists -Path $runtimeServicePath
     $dispatcherText = Read-TextIfExists -Path $dispatcherPath
     $uiText = Read-TextIfExists -Path $uiPath
     $vectorIconText = Read-TextIfExists -Path $vectorIconPath
     $testText = Read-TextIfExists -Path $testPath
+    $runtimeSwitchTestText = Read-TextIfExists -Path $runtimeSwitchTestPath
     $dispatchTestText = Read-TextIfExists -Path $dispatchTestPath
     $featureDocText = Read-TextIfExists -Path $featureDocPath
     $featureIndexText = Read-TextIfExists -Path $featureIndexPath
@@ -1794,14 +1798,31 @@ function Test-FeatureToggleHotkeyGovernance {
         Write-FailHealth "Feature toggle hotkey target catalog/docs incomplete; missing=$($missingTargets -join ', ') excludedLeaks=$($catalogExcludedLeaks -join ', ')"
     }
 
-    if ($hotkeySettingsText.Contains("automation.auto_mining already uses that legacy table as its mining trigger") -and
+    $legacyAutoMiningTriggerSeparation =
+        $hotkeySettingsText.Contains("automation.auto_mining already uses that legacy table as its mining trigger") -and
         $conflictRegistryText.Contains("FeatureToggleHotkeyConflictType.AutoMiningTrigger") -and
         $conflictRegistryText.Contains("自动挖矿 的采集按键") -and
         $runtimeServiceText.Contains("ValidateAutoMiningMode") -and
         $runtimeServiceText.Contains("missingMiningTriggerHotkey") -and
         $testText.Contains("FeatureToggleHotkeyRuntimeBlocksAutoMiningHotkeyWithoutTrigger") -and
         $autoMiningDocText.Contains("采集触发键") -and
-        $autoMiningDocText.Contains("ToggleHotkeysByTargetId[automation.auto_mining]")) {
+        $autoMiningDocText.Contains("ToggleHotkeysByTargetId[automation.auto_mining]")
+
+    $unifiedAutoMiningTriggerSeparation =
+        $unifiedBindingIdsText -and
+        $unifiedBindingIdsText.Contains('WorldAutomationAutoMiningTrigger = "automation.auto_mining.trigger"') -and
+        $unifiedBindingIdsText.Contains('FeatureTogglePrefix = "feature.toggle."') -and
+        $runtimeServiceText.Contains("UnifiedHotkeyBindingIds.WorldAutomationAutoMiningTrigger") -and
+        $runtimeServiceText.Contains("missingMiningTriggerHotkey") -and
+        $testText.Contains("FeatureToggleHotkeyRuntimeBlocksAutoMiningHotkeyWithoutTrigger") -and
+        $runtimeSwitchTestText -and
+        $runtimeSwitchTestText.Contains("UnifiedHotkeyBindingIds.WorldAutomationAutoMiningTrigger") -and
+        $featureDocText.Contains("feature.toggle.automation.auto_mining") -and
+        $featureDocText.Contains("automation.auto_mining.trigger") -and
+        $autoMiningDocText.Contains("feature.toggle.automation.auto_mining") -and
+        $autoMiningDocText.Contains("automation.auto_mining.trigger")
+
+    if ($legacyAutoMiningTriggerSeparation -or $unifiedAutoMiningTriggerSeparation) {
         Write-Pass "Feature toggle hotkey keeps auto-mining trigger hotkeys separate from master-toggle hotkeys."
     }
     else {
@@ -12476,11 +12497,14 @@ function Test-HotkeyBackspaceClearGovernance {
     $quickItemCardPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.Misc.QuickItems.Cards.cs"
     $quickItemRuntimePath = Join-Path $RepoRoot "src\JueMingZ\Automation\InventoryAndItems\QuickItemHotkeyService.cs"
     $autoMiningUiPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.Misc.AutoMining.cs"
+    $unifiedHotkeyUiPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.UnifiedHotkeys.cs"
+    $hotkeyCaptureServicePath = Join-Path $RepoRoot "src\JueMingZ\Input\Hotkeys\HotkeyCaptureService.cs"
     $mapInputPath = Join-Path $RepoRoot "src\JueMingZ\Automation\Information\MapQuickAnnouncementHotkeyInput.cs"
     $mapSettingsPath = Join-Path $RepoRoot "src\JueMingZ\Config\MapQuickAnnouncementSettings.cs"
     $mapCapturePath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.MapEnhancement.Capture.cs"
     $mapUiPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.MapEnhancement.cs"
     $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
+    $unifiedHotkeyCaptureTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.UnifiedHotkeyCaptureTests.cs"
     $featureToggleTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.FeatureToggleHotkeyTests.cs"
     $blueprintTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintEntryTests.cs"
     $inventoryTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.InventoryAutomationActionTests.cs"
@@ -12507,11 +12531,14 @@ function Test-HotkeyBackspaceClearGovernance {
     $quickItemCardText = Read-TextIfExists -Path $quickItemCardPath
     $quickItemRuntimeText = Read-TextIfExists -Path $quickItemRuntimePath
     $autoMiningUiText = Read-TextIfExists -Path $autoMiningUiPath
+    $unifiedHotkeyUiText = Read-TextIfExists -Path $unifiedHotkeyUiPath
+    $hotkeyCaptureServiceText = Read-TextIfExists -Path $hotkeyCaptureServicePath
     $mapInputText = Read-TextIfExists -Path $mapInputPath
     $mapSettingsText = Read-TextIfExists -Path $mapSettingsPath
     $mapCaptureText = Read-TextIfExists -Path $mapCapturePath
     $mapUiText = Read-TextIfExists -Path $mapUiPath
     $programText = Read-TextIfExists -Path $programPath
+    $unifiedHotkeyCaptureTestText = Read-TextIfExists -Path $unifiedHotkeyCaptureTestPath
     $featureToggleTestText = Read-TextIfExists -Path $featureToggleTestPath
     $blueprintTestText = Read-TextIfExists -Path $blueprintTestPath
     $inventoryTestText = Read-TextIfExists -Path $inventoryTestPath
@@ -12524,10 +12551,30 @@ function Test-HotkeyBackspaceClearGovernance {
     $autoMiningDocText = Read-TextIfExists -Path $autoMiningDocPath
     $quickAnnouncementDocText = Read-TextIfExists -Path $quickAnnouncementDocPath
 
-    if ($featureToggleUiText -and
+    $unifiedBackspaceClearPath =
+        $unifiedHotkeyUiText -and
+        $unifiedHotkeyUiText.Contains("HotkeyCaptureResultKind.Cleared") -and
+        $hotkeyCaptureServiceText -and
+        $hotkeyCaptureServiceText.Contains("BackspaceToken") -and
+        $hotkeyCaptureServiceText.Contains("HotkeyCaptureResult.Cleared()") -and
+        $unifiedHotkeyCaptureTestText -and
+        $unifiedHotkeyCaptureTestText.Contains('HotkeyCaptureService.EvaluateTokens(new[] { "Backspace" })') -and
+        $unifiedHotkeyCaptureTestText.Contains("HotkeyCaptureResultKind.Cleared")
+
+    $featureToggleLegacyBackspacePath =
+        $featureToggleUiText -and
         $featureToggleUiText.Contains("VkBackspace") -and
         $featureToggleUiText.Contains("ClearFeatureToggleHotkeyBinding") -and
+        $featureToggleUiText.Contains("TryClearFeatureToggleHotkeyBindingForTesting")
+
+    $featureToggleUnifiedBackspacePath =
+        $featureToggleUiText -and
+        $featureToggleUiText.Contains("FeatureToggleHotkeyCaptureSession") -and
+        $featureToggleUiText.Contains("TryApplyUnifiedHotkeyCaptureResult") -and
         $featureToggleUiText.Contains("TryClearFeatureToggleHotkeyBindingForTesting") -and
+        $unifiedBackspaceClearPath
+
+    if (($featureToggleLegacyBackspacePath -or $featureToggleUnifiedBackspacePath) -and
         $featureToggleChordText -and
         $featureToggleChordText.Contains("Backspace")) {
         Write-Pass "Feature toggle hotkey capture treats Backspace as clear-only and rejects it as a saved chord."
@@ -12536,23 +12583,48 @@ function Test-HotkeyBackspaceClearGovernance {
         Write-FailHealth "Feature toggle hotkey capture must clear on Backspace and FeatureToggleHotkeyChord must reject Backspace."
     }
 
-    if ($blueprintUiText -and
+    $blueprintLegacyBackspacePath =
+        $blueprintUiText -and
         $blueprintUiText.Contains("BlueprintActionHotkeyTooltipClear") -and
         $blueprintHotkeyText -and
         $blueprintHotkeyText.Contains("VkBackspace") -and
         $blueprintHotkeyText.Contains("ClearBlueprintHotkeyBinding") -and
         $blueprintHotkeyText.Contains("TryClearBlueprintActionHotkeyForTesting") -and
-        $blueprintHotkeyText.Contains("FeatureIds.BlueprintLibraryAction")) {
+        $blueprintHotkeyText.Contains("FeatureIds.BlueprintLibraryAction")
+
+    $blueprintUnifiedBackspacePath =
+        $blueprintUiText -and
+        $blueprintUiText.Contains("BlueprintActionHotkeyTooltipClear") -and
+        $blueprintHotkeyText -and
+        $blueprintHotkeyText.Contains("BlueprintEntryHotkeyCaptureSession") -and
+        $blueprintHotkeyText.Contains("TryApplyUnifiedHotkeyCaptureResult") -and
+        $blueprintHotkeyText.Contains("TryClearBlueprintActionHotkeyForTesting") -and
+        $blueprintHotkeyText.Contains("FeatureIds.BlueprintLibraryAction") -and
+        $unifiedBackspaceClearPath
+
+    if ($blueprintLegacyBackspacePath -or $blueprintUnifiedBackspacePath) {
         Write-Pass "Blueprint create/save/library action hotkey capture clears bindings on Backspace without saving Backspace."
     }
     else {
         Write-FailHealth "Blueprint create/save/library action hotkey capture must expose Backspace clear behavior and clear test hooks."
     }
 
-    if ($quickItemCaptureText -and
+    $quickItemLegacyBackspacePath =
+        $quickItemCaptureText -and
         $quickItemCaptureText.Contains("ClearQuickItemHotkeyBinding") -and
         $quickItemCaptureText.Contains("ClearAutoMiningHotkeyBinding") -and
-        $quickItemCaptureText.Contains("VkBackspace") -and
+        $quickItemCaptureText.Contains("VkBackspace")
+
+    $quickItemUnifiedBackspacePath =
+        $quickItemCaptureText -and
+        $quickItemCaptureText.Contains("QuickItemHotkeyCaptureSession") -and
+        $quickItemCaptureText.Contains("AutoMiningHotkeyCaptureSession") -and
+        $quickItemCaptureText.Contains("TryApplyUnifiedHotkeyCaptureResult") -and
+        $quickItemCaptureText.Contains("TryClearQuickItemHotkeyBindingForTesting") -and
+        $quickItemCaptureText.Contains("TryClearAutoMiningHotkeyBindingForTesting") -and
+        $unifiedBackspaceClearPath
+
+    if (($quickItemLegacyBackspacePath -or $quickItemUnifiedBackspacePath) -and
         $quickItemUiText -and
         $quickItemUiText.Contains("Backspace 删除") -and
         $quickItemCardText -and
@@ -12617,6 +12689,413 @@ function Test-HotkeyBackspaceClearGovernance {
     }
     else {
         Write-FailHealth "Stage 06 plan and feature docs must document Backspace clear-only hotkey behavior for all touched capture paths."
+    }
+}
+
+function Test-UnifiedHotkeyRegressionAuditGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
+    $aggregateTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.UnifiedHotkeyRegressionAuditTests.cs"
+    $quickItemRuntimePath = Join-Path $RepoRoot "src\JueMingZ\Automation\InventoryAndItems\QuickItemHotkeyService.cs"
+    $autoMiningInputPath = Join-Path $RepoRoot "src\JueMingZ\Automation\WorldAutomation\AutoMiningHotkeyInput.cs"
+    $autoMiningServicePath = Join-Path $RepoRoot "src\JueMingZ\Automation\WorldAutomation\AutoMiningService.cs"
+    $quickAnnouncementRuntimePath = Join-Path $RepoRoot "src\JueMingZ\Automation\Information\MapQuickAnnouncementRuntimeService.cs"
+    $featureToggleRuntimePath = Join-Path $RepoRoot "src\JueMingZ\Input\FeatureToggleHotkeyService.cs"
+    $blueprintRuntimePath = Join-Path $RepoRoot "src\JueMingZ\Input\BlueprintEntryHotkeyService.cs"
+    $engineeringRulesPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "工程规则.md")
+    $diagnosticRulesPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $featureToggleDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "F5通用", "功能主开关快捷键.md")
+    $quickItemDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "物品页", "快捷物品.md")
+    $autoMiningDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "杂项页", "自动挖矿.md")
+    $quickAnnouncementDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "地图加强页", "快捷宣告.md")
+    $blueprintDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $plan09Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "统一快捷键系统重构-260702", "09-回归审计与防单独系统回流.md")
+    if (-not (Test-Path -LiteralPath $plan09Path)) {
+        $plan09Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "统一快捷键系统重构-260702", "09-回归审计与防单独系统回流.md")
+    }
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+
+    $programText = Read-TextIfExists -Path $programPath
+    $aggregateTestText = Read-TextIfExists -Path $aggregateTestPath
+    $quickItemRuntimeText = Read-TextIfExists -Path $quickItemRuntimePath
+    $autoMiningInputText = Read-TextIfExists -Path $autoMiningInputPath
+    $autoMiningServiceText = Read-TextIfExists -Path $autoMiningServicePath
+    $quickAnnouncementRuntimeText = Read-TextIfExists -Path $quickAnnouncementRuntimePath
+    $featureToggleRuntimeText = Read-TextIfExists -Path $featureToggleRuntimePath
+    $blueprintRuntimeText = Read-TextIfExists -Path $blueprintRuntimePath
+    $engineeringRulesText = Read-TextIfExists -Path $engineeringRulesPath
+    $diagnosticRulesText = Read-TextIfExists -Path $diagnosticRulesPath
+    $featureToggleDocText = Read-TextIfExists -Path $featureToggleDocPath
+    $quickItemDocText = Read-TextIfExists -Path $quickItemDocPath
+    $autoMiningDocText = Read-TextIfExists -Path $autoMiningDocPath
+    $quickAnnouncementDocText = Read-TextIfExists -Path $quickAnnouncementDocPath
+    $blueprintDocText = Read-TextIfExists -Path $blueprintDocPath
+    $plan09Text = Read-TextIfExists -Path $plan09Path
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+
+    if ($null -eq $programText -or $null -eq $aggregateTestText -or
+        $null -eq $quickItemRuntimeText -or $null -eq $autoMiningInputText -or
+        $null -eq $autoMiningServiceText -or $null -eq $quickAnnouncementRuntimeText -or
+        $null -eq $featureToggleRuntimeText -or $null -eq $blueprintRuntimeText -or
+        $null -eq $engineeringRulesText -or $null -eq $diagnosticRulesText -or
+        $null -eq $featureToggleDocText -or $null -eq $quickItemDocText -or
+        $null -eq $autoMiningDocText -or $null -eq $quickAnnouncementDocText -or
+        $null -eq $blueprintDocText -or $null -eq $plan09Text -or
+        $null -eq $updateIndexText -or $null -eq $docHistoryIndexText) {
+        Write-FailHealth "Unified hotkey regression audit requires source, tests, feature docs, diagnostics rules, plan, and history index files."
+        return
+    }
+
+    $requiredAggregateCalls = @(
+        "HotkeyTokenCatalogCoversStandardKeyboardMouseTokens",
+        "HotkeyParserNormalizesTokensAndAliases",
+        "HotkeyParserReportsFailureReasons",
+        "HotkeyDisplayFormatterKeepsMainAndNumpadDistinct",
+        "UnifiedHotkeyCaptureEvaluatesClearCancelAndFailureReasons",
+        "UnifiedHotkeyCaptureReadsLeftRightModifiersNumpadAndMouse",
+        "UnifiedHotkeyUiReasonMessagesUsePlayerReadableCopy",
+        "UnifiedHotkeySettingsDefaultsUseCanonicalQuickAnnouncement",
+        "UnifiedHotkeySettingsDoNotMigrateLegacyHotkeys",
+        "UnifiedHotkeySettingsAcceptsOnlyCatalogTokens",
+        "UnifiedHotkeySettingsCacheSignatureTracksBindings",
+        "ConfigServiceUnifiedHotkeySaveFailureReturnsSaveFailed",
+        "UnifiedHotkeyConflictRegistryReportsInternalConflicts",
+        "UnifiedHotkeyRegistryIgnoresEmptyBindingsAndTerrariaOriginalConflicts",
+        "UnifiedHotkeyRuntimeCacheRefreshesOnlyWhenSignatureChanges",
+        "UnifiedHotkeyRuntimeTriggerDetectsPressedEdgesAndMouseMiddle",
+        "UnifiedHotkeyRuntimeGateReturnsRequiredReasons",
+        "UnifiedHotkeyRuntimeGateBlocksTriggerAndConfigChangeSwapsBinding",
+        "UnifiedHotkeyRuntimeSwitchFeatureToggleUsesUnifiedOnly",
+        "UnifiedHotkeyRuntimeSwitchBlueprintUsesUnifiedOnly",
+        "UnifiedHotkeyRuntimeSwitchActionBindingsUseUnifiedIds",
+        "UnifiedHotkeyRuntimeSwitchQuickAnnouncementConsumesUnifiedTrigger",
+        "UnifiedHotkeyRuntimeSwitchQuickAnnouncementRecordsBlockedReason",
+        "UnifiedHotkeyRegressionAuditLocksReasonMetadataFields"
+    )
+    $missingAggregateCalls = @()
+    foreach ($call in $requiredAggregateCalls) {
+        if (-not $aggregateTestText.Contains($call)) {
+            $missingAggregateCalls += $call
+        }
+    }
+
+    if ($programText.Contains('Run("unified hotkey regression audit contracts stay wired", ref failed, UnifiedHotkeyRegressionAuditContractsStayWired)') -and
+        $aggregateTestText.Contains("UnifiedHotkeyRegressionAuditContractsStayWired") -and
+        $aggregateTestText.Contains('"bindingId"') -and
+        $aggregateTestText.Contains('"reasonCode"') -and
+        $aggregateTestText.Contains('"blockedReason"') -and
+        $aggregateTestText.Contains('"playerMessage"') -and
+        $missingAggregateCalls.Count -eq 0) {
+        Write-Pass "Unified hotkey stage-09 aggregate regression test stays registered and covers token, config, capture, conflict, runtime, switch, and diagnostics contracts."
+    }
+    else {
+        Write-FailHealth "Unified hotkey aggregate regression registration or coverage missing: $($missingAggregateCalls -join ', ')"
+    }
+
+    $requiredSourceAnchors = @(
+        @{ Path = "src\JueMingZ\Input\Hotkeys\HotkeyTokenCatalog.cs"; Anchors = @("MouseMiddle", "Numpad", "LCtrl") },
+        @{ Path = "src\JueMingZ\Input\Hotkeys\HotkeyParser.cs"; Anchors = @("HotkeyParseFailureReason.ReservedKey", "HotkeyParseFailureReason.UnsupportedToken", "HotkeyParseFailureReason.InvalidToken") },
+        @{ Path = "src\JueMingZ\Input\Hotkeys\HotkeyDisplayFormatter.cs"; Anchors = @("FormatToken", "FormatChord", '" + "') },
+        @{ Path = "src\JueMingZ\Input\Hotkeys\HotkeyCaptureService.cs"; Anchors = @("HotkeyCaptureResult.Cleared()", "HotkeyCaptureResult.Cancelled()", "BackspaceToken") },
+        @{ Path = "src\JueMingZ\Input\Hotkeys\UnifiedHotkeyRuntimeService.cs"; Anchors = @("QueryBinding", "UnifiedHotkeyRuntimeGate.Evaluate", "UnifiedHotkeyRuntimeTriggerResult.Triggered") },
+        @{ Path = "src\JueMingZ\Input\Hotkeys\UnifiedHotkeyRuntimeGate.cs"; Anchors = @("TextInputFocused", "F5TextInputFocused", "NpcChatOpen") },
+        @{ Path = "src\JueMingZ\Input\Hotkeys\UnifiedHotkeyReasonCatalog.cs"; Anchors = @("BuildRuntimeGateMessage", "BuildDiagnosticMetadataJson", "NormalizeRuntimeReasonCode") },
+        @{ Path = "src\JueMingZ\Config\UnifiedHotkeySettings.cs"; Anchors = @("CreateDefault", "LAlt+LShift+MouseLeft", "CreateCacheSignature") },
+        @{ Path = "src\JueMingZ\Config\UnifiedHotkeyBindingIds.cs"; Anchors = @("MapQuickAnnouncementTrigger", "WorldAutomationAutoMiningTrigger", "ForQuickItemSlot") },
+        @{ Path = "src\JueMingZ\Config\UnifiedHotkeyConflictRegistry.cs"; Anchors = @("TryFindConflict", "BuildRegistrations") },
+        @{ Path = "src\JueMingZ\Config\UnifiedHotkeyConflict.cs"; Anchors = @("ResultCode", "conflictWith:") },
+        @{ Path = "src\JueMingZ\Config\UnifiedHotkeyFeaturePolicyCatalog.cs"; Anchors = @("FeatureTogglePolicyId", "QuickItemPolicyId", "BlueprintActionPolicyId") },
+        @{ Path = "src\JueMingZ\UI\Legacy\LegacyMainWindow.UnifiedHotkeys.cs"; Anchors = @("TryApplyUnifiedHotkeyCaptureResult", "BuildUnifiedHotkeyUpdateMessage", "BuildUnifiedHotkeyFailureMessage") }
+    )
+
+    $missingSourceAnchors = @()
+    foreach ($entry in $requiredSourceAnchors) {
+        $path = Join-Path $RepoRoot $entry.Path
+        $text = Read-TextIfExists -Path $path
+        if ($null -eq $text) {
+            $missingSourceAnchors += $entry.Path
+            continue
+        }
+
+        foreach ($anchor in $entry.Anchors) {
+            if (-not $text.Contains($anchor)) {
+                $missingSourceAnchors += ($entry.Path + "::" + $anchor)
+            }
+        }
+    }
+
+    if ($missingSourceAnchors.Count -eq 0) {
+        Write-Pass "Unified hotkey token, parser, formatter, capture, conflict, runtime, reason, config, and UI adapter anchors are present."
+    }
+    else {
+        Write-FailHealth "Unified hotkey source anchors missing: $($missingSourceAnchors -join ', ')"
+    }
+
+    if ($featureToggleRuntimeText.Contains("UnifiedHotkeyBindingIds.ForFeatureToggleTarget") -and
+        $featureToggleRuntimeText.Contains("UnifiedHotkeyRuntimeService.QueryBinding") -and
+        $quickItemRuntimeText.Contains("UnifiedHotkeyBindingIds.ForQuickItemSlot") -and
+        $quickItemRuntimeText.Contains("UnifiedHotkeyRuntimeService.QueryBinding(bindingId)") -and
+        $autoMiningServiceText.Contains("UnifiedHotkeyBindingIds.WorldAutomationAutoMiningTrigger") -and
+        $autoMiningServiceText.Contains("UnifiedHotkeyRuntimeService.QueryBinding") -and
+        $quickAnnouncementRuntimeText.Contains("UnifiedHotkeyBindingIds.MapQuickAnnouncementTrigger") -and
+        $quickAnnouncementRuntimeText.Contains("UseUnifiedHotkeyRuntime = true") -and
+        $blueprintRuntimeText.Contains("UnifiedHotkeyBindingIds.ForBlueprintAction") -and
+        $blueprintRuntimeText.Contains("UnifiedHotkeyRuntimeService.QueryBinding")) {
+        Write-Pass "Feature toggle, quick item, auto-mining, quick announcement, and blueprint runtime paths consume unified binding ids."
+    }
+    else {
+        Write-FailHealth "One or more unified hotkey runtime consumers stopped reading unified binding ids."
+    }
+
+    if ($autoMiningInputText.Contains("Legacy hotkey parser kept only for pre-unified regression tests") -and
+        $quickAnnouncementRuntimeText.Contains("UI display compatibility shape") -and
+        $quickItemRuntimeText.Contains("trigger chord lives only in") -and
+        $quickItemRuntimeText.Contains("inventory.quick_item.slotN")) {
+        Write-Pass "Old hotkey compatibility bridges are explicitly marked as non-production trigger sources."
+    }
+    else {
+        Write-FailHealth "Legacy hotkey bridges must document why they remain and must not be production trigger sources."
+    }
+
+    $privateSystemPatterns = @(
+        "TryParseHotkey",
+        "TryParseVirtualKey",
+        "CaptureVirtualKeys",
+        "MapQuickAnnouncementHotkeyTokens",
+        "NormalizeMainKey",
+        "MainKeyToVirtualKey",
+        "HotkeyTokens"
+    )
+    $allowedPrivateSystemPaths = @(
+        "src/JueMingZ/Input/Hotkeys/",
+        "src/JueMingZ/Config/FeatureToggleHotkeyChord.cs",
+        "src/JueMingZ/Automation/WorldAutomation/AutoMiningHotkeyInput.cs",
+        "src/JueMingZ/Automation/Information/MapQuickAnnouncementHotkeyInput.cs",
+        "src/JueMingZ/Automation/Information/MapQuickAnnouncementRuntimeService.cs"
+    )
+
+    $getAsyncAllowedPaths = @(
+        "src/JueMingZ/Input/Hotkeys/UnifiedHotkeyRuntimeInputState.cs",
+        "src/JueMingZ/Input/DebugHotkeyService.cs",
+        "src/JueMingZ/Input/DiagnosticActionHotkeyService.cs",
+        "src/JueMingZ/UI/DiagnosticMouseStateReader.cs",
+        "src/JueMingZ/UI/Legacy/LegacyMainWindow.Shared.cs",
+        "src/JueMingZ/UI/Legacy/LegacyMainWindow.Misc.QuickItems.Capture.cs",
+        "src/JueMingZ/UI/Legacy/LegacyHexColorInput.cs",
+        "src/JueMingZ/Automation/WorldAutomation/AutoMiningHotkeyInput.cs",
+        "src/JueMingZ/Automation/Information/MapQuickAnnouncementRuntimeService.cs",
+        "src/JueMingZ/Compat/"
+    )
+
+    $forbiddenPrivateSystems = @()
+    $forbiddenGetAsync = @()
+    $mainKeyStateLeaks = @()
+    $sourceRoot = Join-Path $RepoRoot "src\JueMingZ"
+    foreach ($file in Get-ChildItem -LiteralPath $sourceRoot -Recurse -Filter "*.cs" -File -ErrorAction SilentlyContinue) {
+        $relative = $file.FullName.Substring($RepoRoot.Length).TrimStart('\', '/').Replace('\', '/')
+        $text = Read-TextIfExists -Path $file.FullName
+        if ($null -eq $text) {
+            continue
+        }
+
+        $privateAllowed = $false
+        foreach ($allowed in $allowedPrivateSystemPaths) {
+            if ($allowed.EndsWith("/")) {
+                if ($relative.StartsWith($allowed, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    $privateAllowed = $true
+                }
+            }
+            elseif ([string]::Equals($relative, $allowed, [System.StringComparison]::OrdinalIgnoreCase)) {
+                $privateAllowed = $true
+            }
+        }
+
+        if (-not $privateAllowed) {
+            foreach ($pattern in $privateSystemPatterns) {
+                if ($text.Contains($pattern)) {
+                    $forbiddenPrivateSystems += ($relative + "::" + $pattern)
+                }
+            }
+        }
+
+        $getAsyncAllowed = $false
+        foreach ($allowed in $getAsyncAllowedPaths) {
+            if ($allowed.EndsWith("/")) {
+                if ($relative.StartsWith($allowed, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    $getAsyncAllowed = $true
+                }
+            }
+            elseif ([string]::Equals($relative, $allowed, [System.StringComparison]::OrdinalIgnoreCase)) {
+                $getAsyncAllowed = $true
+            }
+        }
+
+        if (-not $getAsyncAllowed -and $text.Contains("GetAsyncKeyState")) {
+            $forbiddenGetAsync += $relative
+        }
+
+        if ($text.Contains("Main.keyState")) {
+            $mainKeyStateLeaks += $relative
+        }
+    }
+
+    if ($forbiddenPrivateSystems.Count -eq 0 -and
+        $forbiddenGetAsync.Count -eq 0 -and
+        $mainKeyStateLeaks.Count -eq 0) {
+        Write-Pass "Unified hotkey audit blocks new private parser/token/capture systems and unapproved direct physical key scans."
+    }
+    else {
+        Write-FailHealth "Unified hotkey private-system backflow detected; private=$($forbiddenPrivateSystems -join ', ') getAsync=$($forbiddenGetAsync -join ', ') mainKeyState=$($mainKeyStateLeaks -join ', ')"
+    }
+
+    if ($engineeringRulesText.Contains("统一快捷键防回流") -and
+        $engineeringRulesText.Contains("Input/Hotkeys") -and
+        $engineeringRulesText.Contains("UnifiedHotkeyReasonCatalog") -and
+        $featureToggleDocText.Contains("统一快捷键底座") -and
+        $featureToggleDocText.Contains("feature.toggle.") -and
+        $quickItemDocText.Contains("inventory.quick_item.slotN") -and
+        $quickItemDocText.Contains("不再作为生产触发来源") -and
+        $autoMiningDocText.Contains("automation.auto_mining.trigger") -and
+        $autoMiningDocText.Contains("旧配置不迁移") -and
+        $quickAnnouncementDocText.Contains("map.quick_announcement.trigger") -and
+        $quickAnnouncementDocText.Contains("旧三槽") -and
+        $blueprintDocText.Contains("blueprint.action.") -and
+        $blueprintDocText.Contains("统一快捷键底座") -and
+        $diagnosticRulesText.Contains("UnifiedHotkeyReasonCatalog") -and
+        $diagnosticRulesText.Contains("reasonCode") -and
+        $diagnosticRulesText.Contains("blockedReason") -and
+        $diagnosticRulesText.Contains("MapQuickAnnouncementLast") -and
+        $plan09Text.Contains("0.1021-hotkey-regression-audit") -and
+        $updateIndexText.Contains("0.1021-统一快捷键回归审计") -and
+        $docHistoryIndexText.Contains("统一快捷键回归审计")) {
+        Write-Pass "Unified hotkey engineering, feature, diagnostics, plan, update, and document-history docs carry the stage-09 anti-backflow contract."
+    }
+    else {
+        Write-FailHealth "Unified hotkey stage-09 documentation anchors are missing from engineering rules, feature docs, diagnostics rules, plan, update index, or document history."
+    }
+}
+
+function Test-UnifiedHotkeyStage10CloseoutGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $runtimePath = Join-Path $RepoRoot "src\JueMingZ\Runtime\JueMingZRuntime.cs"
+    $csprojPath = Join-Path $RepoRoot "src\JueMingZ\JueMingZ.csproj"
+    $currentPlanDirectory = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "统一快捷键系统重构-260702")
+    $archivePlanDirectory = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "统一快捷键系统重构-260702")
+    $plan00Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "统一快捷键系统重构-260702", "00-基准.md")
+    $plan10Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "统一快捷键系统重构-260702", "10-验证打包与归档收口.md")
+    $currentPlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "索引.md")
+    $archivePlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "索引.md")
+    $featureToggleDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "F5通用", "功能主开关快捷键.md")
+    $quickItemDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "物品页", "快捷物品.md")
+    $autoMiningDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "杂项页", "自动挖矿.md")
+    $quickAnnouncementDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "地图加强页", "快捷宣告.md")
+    $blueprintDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $updateRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "0.1022-统一快捷键验证收口-2607020531.md")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+    $docHistoryRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "统一快捷键验证收口-2607020531.md")
+    $auditText = Read-TextIfExists -Path (Join-Path $RepoRoot "scripts\audit-project-health-full.ps1")
+
+    $runtimeText = Read-TextIfExists -Path $runtimePath
+    $csprojText = Read-TextIfExists -Path $csprojPath
+    $plan00Text = Read-TextIfExists -Path $plan00Path
+    $plan10Text = Read-TextIfExists -Path $plan10Path
+    $currentPlanIndexText = Read-TextIfExists -Path $currentPlanIndexPath
+    $archivePlanIndexText = Read-TextIfExists -Path $archivePlanIndexPath
+    $featureToggleDocText = Read-TextIfExists -Path $featureToggleDocPath
+    $quickItemDocText = Read-TextIfExists -Path $quickItemDocPath
+    $autoMiningDocText = Read-TextIfExists -Path $autoMiningDocPath
+    $quickAnnouncementDocText = Read-TextIfExists -Path $quickAnnouncementDocPath
+    $blueprintDocText = Read-TextIfExists -Path $blueprintDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $updateRecordText = Read-TextIfExists -Path $updateRecordPath
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+    $docHistoryRecordText = Read-TextIfExists -Path $docHistoryRecordPath
+
+    if (Test-BlueprintPlacementVersionMetadata -RuntimeText $runtimeText -CsprojText $csprojText -AllowedRuntimeVersions @("0.1022-hotkey-closeout", "0.1023-hotkey-readable-failure-copy")) {
+        Write-Pass "Unified hotkey stage 10 closeout version metadata is current."
+    }
+    else {
+        Write-FailHealth "Unified hotkey stage 10 closeout/follow-up must keep RuntimeVersion and project metadata at 0.1022-hotkey-closeout or 0.1023-hotkey-readable-failure-copy."
+    }
+
+    if ((Test-Path -LiteralPath $archivePlanDirectory) -and
+        -not (Test-Path -LiteralPath $currentPlanDirectory) -and
+        $plan00Text -and
+        $plan00Text.Contains('10-验证打包与归档收口.md`：已完成') -and
+        $plan00Text.Contains("0.1022-hotkey-closeout") -and
+        $plan10Text -and
+        $plan10Text.Contains("阶段状态：已完成") -and
+        $plan10Text.Contains("0.1022-hotkey-closeout") -and
+        $plan10Text.Contains("用户 16 条要求覆盖矩阵") -and
+        $plan10Text.Contains("JueMingZ-TestPackage") -and
+        $plan10Text.Contains("-RequireFreshTestPackage") -and
+        $plan10Text.Contains("未生成源码包") -and
+        $plan10Text.Contains("不创建后续")) {
+        Write-Pass "Unified hotkey plan is archived with stage 10 package delivery and relay termination recorded."
+    }
+    else {
+        Write-FailHealth "Unified hotkey stage 10 must archive the plan and mark 00/10 complete with coverage matrix, package, strict freshness audit, no source package, and no further handoff."
+    }
+
+    if ($currentPlanIndexText -and
+        $currentPlanIndexText.Contains("当前没有正在推进的计划") -and
+        $currentPlanIndexText.Contains("文档/归档历史计划/统一快捷键系统重构-260702/") -and
+        $currentPlanIndexText.Contains("0.1022-hotkey-closeout") -and
+        $archivePlanIndexText -and
+        $archivePlanIndexText.Contains("文档/归档历史计划/统一快捷键系统重构-260702/") -and
+        $archivePlanIndexText.Contains("0.1022-hotkey-closeout") -and
+        $archivePlanIndexText.Contains("JueMingZ-TestPackage")) {
+        Write-Pass "Current and archive plan indexes record the unified hotkey stage 10 closeout."
+    }
+    else {
+        Write-FailHealth "Unified hotkey stage 10 must remove the plan from current work and add the archived closeout summary."
+    }
+
+    if ($featureToggleDocText -and $featureToggleDocText.Contains("0.1022-hotkey-closeout") -and
+        $quickItemDocText -and $quickItemDocText.Contains("0.1022-hotkey-closeout") -and
+        $autoMiningDocText -and $autoMiningDocText.Contains("0.1022-hotkey-closeout") -and
+        $quickAnnouncementDocText -and $quickAnnouncementDocText.Contains("0.1022-hotkey-closeout") -and
+        $blueprintDocText -and $blueprintDocText.Contains("0.1022-hotkey-closeout") -and
+        $diagnosticsDocText -and $diagnosticsDocText.Contains("0.1022-hotkey-closeout") -and
+        $diagnosticsDocText.Contains("不新增 action event schema") -and
+        $diagnosticsDocText.Contains("Test-UnifiedHotkeyStage10CloseoutGovernance")) {
+        Write-Pass "Unified hotkey feature and diagnostics docs record the 0.1022 closeout without expanding runtime behavior or diagnostics schema."
+    }
+    else {
+        Write-FailHealth "Unified hotkey stage 10 must update feature and diagnostics docs with 0.1022 closeout and no-new-schema scope."
+    }
+
+    if ($updateIndexText -and
+        $updateIndexText.Contains("0.1022-统一快捷键验证收口-2607020531.md") -and
+        $updateRecordText -and
+        $updateRecordText.Contains('RuntimeVersion：`0.1022-hotkey-closeout`') -and
+        $updateRecordText.Contains("JueMingZ-TestPackage") -and
+        $updateRecordText.Contains("-RequireFreshTestPackage") -and
+        $updateRecordText.Contains("未生成源码包") -and
+        $docHistoryIndexText -and
+        $docHistoryIndexText.Contains("统一快捷键验证收口-2607020531.md") -and
+        $docHistoryRecordText -and
+        $docHistoryRecordText.Contains("0.1022-hotkey-closeout") -and
+        $docHistoryRecordText.Contains("10-验证打包与归档收口")) {
+        Write-Pass "Unified hotkey stage 10 update record and document-change history are synchronized."
+    }
+    else {
+        Write-FailHealth "Unified hotkey stage 10 must synchronize update index/record and document-change history for the 0.1022 closeout."
+    }
+
+    if ($auditText -and
+        $auditText.Contains("Test-UnifiedHotkeyStage10CloseoutGovernance -RepoRoot `$RepoRoot")) {
+        Write-Pass "Unified hotkey stage 10 closeout audit is wired into the Hotkey health audit."
+    }
+    else {
+        Write-FailHealth "Hotkey health audit must include Test-UnifiedHotkeyStage10CloseoutGovernance."
     }
 }
 
@@ -13623,11 +14102,11 @@ function Test-BlueprintFurnitureSavePlacementStage07CloseoutGovernance {
     $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
     $docHistoryRecordText = Read-TextIfExists -Path $docHistoryRecordPath
 
-    if (Test-BlueprintPlacementVersionMetadata -RuntimeText $runtimeText -CsprojText $csprojText -AllowedRuntimeVersions @("0.1008-blueprint-furniture-closeout", "0.1009-blueprint-tileobjectdata-startup-fix", "0.1010-blueprint-large-projection-display", "0.1011-blueprint-library-gap-flag-ui", "0.1012-blueprint-submenu-scroll-body", "0.1013-blueprint-material-modal-scroll")) {
+    if (Test-BlueprintPlacementVersionMetadata -RuntimeText $runtimeText -CsprojText $csprojText -AllowedRuntimeVersions @("0.1008-blueprint-furniture-closeout", "0.1009-blueprint-tileobjectdata-startup-fix", "0.1010-blueprint-large-projection-display", "0.1011-blueprint-library-gap-flag-ui", "0.1012-blueprint-submenu-scroll-body", "0.1013-blueprint-material-modal-scroll", "0.1014-hotkey-token-catalog", "0.1015-hotkey-config-boundary", "0.1016-hotkey-capture-ui", "0.1017-hotkey-conflict-policy", "0.1018-hotkey-runtime-cache-gate", "0.1019-hotkey-runtime-feature-switch", "0.1020-hotkey-diagnostics-copy", "0.1021-hotkey-regression-audit", "0.1022-hotkey-closeout", "0.1023-hotkey-readable-failure-copy")) {
         Write-Pass "Blueprint furniture closeout/follow-up version metadata is current."
     }
     else {
-        Write-FailHealth "Blueprint furniture closeout/follow-up must keep RuntimeVersion and project metadata at 0.1008, the 0.1009 TileObjectData startup fix, the 0.1010 large projection display fix, the 0.1011 library gap flag UI fix, the 0.1012 submenu scroll body fix, or the 0.1013 material modal scroll fix."
+        Write-FailHealth "Blueprint furniture closeout/follow-up must keep RuntimeVersion and project metadata at 0.1008, the 0.1009 TileObjectData startup fix, the 0.1010 large projection display fix, the 0.1011 library gap flag UI fix, the 0.1012 submenu scroll body fix, the 0.1013 material modal scroll fix, the 0.1014 hotkey token catalog stage, the 0.1015 hotkey config boundary stage, the 0.1016 hotkey capture UI stage, the 0.1017 hotkey conflict policy stage, the 0.1018 hotkey runtime cache/gate stage, the 0.1019 hotkey runtime feature switch stage, the 0.1020 hotkey diagnostics copy stage, the 0.1021 hotkey regression audit stage, the 0.1022 hotkey closeout stage, or the 0.1023 hotkey readable failure copy follow-up."
     }
 
     if ((Test-Path -LiteralPath $archivePlanDirectory) -and
@@ -14299,6 +14778,8 @@ function Invoke-GovernanceAudit {
     if (Test-AuditScopeSelected -Scopes $Scopes -Candidates @("Hotkey")) {
         Test-FeatureToggleHotkeyGovernance -RepoRoot $RepoRoot
         Test-HotkeyBackspaceClearGovernance -RepoRoot $RepoRoot
+        Test-UnifiedHotkeyRegressionAuditGovernance -RepoRoot $RepoRoot
+        Test-UnifiedHotkeyStage10CloseoutGovernance -RepoRoot $RepoRoot
     }
 
     if (Test-AuditScopeSelected -Scopes $Scopes -Candidates @("Blueprint", "BlueprintCreation")) {

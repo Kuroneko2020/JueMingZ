@@ -111,14 +111,7 @@ namespace JueMingZ.UI.Legacy
 
         private static string GetAutoMiningHotkeyDisplay()
         {
-            var hotkeys = ConfigService.HotkeySettings == null ? null : ConfigService.HotkeySettings.HotkeysByFeatureId;
-            if (hotkeys == null)
-            {
-                return string.Empty;
-            }
-
-            string value;
-            return hotkeys.TryGetValue(FeatureIds.WorldAutomationAutoMining, out value) ? (value ?? string.Empty).Trim() : string.Empty;
+            return GetUnifiedHotkeyDisplay(UnifiedHotkeyBindingIds.WorldAutomationAutoMiningTrigger);
         }
 
         private static float ResolveAutoMiningInputScale(string text, int availableWidth)

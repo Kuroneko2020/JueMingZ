@@ -1,5 +1,6 @@
 using JueMingZ.Automation.Information;
 using JueMingZ.Config;
+using JueMingZ.Input.Hotkeys;
 
 namespace JueMingZ.UI.Legacy
 {
@@ -12,59 +13,19 @@ namespace JueMingZ.UI.Legacy
                 return;
             }
 
-            settings = settings ?? ConfigService.AppSettings ?? AppSettings.CreateDefault();
-            string token;
-            if (!MapQuickAnnouncementHotkeyTokens.TryCapturePressedToken(MapQuickAnnouncementCaptureWasDown, IsKeyDown, out token))
+            var capture = HotkeyCaptureService.Update(MapQuickAnnouncementHotkeyCaptureSession, IsKeyDown);
+            if (capture == null || !capture.HasResult)
             {
                 return;
             }
 
-            if (string.Equals(token, "Escape", System.StringComparison.Ordinal))
-            {
-                StopMapQuickAnnouncementHotkeyCapture();
-                return;
-            }
-
-            MapQuickAnnouncementHotkey hotkey;
-            string resultCode;
-            if (string.Equals(token, "Backspace", System.StringComparison.Ordinal))
-            {
-                if (MapQuickAnnouncementSettings.TryClearHotkeySlot(
-                        settings.MapQuickAnnouncementHotkeySlot1,
-                        settings.MapQuickAnnouncementHotkeySlot2,
-                        settings.MapQuickAnnouncementTriggerKey,
-                        _mapQuickAnnouncementHotkeyCaptureSlot,
-                        out hotkey,
-                        out resultCode))
-                {
-                    settings.MapQuickAnnouncementHotkeySlot1 = hotkey.Slot1;
-                    settings.MapQuickAnnouncementHotkeySlot2 = hotkey.Slot2;
-                    settings.MapQuickAnnouncementTriggerKey = hotkey.TriggerKey;
-                    if (string.Equals(resultCode, "cleared", System.StringComparison.Ordinal))
-                    {
-                        ConfigService.SaveAll();
-                    }
-                }
-
-                StopMapQuickAnnouncementHotkeyCapture();
-                return;
-            }
-
-            if (MapQuickAnnouncementSettings.TryApplyCapturedHotkeyToken(
-                    settings.MapQuickAnnouncementHotkeySlot1,
-                    settings.MapQuickAnnouncementHotkeySlot2,
-                    settings.MapQuickAnnouncementTriggerKey,
-                    _mapQuickAnnouncementHotkeyCaptureSlot,
-                    token,
-                    out hotkey,
-                    out resultCode))
-            {
-                settings.MapQuickAnnouncementHotkeySlot1 = hotkey.Slot1;
-                settings.MapQuickAnnouncementHotkeySlot2 = hotkey.Slot2;
-                settings.MapQuickAnnouncementTriggerKey = hotkey.TriggerKey;
-                ConfigService.SaveAll();
-            }
-
+            string message;
+            bool changed;
+            TryApplyUnifiedHotkeyCaptureResult(
+                UnifiedHotkeyBindingIds.MapQuickAnnouncementTrigger,
+                capture,
+                out message,
+                out changed);
             StopMapQuickAnnouncementHotkeyCapture();
         }
 

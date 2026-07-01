@@ -719,10 +719,7 @@ namespace JueMingZ.UI.Legacy
             }
 
             settings = settings ?? AppSettings.CreateDefault();
-            var hotkey = MapQuickAnnouncementSettings.NormalizeHotkey(
-                settings.MapQuickAnnouncementHotkeySlot1,
-                settings.MapQuickAnnouncementHotkeySlot2,
-                settings.MapQuickAnnouncementTriggerKey);
+            var unifiedHotkeyParts = GetUnifiedMapQuickAnnouncementDisplayParts();
             var context = LegacyUiContext.ForScrollArea(spriteBatch, mouse, area, elements, settings);
             LegacyUiTheme.DrawRowClipped(spriteBatch, row, area.Viewport);
             UiTextRenderer.DrawAlignedTextClipped(
@@ -752,7 +749,7 @@ namespace JueMingZ.UI.Legacy
                 layout[0],
                 "map-quick-announcement-key:1",
                 "快捷宣告:前置键1",
-                BuildMapQuickAnnouncementKeyText(hotkey.Slot1, MapQuickAnnouncementSettings.HotkeySlot1Id),
+                BuildMapQuickAnnouncementUnifiedKeyText(unifiedHotkeyParts, 0, MapQuickAnnouncementSettings.HotkeySlot1Id),
                 IsMapQuickAnnouncementHotkeyCaptureSlot(MapQuickAnnouncementSettings.HotkeySlot1Id),
                 MapQuickAnnouncementKeyboardSlotTooltip) ?? hovered;
             DrawMapQuickAnnouncementSeparator(spriteBatch, area.Viewport, layout[1]);
@@ -763,7 +760,7 @@ namespace JueMingZ.UI.Legacy
                 layout[2],
                 "map-quick-announcement-key:2",
                 "快捷宣告:前置键2",
-                BuildMapQuickAnnouncementKeyText(hotkey.Slot2, MapQuickAnnouncementSettings.HotkeySlot2Id),
+                BuildMapQuickAnnouncementUnifiedKeyText(unifiedHotkeyParts, 1, MapQuickAnnouncementSettings.HotkeySlot2Id),
                 IsMapQuickAnnouncementHotkeyCaptureSlot(MapQuickAnnouncementSettings.HotkeySlot2Id),
                 MapQuickAnnouncementKeyboardSlotTooltip) ?? hovered;
             DrawMapQuickAnnouncementSeparator(spriteBatch, area.Viewport, layout[3]);
@@ -774,7 +771,7 @@ namespace JueMingZ.UI.Legacy
                 layout[4],
                 "map-quick-announcement-key:trigger",
                 "快捷宣告:触发键",
-                BuildMapQuickAnnouncementKeyText(hotkey.TriggerKey, MapQuickAnnouncementSettings.HotkeyTriggerId),
+                BuildMapQuickAnnouncementUnifiedKeyText(unifiedHotkeyParts, 2, MapQuickAnnouncementSettings.HotkeyTriggerId),
                 IsMapQuickAnnouncementHotkeyCaptureSlot(MapQuickAnnouncementSettings.HotkeyTriggerId),
                 MapQuickAnnouncementTriggerSlotTooltip) ?? hovered;
 
@@ -888,6 +885,18 @@ namespace JueMingZ.UI.Legacy
 
             var display = MapQuickAnnouncementSettings.DisplayKey(token);
             return string.IsNullOrWhiteSpace(display) ? "空" : display;
+        }
+
+        private static string BuildMapQuickAnnouncementUnifiedKeyText(string[] parts, int index, string slotId)
+        {
+            if (IsMapQuickAnnouncementHotkeyCaptureSlot(slotId))
+            {
+                return "录入";
+            }
+
+            return parts != null && index >= 0 && index < parts.Length && !string.IsNullOrWhiteSpace(parts[index])
+                ? parts[index]
+                : "空";
         }
 
         private static bool IsMapQuickAnnouncementHotkeyCaptureSlot(string slotId)

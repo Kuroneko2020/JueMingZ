@@ -27,15 +27,21 @@ namespace JueMingZ.Config
         public static string AppSettingsPath { get; private set; } = Path.Combine(ConfigDirectory, "appsettings.json");
         public static string FeatureSettingsPath { get; private set; } = Path.Combine(ConfigDirectory, "features.json");
         public static string HotkeySettingsPath { get; private set; } = Path.Combine(ConfigDirectory, "hotkeys.json");
+        public static string UnifiedHotkeySettingsPath { get; private set; } = Path.Combine(ConfigDirectory, "unified-hotkeys.json");
 
         public static AppSettings AppSettings { get; private set; } = AppSettings.CreateDefault();
         public static FeatureSettings FeatureSettings { get; private set; } = FeatureSettings.CreateDefault();
         public static HotkeySettings HotkeySettings { get; private set; } = HotkeySettings.CreateDefault();
+        public static UnifiedHotkeySettings UnifiedHotkeySettings { get; private set; } = UnifiedHotkeySettings.CreateDefault();
+        public static string UnifiedHotkeySettingsCacheSignature { get; private set; } =
+            UnifiedHotkeySettings.CreateDefault().CreateCacheSignature();
+        public static int UnifiedHotkeySettingsRevision { get; private set; }
         public static ConfigSaveSummary LastSaveSummary { get; private set; }
 
         private static bool _appSettingsSaveAllowed = true;
         private static bool _featureSettingsSaveAllowed = true;
         private static bool _hotkeySettingsSaveAllowed = true;
+        private static bool _unifiedHotkeySettingsSaveAllowed = true;
         private static Func<string, string> _saveTempPathFactoryForTesting;
 
         internal static void ResetLoadStateForTesting()
@@ -45,6 +51,7 @@ namespace JueMingZ.Config
                 _appSettingsSaveAllowed = true;
                 _featureSettingsSaveAllowed = true;
                 _hotkeySettingsSaveAllowed = true;
+                _unifiedHotkeySettingsSaveAllowed = true;
                 _saveTempPathFactoryForTesting = null;
                 LastSaveSummary = null;
             }
@@ -57,9 +64,12 @@ namespace JueMingZ.Config
                 AppSettings = AppSettings.CreateDefault();
                 FeatureSettings = FeatureSettings.CreateDefault();
                 HotkeySettings = HotkeySettings.CreateDefault();
+                UnifiedHotkeySettings = UnifiedHotkeySettings.CreateDefault();
+                RefreshUnifiedHotkeySettingsSignalLocked();
                 _appSettingsSaveAllowed = true;
                 _featureSettingsSaveAllowed = true;
                 _hotkeySettingsSaveAllowed = true;
+                _unifiedHotkeySettingsSaveAllowed = true;
                 _saveTempPathFactoryForTesting = null;
                 LastSaveSummary = null;
             }
@@ -111,7 +121,19 @@ namespace JueMingZ.Config
                     HotkeySettings = hotkeySettingsLoad.Value;
                     _hotkeySettingsSaveAllowed = hotkeySettingsLoad.FutureSaveAllowed;
 
-                    LastSaveSummary = BuildSaveSummary(appSettingsLoad.SaveResult, featureSettingsSave, hotkeySettingsLoad.SaveResult);
+                    var unifiedHotkeySettingsLoad = LoadOrCreate(
+                        UnifiedHotkeySettingsPath,
+                        UnifiedHotkeySettings.CreateDefault,
+                        MigrateUnifiedHotkeySettings);
+                    UnifiedHotkeySettings = unifiedHotkeySettingsLoad.Value;
+                    _unifiedHotkeySettingsSaveAllowed = unifiedHotkeySettingsLoad.FutureSaveAllowed;
+                    RefreshUnifiedHotkeySettingsSignalLocked();
+
+                    LastSaveSummary = BuildSaveSummary(
+                        appSettingsLoad.SaveResult,
+                        featureSettingsSave,
+                        hotkeySettingsLoad.SaveResult,
+                        unifiedHotkeySettingsLoad.SaveResult);
                     Logger.Configure(AppSettings.LogLevel, AppSettings.EnableTraceLog);
                     LogSaveSummary(LastSaveSummary);
                     Logger.Info("ConfigService", "Config loaded: " + ConfigDirectory);
@@ -121,13 +143,17 @@ namespace JueMingZ.Config
                     AppSettings = AppSettings.CreateDefault();
                     FeatureSettings = FeatureSettings.CreateDefault();
                     HotkeySettings = HotkeySettings.CreateDefault();
+                    UnifiedHotkeySettings = UnifiedHotkeySettings.CreateDefault();
+                    RefreshUnifiedHotkeySettingsSignalLocked();
                     _appSettingsSaveAllowed = false;
                     _featureSettingsSaveAllowed = false;
                     _hotkeySettingsSaveAllowed = false;
+                    _unifiedHotkeySettingsSaveAllowed = false;
                     LastSaveSummary = BuildSaveSummary(
                         ConfigFileSaveResult.Failure("appsettings.json", AppSettingsPath, "initialize failed: " + error.Message),
                         ConfigFileSaveResult.Failure("features.json", FeatureSettingsPath, "initialize failed: " + error.Message),
-                        ConfigFileSaveResult.Failure("hotkeys.json", HotkeySettingsPath, "initialize failed: " + error.Message));
+                        ConfigFileSaveResult.Failure("hotkeys.json", HotkeySettingsPath, "initialize failed: " + error.Message),
+                        ConfigFileSaveResult.Failure("unified-hotkeys.json", UnifiedHotkeySettingsPath, "initialize failed: " + error.Message));
                     Logger.Warn("ConfigService", "Config initialization failed; using defaults.");
                     Logger.Debug("ConfigService", error.ToString());
                 }
@@ -165,12 +191,64 @@ namespace JueMingZ.Config
                     HotkeySettings,
                     _hotkeySettingsSaveAllowed,
                     "hotkeys.json load failed; refusing to overwrite existing file with in-memory defaults");
-                var summary = BuildSaveSummary(appSettings, featureSettings, hotkeySettings);
+                var unifiedHotkeySettings = SaveIfAllowed(
+                    "unified-hotkeys.json",
+                    UnifiedHotkeySettingsPath,
+                    UnifiedHotkeySettings,
+                    _unifiedHotkeySettingsSaveAllowed,
+                    "unified-hotkeys.json load failed; refusing to overwrite existing file with in-memory defaults");
+                var summary = BuildSaveSummary(appSettings, featureSettings, hotkeySettings, unifiedHotkeySettings);
                 LastSaveSummary = summary;
+                RefreshUnifiedHotkeySettingsSignalLocked();
 
                 LogSaveSummary(summary);
 
                 return summary;
+            }
+        }
+
+        public static bool TrySaveUnifiedHotkeyBinding(
+            string bindingId,
+            string chordText,
+            out UnifiedHotkeyBindingUpdateResult result)
+        {
+            lock (SyncRoot)
+            {
+                if (UnifiedHotkeySettings == null)
+                {
+                    UnifiedHotkeySettings = UnifiedHotkeySettings.CreateDefault();
+                }
+
+                if (!UnifiedHotkeyConflictRegistry.TryValidateBinding(
+                        UnifiedHotkeySettings,
+                        bindingId,
+                        chordText,
+                        out result))
+                {
+                    return false;
+                }
+
+                if (!UnifiedHotkeySettings.TrySetBinding(bindingId, chordText, out result))
+                {
+                    return false;
+                }
+
+                if (!result.Changed)
+                {
+                    return true;
+                }
+
+                var summary = SaveAll();
+                var unifiedSave = summary == null ? null : summary.UnifiedHotkeySettings;
+                if (unifiedSave == null || !unifiedSave.Succeeded)
+                {
+                    result = UnifiedHotkeyBindingUpdateResult.SaveFailed(
+                        result.BindingId,
+                        unifiedSave == null ? "unified-hotkeys.json save did not return diagnostics." : unifiedSave.Error);
+                    return false;
+                }
+
+                return true;
             }
         }
 
@@ -542,11 +620,13 @@ namespace JueMingZ.Config
         private static ConfigSaveSummary BuildSaveSummary(
             ConfigFileSaveResult appSettings,
             ConfigFileSaveResult featureSettings,
-            ConfigFileSaveResult hotkeySettings)
+            ConfigFileSaveResult hotkeySettings,
+            ConfigFileSaveResult unifiedHotkeySettings)
         {
             var succeeded = IsSaveSucceeded(appSettings) &&
                             IsSaveSucceeded(featureSettings) &&
-                            IsSaveSucceeded(hotkeySettings);
+                            IsSaveSucceeded(hotkeySettings) &&
+                            IsSaveSucceeded(unifiedHotkeySettings);
             return new ConfigSaveSummary
             {
                 Utc = DateTime.UtcNow,
@@ -554,8 +634,9 @@ namespace JueMingZ.Config
                 AppSettings = appSettings,
                 FeatureSettings = featureSettings,
                 HotkeySettings = hotkeySettings,
+                UnifiedHotkeySettings = unifiedHotkeySettings,
                 Summary = succeeded
-                    ? "Config save succeeded: appsettings.json, features.json, hotkeys.json."
+                    ? "Config save succeeded: appsettings.json, features.json, hotkeys.json, unified-hotkeys.json."
                     : "Config save failed for one or more files; see per-file diagnostics."
             };
         }
@@ -577,6 +658,7 @@ namespace JueMingZ.Config
                 LogFailedSave(summary.AppSettings);
                 LogFailedSave(summary.FeatureSettings);
                 LogFailedSave(summary.HotkeySettings);
+                LogFailedSave(summary.UnifiedHotkeySettings);
             }
         }
 
@@ -1158,6 +1240,29 @@ namespace JueMingZ.Config
             {
                 settings.ConfigVersion = 4;
             }
+        }
+
+        private static void MigrateUnifiedHotkeySettings(UnifiedHotkeySettings settings)
+        {
+            if (settings == null)
+            {
+                return;
+            }
+
+            // This is the explicit v2 boundary: only normalize the new file itself, never import legacy hotkeys.
+            settings.Normalize();
+        }
+
+        private static void RefreshUnifiedHotkeySettingsSignalLocked()
+        {
+            var settings = UnifiedHotkeySettings ?? UnifiedHotkeySettings.CreateDefault();
+            var next = settings.CreateCacheSignature();
+            if (!string.Equals(UnifiedHotkeySettingsCacheSignature, next, StringComparison.Ordinal))
+            {
+                UnifiedHotkeySettingsRevision++;
+            }
+
+            UnifiedHotkeySettingsCacheSignature = next;
         }
 
         private static void RemoveBlueprintEntryHotkey(Dictionary<string, string> hotkeys)

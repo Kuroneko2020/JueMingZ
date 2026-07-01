@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using JueMingZ.Compat;
 using JueMingZ.Config;
 using JueMingZ.Diagnostics;
+using JueMingZ.Input.Hotkeys;
 using JueMingZ.Runtime;
 using JueMingZ.UI.Legacy;
 
@@ -109,13 +110,22 @@ namespace JueMingZ.Automation.Information
             if (!input.GameInputAvailable)
             {
                 state.ClearPending();
-                result.HotkeyState = state.HotkeyStateMachine.Update(input.Hotkey, _ => false);
+                result.HotkeyState = ResolveHotkeyState(input, state, ports, false);
+                if (TryRecordUnifiedBlockedTrigger(input, state, result, ports.UtcNow))
+                {
+                    return result;
+                }
+
                 return result.Skip("gameInputUnavailable");
             }
 
-            var hotkeyState = state.HotkeyStateMachine.Update(input.Hotkey, token => IsTokenDown(ports, token));
+            var hotkeyState = ResolveHotkeyState(input, state, ports, true);
             result.HotkeyState = hotkeyState;
-            result.TriggerKey = input.Hotkey == null ? string.Empty : input.Hotkey.TriggerKey ?? string.Empty;
+            result.TriggerKey = ResolveTriggerKey(input);
+            if (TryRecordUnifiedBlockedTrigger(input, state, result, ports.UtcNow))
+            {
+                return result;
+            }
 
             string blockedReason;
             if (IsResponseBlocked(input, out blockedReason))
@@ -154,7 +164,7 @@ namespace JueMingZ.Automation.Information
 
             result.Triggered = true;
             result.ResultCode = "triggered";
-            var triggerKey = input.Hotkey == null ? string.Empty : input.Hotkey.TriggerKey ?? string.Empty;
+            var triggerKey = ResolveTriggerKey(input);
             if (IsMouseTrigger(triggerKey))
             {
                 result.InputConsumeAttempted = true;
@@ -213,6 +223,94 @@ namespace JueMingZ.Automation.Information
                 input.CooldownMilliseconds,
                 input.AirCooldownMilliseconds,
                 ports);
+        }
+
+        private static MapQuickAnnouncementHotkeyState ResolveHotkeyState(
+            MapQuickAnnouncementRuntimeInput input,
+            MapQuickAnnouncementRuntimeState state,
+            MapQuickAnnouncementRuntimePorts ports,
+            bool allowTokenReads)
+        {
+            input = input ?? new MapQuickAnnouncementRuntimeInput();
+            state = state ?? new MapQuickAnnouncementRuntimeState();
+            if (input.UseUnifiedHotkeyRuntime)
+            {
+                return CreateHotkeyStateFromUnifiedTrigger(input.UnifiedHotkeyTrigger, input.UnifiedHotkeySignature);
+            }
+
+            Func<string, bool> isTokenDown = allowTokenReads
+                ? new Func<string, bool>(token => IsTokenDown(ports, token))
+                : new Func<string, bool>(_ => false);
+            return state.HotkeyStateMachine.Update(input.Hotkey, isTokenDown);
+        }
+
+        private static bool TryRecordUnifiedBlockedTrigger(
+            MapQuickAnnouncementRuntimeInput input,
+            MapQuickAnnouncementRuntimeState state,
+            MapQuickAnnouncementRuntimeResult result,
+            DateTime utcNow)
+        {
+            if (input == null ||
+                result == null ||
+                !input.UseUnifiedHotkeyRuntime ||
+                !input.UnifiedHotkeyTrigger.PressedEdge ||
+                !string.Equals(input.UnifiedHotkeyTrigger.ResultCode, "blocked", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (state != null)
+            {
+                state.ClearPending();
+            }
+
+            result.Triggered = true;
+            result.ResultCode = "blocked";
+            result.SkipReason = string.IsNullOrWhiteSpace(input.UnifiedHotkeyTrigger.Reason)
+                ? "blocked"
+                : input.UnifiedHotkeyTrigger.Reason;
+            result.TriggerKey = ResolveTriggerKey(input);
+            if (result.HotkeyState == null)
+            {
+                result.HotkeyState = CreateHotkeyStateFromUnifiedTrigger(
+                    input.UnifiedHotkeyTrigger,
+                    input.UnifiedHotkeySignature);
+            }
+
+            MapQuickAnnouncementDiagnostics.RecordRuntimeResult(result, utcNow);
+            return true;
+        }
+
+        private static MapQuickAnnouncementHotkeyState CreateHotkeyStateFromUnifiedTrigger(
+            UnifiedHotkeyRuntimeTriggerResult trigger,
+            string signature)
+        {
+            var hasBinding = trigger.Binding != null;
+            var triggered = string.Equals(trigger.ResultCode, "triggered", StringComparison.Ordinal);
+            return new MapQuickAnnouncementHotkeyState
+            {
+                IsValid = hasBinding,
+                Slot1Down = trigger.Down,
+                Slot2Down = trigger.Down,
+                TriggerDown = trigger.Down,
+                CombinationHeld = hasBinding && trigger.Down,
+                TriggerPressedEdge = trigger.PressedEdge,
+                Triggered = triggered,
+                LatchedUntilRelease = hasBinding && trigger.Down && !triggered,
+                Signature = string.IsNullOrWhiteSpace(signature) ? trigger.Display : signature
+            };
+        }
+
+        private static string ResolveTriggerKey(MapQuickAnnouncementRuntimeInput input)
+        {
+            if (input == null)
+            {
+                return string.Empty;
+            }
+
+            return input.UseUnifiedHotkeyRuntime
+                ? input.UnifiedHotkeyTriggerKey ?? string.Empty
+                : (input.Hotkey == null ? string.Empty : input.Hotkey.TriggerKey ?? string.Empty);
         }
 
         private static MapQuickAnnouncementRuntimeResult ContinuePendingMouseRequest(
@@ -473,12 +571,17 @@ namespace JueMingZ.Automation.Information
                    string.Equals(token, "MouseRight", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(token, "MouseMiddle", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(token, "Mouse4", StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(token, "Mouse5", StringComparison.OrdinalIgnoreCase);
+                   string.Equals(token, "Mouse5", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(token, "MouseX1", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(token, "MouseX2", StringComparison.OrdinalIgnoreCase);
         }
 
         private static MapQuickAnnouncementRuntimeInput BuildCurrentInput()
         {
             var settings = RuntimeSettingsSnapshotProvider.GetCurrent();
+            // The old three AppSettings slots remain a UI display compatibility shape; production
+            // trigger evaluation consumes the canonical map.quick_announcement.trigger binding.
+            var unifiedTrigger = UnifiedHotkeyRuntimeService.QueryBinding(UnifiedHotkeyBindingIds.MapQuickAnnouncementTrigger);
             bool textFocused;
             string textReason;
             TerrariaInputCompat.TryReadTextInputFocus(out textFocused, out textReason);
@@ -496,14 +599,35 @@ namespace JueMingZ.Automation.Information
                 TerrariaTextInputReason = textReason,
                 NpcChatOpen = !string.IsNullOrEmpty(TerrariaMainCompat.NpcChatText),
                 GameUpdateCount = TerrariaMainCompat.GameUpdateCount,
-                Hotkey = new MapQuickAnnouncementHotkey(
-                    settings.MapQuickAnnouncementHotkeySlot1,
-                    settings.MapQuickAnnouncementHotkeySlot2,
-                    settings.MapQuickAnnouncementTriggerKey),
+                Hotkey = new MapQuickAnnouncementHotkey(string.Empty, string.Empty, ResolveUnifiedTriggerKey(unifiedTrigger)),
+                UseUnifiedHotkeyRuntime = true,
+                UnifiedHotkeyTrigger = unifiedTrigger,
+                UnifiedHotkeyTriggerKey = ResolveUnifiedTriggerKey(unifiedTrigger),
+                UnifiedHotkeySignature = unifiedTrigger.Display,
                 ColorHex = settings.MapQuickAnnouncementColorHex,
                 CooldownMilliseconds = settings.MapQuickAnnouncementCooldownMilliseconds,
                 AirCooldownMilliseconds = settings.MapQuickAnnouncementAirCooldownMilliseconds
             };
+        }
+
+        private static string ResolveUnifiedTriggerKey(UnifiedHotkeyRuntimeTriggerResult trigger)
+        {
+            var primary = trigger.Binding == null ||
+                          trigger.Binding.Chord == null ||
+                          trigger.Binding.Chord.PrimaryKey == null
+                ? string.Empty
+                : trigger.Binding.Chord.PrimaryKey.Canonical;
+            switch (primary)
+            {
+                case "MouseX1":
+                    return "Mouse4";
+                case "MouseX2":
+                    return "Mouse5";
+                case "Esc":
+                    return "Escape";
+                default:
+                    return primary ?? string.Empty;
+            }
         }
 
         private static MapQuickAnnouncementRuntimePorts BuildCurrentPorts()
@@ -588,6 +712,8 @@ namespace JueMingZ.Automation.Information
             CooldownMilliseconds = MapQuickAnnouncementSettings.DefaultCooldownMilliseconds;
             AirCooldownMilliseconds = MapQuickAnnouncementSettings.DefaultAirCooldownMilliseconds;
             TerrariaTextInputReason = string.Empty;
+            UnifiedHotkeyTriggerKey = string.Empty;
+            UnifiedHotkeySignature = string.Empty;
         }
 
         public bool FeatureEnabled { get; set; }
@@ -602,6 +728,10 @@ namespace JueMingZ.Automation.Information
         public bool NpcChatOpen { get; set; }
         public ulong GameUpdateCount { get; set; }
         public MapQuickAnnouncementHotkey Hotkey { get; set; }
+        public bool UseUnifiedHotkeyRuntime { get; set; }
+        public UnifiedHotkeyRuntimeTriggerResult UnifiedHotkeyTrigger { get; set; }
+        public string UnifiedHotkeyTriggerKey { get; set; }
+        public string UnifiedHotkeySignature { get; set; }
         public string ColorHex { get; set; }
         public int CooldownMilliseconds { get; set; }
         public int AirCooldownMilliseconds { get; set; }

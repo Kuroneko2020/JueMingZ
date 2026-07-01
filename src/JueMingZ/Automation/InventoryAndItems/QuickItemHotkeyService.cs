@@ -1,29 +1,23 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Globalization;
-using System.Runtime.InteropServices;
 using JueMingZ.Actions;
 using JueMingZ.Common;
 using JueMingZ.Compat;
 using JueMingZ.Config;
 using JueMingZ.Diagnostics;
 using JueMingZ.GameState;
+using JueMingZ.Input.Hotkeys;
 using JueMingZ.Runtime;
-using JueMingZ.UI.Legacy;
 
 namespace JueMingZ.Automation.InventoryAndItems
 {
     // Hotkeys are explicit user commands, but they still enqueue item use instead of writing selectedItem or input flags here.
     public static class QuickItemHotkeyService
     {
-        private const int VkShift = 0x10;
-        private const int VkControl = 0x11;
-        private const int VkAlt = 0x12;
         private const string QuickItemScenario = "Hotkey.QuickItemHotkeys";
         private static readonly TimeSpan TriggerDebounce = TimeSpan.FromMilliseconds(220);
-        private static readonly Dictionary<string, bool> WasDownByBindingKey = new Dictionary<string, bool>(StringComparer.Ordinal);
         private static DateTime _lastTriggerUtc = DateTime.MinValue;
 
         internal static InputActionRequest BuildUseRequestForTesting(int slot, int itemType, string itemName, int requestedItemType, string displayName, string sourceHotkey)
@@ -33,10 +27,10 @@ namespace JueMingZ.Automation.InventoryAndItems
 
         internal static bool TryNormalizeHotkeyForTesting(string text, out string normalized)
         {
-            HotkeyChord chord;
-            if (TryParseHotkey(text, out chord))
+            var parse = HotkeyParser.Parse(text);
+            if (parse.Succeeded)
             {
-                normalized = chord.Normalized;
+                normalized = parse.Normalized;
                 return true;
             }
 
@@ -59,19 +53,23 @@ namespace JueMingZ.Automation.InventoryAndItems
 
             settingsSnapshot = settingsSnapshot ?? RuntimeSettingsSnapshotProvider.GetCurrent();
             var hotkeySettings = ConfigService.HotkeySettings ?? HotkeySettings.CreateDefault();
+            // Rows in hotkeys.json still describe the bound item set; the trigger chord lives only in
+            // unified-hotkeys.json as inventory.quick_item.slotN and is consumed through the runtime cache.
             var bindings = hotkeySettings.QuickItemHotkeyBindings;
             if (bindings == null || bindings.Count <= 0)
             {
-                SyncTrackedStates(new HashSet<string>(StringComparer.Ordinal));
                 return;
             }
 
-            var liveBindingKeys = new HashSet<string>(StringComparer.Ordinal);
             var canTrigger = settingsSnapshot.InventoryQuickItemHotkeysEnabled &&
                              gameState != null &&
                              gameState.IsInWorld &&
-                             !IsInputBlocked() &&
-                             IsCurrentProcessForeground();
+                             !gameState.IsInMainMenu;
+            if (!canTrigger)
+            {
+                return;
+            }
+
             var now = DateTime.UtcNow;
             for (var index = 0; index < bindings.Count; index++)
             {
@@ -81,36 +79,47 @@ namespace JueMingZ.Automation.InventoryAndItems
                     continue;
                 }
 
-                HotkeyChord chord;
-                if (!TryParseHotkey(binding.Hotkey, out chord))
+                var bindingId = UnifiedHotkeyBindingIds.ForQuickItemSlot(index);
+                var trigger = UnifiedHotkeyRuntimeService.QueryBinding(bindingId);
+                if (!trigger.PressedEdge)
                 {
                     continue;
                 }
 
-                var bindingKey = index.ToString(CultureInfo.InvariantCulture) + ":" + chord.Normalized;
-                liveBindingKeys.Add(bindingKey);
-                var isDown = IsChordDown(chord);
-                bool wasDown;
-                WasDownByBindingKey.TryGetValue(bindingKey, out wasDown);
-                WasDownByBindingKey[bindingKey] = isDown;
-                if (!canTrigger || !isDown || wasDown || now - _lastTriggerUtc < TriggerDebounce)
+                if (string.Equals(trigger.ResultCode, "blocked", StringComparison.Ordinal))
+                {
+                    RecordQuickItemHotkeyEvent(
+                        trigger.Display,
+                        UnifiedHotkeyReasonCatalog.IsEnvironmentGateReason(trigger.Reason)
+                            ? DiagnosticResultCode.BlockedByEnvironment
+                            : DiagnosticResultCode.BlockedByUi,
+                        UnifiedHotkeyReasonCatalog.BuildRuntimeGateMessage("快捷物品 " + (index + 1).ToString(CultureInfo.InvariantCulture), trigger.Reason),
+                        bindingId,
+                        trigger.ResultCode,
+                        trigger.Reason,
+                        binding == null ? string.Empty : binding.DisplayName);
+                    continue;
+                }
+
+                if (!string.Equals(trigger.ResultCode, "triggered", StringComparison.Ordinal) ||
+                    now - _lastTriggerUtc < TriggerDebounce)
                 {
                     continue;
                 }
 
-                if (TryHandleBinding(queue, binding, chord))
+                if (TryHandleBinding(queue, binding, trigger.Display, bindingId))
                 {
                     _lastTriggerUtc = now;
                     break;
                 }
             }
-
-            SyncTrackedStates(liveBindingKeys);
         }
 
-        private static bool TryHandleBinding(InputActionQueue queue, QuickItemHotkeyBinding binding, HotkeyChord chord)
+        private static bool TryHandleBinding(InputActionQueue queue, QuickItemHotkeyBinding binding, string sourceHotkey, string bindingId)
         {
-            if (queue == null || binding == null || chord == null)
+            sourceHotkey = sourceHotkey ?? string.Empty;
+            bindingId = bindingId ?? string.Empty;
+            if (queue == null || binding == null || sourceHotkey.Length <= 0)
             {
                 return false;
             }
@@ -135,32 +144,70 @@ namespace JueMingZ.Automation.InventoryAndItems
             string itemName;
             if (!TryFindMatchingSlot(player, selectedSlot, candidateItemTypes, out slot, out itemType, out itemName))
             {
-                DiagnosticActionRecorder.RecordHotkeyEvent(
-                    chord.Display,
-                    "Hotkey.QuickItemHotkeys",
+                RecordQuickItemHotkeyEvent(
+                    sourceHotkey,
                     DiagnosticResultCode.NotApplicable,
-                    "Quick item hotkey pressed, but no matching item was found.");
+                    "Quick item hotkey pressed, but no matching item was found.",
+                    bindingId,
+                    "triggered",
+                    "noMatchingItem",
+                    binding.DisplayName);
                 return false;
             }
 
-            var request = BuildUseRequest(slot, itemType, itemName, requestedItemType, binding.DisplayName, chord.Display);
+            var request = BuildUseRequest(slot, itemType, itemName, requestedItemType, binding.DisplayName, sourceHotkey);
             InputActionAdmissionResult admission;
             if (!queue.TryEnqueue(request, out admission))
             {
-                DiagnosticActionRecorder.RecordHotkeyEvent(
-                    chord.Display,
-                    "Hotkey.QuickItemHotkeys",
-                DiagnosticResultCode.Failed,
-                    "Quick item hotkey request was not admitted: " + (admission == null ? "unknown" : admission.Reason));
+                var reason = admission == null ? "admissionUnknown" : admission.Reason;
+                RecordQuickItemHotkeyEvent(
+                    sourceHotkey,
+                    DiagnosticResultCode.Failed,
+                    "Quick item hotkey request was not admitted: " + (admission == null ? "unknown" : admission.Reason),
+                    bindingId,
+                    "triggered",
+                    reason,
+                    binding.DisplayName);
                 return false;
             }
 
-            DiagnosticActionRecorder.RecordHotkeyEvent(
-                chord.Display,
-                "Hotkey.QuickItemHotkeys",
+            RecordQuickItemHotkeyEvent(
+                sourceHotkey,
                 DiagnosticResultCode.Queued,
-                "Quick item hotkey " + admission.Status.ToLowerInvariant() + " UseHotbarItem for slot " + (slot + 1).ToString(CultureInfo.InvariantCulture) + ".");
+                "Quick item hotkey " + admission.Status.ToLowerInvariant() + " UseHotbarItem for slot " + (slot + 1).ToString(CultureInfo.InvariantCulture) + ".",
+                bindingId,
+                "triggered",
+                string.Empty,
+                binding.DisplayName);
             return true;
+        }
+
+        private static void RecordQuickItemHotkeyEvent(
+            string hotkey,
+            DiagnosticResultCode resultCode,
+            string message,
+            string bindingId,
+            string hotkeyResultCode,
+            string reason,
+            string displayName)
+        {
+            hotkey = hotkey ?? string.Empty;
+            reason = reason ?? string.Empty;
+            message = message ?? string.Empty;
+            DiagnosticActionRecorder.RecordHotkeyEvent(
+                hotkey,
+                QuickItemScenario,
+                resultCode,
+                message,
+                UnifiedHotkeyReasonCatalog.BuildDiagnosticMetadataJson(
+                    "bindingId", bindingId,
+                    "resultCode", resultCode.ToString(),
+                    "hotkeyResultCode", hotkeyResultCode,
+                    "reason", reason,
+                    "reasonCode", UnifiedHotkeyReasonCatalog.NormalizeRuntimeReasonCode(reason),
+                    "blockedReason", resultCode == DiagnosticResultCode.BlockedByUi || resultCode == DiagnosticResultCode.BlockedByEnvironment ? reason : string.Empty,
+                    "displayName", displayName,
+                    "playerMessage", message));
         }
 
         private static InputActionRequest BuildUseRequest(int slot, int itemType, string itemName, int requestedItemType, string displayName, string sourceHotkey)
@@ -326,276 +373,5 @@ namespace JueMingZ.Automation.InventoryAndItems
             return 0;
         }
 
-        private static bool IsInputBlocked()
-        {
-            if (LegacyMainUiState.Visible || LegacyUiInput.IsActiveInteraction() || LegacyTextInput.IsAnyFocused)
-            {
-                return true;
-            }
-
-            bool focused;
-            string reason;
-            if (TerrariaInputCompat.TryReadTextInputFocus(out focused, out reason) && focused)
-            {
-                return true;
-            }
-
-            return focused;
-        }
-
-        private static void SyncTrackedStates(HashSet<string> liveBindingKeys)
-        {
-            if (liveBindingKeys == null)
-            {
-                WasDownByBindingKey.Clear();
-                return;
-            }
-
-            var remove = new List<string>();
-            foreach (var pair in WasDownByBindingKey)
-            {
-                if (!liveBindingKeys.Contains(pair.Key))
-                {
-                    remove.Add(pair.Key);
-                }
-            }
-
-            for (var index = 0; index < remove.Count; index++)
-            {
-                WasDownByBindingKey.Remove(remove[index]);
-            }
-        }
-
-        private static bool TryParseHotkey(string text, out HotkeyChord chord)
-        {
-            chord = null;
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                return false;
-            }
-
-            var parts = text.Split('+');
-            var hasCtrl = false;
-            var hasAlt = false;
-            var hasShift = false;
-            var keyToken = string.Empty;
-            for (var index = 0; index < parts.Length; index++)
-            {
-                var part = parts[index];
-                if (part == null)
-                {
-                    continue;
-                }
-
-                var token = part.Trim();
-                if (token.Length <= 0)
-                {
-                    continue;
-                }
-
-                if (string.Equals(token, "Ctrl", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(token, "Control", StringComparison.OrdinalIgnoreCase))
-                {
-                    hasCtrl = true;
-                    continue;
-                }
-
-                if (string.Equals(token, "Alt", StringComparison.OrdinalIgnoreCase))
-                {
-                    hasAlt = true;
-                    continue;
-                }
-
-                if (string.Equals(token, "Shift", StringComparison.OrdinalIgnoreCase))
-                {
-                    hasShift = true;
-                    continue;
-                }
-
-                if (!string.IsNullOrEmpty(keyToken))
-                {
-                    return false;
-                }
-
-                keyToken = token;
-            }
-
-            if (keyToken.Length <= 0)
-            {
-                return false;
-            }
-
-            int keyCode;
-            if (!TryParseVirtualKey(keyToken, out keyCode))
-            {
-                return false;
-            }
-
-            var normalized = (hasCtrl ? "Ctrl+" : string.Empty) +
-                             (hasAlt ? "Alt+" : string.Empty) +
-                             (hasShift ? "Shift+" : string.Empty) +
-                             keyToken.ToUpperInvariant();
-            chord = new HotkeyChord
-            {
-                Ctrl = hasCtrl,
-                Alt = hasAlt,
-                Shift = hasShift,
-                KeyCode = keyCode,
-                Normalized = normalized,
-                Display = normalized
-            };
-            return true;
-        }
-
-        private static bool TryParseVirtualKey(string token, out int keyCode)
-        {
-            keyCode = 0;
-            if (string.IsNullOrWhiteSpace(token))
-            {
-                return false;
-            }
-
-            var text = token.Trim();
-            if (text.Length == 1)
-            {
-                var c = char.ToUpperInvariant(text[0]);
-                if (c >= 'A' && c <= 'Z')
-                {
-                    keyCode = c;
-                    return true;
-                }
-
-                if (c >= '0' && c <= '9')
-                {
-                    keyCode = c;
-                    return true;
-                }
-            }
-
-            var upper = text.ToUpperInvariant();
-            if (upper.Length > 1 && upper[0] == 'F')
-            {
-                int fn;
-                if (int.TryParse(upper.Substring(1), NumberStyles.Integer, CultureInfo.InvariantCulture, out fn) &&
-                    fn >= 1 &&
-                    fn <= 24)
-                {
-                    keyCode = 0x6F + fn;
-                    return true;
-                }
-            }
-
-            switch (upper)
-            {
-                case "MOUSE1":
-                    keyCode = 0x01;
-                    return true;
-                case "MOUSE2":
-                    keyCode = 0x02;
-                    return true;
-                case "MOUSE3":
-                    keyCode = 0x04;
-                    return true;
-                case "MOUSE4":
-                    keyCode = 0x05;
-                    return true;
-                case "MOUSE5":
-                    keyCode = 0x06;
-                    return true;
-                case "CAPS":
-                case "CAPSLOCK":
-                    keyCode = 0x14;
-                    return true;
-                case "LEFT":
-                    keyCode = 0x25;
-                    return true;
-                case "UP":
-                    keyCode = 0x26;
-                    return true;
-                case "RIGHT":
-                    keyCode = 0x27;
-                    return true;
-                case "DOWN":
-                    keyCode = 0x28;
-                    return true;
-                case "SPACE":
-                    keyCode = 0x20;
-                    return true;
-                case "TAB":
-                    keyCode = 0x09;
-                    return true;
-                case "ENTER":
-                    keyCode = 0x0D;
-                    return true;
-                case "ESC":
-                case "ESCAPE":
-                    keyCode = 0x1B;
-                    return true;
-            }
-
-            return false;
-        }
-
-        private static bool IsChordDown(HotkeyChord chord)
-        {
-            if (chord == null)
-            {
-                return false;
-            }
-
-            return (!chord.Ctrl || IsKeyDown(VkControl)) &&
-                   (!chord.Alt || IsKeyDown(VkAlt)) &&
-                   (!chord.Shift || IsKeyDown(VkShift)) &&
-                   IsKeyDown(chord.KeyCode);
-        }
-
-        private static bool IsKeyDown(int keyCode)
-        {
-            if (!TerrariaMainCompat.AllowsInputProcessing)
-            {
-                return false;
-            }
-
-            return (GetAsyncKeyState(keyCode) & 0x8000) != 0;
-        }
-
-        private static bool IsCurrentProcessForeground()
-        {
-            try
-            {
-                var foregroundWindow = GetForegroundWindow();
-                if (foregroundWindow == IntPtr.Zero)
-                {
-                    return true;
-                }
-
-                int processId;
-                GetWindowThreadProcessId(foregroundWindow, out processId);
-                return processId == Process.GetCurrentProcess().Id;
-            }
-            catch
-            {
-                return true;
-            }
-        }
-
-        [DllImport("user32.dll")]
-        private static extern short GetAsyncKeyState(int virtualKey);
-
-        [DllImport("user32.dll")]
-        private static extern IntPtr GetForegroundWindow();
-
-        [DllImport("user32.dll")]
-        private static extern int GetWindowThreadProcessId(IntPtr windowHandle, out int processId);
-
-        private sealed class HotkeyChord
-        {
-            public bool Ctrl { get; set; }
-            public bool Alt { get; set; }
-            public bool Shift { get; set; }
-            public int KeyCode { get; set; }
-            public string Normalized { get; set; }
-            public string Display { get; set; }
-        }
     }
 }

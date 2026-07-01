@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using JueMingZ.Common;
 using JueMingZ.Config;
+using JueMingZ.Input.Hotkeys;
 
 namespace JueMingZ.UI.Legacy
 {
@@ -16,139 +17,17 @@ namespace JueMingZ.UI.Legacy
             }
 
             var targetId = NormalizeBlueprintHotkeyTargetId(_blueprintHotkeyCaptureTargetId);
-            if (PressedCaptureKey(BlueprintEntryCaptureWasDown, VkEscape))
+            var capture = HotkeyCaptureService.Update(BlueprintEntryHotkeyCaptureSession, IsKeyDown);
+            if (capture == null || !capture.HasResult)
             {
-                _blueprintEntryHotkeyMessage = "已取消录入";
-                StopBlueprintEntryHotkeyCapture();
-                return;
-            }
-
-            if (PressedCaptureKey(BlueprintEntryCaptureWasDown, VkBackspace))
-            {
-                var hotkeySettings = ConfigService.HotkeySettings ?? HotkeySettings.CreateDefault();
-                bool clearChanged;
-                ClearBlueprintHotkeyBinding(hotkeySettings, targetId, out clearChanged);
-                if (clearChanged)
-                {
-                    ConfigService.SaveAll();
-                }
-
-                _blueprintEntryHotkeyMessage = clearChanged ? "已清除绑定" : "当前未绑定";
-                StopBlueprintEntryHotkeyCapture();
-                return;
-            }
-
-            string primaryKey;
-            if (!TryCaptureBlueprintEntryPrimaryKeyToken(out primaryKey))
-            {
-                return;
-            }
-
-            var parts = new List<string>(2);
-            if (IsKeyDown(VkAlt))
-            {
-                parts.Add("Alt");
-            }
-
-            if (IsKeyDown(VkControl))
-            {
-                parts.Add("Ctrl");
-            }
-
-            if (IsKeyDown(VkShift))
-            {
-                parts.Add("Shift");
-            }
-
-            if (parts.Count > 1)
-            {
-                _blueprintEntryHotkeyMessage = "只支持一个修饰键 + 一个主键";
-                StopBlueprintEntryHotkeyCapture();
-                return;
-            }
-
-            parts.Add(primaryKey);
-            FeatureToggleHotkeyChord chord;
-            if (!FeatureToggleHotkeyChord.TryParseParts(parts, out chord))
-            {
-                _blueprintEntryHotkeyMessage = "不支持这个组合";
-                StopBlueprintEntryHotkeyCapture();
                 return;
             }
 
             string message;
             bool changed;
-            if (!TrySaveBlueprintHotkey(ConfigService.HotkeySettings ?? HotkeySettings.CreateDefault(), ConfigService.AppSettings ?? AppSettings.CreateDefault(), targetId, chord.Normalized, out message, out changed))
-            {
-                _blueprintEntryHotkeyMessage = message;
-                StopBlueprintEntryHotkeyCapture();
-                return;
-            }
-
-            if (changed)
-            {
-                ConfigService.SaveAll();
-            }
-
+            TryApplyUnifiedHotkeyCaptureResult(UnifiedHotkeyBindingIds.ForBlueprintAction(targetId), capture, out message, out changed);
             _blueprintEntryHotkeyMessage = message;
             StopBlueprintEntryHotkeyCapture();
-        }
-
-        private static void SeedBlueprintEntryHotkeyCaptureState()
-        {
-            BlueprintEntryCaptureWasDown.Clear();
-            BlueprintEntryCaptureWasDown[VkAlt] = IsKeyDown(VkAlt);
-            BlueprintEntryCaptureWasDown[VkControl] = IsKeyDown(VkControl);
-            BlueprintEntryCaptureWasDown[VkShift] = IsKeyDown(VkShift);
-            BlueprintEntryCaptureWasDown[VkBackspace] = IsKeyDown(VkBackspace);
-            BlueprintEntryCaptureWasDown[VkEscape] = IsKeyDown(VkEscape);
-            for (var key = 0x41; key <= 0x5A; key++)
-            {
-                BlueprintEntryCaptureWasDown[key] = IsKeyDown(key);
-            }
-
-            for (var key = 0x30; key <= 0x39; key++)
-            {
-                BlueprintEntryCaptureWasDown[key] = IsKeyDown(key);
-            }
-
-            for (var key = 0x70; key <= 0x87; key++)
-            {
-                BlueprintEntryCaptureWasDown[key] = IsKeyDown(key);
-            }
-        }
-
-        private static bool TryCaptureBlueprintEntryPrimaryKeyToken(out string token)
-        {
-            token = string.Empty;
-            for (var key = 0x41; key <= 0x5A; key++)
-            {
-                if (PressedCaptureKey(BlueprintEntryCaptureWasDown, key))
-                {
-                    token = ((char)key).ToString();
-                    return true;
-                }
-            }
-
-            for (var key = 0x30; key <= 0x39; key++)
-            {
-                if (PressedCaptureKey(BlueprintEntryCaptureWasDown, key))
-                {
-                    token = ((char)key).ToString();
-                    return true;
-                }
-            }
-
-            for (var key = 0x70; key <= 0x87; key++)
-            {
-                if (PressedCaptureKey(BlueprintEntryCaptureWasDown, key))
-                {
-                    token = "F" + (key - 0x6F).ToString(CultureInfo.InvariantCulture);
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         private static bool TrySaveBlueprintEntryHotkey(

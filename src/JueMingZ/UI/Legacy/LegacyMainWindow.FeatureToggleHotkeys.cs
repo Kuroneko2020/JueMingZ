@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using JueMingZ.Config;
+using JueMingZ.Input.Hotkeys;
 using JueMingZ.UI.Legacy.Controls;
 using JueMingZ.UI.Legacy.Framework;
 
@@ -23,15 +24,12 @@ namespace JueMingZ.UI.Legacy
         private const string FeatureToggleHotkeyIntroText = "只切换功能开启/关闭，不执行功能动作。";
         private const string FeatureToggleHotkeyIdleText = "单击开始录入按钮";
         private const string FeatureToggleHotkeyCapturingText = "请按下按键，Backspace 删除，Esc 取消";
-        private const string FeatureToggleHotkeyCaptureTooltip = "支持 Ctrl / Alt / Shift + 键；Backspace 删除绑定";
+        private const string FeatureToggleHotkeyCaptureTooltip = "支持左右 Ctrl / Alt / Shift、小键盘和鼠标键；Backspace 删除绑定";
 
         private static string _featureToggleHotkeyModalTargetId = string.Empty;
         private static LegacyUiRect _featureToggleHotkeyModalAnchor;
         private static bool _featureToggleHotkeyCaptureActive;
-        private static bool _featureToggleHotkeyCaptureWaitingForRelease;
-        private static string _featureToggleHotkeyPendingChord = string.Empty;
         private static string _featureToggleHotkeyMessage = string.Empty;
-        private static readonly Dictionary<int, bool> FeatureToggleHotkeyCaptureWasDown = new Dictionary<int, bool>();
 
         public static void OpenFeatureToggleHotkeyModal(string targetId, LegacyUiRect anchor)
         {
@@ -68,10 +66,8 @@ namespace JueMingZ.UI.Legacy
             StopOtherHotkeyCapturesForFeatureToggleModal();
             LegacyTextInput.ClearFocus();
             _featureToggleHotkeyCaptureActive = true;
-            _featureToggleHotkeyCaptureWaitingForRelease = false;
-            _featureToggleHotkeyPendingChord = string.Empty;
             _featureToggleHotkeyMessage = string.Empty;
-            SeedFeatureToggleHotkeyCaptureState();
+            HotkeyCaptureService.Seed(FeatureToggleHotkeyCaptureSession, IsKeyDown);
         }
 
         public static string GetFeatureToggleHotkeyModalTargetId()
@@ -101,15 +97,12 @@ namespace JueMingZ.UI.Legacy
                 return false;
             }
 
-            var settings = EnsureHotkeySettings();
             bool changed;
-            ClearFeatureToggleHotkeyBinding(settings, targetId, out changed);
+            UnifiedHotkeyBindingUpdateResult result;
+            ConfigService.TrySaveUnifiedHotkeyBinding(UnifiedHotkeyBindingIds.ForFeatureToggleTarget(targetId), string.Empty, out result);
+            changed = result != null && result.Changed;
             StopFeatureToggleHotkeyCapture();
             _featureToggleHotkeyMessage = changed ? "已清除绑定" : "当前未绑定";
-            if (changed)
-            {
-                ConfigService.SaveAll();
-            }
 
             return changed;
         }
@@ -125,9 +118,7 @@ namespace JueMingZ.UI.Legacy
         private static void StopFeatureToggleHotkeyCapture()
         {
             _featureToggleHotkeyCaptureActive = false;
-            _featureToggleHotkeyCaptureWaitingForRelease = false;
-            _featureToggleHotkeyPendingChord = string.Empty;
-            FeatureToggleHotkeyCaptureWasDown.Clear();
+            FeatureToggleHotkeyCaptureSession.Clear();
         }
 
         private static int GetFeatureToggleHotkeyReserveWidth(string targetId)
@@ -253,8 +244,7 @@ namespace JueMingZ.UI.Legacy
 
         private static void DrawFeatureToggleHotkeyModal(LegacyUiContext context, LegacyUiRect popup, string targetId)
         {
-            var settings = EnsureHotkeySettings();
-            var current = GetFeatureToggleHotkeyBinding(settings, targetId);
+            var current = GetUnifiedHotkeyDisplay(UnifiedHotkeyBindingIds.ForFeatureToggleTarget(targetId));
             var displayName = FeatureToggleHotkeyTargetCatalog.GetDisplayName(targetId);
             var captureText = _featureToggleHotkeyCaptureActive ? FeatureToggleHotkeyCapturingText : FeatureToggleHotkeyIdleText;
 
@@ -318,14 +308,15 @@ namespace JueMingZ.UI.Legacy
             unchecked
             {
                 var hotkeySettings = ConfigService.HotkeySettings ?? HotkeySettings.CreateDefault();
+                var unifiedHotkeys = ConfigService.UnifiedHotkeySettings ?? UnifiedHotkeySettings.CreateDefault();
                 var hash = 17;
                 AddHash(ref hash, targetId);
-                AddHash(ref hash, GetFeatureToggleHotkeyBinding(hotkeySettings, targetId));
+                AddHash(ref hash, GetUnifiedHotkeyDisplay(UnifiedHotkeyBindingIds.ForFeatureToggleTarget(targetId)));
                 AddHash(ref hash, _featureToggleHotkeyCaptureActive);
-                AddHash(ref hash, _featureToggleHotkeyCaptureWaitingForRelease);
                 AddHash(ref hash, _featureToggleHotkeyMessage);
                 AddHash(ref hash, appSettings == null ? 0 : appSettings.ConfigVersion);
                 AddHash(ref hash, hotkeySettings.ConfigVersion);
+                AddHash(ref hash, unifiedHotkeys.CreateCacheSignature());
                 AddHash(ref hash, popup.X);
                 AddHash(ref hash, popup.Y);
                 AddHash(ref hash, popup.Width);
@@ -341,202 +332,27 @@ namespace JueMingZ.UI.Legacy
                 return;
             }
 
-            if (_featureToggleHotkeyCaptureWaitingForRelease)
-            {
-                if (IsAnyFeatureToggleCaptureKeyDown())
-                {
-                    return;
-                }
-
-                var pendingChord = _featureToggleHotkeyPendingChord;
-                _featureToggleHotkeyCaptureWaitingForRelease = false;
-                _featureToggleHotkeyPendingChord = string.Empty;
-                if (string.IsNullOrWhiteSpace(pendingChord))
-                {
-                    return;
-                }
-
-                string message;
-                bool changed;
-                if (TrySaveFeatureToggleHotkey(EnsureHotkeySettings(), ConfigService.AppSettings ?? AppSettings.CreateDefault(), _featureToggleHotkeyModalTargetId, pendingChord, out message, out changed))
-                {
-                    if (changed)
-                    {
-                        ConfigService.SaveAll();
-                    }
-
-                    CloseFeatureToggleHotkeyModal();
-                    return;
-                }
-
-                _featureToggleHotkeyCaptureActive = false;
-                _featureToggleHotkeyMessage = message;
-                return;
-            }
-
-            if (PressedCaptureKey(FeatureToggleHotkeyCaptureWasDown, VkEscape))
-            {
-                StopFeatureToggleHotkeyCapture();
-                _featureToggleHotkeyMessage = "已取消录入";
-                return;
-            }
-
-            if (PressedCaptureKey(FeatureToggleHotkeyCaptureWasDown, VkBackspace))
-            {
-                ClearFeatureToggleHotkeyBinding();
-                return;
-            }
-
-            string primaryKey;
-            if (!TryCaptureFeatureTogglePrimaryKeyToken(out primaryKey))
+            var capture = HotkeyCaptureService.Update(FeatureToggleHotkeyCaptureSession, IsKeyDown);
+            if (capture == null || !capture.HasResult)
             {
                 return;
             }
 
-            var modifiers = BuildFeatureToggleModifierTokens();
-            if (modifiers.Count > 1)
+            string message;
+            bool changed;
+            if (TryApplyUnifiedHotkeyCaptureResult(
+                    UnifiedHotkeyBindingIds.ForFeatureToggleTarget(_featureToggleHotkeyModalTargetId),
+                    capture,
+                    out message,
+                    out changed) &&
+                capture.Kind == HotkeyCaptureResultKind.Captured)
             {
-                _featureToggleHotkeyMessage = "只支持一个修饰键 + 一个主键";
-                _featureToggleHotkeyCaptureWaitingForRelease = true;
-                _featureToggleHotkeyPendingChord = string.Empty;
+                CloseFeatureToggleHotkeyModal();
                 return;
             }
 
-            var parts = new List<string>(2);
-            if (modifiers.Count == 1)
-            {
-                parts.Add(modifiers[0]);
-            }
-
-            parts.Add(primaryKey);
-            FeatureToggleHotkeyChord chord;
-            if (!FeatureToggleHotkeyChord.TryParseParts(parts, out chord))
-            {
-                _featureToggleHotkeyMessage = "不支持这个组合";
-                _featureToggleHotkeyCaptureWaitingForRelease = true;
-                _featureToggleHotkeyPendingChord = string.Empty;
-                return;
-            }
-
-            _featureToggleHotkeyPendingChord = chord.Normalized;
-            _featureToggleHotkeyCaptureWaitingForRelease = true;
-            _featureToggleHotkeyMessage = "松开按键后保存 " + chord.Display;
-        }
-
-        private static bool TryCaptureFeatureTogglePrimaryKeyToken(out string token)
-        {
-            token = string.Empty;
-            for (var key = 0x41; key <= 0x5A; key++)
-            {
-                if (PressedCaptureKey(FeatureToggleHotkeyCaptureWasDown, key))
-                {
-                    token = ((char)key).ToString();
-                    return true;
-                }
-            }
-
-            for (var key = 0x30; key <= 0x39; key++)
-            {
-                if (PressedCaptureKey(FeatureToggleHotkeyCaptureWasDown, key))
-                {
-                    token = ((char)key).ToString();
-                    return true;
-                }
-            }
-
-            for (var key = 0x70; key <= 0x87; key++)
-            {
-                if (PressedCaptureKey(FeatureToggleHotkeyCaptureWasDown, key))
-                {
-                    token = "F" + (key - 0x6F).ToString(CultureInfo.InvariantCulture);
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static List<string> BuildFeatureToggleModifierTokens()
-        {
-            var modifiers = new List<string>(3);
-            if (IsKeyDown(VkAlt))
-            {
-                modifiers.Add("Alt");
-            }
-
-            if (IsKeyDown(VkControl))
-            {
-                modifiers.Add("Ctrl");
-            }
-
-            if (IsKeyDown(VkShift))
-            {
-                modifiers.Add("Shift");
-            }
-
-            return modifiers;
-        }
-
-        private static bool IsAnyFeatureToggleCaptureKeyDown()
-        {
-            if (IsKeyDown(VkAlt) ||
-                IsKeyDown(VkControl) ||
-                IsKeyDown(VkShift) ||
-                IsKeyDown(VkBackspace) ||
-                IsKeyDown(VkEscape))
-            {
-                return true;
-            }
-
-            for (var key = 0x41; key <= 0x5A; key++)
-            {
-                if (IsKeyDown(key))
-                {
-                    return true;
-                }
-            }
-
-            for (var key = 0x30; key <= 0x39; key++)
-            {
-                if (IsKeyDown(key))
-                {
-                    return true;
-                }
-            }
-
-            for (var key = 0x70; key <= 0x87; key++)
-            {
-                if (IsKeyDown(key))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static void SeedFeatureToggleHotkeyCaptureState()
-        {
-            FeatureToggleHotkeyCaptureWasDown.Clear();
-            FeatureToggleHotkeyCaptureWasDown[VkAlt] = IsKeyDown(VkAlt);
-            FeatureToggleHotkeyCaptureWasDown[VkControl] = IsKeyDown(VkControl);
-            FeatureToggleHotkeyCaptureWasDown[VkShift] = IsKeyDown(VkShift);
-            FeatureToggleHotkeyCaptureWasDown[VkBackspace] = IsKeyDown(VkBackspace);
-            FeatureToggleHotkeyCaptureWasDown[VkEscape] = IsKeyDown(VkEscape);
-            for (var key = 0x41; key <= 0x5A; key++)
-            {
-                FeatureToggleHotkeyCaptureWasDown[key] = IsKeyDown(key);
-            }
-
-            for (var key = 0x30; key <= 0x39; key++)
-            {
-                FeatureToggleHotkeyCaptureWasDown[key] = IsKeyDown(key);
-            }
-
-            for (var key = 0x70; key <= 0x87; key++)
-            {
-                FeatureToggleHotkeyCaptureWasDown[key] = IsKeyDown(key);
-            }
+            _featureToggleHotkeyMessage = message;
+            StopFeatureToggleHotkeyCapture();
         }
 
         private static bool TrySaveFeatureToggleHotkey(HotkeySettings hotkeySettings, AppSettings appSettings, string targetId, string chordText, out string message, out bool changed)

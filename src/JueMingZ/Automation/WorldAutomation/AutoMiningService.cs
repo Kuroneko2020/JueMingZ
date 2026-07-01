@@ -8,6 +8,7 @@ using JueMingZ.Compat;
 using JueMingZ.Config;
 using JueMingZ.Diagnostics;
 using JueMingZ.GameState;
+using JueMingZ.Input.Hotkeys;
 using JueMingZ.Runtime;
 
 namespace JueMingZ.Automation.WorldAutomation
@@ -128,9 +129,11 @@ namespace JueMingZ.Automation.WorldAutomation
             reason = string.IsNullOrWhiteSpace(reason) ? "gameInputUnavailable" : reason;
             RecordHotkeyDecision(
                 string.Empty,
-                IsEnvironmentRuntimeGate(reason) ? DiagnosticResultCode.BlockedByEnvironment : DiagnosticResultCode.BlockedByUi,
+                UnifiedHotkeyReasonCatalog.IsEnvironmentGateReason(reason) ? DiagnosticResultCode.BlockedByEnvironment : DiagnosticResultCode.BlockedByUi,
                 reason,
-                "auto mining hotkey dispatch blocked by runtime gate");
+                UnifiedHotkeyReasonCatalog.BuildRuntimeGateMessage("自动挖矿采集快捷键", reason),
+                UnifiedHotkeyBindingIds.WorldAutomationAutoMiningTrigger,
+                "blocked");
         }
 
         public static void ClearSelection(string reason)
@@ -321,28 +324,26 @@ namespace JueMingZ.Automation.WorldAutomation
 
         private static void TryHandleHotkeySelection(AppSettings settings, AutoMiningPickaxeProfile pickaxe, long tick)
         {
-            var hotkeys = ConfigService.HotkeySettings == null ? null : ConfigService.HotkeySettings.HotkeysByFeatureId;
-            string hotkey;
-            if (hotkeys == null ||
-                !hotkeys.TryGetValue(FeatureIds.WorldAutomationAutoMining, out hotkey) ||
-                string.IsNullOrWhiteSpace(hotkey))
-            {
-                return;
-            }
-
-            var hotkeyResult = AutoMiningHotkeyInput.ConsumePressed(hotkey);
+            var hotkeyResult = UnifiedHotkeyRuntimeService.QueryBinding(UnifiedHotkeyBindingIds.WorldAutomationAutoMiningTrigger);
             if (!hotkeyResult.PressedEdge)
             {
                 return;
             }
 
-            if (!hotkeyResult.Accepted)
+            if (string.Equals(hotkeyResult.ResultCode, "blocked", StringComparison.Ordinal))
             {
                 RecordHotkeyDecision(
                     hotkeyResult.Display,
-                    hotkeyResult.DiagnosticResultCode,
+                    UnifiedHotkeyReasonCatalog.IsEnvironmentGateReason(hotkeyResult.Reason) ? DiagnosticResultCode.BlockedByEnvironment : DiagnosticResultCode.BlockedByUi,
                     hotkeyResult.Reason,
-                    "auto mining hotkey blocked: " + hotkeyResult.Reason);
+                    UnifiedHotkeyReasonCatalog.BuildRuntimeGateMessage("自动挖矿采集快捷键", hotkeyResult.Reason),
+                    hotkeyResult.BindingId,
+                    hotkeyResult.ResultCode);
+                return;
+            }
+
+            if (!string.Equals(hotkeyResult.ResultCode, "triggered", StringComparison.Ordinal))
+            {
                 return;
             }
 
@@ -356,7 +357,9 @@ namespace JueMingZ.Automation.WorldAutomation
                     hotkeyResult.Display,
                     DiagnosticResultCode.NotApplicable,
                     "cursorMineableOreUnavailable",
-                    "auto mining hotkey ignored: " + message);
+                    "auto mining hotkey ignored: " + message,
+                    hotkeyResult.BindingId,
+                    hotkeyResult.ResultCode);
                 RecordDecision("hotkey ignored: " + message);
                 return;
             }
@@ -365,7 +368,9 @@ namespace JueMingZ.Automation.WorldAutomation
                 hotkeyResult.Display,
                 DiagnosticResultCode.Succeeded,
                 string.Empty,
-                "auto mining hotkey accepted");
+                "auto mining hotkey accepted",
+                hotkeyResult.BindingId,
+                hotkeyResult.ResultCode);
             TrySelectVein(tileX, tileY, tileType, AutoMiningModes.Hotkey, hotkeyResult.Display, pickaxe, tick);
         }
 
@@ -1290,11 +1295,15 @@ namespace JueMingZ.Automation.WorldAutomation
             string hotkey,
             DiagnosticResultCode resultCode,
             string blockedReason,
-            string message)
+            string message,
+            string bindingId,
+            string hotkeyResultCode)
         {
             hotkey = hotkey ?? string.Empty;
             blockedReason = blockedReason ?? string.Empty;
             message = message ?? string.Empty;
+            bindingId = bindingId ?? string.Empty;
+            hotkeyResultCode = hotkeyResultCode ?? string.Empty;
             var resultCodeText = resultCode.ToString();
             var shouldRecordEvent = false;
             lock (SyncRoot)
@@ -1317,15 +1326,16 @@ namespace JueMingZ.Automation.WorldAutomation
                     hotkey,
                     ScenarioNames.WorldAutomationAutoMiningHotkey,
                     resultCode,
-                    message);
+                    message,
+                    UnifiedHotkeyReasonCatalog.BuildDiagnosticMetadataJson(
+                        "bindingId", bindingId,
+                        "resultCode", resultCodeText,
+                        "hotkeyResultCode", hotkeyResultCode,
+                        "reason", blockedReason,
+                        "reasonCode", UnifiedHotkeyReasonCatalog.NormalizeRuntimeReasonCode(blockedReason),
+                        "blockedReason", blockedReason,
+                        "playerMessage", message));
             }
-        }
-
-        private static bool IsEnvironmentRuntimeGate(string reason)
-        {
-            return string.Equals(reason, "gameStateUnavailable", StringComparison.Ordinal) ||
-                   string.Equals(reason, "worldUnavailable", StringComparison.Ordinal) ||
-                   string.Equals(reason, "gameInputUnavailable", StringComparison.Ordinal);
         }
 
         private sealed class ManualMiningObservation

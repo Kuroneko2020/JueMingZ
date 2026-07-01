@@ -319,7 +319,7 @@ namespace JueMingZ.Tests
 
             var tooltipCopy = LegacyMainWindow.GetFeatureToggleHotkeyModalTooltipCopyForTesting();
             AssertStringEquals(tooltipCopy[0], null, "feature toggle close button tooltip");
-            AssertStringEquals(tooltipCopy[1], "支持 Ctrl / Alt / Shift + 键；Backspace 删除绑定", "feature toggle capture button tooltip");
+            AssertStringEquals(tooltipCopy[1], "支持左右 Ctrl / Alt / Shift、小键盘和鼠标键；Backspace 删除绑定", "feature toggle capture button tooltip");
             AssertStringEquals(tooltipCopy[2], null, "feature toggle clear button tooltip");
 
             LegacyMainWindow.StartQuickItemHotkeyCapture(0);

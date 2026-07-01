@@ -23,6 +23,11 @@ namespace JueMingZ.UI.Legacy
             get { lock (SyncRoot) { return !string.IsNullOrWhiteSpace(_activeId); } }
         }
 
+        public static string ActiveId
+        {
+            get { lock (SyncRoot) { return _activeId ?? string.Empty; } }
+        }
+
         public static void Focus(string id, string currentColor)
         {
             lock (SyncRoot)
