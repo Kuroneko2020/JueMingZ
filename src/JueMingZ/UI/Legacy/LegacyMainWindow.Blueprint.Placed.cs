@@ -239,7 +239,8 @@ namespace JueMingZ.UI.Legacy
                 ZIndex = 24,
                 CacheSignature = BuildBlueprintPlacedMaterialModalCacheSignature(instance),
                 State = new BlueprintPlacedMaterialModalState(area, instance),
-                Draw = DrawBlueprintPlacedMaterialModalOverlay
+                Draw = DrawBlueprintPlacedMaterialModalOverlay,
+                TryConsumeScroll = TryConsumeBlueprintPlacedMaterialModalScroll
             });
         }
 
@@ -303,20 +304,27 @@ namespace JueMingZ.UI.Legacy
 
             var lines = BuildBlueprintPlacedInstanceMaterialLines(instance);
             var columns = ResolveBlueprintLibraryMaterialModalColumns(bounds.Width, lines.Count);
-            var columnGap = 10;
-            var contentX = bounds.X + BlueprintLibraryMaterialModalPadding;
-            var contentY = bounds.Y + BlueprintLibraryMaterialModalHeaderHeight;
-            var contentWidth = Math.Max(1, bounds.Width - BlueprintLibraryMaterialModalPadding * 2);
-            var columnWidth = Math.Max(1, (contentWidth - Math.Max(0, columns - 1) * columnGap) / columns);
+            var body = CalculateBlueprintMaterialModalBodyRect(bounds);
+            var contentHeight = CalculateBlueprintMaterialModalContentHeight(lines.Count, columns);
+            SetBlueprintPlacedMaterialModalViewport(instance, body.Intersect(area.Viewport), contentHeight);
+            var scrollOffset = GetBlueprintPlacedMaterialModalScrollOffset(instance);
+            var clip = body.Intersect(area.Viewport);
+            var contentWidth = Math.Max(1, body.Width);
+            var columnWidth = Math.Max(1, (contentWidth - Math.Max(0, columns - 1) * BlueprintLibraryMaterialModalColumnGap) / columns);
             for (var index = 0; index < lines.Count; index++)
             {
                 var column = index % columns;
                 var row = index / columns;
                 var rect = new LegacyUiRect(
-                    contentX + column * (columnWidth + columnGap),
-                    contentY + row * BlueprintLibraryMaterialModalRowHeight,
+                    body.X + column * (columnWidth + BlueprintLibraryMaterialModalColumnGap),
+                    body.Y + row * BlueprintLibraryMaterialModalRowHeight - scrollOffset,
                     columnWidth,
                     BlueprintLibraryMaterialModalRowHeight);
+                if (!rect.Intersects(clip))
+                {
+                    continue;
+                }
+
                 UiTextRenderer.DrawTextClipped(
                     spriteBatch,
                     UiTextRenderer.Ellipsize(lines[index], Math.Max(1, rect.Width - 4), 0.66f),
@@ -324,10 +332,10 @@ namespace JueMingZ.UI.Legacy
                     rect.Y + 3,
                     rect.Width - 4,
                     rect.Height - 4,
-                    area.Viewport.X,
-                    area.Viewport.Y,
-                    area.Viewport.Width,
-                    area.Viewport.Height,
+                    clip.X,
+                    clip.Y,
+                    clip.Width,
+                    clip.Height,
                     218,
                     226,
                     238,
@@ -369,6 +377,7 @@ namespace JueMingZ.UI.Legacy
                     hash = hash * 31 + StringComparer.Ordinal.GetHashCode(lines[index] ?? string.Empty);
                 }
 
+                hash = hash * 31 + GetBlueprintPlacedMaterialModalScrollOffset(instance);
                 return hash;
             }
         }

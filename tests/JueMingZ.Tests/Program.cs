@@ -1207,6 +1207,7 @@ namespace JueMingZ.Tests
             Run("blueprint placed list refreshes material comparison without draw scan", ref failed, BlueprintPlacedListRefreshesMaterialComparisonWithoutDrawScan);
             Run("blueprint placed list stage 03 layout material and cards", ref failed, BlueprintPlacedListStage03LayoutMaterialAndCards);
             Run("blueprint submenus keep body visible after header scroll", ref failed, BlueprintSubmenusKeepBodyVisibleAfterHeaderScroll);
+            Run("blueprint material modals scroll own body viewports", ref failed, BlueprintMaterialModalsScrollOwnBodyViewports);
             Run("blueprint placed list layout cache tracks management materials", ref failed, BlueprintPlacedListLayoutCacheTracksManagementMaterials);
             Run("blueprint materials use replacement item when configured", ref failed, BlueprintMaterialsUseReplacementItemWhenConfigured);
             Run("blueprint material window routes and consumes input", ref failed, BlueprintMaterialWindowRoutesAndConsumesInput);

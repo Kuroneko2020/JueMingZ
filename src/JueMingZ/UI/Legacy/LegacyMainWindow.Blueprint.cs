@@ -33,6 +33,7 @@ namespace JueMingZ.UI.Legacy
         private const int BlueprintLibraryMaterialModalHeaderHeight = 42;
         private const int BlueprintLibraryMaterialModalRowHeight = 22;
         private const int BlueprintLibraryMaterialModalPadding = 14;
+        private const int BlueprintLibraryMaterialModalColumnGap = 10;
         private const int BlueprintLibraryPreviewMaxDrawCells = 768;
         private const int BlueprintPlacedMaterialPanelMinHeight = 64;
         private const int BlueprintPlacedMaterialPanelHeaderHeight = 30;
@@ -46,8 +47,8 @@ namespace JueMingZ.UI.Legacy
         private const int BlueprintPlacedRowGap = BlueprintLibraryCardGap;
         private const int BlueprintLibraryPreviewGridSize = 70;
         private const string BlueprintStatusBarElementId = "blueprint-status-bar";
-        private const string BlueprintLibraryVisualContract = "main-menu-hotkey-open-row+same-content-submenu+stage06-two-column-fixed-cards+preview-scales-to-fit+stage07-name-edit-delete-confirm+stage08-import-export-windows-dialog+stage09-layout-use-real-template-snapshot+stage02-title-row-tools+card-material-toggle+card-material-modal+card-buttons-no-tooltips+summary-placed-count+summary-only+no-empty-gap-text+raw-gap-flags-hidden+larger-card-summary+use-closes-f5+mutual-submenus+hit-owned+state-paged-6+scroll-header-nonblocking";
-        private const string BlueprintPlacedInstanceVisualContract = "main-menu-open-row+same-content-submenu+current-world-list+paged-5+stage03-title-count+stage03-header-page-back+stage03-material-total-all-lines+stage03-card-preview+stage03-library-sized-cards+read-only-name+hide-show-cancel-place+card-material-modal+template-snapshot-isolated+material-comparison+materials-cache-only+scroll-header-nonblocking";
+        private const string BlueprintLibraryVisualContract = "main-menu-hotkey-open-row+same-content-submenu+stage06-two-column-fixed-cards+preview-scales-to-fit+stage07-name-edit-delete-confirm+stage08-import-export-windows-dialog+stage09-layout-use-real-template-snapshot+stage02-title-row-tools+card-material-toggle+card-material-modal+card-buttons-no-tooltips+summary-placed-count+summary-only+no-empty-gap-text+raw-gap-flags-hidden+larger-card-summary+use-closes-f5+mutual-submenus+hit-owned+state-paged-6+scroll-header-nonblocking+material-modal-body-scroll";
+        private const string BlueprintPlacedInstanceVisualContract = "main-menu-open-row+same-content-submenu+current-world-list+paged-5+stage03-title-count+stage03-header-page-back+stage03-material-total-all-lines+stage03-card-preview+stage03-library-sized-cards+read-only-name+hide-show-cancel-place+card-material-modal+template-snapshot-isolated+material-comparison+materials-cache-only+scroll-header-nonblocking+material-modal-body-scroll";
         private const string BlueprintCreationVisualContract = "world-mask+single-toggle+drag-toggle+multi-region+ui-owned-consume+world-hover+air-select+low-alpha-no-border+continuous-mask+clear-selection+finish-cancel+placement-preview+center-anchor+left-click-instance";
         private const string BlueprintProjectionVisualContract = "world-projection+appearance-ghost+original-missing+red-conflict+gray-unavailable+fulfilled-no-mask+completed-progress+no-cell-border+move-floating-follow-preview+hidden-skip+layer-cover+wire-actuator-original-color+missing-no-state-block+multitile-object-group-conflict";
         private const string BlueprintMaterialVisualContract = "aggregate-materials+main-inventory+void-bag+floating-window+placed-list-comparison+cache-only-draw";
@@ -104,6 +105,15 @@ namespace JueMingZ.UI.Legacy
             new BlueprintReplacementOptionDefinition(BlueprintReplacementCategories.Chest, "箱子", "缺少原箱子时允许使用同类箱子。"),
             new BlueprintReplacementOptionDefinition(BlueprintReplacementCategories.Sign, "牌子", "缺少原牌子时允许使用同类牌子。")
         };
+        private static readonly object BlueprintMaterialModalScrollSyncRoot = new object();
+        private static string _blueprintLibraryMaterialModalScrollTemplateId = string.Empty;
+        private static int _blueprintLibraryMaterialModalScrollOffset;
+        private static LegacyUiRect _blueprintLibraryMaterialModalScrollViewport;
+        private static int _blueprintLibraryMaterialModalMaxScroll;
+        private static string _blueprintPlacedMaterialModalScrollInstanceId = string.Empty;
+        private static int _blueprintPlacedMaterialModalScrollOffset;
+        private static LegacyUiRect _blueprintPlacedMaterialModalScrollViewport;
+        private static int _blueprintPlacedMaterialModalMaxScroll;
 
         private sealed class BlueprintReplacementOptionDefinition
         {
@@ -1364,7 +1374,8 @@ namespace JueMingZ.UI.Legacy
                 ZIndex = 24,
                 CacheSignature = BuildBlueprintLibraryMaterialModalCacheSignature(template),
                 State = new BlueprintLibraryMaterialModalState(area, template),
-                Draw = DrawBlueprintLibraryMaterialModalOverlay
+                Draw = DrawBlueprintLibraryMaterialModalOverlay,
+                TryConsumeScroll = TryConsumeBlueprintLibraryMaterialModalScroll
             });
         }
 
@@ -1428,20 +1439,27 @@ namespace JueMingZ.UI.Legacy
 
             var lines = BlueprintLibraryUiState.BuildTemplateMaterialLines(template);
             var columns = ResolveBlueprintLibraryMaterialModalColumns(bounds.Width, lines.Count);
-            var columnGap = 10;
-            var contentX = bounds.X + BlueprintLibraryMaterialModalPadding;
-            var contentY = bounds.Y + BlueprintLibraryMaterialModalHeaderHeight;
-            var contentWidth = Math.Max(1, bounds.Width - BlueprintLibraryMaterialModalPadding * 2);
-            var columnWidth = Math.Max(1, (contentWidth - Math.Max(0, columns - 1) * columnGap) / columns);
+            var body = CalculateBlueprintMaterialModalBodyRect(bounds);
+            var contentHeight = CalculateBlueprintMaterialModalContentHeight(lines.Count, columns);
+            SetBlueprintLibraryMaterialModalViewport(template, body.Intersect(area.Viewport), contentHeight);
+            var scrollOffset = GetBlueprintLibraryMaterialModalScrollOffset(template);
+            var clip = body.Intersect(area.Viewport);
+            var contentWidth = Math.Max(1, body.Width);
+            var columnWidth = Math.Max(1, (contentWidth - Math.Max(0, columns - 1) * BlueprintLibraryMaterialModalColumnGap) / columns);
             for (var index = 0; index < lines.Count; index++)
             {
                 var column = index % columns;
                 var row = index / columns;
                 var rect = new LegacyUiRect(
-                    contentX + column * (columnWidth + columnGap),
-                    contentY + row * BlueprintLibraryMaterialModalRowHeight,
+                    body.X + column * (columnWidth + BlueprintLibraryMaterialModalColumnGap),
+                    body.Y + row * BlueprintLibraryMaterialModalRowHeight - scrollOffset,
                     columnWidth,
                     BlueprintLibraryMaterialModalRowHeight);
+                if (!rect.Intersects(clip))
+                {
+                    continue;
+                }
+
                 UiTextRenderer.DrawTextClipped(
                     spriteBatch,
                     UiTextRenderer.Ellipsize(lines[index], Math.Max(1, rect.Width - 4), 0.66f),
@@ -1449,10 +1467,10 @@ namespace JueMingZ.UI.Legacy
                     rect.Y + 3,
                     rect.Width - 4,
                     rect.Height - 4,
-                    area.Viewport.X,
-                    area.Viewport.Y,
-                    area.Viewport.Width,
-                    area.Viewport.Height,
+                    clip.X,
+                    clip.Y,
+                    clip.Width,
+                    clip.Height,
                     218,
                     226,
                     238,
@@ -1853,6 +1871,141 @@ namespace JueMingZ.UI.Legacy
             return width >= 360 && lineCount > 8 ? 2 : 1;
         }
 
+        private static LegacyUiRect CalculateBlueprintMaterialModalBodyRect(LegacyUiRect bounds)
+        {
+            return new LegacyUiRect(
+                bounds.X + BlueprintLibraryMaterialModalPadding,
+                bounds.Y + BlueprintLibraryMaterialModalHeaderHeight,
+                Math.Max(0, bounds.Width - BlueprintLibraryMaterialModalPadding * 2),
+                Math.Max(0, bounds.Height - BlueprintLibraryMaterialModalHeaderHeight - BlueprintLibraryMaterialModalPadding));
+        }
+
+        private static int CalculateBlueprintMaterialModalContentHeight(int lineCount, int columns)
+        {
+            columns = Math.Max(1, columns);
+            var rows = Math.Max(1, (Math.Max(0, lineCount) + columns - 1) / columns);
+            return rows * BlueprintLibraryMaterialModalRowHeight;
+        }
+
+        private static void SetBlueprintLibraryMaterialModalViewport(BlueprintTemplateRecord template, LegacyUiRect viewport, int contentHeight)
+        {
+            var targetId = BlueprintTemplateLibraryStore.NormalizeId(template == null ? string.Empty : template.TemplateId);
+            lock (BlueprintMaterialModalScrollSyncRoot)
+            {
+                if (!string.Equals(_blueprintLibraryMaterialModalScrollTemplateId, targetId, StringComparison.OrdinalIgnoreCase))
+                {
+                    _blueprintLibraryMaterialModalScrollTemplateId = targetId;
+                    _blueprintLibraryMaterialModalScrollOffset = 0;
+                }
+
+                _blueprintLibraryMaterialModalScrollViewport = viewport;
+                _blueprintLibraryMaterialModalMaxScroll = Math.Max(0, contentHeight - Math.Max(0, viewport.Height));
+                _blueprintLibraryMaterialModalScrollOffset = ClampInt(_blueprintLibraryMaterialModalScrollOffset, 0, _blueprintLibraryMaterialModalMaxScroll);
+            }
+        }
+
+        private static void SetBlueprintPlacedMaterialModalViewport(BlueprintWorldInstanceRecord instance, LegacyUiRect viewport, int contentHeight)
+        {
+            var targetId = BlueprintTemplateLibraryStore.NormalizeId(instance == null ? string.Empty : instance.InstanceId);
+            lock (BlueprintMaterialModalScrollSyncRoot)
+            {
+                if (!string.Equals(_blueprintPlacedMaterialModalScrollInstanceId, targetId, StringComparison.OrdinalIgnoreCase))
+                {
+                    _blueprintPlacedMaterialModalScrollInstanceId = targetId;
+                    _blueprintPlacedMaterialModalScrollOffset = 0;
+                }
+
+                _blueprintPlacedMaterialModalScrollViewport = viewport;
+                _blueprintPlacedMaterialModalMaxScroll = Math.Max(0, contentHeight - Math.Max(0, viewport.Height));
+                _blueprintPlacedMaterialModalScrollOffset = ClampInt(_blueprintPlacedMaterialModalScrollOffset, 0, _blueprintPlacedMaterialModalMaxScroll);
+            }
+        }
+
+        private static int GetBlueprintLibraryMaterialModalScrollOffset(BlueprintTemplateRecord template)
+        {
+            var targetId = BlueprintTemplateLibraryStore.NormalizeId(template == null ? string.Empty : template.TemplateId);
+            lock (BlueprintMaterialModalScrollSyncRoot)
+            {
+                return string.Equals(_blueprintLibraryMaterialModalScrollTemplateId, targetId, StringComparison.OrdinalIgnoreCase)
+                    ? _blueprintLibraryMaterialModalScrollOffset
+                    : 0;
+            }
+        }
+
+        private static int GetBlueprintPlacedMaterialModalScrollOffset(BlueprintWorldInstanceRecord instance)
+        {
+            var targetId = BlueprintTemplateLibraryStore.NormalizeId(instance == null ? string.Empty : instance.InstanceId);
+            lock (BlueprintMaterialModalScrollSyncRoot)
+            {
+                return string.Equals(_blueprintPlacedMaterialModalScrollInstanceId, targetId, StringComparison.OrdinalIgnoreCase)
+                    ? _blueprintPlacedMaterialModalScrollOffset
+                    : 0;
+            }
+        }
+
+        private static bool TryConsumeBlueprintLibraryMaterialModalScroll(LegacyMouseSnapshot mouse, int rawScrollDelta)
+        {
+            lock (BlueprintMaterialModalScrollSyncRoot)
+            {
+                return TryConsumeBlueprintMaterialModalScrollLocked(
+                    _blueprintLibraryMaterialModalScrollViewport,
+                    _blueprintLibraryMaterialModalMaxScroll,
+                    ref _blueprintLibraryMaterialModalScrollOffset,
+                    mouse,
+                    rawScrollDelta);
+            }
+        }
+
+        private static bool TryConsumeBlueprintPlacedMaterialModalScroll(LegacyMouseSnapshot mouse, int rawScrollDelta)
+        {
+            lock (BlueprintMaterialModalScrollSyncRoot)
+            {
+                return TryConsumeBlueprintMaterialModalScrollLocked(
+                    _blueprintPlacedMaterialModalScrollViewport,
+                    _blueprintPlacedMaterialModalMaxScroll,
+                    ref _blueprintPlacedMaterialModalScrollOffset,
+                    mouse,
+                    rawScrollDelta);
+            }
+        }
+
+        private static bool TryConsumeBlueprintMaterialModalScrollLocked(
+            LegacyUiRect viewport,
+            int maxScroll,
+            ref int scrollOffset,
+            LegacyMouseSnapshot mouse,
+            int rawScrollDelta)
+        {
+            if (viewport.Width <= 0 ||
+                viewport.Height <= 0 ||
+                mouse == null ||
+                rawScrollDelta == 0 ||
+                !viewport.Contains(mouse.X, mouse.Y))
+            {
+                return false;
+            }
+
+            var next = ClampInt(scrollOffset + ConvertBlueprintMaterialModalWheelDelta(rawScrollDelta), 0, Math.Max(0, maxScroll));
+            if (next == scrollOffset)
+            {
+                return false;
+            }
+
+            scrollOffset = next;
+            return true;
+        }
+
+        private static int ConvertBlueprintMaterialModalWheelDelta(int rawScrollDelta)
+        {
+            var scrollDelta = -rawScrollDelta / 3;
+            if (scrollDelta == 0)
+            {
+                scrollDelta = rawScrollDelta > 0 ? -40 : 40;
+            }
+
+            return scrollDelta;
+        }
+
         private static int BuildBlueprintLibraryMaterialModalCacheSignature(BlueprintTemplateRecord template)
         {
             unchecked
@@ -1866,6 +2019,7 @@ namespace JueMingZ.UI.Legacy
                     hash = hash * 31 + StringComparer.Ordinal.GetHashCode(lines[index] ?? string.Empty);
                 }
 
+                hash = hash * 31 + GetBlueprintLibraryMaterialModalScrollOffset(template);
                 return hash;
             }
         }
@@ -2416,6 +2570,14 @@ namespace JueMingZ.UI.Legacy
             return RegisterBlueprintLibraryMaterialModalOverlay(area, BlueprintLibraryUiState.GetSnapshot());
         }
 
+        internal static int GetBlueprintLibraryMaterialModalScrollOffsetForTesting()
+        {
+            lock (BlueprintMaterialModalScrollSyncRoot)
+            {
+                return _blueprintLibraryMaterialModalScrollOffset;
+            }
+        }
+
         internal static string BuildBlueprintLibraryHeaderSummaryForTesting(int templateCount, int placedCount)
         {
             return BuildBlueprintLibraryHeaderSummary(templateCount, placedCount);
@@ -2580,6 +2742,14 @@ namespace JueMingZ.UI.Legacy
         internal static bool RegisterBlueprintPlacedMaterialModalOverlayForTesting(LegacyScrollArea area)
         {
             return RegisterBlueprintPlacedMaterialModalOverlay(area, BlueprintPlacedInstanceUiState.GetSnapshot());
+        }
+
+        internal static int GetBlueprintPlacedMaterialModalScrollOffsetForTesting()
+        {
+            lock (BlueprintMaterialModalScrollSyncRoot)
+            {
+                return _blueprintPlacedMaterialModalScrollOffset;
+            }
         }
 
         internal static int CalculateBlueprintPlacedListHeightForTesting(bool loadSucceeded, int instanceCount, int visibleCount)

@@ -4,6 +4,7 @@ using JueMingZ.Automation.Blueprint;
 using JueMingZ.Config;
 using JueMingZ.Diagnostics;
 using JueMingZ.Hooks;
+using JueMingZ.Input;
 using JueMingZ.Runtime;
 using JueMingZ.UI;
 using JueMingZ.UI.Legacy;
@@ -402,6 +403,136 @@ namespace JueMingZ.Tests
             {
                 LegacyUiOverlayCoordinator.Current.ResetForTesting();
                 BlueprintPlacedInstanceUiState.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialWindowOverlay.ResetForTesting();
+                restore();
+            }
+        }
+
+        private static void BlueprintMaterialModalsScrollOwnBodyViewports()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-material-modal-body-scroll");
+            try
+            {
+                var templateStore = new BlueprintTemplateLibraryStore();
+                var longTemplate = CreateManyMaterialTemplate("长材料清单", 48);
+                BlueprintTemplateRecord savedTemplate;
+                RequireBlueprintSuccess(templateStore.CreateTemplate(longTemplate, out savedTemplate), "create long material blueprint template");
+                BlueprintLibraryUiState.SetStoreForTesting(templateStore, true);
+                RequireBlueprintCommandSuccess(BlueprintLibraryUiState.OpenLibrary(), "open blueprint library for material modal scroll");
+                var expanded = LegacyUiActionService.HandleBlueprintLibraryActionForTesting("layout-materials", savedTemplate.TemplateId);
+                if (expanded == null ||
+                    !expanded.Succeeded ||
+                    !string.Equals(BlueprintLibraryUiState.GetSnapshot().ExpandedMaterialTemplateId, savedTemplate.TemplateId, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected long blueprint library material modal to open before testing its internal scroll.");
+                }
+
+                AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "material-modal-body-scroll");
+                var viewport = new LegacyUiRect(20, 20, 460, 220);
+                var area = LegacyScrollArea.Create(viewport, 620, 0);
+                var coordinator = LegacyUiOverlayCoordinator.Current;
+                coordinator.ResetForTesting();
+                var elements = new List<LegacyUiElement>
+                {
+                    CreateLegacyUiElementForTesting("blueprint-entry:open-placed", "Lower", "button", viewport)
+                };
+                var mouse = new LegacyMouseSnapshot
+                {
+                    ReadAvailable = true,
+                    ScrollDelta = -120
+                };
+
+                coordinator.BeginFrame("blueprint");
+                if (!LegacyMainWindow.RegisterBlueprintLibraryMaterialModalOverlayForTesting(area))
+                {
+                    throw new InvalidOperationException("Expected long blueprint library material modal to register as an overlay.");
+                }
+
+                coordinator.DrawOverlays(null, mouse, new LegacyUiRect(0, 0, 560, 340), "blueprint", AppSettings.CreateDefault(), elements);
+                var libraryModal = FindLegacyUiElementForTesting(elements, LegacyMainWindow.GetBlueprintLibraryMaterialModalElementIdForTesting());
+                mouse.X = libraryModal.Rect.X + 20;
+                mouse.Y = libraryModal.Rect.Y + 56;
+                var beforeLibraryScroll = LegacyMainWindow.GetBlueprintLibraryMaterialModalScrollOffsetForTesting();
+                if (!coordinator.ShouldBlockMainScroll(mouse, mouse.ScrollDelta) ||
+                    LegacyMainWindow.GetBlueprintLibraryMaterialModalScrollOffsetForTesting() <= beforeLibraryScroll)
+                {
+                    throw new InvalidOperationException("Expected blueprint library material modal body to consume wheel and move its own scroll offset.");
+                }
+
+                var afterLibraryScroll = LegacyMainWindow.GetBlueprintLibraryMaterialModalScrollOffsetForTesting();
+                mouse.Y = libraryModal.Rect.Y + 12;
+                if (!coordinator.ShouldBlockMainScroll(mouse, mouse.ScrollDelta) ||
+                    LegacyMainWindow.GetBlueprintLibraryMaterialModalScrollOffsetForTesting() != afterLibraryScroll)
+                {
+                    throw new InvalidOperationException("Expected blueprint library material modal header wheel to block the main page without moving the body list.");
+                }
+
+                coordinator.EndFrame();
+                coordinator.ResetForTesting();
+
+                var instanceStore = new BlueprintWorldInstanceStore();
+                BlueprintWorldInstanceRecord placedInstance;
+                RequireBlueprintSuccess(
+                    instanceStore.CreateInstanceFromTemplate("pair-modal-scroll", "world-modal-scroll", savedTemplate, 8, 9, 0, out placedInstance),
+                    "create long material placed blueprint instance");
+                BlueprintProjectionService.SetDependenciesForTesting(
+                    instanceStore,
+                    BlueprintPlacementWorldContext.Success("pair-modal-scroll", "world-modal-scroll"),
+                    new FakeBlueprintWorldTileReader(),
+                    true);
+                BlueprintMaterialService.SetInventoryReaderForTesting(new FakeBlueprintMaterialInventoryReader(), true);
+                BlueprintPlacedInstanceUiState.SetDependenciesForTesting(
+                    instanceStore,
+                    BlueprintPlacementWorldContext.Success("pair-modal-scroll", "world-modal-scroll"),
+                    true);
+                var openPlaced = BlueprintPlacedInstanceUiState.OpenManagement();
+                if (!openPlaced.Succeeded)
+                {
+                    throw new InvalidOperationException("Expected placed blueprint management to open before testing material modal scroll.");
+                }
+
+                RunPlacedInstanceCommand("materials", placedInstance.InstanceId);
+                AssertContains(LegacyMainWindow.GetBlueprintPlacedInstanceVisualContractForTesting(), "material-modal-body-scroll");
+                elements.Clear();
+                elements.Add(CreateLegacyUiElementForTesting("blueprint-entry:start-create", "Lower", "button", viewport));
+                mouse.X = 0;
+                mouse.Y = 0;
+                coordinator.BeginFrame("blueprint");
+                if (!LegacyMainWindow.RegisterBlueprintPlacedMaterialModalOverlayForTesting(area))
+                {
+                    throw new InvalidOperationException("Expected long placed blueprint material modal to register as an overlay.");
+                }
+
+                coordinator.DrawOverlays(null, mouse, new LegacyUiRect(0, 0, 560, 340), "blueprint", AppSettings.CreateDefault(), elements);
+                var placedModal = FindLegacyUiElementForTesting(elements, LegacyMainWindow.GetBlueprintPlacedMaterialModalElementIdForTesting());
+                mouse.X = placedModal.Rect.X + 20;
+                mouse.Y = placedModal.Rect.Y + 56;
+                var beforePlacedScroll = LegacyMainWindow.GetBlueprintPlacedMaterialModalScrollOffsetForTesting();
+                if (!coordinator.ShouldBlockMainScroll(mouse, mouse.ScrollDelta) ||
+                    LegacyMainWindow.GetBlueprintPlacedMaterialModalScrollOffsetForTesting() <= beforePlacedScroll)
+                {
+                    throw new InvalidOperationException("Expected placed blueprint material modal body to consume wheel and move its own scroll offset.");
+                }
+
+                var afterPlacedScroll = LegacyMainWindow.GetBlueprintPlacedMaterialModalScrollOffsetForTesting();
+                mouse.X = placedModal.Rect.Right + 16;
+                mouse.Y = placedModal.Rect.Bottom + 16;
+                if (coordinator.ShouldBlockMainScroll(mouse, mouse.ScrollDelta) ||
+                    LegacyMainWindow.GetBlueprintPlacedMaterialModalScrollOffsetForTesting() != afterPlacedScroll)
+                {
+                    throw new InvalidOperationException("Expected wheel outside the placed material modal to stay outside the modal scroll owner.");
+                }
+
+                coordinator.EndFrame();
+            }
+            finally
+            {
+                LegacyUiOverlayCoordinator.Current.ResetForTesting();
+                BlueprintLibraryUiState.ResetForTesting();
+                BlueprintPlacedInstanceUiState.ResetForTesting();
+                BlueprintTemplateLibraryStore.ResetTestingHooks();
                 BlueprintMaterialService.ResetForTesting();
                 BlueprintProjectionService.ResetForTesting();
                 BlueprintMaterialWindowOverlay.ResetForTesting();
@@ -815,6 +946,27 @@ namespace JueMingZ.Tests
                 AnchorY = 0
             };
             template.Cells.Add(CreateMaterialTileCell(0, 0, tileType, materialItemId, materialStack, name + "材料"));
+            AddMaterialEntries(template);
+            return template;
+        }
+
+        private static BlueprintTemplateRecord CreateManyMaterialTemplate(string name, int count)
+        {
+            count = Math.Max(1, count);
+            var template = new BlueprintTemplateRecord
+            {
+                Name = name,
+                Width = count,
+                Height = 1,
+                AnchorX = 0,
+                AnchorY = 0
+            };
+
+            for (var index = 0; index < count; index++)
+            {
+                template.Cells.Add(CreateMaterialTileCell(index, 0, 200 + index, 1200 + index, 1 + index % 5, "长材料" + index));
+            }
+
             AddMaterialEntries(template);
             return template;
         }

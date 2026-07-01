@@ -13623,11 +13623,11 @@ function Test-BlueprintFurnitureSavePlacementStage07CloseoutGovernance {
     $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
     $docHistoryRecordText = Read-TextIfExists -Path $docHistoryRecordPath
 
-    if (Test-BlueprintPlacementVersionMetadata -RuntimeText $runtimeText -CsprojText $csprojText -AllowedRuntimeVersions @("0.1008-blueprint-furniture-closeout", "0.1009-blueprint-tileobjectdata-startup-fix", "0.1010-blueprint-large-projection-display", "0.1011-blueprint-library-gap-flag-ui", "0.1012-blueprint-submenu-scroll-body")) {
+    if (Test-BlueprintPlacementVersionMetadata -RuntimeText $runtimeText -CsprojText $csprojText -AllowedRuntimeVersions @("0.1008-blueprint-furniture-closeout", "0.1009-blueprint-tileobjectdata-startup-fix", "0.1010-blueprint-large-projection-display", "0.1011-blueprint-library-gap-flag-ui", "0.1012-blueprint-submenu-scroll-body", "0.1013-blueprint-material-modal-scroll")) {
         Write-Pass "Blueprint furniture closeout/follow-up version metadata is current."
     }
     else {
-        Write-FailHealth "Blueprint furniture closeout/follow-up must keep RuntimeVersion and project metadata at 0.1008, the 0.1009 TileObjectData startup fix, the 0.1010 large projection display fix, the 0.1011 library gap flag UI fix, or the 0.1012 submenu scroll body fix."
+        Write-FailHealth "Blueprint furniture closeout/follow-up must keep RuntimeVersion and project metadata at 0.1008, the 0.1009 TileObjectData startup fix, the 0.1010 large projection display fix, the 0.1011 library gap flag UI fix, the 0.1012 submenu scroll body fix, or the 0.1013 material modal scroll fix."
     }
 
     if ((Test-Path -LiteralPath $archivePlanDirectory) -and
