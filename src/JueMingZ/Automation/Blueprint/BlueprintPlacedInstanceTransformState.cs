@@ -124,7 +124,6 @@ namespace JueMingZ.Automation.Blueprint
     internal static class BlueprintPlacedInstanceTransformState
     {
         private static readonly object SyncRoot = new object();
-        private const int MaxFloatingPreviewLayers = 2048;
 
         private static BlueprintWorldInstanceStore _store;
         private static BlueprintWorldInstanceStore _testingStore;
@@ -774,7 +773,7 @@ namespace JueMingZ.Automation.Blueprint
             var layers = new List<BlueprintProjectionCellSnapshot>();
             var template = instance == null ? null : instance.TemplateSnapshot;
             var cells = template == null ? null : template.Cells;
-            for (var cellIndex = 0; cells != null && cellIndex < cells.Count && layers.Count < MaxFloatingPreviewLayers; cellIndex++)
+            for (var cellIndex = 0; cells != null && cellIndex < cells.Count; cellIndex++)
             {
                 var cell = cells[cellIndex];
                 if (cell == null || IsCellErased(instance == null ? null : instance.EraseMask, cell.X, cell.Y))
@@ -782,7 +781,7 @@ namespace JueMingZ.Automation.Blueprint
                     continue;
                 }
 
-                for (var layerIndex = 0; cell.Layers != null && layerIndex < cell.Layers.Count && layers.Count < MaxFloatingPreviewLayers; layerIndex++)
+                for (var layerIndex = 0; cell.Layers != null && layerIndex < cell.Layers.Count; layerIndex++)
                 {
                     var layer = cell.Layers[layerIndex];
                     if (layer == null || string.IsNullOrWhiteSpace(layer.LayerKind))

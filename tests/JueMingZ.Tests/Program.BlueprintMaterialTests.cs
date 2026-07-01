@@ -409,6 +409,201 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void BlueprintSubmenusKeepBodyVisibleAfterHeaderScroll()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-submenu-header-scroll");
+            try
+            {
+                ConfigService.Initialize();
+                BlueprintEntryState.ResetForTesting();
+                BlueprintLibraryUiState.ResetForTesting();
+                BlueprintPlacedInstanceUiState.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                LegacyUiOverlayCoordinator.Current.ResetForTesting();
+
+                var templateStore = new BlueprintTemplateLibraryStore();
+                BlueprintTemplateRecord libraryTemplate;
+                RequireBlueprintSuccess(templateStore.CreateTemplate(CreateSampleBlueprintTemplate("标题滚出蓝图库"), out libraryTemplate), "create header-scroll library template");
+                BlueprintLibraryUiState.SetStoreForTesting(templateStore, true);
+                RequireBlueprintCommandSuccess(BlueprintLibraryUiState.OpenLibrary(), "open header-scroll library");
+
+                var content = new LegacyUiRect(20, 20, 520, 180);
+                var mouse = new LegacyMouseSnapshot { ReadAvailable = true, X = 0, Y = 0 };
+                var libraryArea = LegacyScrollArea.Create(content, LegacyMainWindow.CalculateBlueprintContentHeightForTesting(), 64);
+                if (LegacyMainWindow.IsBlueprintSubmenuHeaderVisibleForTesting(libraryArea))
+                {
+                    throw new InvalidOperationException("Expected library submenu title row to be outside the scrolled viewport.");
+                }
+
+                var libraryElements = new List<LegacyUiElement>();
+                LegacyMainWindow.DrawBlueprintLibrarySubmenuForTesting(libraryArea, mouse, libraryElements);
+                FindLegacyUiElementForTesting(
+                    libraryElements,
+                    LegacyMainWindow.BuildBlueprintLibraryLayoutCommandIdForTesting("use", libraryTemplate.TemplateId));
+
+                BlueprintLibraryUiState.CloseLibrary();
+                var instanceStore = new BlueprintWorldInstanceStore();
+                BlueprintWorldInstanceRecord placed;
+                RequireBlueprintSuccess(
+                    instanceStore.CreateInstanceFromTemplate(
+                        "pair-header-scroll",
+                        "world-header-scroll",
+                        CreateSingleMaterialTemplate("标题滚出已放置", 21, 501, 10),
+                        3,
+                        4,
+                        0,
+                        out placed),
+                    "create header-scroll placed instance");
+                BlueprintProjectionService.SetDependenciesForTesting(
+                    instanceStore,
+                    BlueprintPlacementWorldContext.Success("pair-header-scroll", "world-header-scroll"),
+                    new FakeBlueprintWorldTileReader(),
+                    true);
+                BlueprintMaterialService.SetInventoryReaderForTesting(
+                    new FakeBlueprintMaterialInventoryReader(new Dictionary<int, int> { { 501, 4 } }, new Dictionary<int, int>()),
+                    true);
+                BlueprintPlacedInstanceUiState.SetDependenciesForTesting(
+                    instanceStore,
+                    BlueprintPlacementWorldContext.Success("pair-header-scroll", "world-header-scroll"),
+                    true);
+
+                var entry = BlueprintEntryState.ApplyCommand(BlueprintEntryCommands.OpenPlacedInstances, ConfigService.AppSettings ?? AppSettings.CreateDefault());
+                if (entry == null || !entry.Succeeded)
+                {
+                    throw new InvalidOperationException("Expected header-scroll placed list entry mode to open.");
+                }
+
+                var open = BlueprintPlacedInstanceUiState.OpenManagement();
+                if (open == null || !open.Succeeded)
+                {
+                    throw new InvalidOperationException("Expected header-scroll placed list to load.");
+                }
+
+                var placedArea = LegacyScrollArea.Create(content, LegacyMainWindow.CalculateBlueprintContentHeightForTesting(), 64);
+                if (LegacyMainWindow.IsBlueprintSubmenuHeaderVisibleForTesting(placedArea))
+                {
+                    throw new InvalidOperationException("Expected placed submenu title row to be outside the scrolled viewport.");
+                }
+
+                var placedElements = new List<LegacyUiElement>();
+                LegacyMainWindow.DrawBlueprintPlacedSubmenuForTesting(placedArea, mouse, placedElements);
+                FindLegacyUiElementForTesting(
+                    placedElements,
+                    LegacyMainWindow.BuildBlueprintPlacedInstanceCommandIdForTesting("materials", placed.InstanceId));
+                AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "scroll-header-nonblocking");
+                AssertContains(LegacyMainWindow.GetBlueprintPlacedInstanceVisualContractForTesting(), "scroll-header-nonblocking");
+            }
+            finally
+            {
+                LegacyUiOverlayCoordinator.Current.ResetForTesting();
+                BlueprintEntryState.ResetForTesting();
+                BlueprintLibraryUiState.ResetForTesting();
+                BlueprintPlacedInstanceUiState.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintMaterialWindowOverlay.ResetForTesting();
+                BlueprintTemplateLibraryStore.ResetTestingHooks();
+                restore();
+            }
+        }
+
+        private static void BlueprintPlacedListLayoutCacheTracksManagementMaterials()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-placed-layout-cache-materials");
+            try
+            {
+                ConfigService.Initialize();
+                BlueprintEntryState.ResetForTesting();
+                BlueprintLibraryUiState.ResetForTesting();
+                BlueprintPlacedInstanceUiState.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                LegacyMainWindow.ResetPageLayoutCacheForTesting();
+
+                var settings = ConfigService.AppSettings ?? AppSettings.CreateDefault();
+                var window = new LegacyUiRect(40, 50, LegacyUiMetrics.DefaultWidth, LegacyUiMetrics.DefaultHeight);
+                var content = new LegacyUiRect(58, 134, 520, 180);
+                var toolLayout = LegacyMainWindow.BuildPageLayoutSnapshotForTesting("blueprint", window, content, 0, settings);
+
+                var store = new BlueprintWorldInstanceStore();
+                BlueprintWorldInstanceRecord placed;
+                RequireBlueprintSuccess(
+                    store.CreateInstanceFromTemplate(
+                        "pair-placed-layout-cache",
+                        "world-placed-layout-cache",
+                        CreateSingleMaterialTemplate("布局缓存材料", 21, 501, 10),
+                        3,
+                        4,
+                        0,
+                        out placed),
+                    "create layout-cache placed instance");
+                BlueprintProjectionService.SetDependenciesForTesting(
+                    store,
+                    BlueprintPlacementWorldContext.Success("pair-placed-layout-cache", "world-placed-layout-cache"),
+                    new FakeBlueprintWorldTileReader(),
+                    true);
+                BlueprintMaterialService.SetInventoryReaderForTesting(
+                    new FakeBlueprintMaterialInventoryReader(new Dictionary<int, int> { { 501, 2 }, { 502, 0 } }, new Dictionary<int, int>()),
+                    true);
+                BlueprintPlacedInstanceUiState.SetDependenciesForTesting(
+                    store,
+                    BlueprintPlacementWorldContext.Success("pair-placed-layout-cache", "world-placed-layout-cache"),
+                    true);
+
+                var entry = BlueprintEntryState.ApplyCommand(BlueprintEntryCommands.OpenPlacedInstances, settings);
+                var open = BlueprintPlacedInstanceUiState.OpenManagement();
+                if (entry == null || !entry.Succeeded || open == null || !open.Succeeded)
+                {
+                    throw new InvalidOperationException("Expected placed-list layout cache test to enter management mode.");
+                }
+
+                var placedLayout = LegacyMainWindow.BuildPageLayoutSnapshotForTesting("blueprint", window, content, 0, settings);
+                if (placedLayout.RebuildCount <= toolLayout.RebuildCount ||
+                    placedLayout.PageStateSignature == toolLayout.PageStateSignature)
+                {
+                    throw new InvalidOperationException("Expected blueprint page layout cache to dirty when entering placed management mode.");
+                }
+
+                BlueprintWorldInstanceRecord second;
+                RequireBlueprintSuccess(
+                    store.CreateInstanceFromTemplate(
+                        "pair-placed-layout-cache",
+                        "world-placed-layout-cache",
+                        CreateSingleMaterialTemplate("布局缓存第二材料", 22, 502, 5),
+                        5,
+                        4,
+                        1,
+                        out second),
+                    "create second layout-cache placed instance");
+
+                open = BlueprintPlacedInstanceUiState.OpenManagement();
+                if (open == null || !open.Succeeded)
+                {
+                    throw new InvalidOperationException("Expected placed-list layout cache test to refresh management mode after material state changes.");
+                }
+
+                var materialChangedLayout = LegacyMainWindow.BuildPageLayoutSnapshotForTesting("blueprint", window, content, 0, settings);
+                if (materialChangedLayout.RebuildCount <= placedLayout.RebuildCount ||
+                    materialChangedLayout.ContentHeight <= placedLayout.ContentHeight ||
+                    materialChangedLayout.PageStateSignature == placedLayout.PageStateSignature)
+                {
+                    throw new InvalidOperationException("Expected blueprint page layout cache to dirty when placed material row count changes content height.");
+                }
+            }
+            finally
+            {
+                LegacyMainWindow.ResetPageLayoutCacheForTesting();
+                BlueprintEntryState.ResetForTesting();
+                BlueprintLibraryUiState.ResetForTesting();
+                BlueprintPlacedInstanceUiState.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintMaterialWindowOverlay.ResetForTesting();
+                restore();
+            }
+        }
+
         private static void BlueprintMaterialsUseReplacementItemWhenConfigured()
         {
             var restore = PushTemporaryConfigDirectory("blueprint-material-replacement");

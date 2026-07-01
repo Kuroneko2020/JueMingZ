@@ -1158,6 +1158,7 @@ namespace JueMingZ.Tests
             Run("blueprint placement preview waits for physical left release before confirm", ref failed, BlueprintPlacementPreviewWaitsForPhysicalLeftReleaseBeforeConfirm);
             Run("blueprint placement preview wall template does not draw late range fill over foreground", ref failed, BlueprintPlacementPreviewWallTemplateDoesNotDrawLateRangeFillOverForeground);
             Run("blueprint placement preview wall content uses world layer before late preview overlay", ref failed, BlueprintPlacementPreviewWallContentUsesWorldLayerBeforeLatePreviewOverlay);
+            Run("blueprint placement preview keeps layers beyond former display caps", ref failed, BlueprintPlacementPreviewKeepsLayersBeyondFormerDisplayCaps);
             Run("blueprint placement preview late overlay skips wall content when world layer active", ref failed, BlueprintPlacementPreviewLateOverlaySkipsWallContentWhenWorldLayerActive);
             Run("blueprint placement preview multitile object uses original ghost layers", ref failed, BlueprintPlacementPreviewMultitileObjectUsesOriginalGhostLayers);
             Run("blueprint placement preview object group conflict marks whole group", ref failed, BlueprintPlacementPreviewObjectGroupConflictMarksWholeGroup);
@@ -1179,6 +1180,8 @@ namespace JueMingZ.Tests
             Run("blueprint world instances persist hidden erase layer and snapshots on reload", ref failed, BlueprintWorldInstancesPersistHiddenEraseLayerAndSnapshotsOnReload);
             Run("blueprint projection classifies fulfilled missing and conflict", ref failed, BlueprintProjectionClassifiesFulfilledMissingAndConflict);
             Run("blueprint projection ignores air-only template bounds", ref failed, BlueprintProjectionIgnoresAirOnlyTemplateBounds);
+            Run("blueprint projection keeps layers beyond former overlay cap", ref failed, BlueprintProjectionKeepsLayersBeyondFormerOverlayCap);
+            Run("blueprint projection overlay draw order includes layers beyond former frame cap", ref failed, BlueprintProjectionOverlayDrawOrderIncludesLayersBeyondFormerFrameCap);
             Run("blueprint projection composes layer order and skips hidden", ref failed, BlueprintProjectionComposesLayerOrderAndSkipsHidden);
             Run("blueprint projection stage 04 later instance covers earlier without mutating snapshots", ref failed, BlueprintProjectionStage04LaterInstanceCoversEarlierWithoutMutatingSnapshots);
             Run("blueprint projection stage 05 completed progress persists and skips dug cells", ref failed, BlueprintProjectionStage05CompletedProgressPersistsAndSkipsDugCells);
@@ -1203,6 +1206,8 @@ namespace JueMingZ.Tests
             Run("blueprint materials read main inventory and void bag availability", ref failed, BlueprintMaterialsReadMainInventoryAndVoidBagAvailability);
             Run("blueprint placed list refreshes material comparison without draw scan", ref failed, BlueprintPlacedListRefreshesMaterialComparisonWithoutDrawScan);
             Run("blueprint placed list stage 03 layout material and cards", ref failed, BlueprintPlacedListStage03LayoutMaterialAndCards);
+            Run("blueprint submenus keep body visible after header scroll", ref failed, BlueprintSubmenusKeepBodyVisibleAfterHeaderScroll);
+            Run("blueprint placed list layout cache tracks management materials", ref failed, BlueprintPlacedListLayoutCacheTracksManagementMaterials);
             Run("blueprint materials use replacement item when configured", ref failed, BlueprintMaterialsUseReplacementItemWhenConfigured);
             Run("blueprint material window routes and consumes input", ref failed, BlueprintMaterialWindowRoutesAndConsumesInput);
             Run("blueprint material diagnostics write runtime snapshot json", ref failed, BlueprintMaterialDiagnosticsWriteRuntimeSnapshotJson);

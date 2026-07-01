@@ -223,7 +223,6 @@ namespace JueMingZ.Automation.Blueprint
     internal static class BlueprintProjectionService
     {
         private const int CacheCadenceMs = 250;
-        private const int MaxProjectedLayersForOverlay = 2048;
         private static readonly object SyncRoot = new object();
         private static BlueprintWorldInstanceStore _testingStore;
         private static BlueprintPlacementWorldContext _testingWorldContext;
@@ -567,7 +566,6 @@ namespace JueMingZ.Automation.Blueprint
                 }
             }
 
-            var projected = new List<BlueprintProjectionCellSnapshot>();
             var allProjected = new List<BlueprintProjectionCellSnapshot>();
             var wallDiagnostics = new List<BlueprintWallCompletionDiagnostic>();
             var replacementSettings = BlueprintReplacementRuleService.GetSettingsFromCurrentConfig();
@@ -598,10 +596,6 @@ namespace JueMingZ.Automation.Blueprint
 
                 allProjected.Add(projectedLayer);
                 RecordWallCompletionDiagnostic(snapshot, candidate, projectedLayer, reader, worldTileCache, world, wallDiagnostics);
-                if (projected.Count < MaxProjectedLayersForOverlay)
-                {
-                    projected.Add(projectedLayer);
-                }
             }
 
             ApplyMultitileObjectGroupPolicy(allProjected);
@@ -609,7 +603,7 @@ namespace JueMingZ.Automation.Blueprint
             CountProjectionStatuses(snapshot, allProjected);
             FinalizeWallCompletionDiagnostics(snapshot, wallDiagnostics);
             snapshot.EffectiveLayerCount = order.Count;
-            snapshot.ProjectedLayers = projected;
+            snapshot.ProjectedLayers = allProjected;
             snapshot.AllProjectedLayers = allProjected;
             if (snapshot.InstanceCount <= 0)
             {

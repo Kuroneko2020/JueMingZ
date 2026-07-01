@@ -6,8 +6,6 @@ namespace JueMingZ.Automation.Blueprint
 {
     internal static class BlueprintPlacementPreviewLayerBuilder
     {
-        private const int MaxPreviewLayers = 2048;
-
         public static IReadOnlyList<BlueprintProjectionCellSnapshot> Build(
             BlueprintTemplateRecord template,
             string templateId,
@@ -24,8 +22,7 @@ namespace JueMingZ.Automation.Blueprint
 
             var replacementSettings = BlueprintReplacementRuleService.GetSettingsFromCurrentConfig();
             var worldTileCache = new Dictionary<string, BlueprintWorldTileSnapshot>(StringComparer.Ordinal);
-            var maxCells = Math.Min(template.Cells.Count, MaxPreviewLayers);
-            for (var cellIndex = 0; cellIndex < maxCells && layers.Count < MaxPreviewLayers; cellIndex++)
+            for (var cellIndex = 0; cellIndex < template.Cells.Count; cellIndex++)
             {
                 var cell = template.Cells[cellIndex];
                 if (cell == null || cell.Layers == null)
@@ -33,7 +30,7 @@ namespace JueMingZ.Automation.Blueprint
                     continue;
                 }
 
-                for (var layerIndex = 0; layerIndex < cell.Layers.Count && layers.Count < MaxPreviewLayers; layerIndex++)
+                for (var layerIndex = 0; layerIndex < cell.Layers.Count; layerIndex++)
                 {
                     var layer = cell.Layers[layerIndex];
                     if (layer == null)

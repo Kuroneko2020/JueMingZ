@@ -46,8 +46,8 @@ namespace JueMingZ.UI.Legacy
         private const int BlueprintPlacedRowGap = BlueprintLibraryCardGap;
         private const int BlueprintLibraryPreviewGridSize = 70;
         private const string BlueprintStatusBarElementId = "blueprint-status-bar";
-        private const string BlueprintLibraryVisualContract = "main-menu-hotkey-open-row+same-content-submenu+stage06-two-column-fixed-cards+preview-scales-to-fit+stage07-name-edit-delete-confirm+stage08-import-export-windows-dialog+stage09-layout-use-real-template-snapshot+stage02-title-row-tools+card-material-toggle+card-material-modal+card-buttons-no-tooltips+summary-placed-count+summary-only+no-empty-gap-text+larger-card-summary+use-closes-f5+mutual-submenus+hit-owned+state-paged-6";
-        private const string BlueprintPlacedInstanceVisualContract = "main-menu-open-row+same-content-submenu+current-world-list+paged-5+stage03-title-count+stage03-header-page-back+stage03-material-total-all-lines+stage03-card-preview+stage03-library-sized-cards+read-only-name+hide-show-cancel-place+card-material-modal+template-snapshot-isolated+material-comparison+materials-cache-only";
+        private const string BlueprintLibraryVisualContract = "main-menu-hotkey-open-row+same-content-submenu+stage06-two-column-fixed-cards+preview-scales-to-fit+stage07-name-edit-delete-confirm+stage08-import-export-windows-dialog+stage09-layout-use-real-template-snapshot+stage02-title-row-tools+card-material-toggle+card-material-modal+card-buttons-no-tooltips+summary-placed-count+summary-only+no-empty-gap-text+raw-gap-flags-hidden+larger-card-summary+use-closes-f5+mutual-submenus+hit-owned+state-paged-6+scroll-header-nonblocking";
+        private const string BlueprintPlacedInstanceVisualContract = "main-menu-open-row+same-content-submenu+current-world-list+paged-5+stage03-title-count+stage03-header-page-back+stage03-material-total-all-lines+stage03-card-preview+stage03-library-sized-cards+read-only-name+hide-show-cancel-place+card-material-modal+template-snapshot-isolated+material-comparison+materials-cache-only+scroll-header-nonblocking";
         private const string BlueprintCreationVisualContract = "world-mask+single-toggle+drag-toggle+multi-region+ui-owned-consume+world-hover+air-select+low-alpha-no-border+continuous-mask+clear-selection+finish-cancel+placement-preview+center-anchor+left-click-instance";
         private const string BlueprintProjectionVisualContract = "world-projection+appearance-ghost+original-missing+red-conflict+gray-unavailable+fulfilled-no-mask+completed-progress+no-cell-border+move-floating-follow-preview+hidden-skip+layer-cover+wire-actuator-original-color+missing-no-state-block+multitile-object-group-conflict";
         private const string BlueprintMaterialVisualContract = "aggregate-materials+main-inventory+void-bag+floating-window+placed-list-comparison+cache-only-draw";
@@ -554,77 +554,75 @@ namespace JueMingZ.UI.Legacy
         {
             var snapshot = BlueprintLibraryUiState.GetSnapshot();
             var row = new LegacyUiRect(area.Viewport.X, area.ToScreenY(0), area.Viewport.Width, BlueprintLibrarySubmenuHeaderHeight);
-            if (!area.IsVisible(row))
-            {
-                return null;
-            }
-
-            LegacyUiRect importRect;
-            LegacyUiRect prevRect;
-            LegacyUiRect nextRect;
-            LegacyUiRect backRect;
-            CalculateBlueprintLibraryHeaderButtonRects(row, out importRect, out prevRect, out nextRect, out backRect);
-
-            LegacyUiTheme.DrawRowClipped(spriteBatch, row, area.Viewport);
-            UiTextRenderer.DrawTextClipped(
-                spriteBatch,
-                "蓝图库",
-                row.X + 10,
-                row.Y + 5,
-                Math.Max(1, importRect.X - row.X - 18),
-                16,
-                area.Viewport.X,
-                area.Viewport.Y,
-                area.Viewport.Width,
-                area.Viewport.Height,
-                238,
-                238,
-                226,
-                255,
-                0.76f);
-            var count = snapshot == null || snapshot.Templates == null ? 0 : snapshot.Templates.Count;
-            var placed = BlueprintPlacedInstanceUiState.GetCachedSummary();
-            var placedCount = placed == null ? 0 : placed.InstanceCount;
-            var detail = BuildBlueprintLibraryHeaderSummary(count, placedCount);
-
-            UiTextRenderer.DrawTextClipped(
-                spriteBatch,
-                detail,
-                row.X + 10,
-                row.Y + 24,
-                Math.Max(1, importRect.X - row.X - 18),
-                12,
-                area.Viewport.X,
-                area.Viewport.Y,
-                area.Viewport.Width,
-                area.Viewport.Height,
-                206,
-                218,
-                238,
-                230,
-                0.54f);
-
             var hovered = (LegacyUiElement)null;
-            hovered = DrawBlueprintSmallButton(
-                spriteBatch,
-                mouse,
-                elements,
-                area.Viewport,
-                importRect,
-                BlueprintLibraryUiState.BuildCommandId("import", string.Empty),
-                "导入",
-                null) ?? hovered;
-            hovered = DrawBlueprintSmallButton(spriteBatch, mouse, elements, area.Viewport, prevRect, "blueprint-library:page-prev", "上一页", null) ?? hovered;
-            hovered = DrawBlueprintSmallButton(spriteBatch, mouse, elements, area.Viewport, nextRect, "blueprint-library:page-next", "下一页", null) ?? hovered;
-            hovered = DrawBlueprintSmallButton(
-                spriteBatch,
-                mouse,
-                elements,
-                area.Viewport,
-                backRect,
-                BlueprintLibraryUiState.BuildCommandId("back", string.Empty),
-                "返回",
-                "返回蓝图主菜单") ?? hovered;
+            if (IsBlueprintSubmenuHeaderVisible(area))
+            {
+                LegacyUiRect importRect;
+                LegacyUiRect prevRect;
+                LegacyUiRect nextRect;
+                LegacyUiRect backRect;
+                CalculateBlueprintLibraryHeaderButtonRects(row, out importRect, out prevRect, out nextRect, out backRect);
+
+                LegacyUiTheme.DrawRowClipped(spriteBatch, row, area.Viewport);
+                UiTextRenderer.DrawTextClipped(
+                    spriteBatch,
+                    "蓝图库",
+                    row.X + 10,
+                    row.Y + 5,
+                    Math.Max(1, importRect.X - row.X - 18),
+                    16,
+                    area.Viewport.X,
+                    area.Viewport.Y,
+                    area.Viewport.Width,
+                    area.Viewport.Height,
+                    238,
+                    238,
+                    226,
+                    255,
+                    0.76f);
+                var count = snapshot == null || snapshot.Templates == null ? 0 : snapshot.Templates.Count;
+                var placed = BlueprintPlacedInstanceUiState.GetCachedSummary();
+                var placedCount = placed == null ? 0 : placed.InstanceCount;
+                var detail = BuildBlueprintLibraryHeaderSummary(count, placedCount);
+
+                UiTextRenderer.DrawTextClipped(
+                    spriteBatch,
+                    detail,
+                    row.X + 10,
+                    row.Y + 24,
+                    Math.Max(1, importRect.X - row.X - 18),
+                    12,
+                    area.Viewport.X,
+                    area.Viewport.Y,
+                    area.Viewport.Width,
+                    area.Viewport.Height,
+                    206,
+                    218,
+                    238,
+                    230,
+                    0.54f);
+
+                hovered = DrawBlueprintSmallButton(
+                    spriteBatch,
+                    mouse,
+                    elements,
+                    area.Viewport,
+                    importRect,
+                    BlueprintLibraryUiState.BuildCommandId("import", string.Empty),
+                    "导入",
+                    null) ?? hovered;
+                hovered = DrawBlueprintSmallButton(spriteBatch, mouse, elements, area.Viewport, prevRect, "blueprint-library:page-prev", "上一页", null) ?? hovered;
+                hovered = DrawBlueprintSmallButton(spriteBatch, mouse, elements, area.Viewport, nextRect, "blueprint-library:page-next", "下一页", null) ?? hovered;
+                hovered = DrawBlueprintSmallButton(
+                    spriteBatch,
+                    mouse,
+                    elements,
+                    area.Viewport,
+                    backRect,
+                    BlueprintLibraryUiState.BuildCommandId("back", string.Empty),
+                    "返回",
+                    "返回蓝图主菜单") ?? hovered;
+            }
 
             var y = BlueprintLibrarySubmenuHeaderHeight + LegacyUiMetrics.SettingRowGap;
             hovered = DrawBlueprintLibraryList(spriteBatch, area, mouse, elements, y, snapshot) ?? hovered;
@@ -640,82 +638,80 @@ namespace JueMingZ.UI.Legacy
         {
             var snapshot = BlueprintPlacedInstanceUiState.GetSnapshot();
             var row = new LegacyUiRect(area.Viewport.X, area.ToScreenY(0), area.Viewport.Width, BlueprintLibrarySubmenuHeaderHeight);
-            if (!area.IsVisible(row))
-            {
-                return null;
-            }
-
-            LegacyUiTheme.DrawRowClipped(spriteBatch, row, area.Viewport);
-            LegacyUiRect prevRect;
-            LegacyUiRect nextRect;
-            LegacyUiRect backRect;
-            CalculateBlueprintPlacedHeaderButtonRects(row, out prevRect, out nextRect, out backRect);
-            UiTextRenderer.DrawTextClipped(
-                spriteBatch,
-                "已放置蓝图列表",
-                row.X + 10,
-                row.Y + 5,
-                Math.Max(1, prevRect.X - row.X - 18),
-                16,
-                area.Viewport.X,
-                area.Viewport.Y,
-                area.Viewport.Width,
-                area.Viewport.Height,
-                238,
-                238,
-                226,
-                255,
-                0.76f);
-            var count = snapshot == null || snapshot.Instances == null ? 0 : snapshot.Instances.Count;
-            var detail = snapshot != null && snapshot.LoadSucceeded
-                ? BuildBlueprintPlacedHeaderSummary(count)
-                : "当前世界实例读取失败";
-
-            UiTextRenderer.DrawTextClipped(
-                spriteBatch,
-                detail,
-                row.X + 10,
-                row.Y + 24,
-                Math.Max(1, prevRect.X - row.X - 18),
-                12,
-                area.Viewport.X,
-                area.Viewport.Y,
-                area.Viewport.Width,
-                area.Viewport.Height,
-                206,
-                218,
-                238,
-                230,
-                0.54f);
-
             var hovered = (LegacyUiElement)null;
-            hovered = DrawBlueprintSmallButton(
-                spriteBatch,
-                mouse,
-                elements,
-                area.Viewport,
-                prevRect,
-                BlueprintPlacedInstanceUiState.BuildCommandId("page-prev", string.Empty),
-                "上一页",
-                null) ?? hovered;
-            hovered = DrawBlueprintSmallButton(
-                spriteBatch,
-                mouse,
-                elements,
-                area.Viewport,
-                nextRect,
-                BlueprintPlacedInstanceUiState.BuildCommandId("page-next", string.Empty),
-                "下一页",
-                null) ?? hovered;
-            hovered = DrawBlueprintSmallButton(
-                spriteBatch,
-                mouse,
-                elements,
-                area.Viewport,
-                backRect,
-                BlueprintEntryElementPrefix + BlueprintEntryCommands.Cancel,
-                "返回",
-                "返回蓝图主菜单") ?? hovered;
+            if (IsBlueprintSubmenuHeaderVisible(area))
+            {
+                LegacyUiTheme.DrawRowClipped(spriteBatch, row, area.Viewport);
+                LegacyUiRect prevRect;
+                LegacyUiRect nextRect;
+                LegacyUiRect backRect;
+                CalculateBlueprintPlacedHeaderButtonRects(row, out prevRect, out nextRect, out backRect);
+                UiTextRenderer.DrawTextClipped(
+                    spriteBatch,
+                    "已放置蓝图列表",
+                    row.X + 10,
+                    row.Y + 5,
+                    Math.Max(1, prevRect.X - row.X - 18),
+                    16,
+                    area.Viewport.X,
+                    area.Viewport.Y,
+                    area.Viewport.Width,
+                    area.Viewport.Height,
+                    238,
+                    238,
+                    226,
+                    255,
+                    0.76f);
+                var count = snapshot == null || snapshot.Instances == null ? 0 : snapshot.Instances.Count;
+                var detail = snapshot != null && snapshot.LoadSucceeded
+                    ? BuildBlueprintPlacedHeaderSummary(count)
+                    : "当前世界实例读取失败";
+
+                UiTextRenderer.DrawTextClipped(
+                    spriteBatch,
+                    detail,
+                    row.X + 10,
+                    row.Y + 24,
+                    Math.Max(1, prevRect.X - row.X - 18),
+                    12,
+                    area.Viewport.X,
+                    area.Viewport.Y,
+                    area.Viewport.Width,
+                    area.Viewport.Height,
+                    206,
+                    218,
+                    238,
+                    230,
+                    0.54f);
+
+                hovered = DrawBlueprintSmallButton(
+                    spriteBatch,
+                    mouse,
+                    elements,
+                    area.Viewport,
+                    prevRect,
+                    BlueprintPlacedInstanceUiState.BuildCommandId("page-prev", string.Empty),
+                    "上一页",
+                    null) ?? hovered;
+                hovered = DrawBlueprintSmallButton(
+                    spriteBatch,
+                    mouse,
+                    elements,
+                    area.Viewport,
+                    nextRect,
+                    BlueprintPlacedInstanceUiState.BuildCommandId("page-next", string.Empty),
+                    "下一页",
+                    null) ?? hovered;
+                hovered = DrawBlueprintSmallButton(
+                    spriteBatch,
+                    mouse,
+                    elements,
+                    area.Viewport,
+                    backRect,
+                    BlueprintEntryElementPrefix + BlueprintEntryCommands.Cancel,
+                    "返回",
+                    "返回蓝图主菜单") ?? hovered;
+            }
 
             var y = BlueprintLibrarySubmenuHeaderHeight + LegacyUiMetrics.SettingRowGap;
             var materialHeight = CalculateBlueprintPlacedMaterialPanelHeight(BlueprintMaterialService.GetCachedSnapshotForDraw());
@@ -724,6 +720,17 @@ namespace JueMingZ.UI.Legacy
             hovered = DrawBlueprintPlacedList(spriteBatch, area, mouse, elements, y, snapshot) ?? hovered;
             RegisterBlueprintPlacedMaterialModalOverlay(area, snapshot);
             return hovered;
+        }
+
+        private static bool IsBlueprintSubmenuHeaderVisible(LegacyScrollArea area)
+        {
+            if (area == null)
+            {
+                return false;
+            }
+
+            var row = new LegacyUiRect(area.Viewport.X, area.ToScreenY(0), area.Viewport.Width, BlueprintLibrarySubmenuHeaderHeight);
+            return area.IsVisible(row);
         }
 
         private static LegacyUiElement DrawBlueprintReplacementRow(
@@ -1929,12 +1936,8 @@ namespace JueMingZ.UI.Legacy
 
         private static string BuildBlueprintCapabilityText(BlueprintTemplateRecord template)
         {
-            if (template == null || template.MissingCapabilityFlags == null || template.MissingCapabilityFlags.Count <= 0)
-            {
-                return string.Empty;
-            }
-
-            return "缺口：" + UiTextRenderer.Ellipsize(string.Join(" / ", template.MissingCapabilityFlags.ToArray()), 220, 0.58f);
+            _ = template;
+            return string.Empty;
         }
 
         private static string BuildBlueprintCreationSummary(BlueprintCreationMaskSnapshot snapshot)
@@ -2431,6 +2434,27 @@ namespace JueMingZ.UI.Legacy
         internal static LegacyUiRect GetBlueprintLibrarySubmenuContentBoundsForTesting(LegacyUiRect viewport)
         {
             return viewport;
+        }
+
+        internal static bool IsBlueprintSubmenuHeaderVisibleForTesting(LegacyScrollArea area)
+        {
+            return IsBlueprintSubmenuHeaderVisible(area);
+        }
+
+        internal static LegacyUiElement DrawBlueprintLibrarySubmenuForTesting(
+            LegacyScrollArea area,
+            LegacyMouseSnapshot mouse,
+            List<LegacyUiElement> elements)
+        {
+            return DrawBlueprintLibrarySubmenu(null, area, mouse, elements);
+        }
+
+        internal static LegacyUiElement DrawBlueprintPlacedSubmenuForTesting(
+            LegacyScrollArea area,
+            LegacyMouseSnapshot mouse,
+            List<LegacyUiElement> elements)
+        {
+            return DrawBlueprintPlacedSubmenu(null, area, mouse, elements);
         }
 
         internal static string GetBlueprintPlacedOpenElementIdForTesting()

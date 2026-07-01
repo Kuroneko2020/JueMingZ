@@ -10,7 +10,6 @@ namespace JueMingZ.UI
     public static class BlueprintProjectionOverlay
     {
         private const int TileSize = 16;
-        private const int MaxDrawLayersPerFrame = 1536;
         private const string VisualContract = "placed-instance-projection+appearance-ghost+original-missing+red-conflict+gray-unavailable+fulfilled-no-mask+completed-progress+no-cell-border+move-floating-follow-preview+hidden-skip+layer-order-cover+wire-actuator-original-color+missing-no-state-block+wall-bottom-layer-complete+wall-world-layer-before-foreground+terraria-foreground-between-wall-and-late-projection+late-overlay-skips-wall+wall-outer-edge-deemphasis+foreground-mask-not-wall-cut+multitile-object-group-conflict+draw-cache-only";
 
         public static bool DrawInterfaceLayer()
@@ -194,8 +193,7 @@ namespace JueMingZ.UI
             }
 
             var layers = snapshot.ProjectedLayers;
-            var max = Math.Min(layers.Count, MaxDrawLayersPerFrame);
-            for (var index = 0; index < max; index++)
+            for (var index = 0; index < layers.Count; index++)
             {
                 var layer = layers[index];
                 if (layer == null ||
@@ -242,10 +240,9 @@ namespace JueMingZ.UI
             }
 
             var layers = snapshot.ProjectedLayers;
-            var max = Math.Min(layers.Count, MaxDrawLayersPerFrame);
             for (var pass = 0; pass <= 2; pass++)
             {
-                for (var index = 0; index < max; index++)
+                for (var index = 0; index < layers.Count; index++)
                 {
                     var layer = layers[index];
                     if (layer == null ||
@@ -276,10 +273,9 @@ namespace JueMingZ.UI
             }
 
             var layers = snapshot.ProjectedLayers;
-            var max = Math.Min(layers.Count, MaxDrawLayersPerFrame);
             for (var pass = 0; pass <= 2; pass++)
             {
-                for (var index = 0; index < max; index++)
+                for (var index = 0; index < layers.Count; index++)
                 {
                     var layer = layers[index];
                     if (layer == null ||

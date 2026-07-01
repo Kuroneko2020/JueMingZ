@@ -536,6 +536,7 @@ namespace JueMingZ.Tests
                 AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "summary-placed-count");
                 AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "summary-only");
                 AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "no-empty-gap-text");
+                AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "raw-gap-flags-hidden");
                 AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "larger-card-summary");
                 AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "use-closes-f5");
                 AssertContains(LegacyMainWindow.GetBlueprintLibraryVisualContractForTesting(), "mutual-submenus");
@@ -550,9 +551,10 @@ namespace JueMingZ.Tests
                     LegacyMainWindow.BuildBlueprintCapabilityTextForTesting(noGapTemplate),
                     string.Empty,
                     "stage02 library cards hide the old empty capability gap text");
-                AssertContains(
+                AssertStringEquals(
                     LegacyMainWindow.BuildBlueprintCapabilityTextForTesting(template),
-                    "liquid-not-supported");
+                    string.Empty,
+                    "stage02 library cards hide raw capability gap flags");
                 if (LegacyMainWindow.GetBlueprintLibraryCardSummaryTextScaleForTesting() <= 0.52f)
                 {
                     throw new InvalidOperationException("Stage 02 blueprint library card summary text scale should be larger than the old compact baseline.");

@@ -444,6 +444,30 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void BlueprintPlacementPreviewKeepsLayersBeyondFormerDisplayCaps()
+        {
+            var template = CreatePlacementPreviewLargeTemplateWithLateWallAndForeground("大蓝图预览完整层");
+            var snapshot = CreateActivePlacementPreviewSnapshot(template);
+            var worldOrder = BlueprintPlacementPreviewWallWorldOverlay.BuildWorldWallDrawOrderForTesting(snapshot);
+            var lateOrder = BlueprintPlacementPreviewOverlay.BuildLatePreviewDrawOrderForTesting(snapshot);
+            var worldTileX = 30 + 2048 % template.Width;
+            var worldTileY = 40 + 2048 / template.Width;
+
+            if (snapshot.PreviewLayers == null ||
+                snapshot.PreviewLayers.Count != 2050 ||
+                IndexOfOrder(worldOrder, "world-preview:wall:" + worldTileX + "," + worldTileY) < 0 ||
+                IndexOfOrder(lateOrder, "late-preview:object:" + worldTileX + "," + worldTileY) < 0)
+            {
+                throw new InvalidOperationException("Expected placement preview world and late overlays to keep layers beyond the former 512/1536/2048 prefix caps.");
+            }
+
+            if (BlueprintPlacementPreviewOverlay.ShouldDrawRangeFillForTesting(snapshot) ||
+                IndexOfOrder(lateOrder, "late-preview:range-fill") >= 0)
+            {
+                throw new InvalidOperationException("Expected a wall layer beyond the former 512-cell scan cap to still disable the late filled range surface.");
+            }
+        }
+
         private static void BlueprintPlacementPreviewLateOverlaySkipsWallContentWhenWorldLayerActive()
         {
             var snapshot = CreateActivePlacementPreviewSnapshot(CreatePlacementPreviewMixedWallTemplate("摆放晚层跳墙"));
@@ -893,6 +917,65 @@ namespace JueMingZ.Tests
                     }
                 }
             });
+            return template;
+        }
+
+        private static BlueprintTemplateRecord CreatePlacementPreviewLargeTemplateWithLateWallAndForeground(string name)
+        {
+            var width = 89;
+            var wallIndex = 2048;
+            var template = new BlueprintTemplateRecord
+            {
+                TemplateId = "template-" + Guid.NewGuid().ToString("N"),
+                Name = name,
+                Width = width,
+                Height = (wallIndex + width) / width,
+                AnchorX = 0,
+                AnchorY = 0
+            };
+
+            for (var index = 0; index < wallIndex; index++)
+            {
+                template.Cells.Add(new BlueprintCellRecord
+                {
+                    X = index % width,
+                    Y = index / width,
+                    Layers =
+                    {
+                        new BlueprintCellLayerRecord
+                        {
+                            LayerKind = BlueprintLayerKinds.Tile,
+                            ContentId = 1,
+                            MaterialItemId = 1,
+                            MaterialStack = 1
+                        }
+                    }
+                });
+            }
+
+            template.Cells.Add(new BlueprintCellRecord
+            {
+                X = wallIndex % width,
+                Y = wallIndex / width,
+                Layers =
+                {
+                    new BlueprintCellLayerRecord
+                    {
+                        LayerKind = BlueprintLayerKinds.Wall,
+                        ContentId = 2,
+                        MaterialItemId = 2,
+                        MaterialStack = 1
+                    },
+                    new BlueprintCellLayerRecord
+                    {
+                        LayerKind = BlueprintLayerKinds.Object,
+                        ContentId = 4,
+                        MaterialItemId = 4,
+                        MaterialStack = 1
+                    }
+                }
+            });
+
             return template;
         }
 

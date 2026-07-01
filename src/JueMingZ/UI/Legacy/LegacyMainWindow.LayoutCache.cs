@@ -595,10 +595,24 @@ namespace JueMingZ.UI.Legacy
                 AddHash(ref hash, _blueprintEntryHotkeyMessage);
             }
 
+            var entrySnapshot = BlueprintEntryState.GetSnapshot(settings);
+            AddHash(ref hash, entrySnapshot == null ? string.Empty : entrySnapshot.Mode);
+            if (includeTransientMessage)
+            {
+                AddHash(ref hash, BlueprintEntryState.BuildStateSignature(settings));
+            }
+
             AddHash(ref hash, BlueprintLibraryUiState.IsOpen);
             if (BlueprintLibraryUiState.IsOpen)
             {
                 AddHash(ref hash, BlueprintLibraryUiState.BuildStateSignature());
+                return;
+            }
+
+            if (entrySnapshot != null && string.Equals(entrySnapshot.Mode, BlueprintEntryModes.PlacedManagement, StringComparison.Ordinal))
+            {
+                AddHash(ref hash, BlueprintPlacedInstanceUiState.BuildStateSignature());
+                AddHash(ref hash, BlueprintMaterialService.BuildStateSignature());
                 return;
             }
 

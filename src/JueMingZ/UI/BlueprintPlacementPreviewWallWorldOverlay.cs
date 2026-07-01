@@ -10,14 +10,14 @@ namespace JueMingZ.UI
     public static class BlueprintPlacementPreviewWallWorldOverlay
     {
         private const int TileSize = 16;
-        private const int MaxPreviewWallLayersPerFrame = 512;
+        private const int InitialScratchWallLayerCapacity = 128;
         private const int WallR = 92;
         private const int WallG = 144;
         private const int WallB = 214;
         private const int WallAlpha = 142;
         private const string VisualContract = "blueprint-placement-preview-wall-world-layer+complete-template-wall-target+before-terraria-foreground+before-preview-foreground+late-preview-skips-wall-content+draw-snapshot-only";
         private static readonly object SyncRoot = new object();
-        private static readonly List<BlueprintProjectionCellSnapshot> ScratchWallLayers = new List<BlueprintProjectionCellSnapshot>(MaxPreviewWallLayersPerFrame);
+        private static readonly List<BlueprintProjectionCellSnapshot> ScratchWallLayers = new List<BlueprintProjectionCellSnapshot>(InitialScratchWallLayerCapacity);
 
         public static bool DrawWorldLayer()
         {
@@ -109,14 +109,13 @@ namespace JueMingZ.UI
         private static void BuildWallLayers(BlueprintPlacementPreviewSnapshot snapshot, List<BlueprintProjectionCellSnapshot> layers)
         {
             layers.Clear();
-            if (!HasDrawableWallLayers(snapshot))
+            if (!CanUsePreviewSnapshot(snapshot))
             {
                 return;
             }
 
             var previewLayers = snapshot.PreviewLayers;
-            var maxLayers = Math.Min(previewLayers == null ? 0 : previewLayers.Count, MaxPreviewWallLayersPerFrame);
-            for (var layerIndex = 0; layerIndex < maxLayers && layers.Count < MaxPreviewWallLayersPerFrame; layerIndex++)
+            for (var layerIndex = 0; previewLayers != null && layerIndex < previewLayers.Count; layerIndex++)
             {
                 var layer = previewLayers[layerIndex];
                 if (layer == null ||
@@ -155,16 +154,12 @@ namespace JueMingZ.UI
 
         private static bool HasDrawableWallLayers(BlueprintPlacementPreviewSnapshot snapshot)
         {
-            if (snapshot == null ||
-                !snapshot.Active ||
-                !snapshot.HoverTileHit ||
-                snapshot.PreviewLayers == null)
+            if (!CanUsePreviewSnapshot(snapshot))
             {
                 return false;
             }
 
-            var maxLayers = Math.Min(snapshot.PreviewLayers.Count, MaxPreviewWallLayersPerFrame);
-            for (var index = 0; index < maxLayers; index++)
+            for (var index = 0; index < snapshot.PreviewLayers.Count; index++)
             {
                 var layer = snapshot.PreviewLayers[index];
                 if (IsWallLayer(layer) && BlueprintProjectionGhostRenderer.ShouldDrawLayer(layer.Status))
@@ -174,6 +169,14 @@ namespace JueMingZ.UI
             }
 
             return false;
+        }
+
+        private static bool CanUsePreviewSnapshot(BlueprintPlacementPreviewSnapshot snapshot)
+        {
+            return snapshot != null &&
+                   snapshot.Active &&
+                   snapshot.HoverTileHit &&
+                   snapshot.PreviewLayers != null;
         }
 
         private static bool IsWallLayer(BlueprintCellLayerRecord layer)

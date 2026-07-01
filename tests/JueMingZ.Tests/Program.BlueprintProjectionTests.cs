@@ -90,6 +90,73 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void BlueprintProjectionKeepsLayersBeyondFormerOverlayCap()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-projection-large-layer-cap");
+            try
+            {
+                var store = new BlueprintWorldInstanceStore();
+                var reader = new FakeBlueprintWorldTileReader();
+                var template = CreateLargeProjectionTileTemplate("大蓝图投影完整层", 2050);
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(store.CreateInstanceFromTemplate("pair-proj-large", "world-proj-large", template, 30, 40, 0, out instance), "create large projection instance");
+
+                BlueprintProjectionService.SetDependenciesForTesting(
+                    store,
+                    BlueprintPlacementWorldContext.Success("pair-proj-large", "world-proj-large"),
+                    reader,
+                    true);
+
+                var snapshot = BlueprintProjectionService.GetSnapshot();
+                var lastRelativeX = 2049 % template.Width;
+                var lastRelativeY = 2049 / template.Width;
+                if (!snapshot.LoadSucceeded ||
+                    snapshot.EffectiveLayerCount != 2050 ||
+                    snapshot.AllProjectedLayers.Count != 2050 ||
+                    snapshot.ProjectedLayers.Count != 2050 ||
+                    !HasProjectedLayerAt(snapshot.ProjectedLayers, instance.InstanceId, BlueprintLayerKinds.Tile, 30 + lastRelativeX, 40 + lastRelativeY))
+                {
+                    throw new InvalidOperationException("Expected projection overlay input to keep layers beyond the former 2048 prefix cap.");
+                }
+            }
+            finally
+            {
+                BlueprintProjectionService.ResetForTesting();
+                restore();
+            }
+        }
+
+        private static void BlueprintProjectionOverlayDrawOrderIncludesLayersBeyondFormerFrameCap()
+        {
+            var layers = new List<BlueprintProjectionCellSnapshot>();
+            for (var index = 0; index <= 1536; index++)
+            {
+                layers.Add(new BlueprintProjectionCellSnapshot
+                {
+                    InstanceId = "large",
+                    LayerKind = BlueprintLayerKinds.Tile,
+                    CoverageGroup = BlueprintLayerKinds.Tile,
+                    ContentId = 1,
+                    Status = BlueprintProjectionLayerStatuses.Missing,
+                    WorldTileX = index,
+                    WorldTileY = 0
+                });
+            }
+
+            var snapshot = new BlueprintProjectionSnapshot
+            {
+                LoadSucceeded = true,
+                ProjectedLayers = layers,
+                AllProjectedLayers = layers
+            };
+
+            var order = BlueprintProjectionOverlay.BuildProjectionDrawOrderForTesting(snapshot, null);
+            if (IndexOfDrawOrder(order, "placed:tile:1536,0") < 0)
+            {
+                throw new InvalidOperationException("Expected projection overlay draw order to include layers beyond the former 1536 per-frame prefix cap.");
+            }
+        }
+
         private static void BlueprintProjectionComposesLayerOrderAndSkipsHidden()
         {
             var restore = PushTemporaryConfigDirectory("blueprint-projection-layer-order-hidden");
@@ -1176,6 +1243,27 @@ namespace JueMingZ.Tests
             template.Cells.Add(CreateTileCell(0, 0, 11));
             template.Cells.Add(CreateWallCell(1, 0, 22));
             template.Cells.Add(CreateTileCell(2, 0, 33));
+            return template;
+        }
+
+        private static BlueprintTemplateRecord CreateLargeProjectionTileTemplate(string name, int layerCount)
+        {
+            var width = 89;
+            var height = Math.Max(1, (layerCount + width - 1) / width);
+            var template = new BlueprintTemplateRecord
+            {
+                Name = name,
+                Width = width,
+                Height = height,
+                AnchorX = 0,
+                AnchorY = 0
+            };
+
+            for (var index = 0; index < layerCount; index++)
+            {
+                template.Cells.Add(CreateTileCell(index % width, index / width, 100 + index));
+            }
+
             return template;
         }
 

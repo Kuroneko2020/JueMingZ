@@ -9862,6 +9862,7 @@ function Test-BlueprintFeedbackStage02Governance {
     $actionPath = Join-Path $RepoRoot "src\JueMingZ\Input\LegacyUiActionService.Blueprint.cs"
     $mainWindowPath = Join-Path $RepoRoot "src\JueMingZ\UI\Legacy\LegacyMainWindow.Blueprint.cs"
     $libraryTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintLibraryTests.cs"
+    $materialTestPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.BlueprintMaterialTests.cs"
     $programPath = Join-Path $RepoRoot "tests\JueMingZ.Tests\Program.cs"
     $auditPath = Join-Path $RepoRoot "scripts\audit-project-health.ps1"
     $planDirectory = Get-BlueprintFeedbackAutoplacePlanDirectory -RepoRoot $RepoRoot
@@ -9897,6 +9898,7 @@ function Test-BlueprintFeedbackStage02Governance {
     $actionText = Read-TextIfExists -Path $actionPath
     $mainWindowText = Read-TextIfExists -Path $mainWindowPath
     $libraryTestText = Read-TextIfExists -Path $libraryTestPath
+    $materialTestText = Read-TextIfExists -Path $materialTestPath
     $programText = Read-TextIfExists -Path $programPath
     $auditText = Read-TextIfExists -Path $auditPath
     $plan00Text = Read-TextIfExists -Path $plan00Path
@@ -9946,15 +9948,19 @@ function Test-BlueprintFeedbackStage02Governance {
         $mainWindowText.Contains("card-material-modal") -and
         $mainWindowText.Contains("summary-only") -and
         $mainWindowText.Contains("no-empty-gap-text") -and
+        $mainWindowText.Contains("raw-gap-flags-hidden") -and
+        $mainWindowText.Contains("scroll-header-nonblocking") -and
+        $mainWindowText.Contains("IsBlueprintSubmenuHeaderVisible") -and
         $mainWindowText.Contains("larger-card-summary") -and
         $mainWindowText.Contains("use-closes-f5") -and
         $mainWindowText.Contains("mutual-submenus") -and
         $mainWindowText.Contains("return string.Empty;") -and
+        -not $mainWindowText.Contains('return "缺口："') -and
         -not $mainWindowText.Contains('return "缺口：无";')) {
-        Write-Pass "Blueprint stage 02 UI/actions enforce submenu mutual exclusion, F5 close-on-use, summary-only header, no empty-gap text, and material modal."
+        Write-Pass "Blueprint stage 02 UI/actions enforce submenu mutual exclusion, F5 close-on-use, summary-only header, hidden raw gap flags, nonblocking scrolled header, and material modal."
     }
     else {
-        Write-FailHealth "Blueprint stage 02 UI/actions must enforce mutual submenus, close F5 when placement starts, trim summary/no-gap copy, enlarge card summary, and move materials to a modal."
+        Write-FailHealth "Blueprint stage 02 UI/actions must enforce mutual submenus, close F5 when placement starts, trim summary/no-gap copy, hide raw gap flags, keep scrolled submenus nonblocking, enlarge card summary, and move materials to a modal."
     }
 
     if ($libraryTestText -and
@@ -9962,13 +9968,19 @@ function Test-BlueprintFeedbackStage02Governance {
         $libraryTestText.Contains("BlueprintLibraryStage02MutualSubmenusAndUseCloseF5") -and
         $libraryTestText.Contains("RegisterBlueprintLibraryMaterialModalOverlayForTesting") -and
         $libraryTestText.Contains("BuildTemplateMaterialLines") -and
+        $libraryTestText.Contains("stage02 library cards hide raw capability gap flags") -and
         $libraryTestText.Contains("materials-close") -and
+        $materialTestText -and
+        $materialTestText.Contains("BlueprintSubmenusKeepBodyVisibleAfterHeaderScroll") -and
+        $materialTestText.Contains("BlueprintPlacedListLayoutCacheTracksManagementMaterials") -and
         $programText -and
-        $programText.Contains("blueprint library stage 02 mutual submenus and use close F5")) {
-        Write-Pass "Blueprint stage 02 console tests cover material modal, submenu mutual exclusion, and close-F5-on-use contracts."
+        $programText.Contains("blueprint library stage 02 mutual submenus and use close F5") -and
+        $programText.Contains("blueprint submenus keep body visible after header scroll") -and
+        $programText.Contains("blueprint placed list layout cache tracks management materials")) {
+        Write-Pass "Blueprint stage 02 console tests cover material modal, raw flag hiding, scrolled submenu body, layout cache, submenu mutual exclusion, and close-F5-on-use contracts."
     }
     else {
-        Write-FailHealth "Blueprint stage 02 must register console tests for material modal, submenu mutual exclusion, and close-F5-on-use contracts."
+        Write-FailHealth "Blueprint stage 02 must register console tests for material modal, raw flag hiding, scrolled submenu body, layout cache, submenu mutual exclusion, and close-F5-on-use contracts."
     }
 
     if ($plan02Text -and
@@ -13611,11 +13623,11 @@ function Test-BlueprintFurnitureSavePlacementStage07CloseoutGovernance {
     $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
     $docHistoryRecordText = Read-TextIfExists -Path $docHistoryRecordPath
 
-    if (Test-BlueprintPlacementVersionMetadata -RuntimeText $runtimeText -CsprojText $csprojText -AllowedRuntimeVersions @("0.1008-blueprint-furniture-closeout", "0.1009-blueprint-tileobjectdata-startup-fix")) {
+    if (Test-BlueprintPlacementVersionMetadata -RuntimeText $runtimeText -CsprojText $csprojText -AllowedRuntimeVersions @("0.1008-blueprint-furniture-closeout", "0.1009-blueprint-tileobjectdata-startup-fix", "0.1010-blueprint-large-projection-display", "0.1011-blueprint-library-gap-flag-ui", "0.1012-blueprint-submenu-scroll-body")) {
         Write-Pass "Blueprint furniture closeout/follow-up version metadata is current."
     }
     else {
-        Write-FailHealth "Blueprint furniture closeout/follow-up must keep RuntimeVersion and project metadata at 0.1008 or the 0.1009 TileObjectData startup fix."
+        Write-FailHealth "Blueprint furniture closeout/follow-up must keep RuntimeVersion and project metadata at 0.1008, the 0.1009 TileObjectData startup fix, the 0.1010 large projection display fix, the 0.1011 library gap flag UI fix, or the 0.1012 submenu scroll body fix."
     }
 
     if ((Test-Path -LiteralPath $archivePlanDirectory) -and

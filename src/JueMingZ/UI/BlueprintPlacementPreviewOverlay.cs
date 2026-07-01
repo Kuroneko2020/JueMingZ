@@ -452,10 +452,9 @@ namespace JueMingZ.UI
                 return;
             }
 
-            var maxLayers = Math.Min(layers.Count, 1536);
             for (var pass = 1; pass <= 2; pass++)
             {
-                for (var index = 0; index < maxLayers; index++)
+                for (var index = 0; index < layers.Count; index++)
                 {
                     var layer = layers[index];
                     if (layer == null ||
@@ -511,10 +510,9 @@ namespace JueMingZ.UI
 
             order.Add("late-preview:range-border");
             var layers = snapshot.PreviewLayers;
-            var maxLayers = Math.Min(layers == null ? 0 : layers.Count, 1536);
             for (var pass = 1; pass <= 2; pass++)
             {
-                for (var index = 0; index < maxLayers; index++)
+                for (var index = 0; layers != null && index < layers.Count; index++)
                 {
                     var layer = layers[index];
                     if (layer == null ||
@@ -556,8 +554,7 @@ namespace JueMingZ.UI
                 return false;
             }
 
-            var maxCells = Math.Min(template.Cells.Count, 512);
-            for (var cellIndex = 0; cellIndex < maxCells; cellIndex++)
+            for (var cellIndex = 0; cellIndex < template.Cells.Count; cellIndex++)
             {
                 var cell = template.Cells[cellIndex];
                 if (cell == null || cell.Layers == null)
