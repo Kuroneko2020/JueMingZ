@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using JueMingZ.Bootstrap;
 using JueMingZ.Records;
 
 namespace JueMingZ.Automation.Blueprint
@@ -54,6 +55,7 @@ namespace JueMingZ.Automation.Blueprint
             LastPlacedInstanceId = string.Empty;
             LastPlacedInstanceName = string.Empty;
             TemplateSnapshot = new BlueprintTemplateRecord();
+            PreviewLayers = new List<BlueprintProjectionCellSnapshot>();
         }
 
         public bool Active { get; set; }
@@ -76,6 +78,7 @@ namespace JueMingZ.Automation.Blueprint
         public string MirrorLastStatus { get; set; }
         public string MirrorBlockedReason { get; set; }
         public BlueprintTemplateRecord TemplateSnapshot { get; set; }
+        public IReadOnlyList<BlueprintProjectionCellSnapshot> PreviewLayers { get; set; }
     }
 
     internal sealed class BlueprintPlacementCommandResult
@@ -147,9 +150,12 @@ namespace JueMingZ.Automation.Blueprint
         private static BlueprintTemplateLibraryStore _testingTemplateStore;
         private static BlueprintWorldInstanceStore _testingInstanceStore;
         private static BlueprintPlacementWorldContext _testingWorldContext;
+        private static IBlueprintWorldTileReader _testingWorldTileReader;
 
         private static bool _active;
         private static BlueprintTemplateRecord _template = new BlueprintTemplateRecord();
+        private static List<BlueprintProjectionCellSnapshot> _previewLayers = new List<BlueprintProjectionCellSnapshot>();
+        private static string _previewLayerSignature = string.Empty;
         private static bool _hoverTileHit;
         private static int _hoverTileX;
         private static int _hoverTileY;
@@ -197,6 +203,7 @@ namespace JueMingZ.Automation.Blueprint
                 _hoverTileY = 0;
                 _originTileX = 0;
                 _originTileY = 0;
+                ClearPreviewLayersLocked();
                 _awaitInitialLeftRelease = true;
                 _lastInputOwner = source ?? string.Empty;
                 _lastResultCode = "previewStarted";
@@ -250,6 +257,7 @@ namespace JueMingZ.Automation.Blueprint
                 _hoverTileY = 0;
                 _originTileX = 0;
                 _originTileY = 0;
+                ClearPreviewLayersLocked();
                 _awaitInitialLeftRelease = false;
                 _lastInputOwner = "ui";
                 _lastResultCode = "previewCancelled";
@@ -288,6 +296,11 @@ namespace JueMingZ.Automation.Blueprint
                 if (_hoverTileHit)
                 {
                     CalculateOrigin(_template, _hoverTileX, _hoverTileY, out _originTileX, out _originTileY);
+                    RefreshPreviewLayersLocked(true);
+                }
+                else
+                {
+                    ClearPreviewLayersLocked();
                 }
 
                 return BlueprintPlacementCommandResult.Create(true, true, _lastResultCode, _lastNotice, _template.TemplateId, GetTemplateName(_template));
@@ -412,6 +425,7 @@ namespace JueMingZ.Automation.Blueprint
                 hash = hash * 31 + snapshot.HoverTileY;
                 hash = hash * 31 + snapshot.OriginTileX;
                 hash = hash * 31 + snapshot.OriginTileY;
+                hash = hash * 31 + (snapshot.PreviewLayers == null ? 0 : snapshot.PreviewLayers.Count);
                 hash = hash * 31 + StringComparer.Ordinal.GetHashCode(snapshot.LastResultCode ?? string.Empty);
                 hash = hash * 31 + StringComparer.Ordinal.GetHashCode(snapshot.LastPlacedInstanceId ?? string.Empty);
                 hash = hash * 31 + BlueprintMirrorService.BuildStateSignature();
@@ -422,13 +436,15 @@ namespace JueMingZ.Automation.Blueprint
         internal static void SetPlacementDependenciesForTesting(
             BlueprintTemplateLibraryStore templateStore,
             BlueprintWorldInstanceStore instanceStore,
-            BlueprintPlacementWorldContext worldContext)
+            BlueprintPlacementWorldContext worldContext,
+            IBlueprintWorldTileReader worldTileReader = null)
         {
             lock (TestingSyncRoot)
             {
                 _testingTemplateStore = templateStore;
                 _testingInstanceStore = instanceStore;
                 _testingWorldContext = worldContext;
+                _testingWorldTileReader = worldTileReader;
             }
         }
 
@@ -439,6 +455,7 @@ namespace JueMingZ.Automation.Blueprint
                 _testingTemplateStore = null;
                 _testingInstanceStore = null;
                 _testingWorldContext = null;
+                _testingWorldTileReader = null;
             }
 
             lock (SyncRoot)
@@ -450,6 +467,7 @@ namespace JueMingZ.Automation.Blueprint
                 _hoverTileY = 0;
                 _originTileX = 0;
                 _originTileY = 0;
+                ClearPreviewLayersLocked();
                 _lastNotice = "摆放预览待命。";
                 _lastInputOwner = string.Empty;
                 _lastResultCode = "idle";
@@ -479,6 +497,7 @@ namespace JueMingZ.Automation.Blueprint
             }
 
             UpdateHoverLocked(tileX, tileY, "world");
+            RefreshPreviewLayersLocked(true);
             var context = ResolveWorldContext();
             if (context == null || !context.Succeeded)
             {
@@ -531,6 +550,7 @@ namespace JueMingZ.Automation.Blueprint
             _hoverTileX = tileX;
             _hoverTileY = tileY;
             CalculateOrigin(_template, tileX, tileY, out _originTileX, out _originTileY);
+            RefreshPreviewLayersLocked(false);
             _lastInputOwner = owner ?? string.Empty;
             _lastResultCode = "hoverUpdated";
             _lastNotice = "摆放预览：" + GetTemplateName(_template) +
@@ -564,8 +584,97 @@ namespace JueMingZ.Automation.Blueprint
                 LastPlacedInstanceName = _lastPlacedInstanceName,
                 MirrorLastStatus = mirror.LastStatus,
                 MirrorBlockedReason = mirror.LastBlockedReason,
-                TemplateSnapshot = template
+                TemplateSnapshot = template,
+                PreviewLayers = ClonePreviewLayers(_previewLayers)
             };
+        }
+
+        private static void RefreshPreviewLayersLocked(bool force)
+        {
+            if (!_active || !_hoverTileHit || !IsUsableTemplate(_template))
+            {
+                ClearPreviewLayersLocked();
+                return;
+            }
+
+            var signature = BuildPreviewLayerSignature(_template, _originTileX, _originTileY);
+            if (!force && string.Equals(signature, _previewLayerSignature, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            var reader = ResolveWorldTileReader();
+            _previewLayers = new List<BlueprintProjectionCellSnapshot>(
+                BlueprintPlacementPreviewLayerBuilder.Build(
+                    _template,
+                    _template.TemplateId,
+                    GetTemplateName(_template),
+                    _originTileX,
+                    _originTileY,
+                    reader));
+            _previewLayerSignature = signature;
+        }
+
+        private static void ClearPreviewLayersLocked()
+        {
+            _previewLayers = new List<BlueprintProjectionCellSnapshot>();
+            _previewLayerSignature = string.Empty;
+        }
+
+        private static string BuildPreviewLayerSignature(BlueprintTemplateRecord template, int originTileX, int originTileY)
+        {
+            return (template == null ? string.Empty : template.TemplateId ?? string.Empty) + "|" +
+                   (template == null ? string.Empty : template.UpdatedUtc ?? string.Empty) + "|" +
+                   (template == null || template.Cells == null ? 0 : template.Cells.Count).ToString(CultureInfo.InvariantCulture) + "|" +
+                   originTileX.ToString(CultureInfo.InvariantCulture) + "," +
+                   originTileY.ToString(CultureInfo.InvariantCulture);
+        }
+
+        private static IReadOnlyList<BlueprintProjectionCellSnapshot> ClonePreviewLayers(IReadOnlyList<BlueprintProjectionCellSnapshot> source)
+        {
+            var clone = new List<BlueprintProjectionCellSnapshot>();
+            for (var index = 0; source != null && index < source.Count; index++)
+            {
+                var layer = source[index];
+                if (layer == null)
+                {
+                    continue;
+                }
+
+                clone.Add(new BlueprintProjectionCellSnapshot
+                {
+                    InstanceId = layer.InstanceId ?? string.Empty,
+                    InstanceName = layer.InstanceName ?? string.Empty,
+                    LayerOrder = layer.LayerOrder,
+                    WorldTileX = layer.WorldTileX,
+                    WorldTileY = layer.WorldTileY,
+                    RelativeX = layer.RelativeX,
+                    RelativeY = layer.RelativeY,
+                    LayerKind = layer.LayerKind ?? string.Empty,
+                    CoverageGroup = layer.CoverageGroup ?? string.Empty,
+                    ObjectGroupKey = layer.ObjectGroupKey ?? string.Empty,
+                    ObjectGroupStatus = layer.ObjectGroupStatus ?? string.Empty,
+                    ContentId = layer.ContentId,
+                    Style = layer.Style,
+                    FrameX = layer.FrameX,
+                    FrameY = layer.FrameY,
+                    PaintId = layer.PaintId,
+                    CoatingFlags = layer.CoatingFlags,
+                    Slope = layer.Slope,
+                    HalfBrick = layer.HalfBrick,
+                    Inactive = layer.Inactive,
+                    WallGhostBlockedByFullTile = layer.WallGhostBlockedByFullTile,
+                    WallGhostOcclusionMask = layer.WallGhostOcclusionMask,
+                    WallGhostProjectionForegroundMask = layer.WallGhostProjectionForegroundMask,
+                    WallGhostOuterEdgeMask = layer.WallGhostOuterEdgeMask,
+                    MaterialItemId = layer.MaterialItemId,
+                    MaterialStack = layer.MaterialStack,
+                    MaterialDisplayName = layer.MaterialDisplayName ?? string.Empty,
+                    Status = layer.Status ?? string.Empty
+                });
+            }
+
+            return clone;
         }
 
         private static BlueprintPlacementInteractionResult BuildInteractionResultLocked(
@@ -638,6 +747,21 @@ namespace JueMingZ.Automation.Blueprint
             }
 
             return new BlueprintWorldInstanceStore();
+        }
+
+        private static IBlueprintWorldTileReader ResolveWorldTileReader()
+        {
+            lock (TestingSyncRoot)
+            {
+                if (_testingWorldTileReader != null)
+                {
+                    return _testingWorldTileReader;
+                }
+            }
+
+            return AssemblyLoadTracker.SafeBootstrapStarted
+                ? BlueprintCaptureService.CreateWorldTileReader()
+                : null;
         }
 
         private static int ResolveNextLayerOrder(IReadOnlyList<BlueprintWorldInstanceRecord> instances)

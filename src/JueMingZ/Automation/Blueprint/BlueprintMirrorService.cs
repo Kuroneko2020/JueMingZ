@@ -134,7 +134,6 @@ namespace JueMingZ.Automation.Blueprint
 
         private static readonly object SyncRoot = new object();
         private static BlueprintMirrorDiagnosticsSnapshot _diagnostics = CreateIdleDiagnostics();
-        private static bool _tileObjectDataInitializeAttempted;
 
         private sealed class BlueprintObjectFrameInfo
         {
@@ -278,6 +277,7 @@ namespace JueMingZ.Automation.Blueprint
                         }
                     }
 
+                    BlueprintObjectGroupNormalizer.MirrorObjectGroupHorizontal(mirroredLayer, template.Width);
                     mirroredCell.Layers.Add(mirroredLayer);
                     mirroredLayerCount++;
                 }
@@ -757,8 +757,10 @@ namespace JueMingZ.Automation.Blueprint
                     return data;
                 }
 
-                EnsureTileObjectDataInitialized();
-                return TryGetTileData(tile);
+                // Production runtime must never initialize vanilla TileObjectData.
+                // If Terraria has not finished its own startup writer yet, object
+                // mirror/repair must fail closed instead of locking startup data.
+                return null;
             }
             catch
             {
@@ -776,12 +778,7 @@ namespace JueMingZ.Automation.Blueprint
                 var baseData = TryGetTileData((int)tileType, 0, 0);
                 if (baseData == null)
                 {
-                    EnsureTileObjectDataInitialized();
-                    baseData = TryGetTileData((int)tileType, 0, 0);
-                    if (baseData == null)
-                    {
-                        return null;
-                    }
+                    return null;
                 }
 
                 var tileStyle = ComputeTileStyle(baseData, styleColumn, styleRow);
@@ -835,25 +832,6 @@ namespace JueMingZ.Automation.Blueprint
             catch
             {
                 return null;
-            }
-        }
-
-        private static void EnsureTileObjectDataInitialized()
-        {
-            if (_tileObjectDataInitializeAttempted)
-            {
-                return;
-            }
-
-            lock (SyncRoot)
-            {
-                if (_tileObjectDataInitializeAttempted)
-                {
-                    return;
-                }
-
-                _tileObjectDataInitializeAttempted = true;
-                TileObjectData.Initialize();
             }
         }
 

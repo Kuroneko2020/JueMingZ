@@ -14,7 +14,7 @@ namespace JueMingZ.UI
         private const int RangeFillAlpha = 10;
         private const int CellFillAlpha = 92;
         private const int CellBorderAlpha = 155;
-        private const string VisualContract = "blueprint-placement-preview-late-overlay+ui-range-border-anchor-hints+foreground-cell-hints+skip-wall-content+mixed-cell-layer-aware+wall-content-owned-by-world-layer+wall-template-disables-late-range-fill";
+        private const string VisualContract = "blueprint-placement-preview-late-overlay+ui-range-border-anchor-hints+foreground-original-ghost+skip-wall-content+mixed-cell-layer-aware+wall-content-owned-by-world-layer+wall-template-disables-late-range-fill+explicit-object-group-conflict+draw-snapshot-only";
         private static bool _wasPhysicalLeftDown;
         private static bool _wasActive;
 
@@ -446,43 +446,45 @@ namespace JueMingZ.UI
 
         private static void DrawTemplateCells(object spriteBatch, BlueprintPlacementPreviewSnapshot snapshot, Vector2 screenPosition, int clipWidth, int clipHeight)
         {
-            var template = snapshot.TemplateSnapshot;
-            if (template == null || template.Cells == null)
+            var layers = snapshot.PreviewLayers;
+            if (layers == null || layers.Count <= 0)
             {
                 return;
             }
 
-            var maxCells = Math.Min(template.Cells.Count, 512);
+            var maxLayers = Math.Min(layers.Count, 1536);
             for (var pass = 1; pass <= 2; pass++)
             {
-                for (var index = 0; index < maxCells; index++)
+                for (var index = 0; index < maxLayers; index++)
                 {
-                    var cell = template.Cells[index];
-                    if (cell == null || cell.Layers == null)
+                    var layer = layers[index];
+                    if (layer == null ||
+                        !ShouldDrawTemplateLayerInLateOverlay(layer.LayerKind) ||
+                        BlueprintProjectionGhostRenderer.ResolveLayerDrawPass(layer.LayerKind) != pass ||
+                        !BlueprintProjectionGhostRenderer.ShouldDrawLayer(layer.Status))
                     {
                         continue;
                     }
 
-                    var x = (int)Math.Round((snapshot.OriginTileX + cell.X) * TileSize - screenPosition.X);
-                    var y = (int)Math.Round((snapshot.OriginTileY + cell.Y) * TileSize - screenPosition.Y);
+                    var x = (int)Math.Round(layer.WorldTileX * TileSize - screenPosition.X);
+                    var y = (int)Math.Round(layer.WorldTileY * TileSize - screenPosition.Y);
                     if (x >= clipWidth || y >= clipHeight || x + TileSize <= 0 || y + TileSize <= 0)
                     {
                         continue;
                     }
 
-                    for (var layerIndex = 0; layerIndex < cell.Layers.Count; layerIndex++)
+                    var color = BlueprintProjectionOverlay.ResolveProjectionColor(layer.Status);
+                    var fillAlpha = BlueprintProjectionOverlay.ResolveProjectionFillAlpha(layer.Status);
+                    var borderAlpha = BlueprintProjectionOverlay.ResolveProjectionBorderAlpha(layer.Status);
+                    if (BlueprintProjectionGhostRenderer.DrawLayer(spriteBatch, layer, x, y, clipWidth, clipHeight, color[0], color[1], color[2], fillAlpha, borderAlpha))
                     {
-                        var layer = cell.Layers[layerIndex];
-                        if (layer == null ||
-                            !ShouldDrawTemplateLayerInLateOverlay(layer.LayerKind) ||
-                            BlueprintProjectionGhostRenderer.ResolveLayerDrawPass(layer.LayerKind) != pass)
-                        {
-                            continue;
-                        }
+                        continue;
+                    }
 
-                        var color = ResolvePreviewColor(layer);
-                        UiPrimitiveRenderer.DrawFilledRectClipped(spriteBatch, x, y, TileSize, TileSize, 0, 0, clipWidth, clipHeight, color[0], color[1], color[2], CellFillAlpha);
-                        UiPrimitiveRenderer.DrawRectBorderClipped(spriteBatch, x, y, TileSize, TileSize, 1, 0, 0, clipWidth, clipHeight, color[0], color[1], color[2], CellBorderAlpha);
+                    if (BlueprintProjectionOverlay.ShouldDrawFallbackBlock(layer.Status))
+                    {
+                        UiPrimitiveRenderer.DrawFilledRectClipped(spriteBatch, x, y, TileSize, TileSize, 0, 0, clipWidth, clipHeight, color[0], color[1], color[2], fillAlpha);
+                        UiPrimitiveRenderer.DrawRectBorderClipped(spriteBatch, x, y, TileSize, TileSize, 1, 0, 0, clipWidth, clipHeight, color[0], color[1], color[2], Math.Max(CellBorderAlpha, borderAlpha));
                     }
                 }
             }
@@ -508,30 +510,22 @@ namespace JueMingZ.UI
             }
 
             order.Add("late-preview:range-border");
-            var template = snapshot.TemplateSnapshot;
-            var maxCells = Math.Min(template.Cells.Count, 512);
+            var layers = snapshot.PreviewLayers;
+            var maxLayers = Math.Min(layers == null ? 0 : layers.Count, 1536);
             for (var pass = 1; pass <= 2; pass++)
             {
-                for (var cellIndex = 0; cellIndex < maxCells; cellIndex++)
+                for (var index = 0; index < maxLayers; index++)
                 {
-                    var cell = template.Cells[cellIndex];
-                    if (cell == null || cell.Layers == null)
+                    var layer = layers[index];
+                    if (layer == null ||
+                        !ShouldDrawTemplateLayerInLateOverlay(layer.LayerKind) ||
+                        BlueprintProjectionGhostRenderer.ResolveLayerDrawPass(layer.LayerKind) != pass ||
+                        !BlueprintProjectionGhostRenderer.ShouldDrawLayer(layer.Status))
                     {
                         continue;
                     }
 
-                    for (var layerIndex = 0; layerIndex < cell.Layers.Count; layerIndex++)
-                    {
-                        var layer = cell.Layers[layerIndex];
-                        if (layer == null ||
-                            !ShouldDrawTemplateLayerInLateOverlay(layer.LayerKind) ||
-                            BlueprintProjectionGhostRenderer.ResolveLayerDrawPass(layer.LayerKind) != pass)
-                        {
-                            continue;
-                        }
-
-                        order.Add("late-preview:" + (layer.LayerKind ?? string.Empty) + ":" + (snapshot.OriginTileX + cell.X) + "," + (snapshot.OriginTileY + cell.Y));
-                    }
+                    order.Add("late-preview:" + (layer.LayerKind ?? string.Empty) + ":" + layer.WorldTileX + "," + layer.WorldTileY);
                 }
             }
 
@@ -585,30 +579,5 @@ namespace JueMingZ.UI
             return false;
         }
 
-        private static int[] ResolvePreviewColor(BlueprintCellLayerRecord layer)
-        {
-            var kind = layer == null ? string.Empty : layer.LayerKind ?? string.Empty;
-            if (string.Equals(kind, BlueprintLayerKinds.Wall, StringComparison.OrdinalIgnoreCase))
-            {
-                return new[] { 92, 144, 214 };
-            }
-
-            if (string.Equals(kind, BlueprintLayerKinds.Wire, StringComparison.OrdinalIgnoreCase))
-            {
-                return new[] { 226, 96, 92 };
-            }
-
-            if (string.Equals(kind, BlueprintLayerKinds.Actuator, StringComparison.OrdinalIgnoreCase))
-            {
-                return new[] { 218, 178, 84 };
-            }
-
-            if (string.Equals(kind, BlueprintLayerKinds.Object, StringComparison.OrdinalIgnoreCase))
-            {
-                return new[] { 126, 206, 132 };
-            }
-
-            return new[] { 178, 204, 148 };
-        }
     }
 }

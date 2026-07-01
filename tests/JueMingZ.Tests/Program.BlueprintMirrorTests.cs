@@ -86,6 +86,16 @@ namespace JueMingZ.Tests
                     throw new InvalidOperationException("Expected mirrored 3x2 object to keep all child cells and horizontally corrected frames.");
                 }
 
+                if (string.IsNullOrWhiteSpace(mirroredLeftTop.ObjectGroupId) ||
+                    !string.Equals(mirroredLeftTop.ObjectGroupId, mirroredRightTop.ObjectGroupId, StringComparison.Ordinal) ||
+                    mirroredLeftTop.ObjectSubTileX != 0 ||
+                    mirroredRightTop.ObjectSubTileX != 2 ||
+                    mirroredLeftTop.ObjectOriginX != 0 ||
+                    mirroredLeftTop.ObjectWidth != 3)
+                {
+                    throw new InvalidOperationException("Expected mirrored object layers to keep explicit object group metadata in mirrored coordinates.");
+                }
+
                 var diagnostics = BlueprintMirrorService.GetDiagnostics();
                 if (!string.Equals(diagnostics.LastStatus, "mirrorHorizontalApplied", StringComparison.Ordinal))
                 {
@@ -369,6 +379,14 @@ namespace JueMingZ.Tests
                             }
                         }
                     });
+                    BlueprintObjectGroupNormalizer.SetCapturedObjectGroup(
+                        template.Cells[template.Cells.Count - 1].Layers[0],
+                        x,
+                        y,
+                        0,
+                        0,
+                        3,
+                        2);
                 }
             }
 

@@ -171,6 +171,141 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void BlueprintObjectGroupMetadataPersistsThroughInstanceExportAndImport()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-object-group-roundtrip");
+            try
+            {
+                var templateStore = new BlueprintTemplateLibraryStore();
+                var instanceStore = new BlueprintWorldInstanceStore();
+                BlueprintTemplateRecord source;
+                RequireBlueprintSuccess(
+                    templateStore.CreateTemplate(CreateExplicitGroupedTableTemplate("显式组蓝图"), out source),
+                    "create explicit object group template");
+
+                AssertCompleteTableGroup(source, "created explicit template");
+
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(
+                    instanceStore.CreateInstanceFromTemplate("playerA-worldA", "worldA", source, 12, 34, 1, out instance),
+                    "create object group instance");
+                AssertCompleteTableGroup(instance.TemplateSnapshot, "instance object group snapshot");
+
+                string exportPath;
+                RequireBlueprintSuccess(templateStore.ExportTemplate(source.TemplateId, string.Empty, out exportPath), "export object group template");
+                BlueprintTemplateExportFile export;
+                RequireBlueprintSuccess(BlueprintTemplateLibraryStore.ReadExportForTesting(exportPath, out export), "read object group export");
+                AssertCompleteTableGroup(export.Template, "exported object group template");
+
+                BlueprintTemplateRecord imported;
+                RequireBlueprintSuccess(templateStore.ImportTemplate(exportPath, out imported), "import object group template");
+                AssertCompleteTableGroup(imported, "imported object group template");
+            }
+            finally
+            {
+                BlueprintTemplateLibraryStore.ResetTestingHooks();
+                restore();
+            }
+        }
+
+        private static void BlueprintLegacyCompleteObjectRestoresGroupMetadata()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-legacy-object-complete");
+            try
+            {
+                var store = new BlueprintTemplateLibraryStore();
+                BlueprintTemplateRecord saved;
+                RequireBlueprintSuccess(
+                    store.CreateTemplate(CreateLegacyCompleteTableTemplate("旧完整家具"), out saved),
+                    "create legacy complete object template");
+
+                AssertCompleteTableGroup(saved, "legacy complete object template");
+                if (ContainsFlag(saved, BlueprintCaptureMissingCapabilities.LegacyObjectRepaired) ||
+                    ContainsFlag(saved, BlueprintCaptureMissingCapabilities.LegacyPartialObject))
+                {
+                    throw new InvalidOperationException("A complete legacy object should restore group metadata without degraded repair flags.");
+                }
+            }
+            finally
+            {
+                BlueprintTemplateLibraryStore.ResetTestingHooks();
+                restore();
+            }
+        }
+
+        private static void BlueprintLegacyPartialObjectRepairsMissingCellsAndFlags()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-legacy-object-repair");
+            try
+            {
+                var store = new BlueprintTemplateLibraryStore();
+                BlueprintTemplateRecord saved;
+                RequireBlueprintSuccess(
+                    store.CreateTemplate(CreateLegacyPartialTableTemplate("旧半截家具"), out saved),
+                    "create repairable legacy partial object template");
+
+                AssertCompleteTableGroup(saved, "repaired legacy partial object template");
+                if (!ContainsFlag(saved, BlueprintCaptureMissingCapabilities.LegacyObjectRepaired) ||
+                    saved.Width != 3 ||
+                    saved.Height != 2 ||
+                    saved.AnchorX != 1)
+                {
+                    throw new InvalidOperationException("Expected repairable legacy partial object to expand template bounds and record a repair flag.");
+                }
+
+                var materialStack = SumObjectMaterialStack(saved);
+                if (materialStack != 1)
+                {
+                    throw new InvalidOperationException("Expected repaired legacy object to keep material counted once, got " + materialStack.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                }
+
+                var layer = RequireObjectLayer(saved, 0, 0);
+                if (!string.Equals(layer.ObjectGroupStatus, BlueprintObjectGroupStatuses.RepairedLegacyObject, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected synthesized legacy object cells to be marked as repaired.");
+                }
+            }
+            finally
+            {
+                BlueprintTemplateLibraryStore.ResetTestingHooks();
+                restore();
+            }
+        }
+
+        private static void BlueprintLegacyPartialObjectMarksDegradedWhenUnverifiable()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-legacy-object-degraded");
+            try
+            {
+                var store = new BlueprintTemplateLibraryStore();
+                var template = CreateLegacyPartialTableTemplate("旧不可证明家具");
+                template.Cells[0].Layers[0].Style = 99;
+
+                BlueprintTemplateRecord saved;
+                RequireBlueprintSuccess(
+                    store.CreateTemplate(template, out saved),
+                    "create unverifiable legacy partial object template");
+
+                if (!ContainsFlag(saved, BlueprintCaptureMissingCapabilities.LegacyPartialObject) ||
+                    saved.Cells.Count != 1)
+                {
+                    throw new InvalidOperationException("Expected unverifiable legacy object to stay partial and record a degraded flag.");
+                }
+
+                var layer = saved.Cells[0].Layers[0];
+                if (!string.Equals(layer.ObjectGroupStatus, BlueprintObjectGroupStatuses.LegacyPartialObject, StringComparison.Ordinal) ||
+                    !string.IsNullOrWhiteSpace(layer.ObjectGroupId))
+                {
+                    throw new InvalidOperationException("Expected unverifiable legacy object to be marked degraded without pretending it has a complete group.");
+                }
+            }
+            finally
+            {
+                BlueprintTemplateLibraryStore.ResetTestingHooks();
+                restore();
+            }
+        }
+
         private static void BlueprintSafeWriteFailureKeepsExistingTemplateLibrary()
         {
             var restore = PushTemporaryConfigDirectory("blueprint-safe-write-failure");
@@ -365,6 +500,184 @@ namespace JueMingZ.Tests
             });
             template.MissingCapabilityFlags.Add("liquid-not-supported");
             return template;
+        }
+
+        private static BlueprintTemplateRecord CreateExplicitGroupedTableTemplate(string name)
+        {
+            var template = CreateLegacyCompleteTableTemplate(name);
+            for (var cellIndex = 0; cellIndex < template.Cells.Count; cellIndex++)
+            {
+                var cell = template.Cells[cellIndex];
+                var layer = cell.Layers[0];
+                BlueprintObjectGroupNormalizer.SetCapturedObjectGroup(layer, cell.X, cell.Y, 0, 0, 3, 2);
+            }
+
+            return template;
+        }
+
+        private static BlueprintTemplateRecord CreateLegacyCompleteTableTemplate(string name)
+        {
+            var template = new BlueprintTemplateRecord
+            {
+                Name = name,
+                Width = 3,
+                Height = 2,
+                AnchorX = 1,
+                AnchorY = 0
+            };
+
+            for (var y = 0; y < 2; y++)
+            {
+                for (var x = 0; x < 3; x++)
+                {
+                    template.Cells.Add(CreateLegacyTableCell(x, y, x * 18, y * 18, x == 0 && y == 0 ? 1 : 0));
+                }
+            }
+
+            template.Materials.Add(new BlueprintMaterialEntry
+            {
+                ItemId = 1006,
+                RequiredStack = 1,
+                DisplayNameSnapshot = "桌子",
+                LayerKind = BlueprintLayerKinds.Object,
+                Source = "object"
+            });
+            return template;
+        }
+
+        private static BlueprintTemplateRecord CreateLegacyPartialTableTemplate(string name)
+        {
+            var template = new BlueprintTemplateRecord
+            {
+                Name = name,
+                Width = 1,
+                Height = 1,
+                AnchorX = 0,
+                AnchorY = 0
+            };
+            template.Cells.Add(CreateLegacyTableCell(0, 0, 18, 0, 1));
+            template.Materials.Add(new BlueprintMaterialEntry
+            {
+                ItemId = 1006,
+                RequiredStack = 1,
+                DisplayNameSnapshot = "桌子",
+                LayerKind = BlueprintLayerKinds.Object,
+                Source = "object"
+            });
+            return template;
+        }
+
+        private static BlueprintCellRecord CreateLegacyTableCell(int x, int y, int frameX, int frameY, int materialStack)
+        {
+            return new BlueprintCellRecord
+            {
+                X = x,
+                Y = y,
+                Layers =
+                {
+                    new BlueprintCellLayerRecord
+                    {
+                        LayerKind = BlueprintLayerKinds.Object,
+                        ContentId = 14,
+                        Style = 0,
+                        FrameX = frameX,
+                        FrameY = frameY,
+                        MaterialItemId = 1006,
+                        MaterialStack = materialStack
+                    }
+                }
+            };
+        }
+
+        private static void AssertCompleteTableGroup(BlueprintTemplateRecord template, string label)
+        {
+            if (template == null || template.Cells == null || template.Cells.Count != 6)
+            {
+                throw new InvalidOperationException("Expected " + label + " to contain all six table cells.");
+            }
+
+            var groupId = string.Empty;
+            for (var y = 0; y < 2; y++)
+            {
+                for (var x = 0; x < 3; x++)
+                {
+                    var layer = RequireObjectLayer(template, x, y);
+                    if (string.IsNullOrWhiteSpace(layer.ObjectGroupId) ||
+                        layer.ObjectOriginX != 0 ||
+                        layer.ObjectOriginY != 0 ||
+                        layer.ObjectWidth != 3 ||
+                        layer.ObjectHeight != 2 ||
+                        layer.ObjectSubTileX != x ||
+                        layer.ObjectSubTileY != y)
+                    {
+                        throw new InvalidOperationException("Expected " + label + " to carry complete table object group metadata.");
+                    }
+
+                    if (string.IsNullOrEmpty(groupId))
+                    {
+                        groupId = layer.ObjectGroupId;
+                    }
+                    else if (!string.Equals(groupId, layer.ObjectGroupId, StringComparison.Ordinal))
+                    {
+                        throw new InvalidOperationException("Expected " + label + " table cells to share one object group id.");
+                    }
+                }
+            }
+        }
+
+        private static BlueprintCellLayerRecord RequireObjectLayer(BlueprintTemplateRecord template, int x, int y)
+        {
+            for (var cellIndex = 0; template != null && template.Cells != null && cellIndex < template.Cells.Count; cellIndex++)
+            {
+                var cell = template.Cells[cellIndex];
+                if (cell == null || cell.X != x || cell.Y != y || cell.Layers == null)
+                {
+                    continue;
+                }
+
+                for (var layerIndex = 0; layerIndex < cell.Layers.Count; layerIndex++)
+                {
+                    var layer = cell.Layers[layerIndex];
+                    if (layer != null && string.Equals(layer.LayerKind, BlueprintLayerKinds.Object, StringComparison.Ordinal))
+                    {
+                        return layer;
+                    }
+                }
+            }
+
+            throw new InvalidOperationException("Missing object layer at " + x.ToString(System.Globalization.CultureInfo.InvariantCulture) + "," + y.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+
+        private static bool ContainsFlag(BlueprintTemplateRecord template, string flag)
+        {
+            for (var index = 0; template != null && template.MissingCapabilityFlags != null && index < template.MissingCapabilityFlags.Count; index++)
+            {
+                if (string.Equals(template.MissingCapabilityFlags[index], flag, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static int SumObjectMaterialStack(BlueprintTemplateRecord template)
+        {
+            var sum = 0;
+            for (var cellIndex = 0; template != null && template.Cells != null && cellIndex < template.Cells.Count; cellIndex++)
+            {
+                var cell = template.Cells[cellIndex];
+                for (var layerIndex = 0; cell != null && cell.Layers != null && layerIndex < cell.Layers.Count; layerIndex++)
+                {
+                    var layer = cell.Layers[layerIndex];
+                    if (layer != null && string.Equals(layer.LayerKind, BlueprintLayerKinds.Object, StringComparison.Ordinal))
+                    {
+                        sum += Math.Max(0, layer.MaterialStack);
+                    }
+                }
+            }
+
+            return sum;
         }
 
         private static bool TemplateExists(BlueprintTemplateLibrarySnapshot snapshot, string templateId)

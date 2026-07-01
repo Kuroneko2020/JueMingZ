@@ -1000,6 +1000,56 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void BlueprintProjectionExplicitObjectGroupOverridesStyleHeuristic()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-projection-explicit-object-group");
+            try
+            {
+                var store = new BlueprintWorldInstanceStore();
+                var reader = new FakeBlueprintWorldTileReader();
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(
+                    store.CreateInstanceFromTemplate(
+                        "pair-proj-explicit-object-group",
+                        "world-proj-explicit-object-group",
+                        CreateAutoPlacementTwoCellExplicitObjectGroupTemplate("显式整件家具", 14, 1010),
+                        24,
+                        30,
+                        0,
+                        out instance),
+                    "create explicit object group projection instance");
+                reader.Set(24, 30, new BlueprintWorldTileSnapshot());
+                reader.Set(25, 30, new BlueprintWorldTileSnapshot { Active = true, TileType = 999 });
+                BlueprintProjectionService.SetDependenciesForTesting(
+                    store,
+                    BlueprintPlacementWorldContext.Success("pair-proj-explicit-object-group", "world-proj-explicit-object-group"),
+                    reader,
+                    true);
+
+                var snapshot = BlueprintProjectionService.GetSnapshot();
+                var left = FindProjectedLayerAt(snapshot.AllProjectedLayers, instance.InstanceId, BlueprintLayerKinds.Object, 24, 30);
+                var right = FindProjectedLayerAt(snapshot.AllProjectedLayers, instance.InstanceId, BlueprintLayerKinds.Object, 25, 30);
+                if (snapshot.MissingLayerCount != 0 ||
+                    snapshot.ConflictLayerCount != 2 ||
+                    left == null ||
+                    right == null ||
+                    !string.Equals(left.Status, BlueprintProjectionLayerStatuses.Conflict, StringComparison.Ordinal) ||
+                    !string.Equals(right.Status, BlueprintProjectionLayerStatuses.Conflict, StringComparison.Ordinal) ||
+                    string.IsNullOrWhiteSpace(left.ObjectGroupKey) ||
+                    !string.Equals(left.ObjectGroupKey, right.ObjectGroupKey, StringComparison.Ordinal) ||
+                    !string.Equals(left.ObjectGroupStatus, BlueprintProjectionLayerStatuses.Conflict, StringComparison.Ordinal) ||
+                    !string.Equals(right.ObjectGroupStatus, BlueprintProjectionLayerStatuses.Conflict, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected explicit object group metadata to mark the whole placed projection object even when style-based fallback would split it.");
+                }
+            }
+            finally
+            {
+                BlueprintProjectionService.ResetForTesting();
+                restore();
+            }
+        }
+
         private static void BlueprintProjectionUiOverlayAndDiagnosticsContracts()
         {
             var restore = PushTemporaryConfigDirectory("blueprint-projection-contracts");
@@ -1251,11 +1301,15 @@ namespace JueMingZ.Tests
         private static BlueprintTemplateRecord CreateProjectionWallWithObjectTemplate(string name, int wallType, int objectType)
         {
             var template = CreateProjectionSingleWallTemplate(name, wallType);
-            template.Cells[0].Layers.Add(new BlueprintCellLayerRecord
+            var layer = new BlueprintCellLayerRecord
             {
                 LayerKind = BlueprintLayerKinds.Object,
                 ContentId = objectType
-            });
+            };
+            layer.ObjectGroupId = BlueprintObjectGroupNormalizer.BuildObjectGroupId(objectType, 0, 0, 0, 1, 1);
+            layer.ObjectWidth = 1;
+            layer.ObjectHeight = 1;
+            template.Cells[0].Layers.Add(layer);
             return template;
         }
 

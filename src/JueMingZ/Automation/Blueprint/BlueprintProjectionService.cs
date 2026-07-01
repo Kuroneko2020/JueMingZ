@@ -587,7 +587,9 @@ namespace JueMingZ.Automation.Blueprint
                 var completed = IsCandidateCompleted(candidate, completedKeysByInstance);
                 projectedLayer.Status = completed
                     ? BlueprintProjectionLayerStatuses.Completed
-                    : ClassifyLayer(candidate, reader, replacementSettings, worldTileCache, out world);
+                    : (IsLegacyPartialObject(candidate.Layer)
+                        ? BlueprintProjectionLayerStatuses.Unavailable
+                        : ClassifyLayer(candidate, reader, replacementSettings, worldTileCache, out world));
 
                 if (completed)
                 {
@@ -956,6 +958,24 @@ namespace JueMingZ.Automation.Blueprint
                    string.Equals(layer.LayerKind, BlueprintLayerKinds.Object, StringComparison.OrdinalIgnoreCase);
         }
 
+        private static bool IsObjectLayer(BlueprintCellLayerRecord layer)
+        {
+            return layer != null &&
+                   string.Equals(layer.LayerKind, BlueprintLayerKinds.Object, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsLegacyPartialObject(BlueprintCellLayerRecord layer)
+        {
+            return IsObjectLayer(layer) &&
+                   string.Equals(layer.ObjectGroupStatus, BlueprintObjectGroupStatuses.LegacyPartialObject, StringComparison.Ordinal);
+        }
+
+        private static bool IsProjectionSatisfiedStatus(string status)
+        {
+            return string.Equals(status, BlueprintProjectionLayerStatuses.Fulfilled, StringComparison.Ordinal) ||
+                   string.Equals(status, BlueprintProjectionLayerStatuses.Completed, StringComparison.Ordinal);
+        }
+
         private static bool ShouldDrawProjectionLayer(string status)
         {
             return !string.Equals(status, BlueprintProjectionLayerStatuses.Fulfilled, StringComparison.Ordinal) &&
@@ -1129,9 +1149,8 @@ namespace JueMingZ.Automation.Blueprint
                 return;
             }
 
-            // The template format has no explicit furniture id. Treat only connected
-            // object cells with one material-bearing representative as a whole object.
-            var groups = new Dictionary<string, List<BlueprintProjectionCellSnapshot>>(StringComparer.Ordinal);
+            var explicitGroups = new Dictionary<string, List<BlueprintProjectionCellSnapshot>>(StringComparer.Ordinal);
+            var fallbackLayers = new List<BlueprintProjectionCellSnapshot>();
             for (var index = 0; index < layers.Count; index++)
             {
                 var layer = layers[index];
@@ -1140,6 +1159,33 @@ namespace JueMingZ.Automation.Blueprint
                     continue;
                 }
 
+                if (!string.IsNullOrWhiteSpace(layer.ObjectGroupKey))
+                {
+                    List<BlueprintProjectionCellSnapshot> explicitBucket;
+                    if (!explicitGroups.TryGetValue(layer.ObjectGroupKey, out explicitBucket))
+                    {
+                        explicitBucket = new List<BlueprintProjectionCellSnapshot>();
+                        explicitGroups.Add(layer.ObjectGroupKey, explicitBucket);
+                    }
+
+                    explicitBucket.Add(layer);
+                    continue;
+                }
+
+                fallbackLayers.Add(layer);
+            }
+
+            foreach (var group in explicitGroups)
+            {
+                ApplyExplicitObjectGroupStatus(group.Value);
+            }
+
+            // Old templates can still lack explicit furniture metadata. Keep the
+            // former connected-cell heuristic only as a fallback for those layers.
+            var groups = new Dictionary<string, List<BlueprintProjectionCellSnapshot>>(StringComparer.Ordinal);
+            for (var index = 0; index < fallbackLayers.Count; index++)
+            {
+                var layer = fallbackLayers[index];
                 var key = BuildObjectGroupSeedKey(layer);
                 if (key.Length <= 0)
                 {
@@ -1159,6 +1205,59 @@ namespace JueMingZ.Automation.Blueprint
             foreach (var group in groups)
             {
                 ApplyMultitileObjectGroupPolicy(group.Key, group.Value);
+            }
+        }
+
+        private static void ApplyExplicitObjectGroupStatus(List<BlueprintProjectionCellSnapshot> layers)
+        {
+            if (layers == null || layers.Count <= 0)
+            {
+                return;
+            }
+
+            var hasConflict = false;
+            var hasUnavailable = false;
+            for (var index = 0; index < layers.Count; index++)
+            {
+                var layer = layers[index];
+                if (layer == null)
+                {
+                    continue;
+                }
+
+                if (string.Equals(layer.Status, BlueprintProjectionLayerStatuses.Conflict, StringComparison.Ordinal))
+                {
+                    hasConflict = true;
+                    break;
+                }
+
+                if (string.Equals(layer.Status, BlueprintProjectionLayerStatuses.Unavailable, StringComparison.Ordinal))
+                {
+                    hasUnavailable = true;
+                }
+            }
+
+            if (!hasConflict && !hasUnavailable)
+            {
+                return;
+            }
+
+            var groupStatus = hasConflict
+                ? BlueprintProjectionLayerStatuses.Conflict
+                : BlueprintProjectionLayerStatuses.Unavailable;
+            for (var index = 0; index < layers.Count; index++)
+            {
+                var layer = layers[index];
+                if (layer == null)
+                {
+                    continue;
+                }
+
+                layer.ObjectGroupStatus = groupStatus;
+                if (!IsProjectionSatisfiedStatus(layer.Status))
+                {
+                    layer.Status = groupStatus;
+                }
             }
         }
 
@@ -1308,7 +1407,7 @@ namespace JueMingZ.Automation.Blueprint
                 }
 
                 layer.ObjectGroupStatus = groupStatus;
-                if (string.Equals(layer.Status, BlueprintProjectionLayerStatuses.Missing, StringComparison.Ordinal))
+                if (!IsProjectionSatisfiedStatus(layer.Status))
                 {
                     layer.Status = groupStatus;
                 }
@@ -1341,6 +1440,29 @@ namespace JueMingZ.Automation.Blueprint
                    layer.LayerOrder.ToString(CultureInfo.InvariantCulture) + "|" +
                    layer.ContentId.ToString(CultureInfo.InvariantCulture) + "|" +
                    layer.Style.ToString(CultureInfo.InvariantCulture);
+        }
+
+        private static string ResolveExplicitObjectGroupKey(BlueprintWorldInstanceRecord instance, BlueprintCellLayerRecord layer)
+        {
+            if (instance == null || layer == null || !IsObjectLayer(layer) || !BlueprintObjectGroupNormalizer.HasObjectGroupMetadata(layer))
+            {
+                return string.Empty;
+            }
+
+            var instanceId = instance.InstanceId ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(layer.ObjectGroupId))
+            {
+                return instanceId + "|" + layer.ObjectGroupId.Trim();
+            }
+
+            return instanceId + "|" +
+                   BlueprintObjectGroupNormalizer.BuildObjectGroupId(
+                       layer.ContentId,
+                       layer.Style,
+                       layer.ObjectOriginX,
+                       layer.ObjectOriginY,
+                       Math.Max(1, layer.ObjectWidth),
+                       Math.Max(1, layer.ObjectHeight));
         }
 
         private static string BuildObjectGroupComponentKey(string seedKey, List<BlueprintProjectionCellSnapshot> component)
@@ -1750,6 +1872,7 @@ namespace JueMingZ.Automation.Blueprint
                     RelativeY = Cell == null ? 0 : Cell.Y,
                     LayerKind = Layer == null ? string.Empty : Layer.LayerKind ?? string.Empty,
                     CoverageGroup = CoverageGroup ?? string.Empty,
+                    ObjectGroupKey = ResolveExplicitObjectGroupKey(Instance, Layer),
                     ContentId = Layer == null ? 0 : Layer.ContentId,
                     Style = Layer == null ? 0 : Layer.Style,
                     FrameX = Layer == null ? 0 : Layer.FrameX,

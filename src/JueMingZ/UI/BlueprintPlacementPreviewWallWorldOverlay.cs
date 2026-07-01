@@ -114,48 +114,42 @@ namespace JueMingZ.UI
                 return;
             }
 
-            var template = snapshot.TemplateSnapshot;
-            var maxCells = Math.Min(template.Cells.Count, MaxPreviewWallLayersPerFrame);
-            for (var cellIndex = 0; cellIndex < maxCells && layers.Count < MaxPreviewWallLayersPerFrame; cellIndex++)
+            var previewLayers = snapshot.PreviewLayers;
+            var maxLayers = Math.Min(previewLayers == null ? 0 : previewLayers.Count, MaxPreviewWallLayersPerFrame);
+            for (var layerIndex = 0; layerIndex < maxLayers && layers.Count < MaxPreviewWallLayersPerFrame; layerIndex++)
             {
-                var cell = template.Cells[cellIndex];
-                if (cell == null || cell.Layers == null)
+                var layer = previewLayers[layerIndex];
+                if (layer == null ||
+                    !IsWallLayer(layer) ||
+                    !BlueprintProjectionGhostRenderer.ShouldDrawLayer(layer.Status))
                 {
                     continue;
                 }
 
-                for (var layerIndex = 0; layerIndex < cell.Layers.Count && layers.Count < MaxPreviewWallLayersPerFrame; layerIndex++)
+                layers.Add(new BlueprintProjectionCellSnapshot
                 {
-                    var layer = cell.Layers[layerIndex];
-                    if (!IsWallLayer(layer))
-                    {
-                        continue;
-                    }
-
-                    layers.Add(new BlueprintProjectionCellSnapshot
-                    {
-                        InstanceId = snapshot.TemplateId ?? string.Empty,
-                        InstanceName = snapshot.TemplateName ?? string.Empty,
-                        WorldTileX = snapshot.OriginTileX + cell.X,
-                        WorldTileY = snapshot.OriginTileY + cell.Y,
-                        RelativeX = cell.X,
-                        RelativeY = cell.Y,
-                        LayerKind = BlueprintLayerKinds.Wall,
-                        CoverageGroup = BlueprintLayerKinds.Wall,
-                        ContentId = layer.ContentId,
-                        Style = layer.Style,
-                        FrameX = layer.FrameX,
-                        FrameY = layer.FrameY,
-                        PaintId = layer.PaintId,
-                        CoatingFlags = layer.CoatingFlags,
-                        Slope = layer.Slope,
-                        HalfBrick = layer.HalfBrick,
-                        Inactive = layer.Inactive,
-                        MaterialItemId = layer.MaterialItemId,
-                        MaterialStack = layer.MaterialStack,
-                        Status = BlueprintProjectionLayerStatuses.Missing
-                    });
-                }
+                    InstanceId = layer.InstanceId ?? string.Empty,
+                    InstanceName = layer.InstanceName ?? string.Empty,
+                    WorldTileX = layer.WorldTileX,
+                    WorldTileY = layer.WorldTileY,
+                    RelativeX = layer.RelativeX,
+                    RelativeY = layer.RelativeY,
+                    LayerKind = BlueprintLayerKinds.Wall,
+                    CoverageGroup = BlueprintLayerKinds.Wall,
+                    ContentId = layer.ContentId,
+                    Style = layer.Style,
+                    FrameX = layer.FrameX,
+                    FrameY = layer.FrameY,
+                    PaintId = layer.PaintId,
+                    CoatingFlags = layer.CoatingFlags,
+                    Slope = layer.Slope,
+                    HalfBrick = layer.HalfBrick,
+                    Inactive = layer.Inactive,
+                    MaterialItemId = layer.MaterialItemId,
+                    MaterialStack = layer.MaterialStack,
+                    MaterialDisplayName = layer.MaterialDisplayName ?? string.Empty,
+                    Status = layer.Status ?? string.Empty
+                });
             }
         }
 
@@ -164,27 +158,18 @@ namespace JueMingZ.UI
             if (snapshot == null ||
                 !snapshot.Active ||
                 !snapshot.HoverTileHit ||
-                snapshot.TemplateSnapshot == null ||
-                snapshot.TemplateSnapshot.Cells == null)
+                snapshot.PreviewLayers == null)
             {
                 return false;
             }
 
-            var maxCells = Math.Min(snapshot.TemplateSnapshot.Cells.Count, MaxPreviewWallLayersPerFrame);
-            for (var cellIndex = 0; cellIndex < maxCells; cellIndex++)
+            var maxLayers = Math.Min(snapshot.PreviewLayers.Count, MaxPreviewWallLayersPerFrame);
+            for (var index = 0; index < maxLayers; index++)
             {
-                var cell = snapshot.TemplateSnapshot.Cells[cellIndex];
-                if (cell == null || cell.Layers == null)
+                var layer = snapshot.PreviewLayers[index];
+                if (IsWallLayer(layer) && BlueprintProjectionGhostRenderer.ShouldDrawLayer(layer.Status))
                 {
-                    continue;
-                }
-
-                for (var layerIndex = 0; layerIndex < cell.Layers.Count; layerIndex++)
-                {
-                    if (IsWallLayer(cell.Layers[layerIndex]))
-                    {
-                        return true;
-                    }
+                    return true;
                 }
             }
 
@@ -192,6 +177,13 @@ namespace JueMingZ.UI
         }
 
         private static bool IsWallLayer(BlueprintCellLayerRecord layer)
+        {
+            return layer != null &&
+                   layer.ContentId > 0 &&
+                   string.Equals(layer.LayerKind, BlueprintLayerKinds.Wall, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsWallLayer(BlueprintProjectionCellSnapshot layer)
         {
             return layer != null &&
                    layer.ContentId > 0 &&

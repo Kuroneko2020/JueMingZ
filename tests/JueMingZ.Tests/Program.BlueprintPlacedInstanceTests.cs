@@ -601,7 +601,9 @@ namespace JueMingZ.Tests
                 BlueprintTemplateRecord progressTemplate;
                 BlueprintTemplateRecord completedTemplate;
                 RequireBlueprintSuccess(templateStore.CreateTemplate(CreateMirrorableBlueprintTemplate("实例镜像"), out mirrorable), "create mirrorable template");
-                RequireBlueprintSuccess(templateStore.CreateTemplate(CreatePartialTableBlueprintTemplate("半件实例镜像"), out unsupported), "create unsupported mirror template");
+                var unsupportedDraft = CreatePartialTableBlueprintTemplate("半件实例镜像");
+                unsupportedDraft.Cells[0].Layers[0].Style = 99;
+                RequireBlueprintSuccess(templateStore.CreateTemplate(unsupportedDraft, out unsupported), "create unsupported mirror template");
                 RequireBlueprintSuccess(templateStore.CreateTemplate(CreateMirrorableBlueprintTemplate("进度镜像"), out progressTemplate), "create progress mirror template");
                 RequireBlueprintSuccess(templateStore.CreateTemplate(CreateMirrorableBlueprintTemplate("已完成进度镜像"), out completedTemplate), "create completed-progress mirror template");
 

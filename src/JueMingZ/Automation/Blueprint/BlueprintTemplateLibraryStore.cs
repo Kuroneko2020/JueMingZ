@@ -367,6 +367,8 @@ namespace JueMingZ.Automation.Blueprint
             draft.Cells = NormalizeCells(draft.Cells);
             draft.Materials = NormalizeMaterials(draft.Materials);
             draft.MissingCapabilityFlags = NormalizeFlags(draft.MissingCapabilityFlags);
+            BlueprintObjectGroupNormalizer.NormalizeTemplateInPlace(draft);
+            draft.MissingCapabilityFlags = NormalizeFlags(draft.MissingCapabilityFlags);
             return draft;
         }
 
@@ -404,6 +406,8 @@ namespace JueMingZ.Automation.Blueprint
                 clone.UpdatedUtc = clone.UpdatedUtc ?? string.Empty;
                 clone.Cells = NormalizeCells(clone.Cells);
                 clone.Materials = NormalizeMaterials(clone.Materials);
+                clone.MissingCapabilityFlags = NormalizeFlags(clone.MissingCapabilityFlags);
+                BlueprintObjectGroupNormalizer.NormalizeTemplateInPlace(clone);
                 clone.MissingCapabilityFlags = NormalizeFlags(clone.MissingCapabilityFlags);
                 normalized.Add(clone);
             }

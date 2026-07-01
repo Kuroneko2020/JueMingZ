@@ -501,6 +501,185 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void BlueprintPlacementPreviewMultitileObjectUsesOriginalGhostLayers()
+        {
+            BlueprintPlacementPreviewState.ResetForTesting();
+            var reader = new FakeBlueprintWorldTileReader();
+            var template = CreatePlacementPreviewObjectGroupTemplate("整件预览原贴图", string.Empty);
+            try
+            {
+                BlueprintPlacementPreviewState.SetPlacementDependenciesForTesting(
+                    null,
+                    null,
+                    BlueprintPlacementWorldContext.Success("pair-preview-object", "world-preview-object"),
+                    reader);
+                var begin = BlueprintPlacementPreviewState.BeginPreview(template, "test");
+                if (!begin.Succeeded)
+                {
+                    throw new InvalidOperationException("Expected object group template to enter placement preview.");
+                }
+
+                var hover = BlueprintPlacementPreviewState.HandlePointer(new BlueprintPlacementPointerInput
+                {
+                    WorldTileHit = true,
+                    TileX = 20,
+                    TileY = 30
+                });
+                if (!hover.Succeeded)
+                {
+                    throw new InvalidOperationException("Expected placement preview hover to build object group preview layers.");
+                }
+
+                var snapshot = BlueprintPlacementPreviewState.GetSnapshot();
+                var left = FindPreviewLayer(snapshot.PreviewLayers, BlueprintLayerKinds.Object, 20, 30);
+                var right = FindPreviewLayer(snapshot.PreviewLayers, BlueprintLayerKinds.Object, 21, 30);
+                if (left == null ||
+                    right == null ||
+                    !string.Equals(left.Status, BlueprintProjectionLayerStatuses.Missing, StringComparison.Ordinal) ||
+                    !string.Equals(right.Status, BlueprintProjectionLayerStatuses.Missing, StringComparison.Ordinal) ||
+                    string.IsNullOrWhiteSpace(left.ObjectGroupKey) ||
+                    !string.Equals(left.ObjectGroupKey, right.ObjectGroupKey, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected placement preview to expose complete missing object group layers.");
+                }
+
+                if (BlueprintProjectionOverlay.ShouldDrawFallbackBlockForTesting(BlueprintProjectionLayerStatuses.Missing))
+                {
+                    throw new InvalidOperationException("Missing placement preview objects must use original ghost texture input instead of a fallback state block.");
+                }
+
+                var readsAfterHover = reader.ReadCount;
+                var order = BlueprintPlacementPreviewOverlay.BuildLatePreviewDrawOrderForTesting(snapshot);
+                if (IndexOfOrder(order, "late-preview:object:20,30") < 0 ||
+                    IndexOfOrder(order, "late-preview:object:21,30") < 0 ||
+                    reader.ReadCount != readsAfterHover)
+                {
+                    throw new InvalidOperationException("Expected late placement preview draw to consume cached original object layers without reading world tiles.");
+                }
+
+                AssertContains(BlueprintPlacementPreviewOverlay.GetVisualContractForTesting(), "foreground-original-ghost");
+                AssertContains(BlueprintPlacementPreviewOverlay.GetVisualContractForTesting(), "draw-snapshot-only");
+            }
+            finally
+            {
+                BlueprintPlacementPreviewState.ResetForTesting();
+            }
+        }
+
+        private static void BlueprintPlacementPreviewObjectGroupConflictMarksWholeGroup()
+        {
+            BlueprintPlacementPreviewState.ResetForTesting();
+            var reader = new FakeBlueprintWorldTileReader();
+            reader.Set(21, 30, new BlueprintWorldTileSnapshot { Active = true, TileType = 999 });
+            var template = CreatePlacementPreviewObjectGroupTemplate("整件冲突预览", string.Empty);
+            try
+            {
+                BlueprintPlacementPreviewState.SetPlacementDependenciesForTesting(
+                    null,
+                    null,
+                    BlueprintPlacementWorldContext.Success("pair-preview-conflict", "world-preview-conflict"),
+                    reader);
+                RequireBlueprintCommandSuccess(BlueprintPlacementPreviewState.BeginPreview(template, "test"), "begin object conflict preview");
+                BlueprintPlacementPreviewState.HandlePointer(new BlueprintPlacementPointerInput
+                {
+                    WorldTileHit = true,
+                    TileX = 20,
+                    TileY = 30
+                });
+
+                var snapshot = BlueprintPlacementPreviewState.GetSnapshot();
+                var left = FindPreviewLayer(snapshot.PreviewLayers, BlueprintLayerKinds.Object, 20, 30);
+                var right = FindPreviewLayer(snapshot.PreviewLayers, BlueprintLayerKinds.Object, 21, 30);
+                if (left == null ||
+                    right == null ||
+                    !string.Equals(left.Status, BlueprintProjectionLayerStatuses.Conflict, StringComparison.Ordinal) ||
+                    !string.Equals(right.Status, BlueprintProjectionLayerStatuses.Conflict, StringComparison.Ordinal) ||
+                    !string.Equals(left.ObjectGroupStatus, BlueprintProjectionLayerStatuses.Conflict, StringComparison.Ordinal) ||
+                    !string.Equals(right.ObjectGroupStatus, BlueprintProjectionLayerStatuses.Conflict, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected any conflicting object sub-tile to mark the whole placement preview group red.");
+                }
+
+                var conflictColor = BlueprintProjectionOverlay.ResolveProjectionColorForTesting(BlueprintProjectionLayerStatuses.Conflict);
+                if (conflictColor[0] < 200 || conflictColor[1] > 120)
+                {
+                    throw new InvalidOperationException("Expected placement preview group conflict to reuse the projection red visual policy.");
+                }
+            }
+            finally
+            {
+                BlueprintPlacementPreviewState.ResetForTesting();
+            }
+        }
+
+        private static void BlueprintPlacementPreviewDegradedPartialObjectStaysUnavailable()
+        {
+            var reader = new FakeBlueprintWorldTileReader();
+            var template = CreatePlacementPreviewLegacyPartialObjectTemplate("降级旧半件");
+            var layers = BlueprintPlacementPreviewLayerBuilder.Build(template, template.TemplateId, template.Name, 10, 15, reader);
+            var layer = FindPreviewLayer(layers, BlueprintLayerKinds.Object, 10, 15);
+            if (layer == null ||
+                !string.Equals(layer.Status, BlueprintProjectionLayerStatuses.Unavailable, StringComparison.Ordinal) ||
+                !string.IsNullOrWhiteSpace(layer.ObjectGroupKey))
+            {
+                throw new InvalidOperationException("Expected degraded legacy partial object to stay unavailable without pretending it has a complete object group.");
+            }
+
+            if (!BlueprintPlacementPreviewLayerBuilder.IsLegacyPartialObjectForTesting(template.Cells[0].Layers[0]))
+            {
+                throw new InvalidOperationException("Expected legacy partial object marker to remain visible to placement preview validation.");
+            }
+        }
+
+        private static void BlueprintPlacementConfirmRefreshesObjectGroupValidationWithoutBlockingInstance()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-placement-confirm-refresh-object-group");
+            try
+            {
+                var reader = new FakeBlueprintWorldTileReader();
+                var instanceStore = new BlueprintWorldInstanceStore();
+                var template = CreatePlacementPreviewObjectGroupTemplate("确认前整件校验", string.Empty);
+                BlueprintPlacementPreviewState.SetPlacementDependenciesForTesting(
+                    null,
+                    instanceStore,
+                    BlueprintPlacementWorldContext.Success("pair-preview-confirm", "world-preview-confirm"),
+                    reader);
+                RequireBlueprintCommandSuccess(BlueprintPlacementPreviewState.BeginPreview(template, "test"), "begin confirm validation preview");
+                BlueprintPlacementPreviewState.HandlePointer(new BlueprintPlacementPointerInput
+                {
+                    WorldTileHit = true,
+                    TileX = 20,
+                    TileY = 30
+                });
+                var readsAfterHover = reader.ReadCount;
+                reader.Set(21, 30, new BlueprintWorldTileSnapshot { Active = true, TileType = 999 });
+
+                var result = BlueprintPlacementPreviewState.HandlePointer(new BlueprintPlacementPointerInput
+                {
+                    WorldTileHit = true,
+                    TileX = 20,
+                    TileY = 30,
+                    PhysicalLeftDown = true,
+                    LeftDown = true,
+                    LeftPressed = true
+                });
+                if (!result.Succeeded || !result.PlacedInstance || result.Instance == null)
+                {
+                    throw new InvalidOperationException("Placement confirmation should still create a blueprint hint instance when preview validation finds conflicts.");
+                }
+
+                if (reader.ReadCount <= readsAfterHover)
+                {
+                    throw new InvalidOperationException("Expected placement confirmation to refresh object group validation before creating the hint instance.");
+                }
+            }
+            finally
+            {
+                BlueprintPlacementPreviewState.ResetForTesting();
+                restore();
+            }
+        }
+
         private static void BlueprintPlacementOverlayRoutesAndPointerContract()
         {
             if (!BlueprintPlacementPreviewOverlay.ShouldRegisterWorldOverlayForTesting())
@@ -567,6 +746,7 @@ namespace JueMingZ.Tests
 
         private static BlueprintPlacementPreviewSnapshot CreateActivePlacementPreviewSnapshot(BlueprintTemplateRecord template)
         {
+            var reader = new FakeBlueprintWorldTileReader();
             return new BlueprintPlacementPreviewSnapshot
             {
                 Active = true,
@@ -581,8 +761,38 @@ namespace JueMingZ.Tests
                 AnchorY = template.AnchorY,
                 TemplateId = template.TemplateId,
                 TemplateName = template.Name,
-                TemplateSnapshot = template
+                TemplateSnapshot = template,
+                PreviewLayers = BlueprintPlacementPreviewLayerBuilder.Build(template, template.TemplateId, template.Name, 30, 40, reader)
             };
+        }
+
+        private static BlueprintProjectionCellSnapshot FindPreviewLayer(
+            IReadOnlyList<BlueprintProjectionCellSnapshot> layers,
+            string layerKind,
+            int worldTileX,
+            int worldTileY)
+        {
+            for (var index = 0; layers != null && index < layers.Count; index++)
+            {
+                var layer = layers[index];
+                if (layer != null &&
+                    string.Equals(layer.LayerKind, layerKind, StringComparison.OrdinalIgnoreCase) &&
+                    layer.WorldTileX == worldTileX &&
+                    layer.WorldTileY == worldTileY)
+                {
+                    return layer;
+                }
+            }
+
+            return null;
+        }
+
+        private static void RequireBlueprintCommandSuccess(BlueprintPlacementCommandResult result, string label)
+        {
+            if (result == null || !result.Succeeded)
+            {
+                throw new InvalidOperationException("Expected blueprint command success for " + label + ".");
+            }
         }
 
         private static BlueprintTemplateRecord CreatePlacementPreviewMixedWallTemplate(string name)
@@ -680,6 +890,107 @@ namespace JueMingZ.Tests
                         ContentId = 1,
                         MaterialItemId = 1,
                         MaterialStack = 1
+                    }
+                }
+            });
+            return template;
+        }
+
+        private static BlueprintTemplateRecord CreatePlacementPreviewObjectGroupTemplate(string name, string objectGroupStatus)
+        {
+            var template = new BlueprintTemplateRecord
+            {
+                TemplateId = "template-" + Guid.NewGuid().ToString("N"),
+                Name = name,
+                Width = 2,
+                Height = 1,
+                AnchorX = 0,
+                AnchorY = 0
+            };
+            var groupId = BlueprintObjectGroupNormalizer.BuildObjectGroupId(21, 3, 0, 0, 2, 1);
+            template.Cells.Add(new BlueprintCellRecord
+            {
+                X = 0,
+                Y = 0,
+                Layers =
+                {
+                    new BlueprintCellLayerRecord
+                    {
+                        LayerKind = BlueprintLayerKinds.Object,
+                        ContentId = 21,
+                        Style = 3,
+                        FrameX = 0,
+                        FrameY = 0,
+                        MaterialItemId = 100,
+                        MaterialStack = 1,
+                        ObjectGroupId = groupId,
+                        ObjectOriginX = 0,
+                        ObjectOriginY = 0,
+                        ObjectWidth = 2,
+                        ObjectHeight = 1,
+                        ObjectSubTileX = 0,
+                        ObjectSubTileY = 0,
+                        ObjectGroupStatus = objectGroupStatus ?? string.Empty
+                    }
+                }
+            });
+            template.Cells.Add(new BlueprintCellRecord
+            {
+                X = 1,
+                Y = 0,
+                Layers =
+                {
+                    new BlueprintCellLayerRecord
+                    {
+                        LayerKind = BlueprintLayerKinds.Object,
+                        ContentId = 21,
+                        Style = 3,
+                        FrameX = 18,
+                        FrameY = 0,
+                        MaterialItemId = 100,
+                        MaterialStack = 0,
+                        ObjectGroupId = groupId,
+                        ObjectOriginX = 0,
+                        ObjectOriginY = 0,
+                        ObjectWidth = 2,
+                        ObjectHeight = 1,
+                        ObjectSubTileX = 1,
+                        ObjectSubTileY = 0,
+                        ObjectGroupStatus = objectGroupStatus ?? string.Empty
+                    }
+                }
+            });
+            return template;
+        }
+
+        private static BlueprintTemplateRecord CreatePlacementPreviewLegacyPartialObjectTemplate(string name)
+        {
+            var template = new BlueprintTemplateRecord
+            {
+                TemplateId = "template-" + Guid.NewGuid().ToString("N"),
+                Name = name,
+                Width = 1,
+                Height = 1,
+                AnchorX = 0,
+                AnchorY = 0
+            };
+            template.Cells.Add(new BlueprintCellRecord
+            {
+                X = 0,
+                Y = 0,
+                Layers =
+                {
+                    new BlueprintCellLayerRecord
+                    {
+                        LayerKind = BlueprintLayerKinds.Object,
+                        ContentId = 99999,
+                        Style = 0,
+                        FrameX = 0,
+                        FrameY = 0,
+                        MaterialItemId = 100,
+                        MaterialStack = 1,
+                        ObjectGroupStatus = BlueprintObjectGroupStatuses.LegacyPartialObject,
+                        ObjectGroupReason = BlueprintCaptureMissingCapabilities.LegacyPartialObject
                     }
                 }
             });

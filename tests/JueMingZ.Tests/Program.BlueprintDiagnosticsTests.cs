@@ -238,6 +238,69 @@ namespace JueMingZ.Tests
             AssertDoesNotContain(projectionContract, "topmost");
         }
 
+        private static void BlueprintCaptureSavesWhenRecognizableFurnitureIsPartiallySelected()
+        {
+            BlueprintCaptureExpandsPartialMultitileObjectWithoutWallsOrWires();
+            BlueprintCaptureNormalizesMultitileObjectStyleAcrossSubtiles();
+            BlueprintCaptureMergesRepeatedMultitileObjectSelectionWithStyleDrift();
+        }
+
+        private static void BlueprintCaptureDoesNotRejectWholeBlueprintForRecoverableObjectIssue()
+        {
+            BlueprintCaptureSkipsIncompleteExpandedObjectAndSavesOtherContent();
+            BlueprintCaptureFailsClosedWhenExpandedObjectCellIsIncomplete();
+        }
+
+        private static void BlueprintTemplateObjectGroupMetadataSurvivesCloneImportExport()
+        {
+            BlueprintObjectGroupMetadataPersistsThroughInstanceExportAndImport();
+        }
+
+        private static void BlueprintLegacyPartialFurnitureRepairOrDegradeIsExplicit()
+        {
+            BlueprintLegacyPartialObjectRepairsMissingCellsAndFlags();
+            BlueprintLegacyPartialObjectMarksDegradedWhenUnverifiable();
+        }
+
+        private static void BlueprintPlacementPreviewMultitileObjectConflictMarksWholeGroup()
+        {
+            BlueprintPlacementPreviewMultitileObjectUsesOriginalGhostLayers();
+            BlueprintPlacementPreviewObjectGroupConflictMarksWholeGroup();
+            BlueprintPlacementPreviewDegradedPartialObjectStaysUnavailable();
+        }
+
+        private static void BlueprintProjectionExplicitObjectGroupConflictMarksWholeFurniture()
+        {
+            BlueprintProjectionExplicitObjectGroupOverridesStyleHeuristic();
+            BlueprintProjectionMultitileObjectConflictMarksWholeGroup();
+        }
+
+        private static void BlueprintAutoPlacementSkipsExplicitObjectGroupWhenAnyCellConflicts()
+        {
+            BlueprintAutoPlacementExplicitObjectGroupConflictSkipsRepresentative();
+        }
+
+        private static void BlueprintFurnitureSavePlacementRegressionContractsStayWired()
+        {
+            BlueprintCaptureSavesWhenRecognizableFurnitureIsPartiallySelected();
+            BlueprintCaptureDoesNotRejectWholeBlueprintForRecoverableObjectIssue();
+            BlueprintTemplateObjectGroupMetadataSurvivesCloneImportExport();
+            BlueprintLegacyPartialFurnitureRepairOrDegradeIsExplicit();
+            BlueprintPlacementPreviewMultitileObjectConflictMarksWholeGroup();
+            BlueprintProjectionExplicitObjectGroupConflictMarksWholeFurniture();
+            BlueprintAutoPlacementSkipsExplicitObjectGroupWhenAnyCellConflicts();
+
+            var previewContract = BlueprintPlacementPreviewOverlay.GetVisualContractForTesting();
+            AssertContains(previewContract, "foreground-original-ghost");
+            AssertContains(previewContract, "draw-snapshot-only");
+
+            var projectionContract = BlueprintProjectionOverlay.GetVisualContractForTesting();
+            AssertContains(projectionContract, "original-missing");
+            AssertContains(projectionContract, "multitile-object-group-conflict");
+            AssertDoesNotContain(projectionContract, "yellow-missing");
+            AssertDoesNotContain(projectionContract, "topmost");
+        }
+
         private static void BlueprintWallContinuityStage05RegressionDiagnosticsContractsStayWired()
         {
             BlueprintProjectionWallFramesUseNeighborContinuity();

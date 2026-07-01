@@ -689,6 +689,11 @@ namespace JueMingZ.Automation.Blueprint
                     continue;
                 }
 
+                if (TrySkipBlockedObjectGroupCandidate(layer, snapshot))
+                {
+                    continue;
+                }
+
                 string supportReason;
                 if (!IsStage14SupportedLayer(layer, out supportReason))
                 {
@@ -782,6 +787,11 @@ namespace JueMingZ.Automation.Blueprint
                     snapshot.SkippedUnavailableLayerCount++;
                 }
                 else if (string.Equals(layer.Status, BlueprintProjectionLayerStatuses.Missing, StringComparison.Ordinal) &&
+                         TrySkipBlockedObjectGroupCandidate(layer, snapshot))
+                {
+                    continue;
+                }
+                else if (string.Equals(layer.Status, BlueprintProjectionLayerStatuses.Missing, StringComparison.Ordinal) &&
                          !IsStage14SupportedLayer(layer, out _))
                 {
                     snapshot.SkippedUnsupportedLayerCount++;
@@ -803,6 +813,40 @@ namespace JueMingZ.Automation.Blueprint
                     }
                 }
             }
+        }
+
+        private static bool TrySkipBlockedObjectGroupCandidate(
+            BlueprintProjectionCellSnapshot layer,
+            BlueprintAutoPlacementSnapshot snapshot)
+        {
+            if (layer == null ||
+                !string.Equals(layer.LayerKind, BlueprintLayerKinds.Object, StringComparison.OrdinalIgnoreCase) ||
+                string.IsNullOrWhiteSpace(layer.ObjectGroupStatus))
+            {
+                return false;
+            }
+
+            if (string.Equals(layer.ObjectGroupStatus, BlueprintProjectionLayerStatuses.Conflict, StringComparison.Ordinal))
+            {
+                if (snapshot != null)
+                {
+                    snapshot.SkippedConflictLayerCount++;
+                }
+
+                return true;
+            }
+
+            if (string.Equals(layer.ObjectGroupStatus, BlueprintProjectionLayerStatuses.Unavailable, StringComparison.Ordinal))
+            {
+                if (snapshot != null)
+                {
+                    snapshot.SkippedUnavailableLayerCount++;
+                }
+
+                return true;
+            }
+
+            return false;
         }
 
         private static Dictionary<int, int> BuildMainInventoryAvailabilityMap(BlueprintMaterialSnapshot materials)

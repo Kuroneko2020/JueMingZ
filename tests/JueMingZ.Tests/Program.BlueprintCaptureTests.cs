@@ -206,6 +206,18 @@ namespace JueMingZ.Tests
                 throw new InvalidOperationException("Expected expanded object cells to keep each furniture part frame.");
             }
 
+            if (string.IsNullOrWhiteSpace(leftObject.ObjectGroupId) ||
+                !string.Equals(leftObject.ObjectGroupId, rightObject.ObjectGroupId, StringComparison.Ordinal) ||
+                leftObject.ObjectOriginX != 0 ||
+                leftObject.ObjectOriginY != 0 ||
+                leftObject.ObjectWidth != 2 ||
+                leftObject.ObjectHeight != 1 ||
+                leftObject.ObjectSubTileX != 0 ||
+                rightObject.ObjectSubTileX != 1)
+            {
+                throw new InvalidOperationException("Expected captured multi-tile object cells to carry explicit object group metadata.");
+            }
+
             if (HasLayer(leftCell, BlueprintLayerKinds.Wall) ||
                 HasLayer(leftCell, BlueprintLayerKinds.Wire) ||
                 HasLayer(leftCell, BlueprintLayerKinds.Actuator))
@@ -221,8 +233,65 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void BlueprintCaptureNormalizesMultitileObjectStyleAcrossSubtiles()
+        {
+            BlueprintCreationMaskState.ResetForTesting();
+            BlueprintCreationMaskState.BeginCreate();
+            ClickTileForBlueprintCreation(31, 40);
+            BlueprintCreationMaskState.FinishCreate(false);
+
+            var reader = new FakeBlueprintWorldTileReader();
+            var leftPart = CreateObjectPart(21, 30, 40, 3, 300, string.Empty);
+            leftPart.FrameX = 0;
+            var rightPart = CreateObjectPart(21, 30, 40, 4, 300, string.Empty);
+            rightPart.FrameX = 18;
+            reader.Set(30, 40, leftPart);
+            reader.Set(31, 40, rightPart);
+
+            var result = BlueprintCaptureService.CaptureSnapshotToTemplate(BlueprintCreationMaskState.GetSnapshot(), reader, false);
+            if (!result.Succeeded || result.Template.Cells.Count != 2)
+            {
+                throw new InvalidOperationException("Expected style drift between subtiles to normalize instead of rejecting the object expansion.");
+            }
+
+            var objectLayers = result.Template.Cells.Select(cell => RequireLayer(cell, BlueprintLayerKinds.Object)).ToList();
+            if (objectLayers.Any(layer => layer.Style != 3) ||
+                objectLayers.Sum(layer => layer.MaterialStack) != 1 ||
+                result.Template.MissingCapabilityFlags.Contains(BlueprintCaptureMissingCapabilities.ObjectExpansionIncomplete))
+            {
+                throw new InvalidOperationException("Expected expanded object layers to use the origin canonical style and count material once.");
+            }
+        }
+
+        private static void BlueprintCaptureMergesRepeatedMultitileObjectSelectionWithStyleDrift()
+        {
+            BlueprintCreationMaskState.ResetForTesting();
+            BlueprintCreationMaskState.BeginCreate();
+            ClickTileForBlueprintCreation(30, 40);
+            ClickTileForBlueprintCreation(31, 40);
+            BlueprintCreationMaskState.FinishCreate(false);
+
+            var reader = new FakeBlueprintWorldTileReader();
+            var leftPart = CreateObjectPart(21, 30, 40, 3, 300, string.Empty);
+            leftPart.FrameX = 0;
+            var rightPart = CreateObjectPart(21, 30, 40, 4, 300, string.Empty);
+            rightPart.FrameX = 18;
+            reader.Set(30, 40, leftPart);
+            reader.Set(31, 40, rightPart);
+
+            var result = BlueprintCaptureService.CaptureSnapshotToTemplate(BlueprintCreationMaskState.GetSnapshot(), reader, false);
+            if (!result.Succeeded ||
+                result.Template.Cells.Count != 2 ||
+                result.Template.Cells.Select(cell => RequireLayer(cell, BlueprintLayerKinds.Object)).Any(layer => layer.Style != 3))
+            {
+                throw new InvalidOperationException("Expected repeated selection of the same furniture to merge by object identity, not per-subtile style.");
+            }
+        }
+
         private static void BlueprintCaptureFailsClosedWhenExpandedObjectCellIsIncomplete()
         {
+            // Keep the objectExpansionIncomplete regression intent: never save
+            // an unproven half object as if it were complete.
             BlueprintCreationMaskState.ResetForTesting();
             BlueprintCreationMaskState.BeginCreate();
             ClickTileForBlueprintCreation(31, 40);
@@ -235,9 +304,40 @@ namespace JueMingZ.Tests
 
             var result = BlueprintCaptureService.CaptureSnapshotToTemplate(BlueprintCreationMaskState.GetSnapshot(), reader, false);
             if (result.Succeeded ||
-                !string.Equals(result.ResultCode, "objectExpansionIncomplete", StringComparison.Ordinal))
+                !string.Equals(result.ResultCode, "emptyContent", StringComparison.Ordinal) ||
+                result.Template.Cells.Any(cell => HasLayer(cell, BlueprintLayerKinds.Object)))
             {
-                throw new InvalidOperationException("Expected incomplete multi-tile object expansion to fail closed instead of saving a half object.");
+                throw new InvalidOperationException("Expected incomplete multi-tile object expansion to avoid saving a half object.");
+            }
+        }
+
+        private static void BlueprintCaptureSkipsIncompleteExpandedObjectAndSavesOtherContent()
+        {
+            BlueprintCreationMaskState.ResetForTesting();
+            BlueprintCreationMaskState.BeginCreate();
+            ClickTileForBlueprintCreation(31, 40);
+            ClickTileForBlueprintCreation(50, 40);
+            BlueprintCreationMaskState.FinishCreate(false);
+
+            var reader = new FakeBlueprintWorldTileReader();
+            var rightPart = CreateObjectPart(21, 30, 40, 3, 300, string.Empty);
+            rightPart.FrameX = 18;
+            reader.Set(31, 40, rightPart);
+            reader.Set(50, 40, new BlueprintWorldTileSnapshot
+            {
+                Active = true,
+                TileType = 1,
+                TileMaterialItemId = 101,
+                TileDisplayName = "Stone Block"
+            });
+
+            var result = BlueprintCaptureService.CaptureSnapshotToTemplate(BlueprintCreationMaskState.GetSnapshot(), reader, false);
+            if (!result.Succeeded ||
+                result.Template.Cells.Count != 1 ||
+                result.Template.Cells.Any(cell => HasLayer(cell, BlueprintLayerKinds.Object)) ||
+                !result.Template.MissingCapabilityFlags.Contains(BlueprintCaptureMissingCapabilities.ObjectExpansionIncomplete))
+            {
+                throw new InvalidOperationException("Expected incomplete furniture to be skipped with a warning while other selected content is saved.");
             }
         }
 

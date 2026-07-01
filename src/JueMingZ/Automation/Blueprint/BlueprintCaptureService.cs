@@ -135,6 +135,8 @@ namespace JueMingZ.Automation.Blueprint
                 return requestFailure;
             }
 
+            ValidateObjectExpansionRequests(captureRequests, reader, state);
+
             int minMaskX;
             int minMaskY;
             int maxMaskX;
@@ -154,14 +156,7 @@ namespace JueMingZ.Automation.Blueprint
                     state.MissingFlags.Add(BlueprintCaptureMissingCapabilities.TileReadUnavailable);
                     if (request.ExpectedObject != null)
                     {
-                        return BuildObjectExpansionFailureResult(
-                            "objectExpansionTileReadUnavailable",
-                            "多格家具采集补齐失败：无法读取整件家具的格子 " +
-                            request.X.ToString(CultureInfo.InvariantCulture) + "," +
-                            request.Y.ToString(CultureInfo.InvariantCulture) + "。",
-                            mask.SelectedCount,
-                            state,
-                            useAfterSave);
+                        state.MissingFlags.Add(BlueprintCaptureMissingCapabilities.ObjectExpansionTileReadUnavailable);
                     }
 
                     continue;
@@ -171,31 +166,23 @@ namespace JueMingZ.Automation.Blueprint
                 sample.TileY = request.Y;
                 if (request.ExpectedObject != null && !MatchesObjectSignature(sample, request.ExpectedObject))
                 {
-                    return BuildObjectExpansionFailureResult(
-                        "objectExpansionIncomplete",
-                        "多格家具采集补齐失败：整件家具的格子 " +
-                        request.X.ToString(CultureInfo.InvariantCulture) + "," +
-                        request.Y.ToString(CultureInfo.InvariantCulture) + " 与起始家具不一致。",
-                        mask.SelectedCount,
-                        state,
-                        useAfterSave);
+                    state.MissingFlags.Add(BlueprintCaptureMissingCapabilities.ObjectExpansionIncomplete);
+                    request.SuppressObjectLayer = true;
+                }
+
+                if (request.ExpectedObject != null && !request.SuppressObjectLayer)
+                {
+                    sample.ObjectStyle = request.ExpectedObject.Style;
                 }
 
                 var cell = request.CaptureAllLayers
-                    ? BuildCell(sample, state)
+                    ? BuildCell(sample, state, request.SuppressObjectLayer)
                     : BuildObjectExpansionCell(sample, state);
                 if (cell == null || cell.Layers == null || cell.Layers.Count <= 0)
                 {
                     if (request.ExpectedObject != null)
                     {
-                        return BuildObjectExpansionFailureResult(
-                            "objectExpansionEmptyCell",
-                            "多格家具采集补齐失败：整件家具的格子 " +
-                            request.X.ToString(CultureInfo.InvariantCulture) + "," +
-                            request.Y.ToString(CultureInfo.InvariantCulture) + " 没有可采集的 object 层。",
-                            mask.SelectedCount,
-                            state,
-                            useAfterSave);
+                        state.MissingFlags.Add(BlueprintCaptureMissingCapabilities.ObjectExpansionIncomplete);
                     }
 
                     if (request.CaptureAllLayers)
@@ -295,7 +282,10 @@ namespace JueMingZ.Automation.Blueprint
                    sample.HasActuator;
         }
 
-        private static BlueprintCellRecord BuildCell(BlueprintWorldTileSnapshot sample, BlueprintCaptureBuildState state)
+        private static BlueprintCellRecord BuildCell(
+            BlueprintWorldTileSnapshot sample,
+            BlueprintCaptureBuildState state,
+            bool suppressActiveTile)
         {
             var cell = new BlueprintCellRecord
             {
@@ -308,7 +298,10 @@ namespace JueMingZ.Automation.Blueprint
                 state.MissingFlags.Add(BlueprintCaptureMissingCapabilities.LiquidNotSupported);
             }
 
-            TryAddActiveTileLayer(cell, sample, state, false);
+            if (!suppressActiveTile)
+            {
+                TryAddActiveTileLayer(cell, sample, state, false);
+            }
 
             if (sample.WallType > 0)
             {
@@ -409,6 +402,18 @@ namespace JueMingZ.Automation.Blueprint
                 MaterialStack = materialStack,
                 Note = note
             };
+            if (string.Equals(kind, BlueprintLayerKinds.Object, StringComparison.OrdinalIgnoreCase))
+            {
+                BlueprintObjectGroupNormalizer.SetCapturedObjectGroup(
+                    layer,
+                    sample.TileX,
+                    sample.TileY,
+                    sample.ObjectOriginX,
+                    sample.ObjectOriginY,
+                    sample.ObjectWidth,
+                    sample.ObjectHeight);
+            }
+
             cell.Layers.Add(layer);
             state.LayerCount++;
             AddMaterial(state, layer.MaterialItemId, layer.MaterialStack, sample.TileDisplayName, kind, "tile");
@@ -680,6 +685,145 @@ namespace JueMingZ.Automation.Blueprint
             return true;
         }
 
+        private static void ValidateObjectExpansionRequests(
+            IList<BlueprintCaptureCellRequest> requests,
+            IBlueprintWorldTileReader reader,
+            BlueprintCaptureBuildState state)
+        {
+            // Historical result-code anchor: objectExpansionIncomplete is now a
+            // per-object warning path so one bad furniture does not discard
+            // other selectable blueprint content.
+            if (requests == null || requests.Count <= 0 || reader == null || state == null)
+            {
+                return;
+            }
+
+            var signatures = new List<BlueprintCaptureObjectSignature>();
+            for (var index = 0; index < requests.Count; index++)
+            {
+                var signature = requests[index] == null ? null : requests[index].ExpectedObject;
+                if (signature == null || ContainsSignature(signatures, signature))
+                {
+                    continue;
+                }
+
+                signatures.Add(signature);
+            }
+
+            for (var signatureIndex = 0; signatureIndex < signatures.Count; signatureIndex++)
+            {
+                var signature = signatures[signatureIndex];
+                BlueprintCaptureCellRequest originRequest;
+                if (TryFindObjectExpansionRequest(requests, signature, signature.OriginX, signature.OriginY, out originRequest))
+                {
+                    BlueprintWorldTileSnapshot originSample;
+                    if (TryReadCaptureSample(reader, originRequest, out originSample))
+                    {
+                        originSample.TileX = originRequest.X;
+                        originSample.TileY = originRequest.Y;
+                        if (MatchesObjectIdentity(originSample, signature))
+                        {
+                            signature.Style = Math.Max(0, originSample.ObjectStyle);
+                        }
+                    }
+                }
+
+                var valid = true;
+                var missingFlag = BlueprintCaptureMissingCapabilities.ObjectExpansionIncomplete;
+                for (var requestIndex = 0; requestIndex < requests.Count; requestIndex++)
+                {
+                    var request = requests[requestIndex];
+                    if (request == null || !ReferenceEquals(request.ExpectedObject, signature))
+                    {
+                        continue;
+                    }
+
+                    BlueprintWorldTileSnapshot sample;
+                    if (!TryReadCaptureSample(reader, request, out sample))
+                    {
+                        valid = false;
+                        missingFlag = BlueprintCaptureMissingCapabilities.ObjectExpansionTileReadUnavailable;
+                        break;
+                    }
+
+                    sample.TileX = request.X;
+                    sample.TileY = request.Y;
+                    if (!MatchesObjectIdentity(sample, signature))
+                    {
+                        valid = false;
+                        missingFlag = BlueprintCaptureMissingCapabilities.ObjectExpansionIncomplete;
+                        break;
+                    }
+                }
+
+                if (valid)
+                {
+                    continue;
+                }
+
+                state.MissingFlags.Add(missingFlag);
+                for (var requestIndex = 0; requestIndex < requests.Count; requestIndex++)
+                {
+                    var request = requests[requestIndex];
+                    if (request == null || !ReferenceEquals(request.ExpectedObject, signature))
+                    {
+                        continue;
+                    }
+
+                    request.SuppressObjectLayer = true;
+                    request.ExpectedObject = null;
+                }
+            }
+
+            for (var index = requests.Count - 1; index >= 0; index--)
+            {
+                var request = requests[index];
+                if (request != null && request.SuppressObjectLayer && !request.CaptureAllLayers)
+                {
+                    requests.RemoveAt(index);
+                }
+            }
+        }
+
+        private static bool ContainsSignature(
+            IList<BlueprintCaptureObjectSignature> signatures,
+            BlueprintCaptureObjectSignature signature)
+        {
+            for (var index = 0; signatures != null && index < signatures.Count; index++)
+            {
+                if (ReferenceEquals(signatures[index], signature))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryFindObjectExpansionRequest(
+            IList<BlueprintCaptureCellRequest> requests,
+            BlueprintCaptureObjectSignature signature,
+            int tileX,
+            int tileY,
+            out BlueprintCaptureCellRequest found)
+        {
+            found = null;
+            for (var index = 0; requests != null && index < requests.Count; index++)
+            {
+                var request = requests[index];
+                if (request != null &&
+                    ReferenceEquals(request.ExpectedObject, signature) &&
+                    request.X == tileX &&
+                    request.Y == tileY)
+                {
+                    found = request;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static bool TryCreateObjectExpansionSignature(
             BlueprintWorldTileSnapshot sample,
             int maskSelectedCount,
@@ -832,6 +976,11 @@ namespace JueMingZ.Automation.Blueprint
 
         private static bool MatchesObjectSignature(BlueprintWorldTileSnapshot sample, BlueprintCaptureObjectSignature signature)
         {
+            return MatchesObjectIdentity(sample, signature);
+        }
+
+        private static bool MatchesObjectIdentity(BlueprintWorldTileSnapshot sample, BlueprintCaptureObjectSignature signature)
+        {
             if (sample == null || signature == null)
             {
                 return false;
@@ -840,7 +989,6 @@ namespace JueMingZ.Automation.Blueprint
             return sample.Active &&
                    sample.FrameImportant &&
                    sample.TileType == signature.TileType &&
-                   Math.Max(0, sample.ObjectStyle) == signature.Style &&
                    sample.ObjectOriginX == signature.OriginX &&
                    sample.ObjectOriginY == signature.OriginY &&
                    Math.Max(1, sample.ObjectWidth) == signature.Width &&
@@ -916,6 +1064,7 @@ namespace JueMingZ.Automation.Blueprint
             public int Y { get; set; }
             public bool CaptureAllLayers { get; set; }
             public BlueprintCaptureObjectSignature ExpectedObject { get; set; }
+            public bool SuppressObjectLayer { get; set; }
             public bool CachedReadAttempted { get; set; }
             public bool CachedReadSucceeded { get; set; }
             public BlueprintWorldTileSnapshot CachedSample { get; set; }
@@ -934,7 +1083,6 @@ namespace JueMingZ.Automation.Blueprint
             {
                 return other != null &&
                        TileType == other.TileType &&
-                       Style == other.Style &&
                        OriginX == other.OriginX &&
                        OriginY == other.OriginY &&
                        Width == other.Width &&
@@ -954,6 +1102,10 @@ namespace JueMingZ.Automation.Blueprint
 
                 cell.X -= originX;
                 cell.Y -= originY;
+                for (var layerIndex = 0; cell.Layers != null && layerIndex < cell.Layers.Count; layerIndex++)
+                {
+                    BlueprintObjectGroupNormalizer.OffsetObjectGroupOrigin(cell.Layers[layerIndex], originX, originY);
+                }
             }
         }
 

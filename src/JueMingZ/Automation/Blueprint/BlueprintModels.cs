@@ -311,10 +311,40 @@ namespace JueMingZ.Automation.Blueprint
         [DataMember(Order = 13)]
         public string Note { get; set; }
 
+        [DataMember(Order = 14)]
+        public string ObjectGroupId { get; set; }
+
+        [DataMember(Order = 15)]
+        public int ObjectOriginX { get; set; }
+
+        [DataMember(Order = 16)]
+        public int ObjectOriginY { get; set; }
+
+        [DataMember(Order = 17)]
+        public int ObjectWidth { get; set; }
+
+        [DataMember(Order = 18)]
+        public int ObjectHeight { get; set; }
+
+        [DataMember(Order = 19)]
+        public int ObjectSubTileX { get; set; }
+
+        [DataMember(Order = 20)]
+        public int ObjectSubTileY { get; set; }
+
+        [DataMember(Order = 21)]
+        public string ObjectGroupStatus { get; set; }
+
+        [DataMember(Order = 22)]
+        public string ObjectGroupReason { get; set; }
+
         public BlueprintCellLayerRecord()
         {
             LayerKind = string.Empty;
             Note = string.Empty;
+            ObjectGroupId = string.Empty;
+            ObjectGroupStatus = string.Empty;
+            ObjectGroupReason = string.Empty;
         }
 
         public BlueprintCellLayerRecord Clone()
@@ -333,7 +363,16 @@ namespace JueMingZ.Automation.Blueprint
                 Inactive = Inactive,
                 MaterialItemId = MaterialItemId,
                 MaterialStack = MaterialStack,
-                Note = Note ?? string.Empty
+                Note = Note ?? string.Empty,
+                ObjectGroupId = ObjectGroupId ?? string.Empty,
+                ObjectOriginX = ObjectOriginX,
+                ObjectOriginY = ObjectOriginY,
+                ObjectWidth = ObjectWidth,
+                ObjectHeight = ObjectHeight,
+                ObjectSubTileX = ObjectSubTileX,
+                ObjectSubTileY = ObjectSubTileY,
+                ObjectGroupStatus = ObjectGroupStatus ?? string.Empty,
+                ObjectGroupReason = ObjectGroupReason ?? string.Empty
             };
         }
     }

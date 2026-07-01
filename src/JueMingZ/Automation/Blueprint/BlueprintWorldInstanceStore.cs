@@ -198,6 +198,7 @@ namespace JueMingZ.Automation.Blueprint
                 clone.EraseMask = NormalizeEraseMask(clone.EraseMask);
                 clone.CompletedLayers = NormalizeCompletedLayers(clone.CompletedLayers);
                 clone.TemplateSnapshot = clone.TemplateSnapshot == null ? new BlueprintTemplateRecord() : clone.TemplateSnapshot.Clone();
+                BlueprintObjectGroupNormalizer.NormalizeTemplateInPlace(clone.TemplateSnapshot);
                 if (string.IsNullOrWhiteSpace(clone.TemplateSnapshot.Name))
                 {
                     clone.TemplateSnapshot.Name = clone.Name;

@@ -293,6 +293,57 @@ namespace JueMingZ.Tests
             }
         }
 
+        private static void BlueprintAutoPlacementExplicitObjectGroupConflictSkipsRepresentative()
+        {
+            var restore = PushTemporaryConfigDirectory("blueprint-auto-placement-explicit-object-group");
+            try
+            {
+                BlueprintAutoPlacementService.ResetForTesting();
+                var store = new BlueprintWorldInstanceStore();
+                var reader = new FakeBlueprintWorldTileReader();
+                BlueprintWorldInstanceRecord instance;
+                RequireBlueprintSuccess(
+                    store.CreateInstanceFromTemplate(
+                        "pair-auto-explicit-object-group",
+                        "world-auto-explicit-object-group",
+                        CreateAutoPlacementTwoCellExplicitObjectGroupTemplate("显式整件家具", 14, 1010),
+                        24,
+                        30,
+                        0,
+                        out instance),
+                    "create auto placement explicit object group instance");
+                reader.Set(24, 30, new BlueprintWorldTileSnapshot());
+                reader.Set(25, 30, new BlueprintWorldTileSnapshot { Active = true, TileType = 999 });
+                BlueprintProjectionService.SetDependenciesForTesting(
+                    store,
+                    BlueprintPlacementWorldContext.Success("pair-auto-explicit-object-group", "world-auto-explicit-object-group"),
+                    reader,
+                    true);
+                BlueprintMaterialService.SetInventoryReaderForTesting(new FakeBlueprintMaterialInventoryReader(
+                    new Dictionary<int, int> { { 1010, 1 } },
+                    new Dictionary<int, int>()), true);
+
+                var settings = AppSettings.CreateDefault();
+                settings.BlueprintAutoPlacementEnabled = true;
+                var result = BlueprintAutoPlacementService.ResolveCandidatesForTesting(RuntimeSettingsSnapshot.FromSettings(settings));
+                if (result.Candidate != null ||
+                    result.Snapshot.CandidateCount != 0 ||
+                    result.Snapshot.SkippedConflictLayerCount != 2 ||
+                    !string.Equals(result.Snapshot.ResultCode, "noCandidate", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Expected explicit object group conflict to skip the material-bearing representative instead of placing a half object.");
+                }
+            }
+            finally
+            {
+                BlueprintAutoPlacementService.ResetForTesting();
+                BlueprintMaterialService.ResetForTesting();
+                BlueprintProjectionService.ResetForTesting();
+                BlueprintMaterialWindowOverlay.ResetForTesting();
+                restore();
+            }
+        }
+
         private static void BlueprintAutoPlacementSubmitsActionQueueAndVerifiesPlacement()
         {
             var restore = PushTemporaryConfigDirectory("blueprint-auto-placement-action");
@@ -811,20 +862,28 @@ namespace JueMingZ.Tests
                 AnchorX = 0,
                 AnchorY = 0
             };
+            var layer = new BlueprintCellLayerRecord
+            {
+                LayerKind = layerKind,
+                ContentId = contentId,
+                MaterialItemId = materialItemId,
+                MaterialStack = materialStack,
+                Note = name + "材料"
+            };
+            if (string.Equals(layerKind, BlueprintLayerKinds.Object, StringComparison.Ordinal))
+            {
+                layer.ObjectGroupId = BlueprintObjectGroupNormalizer.BuildObjectGroupId(contentId, 0, 0, 0, 1, 1);
+                layer.ObjectWidth = 1;
+                layer.ObjectHeight = 1;
+            }
+
             template.Cells.Add(new BlueprintCellRecord
             {
                 X = 0,
                 Y = 0,
                 Layers =
                 {
-                    new BlueprintCellLayerRecord
-                    {
-                        LayerKind = layerKind,
-                        ContentId = contentId,
-                        MaterialItemId = materialItemId,
-                        MaterialStack = materialStack,
-                        Note = name + "材料"
-                    }
+                    layer
                 }
             });
             AddMaterialEntries(template);
@@ -841,36 +900,109 @@ namespace JueMingZ.Tests
                 AnchorX = 0,
                 AnchorY = 0
             };
+            var leftLayer = new BlueprintCellLayerRecord
+            {
+                LayerKind = BlueprintLayerKinds.Object,
+                ContentId = contentId,
+                MaterialItemId = materialItemId,
+                MaterialStack = 1,
+                Note = name + "代表材料"
+            };
+            BlueprintObjectGroupNormalizer.SetCapturedObjectGroup(leftLayer, 0, 0, 0, 0, 2, 1);
             template.Cells.Add(new BlueprintCellRecord
             {
                 X = 0,
                 Y = 0,
                 Layers =
                 {
-                    new BlueprintCellLayerRecord
-                    {
-                        LayerKind = BlueprintLayerKinds.Object,
-                        ContentId = contentId,
-                        MaterialItemId = materialItemId,
-                        MaterialStack = 1,
-                        Note = name + "代表材料"
-                    }
+                    leftLayer
                 }
             });
+            var rightLayer = new BlueprintCellLayerRecord
+            {
+                LayerKind = BlueprintLayerKinds.Object,
+                ContentId = contentId,
+                MaterialItemId = materialItemId,
+                MaterialStack = 0,
+                Note = name + "重复格"
+            };
+            BlueprintObjectGroupNormalizer.SetCapturedObjectGroup(rightLayer, 1, 0, 0, 0, 2, 1);
             template.Cells.Add(new BlueprintCellRecord
             {
                 X = 1,
                 Y = 0,
                 Layers =
                 {
-                    new BlueprintCellLayerRecord
-                    {
-                        LayerKind = BlueprintLayerKinds.Object,
-                        ContentId = contentId,
-                        MaterialItemId = materialItemId,
-                        MaterialStack = 0,
-                        Note = name + "重复格"
-                    }
+                    rightLayer
+                }
+            });
+            AddMaterialEntries(template);
+            return template;
+        }
+
+        private static BlueprintTemplateRecord CreateAutoPlacementTwoCellExplicitObjectGroupTemplate(string name, int contentId, int materialItemId)
+        {
+            var template = new BlueprintTemplateRecord
+            {
+                Name = name,
+                Width = 2,
+                Height = 1,
+                AnchorX = 0,
+                AnchorY = 0
+            };
+            var groupId = BlueprintObjectGroupNormalizer.BuildObjectGroupId(contentId, 7, 0, 0, 2, 1);
+            var leftLayer = new BlueprintCellLayerRecord
+            {
+                LayerKind = BlueprintLayerKinds.Object,
+                ContentId = contentId,
+                Style = 7,
+                FrameX = 0,
+                FrameY = 0,
+                MaterialItemId = materialItemId,
+                MaterialStack = 1,
+                Note = name + "显式代表材料",
+                ObjectGroupId = groupId,
+                ObjectOriginX = 0,
+                ObjectOriginY = 0,
+                ObjectWidth = 2,
+                ObjectHeight = 1,
+                ObjectSubTileX = 0,
+                ObjectSubTileY = 0
+            };
+            template.Cells.Add(new BlueprintCellRecord
+            {
+                X = 0,
+                Y = 0,
+                Layers =
+                {
+                    leftLayer
+                }
+            });
+            var rightLayer = new BlueprintCellLayerRecord
+            {
+                LayerKind = BlueprintLayerKinds.Object,
+                ContentId = contentId,
+                Style = 8,
+                FrameX = 18,
+                FrameY = 0,
+                MaterialItemId = materialItemId,
+                MaterialStack = 0,
+                Note = name + "显式重复格",
+                ObjectGroupId = groupId,
+                ObjectOriginX = 0,
+                ObjectOriginY = 0,
+                ObjectWidth = 2,
+                ObjectHeight = 1,
+                ObjectSubTileX = 1,
+                ObjectSubTileY = 0
+            };
+            template.Cells.Add(new BlueprintCellRecord
+            {
+                X = 1,
+                Y = 0,
+                Layers =
+                {
+                    rightLayer
                 }
             });
             AddMaterialEntries(template);

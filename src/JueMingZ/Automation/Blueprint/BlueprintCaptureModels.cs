@@ -23,6 +23,10 @@ namespace JueMingZ.Automation.Blueprint
         public const string ExternalTextNotCaptured = "external-text-not-captured";
         public const string ContainerContentNotCaptured = "container-content-not-captured";
         public const string EquipmentContentNotCaptured = "equipment-content-not-captured";
+        public const string ObjectExpansionIncomplete = "object-expansion-incomplete";
+        public const string ObjectExpansionTileReadUnavailable = "object-expansion-tile-read-unavailable";
+        public const string LegacyObjectRepaired = "legacy-object-repaired";
+        public const string LegacyPartialObject = "legacy-partial-object";
     }
 
     internal interface IBlueprintWorldTileReader

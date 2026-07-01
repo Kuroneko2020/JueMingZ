@@ -1035,6 +1035,7 @@ namespace JueMingZ.Tests
         private static int Main()
         {
             InstallProcessConfigDirectoryIsolation();
+            InitializeTerrariaTileObjectDataForTests();
             var failed = 0;
             Run("test process config directory is isolated from user Documents", ref failed, TestProcessConfigDirectoryIsolatedFromUserDocuments);
             Run("test config isolation guard rejects real Documents directory", ref failed, TestConfigIsolationGuardRejectsRealDocumentsDirectory);
@@ -1060,6 +1061,10 @@ namespace JueMingZ.Tests
             Run("blueprint template names use default and numeric suffix", ref failed, BlueprintTemplateNamesUseDefaultAndNumericSuffix);
             Run("blueprint world instances keep template snapshot after template delete", ref failed, BlueprintWorldInstancesKeepTemplateSnapshotAfterTemplateDelete);
             Run("blueprint models persist cells materials erase mask and layer order", ref failed, BlueprintModelsPersistCellsMaterialsEraseMaskAndLayerOrder);
+            Run("blueprint object group metadata persists through instance export and import", ref failed, BlueprintObjectGroupMetadataPersistsThroughInstanceExportAndImport);
+            Run("blueprint legacy complete object restores group metadata", ref failed, BlueprintLegacyCompleteObjectRestoresGroupMetadata);
+            Run("blueprint legacy partial object repairs missing cells and flags", ref failed, BlueprintLegacyPartialObjectRepairsMissingCellsAndFlags);
+            Run("blueprint legacy partial object marks degraded when unverifiable", ref failed, BlueprintLegacyPartialObjectMarksDegradedWhenUnverifiable);
             Run("blueprint safe write failure keeps existing template library", ref failed, BlueprintSafeWriteFailureKeepsExistingTemplateLibrary);
             Run("blueprint corrupt json fails soft without overwrite", ref failed, BlueprintCorruptJsonFailsSoftWithoutOverwrite);
             Run("blueprint template export contains template only", ref failed, BlueprintTemplateExportContainsTemplateOnly);
@@ -1139,7 +1144,10 @@ namespace JueMingZ.Tests
             Run("blueprint capture rejects pure air selection explicitly", ref failed, BlueprintCaptureRejectsPureAirSelectionExplicitly);
             Run("blueprint capture counts multitile material once and flags external content", ref failed, BlueprintCaptureCountsMultitileMaterialOnceAndFlagsExternalContent);
             Run("blueprint capture expands partial multitile object without walls or wires", ref failed, BlueprintCaptureExpandsPartialMultitileObjectWithoutWallsOrWires);
+            Run("blueprint capture normalizes multitile object style across subtiles", ref failed, BlueprintCaptureNormalizesMultitileObjectStyleAcrossSubtiles);
+            Run("blueprint capture merges repeated multitile object selection with style drift", ref failed, BlueprintCaptureMergesRepeatedMultitileObjectSelectionWithStyleDrift);
             Run("blueprint capture fails closed when expanded object cell is incomplete", ref failed, BlueprintCaptureFailsClosedWhenExpandedObjectCellIsIncomplete);
+            Run("blueprint capture skips incomplete expanded object and saves other content", ref failed, BlueprintCaptureSkipsIncompleteExpandedObjectAndSavesOtherContent);
             Run("blueprint capture save writes template and refreshes library", ref failed, BlueprintCaptureSaveWritesTemplateAndRefreshesLibrary);
             Run("blueprint capture finish-use saves and enters placement preview", ref failed, BlueprintCaptureFinishUseSavesAndEntersPlacementPreview);
             Run("blueprint placement preview uses upper-left center anchor for even size", ref failed, BlueprintPlacementPreviewUsesUpperLeftCenterAnchorForEvenSize);
@@ -1151,6 +1159,10 @@ namespace JueMingZ.Tests
             Run("blueprint placement preview wall template does not draw late range fill over foreground", ref failed, BlueprintPlacementPreviewWallTemplateDoesNotDrawLateRangeFillOverForeground);
             Run("blueprint placement preview wall content uses world layer before late preview overlay", ref failed, BlueprintPlacementPreviewWallContentUsesWorldLayerBeforeLatePreviewOverlay);
             Run("blueprint placement preview late overlay skips wall content when world layer active", ref failed, BlueprintPlacementPreviewLateOverlaySkipsWallContentWhenWorldLayerActive);
+            Run("blueprint placement preview multitile object uses original ghost layers", ref failed, BlueprintPlacementPreviewMultitileObjectUsesOriginalGhostLayers);
+            Run("blueprint placement preview object group conflict marks whole group", ref failed, BlueprintPlacementPreviewObjectGroupConflictMarksWholeGroup);
+            Run("blueprint placement preview degraded partial object stays unavailable", ref failed, BlueprintPlacementPreviewDegradedPartialObjectStaysUnavailable);
+            Run("blueprint placement confirm refreshes object group validation without blocking instance", ref failed, BlueprintPlacementConfirmRefreshesObjectGroupValidationWithoutBlockingInstance);
             Run("blueprint placement overlay routes and pointer contract", ref failed, BlueprintPlacementOverlayRoutesAndPointerContract);
             Run("blueprint mirror horizontal mirrors preview coordinates anchor and slope", ref failed, BlueprintMirrorHorizontalMirrorsPreviewCoordinatesAnchorAndSlope);
             Run("blueprint mirror complete multitile object mirrors and partial fails closed", ref failed, BlueprintMirrorCompleteMultitileObjectMirrorsAndPartialFailsClosed);
@@ -1183,6 +1195,7 @@ namespace JueMingZ.Tests
             Run("blueprint projection cache avoids immediate recompute", ref failed, BlueprintProjectionCacheAvoidsImmediateRecompute);
             Run("blueprint projection replacement rules fulfill configured same category", ref failed, BlueprintProjectionReplacementRulesFulfillConfiguredSameCategory);
             Run("blueprint projection multitile object conflict marks whole group", ref failed, BlueprintProjectionMultitileObjectConflictMarksWholeGroup);
+            Run("blueprint projection explicit object group overrides style heuristic", ref failed, BlueprintProjectionExplicitObjectGroupOverridesStyleHeuristic);
             Run("blueprint projection UI overlay and diagnostics contracts", ref failed, BlueprintProjectionUiOverlayAndDiagnosticsContracts);
             Run("blueprint materials count only missing effective projection layers", ref failed, BlueprintMaterialsCountOnlyMissingEffectiveProjectionLayers);
             Run("blueprint materials ignore air-only template bounds", ref failed, BlueprintMaterialsIgnoreAirOnlyTemplateBounds);
@@ -1204,6 +1217,7 @@ namespace JueMingZ.Tests
             Run("blueprint auto placement candidates sort and skip unsafe layers", ref failed, BlueprintAutoPlacementCandidatesSortAndSkipUnsafeLayers);
             Run("blueprint auto placement stage 14 supports furniture track actuator and skips wire", ref failed, BlueprintAutoPlacementStage14SupportsFurnitureTrackActuatorAndSkipsWire);
             Run("blueprint auto placement skips whole multitile object when any cell conflicts", ref failed, BlueprintAutoPlacementSkipsWholeMultitileObjectWhenAnyCellConflicts);
+            Run("blueprint auto placement explicit object group conflict skips representative", ref failed, BlueprintAutoPlacementExplicitObjectGroupConflictSkipsRepresentative);
             Run("blueprint auto placement submits ActionQueue and verifies placement", ref failed, BlueprintAutoPlacementSubmitsActionQueueAndVerifiesPlacement);
             Run("blueprint auto placement refreshes wall frames after verified wall use", ref failed, BlueprintAutoPlacementRefreshesWallFramesAfterVerifiedWallUse);
             Run("blueprint auto placement skips wall frame refresh when WallType is missing", ref failed, BlueprintAutoPlacementDoesNotRefreshWallFramesWhenWallTypeMissing);
@@ -1218,6 +1232,7 @@ namespace JueMingZ.Tests
             Run("blueprint feedback stage 11 regression diagnostics contracts stay wired", ref failed, BlueprintFeedbackStage11RegressionDiagnosticsContractsStayWired);
             Run("blueprint wall object stage 06 regression diagnostics contracts stay wired", ref failed, BlueprintWallObjectStage06RegressionDiagnosticsContractsStayWired);
             Run("blueprint projection rebuild stage 06 regression audit contracts stay wired", ref failed, BlueprintProjectionRebuildStage06RegressionAuditContractsStayWired);
+            Run("blueprint furniture save placement regression contracts stay wired", ref failed, BlueprintFurnitureSavePlacementRegressionContractsStayWired);
             Run("blueprint wall continuity stage 05 regression diagnostics contracts stay wired", ref failed, BlueprintWallContinuityStage05RegressionDiagnosticsContractsStayWired);
             Run("user notes tab keeps hotkeys page id and note icon", ref failed, UserNotesTabKeepsHotkeysPageIdAndUsesNoteIcon);
             Run("user notes layout uses two columns and caps card height", ref failed, UserNotesLayoutUsesTwoColumnsAndCapsCardHeight);

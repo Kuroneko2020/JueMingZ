@@ -303,7 +303,7 @@ namespace JueMingZ.UI
             return isWall ? drawWalls : drawForeground;
         }
 
-        private static int[] ResolveProjectionColor(string status)
+        internal static int[] ResolveProjectionColor(string status)
         {
             if (string.Equals(status, BlueprintProjectionLayerStatuses.Fulfilled, StringComparison.Ordinal))
             {
@@ -328,14 +328,14 @@ namespace JueMingZ.UI
             return new[] { 156, 164, 180 };
         }
 
-        private static bool ShouldDrawFallbackBlock(string status)
+        internal static bool ShouldDrawFallbackBlock(string status)
         {
             return !string.Equals(status, BlueprintProjectionLayerStatuses.Missing, StringComparison.Ordinal) &&
                    !string.Equals(status, BlueprintProjectionLayerStatuses.Fulfilled, StringComparison.Ordinal) &&
                    !string.Equals(status, BlueprintProjectionLayerStatuses.Completed, StringComparison.Ordinal);
         }
 
-        private static int ResolveProjectionFillAlpha(string status)
+        internal static int ResolveProjectionFillAlpha(string status)
         {
             if (string.Equals(status, BlueprintProjectionLayerStatuses.Fulfilled, StringComparison.Ordinal))
             {
@@ -360,7 +360,7 @@ namespace JueMingZ.UI
             return 118;
         }
 
-        private static int ResolveProjectionBorderAlpha(string status)
+        internal static int ResolveProjectionBorderAlpha(string status)
         {
             return 0;
         }

@@ -34,6 +34,7 @@ namespace JueMingZ.Tests
             "config"));
 
         private static string _processTestConfigDirectory;
+        private static bool _testTileObjectDataInitialized;
 
         private static void InstallProcessConfigDirectoryIsolation()
         {
@@ -49,6 +50,31 @@ namespace JueMingZ.Tests
             // before any test can call ConfigService.Initialize() or SaveAll().
             SetConfigDirectoryForTesting(root);
             _processTestConfigDirectory = root;
+        }
+
+        private static void InitializeTerrariaTileObjectDataForTests()
+        {
+            if (_testTileObjectDataInitialized)
+            {
+                return;
+            }
+
+            // Test process has no vanilla startup pass; initialize the table here
+            // so production code can keep fail-closed and never call this API.
+            var tileObjectDataType = Type.GetType("Terraria.ObjectData.TileObjectData, Terraria", false);
+            if (tileObjectDataType == null)
+            {
+                throw new InvalidOperationException("Terraria TileObjectData type missing from test runtime dependencies.");
+            }
+
+            var initialize = tileObjectDataType.GetMethod("Initialize", BindingFlags.Public | BindingFlags.Static);
+            if (initialize == null)
+            {
+                throw new InvalidOperationException("Terraria TileObjectData.Initialize test hook missing.");
+            }
+
+            initialize.Invoke(null, null);
+            _testTileObjectDataInitialized = true;
         }
 
         private static string ProcessTestConfigDirectory

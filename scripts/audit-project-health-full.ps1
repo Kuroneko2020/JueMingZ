@@ -13461,6 +13461,258 @@ function Test-BlueprintProjectionRebuildStage06RegressionAuditGovernance {
     ) -PassMessage "Blueprint projection rebuild stage 06 document history exists." -FailMessage "Blueprint projection rebuild stage 06 document history anchors drifted."
 }
 
+function Test-BlueprintFurnitureSavePlacementStage06RegressionAuditGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $auditText = Read-TextIfExists -Path (Join-Path $RepoRoot "scripts\audit-project-health-full.ps1")
+    if ($null -ne $auditText -and
+        $auditText.Contains("Test-BlueprintFurnitureSavePlacementStage06RegressionAuditGovernance -RepoRoot `$RepoRoot")) {
+        Write-Pass "Blueprint furniture save/placement stage 06 audit is wired into the scoped health audit."
+    }
+    else {
+        Write-FailHealth "Blueprint furniture save/placement stage 06 audit must be called by the Blueprint diagnostics scoped health audit."
+    }
+
+    $runtimeText = Read-TextIfExists -Path (Join-Path $RepoRoot "src\JueMingZ\Runtime\JueMingZRuntime.cs")
+    $csprojText = Read-TextIfExists -Path (Join-Path $RepoRoot "src\JueMingZ\JueMingZ.csproj")
+    if ($runtimeText -and
+        $csprojText -and
+        $csprojText.Contains("<InformationalVersion>") -and
+        $runtimeText.Contains("public const string Version = ")) {
+        Write-Pass "Blueprint furniture stage 06 keeps 0.1007 as archived evidence without pinning the current RuntimeVersion."
+    }
+    else {
+        Write-FailHealth "Blueprint furniture stage 06 audit requires current RuntimeVersion metadata to remain readable."
+    }
+
+    $furniturePlanDirectoryRelativePath = "文档\当前在做计划\蓝图多格家具保存与放置修复-2606301251"
+    if (-not (Test-Path -LiteralPath (Join-Path $RepoRoot $furniturePlanDirectoryRelativePath))) {
+        $furniturePlanDirectoryRelativePath = "文档\归档历史计划\蓝图多格家具保存与放置修复-2606301251"
+    }
+    $furniturePlan00RelativePath = Join-Path $furniturePlanDirectoryRelativePath "00-基准.md"
+    $furniturePlan06RelativePath = Join-Path $furniturePlanDirectoryRelativePath "06-回归诊断与审计防线.md"
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.BlueprintDiagnosticsTests.cs" -RequiredAnchors @(
+        "BlueprintFurnitureSavePlacementRegressionContractsStayWired",
+        "BlueprintCaptureSavesWhenRecognizableFurnitureIsPartiallySelected",
+        "BlueprintCaptureDoesNotRejectWholeBlueprintForRecoverableObjectIssue",
+        "BlueprintTemplateObjectGroupMetadataSurvivesCloneImportExport",
+        "BlueprintLegacyPartialFurnitureRepairOrDegradeIsExplicit",
+        "BlueprintPlacementPreviewMultitileObjectConflictMarksWholeGroup",
+        "BlueprintProjectionExplicitObjectGroupConflictMarksWholeFurniture",
+        "BlueprintAutoPlacementSkipsExplicitObjectGroupWhenAnyCellConflicts",
+        "foreground-original-ghost",
+        "multitile-object-group-conflict",
+        "yellow-missing",
+        "topmost"
+    ) -PassMessage "Blueprint furniture stage 06 aggregate regression covers save, group metadata, legacy repair/degrade, preview, projection, and auto-placement contracts." -FailMessage "Blueprint furniture stage 06 aggregate regression drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "tests\JueMingZ.Tests\Program.cs" -RequiredAnchors @(
+        "blueprint furniture save placement regression contracts stay wired"
+    ) -PassMessage "Blueprint furniture stage 06 aggregate regression is registered." -FailMessage "Blueprint furniture stage 06 aggregate regression registration drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "文档\项目规则\工程规则.md" -RequiredAnchors @(
+        "保护逻辑不得阉割正常功能",
+        "允许通过的正常路径",
+        "必须拒绝的异常条件",
+        "回归验证不能只证明异常路径被拒绝"
+    ) -PassMessage "Engineering rules keep the protection-does-not-disable-normal-function contract visible." -FailMessage "Engineering rules lost the protection-does-not-disable-normal-function contract."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "文档\功能介绍\蓝图页\蓝图.md" -RequiredAnchors @(
+        "0.1007-blueprint-furniture-regression-audit",
+        "BlueprintFurnitureSavePlacementRegressionContractsStayWired",
+        "Test-BlueprintFurnitureSavePlacementStage06RegressionAuditGovernance",
+        "多格家具硬口径",
+        "保护逻辑不得阉割正常功能",
+        "不生成测试包"
+    ) -PassMessage "Blueprint feature doc describes the furniture stage 06 regression and audit boundary." -FailMessage "Blueprint feature doc must describe the furniture stage 06 regression boundary."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "文档\项目规则\AI诊断日志说明.md" -RequiredAnchors @(
+        "0.1007-blueprint-furniture-regression-audit",
+        "BlueprintFurnitureSavePlacementRegressionContractsStayWired",
+        "Test-BlueprintFurnitureSavePlacementStage06RegressionAuditGovernance",
+        "不新增 runtime snapshot 字段",
+        '不改变 `Blueprint.AutoPlace` action event schema',
+        "本地验证不等于用户实机验收"
+    ) -PassMessage "Blueprint diagnostics doc keeps the stage 06 evidence and no-new-diagnostics boundary visible." -FailMessage "Blueprint diagnostics doc must describe the furniture stage 06 evidence boundary."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath $furniturePlan00RelativePath -RequiredAnchors @(
+        '06-回归诊断与审计防线.md`：已完成',
+        "0.1007-blueprint-furniture-regression-audit",
+        "BlueprintFurnitureSavePlacementRegressionContractsStayWired",
+        "Test-BlueprintFurnitureSavePlacementStage06RegressionAuditGovernance"
+    ) -PassMessage "Blueprint furniture plan baseline records stage 06 completion." -FailMessage "Blueprint furniture plan baseline must record stage 06 completion."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath $furniturePlan06RelativePath -RequiredAnchors @(
+        "阶段状态：已完成",
+        "BlueprintFurnitureSavePlacementRegressionContractsStayWired",
+        "Test-BlueprintFurnitureSavePlacementStage06RegressionAuditGovernance",
+        "不生成测试包",
+        "未改自动放置 executor、ActionQueue admission、真实世界 Tile / Wall / object 写入、背包、玩家、NPC、网络或多人状态",
+        '下一唯一入口：`07-验证打包与归档收口.md`'
+    ) -PassMessage "Blueprint furniture stage 06 plan records completion, audit, and no-package boundaries." -FailMessage "Blueprint furniture stage 06 plan anchors drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "文档\更新记录\0.1007-蓝图家具回归审计-2606301538.md" -RequiredAnchors @(
+        "0.1007-blueprint-furniture-regression-audit",
+        "BlueprintFurnitureSavePlacementRegressionContractsStayWired",
+        "Test-BlueprintFurnitureSavePlacementStage06RegressionAuditGovernance",
+        "不生成测试包",
+        "未改自动放置 executor、ActionQueue admission、真实世界 Tile / Wall / object 写入、背包、玩家、NPC、网络或多人状态"
+    ) -PassMessage "Blueprint furniture stage 06 update record exists." -FailMessage "Blueprint furniture stage 06 update record anchors drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "文档\更新记录\索引.md" -RequiredAnchors @(
+        "0.1007-蓝图家具回归审计-2606301538.md",
+        "BlueprintFurnitureSavePlacementRegressionContractsStayWired",
+        '下一唯一入口为 `07-验证打包与归档收口.md`'
+    ) -PassMessage "Blueprint furniture stage 06 update index entry exists." -FailMessage "Blueprint furniture stage 06 update index entry drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "文档\文档更改历史\蓝图家具回归审计-2606301538.md" -RequiredAnchors @(
+        "BlueprintFurnitureSavePlacementRegressionContractsStayWired",
+        "Test-BlueprintFurnitureSavePlacementStage06RegressionAuditGovernance",
+        "不生成测试包"
+    ) -PassMessage "Blueprint furniture stage 06 document history exists." -FailMessage "Blueprint furniture stage 06 document history anchors drifted."
+
+    Test-CurrentContractAnchors -RepoRoot $RepoRoot -RelativePath "文档\文档更改历史\索引.md" -RequiredAnchors @(
+        "蓝图家具回归审计-2606301538.md",
+        "BlueprintFurnitureSavePlacementRegressionContractsStayWired",
+        "Test-BlueprintFurnitureSavePlacementStage06RegressionAuditGovernance"
+    ) -PassMessage "Blueprint furniture stage 06 document history index entry exists." -FailMessage "Blueprint furniture stage 06 document history index entry drifted."
+}
+
+function Test-BlueprintFurnitureSavePlacementStage07CloseoutGovernance {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $csprojPath = Join-Path $RepoRoot "src\JueMingZ\JueMingZ.csproj"
+    $runtimePath = Join-Path $RepoRoot "src\JueMingZ\Runtime\JueMingZRuntime.cs"
+    $currentPlanDirectory = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "蓝图多格家具保存与放置修复-2606301251")
+    $archivePlanDirectory = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图多格家具保存与放置修复-2606301251")
+    $plan00Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图多格家具保存与放置修复-2606301251", "00-基准.md")
+    $plan07Path = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "蓝图多格家具保存与放置修复-2606301251", "07-验证打包与归档收口.md")
+    $currentPlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("当前在做计划", "索引.md")
+    $archivePlanIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("归档历史计划", "索引.md")
+    $functionDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("功能介绍", "蓝图页", "蓝图.md")
+    $diagnosticsDocPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("项目规则", "AI诊断日志说明.md")
+    $updateIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "索引.md")
+    $updateRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("更新记录", "0.1008-蓝图家具验证收口-2606301556.md")
+    $docHistoryIndexPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "索引.md")
+    $docHistoryRecordPath = Join-LocalDocsPath -RepoRoot $RepoRoot -Segments @("文档更改历史", "蓝图家具验证收口-2606301556.md")
+    $auditText = Read-TextIfExists -Path (Join-Path $RepoRoot "scripts\audit-project-health-full.ps1")
+
+    $csprojText = Read-TextIfExists -Path $csprojPath
+    $runtimeText = Read-TextIfExists -Path $runtimePath
+    $plan00Text = Read-TextIfExists -Path $plan00Path
+    $plan07Text = Read-TextIfExists -Path $plan07Path
+    $currentPlanIndexText = Read-TextIfExists -Path $currentPlanIndexPath
+    $archivePlanIndexText = Read-TextIfExists -Path $archivePlanIndexPath
+    $functionDocText = Read-TextIfExists -Path $functionDocPath
+    $diagnosticsDocText = Read-TextIfExists -Path $diagnosticsDocPath
+    $updateIndexText = Read-TextIfExists -Path $updateIndexPath
+    $updateRecordText = Read-TextIfExists -Path $updateRecordPath
+    $docHistoryIndexText = Read-TextIfExists -Path $docHistoryIndexPath
+    $docHistoryRecordText = Read-TextIfExists -Path $docHistoryRecordPath
+
+    if (Test-BlueprintPlacementVersionMetadata -RuntimeText $runtimeText -CsprojText $csprojText -AllowedRuntimeVersions @("0.1008-blueprint-furniture-closeout", "0.1009-blueprint-tileobjectdata-startup-fix")) {
+        Write-Pass "Blueprint furniture closeout/follow-up version metadata is current."
+    }
+    else {
+        Write-FailHealth "Blueprint furniture closeout/follow-up must keep RuntimeVersion and project metadata at 0.1008 or the 0.1009 TileObjectData startup fix."
+    }
+
+    if ((Test-Path -LiteralPath $archivePlanDirectory) -and
+        -not (Test-Path -LiteralPath $currentPlanDirectory) -and
+        $plan00Text -and
+        $plan00Text.Contains("07-验证打包与归档收口") -and
+        $plan00Text.Contains("0.1008-blueprint-furniture-closeout") -and
+        $plan00Text.Contains("Test-BlueprintFurnitureSavePlacementStage07CloseoutGovernance") -and
+        $plan07Text -and
+        $plan07Text.Contains("阶段状态：已完成") -and
+        $plan07Text.Contains("0.1008-blueprint-furniture-closeout") -and
+        $plan07Text.Contains("JueMingZ-TestPackage") -and
+        $plan07Text.Contains("-RequireFreshTestPackage") -and
+        $plan07Text.Contains("未生成源码包") -and
+        $plan07Text.Contains("不新增玩家可见功能") -and
+        $plan07Text.Contains("不新增 runtime snapshot 字段")) {
+        Write-Pass "Blueprint furniture plan is archived with stage 07 package delivery and strict freshness audit recorded."
+    }
+    else {
+        Write-FailHealth "Blueprint furniture stage 07 must archive the plan and mark 00/07 complete with package, strict freshness audit, no source package, no-new-feature, and no-new-diagnostics scope."
+    }
+
+    if ($currentPlanIndexText -and
+        $currentPlanIndexText.Contains("当前没有正在推进的计划") -and
+        $currentPlanIndexText.Contains("文档/归档历史计划/蓝图多格家具保存与放置修复-2606301251/") -and
+        $currentPlanIndexText.Contains("0.1008-blueprint-furniture-closeout") -and
+        $archivePlanIndexText -and
+        $archivePlanIndexText.Contains("文档/归档历史计划/蓝图多格家具保存与放置修复-2606301251/") -and
+        $archivePlanIndexText.Contains("0.1008-blueprint-furniture-closeout") -and
+        $archivePlanIndexText.Contains("JueMingZ-TestPackage")) {
+        Write-Pass "Blueprint furniture current and archive plan indexes record the stage 07 closeout."
+    }
+    else {
+        Write-FailHealth "Blueprint furniture stage 07 must remove the plan from current work and add the 0.1008 archived closeout summary."
+    }
+
+    if ($functionDocText -and
+        $functionDocText.Contains("0.1008-blueprint-furniture-closeout") -and
+        $functionDocText.Contains("文档/归档历史计划/蓝图多格家具保存与放置修复-2606301251/00-基准.md") -and
+        $functionDocText.Contains("Test-BlueprintFurnitureSavePlacementStage07CloseoutGovernance") -and
+        $functionDocText.Contains("JueMingZ-TestPackage") -and
+        $diagnosticsDocText -and
+        $diagnosticsDocText.Contains("0.1008-blueprint-furniture-closeout") -and
+        $diagnosticsDocText.Contains("不新增 runtime snapshot 字段") -and
+        $diagnosticsDocText.Contains("不新增 trace JSONL") -and
+        $diagnosticsDocText.Contains("Test-BlueprintFurnitureSavePlacementStage07CloseoutGovernance")) {
+        Write-Pass "Blueprint feature and diagnostics docs record the 0.1008 closeout without expanding runtime or diagnostics scope."
+    }
+    else {
+        Write-FailHealth "Blueprint furniture stage 07 must update blueprint feature and diagnostics docs with package closeout and no-new-diagnostics scope."
+    }
+
+    if ($updateIndexText -and
+        $updateIndexText.Contains("0.1008-蓝图家具验证收口-2606301556.md") -and
+        $updateRecordText -and
+        $updateRecordText.Contains('RuntimeVersion：`0.1008-blueprint-furniture-closeout`') -and
+        $updateRecordText.Contains("JueMingZ-TestPackage") -and
+        $updateRecordText.Contains("-RequireFreshTestPackage") -and
+        $updateRecordText.Contains("未生成源码包") -and
+        $docHistoryIndexText -and
+        $docHistoryIndexText.Contains("蓝图家具验证收口-2606301556.md") -and
+        $docHistoryRecordText -and
+        $docHistoryRecordText.Contains("0.1008-blueprint-furniture-closeout") -and
+        $docHistoryRecordText.Contains("07-验证打包与归档收口")) {
+        Write-Pass "Blueprint furniture stage 07 update record and document-change history are synchronized."
+    }
+    else {
+        Write-FailHealth "Blueprint furniture stage 07 must synchronize update index/record and document-change history for the 0.1008 closeout."
+    }
+
+    if ($auditText -and
+        $auditText.Contains("Test-BlueprintFurnitureSavePlacementStage07CloseoutGovernance -RepoRoot `$RepoRoot")) {
+        Write-Pass "Blueprint furniture stage 07 closeout audit is wired into the scoped health audit."
+    }
+    else {
+        Write-FailHealth "Blueprint scoped health audit must include Test-BlueprintFurnitureSavePlacementStage07CloseoutGovernance and archived-plan path resolution."
+    }
+
+    $srcRoot = Join-Path $RepoRoot "src\JueMingZ"
+    $tileObjectDataInitializeMatches = @()
+    if (Test-Path -LiteralPath $srcRoot) {
+        foreach ($file in Get-ChildItem -LiteralPath $srcRoot -Recurse -Filter "*.cs" -File) {
+            $matches = Select-String -LiteralPath $file.FullName -Pattern "TileObjectData\.Initialize\s*\(" -ErrorAction SilentlyContinue
+            if ($null -ne $matches) {
+                $tileObjectDataInitializeMatches += @($matches)
+            }
+        }
+    }
+
+    if (@($tileObjectDataInitializeMatches).Count -eq 0) {
+        Write-Pass "Blueprint production code does not call Terraria TileObjectData.Initialize."
+    }
+    else {
+        Write-FailHealth "Production code must not call TileObjectData.Initialize; Terraria owns that startup-only writer."
+    }
+}
+
 function Test-BlueprintProjectionRebuildStage07CloseoutGovernance {
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
 
@@ -13495,13 +13747,12 @@ function Test-BlueprintProjectionRebuildStage07CloseoutGovernance {
 
     if ($csprojText -and
         $runtimeText -and
-        $csprojText.Contains("<Version>0.1002</Version>") -and
-        $csprojText.Contains("<InformationalVersion>0.1002-blueprint-projection-rebuild-closeout</InformationalVersion>") -and
-        $runtimeText.Contains('public const string Version = "0.1002-blueprint-projection-rebuild-closeout";')) {
-        Write-Pass "Blueprint projection rebuild closeout version metadata is 0.1002."
+        $csprojText.Contains("<InformationalVersion>") -and
+        $runtimeText.Contains("public const string Version = ")) {
+        Write-Pass "Blueprint projection rebuild closeout keeps 0.1002 as archived evidence without pinning the current RuntimeVersion."
     }
     else {
-        Write-FailHealth "Blueprint projection rebuild closeout must keep RuntimeVersion and project metadata at 0.1002-blueprint-projection-rebuild-closeout."
+        Write-FailHealth "Blueprint projection rebuild closeout audit requires current RuntimeVersion metadata to remain readable."
     }
 
     if ((Test-Path -LiteralPath $archivePlanDirectory) -and
@@ -14062,6 +14313,8 @@ function Invoke-GovernanceAudit {
         Test-BlueprintCurrentDiagnosticsGovernance -RepoRoot $RepoRoot
         Test-BlueprintWallObjectStage06RegressionDiagnosticsGovernance -RepoRoot $RepoRoot
         Test-BlueprintProjectionRebuildStage06RegressionAuditGovernance -RepoRoot $RepoRoot
+        Test-BlueprintFurnitureSavePlacementStage06RegressionAuditGovernance -RepoRoot $RepoRoot
+        Test-BlueprintFurnitureSavePlacementStage07CloseoutGovernance -RepoRoot $RepoRoot
         Test-BlueprintProjectionRebuildStage07CloseoutGovernance -RepoRoot $RepoRoot
         Test-BlueprintWallObjectStage07CloseoutGovernance -RepoRoot $RepoRoot
         Test-BlueprintWallFrameRefreshStage03Governance -RepoRoot $RepoRoot
